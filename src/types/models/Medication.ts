@@ -40,7 +40,8 @@ export interface DosageInfo {
   amount: number;
   unit: DosageUnit;
   frequency: DosageFrequency;
-  condition: DosageCondition;
+  condition?: DosageCondition;  // Made optional for backward compatibility
+  timings?: string[];  // New field for multiple timing selections
   startDate?: Date;
   discontinueDate?: Date;
   prescribingDoctor?: string;

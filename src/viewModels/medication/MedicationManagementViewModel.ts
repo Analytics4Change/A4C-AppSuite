@@ -28,7 +28,7 @@ export class MedicationManagementViewModel {
   inventoryQuantity = '';
   inventoryUnit = '';
   frequency = '';
-  condition = '';
+  selectedTimings: string[] = [];  // Changed from single condition to multiple timings
   startDate: Date | null = null;
   discontinueDate: Date | null = null;
   prescribingDoctor = '';
@@ -47,7 +47,6 @@ export class MedicationManagementViewModel {
   showFormDropdown = false;
   showDosageUnitDropdown = false;
   showFrequencyDropdown = false;
-  showConditionDropdown = false;
   
   errors: Map<string, string> = new Map();
   
@@ -96,7 +95,7 @@ export class MedicationManagementViewModel {
       this.inventoryQuantity &&
       this.inventoryUnit &&
       this.frequency &&
-      this.condition &&
+      this.selectedTimings.length > 0 &&
       this.errors.size === 0
     );
   }
@@ -165,7 +164,7 @@ export class MedicationManagementViewModel {
       this.inventoryQuantity = '';
       this.inventoryUnit = '';
       this.frequency = '';
-      this.condition = '';
+      this.selectedTimings = [];
       this.startDate = null;
       this.discontinueDate = null;
       this.prescribingDoctor = '';
@@ -182,7 +181,6 @@ export class MedicationManagementViewModel {
       this.showFormDropdown = false;
       this.showDosageUnitDropdown = false;
       this.showFrequencyDropdown = false;
-      this.showConditionDropdown = false;
       
       // Clear errors
       this.errors.clear();
@@ -250,12 +248,11 @@ export class MedicationManagementViewModel {
     this.validation.clearError('frequency');
   }
 
-  setCondition(cond: string) {
+  setSelectedTimings(timings: string[]) {
     runInAction(() => {
-      this.condition = cond;
-      this.showConditionDropdown = false;
+      this.selectedTimings = timings;
     });
-    this.validation.clearError('condition');
+    this.validation.clearError('dosageTimings');
   }
 
   setStartDate(date: Date | null) {
@@ -353,7 +350,7 @@ export class MedicationManagementViewModel {
       amount: parseFloat(this.dosageAmount),
       unit: this.dosageUnit as DosageUnit,
       frequency: this.frequency as any,
-      condition: this.condition as any,
+      timings: this.selectedTimings,  // Now sending array of timings
       startDate: this.startDate || undefined,
       discontinueDate: this.discontinueDate || undefined,
       prescribingDoctor: this.prescribingDoctor || undefined,
@@ -386,7 +383,7 @@ export class MedicationManagementViewModel {
     this.inventoryQuantity = '';
     this.inventoryUnit = '';
     this.frequency = '';
-    this.condition = '';
+    this.selectedTimings = [];
     this.startDate = null;
     this.discontinueDate = null;
     this.prescribingDoctor = '';
@@ -406,6 +403,5 @@ export class MedicationManagementViewModel {
     this.showFormDropdown = false;
     this.showDosageUnitDropdown = false;
     this.showFrequencyDropdown = false;
-    this.showConditionDropdown = false;
   }
 }

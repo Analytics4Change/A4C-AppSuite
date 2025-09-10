@@ -2,7 +2,7 @@ import React from 'react';
 import { observer } from 'mobx-react-lite';
 import { DosageFormInputsEditable } from './DosageFormInputsEditable';
 import { DosageFrequencyInput } from './DosageFrequencyInput';
-import { DosageConditionInput } from './DosageConditionInput';
+import { DosageTimingsInput } from './DosageTimingsInput';
 
 interface DosageFormProps {
   dosageForm: string;  // Broad category (Solid, Liquid, etc.)
@@ -10,7 +10,7 @@ interface DosageFormProps {
   dosageAmount: string;
   dosageUnit: string;
   frequency: string;
-  condition: string;
+  selectedTimings: string[];  // Changed from single condition to multiple timings
   availableDosageRoutes: string[];
   availableDosageUnits: string[];
   errors: Map<string, string>;
@@ -19,7 +19,7 @@ interface DosageFormProps {
   onDosageAmountChange: (amount: string) => void;
   onDosageUnitChange: (dosageUnit: string) => void;
   onFrequencyChange: (freq: string) => void;
-  onConditionChange: (cond: string) => void;
+  onTimingsChange: (timings: string[]) => void;  // Changed to handle multiple selections
   onDropdownOpen?: (elementId: string) => void;
 }
 
@@ -30,7 +30,7 @@ export const DosageFormEditable = observer((props: DosageFormProps) => {
     dosageAmount,
     dosageUnit,
     frequency,
-    condition,
+    selectedTimings,
     availableDosageRoutes,
     availableDosageUnits,
     errors,
@@ -39,7 +39,7 @@ export const DosageFormEditable = observer((props: DosageFormProps) => {
     onDosageAmountChange,
     onDosageUnitChange,
     onFrequencyChange,
-    onConditionChange,
+    onTimingsChange,
     onDropdownOpen
   } = props;
 
@@ -61,7 +61,7 @@ export const DosageFormEditable = observer((props: DosageFormProps) => {
         onDropdownOpen={onDropdownOpen}
       />
 
-      {/* Dosage Frequency and Condition Inputs */}
+      {/* Dosage Frequency Input */}
       <div className="grid grid-cols-2 gap-6">
         <DosageFrequencyInput
           frequency={frequency}
@@ -69,12 +69,15 @@ export const DosageFormEditable = observer((props: DosageFormProps) => {
           onFrequencyChange={onFrequencyChange}
           onDropdownOpen={onDropdownOpen}
         />
-        <DosageConditionInput
-          condition={condition}
-          onConditionChange={onConditionChange}
-          onDropdownOpen={onDropdownOpen}
-        />
+        <div /> {/* Empty cell for grid alignment */}
       </div>
+
+      {/* Dosage Timings - Full width with focus trap */}
+      <DosageTimingsInput
+        selectedTimings={selectedTimings}
+        onTimingsChange={onTimingsChange}
+        errors={errors}
+      />
     </div>
   );
 });

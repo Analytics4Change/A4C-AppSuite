@@ -284,7 +284,7 @@ export const MedicationManagementPage = observer(() => {
                   dosageAmount={vm.dosageAmount}
                   dosageUnit={vm.dosageUnit}
                   frequency={vm.frequency}
-                  condition={vm.condition}
+                  selectedTimings={vm.selectedTimings}
                   availableDosageRoutes={vm.availableDosageRoutes}
                   availableDosageUnits={vm.availableDosageUnits}
                   errors={vm.errors}
@@ -293,7 +293,7 @@ export const MedicationManagementPage = observer(() => {
                   onDosageAmountChange={(amount) => vm.updateDosageAmount(amount)}
                   onDosageUnitChange={(dosageUnit) => vm.setDosageUnit(dosageUnit)}
                   onFrequencyChange={(freq) => vm.setFrequency(freq)}
-                  onConditionChange={(cond) => vm.setCondition(cond)}
+                  onTimingsChange={(timings) => vm.setSelectedTimings(timings)}
                   onDropdownOpen={() => {}}
                 />
               </div>
