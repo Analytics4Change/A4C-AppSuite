@@ -34,8 +34,9 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
 }) => {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const [focusedElement, setFocusedElement] = useState(0);
+  const [focusedCheckboxIndex, setFocusedCheckboxIndex] = useState(0);
   const [focusedCheckboxId, setFocusedCheckboxId] = useState<string | null>(null);
-  const [additionalData] = useState(new Map<string, any>());
+  const [additionalData, setAdditionalData] = useState(new Map<string, any>());
   
   const containerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLButtonElement>(null);
@@ -60,7 +61,11 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
     
     // Clear additional data if unchecked
     if (!checked) {
-      additionalData.delete(checkboxId);
+      setAdditionalData(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(checkboxId);
+        return newMap;
+      });
       if (onAdditionalDataChange) {
         onAdditionalDataChange(checkboxId, null);
       }
@@ -71,15 +76,25 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
         setFocusedCheckboxId(checkboxId);
       }
     }
-  }, [checkboxes, onSelectionChange, onAdditionalDataChange, additionalData]);
+  }, [checkboxes, onSelectionChange, onAdditionalDataChange]);
   
-  // Handle additional data change
+  // Handle additional data change with immutable updates
   const handleAdditionalDataChange = useCallback((checkboxId: string, data: any) => {
-    additionalData.set(checkboxId, data);
+    // Use immutable update to trigger re-render
+    setAdditionalData(prev => {
+      const newMap = new Map(prev);
+      if (data === null || data === undefined) {
+        newMap.delete(checkboxId);
+      } else {
+        newMap.set(checkboxId, data);
+      }
+      return newMap; // Return new Map instance for React to detect change
+    });
+    
     if (onAdditionalDataChange) {
       onAdditionalDataChange(checkboxId, data);
     }
-  }, [onAdditionalDataChange, additionalData]);
+  }, [onAdditionalDataChange]);
   
   // Handle continue action
   const handleContinue = useCallback(() => {
@@ -104,38 +119,60 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!isExpanded) return;
     
+    // Tab key - moves between sections only
     if (e.key === 'Tab') {
       e.preventDefault();
-      const focusableCount = getFocusableCount();
-      const nextFocus = e.shiftKey ? 
-        (focusedElement - 1 + focusableCount) % focusableCount :
-        (focusedElement + 1) % focusableCount;
+      // 0: checkbox group, 1: cancel, 2: continue
+      const sectionCount = 3;
+      const nextSection = e.shiftKey ? 
+        (focusedElement - 1 + sectionCount) % sectionCount :
+        (focusedElement + 1) % sectionCount;
       
-      setFocusedElement(nextFocus);
+      setFocusedElement(nextSection);
       
-      // Focus the appropriate element
-      if (nextFocus === 0) {
-        // Focus first checkbox or checkbox section
-        const firstCheckbox = containerRef.current?.querySelector('input[type="checkbox"]') as HTMLElement;
-        firstCheckbox?.focus();
-      } else if (nextFocus === focusableCount - 2) {
-        cancelButtonRef.current?.focus();
-      } else if (nextFocus === focusableCount - 1) {
-        continueButtonRef.current?.focus();
-      } else {
-        // Focus on dynamic input field
-        const dynamicInputs = containerRef.current?.querySelectorAll('.additional-input-container input, .additional-input-container select');
-        const inputIndex = nextFocus - 1;
-        if (dynamicInputs && inputIndex < dynamicInputs.length) {
-          (dynamicInputs[inputIndex] as HTMLElement)?.focus();
+      if (nextSection === 0) {
+        // Focus the currently selected checkbox
+        const checkboxElements = containerRef.current?.querySelectorAll('input[type="checkbox"]');
+        if (checkboxElements && checkboxElements[focusedCheckboxIndex]) {
+          (checkboxElements[focusedCheckboxIndex] as HTMLElement).focus();
         }
+      } else if (nextSection === 1) {
+        cancelButtonRef.current?.focus();
+      } else if (nextSection === 2) {
+        continueButtonRef.current?.focus();
       }
-    } else if (e.key === 'Escape') {
+    }
+    
+    // Arrow keys - navigate within checkboxes when focused on checkbox group
+    else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && focusedElement === 0) {
+      e.preventDefault();
+      const direction = e.key === 'ArrowDown' ? 1 : -1;
+      const newIndex = (focusedCheckboxIndex + direction + checkboxes.length) % checkboxes.length;
+      setFocusedCheckboxIndex(newIndex);
+      
+      // Focus the checkbox at new index
+      const checkboxElements = containerRef.current?.querySelectorAll('input[type="checkbox"]');
+      if (checkboxElements && checkboxElements[newIndex]) {
+        (checkboxElements[newIndex] as HTMLElement).focus();
+      }
+    }
+    
+    // Space key - toggle checkbox when in checkbox group
+    else if (e.key === ' ' && focusedElement === 0) {
+      e.preventDefault();
+      const checkbox = checkboxes[focusedCheckboxIndex];
+      if (checkbox && !checkbox.disabled) {
+        handleCheckboxChange(checkbox.id, !checkbox.checked);
+      }
+    }
+    
+    // Escape key
+    else if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
       handleCancel();
     }
-  }, [isExpanded, focusedElement, getFocusableCount, handleCancel]);
+  }, [isExpanded, focusedElement, focusedCheckboxIndex, checkboxes, handleCheckboxChange, handleCancel]);
   
   // Handle header focus to expand
   const handleHeaderFocus = useCallback(() => {
@@ -154,9 +191,12 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   // Focus management when expanding
   useEffect(() => {
     if (isExpanded && containerRef.current) {
-      const firstCheckbox = containerRef.current.querySelector('input[type="checkbox"]') as HTMLElement;
-      firstCheckbox?.focus();
+      const checkboxElements = containerRef.current.querySelectorAll('input[type="checkbox"]');
+      if (checkboxElements && checkboxElements[0]) {
+        (checkboxElements[0] as HTMLElement).focus();
+      }
       setFocusedElement(0);
+      setFocusedCheckboxIndex(0);
     }
   }, [isExpanded]);
   
@@ -223,7 +263,8 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
                     checked={checkbox.checked}
                     disabled={checkbox.disabled}
                     onCheckedChange={(checked) => handleCheckboxChange(checkbox.id, checked as boolean)}
-                    tabIndex={focusedElement === 0 ? 0 : -1}
+                    tabIndex={focusedElement === 0 && index === focusedCheckboxIndex ? 0 : -1}
+                    onFocus={() => setFocusedCheckboxIndex(index)}
                     aria-label={checkbox.label}
                     aria-describedby={checkbox.description ? `${checkbox.id}-desc` : undefined}
                   />
