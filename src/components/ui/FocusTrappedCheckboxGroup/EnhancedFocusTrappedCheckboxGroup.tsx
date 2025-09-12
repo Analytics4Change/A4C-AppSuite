@@ -38,6 +38,9 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   const [focusedCheckboxId, setFocusedCheckboxId] = useState<string | null>(null);
   const [additionalData, setAdditionalData] = useState(new Map<string, any>());
   
+  // Track which logical region has focus for proper keyboard handling
+  const [focusRegion, setFocusRegion] = useState<'header' | 'checkbox' | 'input' | 'button'>('header');
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLButtonElement>(null);
   const checkboxRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -119,7 +122,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!isExpanded) return;
     
-    // Tab key - moves between sections only
+    // Tab key - always handle for focus trap
     if (e.key === 'Tab') {
       e.preventDefault();
       // 0: checkbox group, 1: cancel, 2: continue
@@ -143,39 +146,45 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
       }
     }
     
-    // Arrow keys - navigate within checkboxes when focused on checkbox group
-    else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && focusedElement === 0) {
-      e.preventDefault();
-      const direction = e.key === 'ArrowDown' ? 1 : -1;
-      const newIndex = (focusedCheckboxIndex + direction + checkboxes.length) % checkboxes.length;
-      setFocusedCheckboxIndex(newIndex);
-      
-      // Focus the checkbox at new index
-      const checkboxElements = containerRef.current?.querySelectorAll('[role="checkbox"]');
-      if (checkboxElements && checkboxElements[newIndex]) {
-        (checkboxElements[newIndex] as HTMLElement).focus();
-      }
-    }
-    
-    // Space key - toggle checkbox when in checkbox group
-    else if (e.key === ' ' && focusedElement === 0) {
-      e.preventDefault();
-      const checkbox = checkboxes[focusedCheckboxIndex];
-      if (checkbox && !checkbox.disabled) {
-        handleCheckboxChange(checkbox.id, !checkbox.checked);
-      }
-    }
-    
-    // Escape key
+    // Escape key - always handle for modal behavior
     else if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
       handleCancel();
     }
-  }, [isExpanded, focusedElement, focusedCheckboxIndex, checkboxes, handleCheckboxChange, handleCancel]);
+    
+    // Handle keyboard events based on which region has focus
+    else if (focusRegion === 'checkbox') {
+      // Arrow keys - navigate between checkboxes
+      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && focusedElement === 0) {
+        e.preventDefault();
+        const direction = e.key === 'ArrowDown' ? 1 : -1;
+        const newIndex = (focusedCheckboxIndex + direction + checkboxes.length) % checkboxes.length;
+        setFocusedCheckboxIndex(newIndex);
+        
+        // Focus the checkbox at new index
+        const checkboxElements = containerRef.current?.querySelectorAll('[role="checkbox"]');
+        if (checkboxElements && checkboxElements[newIndex]) {
+          (checkboxElements[newIndex] as HTMLElement).focus();
+        }
+      }
+      
+      // Space key - toggle checkbox
+      else if (e.key === ' ' && focusedElement === 0) {
+        e.preventDefault();
+        const checkbox = checkboxes[focusedCheckboxIndex];
+        if (checkbox && !checkbox.disabled) {
+          handleCheckboxChange(checkbox.id, !checkbox.checked);
+        }
+      }
+    }
+    // When focus is in input region, let native behavior handle everything except Tab/Escape
+    // When focus is in button or header regions, standard behavior applies
+  }, [isExpanded, focusedElement, focusedCheckboxIndex, checkboxes, handleCheckboxChange, handleCancel, focusRegion]);
   
   // Handle header focus to expand
   const handleHeaderFocus = useCallback(() => {
+    setFocusRegion('header');
     if (!isExpanded && isCollapsible) {
       setIsExpanded(true);
     }
@@ -198,6 +207,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
           (checkboxElements[0] as HTMLElement).focus();
           setFocusedElement(0);
           setFocusedCheckboxIndex(0);
+          setFocusRegion('checkbox'); // Set region when auto-focusing first checkbox
         }
       });
     }
@@ -234,6 +244,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
                 (checkboxElements[0] as HTMLElement).focus();
                 setFocusedElement(0);
                 setFocusedCheckboxIndex(0);
+                setFocusRegion('checkbox');
               }
             });
           }
@@ -243,7 +254,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
         aria-expanded={isExpanded}
         aria-controls={`${id}-content`}
       >
-        <span className="text-lg font-medium">{title}</span>
+        <span className="text-base font-medium">{title}</span>
         {isCollapsible && (
           isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />
         )}
@@ -285,7 +296,10 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
                     disabled={checkbox.disabled}
                     onCheckedChange={(checked) => handleCheckboxChange(checkbox.id, checked as boolean)}
                     tabIndex={focusedElement === 0 && index === focusedCheckboxIndex ? 0 : -1}
-                    onFocus={() => setFocusedCheckboxIndex(index)}
+                    onFocus={() => {
+                      setFocusedCheckboxIndex(index);
+                      setFocusRegion('checkbox');
+                    }}
                     aria-label={checkbox.label}
                     aria-describedby={checkbox.description ? `${checkbox.id}-desc` : undefined}
                   />
@@ -309,6 +323,8 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
                     tabIndexBase={-1} // Managed by focus trap
                     shouldFocus={focusedCheckboxId === checkbox.id}
                     onFocusHandled={() => setFocusedCheckboxId(null)}
+                    onInputFocus={() => setFocusRegion('input')}
+                    onInputBlur={() => setFocusRegion('checkbox')}
                   />
                 )}
               </div>
@@ -321,6 +337,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
               ref={cancelButtonRef}
               variant="outline"
               onClick={handleCancel}
+              onFocus={() => setFocusRegion('button')}
               tabIndex={-1}
               className="min-w-[100px]"
             >
@@ -330,6 +347,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
               ref={continueButtonRef}
               variant="default"
               onClick={handleContinue}
+              onFocus={() => setFocusRegion('button')}
               tabIndex={-1}
               className="min-w-[100px]"
               disabled={checkboxes.filter(cb => cb.checked).length === 0}

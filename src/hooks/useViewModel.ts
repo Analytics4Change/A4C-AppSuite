@@ -1,14 +1,27 @@
 import { useMemo } from 'react';
+import { IMedicationApi } from '@/services/api/interfaces/IMedicationApi';
 import { MockMedicationApi } from '@/services/mock/MockMedicationApi';
+import { RXNormMedicationApi } from '@/services/api/RXNormMedicationApi';
 import { MockClientApi } from '@/services/mock/MockClientApi';
 import { DosageValidator } from '@/services/validation/DosageValidator';
 import { MedicationManagementViewModel } from '@/viewModels/medication/MedicationManagementViewModel';
 import { ClientSelectionViewModel } from '@/viewModels/client/ClientSelectionViewModel';
 
+// Determine which API to use based on environment
+const USE_RXNORM = import.meta.env.VITE_USE_RXNORM_API === 'true' || import.meta.env.PROD;
+
 // Create singleton instances
-const medicationApi = new MockMedicationApi();
+const medicationApi: IMedicationApi = USE_RXNORM 
+  ? new RXNormMedicationApi() 
+  : new MockMedicationApi();
+
 const clientApi = new MockClientApi();
 const dosageValidator = new DosageValidator();
+
+// Log which API is being used
+if (import.meta.env.DEV) {
+  console.log('[useViewModel] Using', USE_RXNORM ? 'RXNorm' : 'Mock', 'medication API');
+}
 
 // Store view model instances to reuse them
 const viewModelInstances = new Map();

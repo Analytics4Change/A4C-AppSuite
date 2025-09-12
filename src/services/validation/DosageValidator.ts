@@ -45,21 +45,12 @@ export class DosageValidator {
     return validFrequencies.includes(frequency);
   }
 
-  validateDosageCondition(condition: string): boolean {
-    const validConditions = [
-      'Morning', 'Evening', 'Bedtime', 'With meals', 
-      'Before meals', 'After meals', 'As needed'
-    ];
-    return validConditions.includes(condition);
-  }
-
   validateCompleteDosage(
     form: DosageForm | string,
     route: DosageRoute | string,
     amount: string,
     unit: DosageUnit | string,
-    frequency: string,
-    condition: string
+    frequency: string
   ): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
@@ -81,10 +72,6 @@ export class DosageValidator {
 
     if (!this.validateDosageFrequency(frequency)) {
       errors.push('Invalid dosage frequency');
-    }
-
-    if (!this.validateDosageCondition(condition)) {
-      errors.push('Invalid dosage condition');
     }
 
     return {

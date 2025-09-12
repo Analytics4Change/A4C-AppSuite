@@ -14,7 +14,9 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
   onDataChange,
   tabIndexBase,
   shouldFocus,
-  onFocusHandled
+  onFocusHandled,
+  onInputFocus,
+  onInputBlur
 }) => {
   const inputRef = useRef<HTMLElement>(null);
   
@@ -149,6 +151,8 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
       className="additional-input-container"
       role="group"
       aria-labelledby={`${checkboxId}-label`}
+      onFocus={onInputFocus}
+      onBlur={onInputBlur}
     >
       {component}
       

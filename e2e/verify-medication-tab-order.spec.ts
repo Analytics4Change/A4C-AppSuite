@@ -127,8 +127,8 @@ test.describe('Medication Form Tab Order', () => {
       { ariaLabel: 'Open total unit dropdown', tabIndex: '10' },
       { id: 'dosage-frequency', tabIndex: '11' },
       { ariaLabel: 'Open frequency dropdown', tabIndex: '12' },
-      { id: 'dosage-condition', tabIndex: '13' },
-      { ariaLabel: 'Open condition dropdown', tabIndex: '14' }
+      { id: 'dosage-timings', tabIndex: '13' },
+      { ariaLabel: 'Open timings dropdown', tabIndex: '14' }
     ];
     
     // Log the full tab sequence

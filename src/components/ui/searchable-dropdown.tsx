@@ -5,13 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useSearchDebounce } from '@/hooks/useDebounce';
 import { useDropdownPosition } from '@/hooks/useDropdownPosition';
-import { useTabAsArrows } from '@/hooks/useTabAsArrows';
-import { FocusBehaviorProvider } from '@/contexts/FocusBehaviorContext';
+import { useDropdownHighlighting } from '@/hooks/useDropdownHighlighting';
+import { HighlightType, SelectionMethod } from '@/types/dropdown';
 import { DropdownPortal } from './dropdown-portal';
 import { cn } from './utils';
 import { TIMINGS } from '@/config/timings';
-
-export type SelectionMethod = 'keyboard' | 'mouse';
+import '@/styles/dropdown-highlighting.css';
 
 export interface SearchableDropdownProps<T> {
   // Current state
@@ -55,8 +54,6 @@ export interface SearchableDropdownProps<T> {
   tabIndex?: number;
   autoFocus?: boolean;
   
-  // Tab navigation behavior
-  enableTabAsArrows?: boolean;
 }
 
 // Inner component that uses the hooks
@@ -87,17 +84,39 @@ function SearchableDropdownInner<T>({
   label,
   required = false,
   tabIndex = 0,
-  autoFocus = false,
-  enableTabAsArrows = false
+  autoFocus = false
 }: SearchableDropdownProps<T>) {
   const [localValue, setLocalValue] = useState(value || '');
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listItemRefs = useRef<(HTMLDivElement | null)[]>([]);
   
   // Track dropdown position
   const dropdownPosition = useDropdownPosition(inputRef, showDropdown && searchResults.length > 0);
+  
+  // Use unified dropdown highlighting
+  const {
+    navigationIndex,
+    getItemHighlightType,
+    handleArrowKey,
+    handleTextInput,
+    handleMouseEnter,
+    reset: resetHighlighting
+  } = useDropdownHighlighting({
+    items: searchResults,
+    getItemText: getItemText || ((item) => String(item)),
+    inputValue: localValue,
+    enabled: showDropdown && searchResults.length > 0,
+    onNavigate: (index) => {
+      // Scroll into view when navigating
+      if (listItemRefs.current[index]) {
+        listItemRefs.current[index]?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest'
+        });
+      }
+    }
+  });
 
   // Update local value when prop changes
   useEffect(() => {
@@ -120,32 +139,16 @@ function SearchableDropdownInner<T>({
   const handleSearch = (searchValue: string) => {
     setLocalValue(searchValue);
     handleSearchChange(searchValue);
+    handleTextInput(searchValue); // Notify highlighting hook
   };
 
   // Close dropdown handler for escape key
   const handleCloseDropdown = useCallback(() => {
-    console.log('[SearchableDropdown] handleCloseDropdown called');
-    setHighlightedIndex(0);
+    resetHighlighting();
     setLocalValue('');
     onSearch('');
-  }, [onSearch]);
+  }, [onSearch, resetHighlighting]);
 
-  // Use Tab as Arrows hook when enabled
-  const { handleKeyDown: tabAsArrowsHandler } = useTabAsArrows({
-    items: searchResults,
-    currentIndex: highlightedIndex,
-    onIndexChange: setHighlightedIndex,
-    onSelect: (item, method) => handleSelect(item, method),
-    onEscape: () => {
-      console.log('[SearchableDropdown] onEscape callback - clearing dropdown');
-      // Directly clear the dropdown
-      setHighlightedIndex(0);
-      setLocalValue('');
-      onSearch('');
-    },
-    enabled: enableTabAsArrows && showDropdown && searchResults.length > 0,
-    wrap: true
-  });
 
   // Auto-select exact match on blur (Tab key behavior)
   useEffect(() => {
@@ -188,13 +191,6 @@ function SearchableDropdownInner<T>({
   }, [showDropdown, searchResults, selectedItem, getItemText]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // If Tab as Arrows is enabled, delegate to that handler
-    if (enableTabAsArrows && showDropdown && searchResults.length > 0) {
-      tabAsArrowsHandler(e);
-      return;
-    }
-    
-    // Default behavior when Tab as Arrows is not enabled
     // Tab just moves focus naturally (no special handling)
     if (e.key === 'Tab') {
       // Let Tab move focus naturally, blur handler will auto-select if needed
@@ -206,30 +202,39 @@ function SearchableDropdownInner<T>({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setHighlightedIndex(prev => 
-          prev < searchResults.length - 1 ? prev + 1 : 0
-        );
+        handleArrowKey('down');
         break;
       
       case 'ArrowUp':
         e.preventDefault();
-        setHighlightedIndex(prev => 
-          prev > 0 ? prev - 1 : searchResults.length - 1
-        );
+        handleArrowKey('up');
         break;
       
       case 'Enter':
         e.preventDefault();
-        if (searchResults[highlightedIndex]) {
-          handleSelect(searchResults[highlightedIndex], 'keyboard');
+        // Check how many items start with the typed text
+        const searchText = localValue.toLowerCase().trim();
+        const startsWithMatches = searchResults.filter(item => {
+          const itemText = getItemText(item).toLowerCase();
+          return itemText.startsWith(searchText);
+        });
+        
+        if (navigationIndex >= 0 && searchResults[navigationIndex]) {
+          // User has navigated with arrows - always respect that choice
+          handleSelect(searchResults[navigationIndex], 'keyboard');
+        } else if (startsWithMatches.length === 1) {
+          // Auto-select the single startsWith match
+          handleSelect(startsWithMatches[0], 'keyboard');
+        } else if (searchResults.length === 1) {
+          // Only one filtered result visible - allow Enter to select it
+          handleSelect(searchResults[0], 'keyboard');
         }
+        // Otherwise, do nothing (multiple non-startsWith matches)
         break;
       
       case 'Escape':
-        console.log(`[SearchableDropdown] Escape pressed, dropdown open: ${showDropdown}, results: ${searchResults.length}`);
         if (showDropdown && searchResults.length > 0) {
           // If dropdown is open, just close it without propagating
-          console.log(`[SearchableDropdown] Closing dropdown`);
           e.preventDefault();
           e.stopPropagation();
           handleCloseDropdown();
@@ -244,9 +249,9 @@ function SearchableDropdownInner<T>({
         if (showDropdown && searchResults.length > 0) {
           e.preventDefault();
           if (e.key === 'Home') {
-            setHighlightedIndex(0);
+            handleArrowKey('home');
           } else if (e.key === 'End') {
-            setHighlightedIndex(searchResults.length - 1);
+            handleArrowKey('end');
           }
         }
         break;
@@ -256,24 +261,13 @@ function SearchableDropdownInner<T>({
   const handleSelect = (item: T, method: SelectionMethod) => {
     onSelect(item, method);
     setLocalValue('');
-    setHighlightedIndex(0);
+    resetHighlighting(); // Reset highlighting state
     if (onFieldComplete) {
       onFieldComplete();
     }
   };
 
-  // Scroll highlighted item into view
-  useEffect(() => {
-    if (showDropdown && listItemRefs.current[highlightedIndex]) {
-      // Only call scrollIntoView if it exists (not available in test environment)
-      if (typeof listItemRefs.current[highlightedIndex]?.scrollIntoView === 'function') {
-        listItemRefs.current[highlightedIndex].scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest'
-        });
-      }
-    }
-  }, [highlightedIndex, showDropdown]);
+  // Scroll is now handled by the onNavigate callback in useDropdownHighlighting
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -290,7 +284,7 @@ function SearchableDropdownInner<T>({
         // Close dropdown on outside click
         setLocalValue('');
         onSearch('');
-        setHighlightedIndex(0);
+        resetHighlighting();
       }
     };
 
@@ -368,7 +362,7 @@ function SearchableDropdownInner<T>({
               aria-autocomplete="list"
               aria-controls={showDropdown ? dropdownId : undefined}
               aria-expanded={showDropdown}
-              aria-activedescendant={showDropdown && searchResults.length > 0 ? `${dropdownId}-option-${highlightedIndex}` : undefined}
+              aria-activedescendant={showDropdown && searchResults.length > 0 && navigationIndex >= 0 ? `${dropdownId}-option-${navigationIndex}` : undefined}
               autoComplete="off"
               autoFocus={autoFocus}
               tabIndex={tabIndex}
@@ -410,28 +404,35 @@ function SearchableDropdownInner<T>({
             role="listbox"
             aria-label="Search results"
           >
-            {searchResults.map((result, index) => (
-              <div
-                key={getItemKey(result, index)}
-                ref={el => { listItemRefs.current[index] = el; }}
-                id={`${dropdownId}-option-${index}`}
-                className={cn(
-                  "px-4 py-3 cursor-pointer transition-colors",
-                  index === highlightedIndex ? "bg-blue-50" : "hover:bg-gray-50",
-                  index !== searchResults.length - 1 && "border-b"
-                )}
-                onMouseDown={(e) => {
-                  // Prevent blur
-                  e.preventDefault();
-                  handleSelect(result, 'mouse');
-                }}
-                onMouseEnter={() => setHighlightedIndex(index)}
-                role="option"
-                aria-selected={index === highlightedIndex}
-              >
-                {renderItem(result, index, index === highlightedIndex)}
-              </div>
-            ))}
+            {searchResults.map((result, index) => {
+              const highlightType = getItemHighlightType(result, index);
+              
+              return (
+                <div
+                  key={getItemKey(result, index)}
+                  ref={el => { listItemRefs.current[index] = el; }}
+                  id={`${dropdownId}-option-${index}`}
+                  className={cn(
+                    "dropdown-item",
+                    highlightType === HighlightType.TypedMatch && "dropdown-item-typed-match",
+                    highlightType === HighlightType.Navigation && "dropdown-item-navigation",
+                    highlightType === HighlightType.Both && "dropdown-item-both",
+                    highlightType === HighlightType.None && "hover:bg-gray-50",
+                    index !== searchResults.length - 1 && "border-b border-gray-100"
+                  )}
+                  onMouseDown={(e) => {
+                    // Prevent blur
+                    e.preventDefault();
+                    handleSelect(result, 'mouse');
+                  }}
+                  onMouseEnter={() => handleMouseEnter(index)}
+                  role="option"
+                  aria-selected={index === navigationIndex}
+                >
+                  {renderItem(result, index, index === navigationIndex)}
+                </div>
+              );
+            })}
           </div>
         </DropdownPortal>
       )}
@@ -457,18 +458,7 @@ function SearchableDropdownInner<T>({
   );
 }
 
-// Main export that conditionally wraps with FocusBehaviorProvider
+// Main export
 export function SearchableDropdown<T>(props: SearchableDropdownProps<T>) {
-  // If enableTabAsArrows is true, wrap in isolated FocusBehaviorProvider
-  // This prevents conflicts with parent context's enter-as-tab behavior
-  if (props.enableTabAsArrows) {
-    return (
-      <FocusBehaviorProvider>
-        <SearchableDropdownInner {...props} />
-      </FocusBehaviorProvider>
-    );
-  }
-  
-  // Otherwise use parent context
   return <SearchableDropdownInner {...props} />;
 }

@@ -1,0 +1,47 @@
+/**
+ * Unified dropdown highlighting styles
+ * Provides distinct visual feedback for different interaction modes
+ */
+
+/* Base styles for all dropdown items */
+.dropdown-item {
+  transition: all 200ms;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  position: relative;
+}
+
+/* Typed match highlighting - shows items that start with typed text */
+.dropdown-item-typed-match {
+  background-color: rgb(239 246 255); /* bg-blue-50 */
+  color: rgb(29 78 216); /* text-blue-700 */
+  font-weight: 500; /* font-medium */
+  border-left: 4px solid rgb(59 130 246); /* border-l-blue-500 */
+  padding-left: 0.75rem; /* pl-3 */
+}
+
+/* Navigation highlighting - shows currently arrow-selected item */
+.dropdown-item-navigation {
+  background-color: rgb(219 234 254); /* bg-blue-100 */
+  box-shadow: inset 0 0 0 2px rgb(59 130 246); /* ring-2 ring-blue-500 ring-inset */
+}
+
+/* Combined highlighting - item is both typed match AND navigated to */
+.dropdown-item-both {
+  background-color: rgb(219 234 254); /* bg-blue-100 */
+  color: rgb(29 78 216); /* text-blue-700 */
+  font-weight: 600; /* font-semibold */
+  border-left: 4px solid rgb(37 99 235); /* border-l-blue-600 */
+  padding-left: 0.75rem; /* pl-3 */
+  box-shadow: inset 0 0 0 2px rgb(59 130 246); /* ring-2 ring-blue-500 ring-inset */
+}
+
+/* Hover state for items */
+.dropdown-item:hover:not(.dropdown-item-navigation):not(.dropdown-item-both) {
+  background-color: rgb(249 250 251); /* bg-gray-50 */
+}
+
+/* Separator between items */
+.dropdown-item:not(:last-child) {
+  border-bottom: 1px solid rgb(243 244 246); /* border-gray-100 */
+}

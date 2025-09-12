@@ -10,7 +10,6 @@ import { MedicationSearchModal } from '@/components/medication/MedicationSearchM
 import { DosageFormEditable } from '@/views/medication/DosageFormEditable';
 import { InventoryQuantityInputs } from '@/views/medication/InventoryQuantityInputs';
 import { PharmacyInformationInputs } from '@/views/medication/PharmacyInformationInputs';
-import { TherapeuticClassSelection } from '@/views/medication/TherapeuticClassSelection';
 import { DateSelection } from '@/views/medication/DateSelectionSimplified';
 import { DosageForm } from '@/types/models/Dosage';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
@@ -102,7 +101,7 @@ export const MedicationManagementPage = observer(() => {
            vm.dosageAmount &&
            vm.dosageUnit &&
            vm.frequency &&
-           vm.selectedTherapeuticClasses.length > 0 &&
+           vm.selectedTimings.length > 0 &&
            vm.startDate;
   };
 
@@ -298,13 +297,6 @@ export const MedicationManagementPage = observer(() => {
                 />
               </div>
 
-              {/* Therapeutic Classes Selection */}
-              <div className="bg-white p-6 rounded-lg border">
-                <TherapeuticClassSelection
-                  selectedClasses={vm.selectedTherapeuticClasses}
-                  onClassToggle={(className) => vm.toggleTherapeuticClass(className)}
-                />
-              </div>
 
               {/* Date Selection */}
               <div className="bg-white p-6 rounded-lg border">

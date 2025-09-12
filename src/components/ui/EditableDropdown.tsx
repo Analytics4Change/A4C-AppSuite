@@ -1,11 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Edit2 } from 'lucide-react';
-import { Input } from './input';
+import React, { useState, useRef } from 'react';
+import { Edit2 } from 'lucide-react';
 import { Label } from './label';
-import { AutocompleteDropdown, SelectionMethod } from './autocomplete-dropdown';
-import { useDropdownBlur } from '@/hooks/useDropdownBlur';
+import { EnhancedAutocompleteDropdown } from './EnhancedAutocompleteDropdown';
 import { useFocusAdvancement } from '@/hooks/useFocusAdvancement';
-import { filterStringItems, isItemHighlighted } from '@/utils/dropdown-filter';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('navigation');
@@ -32,7 +29,7 @@ interface EditableDropdownProps {
 /**
  * Reusable editable dropdown component that provides:
  * - Edit mode functionality (click to re-edit selected values)
- * - Autocomplete search
+ * - Autocomplete search with unified highlighting behavior
  * - Keyboard navigation
  * - Accessibility support
  * - Visual feedback for selected/editing states
@@ -55,21 +52,11 @@ export const EditableDropdown: React.FC<EditableDropdownProps> = ({
   className = '',
   showLabel = true
 }) => {
-  const [inputValue, setInputValue] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [internalValue, setInternalValue] = useState(value);
 
   // Use testIdPrefix or id for test IDs
   const testId = testIdPrefix || id;
-
-  // Dropdown blur handler using abstracted timing logic
-  const handleBlur = useDropdownBlur(() => {
-    setShowDropdown(false);
-    if (!value) {
-      setIsEditing(false);
-    }
-  });
 
   // Focus advancement hook for keyboard navigation
   const focusAdvancement = useFocusAdvancement({
@@ -80,71 +67,42 @@ export const EditableDropdown: React.FC<EditableDropdownProps> = ({
   // Enter edit mode
   const enterEditMode = () => {
     setIsEditing(true);
-    setInputValue(value);
-    setShowDropdown(true);
-    setTimeout(() => inputRef.current?.focus(), 0);
-  };
-
-  // Handle input change
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-    if (!value || isEditing) {
-      setShowDropdown(true);
-      onDropdownOpen?.(`${id}-container`);
-    }
-  };
-
-  // Handle input click
-  const handleInputClick = () => {
-    if (value && !isEditing && !disabled) {
-      enterEditMode();
-    }
-  };
-
-  // Handle input focus
-  const handleInputFocus = () => {
-    if (!disabled && (!value || isEditing)) {
-      setShowDropdown(true);
-    }
+    setInternalValue(value);
   };
 
   // Handle selection from dropdown
-  const handleSelect = (selectedValue: string, method: SelectionMethod) => {
+  const handleSelect = (selectedValue: string) => {
     onChange(selectedValue);
-    setInputValue(selectedValue);
-    setShowDropdown(false);
+    setInternalValue(selectedValue);
     setIsEditing(false);
     
     // Use focus advancement if configured
     if (targetTabIndex) {
-      focusAdvancement.handleSelection(selectedValue, method);
+      focusAdvancement.handleSelection(selectedValue, 'keyboard');
     }
   };
-  
 
-  // Filter options based on input
-  const filteredOptions = filterStringItems(options, inputValue, filterMode);
-  
-  // Highlight matching option - always use startsWith for highlighting to prioritize prefix matches
-  const isOptionHighlighted = (option: string) => 
-    isItemHighlighted(option, inputValue, 'startsWith');
+  // Handle value change
+  const handleChange = (newValue: string) => {
+    setInternalValue(newValue);
+    if (!value || isEditing) {
+      onDropdownOpen?.(`${id}-container`);
+    }
+  };
 
-  // Determine display value
-  const displayValue = isEditing ? inputValue : (value || inputValue);
+  // Handle blur
+  const handleBlur = () => {
+    if (!value) {
+      setIsEditing(false);
+    }
+  };
 
-  // Determine if field is read-only
-  const isReadOnly = disabled || (!!value && !isEditing);
-
-  // Build className for input
-  const inputClassName = `pr-10 ${
-    disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-  } ${
-    value && !isEditing ? 'border-blue-500 bg-blue-50 hover:bg-blue-100' : ''
-  } ${
-    error ? 'border-red-500' : ''
-  } ${
-    isEditing ? 'bg-white' : ''
-  } focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:border-blue-500 focus:outline-none ${className}`;
+  // Handle focus
+  const handleFocus = () => {
+    if (!disabled && (!value || isEditing)) {
+      onDropdownOpen?.(`${id}-container`);
+    }
+  };
 
   return (
     <div className="space-y-2">
@@ -158,73 +116,63 @@ export const EditableDropdown: React.FC<EditableDropdownProps> = ({
       )}
       
       <div id={`${id}-container`} className="relative">
-        <Input
-          ref={inputRef}
-          id={id}
-          data-testid={`${testId}-input`}
-          type="text"
-          value={displayValue}
-          onChange={handleInputChange}
-          onClick={handleInputClick}
-          onFocus={handleInputFocus}
-          onBlur={handleBlur}
-          placeholder={disabled && disabledMessage ? disabledMessage : placeholder}
-          className={inputClassName}
-          readOnly={isReadOnly}
-          aria-label={label}
-          aria-describedby={error ? `${id}-error` : undefined}
-          aria-invalid={!!error}
-          tabIndex={disabled || (value && !isEditing) ? -1 : tabIndex}
-        />
-        
-        {/* Edit button - shows when value is selected and not editing */}
-        {!disabled && value && !isEditing && (
-          <button
-            id={`${id}-edit-button`}
-            type="button"
-            className="absolute right-1 top-1/2 transform -translate-y-1/2 p-1.5 hover:bg-gray-100 rounded"
-            onClick={enterEditMode}
-            aria-label={`Edit ${label}`}
+        {/* Show read-only display when value is selected and not editing */}
+        {value && !isEditing ? (
+          <div className="relative">
+            <div
+              className={`w-full px-3 py-2 pr-10 border rounded-md ${
+                disabled ? 'cursor-not-allowed opacity-50 bg-gray-100' : 'cursor-pointer border-blue-500 bg-blue-50 hover:bg-blue-100'
+              } ${className}`}
+              onClick={!disabled ? enterEditMode : undefined}
+              tabIndex={disabled ? -1 : tabIndex}
+              role="button"
+              aria-label={`${label}: ${value}. Click to edit.`}
+              onKeyDown={(e) => {
+                if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault();
+                  enterEditMode();
+                }
+              }}
+            >
+              {value}
+            </div>
+            {!disabled && (
+              <button
+                id={`${id}-edit-button`}
+                type="button"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 p-1.5 hover:bg-gray-100 rounded"
+                onClick={enterEditMode}
+                aria-label={`Edit ${label}`}
+                tabIndex={-1}
+              >
+                <Edit2 className="text-gray-400" size={16} />
+              </button>
+            )}
+          </div>
+        ) : (
+          /* Show enhanced autocomplete dropdown when editing or no value */
+          <EnhancedAutocompleteDropdown
+            id={id}
+            options={options}
+            value={internalValue}
+            onChange={handleChange}
+            onSelect={handleSelect}
+            placeholder={disabled && disabledMessage ? disabledMessage : placeholder}
+            disabled={disabled}
+            error={!!error}
             tabIndex={tabIndex}
-          >
-            <Edit2 className="text-gray-400" size={16} />
-          </button>
-        )}
-        
-        {/* Dropdown button - shows when no value or editing */}
-        {!disabled && (!value || isEditing) && (
-          <button
-            type="button"
-            className="absolute right-1 top-1/2 transform -translate-y-1/2 p-1.5 hover:bg-gray-100 rounded"
-            onClick={() => {
-              setShowDropdown(true);
-              inputRef.current?.focus();
-              onDropdownOpen?.(`${id}-container`);
-            }}
-            aria-label={`Open ${label} dropdown`}
-            tabIndex={-1}
-          >
-            <ChevronDown className="text-gray-400" size={20} />
-          </button>
+            aria-label={label}
+            aria-describedby={error ? `${id}-error` : undefined}
+            aria-invalid={!!error}
+            autoFocus={isEditing}
+            onBlur={handleBlur}
+            onFocus={handleFocus}
+            allowCustomValue={false}
+            filterStrategy={filterMode}
+            className={className}
+          />
         )}
       </div>
-      
-      {/* Autocomplete dropdown */}
-      <AutocompleteDropdown
-        isOpen={showDropdown && !disabled && (!value || isEditing)}
-        items={filteredOptions}
-        inputRef={inputRef}
-        onSelect={handleSelect}
-        getItemKey={(option) => option}
-        isItemHighlighted={isOptionHighlighted}
-        testId={`${testId}-dropdown`}
-        modalId={`${id}-dropdown`}
-        renderItem={(option, index) => (
-          <div data-testid={`${testId}-option-${index}`}>
-            {option}
-          </div>
-        )}
-      />
       
       {/* Error message */}
       {error && (

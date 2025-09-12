@@ -9,7 +9,6 @@ export const mockMedicationDatabase: Medication[] = [
     categories: {
       broad: 'Pain Management',
       specific: 'Anti-inflammatory',
-      therapeutic: 'NSAID'
     },
     flags: {
       isPsychotropic: false,
@@ -27,7 +26,6 @@ export const mockMedicationDatabase: Medication[] = [
     categories: {
       broad: 'Cardiovascular',
       specific: 'Hypertension',
-      therapeutic: 'ACE Inhibitor'
     },
     flags: {
       isPsychotropic: false,
@@ -45,7 +43,6 @@ export const mockMedicationDatabase: Medication[] = [
     categories: {
       broad: 'Mental Health',
       specific: 'Anxiety',
-      therapeutic: 'Benzodiazepine'
     },
     flags: {
       isPsychotropic: true,
@@ -63,7 +60,6 @@ export const mockMedicationDatabase: Medication[] = [
     categories: {
       broad: 'Diabetes',
       specific: 'Type 2 Diabetes',
-      therapeutic: 'Biguanide'
     },
     flags: {
       isPsychotropic: false,
@@ -81,7 +77,6 @@ export const mockMedicationDatabase: Medication[] = [
     categories: {
       broad: 'Mental Health',
       specific: 'Depression',
-      therapeutic: 'SSRI'
     },
     flags: {
       isPsychotropic: true,
@@ -99,7 +94,6 @@ export const mockMedicationDatabase: Medication[] = [
     categories: {
       broad: 'Cardiovascular',
       specific: 'Cholesterol Management',
-      therapeutic: 'Statin'
     },
     flags: {
       isPsychotropic: false,
@@ -117,7 +111,6 @@ export const mockMedicationDatabase: Medication[] = [
     categories: {
       broad: 'Mental Health',
       specific: 'Anxiety',
-      therapeutic: 'Benzodiazepine'
     },
     flags: {
       isPsychotropic: true,
@@ -134,12 +127,12 @@ export const mockMedicationHistory = [
     id: '1',
     name: 'Metformin 500mg',
     frequency: 'Twice daily',
-    condition: 'With meals'
+    timings: ['With meals']
   },
   {
     id: '2',
     name: 'Lisinopril 10mg',
     frequency: 'Once daily',
-    condition: 'Morning'
+    timings: ['Morning']
   }
 ];

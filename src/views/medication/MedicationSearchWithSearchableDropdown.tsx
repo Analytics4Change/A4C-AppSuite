@@ -90,7 +90,6 @@ export const MedicationSearch: React.FC<MedicationSearchProps> = ({
       required={true}
       tabIndex={1}
       autoFocus={true}
-      enableTabAsArrows={true}
     />
   );
 };

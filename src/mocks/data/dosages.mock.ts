@@ -1,4 +1,4 @@
-import { DosageForm, DosageRoute, DosageUnit, DosageFrequency, DosageCondition, DosageFormUnits } from '@/types/models';
+import { DosageForm, DosageRoute, DosageUnit, DosageFrequency, DosageFormUnits } from '@/types/models';
 import { 
   dosageFormHierarchy, 
   dosageFormMap,
@@ -48,15 +48,5 @@ export const dosageFrequencies: DosageFrequency[] = [
   'Every 6 hours',
   'Every 8 hours',
   'Every 12 hours',
-  'As needed'
-];
-
-export const dosageConditions: DosageCondition[] = [
-  'Morning',
-  'Evening',
-  'Bedtime',
-  'With meals',
-  'Before meals',
-  'After meals',
   'As needed'
 ];

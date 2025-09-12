@@ -78,10 +78,6 @@ test.describe('Category Selection Keyboard Navigation UAT', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(200);
     
-    await page.locator('#condition').fill('With food');
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(200);
-    
     await page.locator('#total-amount').fill('60');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(200);

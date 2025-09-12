@@ -5,9 +5,6 @@ import { useFocusBehavior } from '@/contexts/FocusBehaviorContext';
  * Custom hook that makes Enter key behave like Tab for focus advancement
  * Useful for input fields where Enter should move to the next field
  * 
- * This hook is mutually exclusive with useTabAsArrows - they cannot be used
- * in the same focus context.
- * 
  * @param nextTabIndex - The tabIndex of the next element to focus
  * @param enabled - Whether the behavior is enabled (default: true)
  * @returns onKeyDown handler to attach to the input
@@ -45,7 +42,7 @@ export function useEnterAsTab(nextTabIndex: number, enabled: boolean = true) {
     if (enabled && !isActive) {
       console.warn(
         '[useEnterAsTab] Hook is enabled but behavior is not active. ' +
-        'This may be due to a conflict with useTabAsArrows in the same focus context.'
+        'This may be due to a conflict with another focus behavior in the same context.'
       );
     }
   }, [enabled, isActive]);

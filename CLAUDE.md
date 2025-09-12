@@ -516,25 +516,152 @@ runInAction(() => {
 
 ## Component Patterns
 
-### Unified Multi-Select Dropdown
-The `MultiSelectDropdown` component is the standard for all multi-select needs:
+### UI Components Guide
 
+#### When to Use Each Component
+
+##### **SearchableDropdown** (`/components/ui/searchable-dropdown.tsx`)
+**Use when:** You need a searchable selection from a large dataset (100+ items)
+- Real-time search with debouncing
+- Async data loading support
+- Highlighted search matches with unified behavior
+- Clear selection capability
+**Example use cases:** Medication search, client search, diagnosis lookup
 ```typescript
-import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
-
-<MultiSelectDropdown
-  id="unique-id"
-  label="Selection Label"
-  options={['Option 1', 'Option 2']}
-  selected={observableSelectedArray}  // Pass observable directly!
-  onChange={(newSelection) => vm.setSelection(newSelection)}
-  placeholder="Select items..."
-  buttonTabIndex={17}
+<SearchableDropdown
+  value={searchValue}
+  searchResults={results}
+  onSearch={handleSearch}
+  onSelect={handleSelect}
+  renderItem={(item) => <div>{item.name}</div>}
 />
 ```
 
-Key features:
-- Full keyboard navigation (Tab, Arrows, Space, Enter, Escape)
-- WCAG 2.1 Level AA compliant
-- MobX observable compatible
-- Consistent UX across the application
+##### **EditableDropdown** (`/components/ui/EditableDropdown.tsx`)
+**Use when:** You need a dropdown that can be edited after selection
+- Small to medium option sets (< 100 items)
+- Edit mode for changing selections
+- Uses EnhancedAutocompleteDropdown internally for unified highlighting
+**Example use cases:** Dosage form, route, unit, frequency selection
+```typescript
+<EditableDropdown
+  id="dosage-form"
+  label="Dosage Form"
+  value={selectedForm}
+  options={formOptions}
+  onChange={setSelectedForm}
+  tabIndex={5}
+/>
+```
+
+##### **EnhancedAutocompleteDropdown** (`/components/ui/EnhancedAutocompleteDropdown.tsx`)
+**Use when:** You need autocomplete with unified highlighting behavior
+- Type-ahead functionality
+- Distinct typing vs navigation modes
+- Custom value support optional
+**Example use cases:** Form fields with predefined options but allow custom input
+```typescript
+<EnhancedAutocompleteDropdown
+  options={options}
+  value={value}
+  onChange={handleChange}
+  onSelect={handleSelect}
+  allowCustomValue={true}
+/>
+```
+
+##### **MultiSelectDropdown** (`/components/ui/MultiSelectDropdown.tsx`)
+**Use when:** Users need to select multiple items from a list
+- Checkbox-based multi-selection
+- Selected items summary display
+- Full keyboard navigation support
+**Example use cases:** Category selection, tag assignment, permission settings
+```typescript
+<MultiSelectDropdown
+  id="categories"
+  label="Categories"
+  options={['Option 1', 'Option 2']}
+  selected={observableSelectedArray}  // Pass observable directly!
+  onChange={(newSelection) => vm.setSelection(newSelection)}
+/>
+```
+
+##### **EnhancedFocusTrappedCheckboxGroup** (`/components/ui/FocusTrappedCheckboxGroup/`)
+**Use when:** You need a group of checkboxes with complex interactions
+- Focus trapping within the group
+- Dynamic additional inputs based on selection
+- Validation rules and metadata support
+- Strategy pattern for extensible input types
+**Example use cases:** Dosage timings, multi-condition selections
+
+**Focus Region Tracking:**
+The component uses a focus region state system to properly handle keyboard events:
+- **Focus Regions**: `'header' | 'checkbox' | 'input' | 'button'`
+- **Keyboard Handling by Region**:
+  - `'checkbox'`: Arrow keys navigate, Space toggles selection
+  - `'input'`: All keyboard events handled natively by input
+  - `'button'`: Standard button keyboard behavior
+  - `'header'`: Arrow keys can enter checkbox group
+- **Benefits**: 
+  - Works with any custom component via strategy pattern
+  - No fragile DOM inspection or event target checking
+  - Clear separation of keyboard handling concerns
+  - Easier debugging with explicit focus region state
+
+```typescript
+<EnhancedFocusTrappedCheckboxGroup
+  id="dosage-timings"
+  title="Dosage Timings"
+  checkboxes={timingOptions}
+  onSelectionChange={handleTimingChange}
+  onAdditionalDataChange={handleDataChange}
+  onContinue={handleContinue}
+  onCancel={handleCancel}
+/>
+```
+
+##### **Basic UI Components**
+- **Button** (`button.tsx`): Standard button with variants (primary, secondary, ghost)
+- **Input** (`input.tsx`): Basic text input with error states
+- **Label** (`label.tsx`): Form labels with proper accessibility
+- **Card** (`card.tsx`): Content containers with header/body structure
+- **Checkbox** (`checkbox.tsx`): Individual checkbox for simple toggles
+
+#### Dropdown Highlighting Behavior
+
+All dropdown components use the unified highlighting system:
+- **Typing Mode**: Multiple blue highlights for items starting with typed text
+- **Navigation Mode**: Single box-shadow highlight for arrow-selected item
+- **Combined Mode**: Both highlights when navigating to a typed match
+
+The highlighting is powered by:
+- `useDropdownHighlighting` hook for state management
+- `/styles/dropdown-highlighting.css` for consistent styling
+- `HighlightType` enum for clear state representation
+
+#### Component Selection Decision Tree
+
+```
+Need dropdown selection?
+├── Multiple items? → MultiSelectDropdown
+├── Large dataset (100+)? → SearchableDropdown
+├── Need to edit after selection? → EditableDropdown
+├── Need autocomplete? → EnhancedAutocompleteDropdown
+└── Simple list? → Native <select> with styling
+
+Need checkboxes?
+├── Group with complex logic? → EnhancedFocusTrappedCheckboxGroup
+└── Simple toggle? → Checkbox
+
+Need text input?
+├── With dropdown? → See dropdown selection above
+└── Plain text? → Input
+```
+
+### Key Implementation Notes
+
+- Always pass MobX observables directly (never spread arrays)
+- Use proper tabIndex sequencing for keyboard navigation
+- Include all required ARIA attributes for accessibility
+- Follow the unified highlighting pattern for consistency
+- Use centralized timing configuration for delays

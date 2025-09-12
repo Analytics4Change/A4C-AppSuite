@@ -63,9 +63,9 @@ export const MobXDebugger: React.FC<MobXDebuggerProps> = observer(({ viewModel }
         Render Count: {renderCount.current}
       </div>
       <div style={{ marginBottom: '5px' }}>
-        Therapeutic Classes ({viewModel.selectedTherapeuticClasses.length}):
+        Dosage Timings ({viewModel.selectedTimings.length}):
         <div style={{ marginLeft: '10px', color: '#00ffff' }}>
-          {JSON.stringify(viewModel.selectedTherapeuticClasses, null, 2)}
+          {JSON.stringify(viewModel.selectedTimings, null, 2)}
         </div>
       </div>
       <div style={{ fontSize: '10px', color: '#888', marginTop: '5px' }}>

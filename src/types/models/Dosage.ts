@@ -140,22 +140,6 @@ export type DosageFrequency =
   | 'Every 12 hours'
   | 'As needed';
 
-export type DosageCondition = 
-  | 'Morning'
-  | 'Evening'
-  | 'Bedtime'
-  | 'With meals'
-  | 'Before meals'
-  | 'After meals'
-  | 'As needed';
-
-export interface DosageSchedule {
-  frequency: DosageFrequency;
-  condition: DosageCondition;
-  times?: string[];
-  daysOfWeek?: number[];
-}
-
 // Hierarchical structure for dosage forms
 export interface DosageFormHierarchy {
   type: DosageFormType;

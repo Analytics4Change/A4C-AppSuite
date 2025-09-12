@@ -51,7 +51,6 @@ export class MedicationManagementViewModel {
   errors: Map<string, string> = new Map();
   
   searchResults: Medication[] = [];
-  selectedTherapeuticClasses: string[] = [];
   
   // Auxiliary medication information
   isControlled: boolean | null = null;
@@ -141,9 +140,6 @@ export class MedicationManagementViewModel {
       this.medicationName = medication.name;
       this.showMedicationDropdown = false;
       
-      if (medication.categories) {
-        this.selectedTherapeuticClasses = [medication.categories.broad];
-      }
     });
     this.validation.clearError('medication');
   }
@@ -173,7 +169,6 @@ export class MedicationManagementViewModel {
       this.pharmacyName = '';
       this.pharmacyPhone = '';
       this.rxNumber = '';
-      this.selectedTherapeuticClasses = [];
       
       // Clear all dropdowns
       this.showDosageFormDropdown = false;
@@ -269,33 +264,6 @@ export class MedicationManagementViewModel {
     this.validation.clearError('discontinueDate');
   }
 
-  toggleTherapeuticClass(category: string) {
-    log.debug('toggleTherapeuticClass called with:', category);
-    log.debug('Current selected:', [...this.selectedTherapeuticClasses]);
-    runInAction(() => {
-      const index = this.selectedTherapeuticClasses.indexOf(category);
-      if (index > -1) {
-        // Use replace to trigger MobX reactivity
-        this.selectedTherapeuticClasses = this.selectedTherapeuticClasses.filter(c => c !== category);
-        log.debug('Removed, new selected:', [...this.selectedTherapeuticClasses]);
-      } else {
-        // Create new array to trigger MobX reactivity
-        this.selectedTherapeuticClasses = [...this.selectedTherapeuticClasses, category];
-        log.debug('Added, new selected:', [...this.selectedTherapeuticClasses]);
-      }
-    });
-  }
-
-
-  // Setter methods for multi-select dropdowns
-  setTherapeuticClasses(classes: string[]) {
-    log.debug('setTherapeuticClasses called with:', classes);
-    log.debug('Before update:', this.selectedTherapeuticClasses.slice());
-    runInAction(() => {
-      this.selectedTherapeuticClasses = classes;
-      log.debug('After update:', this.selectedTherapeuticClasses.slice());
-    });
-  }
 
   setControlled(value: boolean) {
     runInAction(() => {
@@ -394,7 +362,6 @@ export class MedicationManagementViewModel {
     this.rxNumber = '';
     this.errors.clear();
     this.searchResults = [];
-    this.selectedTherapeuticClasses = [];
     this.isControlled = null;
     this.isPsychotropic = null;
     this.showMedicationDropdown = false;

@@ -60,6 +60,8 @@ export interface DynamicAdditionalInputProps {
   tabIndexBase: number;
   shouldFocus: boolean;
   onFocusHandled: () => void;
+  onInputFocus?: () => void;
+  onInputBlur?: () => void;
 }
 
 /**

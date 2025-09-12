@@ -1,4 +1,4 @@
-import { DosageForm, DosageUnit, DosageFrequency, DosageCondition } from './Dosage';
+import { DosageForm, DosageUnit, DosageFrequency } from './Dosage';
 
 export interface Medication {
   id: string;
@@ -13,7 +13,6 @@ export interface Medication {
 export interface MedicationCategory {
   broad: string;
   specific: string;
-  therapeutic?: string;
 }
 
 export interface MedicationFlags {
@@ -40,8 +39,7 @@ export interface DosageInfo {
   amount: number;
   unit: DosageUnit;
   frequency: DosageFrequency;
-  condition?: DosageCondition;  // Made optional for backward compatibility
-  timings?: string[];  // New field for multiple timing selections
+  timings?: string[];  // Multiple timing selections
   startDate?: Date;
   discontinueDate?: Date;
   prescribingDoctor?: string;

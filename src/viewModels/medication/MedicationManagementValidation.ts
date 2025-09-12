@@ -101,8 +101,8 @@ export class MedicationManagementValidation {
       isValid = false;
     }
     
-    if (!this.vm.condition) {
-      this.setError('condition', 'Please select when to take');
+    if (!this.vm.selectedTimings || this.vm.selectedTimings.length === 0) {
+      this.setError('dosageTimings', 'Please select dosage timings');
       isValid = false;
     }
     
