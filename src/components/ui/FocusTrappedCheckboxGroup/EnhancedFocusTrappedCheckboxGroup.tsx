@@ -132,7 +132,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
       
       if (nextSection === 0) {
         // Focus the currently selected checkbox
-        const checkboxElements = containerRef.current?.querySelectorAll('input[type="checkbox"]');
+        const checkboxElements = containerRef.current?.querySelectorAll('[role="checkbox"]');
         if (checkboxElements && checkboxElements[focusedCheckboxIndex]) {
           (checkboxElements[focusedCheckboxIndex] as HTMLElement).focus();
         }
@@ -151,7 +151,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
       setFocusedCheckboxIndex(newIndex);
       
       // Focus the checkbox at new index
-      const checkboxElements = containerRef.current?.querySelectorAll('input[type="checkbox"]');
+      const checkboxElements = containerRef.current?.querySelectorAll('[role="checkbox"]');
       if (checkboxElements && checkboxElements[newIndex]) {
         (checkboxElements[newIndex] as HTMLElement).focus();
       }
@@ -191,12 +191,15 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   // Focus management when expanding
   useEffect(() => {
     if (isExpanded && containerRef.current) {
-      const checkboxElements = containerRef.current.querySelectorAll('input[type="checkbox"]');
-      if (checkboxElements && checkboxElements[0]) {
-        (checkboxElements[0] as HTMLElement).focus();
-      }
-      setFocusedElement(0);
-      setFocusedCheckboxIndex(0);
+      // Use requestAnimationFrame to ensure DOM is ready (Radix components need a tick)
+      requestAnimationFrame(() => {
+        const checkboxElements = containerRef.current?.querySelectorAll('[role="checkbox"]');
+        if (checkboxElements && checkboxElements[0]) {
+          (checkboxElements[0] as HTMLElement).focus();
+          setFocusedElement(0);
+          setFocusedCheckboxIndex(0);
+        }
+      });
     }
   }, [isExpanded]);
   
@@ -218,6 +221,24 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
         className="w-full flex items-center justify-between p-4 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-t-lg hover:bg-white/80 transition-all"
         onClick={handleHeaderClick}
         onFocus={handleHeaderFocus}
+        onKeyDown={(e) => {
+          // When expanded, arrow keys move focus into checkbox group
+          if (isExpanded && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Move focus to first checkbox
+            requestAnimationFrame(() => {
+              const checkboxElements = containerRef.current?.querySelectorAll('[role="checkbox"]');
+              if (checkboxElements && checkboxElements[0]) {
+                (checkboxElements[0] as HTMLElement).focus();
+                setFocusedElement(0);
+                setFocusedCheckboxIndex(0);
+              }
+            });
+          }
+          // Let other keys bubble up to container handler
+        }}
         tabIndex={baseTabIndex}
         aria-expanded={isExpanded}
         aria-controls={`${id}-content`}
