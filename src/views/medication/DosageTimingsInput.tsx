@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
-import { FocusTrappedCheckboxGroup } from '@/components/ui/FocusTrappedCheckboxGroup';
-import { CheckboxItem } from '@/components/ui/FocusTrappedCheckboxGroup/types';
+import React, { useRef, useEffect } from 'react';
+import { observer } from 'mobx-react-lite';
+import { EnhancedFocusTrappedCheckboxGroup } from '@/components/ui/FocusTrappedCheckboxGroup/EnhancedFocusTrappedCheckboxGroup';
+import { DosageTimingViewModel } from '@/viewModels/medication/DosageTimingViewModel';
 
 interface DosageTimingsInputProps {
   selectedTimings: string[];
@@ -9,84 +10,116 @@ interface DosageTimingsInputProps {
   errors?: Map<string, string>;
 }
 
-// Define the dosage timing options
-const dosageTimingItems: CheckboxItem[] = [
-  { 
-    id: 'qxh', 
-    label: 'Every X Hours - QxH',
-    description: 'Medication taken at regular hourly intervals'
-  },
-  { 
-    id: 'qam', 
-    label: 'Every Morning - QAM',
-    description: 'Once daily in the morning'
-  },
-  { 
-    id: 'qpm', 
-    label: 'Every Evening - QPM',
-    description: 'Once daily in the evening'
-  },
-  { 
-    id: 'qhs', 
-    label: 'Every Night at Bedtime - QHS',
-    description: 'Once daily at bedtime'
-  }
-];
-
 /**
- * Dosage timings input using the FocusTrappedCheckboxGroup component
- * Replaces the previous DosageConditionInput dropdown with a more accessible checkbox group
+ * Enhanced DosageTimingsInput with support for dynamic additional inputs
+ * Uses the DosageTimingViewModel for business logic
+ * When "Every X Hours" is selected, shows a numeric input for hours
+ * When "Specific Times" is selected, shows a text input for times
+ * When "As Needed - PRN" is selected, shows a dropdown for max frequency
  */
-export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = ({
+export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
   selectedTimings,
   onTimingsChange,
   onClose,
   errors
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  // Create ViewModel instance
+  const viewModelRef = useRef<DosageTimingViewModel>();
+  
+  if (!viewModelRef.current) {
+    viewModelRef.current = new DosageTimingViewModel();
+  }
+  
+  const viewModel = viewModelRef.current;
+  
+  // Sync selected timings with ViewModel
+  useEffect(() => {
+    // Update ViewModel to match props
+    selectedTimings.forEach(id => {
+      const metadata = viewModel.checkboxMetadata.find(m => m.id === id);
+      if (metadata && !metadata.checked) {
+        viewModel.handleCheckboxChange(id, true);
+      }
+    });
+    
+    // Uncheck items not in selectedTimings
+    viewModel.checkboxMetadata.forEach(metadata => {
+      if (!selectedTimings.includes(metadata.id) && metadata.checked) {
+        viewModel.handleCheckboxChange(metadata.id, false);
+      }
+    });
+  }, [selectedTimings, viewModel]);
 
-  const handleCancel = useCallback(() => {
-    // Reset to empty selection on cancel
+  const handleSelectionChange = (id: string, checked: boolean) => {
+    viewModel.handleCheckboxChange(id, checked);
+    
+    // Update parent with new selection
+    const newSelection = viewModel.checkboxMetadata
+      .filter(m => m.checked)
+      .map(m => m.id);
+    onTimingsChange(newSelection);
+  };
+
+  const handleAdditionalDataChange = (checkboxId: string, data: any) => {
+    viewModel.handleAdditionalDataChange(checkboxId, data);
+    
+    // Log the additional data for debugging
+    console.log(`Additional data for ${checkboxId}:`, data);
+  };
+
+  const handleCancel = () => {
+    viewModel.reset();
     onTimingsChange([]);
-    setIsExpanded(false);
     onClose?.();
-  }, [onTimingsChange, onClose]);
+  };
 
-  const handleContinue = useCallback((timings: string[]) => {
-    // Save the selected timings
-    onTimingsChange(timings);
-    setIsExpanded(false);
+  const handleContinue = (selectedIds: string[], additionalData: Map<string, any>) => {
+    // Validate before continuing
+    if (!viewModel.isValid) {
+      console.warn('Invalid timing configuration');
+      return;
+    }
+    
+    // Get the complete configuration
+    const config = viewModel.getTimingConfiguration();
+    console.log('Dosage timing configuration:', config);
+    
+    // Update parent
+    onTimingsChange(selectedIds);
     onClose?.();
-  }, [onTimingsChange, onClose]);
+    
+    // Focus should advance to next element (Therapeutic Classes at tabIndex 12)
+    const nextElement = document.querySelector('[tabindex="12"]') as HTMLElement;
+    nextElement?.focus();
+  };
 
-  // Get error message if exists
-  const errorMessage = errors?.get('dosageTimings');
-  const hasError = !!errorMessage;
+  // Combine errors from props and ViewModel
+  const hasError = (errors?.has('dosageTimings') || viewModel.validationErrors.size > 0) ?? false;
+  const errorMessage = errors?.get('dosageTimings') || 
+    (viewModel.validationErrors.size > 0 
+      ? Array.from(viewModel.validationErrors.values()).join(', ')
+      : undefined);
 
   return (
     <div className="col-span-2">
-      <FocusTrappedCheckboxGroup
+      <EnhancedFocusTrappedCheckboxGroup
         id="dosage-timings"
         title="Dosage Timings"
-        items={dosageTimingItems}
-        selectedIds={selectedTimings}
-        onSelectionChange={onTimingsChange}
+        checkboxes={viewModel.checkboxMetadata}
+        onSelectionChange={handleSelectionChange}
+        onAdditionalDataChange={handleAdditionalDataChange}
         onCancel={handleCancel}
         onContinue={handleContinue}
+        isCollapsible={true}
+        initialExpanded={false}
         baseTabIndex={11}
         nextTabIndex={12}
-        isCollapsible={true}
-        initialExpanded={false}  // Always start collapsed, expand only on focus
-        
-        // ARIA and validation support
-        ariaLabel="Select dosage timing schedule"
-        helpText="Select when the medication should be taken. Multiple selections allowed."
+        ariaLabel="Select dosage timing options"
         isRequired={false}
         hasError={hasError}
         errorMessage={errorMessage}
-        
-        className="mt-2"
+        helpText="Select timing options for medication. Some options require additional information."
       />
     </div>
   );
-};
+});
