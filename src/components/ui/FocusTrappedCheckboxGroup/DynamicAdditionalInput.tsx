@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
-import { DynamicAdditionalInputProps } from './metadata-types';
+import { DynamicAdditionalInputProps, FocusSource } from './metadata-types';
 import { Input } from '@/components/ui/input';
 
 /**
@@ -14,22 +14,176 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
   onDataChange,
   tabIndexBase,
   shouldFocus,
+  focusIntent,
   onFocusHandled,
   onInputFocus,
-  onInputBlur
+  onInputBlur,
+  onIntentionalExit,
+  onNaturalBlur,
+  onDirectFocus
 }) => {
   const inputRef = useRef<HTMLElement>(null);
+  const initialValueRef = useRef(currentValue);
+  const [showHint, setShowHint] = useState(false);
+  const [focusSource, setFocusSource] = useState<FocusSource>('programmatic');
+  const hasInitiallyFocused = useRef(false);
   
-  // Handle auto-focus when component appears
+  // Component lifecycle logging
   useEffect(() => {
-    if (shouldFocus && inputRef.current && strategy.focusManagement?.autoFocus) {
-      // Use requestAnimationFrame to ensure DOM is ready
+    console.log('[DynamicInput] Component mounted for checkbox:', checkboxId, 'with value:', currentValue);
+    return () => {
+      console.log('[DynamicInput] Component unmounting for checkbox:', checkboxId);
+    };
+  }, [checkboxId]);
+  
+  // Update initial value when it changes externally
+  useEffect(() => {
+    console.log('[DynamicInput] Initial value updated:', currentValue, 'for checkbox:', checkboxId);
+    initialValueRef.current = currentValue;
+  }, [currentValue, checkboxId]);
+  
+  // Enhanced auto-focus logic respecting focus intent
+  useEffect(() => {
+    // Only auto-focus if:
+    // 1. Intent is for this input
+    // 2. Source was keyboard or programmatic (not mouse - they already focused it)
+    // 3. Haven't already auto-focused
+    if (
+      focusIntent?.type === 'input' && 
+      focusIntent.checkboxId === checkboxId &&
+      focusIntent.source !== 'mouse' &&
+      !hasInitiallyFocused.current &&
+      shouldFocus && 
+      inputRef.current && 
+      strategy.focusManagement?.autoFocus
+    ) {
+      console.log('[DynamicInput] Auto-focusing based on intent (non-mouse)');
       requestAnimationFrame(() => {
         inputRef.current?.focus();
+        hasInitiallyFocused.current = true;
         onFocusHandled();
       });
     }
-  }, [shouldFocus, strategy.focusManagement?.autoFocus, onFocusHandled]);
+  }, [focusIntent, checkboxId, shouldFocus, strategy.focusManagement?.autoFocus, onFocusHandled]);
+  
+  // Reset focus flag on unmount
+  useEffect(() => {
+    return () => {
+      hasInitiallyFocused.current = false;
+    };
+  }, []);
+  
+  // Hide hint after delay
+  useEffect(() => {
+    if (showHint) {
+      const timer = setTimeout(() => setShowHint(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [showHint]);
+  
+  // Enhanced keyboard handler using intentional exit
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    console.log('[DynamicInput] KeyDown:', {
+      key: e.key,
+      keyCode: e.keyCode,
+      targetTagName: (e.target as HTMLElement).tagName,
+      targetId: (e.target as HTMLElement).id,
+      checkboxId,
+      currentValue,
+      initialValue: initialValueRef.current,
+      focusSource,
+      isPrevented: e.defaultPrevented,
+      bubbles: e.bubbles,
+      strategy: strategy.componentType
+    });
+    
+    switch (e.key) {
+      case 'Tab':
+        console.log('[DynamicInput] Tab pressed - preventing default');
+        // Always prevent Tab from leaving the input
+        e.preventDefault();
+        e.stopPropagation(); // Don't let container handle it
+        console.log('[DynamicInput] After preventDefault:', e.defaultPrevented);
+        
+        // For custom multi-field components (future enhancement)
+        if (strategy.componentType === 'custom' && strategy.componentProps.getPeerFields) {
+          const fields = strategy.componentProps.getPeerFields();
+          if (fields && fields.length > 1) {
+            // Navigate between peer fields
+            const currentIndex = fields.indexOf(e.target as HTMLElement);
+            const nextIndex = e.shiftKey ? 
+              (currentIndex - 1 + fields.length) % fields.length :
+              (currentIndex + 1) % fields.length;
+            fields[nextIndex]?.focus();
+            return;
+          }
+        }
+        
+        // For single fields, show hint
+        setShowHint(true);
+        console.log('[DynamicInput] Hint shown');
+        break;
+        
+      case 'Enter':
+        console.log('[DynamicInput] Enter pressed - intentional exit with save');
+        e.preventDefault();
+        if (onIntentionalExit) {
+          onIntentionalExit(checkboxId, true);
+        }
+        break;
+        
+      case 'Escape':
+        console.log('[DynamicInput] Escape pressed - intentional exit without save');
+        e.preventDefault();
+        const originalValue = initialValueRef.current;
+        console.log('[DynamicInput] Restoring from', currentValue, 'to', originalValue);
+        // Restore original value
+        onDataChange(originalValue || null);
+        if (onIntentionalExit) {
+          onIntentionalExit(checkboxId, false);
+        }
+        break;
+        
+      default:
+        // All other keys work naturally
+        console.log('[DynamicInput] Other key pressed:', e.key, '- allowing natural behavior');
+        break;
+    }
+  };
+  
+  // Track how focus was acquired
+  const handleFocus = (e: React.FocusEvent) => {
+    const source = e.nativeEvent.detail === 0 ? 'keyboard' : 'mouse';
+    setFocusSource(source);
+    
+    console.log('[DynamicInput] Focus acquired via:', source);
+    
+    // Update intent if user clicked directly on input
+    if (source === 'mouse' && focusIntent?.type !== 'input' && onDirectFocus) {
+      onDirectFocus(checkboxId);
+    }
+    
+    onInputFocus?.();
+  };
+  
+  // Enhanced blur handler for natural blur
+  const handleBlur = (e: React.FocusEvent) => {
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    
+    console.log('[DynamicInput] Blur event:', {
+      checkboxId,
+      relatedTarget: relatedTarget?.tagName,
+      focusSource,
+      currentIntent: focusIntent?.type
+    });
+    
+    // Only handle as natural blur if not an intentional exit
+    if (focusIntent?.type !== 'returning-to-checkbox' && onNaturalBlur) {
+      onNaturalBlur(checkboxId, relatedTarget);
+    }
+    
+    onInputBlur?.();
+  };
   
   const renderComponent = () => {
     const { componentType, componentProps } = strategy;
@@ -38,7 +192,11 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
       tabIndex: tabIndexBase,
       id: `${checkboxId}-additional-input`,
       'aria-describedby': componentProps.helpText ? `${checkboxId}-help` : undefined,
-      className: 'mt-2 ml-8' // Indent under checkbox
+      className: 'mt-2 ml-8', // Indent under checkbox
+      onKeyDown: handleKeyDown,
+      onFocus: handleFocus,
+      onBlur: handleBlur,
+      onMouseDown: () => setFocusSource('mouse')
     };
     
     switch (componentType) {
@@ -148,13 +306,22 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
   
   return (
     <div 
-      className="additional-input-container"
+      className="additional-input-container relative"
       role="group"
       aria-labelledby={`${checkboxId}-label`}
-      onFocus={onInputFocus}
-      onBlur={onInputBlur}
     >
       {component}
+      
+      {/* Tab key hint */}
+      {showHint && (
+        <div 
+          className="absolute -bottom-6 left-8 text-xs text-gray-600 bg-white px-2 py-1 rounded shadow-sm border border-gray-200 z-10"
+          role="status"
+          aria-live="polite"
+        >
+          Press Enter to save or Esc to cancel
+        </div>
+      )}
       
       {/* Help text if provided */}
       {strategy.componentProps.helpText && (

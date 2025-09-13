@@ -27,10 +27,10 @@ export const PharmacyInformationInputs: React.FC<PharmacyInformationInputsProps>
   onRxNumberChange
 }) => {
   // Hook for Enter key navigation
-  const handlePrescriberNameEnterKey = useEnterAsTab(16); // Move to Pharmacy Name
-  const handlePharmacyNameEnterKey = useEnterAsTab(17); // Move to Pharmacy Phone
-  const handlePharmacyPhoneEnterKey = useEnterAsTab(18); // Move to RX Number
-  const handleRxNumberEnterKey = useEnterAsTab(19); // Move to Inventory Quantity
+  const handlePrescriberNameEnterKey = useEnterAsTab(13); // Move to Pharmacy Name
+  const handlePharmacyNameEnterKey = useEnterAsTab(14); // Move to Pharmacy Phone
+  const handlePharmacyPhoneEnterKey = useEnterAsTab(15); // Move to RX Number
+  const handleRxNumberEnterKey = useEnterAsTab(16); // Move to Inventory Quantity
 
   return (
     <div className="space-y-6">
@@ -51,7 +51,7 @@ export const PharmacyInformationInputs: React.FC<PharmacyInformationInputsProps>
             placeholder="e.g., Dr. Smith"
             className={`mt-2 ${prescriberName ? 'border-blue-500 bg-blue-50' : ''}`}
             aria-label="Prescriber name"
-            tabIndex={15}
+            tabIndex={12}
           />
         </div>
 
@@ -70,7 +70,7 @@ export const PharmacyInformationInputs: React.FC<PharmacyInformationInputsProps>
             placeholder="e.g., Walgreens"
             className={`mt-2 ${pharmacyName ? 'border-blue-500 bg-blue-50' : ''}`}
             aria-label="Pharmacy name"
-            tabIndex={16}
+            tabIndex={13}
           />
         </div>
       </div>
@@ -94,7 +94,7 @@ export const PharmacyInformationInputs: React.FC<PharmacyInformationInputsProps>
             aria-label="Pharmacy phone number"
             aria-describedby={errors.get('pharmacyPhone') ? 'pharmacy-phone-error' : undefined}
             aria-invalid={!!errors.get('pharmacyPhone')}
-            tabIndex={17}
+            tabIndex={14}
           />
           {errors.get('pharmacyPhone') && (
             <p id="pharmacy-phone-error" className="mt-1 text-sm text-red-600" role="alert">
@@ -118,7 +118,7 @@ export const PharmacyInformationInputs: React.FC<PharmacyInformationInputsProps>
             placeholder="e.g., RX123456"
             className={`mt-2 ${rxNumber ? 'border-blue-500 bg-blue-50' : ''}`}
             aria-label="RX number"
-            tabIndex={18}
+            tabIndex={15}
           />
         </div>
       </div>

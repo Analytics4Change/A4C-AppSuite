@@ -35,7 +35,7 @@ export const DosageFormInputsEditable: React.FC<DosageFormInputsProps> = ({
   onDropdownOpen
 }) => {
   // Hook for Enter key navigation in dosage amount field
-  const handleDosageAmountEnterKey = useEnterAsTab(9); // Move to Dosage Unit field
+  const handleDosageAmountEnterKey = useEnterAsTab(7); // Move to Dosage Unit field
 
   return (
     <>
@@ -50,7 +50,7 @@ export const DosageFormInputsEditable: React.FC<DosageFormInputsProps> = ({
           placeholder="Select dosage form..."
           error={errors.get('dosageForm')}
           tabIndex={4}
-          targetTabIndex={6}
+          targetTabIndex={5}
           onChange={onDosageFormChange}
           onDropdownOpen={onDropdownOpen}
           testIdPrefix="dosage-form"
@@ -66,8 +66,8 @@ export const DosageFormInputsEditable: React.FC<DosageFormInputsProps> = ({
           disabled={!dosageForm}
           disabledMessage="(select form first)"
           error={errors.get('dosageRoute')}
-          tabIndex={dosageForm ? 6 : -1}
-          targetTabIndex={8}
+          tabIndex={dosageForm ? 5 : -1}
+          targetTabIndex={6}
           onChange={onDosageRouteChange}
           onDropdownOpen={onDropdownOpen}
           testIdPrefix="dosage-route"
@@ -92,7 +92,7 @@ export const DosageFormInputsEditable: React.FC<DosageFormInputsProps> = ({
             className={`mt-2 ${dosageAmount ? 'border-blue-500 bg-blue-50' : ''} ${errors.get('dosageAmount') ? 'border-red-500' : ''}`}
             aria-label="Dosage amount"
             aria-describedby={errors.get('dosageAmount') ? 'dosage-amount-error' : undefined}
-            tabIndex={8}
+            tabIndex={6}
           />
           {errors.get('dosageAmount') && (
             <p id="dosage-amount-error" className="mt-1 text-sm text-red-600" role="alert">
@@ -111,8 +111,8 @@ export const DosageFormInputsEditable: React.FC<DosageFormInputsProps> = ({
           disabled={!dosageRoute}
           disabledMessage="(select route first)"
           error={errors.get('dosageUnit')}
-          tabIndex={dosageRoute ? 9 : -1}
-          targetTabIndex={10}
+          tabIndex={dosageRoute ? 7 : -1}
+          targetTabIndex={8}
           onChange={onDosageUnitChange}
           onDropdownOpen={onDropdownOpen}
           testIdPrefix="dosage-unit"

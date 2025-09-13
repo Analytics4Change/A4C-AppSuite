@@ -135,7 +135,6 @@ export function useDropdownHighlighting<T>({
     const isNavigated = interactionMode === 'navigating' && index === navigationIndex;
     const itemText = getItemText(item).toLowerCase();
     const isTypedMatch = typedPrefix.length > 0 && 
-                         interactionMode === 'typing' && 
                          itemText.startsWith(typedPrefix);
     
     // Check for both conditions

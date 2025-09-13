@@ -1,18 +1,93 @@
-import { makeAutoObservable, runInAction } from 'mobx';
+import { makeAutoObservable, runInAction, computed } from 'mobx';
 import { CheckboxMetadata, ValidationRule } from '@/components/ui/FocusTrappedCheckboxGroup/metadata-types';
+import { DosageTimingSummaryStrategy } from '@/components/ui/FocusTrappedCheckboxGroup/summary-strategies';
 
 /**
  * ViewModel for managing dosage timing selections with dynamic additional inputs
  * Implements business logic for medication timing configuration
+ * Supports smart reordering and summary generation for reusability
  */
 export class DosageTimingViewModel {
   checkboxMetadata: CheckboxMetadata[] = [];
   additionalData: Map<string, any> = new Map();
   validationErrors: Map<string, string> = new Map();
   
+  // Reordering state (exposed for announcement handling)
+  _hasReorderedOnce = false;
+  _hasFocusedOnce = false;
+  
+  // Configuration for this specific use case
+  readonly config = {
+    enableReordering: true,  // Dosage Timings wants reordering
+    reorderTrigger: 'onBlur' as const,
+    maxVisibleItems: 7,
+    summaryStrategy: new DosageTimingSummaryStrategy()
+  };
+  
   constructor() {
-    makeAutoObservable(this);
+    makeAutoObservable(this, {
+      displayCheckboxes: computed,
+      hasSelectedItems: computed
+    });
     this.initializeMetadata();
+  }
+  
+  /**
+   * Computed property for display order - reorders once after first focus loss
+   */
+  get displayCheckboxes(): CheckboxMetadata[] {
+    // Create deep copies of checkbox objects to ensure React detects changes
+    const source = this.checkboxMetadata.map(cb => ({ ...cb }));
+    
+    // Skip reordering if not enabled
+    if (!this.config.enableReordering) {
+      return source;
+    }
+    
+    // Only reorder once after first focus loss with selections
+    if (!this._hasReorderedOnce || !this.hasSelectedItems) {
+      return source;
+    }
+    
+    // Selected items first, maintain relative order
+    const selected = source.filter(cb => cb.checked);
+    const unselected = source.filter(cb => !cb.checked);
+    return [...selected, ...unselected];
+  }
+  
+  /**
+   * Check if any items are selected
+   */
+  get hasSelectedItems(): boolean {
+    return this.checkboxMetadata.some(cb => cb.checked);
+  }
+  
+  /**
+   * Mark that the group has been focused
+   */
+  handleFocusEntered() {
+    this._hasFocusedOnce = true;
+  }
+  
+  /**
+   * Handle focus lost - trigger reordering if conditions are met
+   */
+  handleFocusLost() {
+    if (this.config.enableReordering && 
+        this._hasFocusedOnce && 
+        !this._hasReorderedOnce && 
+        this.hasSelectedItems) {
+      runInAction(() => {
+        this._hasReorderedOnce = true;
+      });
+    }
+  }
+  
+  /**
+   * Get summary text for a checkbox using the configured strategy
+   */
+  getSummaryText(checkboxId: string, data: any): string {
+    return this.config.summaryStrategy.generateSummary(checkboxId, data);
   }
   
   /**

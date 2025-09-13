@@ -29,8 +29,8 @@ export const DateSelection: React.FC<DateSelectionProps> = ({
   };
 
   // Hook for Enter key navigation
-  const handleStartDateEnterKey = useEnterAsTab(14); // Move to Discontinue Date
-  const handleDiscontinueDateEnterKey = useEnterAsTab(15); // Move to Inventory Quantity
+  const handleStartDateEnterKey = useEnterAsTab(11); // Move to Discontinue Date
+  const handleDiscontinueDateEnterKey = useEnterAsTab(12); // Move to Pharmacy Name
 
   return (
     <div className="grid grid-cols-2 gap-6">
@@ -56,7 +56,7 @@ export const DateSelection: React.FC<DateSelectionProps> = ({
             className="cursor-pointer"
             aria-label="Start date"
             aria-describedby="start-date-format"
-            tabIndex={13}
+            tabIndex={10}
           />
         </div>
         <span id="start-date-format" className="text-xs text-gray-500">
@@ -87,7 +87,7 @@ export const DateSelection: React.FC<DateSelectionProps> = ({
             aria-label="Discontinue date"
             aria-describedby={error ? 'discontinue-date-error' : 'discontinue-date-format'}
             aria-invalid={!!error}
-            tabIndex={14}
+            tabIndex={11}
           />
         </div>
         

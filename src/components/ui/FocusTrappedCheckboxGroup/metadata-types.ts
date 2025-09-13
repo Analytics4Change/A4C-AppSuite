@@ -50,6 +50,21 @@ export interface CheckboxMetadata {
 }
 
 /**
+ * Focus source tracking for hybrid interactions
+ */
+export type FocusSource = 'keyboard' | 'mouse' | 'programmatic';
+
+/**
+ * Focus intent for preventing unwanted auto-focus
+ */
+export type FocusIntent = 
+  | { type: 'none' }
+  | { type: 'checkbox'; checkboxId: string; source: FocusSource }
+  | { type: 'input'; checkboxId: string; source: FocusSource }
+  | { type: 'returning-to-checkbox'; checkboxId: string; source: FocusSource }
+  | { type: 'external-blur'; from: 'input' | 'checkbox' };
+
+/**
  * Props for components that render dynamic additional inputs
  */
 export interface DynamicAdditionalInputProps {
@@ -59,9 +74,13 @@ export interface DynamicAdditionalInputProps {
   onDataChange: (data: any) => void;
   tabIndexBase: number;
   shouldFocus: boolean;
+  focusIntent?: FocusIntent;
   onFocusHandled: () => void;
   onInputFocus?: () => void;
   onInputBlur?: () => void;
+  onIntentionalExit?: (checkboxId: string, save: boolean) => void;
+  onNaturalBlur?: (checkboxId: string, relatedTarget: HTMLElement | null) => void;
+  onDirectFocus?: (checkboxId: string) => void;
 }
 
 /**
@@ -76,12 +95,24 @@ export interface EnhancedCheckboxGroupProps {
   onContinue: (selectedIds: string[], additionalData: Map<string, any>) => void;
   onCancel: () => void;
   
-  // Collapsible behavior
+  // Display configuration (new for reusability)
+  showLabel?: boolean; // Show title label above container (default: true)
+  maxVisibleItems?: number; // Max items before scrolling (default: 7)
+  
+  // Reordering configuration (new for reusability)
+  enableReordering?: boolean; // Enable smart reordering (default: false)
+  reorderTrigger?: 'onBlur' | 'onChange' | 'manual'; // When to trigger reorder (default: 'onBlur')
+  onFocusLost?: () => void; // Callback when focus leaves the checkbox group
+  
+  // Summary display (new for reusability)
+  summaryRenderer?: (checkboxId: string, data: any) => string; // Custom summary generation
+  
+  // Collapsible behavior (deprecated - will be removed)
   isCollapsible?: boolean;
   initialExpanded?: boolean;
   
   // Focus management
-  baseTabIndex: number;
+  baseTabIndex?: number;
   nextTabIndex?: number;
   
   // ARIA support

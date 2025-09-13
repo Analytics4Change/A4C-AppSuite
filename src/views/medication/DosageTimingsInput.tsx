@@ -24,7 +24,7 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
   errors
 }) => {
   // Create ViewModel instance
-  const viewModelRef = useRef<DosageTimingViewModel>();
+  const viewModelRef = useRef<DosageTimingViewModel | null>(null);
   
   if (!viewModelRef.current) {
     viewModelRef.current = new DosageTimingViewModel();
@@ -71,6 +71,9 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
     viewModel.reset();
     onTimingsChange([]);
     onClose?.();
+    // Focus next element (Date Selection at tabIndex 10)
+    const nextElement = document.querySelector('[tabindex="10"]') as HTMLElement;
+    nextElement?.focus();
   };
 
   const handleContinue = (selectedIds: string[], additionalData: Map<string, any>) => {
@@ -88,9 +91,21 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
     onTimingsChange(selectedIds);
     onClose?.();
     
-    // Focus should advance to next element (Therapeutic Classes at tabIndex 12)
-    const nextElement = document.querySelector('[tabindex="12"]') as HTMLElement;
+    // Focus should advance to next element (Date Selection at tabIndex 10)
+    const nextElement = document.querySelector('[tabindex="10"]') as HTMLElement;
     nextElement?.focus();
+  };
+  
+  const handleFocusLost = () => {
+    viewModel.handleFocusLost();
+    
+    // Announce reorder if it happened
+    if (viewModel._hasReorderedOnce && viewModel.hasSelectedItems) {
+      const announcement = document.getElementById('dosage-timings-announcements');
+      if (announcement) {
+        announcement.textContent = 'Selected timing options have been moved to the top of the list';
+      }
+    }
   };
 
   // Combine errors from props and ViewModel
@@ -105,15 +120,18 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
       <EnhancedFocusTrappedCheckboxGroup
         id="dosage-timings"
         title="Dosage Timings"
-        checkboxes={viewModel.checkboxMetadata}
+        checkboxes={viewModel.displayCheckboxes} // Use computed display order
+        showLabel={true} // Show title above the container
+        enableReordering={viewModel.config.enableReordering}
+        maxVisibleItems={viewModel.config.maxVisibleItems}
+        summaryRenderer={(id, data) => viewModel.getSummaryText(id, data)}
+        onFocusLost={handleFocusLost}
         onSelectionChange={handleSelectionChange}
         onAdditionalDataChange={handleAdditionalDataChange}
         onCancel={handleCancel}
         onContinue={handleContinue}
-        isCollapsible={true}
-        initialExpanded={false}
-        baseTabIndex={11}
-        nextTabIndex={12}
+        baseTabIndex={9}
+        nextTabIndex={10}
         ariaLabel="Select dosage timing options"
         isRequired={false}
         hasError={hasError}

@@ -24,7 +24,7 @@ export const InventoryQuantityInputs: React.FC<InventoryQuantityInputsProps> = (
   onDropdownOpen
 }) => {
   // Hook for Enter key navigation in inventory quantity field
-  const handleInventoryQuantityEnterKey = useEnterAsTab(20); // Move to Inventory Unit field
+  const handleInventoryQuantityEnterKey = useEnterAsTab(17); // Move to Inventory Unit field
 
   return (
     <div className="grid grid-cols-2 gap-6">
@@ -44,7 +44,7 @@ export const InventoryQuantityInputs: React.FC<InventoryQuantityInputsProps> = (
           className={`mt-2 ${inventoryQuantity ? 'border-blue-500 bg-blue-50' : ''} ${errors.get('inventoryQuantity') ? 'border-red-500' : ''}`}
           aria-label="Inventory quantity"
           aria-describedby={errors.get('inventoryQuantity') ? 'inventory-quantity-error' : undefined}
-          tabIndex={19}
+          tabIndex={16}
         />
         {errors.get('inventoryQuantity') && (
           <p id="inventory-quantity-error" className="mt-1 text-sm text-red-600" role="alert">
@@ -61,8 +61,8 @@ export const InventoryQuantityInputs: React.FC<InventoryQuantityInputsProps> = (
         options={availableInventoryUnits}
         placeholder="Select inventory unit..."
         error={errors.get('inventoryUnit')}
-        tabIndex={20}
-        targetTabIndex={21}
+        tabIndex={17}
+        targetTabIndex={18}
         onChange={onInventoryUnitChange}
         onDropdownOpen={onDropdownOpen}
         filterMode="startsWith"
