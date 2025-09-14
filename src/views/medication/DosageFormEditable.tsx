@@ -1,6 +1,6 @@
 import React from 'react';
 import { observer } from 'mobx-react-lite';
-import { DosageFormInputsEditable } from './DosageFormInputsEditable';
+import { DosageCascadeInputs } from './DosageCascadeInputs';
 import { DosageFrequencyInput } from './DosageFrequencyInput';
 import { DosageTimingsInput } from './DosageTimingsInput';
 
@@ -45,8 +45,8 @@ export const DosageFormEditable = observer((props: DosageFormProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Dosage Form and Dosage Unit Inputs - Using Editable Version */}
-      <DosageFormInputsEditable
+      {/* Cascading Dosage Inputs (Form → Route → Amount → Unit) */}
+      <DosageCascadeInputs
         dosageForm={dosageForm}
         dosageRoute={dosageRoute}
         dosageAmount={dosageAmount}

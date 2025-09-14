@@ -5,7 +5,7 @@ import { EditableDropdown } from '@/components/ui/EditableDropdown';
 import { dosageForms } from '@/mocks/data/dosages.mock';
 import { useEnterAsTab } from '@/hooks/useEnterAsTab';
 
-interface DosageFormInputsProps {
+interface DosageCascadeInputsProps {
   dosageForm: string;
   dosageRoute: string;
   dosageAmount: string;
@@ -20,7 +20,7 @@ interface DosageFormInputsProps {
   onDropdownOpen?: (elementId: string) => void;
 }
 
-export const DosageFormInputsEditable: React.FC<DosageFormInputsProps> = ({
+export const DosageCascadeInputs: React.FC<DosageCascadeInputsProps> = ({
   dosageForm,
   dosageRoute,
   dosageAmount,
