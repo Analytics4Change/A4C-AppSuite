@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction, computed } from 'mobx';
 import { CheckboxMetadata, ValidationRule } from '@/components/ui/FocusTrappedCheckboxGroup/metadata-types';
 import { DosageTimingSummaryStrategy } from '@/components/ui/FocusTrappedCheckboxGroup/summary-strategies';
+import { RangeHoursInput } from '@/components/ui/FocusTrappedCheckboxGroup/RangeHoursInput';
 
 /**
  * ViewModel for managing dosage timing selections with dynamic additional inputs
@@ -49,10 +50,15 @@ export class DosageTimingViewModel {
       return source;
     }
     
-    // Selected items first, maintain relative order
-    const selected = source.filter(cb => cb.checked);
-    const unselected = source.filter(cb => !cb.checked);
-    return [...selected, ...unselected];
+    // Sort by checked status first (selected items first), then by originalIndex
+    return source.sort((a, b) => {
+      // First sort by checked status (true before false)
+      if (a.checked !== b.checked) {
+        return a.checked ? -1 : 1;
+      }
+      // Then sort by originalIndex to maintain original order within each group
+      return (a.originalIndex || 0) - (b.originalIndex || 0);
+    });
   }
   
   /**
@@ -84,6 +90,18 @@ export class DosageTimingViewModel {
   }
   
   /**
+   * Manually trigger sorting - called when Continue or Cancel is clicked
+   */
+  triggerSort() {
+    if (this.config.enableReordering && this.hasSelectedItems) {
+      runInAction(() => {
+        this._hasReorderedOnce = true;
+        this._hasFocusedOnce = true;
+      });
+    }
+  }
+  
+  /**
    * Get summary text for a checkbox using the configured strategy
    */
   getSummaryText(checkboxId: string, data: any): string {
@@ -102,6 +120,7 @@ export class DosageTimingViewModel {
         checked: false,
         description: 'Medication taken at regular hourly intervals',
         requiresAdditionalInput: true,
+        originalIndex: 0,
         additionalInputStrategy: {
           componentType: 'numeric',
           componentProps: {
@@ -124,12 +143,52 @@ export class DosageTimingViewModel {
         }
       },
       {
+        id: 'qxh-range',
+        label: 'Every X to Y Hours',
+        value: 'qxh-range',
+        checked: false,
+        description: 'Medication taken at variable hourly intervals',
+        requiresAdditionalInput: true,
+        originalIndex: 1,
+        additionalInputStrategy: {
+          componentType: 'custom',
+          componentProps: {
+            component: RangeHoursInput,
+            minPlaceholder: 'Min',
+            maxPlaceholder: 'Max',
+            ariaLabel: 'Enter hour range for doses',
+            helpText: 'Enter minimum and maximum hours between doses (e.g., 4 to 6 hours)',
+            checkboxId: 'qxh-range'
+          },
+          validationRules: [
+            { type: 'required', message: 'Hour range required when this option is selected' },
+            { 
+              type: 'custom', 
+              validate: (data: any) => {
+                if (!data || typeof data !== 'object') return false;
+                const { min, max } = data;
+                if (!min || !max) return false;
+                if (min < 1 || min > 24 || max < 1 || max > 24) return false;
+                return min <= max;
+              },
+              message: 'Please enter valid hour range (1-24 hours, min ≤ max)' 
+            }
+          ],
+          focusManagement: {
+            autoFocus: true,
+            returnFocusTo: 'checkbox',
+            trapFocus: false
+          }
+        }
+      },
+      {
         id: 'qam',
         label: 'Every Morning - QAM',
         value: 'qam',
         checked: false,
         description: 'Once daily in the morning',
-        requiresAdditionalInput: false
+        requiresAdditionalInput: false,
+        originalIndex: 2
       },
       {
         id: 'qpm',
@@ -137,7 +196,8 @@ export class DosageTimingViewModel {
         value: 'qpm',
         checked: false,
         description: 'Once daily in the evening',
-        requiresAdditionalInput: false
+        requiresAdditionalInput: false,
+        originalIndex: 3
       },
       {
         id: 'qhs',
@@ -145,7 +205,8 @@ export class DosageTimingViewModel {
         value: 'qhs',
         checked: false,
         description: 'Once daily at bedtime',
-        requiresAdditionalInput: false
+        requiresAdditionalInput: false,
+        originalIndex: 4
       },
       {
         id: 'specific-times',
@@ -154,6 +215,7 @@ export class DosageTimingViewModel {
         checked: false,
         description: 'Set specific times for medication',
         requiresAdditionalInput: true,
+        originalIndex: 5,
         additionalInputStrategy: {
           componentType: 'text',
           componentProps: {
@@ -172,35 +234,6 @@ export class DosageTimingViewModel {
               pattern: /^(\d{1,2}(:\d{2})?\s*(am|pm|AM|PM)?,?\s*)+$/,
               message: 'Please enter valid times (e.g., 8am, 2:30pm)'
             }
-          ],
-          focusManagement: {
-            autoFocus: true,
-            trapFocus: false
-          }
-        }
-      },
-      {
-        id: 'prn',
-        label: 'As Needed - PRN',
-        value: 'prn',
-        checked: false,
-        description: 'Take medication as needed',
-        requiresAdditionalInput: true,
-        additionalInputStrategy: {
-          componentType: 'select',
-          componentProps: {
-            ariaLabel: 'Maximum frequency for as-needed medication',
-            helpText: 'Select maximum frequency',
-            options: [
-              { value: 'q4h', label: 'Every 4 hours as needed' },
-              { value: 'q6h', label: 'Every 6 hours as needed' },
-              { value: 'q8h', label: 'Every 8 hours as needed' },
-              { value: 'q12h', label: 'Every 12 hours as needed' },
-              { value: 'daily', label: 'Once daily as needed' }
-            ]
-          },
-          validationRules: [
-            { type: 'required', message: 'Please select maximum frequency' }
           ],
           focusManagement: {
             autoFocus: true,

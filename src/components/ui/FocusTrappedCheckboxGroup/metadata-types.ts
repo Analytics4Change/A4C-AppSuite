@@ -47,6 +47,9 @@ export interface CheckboxMetadata {
   // Strategy Pattern Extension
   requiresAdditionalInput?: boolean;
   additionalInputStrategy?: AdditionalInputStrategy;
+  
+  // Sorting support
+  originalIndex?: number;
 }
 
 /**
@@ -72,6 +75,7 @@ export interface DynamicAdditionalInputProps {
   checkboxId: string;
   currentValue?: any;
   onDataChange: (data: any) => void;
+  onSelectionChange?: (checkboxId: string, checked: boolean) => void;
   tabIndexBase: number;
   shouldFocus: boolean;
   focusIntent?: FocusIntent;

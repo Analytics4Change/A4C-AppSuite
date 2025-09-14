@@ -39,12 +39,20 @@ export class DosageTimingSummaryStrategy implements SummaryStrategy {
         return data.length > this.maxLength ? `${times}...` : times;
       }
       
-      case 'every-x-hours': {
-        // For intervals, show "Every X hours"
+      case 'qxh': {
+        // For regular intervals, show "Every X hours"
         return data ? `Every ${data} hours` : '';
       }
       
-      case 'as-needed-prn': {
+      case 'qxh-range': {
+        // For interval range, show "Every X to Y hours"
+        if (data && typeof data === 'object' && data.min && data.max) {
+          return `Every ${data.min} to ${data.max} hours`;
+        }
+        return '';
+      }
+      
+      case 'prn': {
         // For PRN, show the max frequency if specified
         return data || 'PRN';
       }

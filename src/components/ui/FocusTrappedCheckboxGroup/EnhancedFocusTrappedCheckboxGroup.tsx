@@ -19,6 +19,7 @@ interface MemoizedCheckboxItemProps {
   focusedCheckboxId: string | null;
   checkboxesLength: number;
   onCheckboxChange: (id: string, checked: boolean) => void;
+  onSelectionChange: (id: string, checked: boolean) => void;
   onCheckboxFocus: (id: string) => void;
   getRefCallback: (id: string) => (el: HTMLElement | null) => void;
   getSummaryText: (id: string, data: any) => string;
@@ -40,6 +41,7 @@ const MemoizedCheckboxItem = React.memo<MemoizedCheckboxItemProps>(({
   focusedCheckboxId,
   checkboxesLength,
   onCheckboxChange,
+  onSelectionChange,
   onCheckboxFocus,
   getRefCallback,
   getSummaryText,
@@ -56,7 +58,7 @@ const MemoizedCheckboxItem = React.memo<MemoizedCheckboxItemProps>(({
     <div className="space-y-2">
       <label 
         id={`${checkbox.id}-label`}
-        className="flex items-start space-x-3 cursor-pointer p-2 rounded hover:bg-gray-50"
+        className="flex items-start space-x-3 cursor-pointer p-2 rounded-md hover:bg-gray-50 focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 transition-all"
       >
         <Checkbox
           ref={getRefCallback(checkbox.id)}
@@ -74,6 +76,7 @@ const MemoizedCheckboxItem = React.memo<MemoizedCheckboxItemProps>(({
           aria-describedby={checkbox.description ? `${checkbox.id}-desc` : undefined}
           aria-setsize={checkboxesLength}
           aria-posinset={index + 1}
+          className="focus:ring-0 focus-visible:ring-0"
         />
         <div className="flex-1">
           <span className="text-sm font-medium">
@@ -99,6 +102,7 @@ const MemoizedCheckboxItem = React.memo<MemoizedCheckboxItemProps>(({
           checkboxId={checkbox.id}
           currentValue={additionalData.get(checkbox.id)}
           onDataChange={(data) => handleAdditionalDataChange(checkbox.id, data)}
+          onSelectionChange={onSelectionChange}
           tabIndexBase={-1} // Managed by focus trap
           shouldFocus={focusedCheckboxId === checkbox.id && focusIntent.type !== 'returning-to-checkbox'}
           focusIntent={focusIntent}
@@ -725,6 +729,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
                   focusedCheckboxId={focusedCheckboxId}
                   checkboxesLength={checkboxes.length}
                   onCheckboxChange={handleCheckboxChange}
+                  onSelectionChange={onSelectionChange}
                   onCheckboxFocus={(checkboxId: string) => {
                     setFocusedCheckboxIndex(index);
                     setFocusedCheckboxId(checkboxId);

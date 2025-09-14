@@ -12,6 +12,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
   checkboxId,
   currentValue,
   onDataChange,
+  onSelectionChange,
   tabIndexBase,
   shouldFocus,
   focusIntent,
@@ -292,6 +293,8 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
             {...componentProps}
             value={currentValue}
             onChange={onDataChange}
+            onSelectionChange={onSelectionChange}
+            checkboxId={checkboxId}
           />
         );
         

@@ -13,6 +13,7 @@ interface FocusBehaviorContextValue {
   registerBehavior: (behavior: FocusBehaviorType, componentId: string) => boolean;
   unregisterBehavior: (componentId: string) => void;
   canActivateBehavior: (behavior: FocusBehaviorType) => boolean;
+  getRegisteredCount: (behavior: FocusBehaviorType) => number;
 }
 
 /**
@@ -32,29 +33,45 @@ export const FocusBehaviorProvider: React.FC<{ children: React.ReactNode }> = ({
    * Returns true if registration successful, false if conflicting behavior exists
    */
   const registerBehavior = useCallback((behavior: FocusBehaviorType, componentId: string): boolean => {
-    // Check for conflicts
+    // Check for conflicts only between DIFFERENT behavior types
+    // Multiple components can use the same behavior type
     if (behavior === 'tab-as-arrows' && activeBehavior === 'enter-as-tab') {
-      console.warn(
-        `[FocusBehavior] Cannot activate 'tab-as-arrows' while 'enter-as-tab' is active. ` +
-        `Component: ${componentId}`
-      );
-      return false;
+      // Check if there are any active 'enter-as-tab' registrations
+      const hasConflictingBehavior = Array.from(behaviorRegistry.current.values())
+        .some(b => b === 'enter-as-tab');
+      
+      if (hasConflictingBehavior) {
+        console.warn(
+          `[FocusBehavior] Cannot activate 'tab-as-arrows' while 'enter-as-tab' is active. ` +
+          `Component: ${componentId}`
+        );
+        return false;
+      }
     }
     
     if (behavior === 'enter-as-tab' && activeBehavior === 'tab-as-arrows') {
-      console.warn(
-        `[FocusBehavior] Cannot activate 'enter-as-tab' while 'tab-as-arrows' is active. ` +
-        `Component: ${componentId}`
-      );
-      return false;
+      // Check if there are any active 'tab-as-arrows' registrations
+      const hasConflictingBehavior = Array.from(behaviorRegistry.current.values())
+        .some(b => b === 'tab-as-arrows');
+      
+      if (hasConflictingBehavior) {
+        console.warn(
+          `[FocusBehavior] Cannot activate 'enter-as-tab' while 'tab-as-arrows' is active. ` +
+          `Component: ${componentId}`
+        );
+        return false;
+      }
     }
 
     // Register the behavior
     behaviorRegistry.current.set(componentId, behavior);
     
-    // Update active behavior if this is the first non-default registration
-    if (behavior !== 'default' && activeBehavior === 'default') {
-      setActiveBehavior(behavior);
+    // Update active behavior if needed
+    if (behavior !== 'default') {
+      // If this is the first non-default registration, or if we're adding to existing same type
+      if (activeBehavior === 'default' || activeBehavior === behavior) {
+        setActiveBehavior(behavior);
+      }
     }
     
     return true;
@@ -89,18 +106,39 @@ export const FocusBehaviorProvider: React.FC<{ children: React.ReactNode }> = ({
   const canActivateBehavior = useCallback((behavior: FocusBehaviorType): boolean => {
     if (behavior === 'default') return true;
     
-    // Check for mutual exclusivity
-    if (behavior === 'tab-as-arrows' && activeBehavior === 'enter-as-tab') return false;
-    if (behavior === 'enter-as-tab' && activeBehavior === 'tab-as-arrows') return false;
+    // Allow same type, check for conflicts only between different types
+    if (behavior === activeBehavior) return true;
+    
+    // Check for mutual exclusivity between different types
+    if (behavior === 'tab-as-arrows') {
+      const hasEnterAsTab = Array.from(behaviorRegistry.current.values())
+        .some(b => b === 'enter-as-tab');
+      return !hasEnterAsTab;
+    }
+    
+    if (behavior === 'enter-as-tab') {
+      const hasTabAsArrows = Array.from(behaviorRegistry.current.values())
+        .some(b => b === 'tab-as-arrows');
+      return !hasTabAsArrows;
+    }
     
     return true;
   }, [activeBehavior]);
+
+  /**
+   * Get count of components registered with a specific behavior
+   */
+  const getRegisteredCount = useCallback((behavior: FocusBehaviorType): number => {
+    return Array.from(behaviorRegistry.current.values())
+      .filter(b => b === behavior).length;
+  }, []);
 
   const value: FocusBehaviorContextValue = {
     activeBehavior,
     registerBehavior,
     unregisterBehavior,
-    canActivateBehavior
+    canActivateBehavior,
+    getRegisteredCount
   };
 
   return (
@@ -121,7 +159,8 @@ export function useFocusBehaviorContext(): FocusBehaviorContextValue {
       activeBehavior: 'default',
       registerBehavior: () => true,
       unregisterBehavior: () => {},
-      canActivateBehavior: () => true
+      canActivateBehavior: () => true,
+      getRegisteredCount: () => 0
     };
   }
   return context;

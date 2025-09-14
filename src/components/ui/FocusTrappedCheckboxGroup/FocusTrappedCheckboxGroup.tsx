@@ -257,7 +257,7 @@ export const FocusTrappedCheckboxGroup = observer(({
 
   // Focus ring styling for checkbox items
   const getCheckboxItemClasses = (index: number) => cn(
-    "flex items-center gap-3 px-3 py-2 rounded",
+    "flex items-center gap-3 px-3 py-2 rounded-md",
     "transition-all duration-200",
     "hover:bg-blue-50/50",
     "cursor-pointer",
@@ -414,6 +414,7 @@ export const FocusTrappedCheckboxGroup = observer(({
                   tabIndex={-1}
                   onClick={(e) => e.stopPropagation()}
                   disabled={item.disabled}
+                  className="focus:ring-0 focus-visible:ring-0"
                 />
                 <div className="flex-1">
                   <span className={cn(

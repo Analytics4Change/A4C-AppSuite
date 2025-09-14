@@ -68,6 +68,9 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
   };
 
   const handleCancel = () => {
+    // Trigger sorting so selected items appear first next time
+    viewModel.triggerSort();
+    
     viewModel.reset();
     onTimingsChange([]);
     onClose?.();
@@ -86,6 +89,9 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
     // Get the complete configuration
     const config = viewModel.getTimingConfiguration();
     console.log('Dosage timing configuration:', config);
+    
+    // Trigger sorting so selected items appear first next time
+    viewModel.triggerSort();
     
     // Update parent
     onTimingsChange(selectedIds);
