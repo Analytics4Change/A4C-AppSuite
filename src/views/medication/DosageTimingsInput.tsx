@@ -5,6 +5,7 @@ import { DosageTimingViewModel } from '@/viewModels/medication/DosageTimingViewM
 
 interface DosageTimingsInputProps {
   selectedTimings: string[];
+  selectedFrequencies?: string[]; // New prop to receive frequencies from parent
   onTimingsChange: (timings: string[]) => void;
   onClose?: () => void;
   errors?: Map<string, string>;
@@ -19,6 +20,7 @@ interface DosageTimingsInputProps {
  */
 export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
   selectedTimings,
+  selectedFrequencies,
   onTimingsChange,
   onClose,
   errors
@@ -49,6 +51,11 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
       }
     });
   }, [selectedTimings, viewModel]);
+  
+  // Sync selected frequencies with ViewModel for business logic decisions
+  useEffect(() => {
+    viewModel.setSelectedFrequencies(selectedFrequencies || []);
+  }, [selectedFrequencies, viewModel]);
 
   const handleSelectionChange = (id: string, checked: boolean) => {
     viewModel.handleCheckboxChange(id, checked);
@@ -67,6 +74,17 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
     console.log(`Additional data for ${checkboxId}:`, data);
   };
 
+  const handleFieldBlur = (checkboxId: string) => {
+    viewModel.markFieldTouched(checkboxId);
+  };
+
+  const handleBack = () => {
+    // Preserve current selections
+    // Focus Dosage Frequency at tabIndex 9
+    const prevElement = document.querySelector('[tabindex="9"]') as HTMLElement;
+    prevElement?.focus();
+  };
+
   const handleCancel = () => {
     // Trigger sorting so selected items appear first next time
     viewModel.triggerSort();
@@ -74,21 +92,23 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
     viewModel.reset();
     onTimingsChange([]);
     onClose?.();
-    // Focus next element (Date Selection at tabIndex 10)
-    const nextElement = document.querySelector('[tabindex="10"]') as HTMLElement;
+    // Focus next element (Food Conditions at tabIndex 11)
+    const nextElement = document.querySelector('[tabindex="11"]') as HTMLElement;
     nextElement?.focus();
   };
 
   const handleContinue = (selectedIds: string[], additionalData: Map<string, any>) => {
-    // Validate before continuing
+    console.log('[DosageTimings] Continue pressed:', { selectedIds, hasPRNSelection });
+    
+    // Validate using ViewModel business logic (which now considers PRN context)
     if (!viewModel.isValid) {
-      console.warn('Invalid timing configuration');
+      console.warn('[DosageTimings] Invalid timing configuration - blocking continue');
       return;
     }
     
     // Get the complete configuration
     const config = viewModel.getTimingConfiguration();
-    console.log('Dosage timing configuration:', config);
+    console.log('[DosageTimings] Configuration:', config);
     
     // Trigger sorting so selected items appear first next time
     viewModel.triggerSort();
@@ -97,8 +117,9 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
     onTimingsChange(selectedIds);
     onClose?.();
     
-    // Focus should advance to next element (Date Selection at tabIndex 10)
-    const nextElement = document.querySelector('[tabindex="10"]') as HTMLElement;
+    console.log('[DosageTimings] Advancing focus to Food Conditions (tabIndex 11)');
+    // Focus should advance to next element (Food Conditions at tabIndex 11)
+    const nextElement = document.querySelector('[tabindex="11"]') as HTMLElement;
     nextElement?.focus();
   };
   
@@ -121,6 +142,12 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
       ? Array.from(viewModel.validationErrors.values()).join(', ')
       : undefined);
 
+  // Check if PRN (as-needed) frequency is selected
+  const hasPRNSelection = selectedFrequencies?.some(
+    freq => freq === 'prn' || freq === 'prn-max'
+  );
+  
+
   return (
     <div className="col-span-2">
       <EnhancedFocusTrappedCheckboxGroup
@@ -134,15 +161,26 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
         onFocusLost={handleFocusLost}
         onSelectionChange={handleSelectionChange}
         onAdditionalDataChange={handleAdditionalDataChange}
+        onFieldBlur={handleFieldBlur}
         onCancel={handleCancel}
         onContinue={handleContinue}
-        baseTabIndex={9}
-        nextTabIndex={10}
+        onBack={handleBack}
+        showBackButton={true}
+        backButtonText="← Back"
+        previousTabIndex={9}
+        baseTabIndex={10}
+        nextTabIndex={11}
         ariaLabel="Select dosage timing options"
         isRequired={false}
         hasError={hasError}
         errorMessage={errorMessage}
-        helpText="Select timing options for medication. Some options require additional information."
+        helpText="Select timing options. Navigation: Arrows • Select: Space • Back: Backspace/Shift+Tab • Continue: Enter"
+        continueButtonBehavior={{
+          allowSkipSelection: hasPRNSelection,
+          skipMessage: hasPRNSelection 
+            ? "Timing selection optional for as-needed medications" 
+            : undefined
+        }}
       />
     </div>
   );

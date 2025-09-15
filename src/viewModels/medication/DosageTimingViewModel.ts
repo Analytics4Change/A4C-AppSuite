@@ -12,6 +12,8 @@ export class DosageTimingViewModel {
   checkboxMetadata: CheckboxMetadata[] = [];
   additionalData: Map<string, any> = new Map();
   validationErrors: Map<string, string> = new Map();
+  touchedFields: Set<string> = new Set();  // Track which fields have been interacted with
+  selectedFrequencies: string[] = [];  // External context: selected frequency IDs from parent
   
   // Reordering state (exposed for announcement handling)
   _hasReorderedOnce = false;
@@ -28,7 +30,8 @@ export class DosageTimingViewModel {
   constructor() {
     makeAutoObservable(this, {
       displayCheckboxes: computed,
-      hasSelectedItems: computed
+      hasSelectedItems: computed,
+      isValid: computed
     });
     this.initializeMetadata();
   }
@@ -109,6 +112,26 @@ export class DosageTimingViewModel {
   }
   
   /**
+   * Update selected frequencies context from parent component
+   * This allows the ViewModel to make business logic decisions based on frequency selection
+   */
+  setSelectedFrequencies(frequencies: string[]) {
+    runInAction(() => {
+      this.selectedFrequencies = frequencies;
+    });
+  }
+  
+  /**
+   * Check if PRN (as-needed) frequency is selected
+   * PRN medications make timing selection optional
+   */
+  private get hasPRNSelection(): boolean {
+    return this.selectedFrequencies.some(
+      freq => freq === 'prn' || freq === 'prn-max'
+    );
+  }
+  
+  /**
    * Initialize checkbox metadata with strategies for additional inputs
    */
   private initializeMetadata() {
@@ -138,7 +161,8 @@ export class DosageTimingViewModel {
           focusManagement: {
             autoFocus: true,
             returnFocusTo: 'checkbox',
-            trapFocus: false
+            trapFocus: false,
+            requiresInput: true  // Required field - auto-focus when checkbox selected
           }
         }
       },
@@ -177,7 +201,8 @@ export class DosageTimingViewModel {
           focusManagement: {
             autoFocus: true,
             returnFocusTo: 'checkbox',
-            trapFocus: false
+            trapFocus: false,
+            requiresInput: true  // Required field - auto-focus when checkbox selected
           }
         }
       },
@@ -237,7 +262,8 @@ export class DosageTimingViewModel {
           ],
           focusManagement: {
             autoFocus: true,
-            trapFocus: false
+            trapFocus: false,
+            requiresInput: true  // Required field - auto-focus when checkbox selected
           }
         }
       }
@@ -253,10 +279,11 @@ export class DosageTimingViewModel {
       if (metadata) {
         metadata.checked = checked;
         
-        // Clear additional data and validation errors if unchecked
+        // Clear additional data, validation errors, and touched state if unchecked
         if (!checked) {
           this.additionalData.delete(id);
           this.validationErrors.delete(id);
+          this.touchedFields.delete(id);
         }
       }
     });
@@ -277,8 +304,30 @@ export class DosageTimingViewModel {
         this.additionalData.set(checkboxId, data);
       }
       
-      // Validate if rules exist
-      if (metadata.additionalInputStrategy?.validationRules) {
+      // Only validate if the field has been touched OR has a non-empty value
+      // This prevents showing errors immediately when checkbox is first checked
+      if (metadata.additionalInputStrategy?.validationRules &&
+          (this.touchedFields.has(checkboxId) || data)) {
+        const error = this.validateData(data, metadata.additionalInputStrategy.validationRules);
+        if (error) {
+          this.validationErrors.set(checkboxId, error);
+        } else {
+          this.validationErrors.delete(checkboxId);
+        }
+      }
+    });
+  }
+  
+  /**
+   * Mark a field as touched (user has interacted with it)
+   */
+  markFieldTouched(checkboxId: string) {
+    runInAction(() => {
+      this.touchedFields.add(checkboxId);
+      // Re-validate now that field is touched
+      const metadata = this.checkboxMetadata.find(m => m.id === checkboxId);
+      if (metadata?.additionalInputStrategy?.validationRules) {
+        const data = this.additionalData.get(checkboxId);
         const error = this.validateData(data, metadata.additionalInputStrategy.validationRules);
         if (error) {
           this.validationErrors.set(checkboxId, error);
@@ -342,9 +391,30 @@ export class DosageTimingViewModel {
   
   /**
    * Check if configuration is valid
+   * This is called before Continue to ensure all required fields are filled
+   * For PRN medications, timing selection is optional
    */
   get isValid(): boolean {
-    // At least one timing must be selected
+    // For PRN medications, timing selection is optional - always valid even with no selections
+    if (this.hasPRNSelection) {
+      // Still validate any selected items have proper additional data
+      for (const metadata of this.checkboxMetadata) {
+        if (metadata.checked && metadata.requiresAdditionalInput) {
+          const data = this.additionalData.get(metadata.id);
+          if (!data) {
+            // Mark as touched to show validation error
+            this.markFieldTouched(metadata.id);
+            return false;
+          }
+          
+          // Check for validation errors
+          if (this.validationErrors.has(metadata.id)) return false;
+        }
+      }
+      return true;  // PRN medications can have no timing selections
+    }
+    
+    // For non-PRN medications, at least one timing must be selected
     const hasSelection = this.checkboxMetadata.some(m => m.checked);
     if (!hasSelection) return false;
     
@@ -352,7 +422,11 @@ export class DosageTimingViewModel {
     for (const metadata of this.checkboxMetadata) {
       if (metadata.checked && metadata.requiresAdditionalInput) {
         const data = this.additionalData.get(metadata.id);
-        if (!data) return false;
+        if (!data) {
+          // Mark as touched to show validation error
+          this.markFieldTouched(metadata.id);
+          return false;
+        }
         
         // Check for validation errors
         if (this.validationErrors.has(metadata.id)) return false;
@@ -381,6 +455,8 @@ export class DosageTimingViewModel {
       });
       this.additionalData.clear();
       this.validationErrors.clear();
+      this.touchedFields.clear();
+      this.selectedFrequencies = [];  // Clear frequency context
     });
   }
 }
