@@ -7,7 +7,7 @@ import {
   getRoutesByDosageForm,
   getDosageFormsByCategory,
   getUnitsForDosageForm
-} from './dosageFormHierarchy.mock';
+} from './dosageFormHierarchy';
 
 // Export all dosage forms (categories like Solid, Liquid, etc.)
 export const dosageForms: DosageForm[] = getAllCategories();
@@ -16,7 +16,7 @@ export const dosageForms: DosageForm[] = getAllCategories();
 export const dosageRoutes: DosageRoute[] = getAllDosageForms() as DosageRoute[];
 
 // Export the hierarchical structure
-export { dosageFormHierarchy, dosageFormMap } from './dosageFormHierarchy.mock';
+export { dosageFormHierarchy, dosageFormMap } from './dosageFormHierarchy';
 
 // Export helper functions
 export { 
@@ -26,7 +26,7 @@ export {
   getAllCategories,
   getAllDosageForms,
   getAllUnits
-} from './dosageFormHierarchy.mock';
+} from './dosageFormHierarchy';
 
 // Build dosageUnits object for backward compatibility
 export const dosageUnits: DosageFormUnits = (() => {

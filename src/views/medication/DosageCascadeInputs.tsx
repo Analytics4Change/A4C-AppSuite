@@ -2,14 +2,14 @@ import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { EditableDropdown } from '@/components/ui/EditableDropdown';
-import { dosageForms } from '@/mocks/data/dosages.mock';
-import { useEnterAsTab } from '@/hooks/useEnterAsTab';
+import { DosageForm } from '@/types/models';
 
 interface DosageCascadeInputsProps {
   dosageForm: string;
   dosageRoute: string;
   dosageAmount: string;
   dosageUnit: string;
+  availableDosageForms: DosageForm[];
   availableDosageRoutes: string[];
   availableDosageUnits: string[];
   errors: Map<string, string>;
@@ -25,6 +25,7 @@ export const DosageCascadeInputs: React.FC<DosageCascadeInputsProps> = ({
   dosageRoute,
   dosageAmount,
   dosageUnit,
+  availableDosageForms,
   availableDosageRoutes,
   availableDosageUnits,
   errors,
@@ -34,9 +35,6 @@ export const DosageCascadeInputs: React.FC<DosageCascadeInputsProps> = ({
   onDosageUnitChange,
   onDropdownOpen
 }) => {
-  // Hook for Enter key navigation in dosage amount field
-  const handleDosageAmountEnterKey = useEnterAsTab(7); // Move to Dosage Unit field
-
   return (
     <>
       {/* First Row: Dosage Form and Dosage Route */}
@@ -46,11 +44,11 @@ export const DosageCascadeInputs: React.FC<DosageCascadeInputsProps> = ({
           id="dosage-form"
           label="Dosage Form"
           value={dosageForm}
-          options={dosageForms}
+          options={availableDosageForms}
           placeholder="Select dosage form..."
           error={errors.get('dosageForm')}
-          tabIndex={4}
-          targetTabIndex={5}
+          tabIndex={5}
+          targetTabIndex={6}
           onChange={onDosageFormChange}
           onDropdownOpen={onDropdownOpen}
           testIdPrefix="dosage-form"
@@ -66,8 +64,8 @@ export const DosageCascadeInputs: React.FC<DosageCascadeInputsProps> = ({
           disabled={!dosageForm}
           disabledMessage="(select form first)"
           error={errors.get('dosageRoute')}
-          tabIndex={dosageForm ? 5 : -1}
-          targetTabIndex={6}
+          tabIndex={dosageForm ? 6 : -1}
+          targetTabIndex={7}
           onChange={onDosageRouteChange}
           onDropdownOpen={onDropdownOpen}
           testIdPrefix="dosage-route"
@@ -87,12 +85,11 @@ export const DosageCascadeInputs: React.FC<DosageCascadeInputsProps> = ({
             type="text"
             value={dosageAmount}
             onChange={(e) => onDosageAmountChange(e.target.value)}
-            onKeyDown={handleDosageAmountEnterKey}
             placeholder="Enter dosage amount..."
             className={`mt-2 ${dosageAmount ? 'border-blue-500 bg-blue-50' : ''} ${errors.get('dosageAmount') ? 'border-red-500' : ''}`}
             aria-label="Dosage amount"
             aria-describedby={errors.get('dosageAmount') ? 'dosage-amount-error' : undefined}
-            tabIndex={6}
+            tabIndex={7}
           />
           {errors.get('dosageAmount') && (
             <p id="dosage-amount-error" className="mt-1 text-sm text-red-600" role="alert">
@@ -111,8 +108,8 @@ export const DosageCascadeInputs: React.FC<DosageCascadeInputsProps> = ({
           disabled={!dosageRoute}
           disabledMessage="(select route first)"
           error={errors.get('dosageUnit')}
-          tabIndex={dosageRoute ? 7 : -1}
-          targetTabIndex={8}
+          tabIndex={dosageRoute ? 8 : -1}
+          targetTabIndex={9}
           onChange={onDosageUnitChange}
           onDropdownOpen={onDropdownOpen}
           testIdPrefix="dosage-unit"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, RefObject } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { useViewModel } from '@/hooks/useViewModel';
 import { MedicationManagementViewModel } from '@/viewModels/medication/MedicationManagementViewModel';
 import { MedicationSearchModal } from '@/components/medication/MedicationSearchModal';
+import { MedicationStatusIndicator } from '@/components/medication/MedicationStatusIndicator';
+import { MedicationPurposeDropdown } from '@/components/medication/MedicationPurposeDropdown';
 import { DosageFormEditable } from '@/views/medication/DosageFormEditable';
 import { InventoryQuantityInputs } from '@/views/medication/InventoryQuantityInputs';
 import { PharmacyInformationInputs } from '@/views/medication/PharmacyInformationInputs';
@@ -27,16 +29,16 @@ export const MedicationManagementPage = observer(() => {
   const [showSearchModal, setShowSearchModal] = useState(true);
   
   // Refs for focus management
-  const changeMedicationButtonRef = useRef<HTMLButtonElement>(null);
-  const formContainerRef = useRef<HTMLDivElement>(null);
+  const changeMedicationButtonRef = useRef<HTMLButtonElement | null>(null);
+  const formContainerRef = useRef<HTMLDivElement | null>(null);
   
   // Use keyboard navigation hook for focus trap when medication is selected
   const navResult = useKeyboardNavigation({
-    containerRef: formContainerRef,
+    containerRef: formContainerRef as RefObject<HTMLElement>,
     enabled: !!vm.selectedMedication && !showSearchModal,
     trapFocus: true,              // Trap focus within form
     wrapAround: true,             // Tab from last element goes to first
-    initialFocusRef: changeMedicationButtonRef,  // Focus the Change Medication button initially
+    initialFocusRef: changeMedicationButtonRef as RefObject<HTMLElement>,  // Focus the Change Medication button initially
     excludeSelectors: ['button[tabindex="-1"]']  // Exclude non-focusable buttons from trap
   });
   
@@ -100,7 +102,7 @@ export const MedicationManagementPage = observer(() => {
            vm.dosageRoute &&
            vm.dosageAmount &&
            vm.dosageUnit &&
-           vm.frequency &&
+           vm.selectedFrequencies.length > 0 &&
            vm.selectedTimings.length > 0 &&
            vm.startDate;
   };
@@ -164,114 +166,35 @@ export const MedicationManagementPage = observer(() => {
                 {/* Divider */}
                 <div className="border-t border-blue-200 my-4" />
                 
-                {/* Medication Properties */}
-                <div className="grid grid-cols-2 gap-6">
-                  {/* Controlled */}
-                  <div>
-                    <Label id="controlled-label" className="text-sm font-medium text-blue-900">Controlled</Label>
-                    <div 
-                      className="flex items-center space-x-3 mt-2 p-2 -m-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                      role="radiogroup"
-                      aria-labelledby="controlled-label"
-                      tabIndex={2}
-                      onKeyDown={(e) => {
-                        // Handle arrow key navigation within radio group - toggle between options
-                        if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || 
-                            e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                          e.preventDefault();
-                          // Toggle: null→true, true→false, false→true
-                          vm.setControlled(vm.isControlled === true ? false : true);
-                        } else if (e.key === ' ') {
-                          // Space key also toggles
-                          e.preventDefault();
-                          vm.setControlled(vm.isControlled === true ? false : true);
-                        }
-                      }}
-                    >
-                      <label className="flex items-center space-x-1 cursor-pointer">
-                        <input
-                          id="controlled-yes"
-                          type="radio"
-                          name="controlled"
-                          value="true"
-                          checked={vm.isControlled === true}
-                          onChange={() => vm.setControlled(true)}
-                          tabIndex={-1}
-                          className="w-4 h-4 text-blue-600 focus:outline-none"
-                          aria-label="Controlled substance - Yes"
-                        />
-                        <span className="text-sm text-blue-700">Yes</span>
-                      </label>
-                      <label className="flex items-center space-x-1 cursor-pointer">
-                        <input
-                          id="controlled-no"
-                          type="radio"
-                          name="controlled"
-                          value="false"
-                          checked={vm.isControlled === false}
-                          onChange={() => vm.setControlled(false)}
-                          tabIndex={-1}
-                          className="w-4 h-4 text-blue-600 focus:outline-none"
-                          aria-label="Controlled substance - No"
-                        />
-                        <span className="text-sm text-blue-700">No</span>
-                      </label>
-                    </div>
-                  </div>
-                  
-                  {/* Psychotropic */}
-                  <div>
-                    <Label id="psychotropic-label" className="text-sm font-medium text-blue-900">Psychotropic</Label>
-                    <div 
-                      className="flex items-center space-x-3 mt-2 p-2 -m-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                      role="radiogroup"
-                      aria-labelledby="psychotropic-label"
-                      tabIndex={3}
-                      onKeyDown={(e) => {
-                        // Handle arrow key navigation within radio group - toggle between options
-                        if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || 
-                            e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                          e.preventDefault();
-                          // Toggle: null→true, true→false, false→true
-                          vm.setPsychotropic(vm.isPsychotropic === true ? false : true);
-                        } else if (e.key === ' ') {
-                          // Space key also toggles
-                          e.preventDefault();
-                          vm.setPsychotropic(vm.isPsychotropic === true ? false : true);
-                        }
-                      }}
-                    >
-                      <label className="flex items-center space-x-1 cursor-pointer">
-                        <input
-                          id="psychotropic-yes"
-                          type="radio"
-                          name="psychotropic"
-                          value="true"
-                          checked={vm.isPsychotropic === true}
-                          onChange={() => vm.setPsychotropic(true)}
-                          tabIndex={-1}
-                          className="w-4 h-4 text-blue-600 focus:outline-none"
-                          aria-label="Psychotropic medication - Yes"
-                        />
-                        <span className="text-sm text-blue-700">Yes</span>
-                      </label>
-                      <label className="flex items-center space-x-1 cursor-pointer">
-                        <input
-                          id="psychotropic-no"
-                          type="radio"
-                          name="psychotropic"
-                          value="false"
-                          checked={vm.isPsychotropic === false}
-                          onChange={() => vm.setPsychotropic(false)}
-                          tabIndex={-1}
-                          className="w-4 h-4 text-blue-600 focus:outline-none"
-                          aria-label="Psychotropic medication - No"
-                        />
-                        <span className="text-sm text-blue-700">No</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
+                {/* Medication Properties - Using Hybrid API/Manual Component */}
+                <MedicationStatusIndicator
+                  isControlled={vm.isControlled}
+                  isPsychotropic={vm.isPsychotropic}
+                  controlledSchedule={vm.controlledSchedule}
+                  psychotropicCategory={vm.psychotropicCategory}
+                  isCheckingControlled={vm.isCheckingControlled}
+                  isCheckingPsychotropic={vm.isCheckingPsychotropic}
+                  controlledCheckFailed={vm.controlledCheckFailed}
+                  psychotropicCheckFailed={vm.psychotropicCheckFailed}
+                  onControlledChange={(value) => vm.setControlled(value)}
+                  onPsychotropicChange={(value) => vm.setPsychotropic(value)}
+                  controlledTabIndex={2}
+                  psychotropicTabIndex={3}
+                />
+              </div>
+
+              {/* Therapeutic Classification */}
+              <div className="bg-white p-6 rounded-lg border">
+                <h2 className="text-lg font-semibold mb-4">Therapeutic Classification</h2>
+                <MedicationPurposeDropdown
+                  selectedPurpose={vm.selectedPurpose}
+                  availablePurposes={vm.availablePurposes}
+                  isLoading={vm.isLoadingPurposes}
+                  loadFailed={vm.purposeLoadFailed}
+                  onPurposeChange={(purpose) => vm.setSelectedPurpose(purpose)}
+                  tabIndex={4}
+                  error={vm.errors.get('medicationPurpose')}
+                />
               </div>
 
               {/* Dosage Form Configuration */}
@@ -282,8 +205,11 @@ export const MedicationManagementPage = observer(() => {
                   dosageRoute={vm.dosageRoute}
                   dosageAmount={vm.dosageAmount}
                   dosageUnit={vm.dosageUnit}
-                  frequency={vm.frequency}
+                  selectedFrequencies={vm.selectedFrequencies}
                   selectedTimings={vm.selectedTimings}
+                  selectedFoodConditions={vm.selectedFoodConditions}
+                  selectedSpecialRestrictions={vm.selectedSpecialRestrictions}
+                  availableDosageForms={vm.availableDosageForms}
                   availableDosageRoutes={vm.availableDosageRoutes}
                   availableDosageUnits={vm.availableDosageUnits}
                   errors={vm.errors}
@@ -291,8 +217,10 @@ export const MedicationManagementPage = observer(() => {
                   onDosageRouteChange={(dosageRoute) => vm.setDosageRoute(dosageRoute)}
                   onDosageAmountChange={(amount) => vm.updateDosageAmount(amount)}
                   onDosageUnitChange={(dosageUnit) => vm.setDosageUnit(dosageUnit)}
-                  onFrequencyChange={(freq) => vm.setFrequency(freq)}
+                  onFrequenciesChange={(frequencies) => vm.setSelectedFrequencies(frequencies)}
                   onTimingsChange={(timings) => vm.setSelectedTimings(timings)}
+                  onFoodConditionsChange={(conditions) => vm.setSelectedFoodConditions(conditions)}
+                  onSpecialRestrictionsChange={(restrictions) => vm.setSelectedSpecialRestrictions(restrictions)}
                   onDropdownOpen={() => {}}
                 />
               </div>
@@ -345,7 +273,7 @@ export const MedicationManagementPage = observer(() => {
                 <Button
                   variant="outline"
                   onClick={handleBack}
-                  tabIndex={21}
+                  tabIndex={22}
                   aria-label="Cancel and go back"
                 >
                   Cancel
@@ -353,7 +281,7 @@ export const MedicationManagementPage = observer(() => {
                 <Button
                   onClick={handleSave}
                   disabled={!isFormComplete() || vm.isLoading}
-                  tabIndex={22}
+                  tabIndex={23}
                   aria-label="Save medication"
                 >
                   {vm.isLoading ? 'Saving...' : 'Save Medication'}

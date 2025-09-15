@@ -5,16 +5,15 @@ import {
   DosageInfo, 
   DosageForm,  // Now refers to broad categories (Solid, Liquid, etc.)
   DosageRoute, // Specific routes (Tablet, Capsule, etc.)
-  DosageUnit 
+  DosageUnit,
+  DosageFrequency 
 } from '@/types/models';
 import { DosageValidator } from '@/services/validation/DosageValidator';
-import { 
-  getDosageFormsByCategory, 
-  getUnitsForDosageForm,
-  getCategoryForDosageForm 
-} from '@/mocks/data/dosageFormHierarchy.mock';
+import { IDosageDataService } from '@/services/data/interfaces/IDosageDataService';
+import { DataServiceFactory } from '@/services/data/DataServiceFactory';
 import { MedicationManagementValidation } from './MedicationManagementValidation';
 import { Logger } from '@/utils/logger';
+import { RXNormAdapter } from '@/services/adapters/RXNormAdapter';
 
 const log = Logger.getLogger('viewmodel');
 
@@ -27,8 +26,10 @@ export class MedicationManagementViewModel {
   dosageUnit = '';
   inventoryQuantity = '';
   inventoryUnit = '';
-  frequency = '';
+  selectedFrequencies: string[] = [];
   selectedTimings: string[] = [];  // Changed from single condition to multiple timings
+  selectedFoodConditions: string[] = [];  // Food conditions selections
+  selectedSpecialRestrictions: string[] = [];  // Special restrictions selections
   startDate: Date | null = null;
   discontinueDate: Date | null = null;
   prescribingDoctor = '';
@@ -55,33 +56,71 @@ export class MedicationManagementViewModel {
   // Auxiliary medication information
   isControlled: boolean | null = null;
   isPsychotropic: boolean | null = null;
+  controlledSchedule: string | undefined = undefined;
+  psychotropicCategory: string | undefined = undefined;
+  
+  // Loading states for API calls
+  isCheckingControlled = false;
+  isCheckingPsychotropic = false;
+  controlledCheckFailed = false;
+  psychotropicCheckFailed = false;
+  
+  // Medication purpose fields
+  selectedPurpose = '';
+  availablePurposes: string[] = [];
+  isLoadingPurposes = false;
+  purposeLoadFailed = false;
+  
+  // Observable properties for UI
+  availableDosageRoutes: string[] = [];
+  availableDosageUnits: DosageUnit[] = [];
+  availableDosageForms: DosageForm[] = [];
   
   private validation: MedicationManagementValidation;
+  private rxnormAdapter: RXNormAdapter;
+  private dosageService: IDosageDataService;
 
   constructor(
     private medicationApi: IMedicationApi,
-    private validator: DosageValidator
+    private validator: DosageValidator,
+    dosageService?: IDosageDataService
   ) {
+    this.dosageService = dosageService || DataServiceFactory.createDosageDataService();
     makeAutoObservable(this);
     this.validation = new MedicationManagementValidation(this);
     this.validation.setupReactions();
+    this.rxnormAdapter = new RXNormAdapter();
+    
+    // Initialize dosage forms
+    this.initializeDosageForms();
+  }
+
+  private async initializeDosageForms(): Promise<void> {
+    try {
+      const forms = await this.dosageService.getDosageForms();
+      runInAction(() => {
+        this.availableDosageForms = forms;
+      });
+    } catch (error) {
+      log.error('Failed to initialize dosage forms', error);
+    }
   }
 
   get isValidAmount(): boolean {
     return this.validator.isValidDosageAmount(this.dosageAmount);
   }
 
-  get availableDosageRoutes(): string[] {
+  async getAvailableDosageRoutes(): Promise<string[]> {
     if (!this.dosageForm) return [];
-    const dosageRoutes = getDosageFormsByCategory(this.dosageForm);
-    return dosageRoutes.map(dr => dr.name);
+    const dosageRoutes = await this.dosageService.getDosageFormsByCategory(this.dosageForm);
+    return dosageRoutes as string[];
   }
 
-  get availableDosageUnits(): DosageUnit[] {
+  async getAvailableDosageUnits(): Promise<DosageUnit[]> {
     // Units depend on the specific dosage route, not the category
     if (!this.dosageRoute) return [];
     // Use the helper function to get units for the selected dosage route
-    return getUnitsForDosageForm(this.dosageRoute) as DosageUnit[];
+    return await this.dosageService.getUnitsForDosageForm(this.dosageRoute);
   }
 
   get canSave(): boolean {
@@ -93,7 +132,7 @@ export class MedicationManagementViewModel {
       this.dosageUnit &&
       this.inventoryQuantity &&
       this.inventoryUnit &&
-      this.frequency &&
+      this.selectedFrequencies.length > 0 &&
       this.selectedTimings.length > 0 &&
       this.errors.size === 0
     );
@@ -142,6 +181,13 @@ export class MedicationManagementViewModel {
       
     });
     this.validation.clearError('medication');
+    
+    // Fetch controlled and psychotropic status
+    // Defer to next tick to avoid setState during render
+    Promise.resolve().then(() => {
+      this.fetchMedicationClassifications(medication.name);
+      this.fetchMedicationPurposes(medication.name);
+    });
   }
 
   clearMedication() {
@@ -152,6 +198,22 @@ export class MedicationManagementViewModel {
       this.searchResults = [];
       this.showMedicationDropdown = false;
       
+      // Clear classification info
+      this.isControlled = null;
+      this.isPsychotropic = null;
+      this.controlledSchedule = undefined;
+      this.psychotropicCategory = undefined;
+      this.isCheckingControlled = false;
+      this.isCheckingPsychotropic = false;
+      this.controlledCheckFailed = false;
+      this.psychotropicCheckFailed = false;
+      
+      // Clear medication purpose
+      this.selectedPurpose = '';
+      this.availablePurposes = [];
+      this.isLoadingPurposes = false;
+      this.purposeLoadFailed = false;
+      
       // Cascade clear ALL form fields (complete reset)
       this.dosageForm = '';
       this.dosageRoute = '';
@@ -159,8 +221,10 @@ export class MedicationManagementViewModel {
       this.dosageUnit = '';
       this.inventoryQuantity = '';
       this.inventoryUnit = '';
-      this.frequency = '';
+      this.selectedFrequencies = [];
       this.selectedTimings = [];
+      this.selectedFoodConditions = [];
+      this.selectedSpecialRestrictions = [];
       this.startDate = null;
       this.discontinueDate = null;
       this.prescribingDoctor = '';
@@ -192,6 +256,20 @@ export class MedicationManagementViewModel {
       this.inventoryUnit = '';
     });
     this.validation.clearError('dosageForm');
+    // Update available dosage routes
+    this.updateAvailableDosageRoutes();
+  }
+
+  private async updateAvailableDosageRoutes(): Promise<void> {
+    try {
+      const routes = await this.getAvailableDosageRoutes();
+      runInAction(() => {
+        this.availableDosageRoutes = routes;
+        this.availableDosageUnits = []; // Clear units when routes change
+      });
+    } catch (error) {
+      log.error('Failed to update dosage routes', error);
+    }
   }
 
 
@@ -204,6 +282,19 @@ export class MedicationManagementViewModel {
       this.dosageUnit = '';
     });
     this.validation.clearError('dosageRoute');
+    // Update available dosage units
+    this.updateAvailableDosageUnits();
+  }
+
+  private async updateAvailableDosageUnits(): Promise<void> {
+    try {
+      const units = await this.getAvailableDosageUnits();
+      runInAction(() => {
+        this.availableDosageUnits = units;
+      });
+    } catch (error) {
+      log.error('Failed to update dosage units', error);
+    }
   }
 
   updateDosageAmount(value: string) {
@@ -235,9 +326,9 @@ export class MedicationManagementViewModel {
     this.validation.clearError('inventoryUnit');
   }
 
-  setFrequency(freq: string) {
+  setSelectedFrequencies(frequencies: string[]) {
     runInAction(() => {
-      this.frequency = freq;
+      this.selectedFrequencies = frequencies;
       this.showFrequencyDropdown = false;
     });
     this.validation.clearError('frequency');
@@ -248,6 +339,20 @@ export class MedicationManagementViewModel {
       this.selectedTimings = timings;
     });
     this.validation.clearError('dosageTimings');
+  }
+
+  setSelectedFoodConditions(conditions: string[]) {
+    runInAction(() => {
+      this.selectedFoodConditions = conditions;
+    });
+    this.validation.clearError('foodConditions');
+  }
+
+  setSelectedSpecialRestrictions(restrictions: string[]) {
+    runInAction(() => {
+      this.selectedSpecialRestrictions = restrictions;
+    });
+    this.validation.clearError('specialRestrictions');
   }
 
   setStartDate(date: Date | null) {
@@ -302,7 +407,118 @@ export class MedicationManagementViewModel {
       this.rxNumber = value;
     });
   }
+  
+  setSelectedPurpose(purpose: string) {
+    runInAction(() => {
+      this.selectedPurpose = purpose;
+    });
+    this.validation.clearError('medicationPurpose');
+  }
 
+  /**
+   * Fetch controlled and psychotropic classifications from RXNorm API
+   * Now using byDrugName endpoint directly (matching A4C-BMS implementation)
+   */
+  private async fetchMedicationClassifications(medicationName: string) {
+    log.info(`Fetching classifications for: ${medicationName}`);
+    
+    // Check controlled status
+    runInAction(() => {
+      this.isCheckingControlled = true;
+      this.controlledCheckFailed = false;
+    });
+    
+    try {
+      const controlledStatus = await this.rxnormAdapter.checkControlledStatus(medicationName);
+      runInAction(() => {
+        if (controlledStatus.error) {
+          this.controlledCheckFailed = true;
+          this.isControlled = null;
+        } else {
+          this.isControlled = controlledStatus.isControlled;
+          this.controlledSchedule = controlledStatus.scheduleClass;
+          this.controlledCheckFailed = false;
+        }
+        this.isCheckingControlled = false;
+      });
+    } catch (error) {
+      log.error('Failed to check controlled status', error);
+      runInAction(() => {
+        this.controlledCheckFailed = true;
+        this.isCheckingControlled = false;
+        this.isControlled = null;
+      });
+    }
+
+    // Check psychotropic status
+    runInAction(() => {
+      this.isCheckingPsychotropic = true;
+      this.psychotropicCheckFailed = false;
+    });
+    
+    try {
+      const psychotropicStatus = await this.rxnormAdapter.checkPsychotropicStatus(medicationName);
+      runInAction(() => {
+        if (psychotropicStatus.error) {
+          this.psychotropicCheckFailed = true;
+          this.isPsychotropic = null;
+        } else {
+          this.isPsychotropic = psychotropicStatus.isPsychotropic;
+          this.psychotropicCategory = psychotropicStatus.category;
+          this.psychotropicCheckFailed = false;
+        }
+        this.isCheckingPsychotropic = false;
+      });
+    } catch (error) {
+      log.error('Failed to check psychotropic status', error);
+      runInAction(() => {
+        this.psychotropicCheckFailed = true;
+        this.isCheckingPsychotropic = false;
+        this.isPsychotropic = null;
+      });
+    }
+  }
+
+  /**
+   * Fetch medication purposes (diseases/conditions it treats)
+   * Using byDrugName endpoint with MEDRT classification
+   */
+  private async fetchMedicationPurposes(medicationName: string) {
+    log.info(`Fetching therapeutic purposes for: ${medicationName}`);
+    
+    runInAction(() => {
+      this.isLoadingPurposes = true;
+      this.purposeLoadFailed = false;
+      this.availablePurposes = [];
+    });
+    
+    try {
+      const purposes = await this.rxnormAdapter.getMedicationPurposes(medicationName);
+      
+      runInAction(() => {
+        // Convert MedicationPurpose objects to strings for dropdown
+        this.availablePurposes = purposes.map(p => {
+          // Add context about whether it treats or prevents
+          const action = p.rela === 'may_prevent' ? ' (Prevention)' : '';
+          return p.className + action;
+        });
+        
+        if (this.availablePurposes.length === 0) {
+          log.warn(`No therapeutic purposes found for ${medicationName}`);
+          this.purposeLoadFailed = true;
+        }
+        
+        this.isLoadingPurposes = false;
+      });
+    } catch (error) {
+      log.error('Failed to fetch medication purposes', error);
+      runInAction(() => {
+        this.purposeLoadFailed = true;
+        this.isLoadingPurposes = false;
+        this.availablePurposes = [];
+      });
+    }
+  }
 
   async save() {
     // Validate all required fields
@@ -314,11 +530,14 @@ export class MedicationManagementViewModel {
 
     const dosageInfo: DosageInfo = {
       medicationId: this.selectedMedication!.id,
-      form: this.dosageRoute as DosageRoute,  // Use the specific route for the API
+      form: this.dosageForm as DosageForm,  // Broad category (Solid, Liquid, etc.)
+      route: this.dosageRoute as DosageRoute,  // Specific route (Tablet, Capsule, etc.)
       amount: parseFloat(this.dosageAmount),
       unit: this.dosageUnit as DosageUnit,
-      frequency: this.frequency as any,
+      frequency: this.selectedFrequencies as DosageFrequency[],
       timings: this.selectedTimings,  // Now sending array of timings
+      foodConditions: this.selectedFoodConditions,  // Food conditions array
+      specialRestrictions: this.selectedSpecialRestrictions,  // Special restrictions array
       startDate: this.startDate || undefined,
       discontinueDate: this.discontinueDate || undefined,
       prescribingDoctor: this.prescribingDoctor || undefined,
@@ -350,8 +569,10 @@ export class MedicationManagementViewModel {
     this.dosageUnit = '';
     this.inventoryQuantity = '';
     this.inventoryUnit = '';
-    this.frequency = '';
+    this.selectedFrequencies = [];
     this.selectedTimings = [];
+    this.selectedFoodConditions = [];
+    this.selectedSpecialRestrictions = [];
     this.startDate = null;
     this.discontinueDate = null;
     this.prescribingDoctor = '';
@@ -364,6 +585,16 @@ export class MedicationManagementViewModel {
     this.searchResults = [];
     this.isControlled = null;
     this.isPsychotropic = null;
+    this.controlledSchedule = undefined;
+    this.psychotropicCategory = undefined;
+    this.isCheckingControlled = false;
+    this.isCheckingPsychotropic = false;
+    this.controlledCheckFailed = false;
+    this.psychotropicCheckFailed = false;
+    this.selectedPurpose = '';
+    this.availablePurposes = [];
+    this.isLoadingPurposes = false;
+    this.purposeLoadFailed = false;
     this.showMedicationDropdown = false;
     this.showDosageFormDropdown = false;
     this.showDosageRouteDropdown = false;

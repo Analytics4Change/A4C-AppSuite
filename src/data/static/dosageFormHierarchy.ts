@@ -181,35 +181,35 @@ const miscellaneousDosageForms: DosageRouteOption[] = [
 // Complete hierarchical structure
 export const dosageFormHierarchy: DosageFormHierarchy[] = [
   {
-    form: 'Solid',
+    type: 'Solid',
     routes: solidDosageForms
   },
   {
-    form: 'Liquid',
+    type: 'Liquid',
     routes: liquidDosageForms
   },
   {
-    form: 'Topical/Local',
+    type: 'Topical/Local',
     routes: topicalDosageForms
   },
   {
-    form: 'Inhalation',
+    type: 'Inhalation',
     routes: inhalationDosageForms
   },
   {
-    form: 'Injectable',
+    type: 'Injectable',
     routes: injectableDosageForms
   },
   {
-    form: 'Rectal/Vaginal',
+    type: 'Rectal/Vaginal',
     routes: rectalVaginalDosageForms
   },
   {
-    form: 'Ophthalmic/Otic',
+    type: 'Ophthalmic/Otic',
     routes: ophthalmicOticDosageForms
   },
   {
-    form: 'Miscellaneous',
+    type: 'Miscellaneous',
     routes: miscellaneousDosageForms
   }
 ];
@@ -250,7 +250,7 @@ export function getDosageFormForRoute(routeName: string): DosageForm | null {
   for (const hierarchy of dosageFormHierarchy) {
     const route = hierarchy.routes.find(r => r.name === routeName);
     if (route) {
-      return hierarchy.form;
+      return hierarchy.type;
     }
   }
   return null;
@@ -261,7 +261,7 @@ export const getCategoryForDosageForm = getDosageFormForRoute;
 
 // Get all dosage forms (categories)
 export function getAllCategories(): DosageForm[] {
-  return dosageFormHierarchy.map(h => h.form);
+  return dosageFormHierarchy.map(h => h.type);
 }
 
 // Get all dosage forms (flattened)
