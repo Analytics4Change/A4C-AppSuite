@@ -26,8 +26,11 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
   const inputRef = useRef<HTMLElement>(null);
   const initialValueRef = useRef(currentValue);
   const [showHint, setShowHint] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
   const [focusSource, setFocusSource] = useState<FocusSource>('programmatic');
+  const [isFocused, setIsFocused] = useState(false);
   const hasInitiallyFocused = useRef(false);
+  const [localValue, setLocalValue] = useState(currentValue);
   
   // Component lifecycle logging
   useEffect(() => {
@@ -41,24 +44,24 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
   useEffect(() => {
     console.log('[DynamicInput] Initial value updated:', currentValue, 'for checkbox:', checkboxId);
     initialValueRef.current = currentValue;
+    setLocalValue(currentValue);
   }, [currentValue, checkboxId]);
   
   // Enhanced auto-focus logic respecting focus intent
   useEffect(() => {
-    // Only auto-focus if:
-    // 1. Intent is for this input
-    // 2. Source was keyboard or programmatic (not mouse - they already focused it)
-    // 3. Haven't already auto-focused
-    if (
-      focusIntent?.type === 'input' && 
+    // Handle both regular focus intent and tab-to-input intent
+    const shouldAutoFocus = (
+      ((focusIntent?.type === 'input' && focusIntent.source !== 'mouse') ||
+       (focusIntent?.type === 'tab-to-input')) &&
       focusIntent.checkboxId === checkboxId &&
-      focusIntent.source !== 'mouse' &&
       !hasInitiallyFocused.current &&
       shouldFocus && 
       inputRef.current && 
       strategy.focusManagement?.autoFocus
-    ) {
-      console.log('[DynamicInput] Auto-focusing based on intent (non-mouse)');
+    );
+    
+    if (shouldAutoFocus) {
+      console.log('[DynamicInput] Auto-focusing based on intent:', focusIntent?.type);
       requestAnimationFrame(() => {
         inputRef.current?.focus();
         hasInitiallyFocused.current = true;
@@ -82,6 +85,49 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
     }
   }, [showHint]);
   
+  // Hide saved indicator after delay
+  useEffect(() => {
+    if (showSaved) {
+      const timer = setTimeout(() => setShowSaved(false), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [showSaved]);
+  
+  // Helper function to announce messages to screen readers
+  const announceToScreenReader = (message: string) => {
+    const announcement = document.createElement('div');
+    announcement.setAttribute('role', 'status');
+    announcement.setAttribute('aria-live', 'polite');
+    announcement.className = 'sr-only';
+    announcement.textContent = message;
+    document.body.appendChild(announcement);
+    setTimeout(() => announcement.remove(), 1000);
+  };
+
+  // Get dynamic help text based on field state
+  const getHelpText = () => {
+    const isRequired = strategy.focusManagement?.requiresInput !== false;
+    const isEmpty = !localValue;
+    
+    if (isRequired && isEmpty) {
+      return 'Required field. Enter value or press Escape to cancel selection';
+    }
+    if (!isRequired && isEmpty) {
+      return 'Optional field. Press Tab to skip or Enter to save';
+    }
+    // Field has data (required or optional)
+    return 'Press Tab to save and continue or Enter to save and return';
+  };
+  
+  // Auto-save function
+  const handleAutoSave = () => {
+    if (localValue !== currentValue) {
+      console.log('[DynamicInput] Auto-saving value:', localValue);
+      onDataChange(localValue);
+      setShowSaved(true);
+    }
+  };
+  
   // Enhanced keyboard handler using intentional exit
   const handleKeyDown = (e: React.KeyboardEvent) => {
     console.log('[DynamicInput] KeyDown:', {
@@ -100,11 +146,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
     
     switch (e.key) {
       case 'Tab':
-        console.log('[DynamicInput] Tab pressed - preventing default');
-        // Always prevent Tab from leaving the input
-        e.preventDefault();
-        e.stopPropagation(); // Don't let container handle it
-        console.log('[DynamicInput] After preventDefault:', e.defaultPrevented);
+        console.log('[DynamicInput] Tab pressed - auto-saving and allowing navigation');
         
         // For custom multi-field components (future enhancement)
         if (strategy.componentType === 'custom' && strategy.componentProps.getPeerFields) {
@@ -116,18 +158,31 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
               (currentIndex - 1 + fields.length) % fields.length :
               (currentIndex + 1) % fields.length;
             fields[nextIndex]?.focus();
+            e.preventDefault();
             return;
           }
         }
         
-        // For single fields, show hint
-        setShowHint(true);
-        console.log('[DynamicInput] Hint shown');
+        // Auto-save on Tab
+        handleAutoSave();
+        
+        // For Shift+Tab, return to checkbox
+        if (e.shiftKey && onIntentionalExit) {
+          console.log('[DynamicInput] Shift+Tab - returning to checkbox');
+          e.preventDefault();
+          onIntentionalExit(checkboxId, true);
+        }
+        // Regular Tab - allow natural navigation
+        else {
+          console.log('[DynamicInput] Tab - allowing natural navigation');
+          // Let Tab work naturally to move to next field
+        }
         break;
         
       case 'Enter':
         console.log('[DynamicInput] Enter pressed - intentional exit with save');
         e.preventDefault();
+        handleAutoSave();
         if (onIntentionalExit) {
           onIntentionalExit(checkboxId, true);
         }
@@ -137,9 +192,33 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
         console.log('[DynamicInput] Escape pressed - intentional exit without save');
         e.preventDefault();
         const originalValue = initialValueRef.current;
-        console.log('[DynamicInput] Restoring from', currentValue, 'to', originalValue);
-        // Restore original value
-        onDataChange(originalValue || null);
+        const isEmpty = !localValue || localValue === '';
+        const isRequired = strategy.focusManagement?.requiresInput !== false;
+        
+        console.log('[DynamicInput] Escape handler:', {
+          isEmpty,
+          isRequired,
+          localValue,
+          originalValue
+        });
+        
+        if (isEmpty && isRequired) {
+          // Deselect the checkbox for empty required fields
+          console.log('[DynamicInput] Deselecting checkbox due to empty required field');
+          if (onSelectionChange) {
+            onSelectionChange(checkboxId, false);
+          }
+          // Clear the data
+          onDataChange(null);
+          // Announce the deselection to screen readers
+          announceToScreenReader('Selection cancelled, checkbox deselected');
+        } else {
+          // Restore original value for optional or non-empty fields
+          console.log('[DynamicInput] Restoring from', localValue, 'to', originalValue);
+          setLocalValue(originalValue);
+          onDataChange(originalValue || null);
+        }
+        
         if (onIntentionalExit) {
           onIntentionalExit(checkboxId, false);
         }
@@ -156,6 +235,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
   const handleFocus = (e: React.FocusEvent) => {
     const source = e.nativeEvent.detail === 0 ? 'keyboard' : 'mouse';
     setFocusSource(source);
+    setIsFocused(true);
     
     console.log('[DynamicInput] Focus acquired via:', source);
     
@@ -170,6 +250,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
   // Enhanced blur handler for natural blur
   const handleBlur = (e: React.FocusEvent) => {
     const relatedTarget = e.relatedTarget as HTMLElement;
+    setIsFocused(false);
     
     console.log('[DynamicInput] Blur event:', {
       checkboxId,
@@ -177,6 +258,9 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
       focusSource,
       currentIntent: focusIntent?.type
     });
+    
+    // Auto-save on blur (natural navigation away)
+    handleAutoSave();
     
     // Only handle as natural blur if not an intentional exit
     if (focusIntent?.type !== 'returning-to-checkbox' && onNaturalBlur) {
@@ -192,7 +276,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
       ref: inputRef as any,
       tabIndex: tabIndexBase,
       id: `${checkboxId}-additional-input`,
-      'aria-describedby': componentProps.helpText ? `${checkboxId}-help` : undefined,
+      'aria-describedby': `${checkboxId}-help`,
       className: 'mt-2 ml-8', // Indent under checkbox
       onKeyDown: handleKeyDown,
       onFocus: handleFocus,
@@ -207,8 +291,8 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
             <Input
               {...baseProps}
               type="number"
-              value={currentValue || ''}
-              onChange={(e) => onDataChange(e.target.value ? Number(e.target.value) : null)}
+              value={localValue || ''}
+              onChange={(e) => setLocalValue(e.target.value ? Number(e.target.value) : null)}
               min={componentProps.min}
               max={componentProps.max}
               step={componentProps.step || 1}
@@ -227,8 +311,8 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
           <Input
             {...baseProps}
             type="text"
-            value={currentValue || ''}
-            onChange={(e) => onDataChange(e.target.value)}
+            value={localValue || ''}
+            onChange={(e) => setLocalValue(e.target.value)}
             placeholder={componentProps.placeholder}
             maxLength={componentProps.maxLength}
             aria-label={componentProps.ariaLabel || 'Enter text'}
@@ -236,12 +320,28 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
           />
         );
         
+      case 'textarea':
+        return (
+          <textarea
+            {...baseProps}
+            value={localValue || ''}
+            onChange={(e) => setLocalValue(e.target.value)}
+            placeholder={componentProps.placeholder}
+            maxLength={componentProps.maxLength}
+            rows={isFocused && componentProps.autoResize ? 
+              Math.max(componentProps.rows || 2, (localValue || '').split('\n').length) : 
+              componentProps.rows || 2}
+            aria-label={componentProps.ariaLabel || 'Enter text'}
+            className="mt-2 ml-8 max-w-md px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+          />
+        );
+        
       case 'select':
         return (
           <select
             {...baseProps}
-            value={currentValue || ''}
-            onChange={(e) => onDataChange(e.target.value)}
+            value={localValue || ''}
+            onChange={(e) => setLocalValue(e.target.value)}
             aria-label={componentProps.ariaLabel || 'Select option'}
             className="mt-2 ml-8 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
@@ -259,8 +359,8 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
           <Input
             {...baseProps}
             type="time"
-            value={currentValue || ''}
-            onChange={(e) => onDataChange(e.target.value)}
+            value={localValue || ''}
+            onChange={(e) => setLocalValue(e.target.value)}
             aria-label={componentProps.ariaLabel || 'Select time'}
             className="w-32 mt-2 ml-8"
           />
@@ -271,8 +371,8 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
           <Input
             {...baseProps}
             type="date"
-            value={currentValue || ''}
-            onChange={(e) => onDataChange(e.target.value)}
+            value={localValue || ''}
+            onChange={(e) => setLocalValue(e.target.value)}
             min={componentProps.min}
             max={componentProps.max}
             aria-label={componentProps.ariaLabel || 'Select date'}
@@ -291,8 +391,8 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
           <CustomComponent
             {...baseProps}
             {...componentProps}
-            value={currentValue}
-            onChange={onDataChange}
+            value={localValue}
+            onChange={setLocalValue}
             onSelectionChange={onSelectionChange}
             checkboxId={checkboxId}
           />
@@ -315,26 +415,35 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
     >
       {component}
       
-      {/* Tab key hint */}
-      {showHint && (
+      {/* Tab key hint for required fields */}
+      {showHint && strategy.focusManagement?.requiresInput && (
         <div 
           className="absolute -bottom-6 left-8 text-xs text-gray-600 bg-white px-2 py-1 rounded shadow-sm border border-gray-200 z-10"
           role="status"
           aria-live="polite"
         >
-          Press Enter to save or Esc to cancel
+          Press Tab to continue or Enter to save and return
         </div>
       )}
       
-      {/* Help text if provided */}
-      {strategy.componentProps.helpText && (
-        <p 
-          id={`${checkboxId}-help`}
-          className="ml-8 mt-1 text-sm text-gray-600"
+      {/* Saved indicator */}
+      {showSaved && (
+        <div 
+          className="absolute -top-6 left-8 text-xs text-green-600 bg-white px-2 py-1 rounded shadow-sm border border-green-200 z-10"
+          role="status"
+          aria-live="polite"
         >
-          {strategy.componentProps.helpText}
-        </p>
+          ✓ Saved
+        </div>
       )}
+      
+      {/* Dynamic help text */}
+      <p 
+        id={`${checkboxId}-help`}
+        className="ml-8 mt-1 text-sm text-gray-600"
+      >
+        {getHelpText()}
+      </p>
       
       {/* Validation error display */}
       {strategy.componentProps.errorMessage && (

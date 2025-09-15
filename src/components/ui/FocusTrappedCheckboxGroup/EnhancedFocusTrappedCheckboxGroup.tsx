@@ -1,11 +1,12 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
-import { EnhancedCheckboxGroupProps, FocusSource, FocusIntent, CheckboxMetadata } from './metadata-types';
+import { EnhancedCheckboxGroupProps, FocusSource, FocusIntent, CheckboxMetadata, ContinueButtonBehavior } from './metadata-types';
 import { DynamicAdditionalInput } from './DynamicAdditionalInput';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { DefaultSummaryStrategy } from './summary-strategies';
+import { cn } from '@/components/ui/utils';
 
 /**
  * Memoized checkbox item to prevent unnecessary re-renders
@@ -27,7 +28,7 @@ interface MemoizedCheckboxItemProps {
   focusIntent: FocusIntent;
   handleAdditionalDataChange: (id: string, data: any) => void;
   handleInputIntentionalExit: (checkboxId: string, saveValue: boolean) => void;
-  handleInputNaturalBlur: (checkboxId: string) => void;
+  handleInputNaturalBlur: (checkboxId: string, relatedTarget: HTMLElement | null) => void;
   handleDirectInputFocus: (checkboxId: string) => void;
   setFocusedCheckboxId: (id: string | null) => void;
   setFocusRegion: (region: 'checkbox' | 'input' | 'button') => void;
@@ -54,6 +55,11 @@ const MemoizedCheckboxItem = React.memo<MemoizedCheckboxItemProps>(({
   setFocusedCheckboxId,
   setFocusRegion
 }) => {
+  // Debug logging for optional input rendering
+  if (checkbox.id === 'prn') {
+    console.log(`[PRN Checkbox] Rendering - checked: ${checkbox.checked}, hasStrategy: ${!!checkbox.additionalInputStrategy}, requiresInput: ${checkbox.requiresAdditionalInput}`);
+  }
+  
   return (
     <div className="space-y-2">
       <label 
@@ -95,8 +101,8 @@ const MemoizedCheckboxItem = React.memo<MemoizedCheckboxItemProps>(({
         </div>
       </label>
       
-      {/* Dynamic additional input (always shown when checkbox is checked) */}
-      {checkbox.checked && checkbox.requiresAdditionalInput && checkbox.additionalInputStrategy && (
+      {/* Dynamic additional input (shown when checkbox is checked and has a strategy) */}
+      {checkbox.checked && checkbox.additionalInputStrategy && (
         <DynamicAdditionalInput
           strategy={checkbox.additionalInputStrategy}
           checkboxId={checkbox.id}
@@ -132,7 +138,12 @@ const MemoizedCheckboxItem = React.memo<MemoizedCheckboxItemProps>(({
     prevProps.focusedCheckboxId === nextProps.focusedCheckboxId &&
     prevProps.checkboxesLength === nextProps.checkboxesLength &&
     prevProps.focusIntent.type === nextProps.focusIntent.type &&
-    prevProps.focusIntent.checkboxId === nextProps.focusIntent.checkboxId &&
+    (prevProps.focusIntent.type === 'none' || nextProps.focusIntent.type === 'none' || 
+     prevProps.focusIntent.type === 'external-blur' || nextProps.focusIntent.type === 'external-blur'
+      ? true 
+      : 'checkboxId' in prevProps.focusIntent && 'checkboxId' in nextProps.focusIntent
+        ? prevProps.focusIntent.checkboxId === nextProps.focusIntent.checkboxId
+        : true) &&
     JSON.stringify(prevData) === JSON.stringify(nextData)
   );
 });
@@ -150,6 +161,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   checkboxes,
   onSelectionChange,
   onAdditionalDataChange,
+  onFieldBlur,
   onContinue,
   onCancel,
   // Display configuration
@@ -174,7 +186,13 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   helpText,
   // Button customization
   continueButtonText = 'Continue',
-  cancelButtonText = 'Cancel'
+  cancelButtonText = 'Cancel',
+  continueButtonBehavior,
+  // Back navigation
+  onBack,
+  showBackButton = false,
+  backButtonText = 'Back',
+  previousTabIndex
 }) => {
   const [focusedElement, setFocusedElement] = useState(0);
   const [focusedCheckboxIndex, setFocusedCheckboxIndex] = useState(0);
@@ -189,6 +207,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const backButtonRef = useRef<HTMLButtonElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const continueButtonRef = useRef<HTMLButtonElement>(null);
   const checkboxRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -289,6 +308,11 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   
   // Handle natural blur from input (user clicked elsewhere)
   const handleInputNaturalBlur = useCallback((checkboxId: string, relatedTarget: HTMLElement | null) => {
+    // Mark field as touched for validation purposes
+    if (onFieldBlur) {
+      onFieldBlur(checkboxId);
+    }
+    
     // Check if focus is moving within our component
     const isInternalNavigation = relatedTarget && (
       checkboxRefs.current.has(relatedTarget.id) ||
@@ -305,7 +329,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
     } else {
       console.log('[CheckboxGroup] Internal navigation within component');
     }
-  }, []);
+  }, [onFieldBlur]);
   
   // Handle direct input focus via mouse click
   const handleDirectInputFocus = useCallback((checkboxId: string) => {
@@ -317,6 +341,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   
   // Handle checkbox change
   const handleCheckboxChange = useCallback((checkboxId: string, checked: boolean) => {
+    console.log(`[CheckboxGroup] Checkbox ${checkboxId} changed to ${checked}`);
     onSelectionChange(checkboxId, checked);
     
     // Clear additional data if unchecked
@@ -330,14 +355,20 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
         onAdditionalDataChange(checkboxId, null);
       }
     } else {
-      // If checkbox requires additional input, prepare for focus with intent
+      // If checkbox has additional input (required or optional)
       const checkbox = checkboxes.find(cb => cb.id === checkboxId);
-      if (checkbox?.requiresAdditionalInput) {
+      if (checkbox?.additionalInputStrategy) {
         // Determine source based on how the checkbox was activated
-        // This will be keyboard if Space key was used, mouse if clicked
         const source = (window.event as any)?.detail === 0 ? 'keyboard' : 'mouse';
-        setFocusIntent({ type: 'input', checkboxId, source: source as FocusSource });
-        setFocusedCheckboxId(checkboxId);
+        // Auto-focus for both required and optional fields when selected via keyboard
+        if (source === 'keyboard' && (
+          checkbox.requiresAdditionalInput || 
+          checkbox.additionalInputStrategy.focusManagement?.autoFocus
+        )) {
+          setFocusIntent({ type: 'input', checkboxId, source: source as FocusSource });
+          setFocusedCheckboxId(checkboxId);
+        }
+        // Mouse selections don't auto-focus
       }
     }
   }, [checkboxes, onSelectionChange, onAdditionalDataChange]);
@@ -367,6 +398,15 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
       .map(cb => cb.id);
     onContinue(selectedIds, additionalData);
   }, [checkboxes, onContinue, additionalData]);
+  
+  // Handle back navigation
+  const handleBack = useCallback(() => {
+    if (onBack) {
+      // Don't clear selections - preserve state
+      console.log(`[CheckboxGroup ${id}] Navigating back, preserving selections`);
+      onBack();
+    }
+  }, [onBack, id]);
   
   // Handle cancel action
   const handleCancel = useCallback(() => {
@@ -428,20 +468,71 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
       key: e.key,
       focusRegion,
       focusedElement,
+      focusedCheckboxIndex,
       targetTagName: (e.target as HTMLElement).tagName,
       targetId: (e.target as HTMLElement).id,
       defaultPrevented: e.defaultPrevented
     });
     
-    // Tab key - always handle for focus trap regardless of focus region
-    // When in input region, Tab should be blocked by DynamicAdditionalInput
-    // but we still handle it here for the container-level navigation
+    // Shift+Tab from container goes back if onBack is provided
+    if (e.key === 'Tab' && e.shiftKey && focusedElement === 0 && onBack) {
+      e.preventDefault();
+      console.log('[Container] Shift+Tab on container - going back');
+      handleBack();
+      return;
+    }
+    
+    // Backspace in checkbox region goes back if onBack is provided
+    if (e.key === 'Backspace' && focusRegion === 'checkbox' && onBack) {
+      e.preventDefault();
+      console.log('[Container] Backspace in checkbox region - going back');
+      handleBack();
+      return;
+    }
+    
+    // FIRST: Check for Tab to optional input (must come before general Tab handler)
+    if (e.key === 'Tab' && !e.shiftKey && focusRegion === 'checkbox' && focusedElement === 0) {
+      const currentCheckbox = checkboxes[focusedCheckboxIndex];
+      console.log('[Container] Checking for optional input navigation:', {
+        checkboxId: currentCheckbox?.id,
+        checked: currentCheckbox?.checked,
+        hasStrategy: !!currentCheckbox?.additionalInputStrategy,
+        requiresInput: currentCheckbox?.requiresAdditionalInput
+      });
+      
+      // Check if checkbox has an optional input that's checked but not auto-focused
+      if (currentCheckbox?.checked && 
+          currentCheckbox?.additionalInputStrategy && 
+          !currentCheckbox?.requiresAdditionalInput) {
+        e.preventDefault();
+        console.log('[Container] Tab to optional input - preventing default and navigating');
+        // Set intent for Tab navigation to optional input
+        setFocusIntent({ type: 'tab-to-input', checkboxId: currentCheckbox.id, source: 'keyboard' as FocusSource });
+        setFocusRegion('input');
+        setFocusedCheckboxId(currentCheckbox.id);
+        
+        // Focus the optional input
+        requestAnimationFrame(() => {
+          const input = document.getElementById(`${currentCheckbox.id}-additional-input`);
+          if (input) {
+            input.focus();
+            console.log(`[Container] Tab navigated to optional input for ${currentCheckbox.id}`);
+          } else {
+            console.log(`[Container] Could not find input element: ${currentCheckbox.id}-additional-input`);
+          }
+        });
+        return; // Exit early to prevent general Tab handler
+      }
+    }
+    
+    // THEN: General Tab key handling for section navigation
     if (e.key === 'Tab' && focusRegion !== 'input') {
       console.log('[Container] Tab key - preventing default (not in input)');
       e.preventDefault();
       console.log('[Container] Tab preventDefault done');
-      // 0: checkbox group, 1: cancel, 2: continue
-      const sectionCount = 3;
+      // 0: checkbox group, 1: back (optional), 2: cancel, 3: continue
+      const hasBackButton = showBackButton && onBack;
+      const sectionCount = hasBackButton ? 4 : 3;
       const nextSection = e.shiftKey ? 
         (focusedElement - 1 + sectionCount) % sectionCount :
         (focusedElement + 1) % sectionCount;
@@ -454,9 +545,11 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
         if (checkboxElements && checkboxElements[focusedCheckboxIndex]) {
           (checkboxElements[focusedCheckboxIndex] as HTMLElement).focus();
         }
-      } else if (nextSection === 1) {
+      } else if (nextSection === 1 && hasBackButton) {
+        backButtonRef.current?.focus();
+      } else if (nextSection === (hasBackButton ? 2 : 1)) {
         cancelButtonRef.current?.focus();
-      } else if (nextSection === 2) {
+      } else if (nextSection === (hasBackButton ? 3 : 2)) {
         continueButtonRef.current?.focus();
       }
     } else if (e.key === 'Tab' && focusRegion === 'input') {
@@ -497,6 +590,9 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
           handleCheckboxChange(checkbox.id, !checkbox.checked);
         }
       }
+      
+      // Note: Tab key navigation to optional input is handled earlier in the function
+      // to ensure it takes precedence over general Tab navigation
       
       // Enhanced navigation for long lists
       if (maxVisibleItems && checkboxes.length > maxVisibleItems) {
@@ -541,7 +637,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
     // When focus is in input region, let inputs handle their own keyboard events naturally
     // This follows the Focus Region Tracking design principle from CLAUDE.md
     // When focus is in button region, standard behavior applies
-  }, [focusedElement, focusedCheckboxIndex, checkboxes, handleCheckboxChange, handleCancel, focusRegion, maxVisibleItems, ensureItemVisible]);
+  }, [focusedElement, focusedCheckboxIndex, checkboxes, handleCheckboxChange, handleCancel, handleBack, focusRegion, maxVisibleItems, ensureItemVisible, onBack, showBackButton]);
   
   // No need for focus on mount - handled by container focus event
   
@@ -558,6 +654,98 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   
   // Count selected items for display
   const selectedCount = checkboxes.filter(cb => cb.checked).length;
+  
+  // Track focused field state for progressive button text
+  const [focusedFieldState, setFocusedFieldState] = useState<{
+    fieldId: string | null;
+    isEmpty: boolean;
+    isRequired: boolean;
+  }>({ fieldId: null, isEmpty: false, isRequired: false });
+
+  // Update focused field state when focus changes
+  useEffect(() => {
+    if (focusedCheckboxId && focusRegion === 'input') {
+      const checkbox = checkboxes.find(cb => cb.id === focusedCheckboxId);
+      const currentValue = additionalData.get(focusedCheckboxId);
+      const isEmpty = !currentValue || currentValue === '';
+      const isRequired = checkbox?.additionalInputStrategy?.focusManagement?.requiresInput !== false;
+      
+      setFocusedFieldState({
+        fieldId: focusedCheckboxId,
+        isEmpty,
+        isRequired
+      });
+    } else {
+      setFocusedFieldState({ fieldId: null, isEmpty: false, isRequired: false });
+    }
+  }, [focusedCheckboxId, focusRegion, checkboxes, additionalData]);
+
+  // Validation function to check for empty required fields
+  const hasEmptyRequiredFields = useCallback(() => {
+    return checkboxes
+      .filter(cb => cb.checked && cb.requiresAdditionalInput)
+      .some(cb => {
+        const inputValue = additionalData.get(cb.id);
+        return !inputValue || inputValue === '' || 
+               (typeof inputValue === 'string' && inputValue.trim() === '');
+      });
+  }, [checkboxes, additionalData]);
+
+  // Determine if Continue button should be disabled based on behavior strategy
+  const isContinueDisabled = useMemo(() => {
+    const hasSelection = selectedCount > 0;
+    
+    // Custom logic takes precedence
+    if (continueButtonBehavior?.customEnableLogic) {
+      return !continueButtonBehavior.customEnableLogic(checkboxes);
+    }
+    
+    // Allow skip if configured
+    if (continueButtonBehavior?.allowSkipSelection) {
+      return false; // Always enabled
+    }
+    
+    // Check for empty required fields
+    if (hasEmptyRequiredFields()) {
+      return true; // Disable if required fields are empty
+    }
+    
+    // Default behavior: require at least one selection
+    return !hasSelection;
+  }, [selectedCount, continueButtonBehavior, checkboxes, hasEmptyRequiredFields]);
+
+  // Compute progressive button text based on current state
+  const dynamicContinueButtonText = useMemo(() => {
+    // Check for multiple empty required fields
+    const emptyRequiredCount = checkboxes
+      .filter(cb => cb.checked && cb.requiresAdditionalInput)
+      .filter(cb => {
+        const inputValue = additionalData.get(cb.id);
+        return !inputValue || inputValue === '' || 
+               (typeof inputValue === 'string' && inputValue.trim() === '');
+      }).length;
+    
+    if (emptyRequiredCount > 1) {
+      return 'Complete required fields';
+    }
+    
+    // Single focused field case (existing logic)
+    if (focusedFieldState.isRequired && focusedFieldState.isEmpty) {
+      return 'Complete required field';
+    }
+    
+    // Single empty required field (not focused)
+    if (emptyRequiredCount === 1) {
+      return 'Complete required field';
+    }
+    
+    // Check for validation errors (placeholder for future validation)
+    // if (validationErrors.size > 0) {
+    //   return 'Fix validation errors';
+    // }
+    
+    return continueButtonText || 'Continue';
+  }, [checkboxes, additionalData, focusedFieldState, continueButtonText]);
   
   // Stable callback for checkbox focus
   const handleCheckboxFocus = useCallback((index: number, checkboxId: string) => {
@@ -701,6 +889,17 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
             </div>
           )}
           
+          {/* Skip selection announcement */}
+          {continueButtonBehavior?.allowSkipSelection && continueButtonBehavior?.skipMessage && (
+            <div 
+              role="status"
+              aria-live="polite" 
+              className="sr-only"
+            >
+              {continueButtonBehavior.skipMessage}
+            </div>
+          )}
+          
           {/* Content always visible (no expand/collapse) */}
           <div className="p-6 bg-white/50 backdrop-blur-sm">
             {/* Help text */}
@@ -752,29 +951,72 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
         </div>
         
         {/* Action buttons outside scroll area */}
-        <div className="border-t border-gray-200 p-4 bg-white flex justify-end gap-3">
-          <Button
-            ref={cancelButtonRef}
-            variant="outline"
-            onClick={handleCancel}
-            onFocus={() => setFocusRegion('button')}
-            tabIndex={-1}
-            className="min-w-[100px]"
-          >
-            {cancelButtonText}
-          </Button>
-          <Button
-            ref={continueButtonRef}
-            variant="default"
-            onClick={handleContinue}
-            onFocus={() => setFocusRegion('button')}
-            tabIndex={-1}
-            className="min-w-[100px]"
-            disabled={checkboxes.filter(cb => cb.checked).length === 0}
-          >
-            {continueButtonText}
-          </Button>
+        <div className="border-t border-gray-200 p-4 bg-white flex justify-between gap-3">
+          <div>
+            {showBackButton && onBack && (
+              <Button
+                ref={backButtonRef}
+                variant="outline"
+                onClick={handleBack}
+                onFocus={() => setFocusRegion('button')}
+                tabIndex={-1}
+                className="min-w-[100px]"
+              >
+                {backButtonText}
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <Button
+              ref={cancelButtonRef}
+              variant="outline"
+              onClick={handleCancel}
+              onFocus={() => setFocusRegion('button')}
+              tabIndex={-1}
+              className="min-w-[100px]"
+            >
+              {cancelButtonText}
+            </Button>
+            <Button
+              ref={continueButtonRef}
+              variant={isContinueDisabled ? "glass-disabled" : "default"}
+              onClick={handleContinue}
+              onFocus={() => setFocusRegion('button')}
+              tabIndex={-1}
+              className={cn(
+                "min-w-[100px]",
+                !isContinueDisabled && dynamicContinueButtonText !== 'Continue' && "ring-2 ring-yellow-400"
+              )}
+              disabled={isContinueDisabled}
+              aria-describedby={
+                dynamicContinueButtonText !== 'Continue' ? 'continue-helper' : undefined
+              }
+            >
+              {dynamicContinueButtonText}
+            </Button>
+          </div>
         </div>
+        
+        {/* ARIA live region for status announcements */}
+        <div 
+          role="status" 
+          aria-live="polite" 
+          aria-atomic="true"
+          className="sr-only"
+        >
+          {dynamicContinueButtonText !== 'Continue' && 
+            `Please ${dynamicContinueButtonText.toLowerCase()} before proceeding`}
+        </div>
+        
+        {/* Helper text for Continue button when not in default state */}
+        {dynamicContinueButtonText !== 'Continue' && (
+          <div id="continue-helper" className="sr-only">
+            {dynamicContinueButtonText === 'Complete required field' 
+              ? 'Please complete the required field before continuing'
+              : 'Please fix validation errors before continuing'
+            }
+          </div>
+        )}
       </div>
     </div>
   );
