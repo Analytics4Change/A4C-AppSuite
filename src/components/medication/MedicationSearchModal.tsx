@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, RefObject } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MedicationSearch } from '@/views/medication/MedicationSearchWithSearchableDropdown';
@@ -28,11 +28,11 @@ export const MedicationSearchModal: React.FC<MedicationSearchModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMedication, setSelectedMedication] = useState<Medication | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const modalRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
 
   // Use keyboard navigation hook for focus trap
   useKeyboardNavigation({
-    containerRef: modalRef,
+    containerRef: modalRef as RefObject<HTMLElement>,
     enabled: isOpen,
     trapFocus: true,              // Trap focus within modal
     restoreFocus: true,           // Restore focus when modal closes
@@ -145,13 +145,12 @@ export const MedicationSearchModal: React.FC<MedicationSearchModalProps> = ({
             isLoading={isLoading}
             showDropdown={showDropdown}
             selectedMedication={selectedMedication}
-            error={null}
+            error={undefined}
             onSearch={handleSearch}
             onSelect={handleSelect}
             onClear={handleClear}
             onFieldComplete={() => {}}
             onDropdownOpen={() => {}}
-            tabIndex={0}  // This makes the clear button tabIndex={1}
           />
         </div>
 

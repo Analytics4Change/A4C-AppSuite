@@ -1,4 +1,4 @@
-import { DosageForm, DosageUnit, DosageFrequency } from './Dosage';
+import { DosageForm, DosageRoute, DosageUnit, DosageFrequency } from './Dosage';
 
 export interface Medication {
   id: string;
@@ -36,10 +36,13 @@ export interface MedicationHistory {
 export interface DosageInfo {
   medicationId: string;
   form: DosageForm;
+  route?: DosageRoute;  // Specific route (Tablet, Capsule, etc.)
   amount: number;
   unit: DosageUnit;
-  frequency: DosageFrequency;
+  frequency: DosageFrequency | DosageFrequency[];  // Can be single or multiple frequencies
   timings?: string[];  // Multiple timing selections
+  foodConditions?: string[];  // Food conditions array
+  specialRestrictions?: string[];  // Special restrictions array
   startDate?: Date;
   discontinueDate?: Date;
   prescribingDoctor?: string;

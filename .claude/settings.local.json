@@ -80,7 +80,9 @@
       "WebSearch",
       "Bash(npm run typecheck:*)",
       "Bash(npm run test:e2e:*)",
-      "mcp__exa__deep_researcher_check"
+      "mcp__exa__deep_researcher_check",
+      "Bash(PLAYWRIGHT_TEST_BASE_URL=http://localhost:3002 npx playwright test e2e/focus-intent-simple.spec.ts --headed --project=chromium --reporter=list)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "additionalDirectories": [

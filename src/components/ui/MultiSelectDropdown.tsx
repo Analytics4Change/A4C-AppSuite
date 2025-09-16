@@ -218,7 +218,7 @@ export const MultiSelectDropdown = observer(({
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors",
                   index === focusedIndex && "bg-blue-50 outline outline-2 outline-blue-500",
-                  !index === focusedIndex && "hover:bg-gray-50"
+                  index !== focusedIndex && "hover:bg-gray-50"
                 )}
                 onClick={() => handleToggle(option)}
                 onFocus={() => setFocusedIndex(index)}

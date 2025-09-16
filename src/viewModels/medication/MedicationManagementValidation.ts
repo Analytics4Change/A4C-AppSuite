@@ -96,8 +96,8 @@ export class MedicationManagementValidation {
       isValid = false;
     }
     
-    if (!this.vm.frequency) {
-      this.setError('frequency', 'Please select dosage frequency');
+    if (!this.vm.selectedFrequencies || this.vm.selectedFrequencies.length === 0) {
+      this.setError('frequency', 'Please select at least one dosage frequency');
       isValid = false;
     }
     

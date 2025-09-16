@@ -2,7 +2,6 @@ import React from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useEnterAsTab } from '@/hooks/useEnterAsTab';
 
 interface DateSelectionProps {
   startDate: string;
@@ -28,10 +27,6 @@ export const DateSelection: React.FC<DateSelectionProps> = ({
     onDiscontinueDateChange(e.target.value);
   };
 
-  // Hook for Enter key navigation
-  const handleStartDateEnterKey = useEnterAsTab(11); // Move to Discontinue Date
-  const handleDiscontinueDateEnterKey = useEnterAsTab(12); // Move to Pharmacy Name
-
   return (
     <div className="grid grid-cols-2 gap-6">
       <div className="space-y-2 relative">
@@ -49,14 +44,12 @@ export const DateSelection: React.FC<DateSelectionProps> = ({
                 e.preventDefault();
                 // Trigger native date picker
                 (e.currentTarget as HTMLInputElement).showPicker?.();
-              } else if (e.key === 'Enter') {
-                handleStartDateEnterKey(e);
               }
             }}
             className="cursor-pointer"
             aria-label="Start date"
             aria-describedby="start-date-format"
-            tabIndex={10}
+            tabIndex={13}
           />
         </div>
         <span id="start-date-format" className="text-xs text-gray-500">
@@ -79,15 +72,13 @@ export const DateSelection: React.FC<DateSelectionProps> = ({
                 e.preventDefault();
                 // Trigger native date picker
                 (e.currentTarget as HTMLInputElement).showPicker?.();
-              } else if (e.key === 'Enter') {
-                handleDiscontinueDateEnterKey(e);
               }
             }}
             className={`cursor-pointer ${error ? 'border-red-500' : ''}`}
             aria-label="Discontinue date"
             aria-describedby={error ? 'discontinue-date-error' : 'discontinue-date-format'}
             aria-invalid={!!error}
-            tabIndex={11}
+            tabIndex={14}
           />
         </div>
         

@@ -107,3 +107,73 @@ export interface HealthStatus {
   successRate: number;
   averageResponseTime: number;
 }
+
+/**
+ * Controlled substance status from RXNorm
+ */
+export interface ControlledStatus {
+  isControlled: boolean;
+  scheduleClass?: string; // DEA Schedule I-V
+  error?: string;
+}
+
+/**
+ * Psychotropic medication status from RXNorm
+ */
+export interface PsychotropicStatus {
+  isPsychotropic: boolean;
+  atcCodes?: string[];
+  category?: string; // e.g., "Anxiolytic", "Antipsychotic", "Antidepressant"
+  error?: string;
+}
+
+/**
+ * RXNorm relations API response for controlled status
+ */
+export interface RXNormRelationsResponse {
+  relatedGroup?: {
+    conceptGroup?: Array<{
+      tty?: string;
+      conceptProperties?: Array<{
+        rxcui?: string;
+        name?: string;
+        synonym?: string;
+        tty?: string;
+        language?: string;
+        suppress?: string;
+        umlscui?: string;
+      }>;
+    }>;
+  };
+}
+
+/**
+ * RXNorm class API response for ATC codes
+ */
+export interface RXNormClassResponse {
+  rxclassDrugInfoList?: {
+    rxclassDrugInfo?: Array<{
+      minConcept?: {
+        rxcui?: string;
+        name?: string;
+        tty?: string;
+      };
+      rxclassMinConceptItem?: {
+        classId?: string;
+        className?: string;
+        classType?: string;
+      };
+      rela?: string;
+      relaSource?: string;
+    }>;
+  };
+}
+
+/**
+ * Medication purpose/therapeutic classification from RXNorm
+ */
+export interface MedicationPurpose {
+  className: string;
+  classType: string;
+  rela: string; // may_treat or may_prevent
+}

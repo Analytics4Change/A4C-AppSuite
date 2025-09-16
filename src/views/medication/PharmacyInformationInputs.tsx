@@ -1,7 +1,6 @@
 import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useEnterAsTab } from '@/hooks/useEnterAsTab';
 
 interface PharmacyInformationInputsProps {
   prescriberName: string;
@@ -26,12 +25,6 @@ export const PharmacyInformationInputs: React.FC<PharmacyInformationInputsProps>
   onPharmacyPhoneChange,
   onRxNumberChange
 }) => {
-  // Hook for Enter key navigation
-  const handlePrescriberNameEnterKey = useEnterAsTab(13); // Move to Pharmacy Name
-  const handlePharmacyNameEnterKey = useEnterAsTab(14); // Move to Pharmacy Phone
-  const handlePharmacyPhoneEnterKey = useEnterAsTab(15); // Move to RX Number
-  const handleRxNumberEnterKey = useEnterAsTab(16); // Move to Inventory Quantity
-
   return (
     <div className="space-y-6">
       {/* First Row: Prescriber Name and Pharmacy Name */}
@@ -47,11 +40,10 @@ export const PharmacyInformationInputs: React.FC<PharmacyInformationInputsProps>
             type="text"
             value={prescriberName}
             onChange={(e) => onPrescriberNameChange(e.target.value)}
-            onKeyDown={handlePrescriberNameEnterKey}
             placeholder="e.g., Dr. Smith"
             className={`mt-2 ${prescriberName ? 'border-blue-500 bg-blue-50' : ''}`}
             aria-label="Prescriber name"
-            tabIndex={12}
+            tabIndex={15}
           />
         </div>
 
@@ -66,11 +58,10 @@ export const PharmacyInformationInputs: React.FC<PharmacyInformationInputsProps>
             type="text"
             value={pharmacyName}
             onChange={(e) => onPharmacyNameChange(e.target.value)}
-            onKeyDown={handlePharmacyNameEnterKey}
             placeholder="e.g., Walgreens"
             className={`mt-2 ${pharmacyName ? 'border-blue-500 bg-blue-50' : ''}`}
             aria-label="Pharmacy name"
-            tabIndex={13}
+            tabIndex={16}
           />
         </div>
       </div>
@@ -88,13 +79,12 @@ export const PharmacyInformationInputs: React.FC<PharmacyInformationInputsProps>
             type="tel"
             value={pharmacyPhone}
             onChange={(e) => onPharmacyPhoneChange(e.target.value)}
-            onKeyDown={handlePharmacyPhoneEnterKey}
             placeholder="e.g., (555) 123-4567"
             className={`mt-2 ${pharmacyPhone ? 'border-blue-500 bg-blue-50' : ''} ${errors.get('pharmacyPhone') ? 'border-red-500' : ''}`}
             aria-label="Pharmacy phone number"
             aria-describedby={errors.get('pharmacyPhone') ? 'pharmacy-phone-error' : undefined}
             aria-invalid={!!errors.get('pharmacyPhone')}
-            tabIndex={14}
+            tabIndex={17}
           />
           {errors.get('pharmacyPhone') && (
             <p id="pharmacy-phone-error" className="mt-1 text-sm text-red-600" role="alert">
@@ -114,11 +104,10 @@ export const PharmacyInformationInputs: React.FC<PharmacyInformationInputsProps>
             type="text"
             value={rxNumber}
             onChange={(e) => onRxNumberChange(e.target.value)}
-            onKeyDown={handleRxNumberEnterKey}
             placeholder="e.g., RX123456"
             className={`mt-2 ${rxNumber ? 'border-blue-500 bg-blue-50' : ''}`}
             aria-label="RX number"
-            tabIndex={15}
+            tabIndex={18}
           />
         </div>
       </div>

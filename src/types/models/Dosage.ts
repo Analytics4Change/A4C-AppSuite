@@ -142,7 +142,7 @@ export type DosageFrequency =
 
 // Hierarchical structure for dosage forms
 export interface DosageFormHierarchy {
-  type: DosageFormType;
+  type: DosageForm;
   routes: DosageRouteOption[];
 }
 

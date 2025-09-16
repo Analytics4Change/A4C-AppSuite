@@ -70,8 +70,40 @@ export class DosageTimingSummaryStrategy implements SummaryStrategy {
 }
 
 /**
- * Future: Frequency summary strategy
- * Example implementation for when we convert Frequency to use this component
+ * Dosage Frequency summary strategy
+ * Handles PRN with optional notes and PRN with max hours
+ */
+export class DosageFrequencySummaryStrategy implements SummaryStrategy {
+  maxLength = 40;
+  
+  generateSummary(checkboxId: string, data: any): string {
+    if (!data) return '';
+    
+    switch(checkboxId) {
+      case 'prn': {
+        // For PRN, show the optional notes if provided
+        if (data) {
+          const notes = String(data).slice(0, this.maxLength);
+          return data.length > this.maxLength ? `${notes}...` : notes;
+        }
+        return '';
+      }
+      
+      case 'prn-max': {
+        // For PRN with max frequency, show "Not to exceed every X hours"
+        return data ? `Not to exceed every ${data} hrs` : '';
+      }
+      
+      default:
+        // Other frequency checkboxes don't have additional data
+        return '';
+    }
+  }
+}
+
+/**
+ * Legacy FrequencySummaryStrategy - kept for compatibility
+ * @deprecated Use DosageFrequencySummaryStrategy instead
  */
 export class FrequencySummaryStrategy implements SummaryStrategy {
   generateSummary(checkboxId: string, data: any): string {
@@ -86,28 +118,6 @@ export class FrequencySummaryStrategy implements SummaryStrategy {
   }
 }
 
-/**
- * Future: Food Conditions summary strategy
- */
-export class FoodConditionsSummaryStrategy implements SummaryStrategy {
-  generateSummary(checkboxId: string, data: any): string {
-    if (!data) return '';
-    
-    switch(checkboxId) {
-      case 'with-food':
-        return data || 'Take with food';
-      
-      case 'empty-stomach':
-        return data ? `${data} before/after meals` : 'Empty stomach';
-      
-      case 'dietary-restriction':
-        return data || 'See restrictions';
-      
-      default:
-        return '';
-    }
-  }
-}
 
 /**
  * Default summary strategy that simply stringifies the data
@@ -121,5 +131,53 @@ export class DefaultSummaryStrategy implements SummaryStrategy {
     
     const str = typeof data === 'object' ? JSON.stringify(data) : String(data);
     return str.length > this.maxLength ? `${str.slice(0, this.maxLength)}...` : str;
+  }
+}
+
+/**
+ * Summary strategy for Food Conditions checkbox group
+ * Handles summary generation for the Other checkbox with text input
+ */
+export class FoodConditionsSummaryStrategy implements SummaryStrategy {
+  maxLength = 30;
+  
+  generateSummary(checkboxId: string, data: any): string {
+    if (!data) return '';
+    
+    switch(checkboxId) {
+      case 'other': {
+        // For other, show the first part of the custom instructions
+        const text = String(data).slice(0, this.maxLength);
+        return data.length > this.maxLength ? `${text}...` : text;
+      }
+      
+      default:
+        // Other checkboxes don't have additional data
+        return '';
+    }
+  }
+}
+
+/**
+ * Summary strategy for Special Restrictions checkbox group
+ * Handles summary generation for the Other checkbox with text input
+ */
+export class SpecialRestrictionsSummaryStrategy implements SummaryStrategy {
+  maxLength = 30;
+  
+  generateSummary(checkboxId: string, data: any): string {
+    if (!data) return '';
+    
+    switch(checkboxId) {
+      case 'other': {
+        // For other, show the first part of the custom restrictions
+        const text = String(data).slice(0, this.maxLength);
+        return data.length > this.maxLength ? `${text}...` : text;
+      }
+      
+      default:
+        // Other checkboxes don't have additional data
+        return '';
+    }
   }
 }

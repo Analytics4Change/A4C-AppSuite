@@ -9,13 +9,14 @@ export interface FocusStrategy {
   autoFocus: boolean;
   returnFocusTo?: 'checkbox' | 'continue' | 'cancel';
   trapFocus?: boolean;
+  requiresInput?: boolean; // Whether the input is required (true) or optional (false)
 }
 
 /**
  * Validation rule for additional input fields
  */
 export interface ValidationRule {
-  type: 'required' | 'range' | 'pattern' | 'custom';
+  type: 'required' | 'range' | 'pattern' | 'custom' | 'minLength' | 'maxLength';
   message: string;
   min?: number;
   max?: number;
@@ -27,7 +28,7 @@ export interface ValidationRule {
  * Strategy pattern for defining additional input components
  */
 export interface AdditionalInputStrategy {
-  componentType: 'numeric' | 'text' | 'select' | 'date' | 'time' | 'custom';
+  componentType: 'numeric' | 'text' | 'textarea' | 'select' | 'date' | 'time' | 'custom';
   componentProps: Record<string, any>;
   validationRules?: ValidationRule[];
   focusManagement?: FocusStrategy;
@@ -64,6 +65,7 @@ export type FocusIntent =
   | { type: 'none' }
   | { type: 'checkbox'; checkboxId: string; source: FocusSource }
   | { type: 'input'; checkboxId: string; source: FocusSource }
+  | { type: 'tab-to-input'; checkboxId: string; source: FocusSource }
   | { type: 'returning-to-checkbox'; checkboxId: string; source: FocusSource }
   | { type: 'external-blur'; from: 'input' | 'checkbox' };
 
@@ -88,6 +90,15 @@ export interface DynamicAdditionalInputProps {
 }
 
 /**
+ * Strategy for Continue button enablement behavior
+ */
+export interface ContinueButtonBehavior {
+  allowSkipSelection?: boolean; // Allow continuing without any selection
+  skipMessage?: string; // Message for screen readers when skip is allowed
+  customEnableLogic?: (checkboxes: CheckboxMetadata[]) => boolean; // Custom logic for enabling
+}
+
+/**
  * Enhanced props for FocusTrappedCheckboxGroup with metadata support
  */
 export interface EnhancedCheckboxGroupProps {
@@ -96,6 +107,7 @@ export interface EnhancedCheckboxGroupProps {
   checkboxes: CheckboxMetadata[];
   onSelectionChange: (id: string, checked: boolean) => void;
   onAdditionalDataChange?: (checkboxId: string, data: any) => void;
+  onFieldBlur?: (checkboxId: string) => void;  // Called when additional input field loses focus
   onContinue: (selectedIds: string[], additionalData: Map<string, any>) => void;
   onCancel: () => void;
   
@@ -131,4 +143,11 @@ export interface EnhancedCheckboxGroupProps {
   // Button customization
   continueButtonText?: string;
   cancelButtonText?: string;
+  continueButtonBehavior?: ContinueButtonBehavior; // Strategy for Continue button enablement
+  
+  // Back navigation
+  onBack?: () => void;
+  showBackButton?: boolean;
+  backButtonText?: string;
+  previousTabIndex?: number;
 }
