@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: a4c-frontend-ingress
+  namespace: default
+  labels:
+    app: a4c-frontend
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+  - hosts:
+    - a4c.firstovertheline.com
+    secretName: a4c-frontend-tls
+  rules:
+  - host: a4c.firstovertheline.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: a4c-frontend-service
+            port:
+              number: 80
