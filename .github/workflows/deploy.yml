@@ -133,12 +133,20 @@ jobs:
         if kubectl cluster-info 2>/dev/null; then
           echo "✓ kubectl configuration is valid"
         else
-          echo "❌ kubectl configuration failed - attempting to fix JSON format..."
-          # If it looks like JSON, try to convert or extract
-          if grep -q '"apiVersion"' ~/.kube/config; then
-            echo "Detected JSON format in kubeconfig, this needs to be YAML"
-            exit 1
-          fi
+          echo "❌ kubectl configuration failed"
+          echo ""
+          echo "🔧 KUBECONFIG SECRET NEEDS TO BE FIXED"
+          echo "The KUBECONFIG secret contains invalid format."
+          echo ""
+          echo "To fix this:"
+          echo "1. Get your valid kubeconfig file (usually ~/.kube/config on your local machine)"
+          echo "2. Encode it as base64: cat ~/.kube/config | base64 -w 0"
+          echo "3. Update the KUBECONFIG secret with the base64-encoded content"
+          echo "4. Or store the raw YAML content directly (not recommended for security)"
+          echo ""
+          echo "Expected format: Valid Kubernetes kubeconfig YAML"
+          echo "Current format: Invalid/malformed content"
+          exit 1
         fi
         
         echo "✓ kubectl configuration complete"
