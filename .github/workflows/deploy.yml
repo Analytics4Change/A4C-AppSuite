@@ -130,22 +130,22 @@ jobs:
         
         # Test kubectl connectivity
         echo "Testing kubectl configuration..."
-        if kubectl cluster-info 2>/dev/null; then
-          echo "✓ kubectl configuration is valid"
+        if timeout 30 kubectl cluster-info 2>/dev/null; then
+          echo "✓ kubectl configuration is valid and cluster is reachable"
         else
-          echo "❌ kubectl configuration failed"
+          echo "❌ kubectl cluster connection failed"
           echo ""
-          echo "🔧 KUBECONFIG SECRET NEEDS TO BE FIXED"
-          echo "The KUBECONFIG secret contains invalid format."
+          echo "🌐 NETWORK CONNECTIVITY ISSUE"
+          echo "The kubeconfig format is valid, but the cluster is not reachable from GitHub Actions."
           echo ""
-          echo "To fix this:"
-          echo "1. Get your valid kubeconfig file (usually ~/.kube/config on your local machine)"
-          echo "2. Encode it as base64: cat ~/.kube/config | base64 -w 0"
-          echo "3. Update the KUBECONFIG secret with the base64-encoded content"
-          echo "4. Or store the raw YAML content directly (not recommended for security)"
+          echo "Possible solutions:"
+          echo "1. Ensure your k3s cluster has a public IP or domain name"
+          echo "2. Use a VPN or tunnel service (like ngrok, Cloudflare Tunnel)"
+          echo "3. Set up a bastion host or jump server"
+          echo "4. Use a cloud-hosted Kubernetes cluster (EKS, GKE, AKS)"
           echo ""
-          echo "Expected format: Valid Kubernetes kubeconfig YAML"
-          echo "Current format: Invalid/malformed content"
+          echo "Current cluster endpoint: $(grep 'server:' ~/.kube/config | head -1)"
+          echo "This appears to be a private network address not accessible from GitHub Actions."
           exit 1
         fi
         
