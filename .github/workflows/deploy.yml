@@ -103,8 +103,25 @@ jobs:
     - name: Configure kubectl
       run: |
         mkdir -p ~/.kube
-        echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+        echo "Checking KUBECONFIG secret..."
+        if [ -z "${{ secrets.KUBECONFIG }}" ]; then
+          echo "❌ KUBECONFIG secret is empty"
+          exit 1
+        fi
+        echo "✓ KUBECONFIG secret exists and is not empty"
+        echo "Secret length: $(echo '${{ secrets.KUBECONFIG }}' | wc -c) characters"
+        
+        # Try to decode the secret
+        if echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config 2>/dev/null; then
+          echo "✓ Successfully decoded KUBECONFIG secret"
+        else
+          echo "❌ Failed to decode KUBECONFIG secret as base64"
+          echo "Trying to use secret as plain text kubeconfig..."
+          echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+        fi
+        
         chmod 600 ~/.kube/config
+        echo "✓ kubectl configuration complete"
 
     - name: Create image pull secret
       run: |
