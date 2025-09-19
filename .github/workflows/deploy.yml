@@ -121,6 +121,26 @@ jobs:
         fi
         
         chmod 600 ~/.kube/config
+        
+        # Debug the config file format
+        echo "--- Config file debug info ---"
+        echo "First few lines of config:"
+        head -5 ~/.kube/config || true
+        echo "--- End debug info ---"
+        
+        # Test kubectl connectivity
+        echo "Testing kubectl configuration..."
+        if kubectl cluster-info 2>/dev/null; then
+          echo "✓ kubectl configuration is valid"
+        else
+          echo "❌ kubectl configuration failed - attempting to fix JSON format..."
+          # If it looks like JSON, try to convert or extract
+          if grep -q '"apiVersion"' ~/.kube/config; then
+            echo "Detected JSON format in kubeconfig, this needs to be YAML"
+            exit 1
+          fi
+        fi
+        
         echo "✓ kubectl configuration complete"
 
     - name: Create image pull secret
