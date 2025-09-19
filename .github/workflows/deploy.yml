@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: analytics4change/a4c-frontend
+  IMAGE_NAME: lars-tice/a4c-frontend
 
 jobs:
   build:
