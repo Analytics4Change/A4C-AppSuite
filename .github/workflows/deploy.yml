@@ -168,9 +168,11 @@ jobs:
         IMAGE_TAG=$(echo "${{ needs.build.outputs.image-tag }}" | head -n1)
         echo "Using image tag: $IMAGE_TAG"
         
-        # Update the deployment with new image
-        kubectl set image deployment/a4c-frontend nginx="$IMAGE_TAG" || \
-        kubectl apply -f k8s/
+        # Update deployment YAML with new image tag
+        sed -i "s|image: ghcr.io/analytics4change/a4c-frontend:.*|image: $IMAGE_TAG|g" k8s/deployment.yaml
+        
+        # Apply the updated deployment (preserves imagePullSecrets)
+        kubectl apply -f k8s/deployment.yaml
 
     - name: Wait for rollout
       run: |
