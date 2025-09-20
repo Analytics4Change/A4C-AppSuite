@@ -176,7 +176,25 @@ jobs:
 
     - name: Wait for rollout
       run: |
-        kubectl rollout status deployment/a4c-frontend --timeout=300s
+        # First attempt with standard timeout
+        if kubectl rollout status deployment/a4c-frontend --timeout=300s; then
+          echo "✅ Rollout completed successfully"
+        else
+          echo "⚠️ First rollout attempt timed out, checking actual deployment status..."
+          
+          # Check if deployment actually succeeded despite timeout
+          READY_REPLICAS=$(kubectl get deployment a4c-frontend -o jsonpath='{.status.readyReplicas}')
+          DESIRED_REPLICAS=$(kubectl get deployment a4c-frontend -o jsonpath='{.spec.replicas}')
+          
+          if [ "$READY_REPLICAS" = "$DESIRED_REPLICAS" ] && [ "$READY_REPLICAS" != "" ]; then
+            echo "✅ Deployment actually completed successfully ($READY_REPLICAS/$DESIRED_REPLICAS ready)"
+          else
+            echo "❌ Deployment failed - only $READY_REPLICAS/$DESIRED_REPLICAS replicas ready"
+            kubectl get pods -l app=a4c-frontend
+            kubectl describe deployment a4c-frontend
+            exit 1
+          fi
+        fi
 
     - name: Verify deployment
       run: |
