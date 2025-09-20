@@ -161,8 +161,12 @@ jobs:
 
     - name: Deploy to k3s
       run: |
+        # Get the first image tag from the multi-line output
+        IMAGE_TAG=$(echo "${{ needs.build.outputs.image-tag }}" | head -n1)
+        echo "Using image tag: $IMAGE_TAG"
+        
         # Update the deployment with new image
-        kubectl set image deployment/a4c-frontend nginx=${{ needs.build.outputs.image-tag }} || \
+        kubectl set image deployment/a4c-frontend nginx="$IMAGE_TAG" || \
         kubectl apply -f k8s/
 
     - name: Wait for rollout
