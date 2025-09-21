@@ -8,10 +8,45 @@
 const fs = require('fs').promises;
 const path = require('path');
 const glob = require('glob');
-const { exec } = require('child_process');
+const { spawn } = require('child_process');
 const { promisify } = require('util');
 
-const execAsync = promisify(exec);
+/**
+ * Secure wrapper for executing git commands using spawn with argument arrays
+ * @param {string[]} args - Git command arguments
+ * @returns {Promise<string>} - Command output
+ */
+async function secureGitExec(args) {
+  return new Promise((resolve, reject) => {
+    const gitProcess = spawn('git', args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: false // Explicitly disable shell to prevent injection
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    gitProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    gitProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    gitProcess.on('close', (code) => {
+      if (code === 0) {
+        resolve(stdout);
+      } else {
+        reject(new Error(`Git command failed with code ${code}: ${stderr}`));
+      }
+    });
+
+    gitProcess.on('error', (error) => {
+      reject(new Error(`Failed to execute git command: ${error.message}`));
+    });
+  });
+}
 
 // Configuration
 const CONFIG = {
@@ -201,21 +236,23 @@ class MetricsCollector {
     
     // Git statistics (if in git repo)
     try {
-      // Recent commits with documentation changes
-      const { stdout: recentCommits } = await execAsync(
-        'git log --since="7 days ago" --grep="doc" --oneline | wc -l'
-      );
+      // Recent commits with documentation changes (secure command execution)
+      const recentCommitsOutput = await secureGitExec([
+        'log', '--since=7 days ago', '--grep=doc', '--oneline'
+      ]);
+      const commitsWithDocs = recentCommitsOutput.trim().split('\n').filter(line => line.length > 0).length;
       
-      // PRs merged in last week (simplified)
-      const { stdout: totalCommits } = await execAsync(
-        'git log --since="7 days ago" --oneline | wc -l'
-      );
+      // Total commits in last week (secure command execution)
+      const totalCommitsOutput = await secureGitExec([
+        'log', '--since=7 days ago', '--oneline'
+      ]);
+      const totalCommits = totalCommitsOutput.trim().split('\n').filter(line => line.length > 0).length;
       
       this.metrics.process.recentActivity = {
-        commitsWithDocs: parseInt(recentCommits.trim()),
-        totalCommits: parseInt(totalCommits.trim()),
-        percentage: parseInt(totalCommits.trim()) > 0
-          ? Math.round((parseInt(recentCommits.trim()) / parseInt(totalCommits.trim())) * 100)
+        commitsWithDocs,
+        totalCommits,
+        percentage: totalCommits > 0
+          ? Math.round((commitsWithDocs / totalCommits) * 100)
           : 0
       };
     } catch (error) {

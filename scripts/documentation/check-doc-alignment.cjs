@@ -7,13 +7,48 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const { exec } = require('child_process');
-const { sanitizePath, escapeShellArg, isValidProjectPath, DOC_CONFIG } = require('./security-utils.cjs');
+const { spawn } = require('child_process');
+const { sanitizePath, isValidProjectPath, DOC_CONFIG } = require('./security-utils.cjs');
 const { promisify } = require('util');
 const glob = require('glob');
 const chalk = require('chalk');
 
-const execAsync = promisify(exec);
+/**
+ * Secure wrapper for executing git commands using spawn with argument arrays
+ * @param {string[]} args - Git command arguments
+ * @returns {Promise<string>} - Command output
+ */
+async function secureGitExec(args) {
+  return new Promise((resolve, reject) => {
+    const gitProcess = spawn('git', args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: false // Explicitly disable shell to prevent injection
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    gitProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    gitProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    gitProcess.on('close', (code) => {
+      if (code === 0) {
+        resolve(stdout);
+      } else {
+        reject(new Error(`Git command failed with code ${code}: ${stderr}`));
+      }
+    });
+
+    gitProcess.on('error', (error) => {
+      reject(new Error(`Failed to execute git command: ${error.message}`));
+    });
+  });
+}
 
 // Configuration
 const CONFIG = {
@@ -724,18 +759,20 @@ class AlignmentChecker {
 async function getChangedFiles() {
   try {
     // Check if we're in a git repository
-    await execAsync('git rev-parse --git-dir');
+    await secureGitExec(['rev-parse', '--git-dir']);
     
-    // Get current branch name safely
-    const { stdout: branchOutput } = await execAsync('git rev-parse --abbrev-ref HEAD');
+    // Get current branch name safely using argument array
+    const branchOutput = await secureGitExec(['rev-parse', '--abbrev-ref', 'HEAD']);
     const currentBranch = branchOutput.trim();
     
-    // Validate branch name (prevent injection)
-    const safeBranchName = escapeShellArg(currentBranch);
+    // Validate branch name format (basic validation)
+    if (!/^[a-zA-Z0-9._\/-]+$/.test(currentBranch)) {
+      console.warn(`Warning: Unexpected branch name format: ${currentBranch}`);
+      return [];
+    }
     
-    // Get list of changed files compared to main branch with safe command
-    const gitCommand = `git diff --name-only main...${safeBranchName}`;
-    const { stdout } = await execAsync(gitCommand);
+    // Get list of changed files compared to main branch using secure argument array
+    const stdout = await secureGitExec(['diff', '--name-only', `main...${currentBranch}`]);
     
     // Filter and validate file paths
     const files = stdout.trim().split('\n').filter(f => f && isValidProjectPath(f));

@@ -8,29 +8,32 @@ const path = require('path');
  * @throws {Error} - If path is outside allowed directory
  */
 function sanitizePath(userPath, allowedBase = null) {
+  if (!userPath || typeof userPath !== 'string') {
+    throw new Error('Invalid path: must be a non-empty string');
+  }
+  
+  // Normalize path separators and remove null bytes
+  const cleanPath = userPath.replace(/\0/g, '').replace(/\\/g, '/');
+  
   if (!allowedBase) {
     allowedBase = path.resolve(process.cwd());
   }
   
-  const resolved = path.resolve(userPath);
+  // Resolve both paths to their canonical forms
+  const resolved = path.resolve(cleanPath);
   const allowed = path.resolve(allowedBase);
   
-  if (!resolved.startsWith(allowed)) {
-    throw new Error(`Invalid path outside allowed directory: ${userPath}`);
+  // Use path.relative to check containment more securely
+  const relativePath = path.relative(allowed, resolved);
+  
+  // If relative path starts with ".." or is absolute, it's outside the allowed directory
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    throw new Error(`Path traversal attempt detected: ${userPath}`);
   }
   
   return resolved;
 }
 
-/**
- * Escape shell arguments to prevent command injection
- * @param {string} arg - Shell argument to escape
- * @returns {string} - Escaped argument
- */
-function escapeShellArg(arg) {
-  // Handle common shell metacharacters
-  return arg.replace(/[;&|`$(){}[\]\\'"<>?*]/g, '\\$&');
-}
 
 /**
  * Validate that a file path exists within the project structure
@@ -39,23 +42,49 @@ function escapeShellArg(arg) {
  */
 function isValidProjectPath(filePath) {
   try {
-    const sanitized = sanitizePath(filePath);
-    const projectRoot = path.resolve(process.cwd());
-    
-    // Must be within project
-    if (!sanitized.startsWith(projectRoot)) {
+    // First validate basic input
+    if (!filePath || typeof filePath !== 'string' || filePath.length === 0) {
       return false;
     }
     
-    // Must not contain suspicious patterns
-    const suspiciousPatterns = [
-      /\.\./,  // Parent directory traversal
-      /\/\//,  // Double slashes
-      /node_modules/,  // Avoid scanning dependencies
-      /\.git/  // Avoid git internals
+    // Check for null bytes and other dangerous characters
+    if (/[\0\r\n]/.test(filePath)) {
+      return false;
+    }
+    
+    // Use sanitizePath which has more robust validation
+    const sanitized = sanitizePath(filePath);
+    
+    // Additional checks for blocked paths using normalized path
+    const normalizedPath = path.normalize(filePath).toLowerCase();
+    const blockedPaths = [
+      'node_modules',
+      '.git',
+      'dist',
+      'build',
+      '.env',
+      'package-lock.json',
+      '.npmrc'
     ];
     
-    return !suspiciousPatterns.some(pattern => pattern.test(filePath));
+    // Check if any blocked path is contained in the file path
+    if (blockedPaths.some(blocked => normalizedPath.includes(blocked))) {
+      return false;
+    }
+    
+    // Check maximum path depth to prevent deeply nested attacks
+    const pathDepth = sanitized.split(path.sep).length;
+    if (pathDepth > DOC_CONFIG.security.maxPathDepth) {
+      return false;
+    }
+    
+    // Check allowed file extensions
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext && !DOC_CONFIG.security.allowedExtensions.includes(ext)) {
+      return false;
+    }
+    
+    return true;
   } catch {
     return false;
   }
@@ -91,7 +120,6 @@ const DOC_CONFIG = {
 
 module.exports = {
   sanitizePath,
-  escapeShellArg,
   isValidProjectPath,
   DOC_CONFIG
 };
