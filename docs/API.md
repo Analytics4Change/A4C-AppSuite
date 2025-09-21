@@ -151,6 +151,62 @@ interface EnhancedFocusTrappedCheckboxGroupProps {
 
 ### Focus Management System
 
+#### Complete Modal Hierarchy
+
+The application implements a comprehensive modal system with **14 modal-like elements**:
+
+##### Primary Modals
+1. **`medication-type-modal`** (App.tsx)
+   - Purpose: Initial medication type selection
+   - Options: Prescribed Medication, Over-the-Counter, Dietary Supplement
+
+2. **`medication-entry-modal`** (MedicationEntryModalRefactored.tsx)
+   - Purpose: Main container for medication entry form
+   - Title: "Add New Prescribed Medication"
+
+##### Nested Dropdowns within Medication Entry Modal
+
+3. **`medication-dropdown`** (MedicationSearchSimplified.tsx)
+   - Purpose: Search results for medication names
+
+4. **`dosage-category-dropdown`** (DosageFormSimplified.tsx)
+   - Purpose: Select dosage form (Tablet, Capsule, etc.)
+
+5. **`form-type-dropdown`** (DosageFormSimplified.tsx)
+   - Purpose: Select specific form type based on category
+
+6. **`dosage-unit-dropdown`** (DosageFormSimplified.tsx)
+   - Purpose: Select unit for dosage amount (mg, ml, etc.)
+
+7. **`total-unit-dropdown`** (DosageFormSimplified.tsx)
+   - Purpose: Select unit for total amount (optional)
+
+8. **`dosage-frequency-dropdown`** (DosageFormSimplified.tsx)
+   - Purpose: Select dosage frequency (Daily, Twice daily, etc.)
+
+9. **`dosage-condition-dropdown`** (DosageFormSimplified.tsx)
+   - Purpose: Select administration condition (Morning, Evening, Bedtime, etc.)
+
+##### Category and Date Selection
+
+10. **`broad-categories-list`** (CategorySelectionSimplified.tsx)
+    - Purpose: Select medication categories (Pain Relief, Cardiovascular, etc.)
+
+11. **`specific-categories-list`** (CategorySelectionSimplified.tsx)
+    - Purpose: Select usage categories (Chronic Condition, As Needed, etc.)
+
+12. **`start-date-calendar`** (DateSelectionSimplified.tsx)
+    - Purpose: Date picker for medication start date
+
+13. **`discontinue-date-calendar`** (DateSelectionSimplified.tsx)
+    - Purpose: Date picker for medication discontinue date (optional)
+
+##### Extended Features
+
+14. **Side Effects Selection Modal** (SideEffectsSelection.tsx)
+    - Purpose: Select side effects with search and custom effect addition
+    - Note: Includes nested "Other" modal for custom side effects
+
 #### Focus Regions
 The component uses explicit focus region tracking:
 
