@@ -1,0 +1,16 @@
+tunnel: a4c-k3s-tunnel
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  # k8s API endpoint
+  - hostname: k8s.firstovertheline.com
+    service: https://192.168.122.42:6443
+    originRequest:
+      noTLSVerify: true
+  
+  # Application endpoint (your existing one)
+  - hostname: a4c.firstovertheline.com
+    service: http://192.168.122.42:80
+  
+  # Catch-all rule (required)
+  - service: http_status:404
