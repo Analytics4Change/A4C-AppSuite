@@ -17,10 +17,7 @@
     "src/hooks/useAutoComplete.ts",
     "src/hooks/useDebounce.ts",
     "src/views/medication/SideEffectsSelection.tsx",
-    ".pre-commit-memory.config.js",
-    "back-navigation-implementation.md",
-    "test-keyboard-navigation.html",
-    "test-prn-fix.md"
+    ".pre-commit-memory.config.js"
   ],
   "ignoreDependencies": [],
   "ignoreExportsUsedInFile": true,

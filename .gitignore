@@ -101,3 +101,9 @@ pressure-*.log
 step*.png
 page-*.png
 screenshot-*.png
+
+# Test documentation artifacts (should be in test-results/)
+test-*.html
+*-test.html
+focus-*.html
+keyboard-*.html
