@@ -1,0 +1,243 @@
+name: Documentation Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'docs/**'
+      - '*.md'
+      - 'package.json'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'docs/**'
+      - '*.md'
+  workflow_dispatch:
+  schedule:
+    # Weekly documentation audit - Sundays at 2 AM
+    - cron: '0 2 * * 0'
+
+jobs:
+  validate-documentation:
+    name: Validate Documentation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better diff analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          # Install additional documentation tools
+          npm install -g markdownlint-cli@0.39.0
+          npm install glob chalk --save-dev
+
+      - name: Run documentation structure validation
+        id: validate-structure
+        run: |
+          node scripts/documentation/validate-docs.js || echo "validation_failed=true" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Check code-documentation alignment
+        id: check-alignment
+        run: |
+          node scripts/documentation/check-doc-alignment.js || echo "alignment_failed=true" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Lint markdown files
+        id: lint-markdown
+        run: |
+          markdownlint 'docs/**/*.md' '*.md' --config .markdownlint.json || echo "lint_failed=true" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Check for broken links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          use-verbose-mode: 'no'
+          folder-path: 'docs'
+          file-path: './README.md, ./CLAUDE.md'
+        continue-on-error: true
+
+      - name: Generate documentation coverage report
+        id: coverage
+        run: |
+          # Count documented vs undocumented components
+          total_components=$(find src/components -name "*.tsx" -not -path "*/test/*" | wc -l)
+          documented_components=$(find docs/components -name "*.md" | wc -l)
+          coverage=$((documented_components * 100 / total_components))
+          
+          echo "component_coverage=$coverage" >> $GITHUB_OUTPUT
+          echo "total_components=$total_components" >> $GITHUB_OUTPUT
+          echo "documented_components=$documented_components" >> $GITHUB_OUTPUT
+          
+          # Create coverage badge data
+          if [ $coverage -ge 90 ]; then
+            badge_color="green"
+          elif [ $coverage -ge 70 ]; then
+            badge_color="yellow"
+          else
+            badge_color="red"
+          fi
+          echo "badge_color=$badge_color" >> $GITHUB_OUTPUT
+
+      - name: Generate TypeDoc API documentation
+        run: |
+          npx typedoc --out temp-api-docs src \
+            --excludePrivate \
+            --excludeProtected \
+            --excludeExternals \
+            --plugin typedoc-plugin-markdown 2>/dev/null || true
+        continue-on-error: true
+
+      - name: Create documentation report
+        id: create-report
+        run: |
+          cat << EOF > doc-status-report.md
+          ## 📚 Documentation Status Report
+          
+          ### Validation Results
+          | Check | Status |
+          |-------|--------|
+          | Structure Validation | ${{ steps.validate-structure.outputs.validation_failed == 'true' && '❌ Failed' || '✅ Passed' }} |
+          | Code Alignment | ${{ steps.check-alignment.outputs.alignment_failed == 'true' && '❌ Failed' || '✅ Passed' }} |
+          | Markdown Linting | ${{ steps.lint-markdown.outputs.lint_failed == 'true' && '⚠️ Warnings' || '✅ Clean' }} |
+          
+          ### Coverage Metrics
+          - **Component Documentation**: ${{ steps.coverage.outputs.component_coverage }}% (${{ steps.coverage.outputs.documented_components }}/${{ steps.coverage.outputs.total_components }})
+          - **Coverage Status**: ${{ steps.coverage.outputs.component_coverage >= 90 && '✅ Excellent' || steps.coverage.outputs.component_coverage >= 70 && '⚠️ Good' || '❌ Needs Improvement' }}
+          
+          ### Detailed Reports
+          - [Validation Report](doc-validation-report.json)
+          - [Alignment Report](doc-alignment-report.json)
+          
+          ### Recommendations
+          EOF
+          
+          # Add recommendations based on results
+          if [ "${{ steps.validate-structure.outputs.validation_failed }}" == "true" ]; then
+            echo "- Fix documentation structure issues identified in validation report" >> doc-status-report.md
+          fi
+          
+          if [ "${{ steps.check-alignment.outputs.alignment_failed }}" == "true" ]; then
+            echo "- Update documentation to align with recent code changes" >> doc-status-report.md
+          fi
+          
+          if [ ${{ steps.coverage.outputs.component_coverage }} -lt 90 ]; then
+            echo "- Increase component documentation coverage to meet 90% target" >> doc-status-report.md
+          fi
+          
+          echo "" >> doc-status-report.md
+          echo "---" >> doc-status-report.md
+          echo "*Generated at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")*" >> doc-status-report.md
+
+      - name: Post PR comment with documentation status
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('doc-status-report.md', 'utf8');
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Documentation Status Report')
+            );
+            
+            // Update or create comment
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: report
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: report
+              });
+            }
+
+      - name: Upload documentation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-reports
+          path: |
+            doc-validation-report.json
+            doc-alignment-report.json
+            doc-status-report.md
+          retention-days: 30
+
+      - name: Create issue for documentation problems (scheduled run)
+        if: |
+          github.event_name == 'schedule' &&
+          (steps.validate-structure.outputs.validation_failed == 'true' ||
+           steps.check-alignment.outputs.alignment_failed == 'true' ||
+           steps.coverage.outputs.component_coverage < 90)
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('doc-status-report.md', 'utf8');
+            
+            const issueTitle = '📚 Weekly Documentation Audit - Issues Found';
+            const issueBody = `## Weekly Documentation Audit Results
+            
+            ${report}
+            
+            ### Action Required
+            Please address the documentation issues identified above to maintain code quality and developer experience.
+            
+            This issue was automatically created by the weekly documentation audit workflow.`;
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: issueTitle,
+              body: issueBody,
+              labels: ['documentation', 'maintenance']
+            });
+
+      - name: Fail if critical issues found
+        if: |
+          github.event_name == 'pull_request' &&
+          (steps.validate-structure.outputs.validation_failed == 'true' ||
+           steps.check-alignment.outputs.alignment_failed == 'true')
+        run: |
+          echo "❌ Documentation validation failed. Please fix the issues before merging."
+          exit 1
+
+      - name: Success message
+        if: |
+          steps.validate-structure.outputs.validation_failed != 'true' &&
+          steps.check-alignment.outputs.alignment_failed != 'true'
+        run: |
+          echo "✅ Documentation validation passed successfully!"

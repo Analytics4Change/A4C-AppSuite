@@ -91,7 +91,8 @@
       "Bash(gh run list:*)",
       "Bash(gh run view:*)",
       "Bash(gh secret list:*)",
-      "Bash(kubectl:*)"
+      "Bash(kubectl:*)",
+      "mcp__serena__write_memory"
     ],
     "deny": [],
     "additionalDirectories": [
