@@ -11,6 +11,27 @@ const glob = require('glob');
 const { spawn } = require('child_process');
 const { promisify } = require('util');
 
+// Cache for glob results to improve performance
+const globCache = new Map();
+
+/**
+ * Cached glob function to improve performance by avoiding repeated filesystem scans
+ * @param {string} pattern - Glob pattern
+ * @param {Object} options - Glob options
+ * @returns {string[]} - Array of matched files
+ */
+function cachedGlob(pattern, options = {}) {
+  const cacheKey = JSON.stringify({ pattern, options });
+  
+  if (globCache.has(cacheKey)) {
+    return globCache.get(cacheKey);
+  }
+  
+  const result = glob.sync(pattern, options);
+  globCache.set(cacheKey, result);
+  return result;
+}
+
 /**
  * Secure wrapper for executing git commands using spawn with argument arrays
  * @param {string[]} args - Git command arguments
@@ -127,23 +148,26 @@ class MetricsCollector {
     console.log('  Analyzing coverage...');
     
     // Component coverage
-    const componentFiles = glob.sync('**/*.tsx', {
+    const componentFiles = cachedGlob('**/*.tsx', {
       cwd: path.join(CONFIG.srcRoot, 'components'),
       ignore: ['**/*.test.tsx', '**/*.spec.tsx']
     });
     
-    const documentedComponents = [];
-    for (const component of componentFiles) {
+    // Check component documentation in parallel for better performance
+    const componentChecks = componentFiles.map(async (component) => {
       const componentName = path.basename(component, '.tsx');
       const docPath = path.join(CONFIG.docsRoot, 'components', `${componentName}.md`);
       
       try {
         await fs.access(docPath);
-        documentedComponents.push(componentName);
+        return componentName;
       } catch (error) {
-        // Not documented
+        return null; // Not documented
       }
-    }
+    });
+    
+    const componentResults = await Promise.all(componentChecks);
+    const documentedComponents = componentResults.filter(name => name !== null);
     
     this.metrics.coverage.components = {
       total: componentFiles.length,
@@ -155,23 +179,26 @@ class MetricsCollector {
     };
     
     // API coverage
-    const apiFiles = glob.sync('**/api/**/*.ts', {
+    const apiFiles = cachedGlob('**/api/**/*.ts', {
       cwd: CONFIG.srcRoot,
       ignore: ['**/*.test.ts', '**/*.spec.ts']
     });
     
-    const documentedApis = [];
-    for (const apiFile of apiFiles) {
+    // Check API documentation in parallel for better performance
+    const apiChecks = apiFiles.map(async (apiFile) => {
       const apiName = path.basename(apiFile, '.ts');
       const docPath = path.join(CONFIG.docsRoot, 'api', `${apiName}.md`);
       
       try {
         await fs.access(docPath);
-        documentedApis.push(apiName);
+        return apiName;
       } catch (error) {
-        // Not documented
+        return null; // Not documented
       }
-    }
+    });
+    
+    const apiResults = await Promise.all(apiChecks);
+    const documentedApis = apiResults.filter(name => name !== null);
     
     this.metrics.coverage.apis = {
       total: apiFiles.length,

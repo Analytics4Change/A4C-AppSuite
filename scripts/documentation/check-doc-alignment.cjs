@@ -13,6 +13,27 @@ const { promisify } = require('util');
 const glob = require('glob');
 const chalk = require('chalk');
 
+// Cache for glob results to avoid repeated filesystem scans
+const globCache = new Map();
+
+/**
+ * Cached glob function to improve performance by avoiding repeated filesystem scans
+ * @param {string} pattern - Glob pattern
+ * @param {Object} options - Glob options
+ * @returns {string[]} - Array of matched files
+ */
+function cachedGlob(pattern, options = {}) {
+  const cacheKey = JSON.stringify({ pattern, options });
+  
+  if (globCache.has(cacheKey)) {
+    return globCache.get(cacheKey);
+  }
+  
+  const result = glob.sync(pattern, options);
+  globCache.set(cacheKey, result);
+  return result;
+}
+
 /**
  * Secure wrapper for executing git commands using spawn with argument arrays
  * @param {string[]} args - Git command arguments
@@ -714,38 +735,70 @@ class AlignmentChecker {
   async checkRule(rule) {
     console.log(chalk.gray(`Checking ${rule.name}...`));
     
-    const sourceFiles = glob.sync(rule.sourcePattern, {
+    const sourceFiles = cachedGlob(rule.sourcePattern, {
       cwd: CONFIG.srcRoot
     });
     
-    for (const sourceFile of sourceFiles) {
-      const sourcePath = path.join(CONFIG.srcRoot, sourceFile);
+    // Process files in parallel with controlled concurrency
+    const concurrencyLimit = 5; // Process 5 files at a time to avoid overwhelming the system
+    const results = [];
+    
+    for (let i = 0; i < sourceFiles.length; i += concurrencyLimit) {
+      const batch = sourceFiles.slice(i, i + concurrencyLimit);
+      
+      const batchPromises = batch.map(async (sourceFile) => {
+        try {
+          const sourcePath = path.join(CONFIG.srcRoot, sourceFile);
+          
+          // Extract information from source
+          const extracted = await rule.extractor(sourcePath);
+          
+          // Determine corresponding doc file
+          const docFile = this.getDocFile(sourceFile, rule);
+          
+          // Validate against documentation
+          const issues = await rule.validator(extracted, docFile);
+          
+          return {
+            sourceFile,
+            docFile,
+            issues,
+            ruleName: rule.name
+          };
+        } catch (error) {
+          console.warn(chalk.yellow(`Warning: Failed to process ${sourceFile}: ${error.message}`));
+          return {
+            sourceFile,
+            docFile: null,
+            issues: [`Processing error: ${error.message}`],
+            ruleName: rule.name
+          };
+        }
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+    }
+    
+    // Process results and update stats
+    for (const result of results) {
       this.result.stats.filesChecked++;
       
       // Update category stats
-      if (rule.name.includes('Component')) {
+      if (result.ruleName.includes('Component')) {
         this.result.stats.componentsChecked++;
-      } else if (rule.name.includes('API')) {
+      } else if (result.ruleName.includes('API')) {
         this.result.stats.apisChecked++;
-      } else if (rule.name.includes('Type')) {
+      } else if (result.ruleName.includes('Type')) {
         this.result.stats.typesChecked++;
       }
       
-      // Extract information from source
-      const extracted = await rule.extractor(sourcePath);
-      
-      // Determine corresponding doc file
-      const docFile = this.getDocFile(sourceFile, rule);
-      
-      // Validate against documentation
-      const issues = await rule.validator(extracted, docFile);
-      
       // Record misalignments
-      issues.forEach(issue => {
+      result.issues.forEach(issue => {
         this.result.addMisalignment(
-          rule.name,
-          sourceFile,
-          path.relative(process.cwd(), docFile),
+          result.ruleName,
+          result.sourceFile,
+          result.docFile ? path.relative(process.cwd(), result.docFile) : 'unknown',
           issue
         );
       });
