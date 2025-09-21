@@ -85,6 +85,15 @@ memory-reports/snapshots/*.heapsnapshot
 .nuxt/
 .vite/
 
+# Generated metrics and reports
+.metrics/
+
+# MCP server caches
+.serena/
+
+# Claude Code settings
+.claude/settings.local.json
+
 # Debug
 debug.log
 debug.txt
