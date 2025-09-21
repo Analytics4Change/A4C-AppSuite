@@ -16,17 +16,51 @@ const chalk = require('chalk');
 /**
  * Secure wrapper for executing git commands using spawn with argument arrays
  * @param {string[]} args - Git command arguments
+ * @param {Object} options - Additional options
+ * @param {number} options.timeout - Timeout in milliseconds (default: 10000)
  * @returns {Promise<string>} - Command output
  */
-async function secureGitExec(args) {
+async function secureGitExec(args, options = {}) {
+  const { timeout = 10000 } = options;
+  
   return new Promise((resolve, reject) => {
+    // Validate input arguments
+    if (!Array.isArray(args) || args.length === 0) {
+      reject(new Error('Git arguments must be a non-empty array'));
+      return;
+    }
+    
+    // Validate argument safety
+    const safeArgPattern = /^[a-zA-Z0-9._\/-]+$/;
+    for (const arg of args) {
+      if (typeof arg !== 'string') {
+        reject(new Error(`Invalid git argument type: ${typeof arg}`));
+        return;
+      }
+      // Allow some special characters that are safe in git commands
+      if (!/^[a-zA-Z0-9._\/-]+$/.test(arg) && !['--', '...', '@', '^', '~'].some(safe => arg.includes(safe))) {
+        reject(new Error(`Potentially unsafe git argument: ${arg}`));
+        return;
+      }
+    }
+
     const gitProcess = spawn('git', args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      shell: false // Explicitly disable shell to prevent injection
+      shell: false, // Explicitly disable shell to prevent injection
+      timeout: timeout
     });
 
     let stdout = '';
     let stderr = '';
+    let timeoutId;
+
+    // Set up timeout
+    if (timeout > 0) {
+      timeoutId = setTimeout(() => {
+        gitProcess.kill('SIGTERM');
+        reject(new Error(`Git command timed out after ${timeout}ms: git ${args.join(' ')}`));
+      }, timeout);
+    }
 
     gitProcess.stdout.on('data', (data) => {
       stdout += data.toString();
@@ -37,15 +71,26 @@ async function secureGitExec(args) {
     });
 
     gitProcess.on('close', (code) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      
       if (code === 0) {
         resolve(stdout);
       } else {
-        reject(new Error(`Git command failed with code ${code}: ${stderr}`));
+        const errorMsg = stderr.trim() || `Git command exited with code ${code}`;
+        reject(new Error(`Git command failed: ${errorMsg} (Command: git ${args.join(' ')})`));
       }
     });
 
     gitProcess.on('error', (error) => {
-      reject(new Error(`Failed to execute git command: ${error.message}`));
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      if (error.code === 'ENOENT') {
+        reject(new Error('Git is not installed or not in PATH'));
+      } else if (error.code === 'EACCES') {
+        reject(new Error('Permission denied executing git command'));
+      } else {
+        reject(new Error(`Failed to execute git command: ${error.message}`));
+      }
     });
   });
 }
@@ -785,40 +830,120 @@ async function getChangedFiles() {
 
 // Main execution
 async function main() {
+  let checker;
+  let result;
+  let reportPath;
+  
   try {
-    const checker = new AlignmentChecker();
-    const result = await checker.check();
+    console.log(chalk.blue('Checking documentation-code alignment...'));
+    console.log('');
     
-    // Check for changed files if in git repo
-    const changedFiles = await getChangedFiles();
-    if (changedFiles.length > 0) {
-      console.log(chalk.gray(`\nDetected ${changedFiles.length} changed files in current branch.`));
+    // Initialize checker with validation
+    try {
+      checker = new AlignmentChecker();
+    } catch (initError) {
+      console.error(chalk.red('Failed to initialize alignment checker:'));
+      console.error(chalk.red(`  ${initError.message}`));
+      console.log(chalk.yellow('\nTroubleshooting:'));
+      console.log('  • Ensure you are in the project root directory');
+      console.log('  • Verify that src/ and docs/ directories exist');
+      console.log('  • Check file permissions for reading configuration');
+      process.exit(1);
+    }
+    
+    // Run alignment check with progress indication
+    try {
+      result = await checker.check();
+    } catch (checkError) {
+      console.error(chalk.red('Error during alignment analysis:'));
+      console.error(chalk.red(`  ${checkError.message}`));
+      console.log(chalk.yellow('\nThis could be due to:'));
+      console.log('  • Missing or inaccessible source files');
+      console.log('  • File permission issues');
+      console.log('  • Corrupted TypeScript/JSX syntax');
+      console.log('  • Network issues (if accessing remote documentation)');
       
-      // Filter misalignments to only changed files
-      const relevantMisalignments = result.misalignments.filter(m => 
-        changedFiles.some(f => f.includes(m.source))
-      );
-      
-      if (relevantMisalignments.length > 0) {
-        console.log(chalk.yellow('Documentation updates needed for changed files:'));
-        relevantMisalignments.forEach(m => {
-          console.log(chalk.yellow(`  • ${m.source}: ${m.details}`));
-        });
+      // Try to provide partial results if possible
+      if (checkError.partialResults) {
+        console.log(chalk.yellow('\nUsing partial results for analysis...'));
+        result = checkError.partialResults;
+      } else {
+        process.exit(1);
       }
     }
     
-    // Save JSON report
-    const reportPath = path.join(process.cwd(), 'doc-alignment-report.json');
-    await fs.writeFile(reportPath, JSON.stringify(result.toJSON(), null, 2));
-    console.log(chalk.gray(`\nDetailed report saved to: ${reportPath}`));
+    // Check for changed files with error handling
+    let changedFiles = [];
+    try {
+      changedFiles = await getChangedFiles();
+      if (changedFiles.length > 0) {
+        console.log(chalk.gray(`\nDetected ${changedFiles.length} changed files in current branch.`));
+        
+        // Filter misalignments to only changed files
+        const relevantMisalignments = result.misalignments.filter(m => 
+          changedFiles.some(f => f.includes(m.source))
+        );
+        
+        if (relevantMisalignments.length > 0) {
+          console.log(chalk.yellow('Documentation updates needed for changed files:'));
+          relevantMisalignments.forEach(m => {
+            console.log(chalk.yellow(`  • ${m.source}: ${m.details}`));
+          });
+        }
+      }
+    } catch (gitError) {
+      console.log(chalk.gray('\nNote: Git analysis unavailable (not in git repo or git command failed)'));
+      console.log(chalk.gray('Proceeding with full repository analysis...'));
+    }
     
-    // Print results
-    result.print();
+    // Save JSON report with error handling
+    reportPath = path.join(process.cwd(), 'doc-alignment-report.json');
+    try {
+      await fs.writeFile(reportPath, JSON.stringify(result.toJSON(), null, 2));
+      console.log(chalk.gray(`\nDetailed report saved to: ${reportPath}`));
+    } catch (saveError) {
+      console.error(chalk.yellow(`Warning: Could not save report to ${reportPath}:`));
+      console.error(chalk.yellow(`  ${saveError.message}`));
+      console.log(chalk.gray('Proceeding without saving detailed report...'));
+    }
+    
+    // Print results with error handling
+    try {
+      result.print();
+    } catch (printError) {
+      console.error(chalk.yellow('Warning: Error displaying results:'));
+      console.error(chalk.yellow(`  ${printError.message}`));
+      console.log(chalk.gray('Results may be incomplete.'));
+    }
     
     // Exit with appropriate code
-    process.exit(result.isAligned() ? 0 : 1);
+    const isAligned = result && typeof result.isAligned === 'function' ? result.isAligned() : false;
+    process.exit(isAligned ? 0 : 1);
+    
   } catch (error) {
-    console.error(chalk.red('Fatal error during alignment check:'), error);
+    console.error(chalk.red('\n💥 Unexpected error during alignment check:'));
+    console.error(chalk.red(`  ${error.message}`));
+    
+    if (error.stack) {
+      console.log(chalk.gray('\nStack trace:'));
+      console.log(chalk.gray(error.stack));
+    }
+    
+    console.log(chalk.yellow('\n🔧 Recovery actions:'));
+    console.log('  • Ensure all dependencies are installed: npm ci');
+    console.log('  • Verify Node.js version compatibility (18+)');
+    console.log('  • Check for syntax errors in source files');
+    console.log('  • Try running individual validation steps manually');
+    
+    if (reportPath) {
+      console.log(`  • Check if partial report exists: ${reportPath}`);
+    }
+    
+    console.log('\n📋 Report this issue with:');
+    console.log('  • Node.js version: ' + process.version);
+    console.log('  • Operating system: ' + process.platform);
+    console.log('  • Current working directory: ' + process.cwd());
+    
     process.exit(1);
   }
 }
