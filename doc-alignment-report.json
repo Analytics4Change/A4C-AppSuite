@@ -1,0 +1,377 @@
+{
+  "aligned": false,
+  "misalignments": [
+    {
+      "category": "Component Props",
+      "source": "components/ui/searchable-dropdown.tsx",
+      "doc": "docs/components/searchable-dropdown.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/searchable-dropdown.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/label.tsx",
+      "doc": "docs/components/label.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/label.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/input.tsx",
+      "doc": "docs/components/input.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/input.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/dropdown-portal.tsx",
+      "doc": "docs/components/dropdown-portal.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/dropdown-portal.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/checkbox.tsx",
+      "doc": "docs/components/checkbox.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/checkbox.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/card.tsx",
+      "doc": "docs/components/card.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/card.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/button.tsx",
+      "doc": "docs/components/button.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/button.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/MultiSelectDropdown.tsx",
+      "doc": "docs/components/MultiSelectDropdown.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/MultiSelectDropdown.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/EnhancedAutocompleteDropdown.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/EditableDropdown.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/FocusTrappedCheckboxGroup/example-usage.tsx",
+      "doc": "docs/components/example-usage.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/example-usage.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/FocusTrappedCheckboxGroup/RangeHoursInput.tsx",
+      "doc": "docs/components/RangeHoursInput.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/RangeHoursInput.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/FocusTrappedCheckboxGroup/FocusTrappedCheckboxGroup.tsx",
+      "doc": "docs/components/FocusTrappedCheckboxGroup.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/FocusTrappedCheckboxGroup.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/FocusTrappedCheckboxGroup/EnhancedFocusTrappedCheckboxGroup.tsx",
+      "doc": "docs/components/EnhancedFocusTrappedCheckboxGroup.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/EnhancedFocusTrappedCheckboxGroup.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/FocusTrappedCheckboxGroup/DynamicAdditionalInput.tsx",
+      "doc": "docs/components/DynamicAdditionalInput.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/DynamicAdditionalInput.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationStatusIndicator.tsx",
+      "doc": "docs/components/MedicationStatusIndicator.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/MedicationStatusIndicator.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationSearchModal.tsx",
+      "doc": "docs/components/MedicationSearchModal.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/MedicationSearchModal.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationPurposeDropdown.tsx",
+      "doc": "docs/components/MedicationPurposeDropdown.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/MedicationPurposeDropdown.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/layouts/MainLayout.tsx",
+      "doc": "docs/components/MainLayout.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/MainLayout.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/debug/MobXDebugger.tsx",
+      "doc": "docs/components/MobXDebugger.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/MobXDebugger.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/debug/LogOverlay.tsx",
+      "doc": "docs/components/LogOverlay.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/LogOverlay.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/debug/DebugControlPanel.tsx",
+      "doc": "docs/components/DebugControlPanel.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/DebugControlPanel.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/auth/ProtectedRoute.tsx",
+      "doc": "docs/components/ProtectedRoute.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/ProtectedRoute.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/auth/OAuthProviders.tsx",
+      "doc": "docs/components/OAuthProviders.md",
+      "details": "Documentation file not found: /home/lars/dev/A4C-FrontEnd/docs/components/OAuthProviders.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/SpecialRestrictionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "ViewModel documentation not found: /home/lars/dev/A4C-FrontEnd/docs/architecture/viewmodels.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "ViewModel documentation not found: /home/lars/dev/A4C-FrontEnd/docs/architecture/viewmodels.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/FoodConditionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "ViewModel documentation not found: /home/lars/dev/A4C-FrontEnd/docs/architecture/viewmodels.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageTimingViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "ViewModel documentation not found: /home/lars/dev/A4C-FrontEnd/docs/architecture/viewmodels.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageFrequencyViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "ViewModel documentation not found: /home/lars/dev/A4C-FrontEnd/docs/architecture/viewmodels.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/client/ClientSelectionViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "ViewModel documentation not found: /home/lars/dev/A4C-FrontEnd/docs/architecture/viewmodels.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type documentation not found: /home/lars/dev/A4C-FrontEnd/docs/api/types.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/dropdown.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type documentation not found: /home/lars/dev/A4C-FrontEnd/docs/api/types.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Medication.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type documentation not found: /home/lars/dev/A4C-FrontEnd/docs/api/types.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type documentation not found: /home/lars/dev/A4C-FrontEnd/docs/api/types.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Client.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type documentation not found: /home/lars/dev/A4C-FrontEnd/docs/api/types.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Configuration",
+      "source": "config/medication-search.config.ts",
+      "doc": "CLAUDE.md",
+      "details": "Configuration 'API_CONFIG' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Configuration",
+      "source": "config/medication-search.config.ts",
+      "doc": "CLAUDE.md",
+      "details": "Configuration 'INDEXED_DB_CONFIG' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    }
+  ],
+  "suggestions": [
+    {
+      "message": "Consider running documentation generation for Component Props",
+      "files": [
+        "components/ui/searchable-dropdown.tsx",
+        "components/ui/label.tsx",
+        "components/ui/input.tsx"
+      ]
+    },
+    {
+      "message": "Consider running documentation generation for ViewModels",
+      "files": [
+        "viewModels/medication/SpecialRestrictionsViewModel.ts",
+        "viewModels/medication/MedicationManagementViewModel.ts",
+        "viewModels/medication/FoodConditionsViewModel.ts"
+      ]
+    },
+    {
+      "message": "Consider running documentation generation for Types and Interfaces",
+      "files": [
+        "types/medication-search.types.ts",
+        "types/dropdown.ts",
+        "types/models/Medication.ts"
+      ]
+    },
+    {
+      "message": "Documentation is significantly out of sync. Consider a documentation sprint.",
+      "files": []
+    }
+  ],
+  "stats": {
+    "filesChecked": 45,
+    "alignmentScore": 26,
+    "componentsChecked": 24,
+    "apisChecked": 3,
+    "typesChecked": 6
+  },
+  "timestamp": "2025-09-21T22:15:25.455Z",
+  "prSummary": "### 🔍 Code-Documentation Alignment Details\n\n#### 📊 Summary\n- **Total Issues**: 37\n- **High Priority**: 0\n- **Medium Priority**: 0\n- **Low Priority**: 37\n- **Alignment Score**: 26%\n\n#### 💡 General Suggestions\n- Consider running documentation generation for Component Props\n- Consider running documentation generation for ViewModels\n- Consider running documentation generation for Types and Interfaces\n\n**📋 Next Steps**: Download the detailed alignment report artifact for complete file listings and fix suggestions."
+}
