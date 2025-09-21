@@ -8,6 +8,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
+const { sanitizePath, escapeShellArg, isValidProjectPath, DOC_CONFIG } = require('./security-utils');
 const { promisify } = require('util');
 const glob = require('glob');
 const chalk = require('chalk');
@@ -195,7 +196,8 @@ class AlignmentResult {
 
 // Extractors - Parse source code to extract documentation-relevant information
 async function extractComponentProps(filePath) {
-  const content = await fs.readFile(filePath, 'utf-8');
+  const safePath = sanitizePath(filePath);
+  const content = await fs.readFile(safePath, 'utf-8');
   const props = {};
   
   // Extract interface Props
@@ -234,7 +236,8 @@ async function extractComponentProps(filePath) {
 }
 
 async function extractApiEndpoints(filePath) {
-  const content = await fs.readFile(filePath, 'utf-8');
+  const safePath = sanitizePath(filePath);
+  const content = await fs.readFile(safePath, 'utf-8');
   const endpoints = [];
   
   // Extract API method definitions
@@ -274,7 +277,8 @@ async function extractApiEndpoints(filePath) {
 }
 
 async function extractViewModelStructure(filePath) {
-  const content = await fs.readFile(filePath, 'utf-8');
+  const safePath = sanitizePath(filePath);
+  const content = await fs.readFile(safePath, 'utf-8');
   const structure = {
     observables: [],
     computed: [],
@@ -322,7 +326,8 @@ async function extractViewModelStructure(filePath) {
 }
 
 async function extractTypeDefinitions(filePath) {
-  const content = await fs.readFile(filePath, 'utf-8');
+  const safePath = sanitizePath(filePath);
+  const content = await fs.readFile(safePath, 'utf-8');
   const types = {};
   
   // Extract type aliases
@@ -375,7 +380,8 @@ async function extractTypeDefinitions(filePath) {
 }
 
 async function extractConfigValues(filePath) {
-  const content = await fs.readFile(filePath, 'utf-8');
+  const safePath = sanitizePath(filePath);
+  const content = await fs.readFile(safePath, 'utf-8');
   const config = {};
   
   // Extract exported constants
@@ -650,9 +656,20 @@ async function getChangedFiles() {
     // Check if we're in a git repository
     await execAsync('git rev-parse --git-dir');
     
-    // Get list of changed files compared to main branch
-    const { stdout } = await execAsync('git diff --name-only main...HEAD');
-    return stdout.trim().split('\n').filter(f => f);
+    // Get current branch name safely
+    const { stdout: branchOutput } = await execAsync('git rev-parse --abbrev-ref HEAD');
+    const currentBranch = branchOutput.trim();
+    
+    // Validate branch name (prevent injection)
+    const safeBranchName = escapeShellArg(currentBranch);
+    
+    // Get list of changed files compared to main branch with safe command
+    const gitCommand = `git diff --name-only main...${safeBranchName}`;
+    const { stdout } = await execAsync(gitCommand);
+    
+    // Filter and validate file paths
+    const files = stdout.trim().split('\n').filter(f => f && isValidProjectPath(f));
+    return files;
   } catch (error) {
     // Not in a git repo or no changes
     return [];
