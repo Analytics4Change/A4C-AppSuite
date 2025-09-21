@@ -17,9 +17,10 @@ A4C-FrontEnd is a sophisticated healthcare application designed for managing cli
 ## Technology Stack
 
 - **React 19.1.1** with TypeScript 5.9.2
-- **Vite 7.0.6** for fast development and building
+- **Vite 7.0.6** for fast development and building  
 - **MobX 6.13.7** for reactive state management
 - **Tailwind CSS 4.1.12** with Radix UI components
+- **React Router DOM 7.8.2** for declarative routing
 - **Playwright 1.54.2** for E2E testing with accessibility validation
 
 ## Quick Start
@@ -196,7 +197,7 @@ Press `Ctrl+Shift+D` to access the debug control panel:
 ## Documentation
 
 - **[Technical Documentation](./docs/README.md)** - Comprehensive technical details
-- **[Testing Strategies](./docs/testing-strategies.md)** - Testing patterns and methodologies
+- **[Testing Strategies](./docs/TESTING.md)** - Testing patterns and methodologies
 - **[UI Patterns](./docs/ui-patterns.md)** - Component architecture guidelines
 - **[CLAUDE.md](./CLAUDE.md)** - AI assistant project instructions
 

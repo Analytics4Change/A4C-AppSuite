@@ -1,0 +1,490 @@
+{
+  "errors": [
+    {
+      "message": "Required documentation file missing: docs/architecture/overview.md",
+      "file": null,
+      "severity": "error"
+    },
+    {
+      "message": "Required documentation file missing: docs/getting-started/installation.md",
+      "file": null,
+      "severity": "error"
+    }
+  ],
+  "warnings": [
+    {
+      "message": "Missing documentation for component: searchable-dropdown",
+      "file": "ui/searchable-dropdown.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: label",
+      "file": "ui/label.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: input",
+      "file": "ui/input.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: dropdown-portal",
+      "file": "ui/dropdown-portal.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: checkbox",
+      "file": "ui/checkbox.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: card",
+      "file": "ui/card.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: button",
+      "file": "ui/button.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: MultiSelectDropdown",
+      "file": "ui/MultiSelectDropdown.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: EnhancedAutocompleteDropdown",
+      "file": "ui/EnhancedAutocompleteDropdown.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: EditableDropdown",
+      "file": "ui/EditableDropdown.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: example-usage",
+      "file": "ui/FocusTrappedCheckboxGroup/example-usage.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: RangeHoursInput",
+      "file": "ui/FocusTrappedCheckboxGroup/RangeHoursInput.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: FocusTrappedCheckboxGroup",
+      "file": "ui/FocusTrappedCheckboxGroup/FocusTrappedCheckboxGroup.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: EnhancedFocusTrappedCheckboxGroup",
+      "file": "ui/FocusTrappedCheckboxGroup/EnhancedFocusTrappedCheckboxGroup.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: DynamicAdditionalInput",
+      "file": "ui/FocusTrappedCheckboxGroup/DynamicAdditionalInput.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: MedicationStatusIndicator",
+      "file": "medication/MedicationStatusIndicator.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: MedicationSearchModal",
+      "file": "medication/MedicationSearchModal.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: MedicationPurposeDropdown",
+      "file": "medication/MedicationPurposeDropdown.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: MainLayout",
+      "file": "layouts/MainLayout.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: MobXDebugger",
+      "file": "debug/MobXDebugger.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: LogOverlay",
+      "file": "debug/LogOverlay.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: DebugControlPanel",
+      "file": "debug/DebugControlPanel.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: ProtectedRoute",
+      "file": "auth/ProtectedRoute.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing documentation for component: OAuthProviders",
+      "file": "auth/OAuthProviders.tsx",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #overview",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #modal-architecture",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #focus-management-patterns",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #dropdown-and-autocomplete-patterns",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #form-validation-patterns",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #accessibility-considerations",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #component-design-principles",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #timing-and-animation-patterns",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #project-overview",
+      "file": "README.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #tech-stack",
+      "file": "README.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #getting-started",
+      "file": "README.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #project-structure",
+      "file": "README.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #available-commands",
+      "file": "README.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #current-features",
+      "file": "README.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #documentation",
+      "file": "README.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: #development-guidelines",
+      "file": "README.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: ../templates/",
+      "file": "strategy/implementation-guide.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: ../STYLE_GUIDE.md",
+      "file": "strategy/implementation-guide.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "ui-patterns.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "TESTING.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "TESTING.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "TESTING.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "TESTING.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "TESTING.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "FocusTrappedCheckboxGroup_plan.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "DEVELOPMENT.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "DEVELOPMENT.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "DESIGN_PATTERNS_MIGRATION_GUIDE.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "DESIGN_PATTERNS_MIGRATION_GUIDE.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "DESIGN_PATTERNS_MIGRATION_GUIDE.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "DESIGN_PATTERNS_MIGRATION_GUIDE.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "DESIGN_PATTERNS_MIGRATION_GUIDE.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "DESIGN_PATTERNS_MIGRATION_GUIDE.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "DESIGN_PATTERNS_MIGRATION_GUIDE.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "API.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "API.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "API.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "API.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "API.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "API.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "API.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "API.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "API.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "API.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "API.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "API.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "API.md",
+      "severity": "warning"
+    }
+  ],
+  "info": [
+    {
+      "message": "Consider adding documentation for API: RXNormMedicationApi",
+      "file": "services/api/RXNormMedicationApi.ts",
+      "severity": "info"
+    },
+    {
+      "message": "Consider adding documentation for API: IMedicationApi",
+      "file": "services/api/interfaces/IMedicationApi.ts",
+      "severity": "info"
+    },
+    {
+      "message": "Consider adding documentation for API: IClientApi",
+      "file": "services/api/interfaces/IClientApi.ts",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "rxnorm-medication-autocomplete.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "rxnorm-medication-autocomplete.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "TESTING.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "TESTING.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "DESIGN_PATTERNS_MIGRATION_GUIDE.md",
+      "severity": "info"
+    }
+  ],
+  "stats": {
+    "totalFiles": 17,
+    "validFiles": 15,
+    "componentsDocumented": 0,
+    "apisDocumented": 0
+  },
+  "success": false
+}

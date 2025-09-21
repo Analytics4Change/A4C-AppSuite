@@ -31,32 +31,35 @@ The application follows modern React patterns with TypeScript, emphasizing maint
 - **React 19.1.1** - Modern React with latest features and improvements
 - **TypeScript 5.9.2** - Type-safe development with strict typing
 - **Vite 7.0.6** - Fast build tool and development server
+- **React Router DOM 7.8.2** - Declarative routing for React applications
 
 ### State Management
 - **MobX 6.13.7** - Reactive state management
 - **MobX React Lite 4.1.0** - React bindings for MobX
 
 ### UI Framework & Styling
-- **Tailwind CSS 4.1.12** - Utility-first CSS framework
+- **Tailwind CSS 4.1.12** - Utility-first CSS framework with advanced features
 - **Radix UI Components** - Accessible, unstyled UI components
-  - `@radix-ui/react-checkbox` - Checkbox components
-  - `@radix-ui/react-label` - Label components
-  - `@radix-ui/react-slot` - Composition utilities
-- **Tailwind Merge 3.3.1** - Merge Tailwind classes intelligently
-- **Class Variance Authority 0.7.1** - Type-safe component variants
-- **Lucide React 0.536.0** - Beautiful icon library
+  - `@radix-ui/react-checkbox 1.3.2` - Accessible checkbox components
+  - `@radix-ui/react-label 2.1.7` - Semantic label components
+  - `@radix-ui/react-slot 1.2.3` - Composition and polymorphism utilities
+- **Tailwind Merge 3.3.1** - Intelligent Tailwind class merging
+- **Class Variance Authority 0.7.1** - Type-safe component variant system
+- **Lucide React 0.536.0** - Comprehensive icon library
+- **CLSX 2.1.1** - Conditional class name utility
+- **Tailwind CSS Animate 1.0.7** - Animation utilities
+- **Fuse.js 7.1.0** - Advanced fuzzy search capabilities
 
 ### Form Components
-- **React Day Picker 9.8.1** - Advanced date picker component
+- Custom date selection components built with React and Tailwind CSS
 
 ### Testing Framework
 - **Playwright 1.54.2** - End-to-end testing
-- **@axe-core/playwright 4.10.2** - Accessibility testing
-- **jsdom 26.1.0** - DOM implementation for testing
+- **Accessibility Testing** - Built-in axe-core integration for WCAG compliance validation
 
 ### Development Tools
 - **ESLint 9.32.0** - Code linting and style enforcement
-- **TypeScript ESLint** - TypeScript-specific linting rules
+- **TypeScript ESLint 8.39.0** - TypeScript-specific linting rules
 - **Husky 9.1.7** - Git hooks for code quality
 - **Knip 5.63.0** - Unused dependency detection
 - **Autoprefixer 10.4.21** - CSS vendor prefixing
@@ -105,43 +108,67 @@ The application follows modern React patterns with TypeScript, emphasizing maint
 ```
 src/
 ├── components/           # Reusable UI components
-│   ├── ui/              # Base UI components (buttons, inputs, etc.)
-│   ├── focus/           # Focus management components
-│   └── __tests__/       # Component tests
-├── contexts/            # React contexts
-│   └── focus/           # Focus management context and providers
+│   ├── ui/              # Base UI components (buttons, inputs, dropdowns)
+│   │   ├── FocusTrappedCheckboxGroup/  # Complex checkbox component with strategies
+│   │   └── __tests__/   # Component unit tests
+│   ├── auth/            # Authentication components
+│   ├── debug/           # Development debugging tools
+│   ├── layouts/         # Layout components
+│   └── medication/      # Medication-specific components
+├── contexts/            # React contexts and providers
 ├── hooks/               # Custom React hooks
 │   ├── useDropdownBlur.ts     # Dropdown timing management
 │   ├── useScrollToElement.ts  # Scroll animation utilities
 │   ├── useAutoScroll.ts       # Auto-scroll behavior
 │   ├── useDebounce.ts         # Input debouncing
-│   └── useViewModel.ts        # MobX integration
-├── views/               # Page-level components
+│   ├── useViewModel.ts        # MobX integration
+│   ├── useKeyboardNavigation.ts # Keyboard interaction patterns
+│   └── __tests__/       # Hook unit tests
+├── pages/               # Page-level routing components
+│   ├── auth/            # Authentication pages
+│   ├── clients/         # Client management pages
+│   └── medications/     # Medication management pages
+├── views/               # Feature-specific view components
 │   ├── client/          # Client management views
 │   └── medication/      # Medication management views
 ├── viewModels/          # MobX state management
-│   ├── client/          # Client-related state
-│   └── medication/      # Medication-related state
+│   ├── client/          # Client-related state management
+│   └── medication/      # Medication-related state management
 ├── services/            # API and data services
-│   ├── api/             # API interfaces
-│   ├── mock/            # Mock implementations
-│   └── validation/      # Data validation utilities
+│   ├── api/             # API interfaces and implementations
+│   │   └── interfaces/  # API contract definitions
+│   ├── mock/            # Mock API implementations
+│   ├── data/            # Data access services
+│   ├── validation/      # Data validation utilities
+│   ├── search/          # Search functionality
+│   ├── http/            # HTTP client utilities
+│   ├── adapters/        # External service adapters
+│   └── cache/           # Caching implementations
 ├── types/               # TypeScript type definitions
 │   └── models/          # Domain model types
 ├── config/              # Configuration files
-│   └── timings.ts       # Centralized timing configuration
+│   ├── timings.ts       # Centralized timing configuration
+│   ├── logging.config.ts # Logging system configuration
+│   ├── mobx.config.ts   # MobX debugging configuration
+│   └── oauth.config.ts  # Authentication configuration
+├── data/                # Static data and configurations
+│   └── static/          # Static data files
 ├── mocks/               # Mock data for development
-└── utils/               # Utility functions
+│   └── data/            # Mock datasets
+├── styles/              # CSS and styling files
+├── constants/           # Application constants
+├── utils/               # Utility functions
+└── test/                # Test setup and utilities
 
-docs/
-├── README.md                  # Main documentation (this file)
-├── testing-strategies.md      # Testing patterns and strategies
-├── ui-patterns.md            # UI architecture and patterns
-└── focus-management/         # Focus management documentation
+docs/                    # Project documentation
+├── README.md            # Main technical documentation (this file)
+├── testing-strategies.md # Testing patterns and strategies
+├── ui-patterns.md       # UI architecture and patterns
+└── [other docs]/       # Additional specialized documentation
 
-e2e/                     # End-to-end tests
-├── medication-entry.spec.ts   # Comprehensive test suite
-└── [other test files]         # Specialized test scenarios
+e2e/                     # Playwright end-to-end tests
+├── tests/               # Test specifications
+└── [config files]      # Test configuration
 ```
 
 ## Available Commands
@@ -269,10 +296,62 @@ npx knip
 - **Separation of Concerns**: Keep business logic separate from presentation
 
 ### Timing and Async Patterns
-- **Centralized Timing**: All delays configured in `/src/config/timings.ts`
-- **Test-Friendly**: Automatic 0ms delays in test environment
-- **Standardized Hooks**: Use `useDropdownBlur` and `useScrollToElement` for common patterns
-- **Focus Management**: Use React lifecycle hooks instead of setTimeout for focus changes
+
+#### Centralized Timing Configuration
+All timing-related delays are managed through a centralized configuration system:
+
+```typescript
+// /src/config/timings.ts
+export const TIMINGS = {
+  dropdown: {
+    blurDelay: 200,        // Allow time to click dropdown items
+    openDelay: 0,          // Immediate dropdown opening
+  },
+  debounce: {
+    search: 300,           // Search input debouncing
+    validation: 150,       // Form validation delays
+  },
+  animation: {
+    scrollTo: 100,         // Scroll-to-element delays
+    fadeIn: 200,           // UI fade animations
+  },
+  eventSetup: {
+    clickOutsideDelay: 0,  // Click-outside handler setup
+  }
+};
+```
+
+#### Test Environment Optimization
+- **Automatic zero delays**: All timing values automatically set to 0ms in test environments
+- **No fake timers needed**: Tests run at full speed without setTimeout complications
+- **Consistent behavior**: Same timing patterns across development and testing
+
+#### Recommended Timing Hooks
+```typescript
+// Use specialized hooks instead of raw setTimeout
+import { useDropdownBlur } from '@/hooks/useDropdownBlur';
+import { useScrollToElement } from '@/hooks/useScrollToElement';
+import { useDebounce, useSearchDebounce } from '@/hooks/useDebounce';
+
+// Dropdown blur handling
+const handleBlur = useDropdownBlur(setShowDropdown);
+
+// Scroll animations
+const scrollTo = useScrollToElement(scrollFunction);
+
+// Search debouncing with minimum length
+const { handleSearchChange } = useSearchDebounce(
+  (query) => performSearch(query),
+  2, // minimum length
+  TIMINGS.debounce.search
+);
+```
+
+#### Best Practices
+- **Avoid raw setTimeout**: Use centralized timing configuration and specialized hooks
+- **Focus management**: Use React lifecycle hooks (useEffect) instead of setTimeout
+- **Event handler delays**: Only for legitimate UX patterns (dropdown blur, click-outside prevention)
+- **API debouncing**: Use structured debouncing hooks for consistent behavior
 
 ### State Management
 - **MobX Integration**: Reactive state management for complex data flows
@@ -283,8 +362,38 @@ npx knip
 ### Testing Philosophy
 - **E2E First**: Comprehensive end-to-end testing with Playwright
 - **Accessibility Testing**: Built-in accessibility validation with axe-core
-- **Cross-browser Testing**: Automated testing across multiple browsers
+- **Cross-browser Testing**: Automated testing across multiple browsers  
 - **Performance Testing**: Load time and interaction performance validation
+
+#### Accessibility Testing Framework
+The application includes comprehensive accessibility testing at multiple levels:
+
+**Automated Testing Integration:**
+```typescript
+// E2E tests include built-in accessibility audits
+import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+
+test('medication form accessibility', async ({ page }) => {
+  await page.goto('/medication-entry');
+  
+  // Run axe accessibility audit
+  const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
+  expect(accessibilityScanResults.violations).toEqual([]);
+});
+```
+
+**Manual Testing Checklist:**
+- Keyboard-only navigation testing (disable mouse)
+- Screen reader compatibility (NVDA, VoiceOver, JAWS)
+- Focus indicator visibility across all interactive elements
+- Color contrast validation for all text elements
+- Form label and error message announcement verification
+
+**CI/CD Integration:**
+- Zero accessibility violations as merge requirement
+- Automated axe-core scans in pull request validation
+- Performance and accessibility budgets enforced
 
 ### Accessibility Requirements
 - **WCAG Compliance**: Follow WCAG 2.1 AA standards
@@ -298,6 +407,90 @@ npx knip
 - **Bundle Optimization**: Tree-shaking and code splitting where beneficial
 - **Timing Abstractions**: Eliminate setTimeout in test environments
 - **Debounced Inputs**: Prevent excessive API calls with proper debouncing
+
+## Debug and Monitoring Tools
+
+### Development Debug System
+
+The application includes comprehensive debugging tools for development:
+
+#### Debug Control Panel
+- **Activation**: Press `Ctrl+Shift+D` to toggle the debug control panel
+- **Features**:
+  - Toggle individual debug monitors on/off
+  - Adjust position to any corner of the screen
+  - Control opacity (30-100%) for overlay transparency
+  - Change font size (small/medium/large)
+  - Persistent settings stored in localStorage
+
+#### Available Debug Monitors
+
+##### MobX State Monitor (`Ctrl+Shift+M`)
+- **Purpose**: Real-time visualization of MobX observable state
+- **Features**:
+  - Component render count tracking
+  - Observable array contents display
+  - Last update timestamp
+  - State change visualization
+- **Usage**: Automatically appears when enabled via control panel
+
+##### Performance Monitor (`Ctrl+Shift+P`)
+- **Purpose**: Track rendering performance and identify optimization opportunities
+- **Metrics**: FPS tracking, render time measurement, memory usage monitoring
+
+##### Log Overlay
+- **Purpose**: Display application logs directly in the UI
+- **Features**: 
+  - Filter logs by category
+  - Search functionality
+  - Clear buffer capability
+  - Real-time log streaming
+
+##### Network Monitor
+- **Purpose**: Track API calls and responses
+- **Features**: Request timing, payload size analysis, HTTP status monitoring
+
+#### Environment Configuration
+```bash
+# Enable specific monitors on application startup
+VITE_DEBUG_MOBX=true
+VITE_DEBUG_PERFORMANCE=true
+VITE_DEBUG_LOGS=true
+```
+
+### Logging System
+
+#### Configuration-Driven Architecture
+- **Zero-overhead production builds**: Console statements automatically removed
+- **Environment-specific configuration**: Different log levels per environment
+- **Category-based logging**: Separate loggers for different application areas
+
+#### Logger Categories
+- `main` - Application startup and lifecycle events
+- `mobx` - MobX state management and reactive updates
+- `viewmodel` - ViewModel business logic operations
+- `navigation` - Focus management and keyboard navigation
+- `component` - Component lifecycle and rendering events
+- `api` - API calls, responses, and error handling
+- `validation` - Form validation logic and results
+- `diagnostics` - Debug tool controls and operations
+
+#### Usage Pattern
+```typescript
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('component');
+log.debug('Component rendered', { props });
+log.info('User action completed');
+log.warn('Performance threshold exceeded');
+log.error('Operation failed', error);
+```
+
+### Production Optimization
+- All debug tools tree-shaken in production builds
+- Console methods removed via Vite's esbuild configuration
+- Zero runtime overhead when diagnostics disabled
+- Automatic timing delay elimination in test environments
 
 ---
 

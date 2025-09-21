@@ -72,12 +72,15 @@ npm run lint       # Run ESLint
 
 #### Focus Management Standards
 - **TabIndex Guidelines**:
-  - Use sequential tabIndex (1, 2, 3...) for logical flow within components
-  - Reserve tabIndex=0 for natural DOM order
-  - Use tabIndex=-1 for programmatically focusable elements
-  - Never skip numbers in tabIndex sequence
-  - Document tabIndex order in complex components
-  - Reset tabIndex sequence for each major section/modal
+  - **Prefer natural DOM order** (no explicit tabIndex) whenever possible
+  - **Use tabIndex only when needed** to override natural order for UX reasons
+  - **Sequential numbering**: When using explicit tabIndex, use sequential numbers (1, 2, 3...)
+  - **Consistent patterns within components**:
+    - tabIndex=0: Natural DOM order (default)
+    - tabIndex=1,2,3...: Custom order for improved UX flow
+    - tabIndex=-1: Programmatically focusable but not in tab sequence
+  - **Component-level consistency**: Reset tabIndex sequence for each major section/modal
+  - **Document complex sequences**: Add comments explaining tabIndex choices in complex forms
 
 - **Focus Trapping**:
   - Modals MUST trap focus while open
@@ -158,25 +161,47 @@ npm run lint       # Run ESLint
 ```
 src/
 ├── components/       # Reusable UI components
-│   ├── ui/          # Base UI components (button, input, etc.)
-│   │   └── MultiSelectDropdown.tsx  # Unified multi-select component
-│   └── debug/       # Debug utilities (dev only)
-│       └── MobXDebugger.tsx  # MobX state visualization
+│   ├── ui/          # Base UI components (button, input, dropdown, etc.)
+│   │   ├── FocusTrappedCheckboxGroup/  # Complex checkbox group component
+│   │   └── MultiSelectDropdown.tsx    # Unified multi-select component
+│   ├── auth/        # Authentication components
+│   ├── debug/       # Debug utilities (dev only)
+│   ├── layouts/     # Layout components
+│   └── medication/  # Medication-specific components
+├── pages/           # Page-level routing components
+│   ├── auth/        # Authentication pages
+│   ├── clients/     # Client management pages
+│   └── medications/ # Medication management pages
+├── views/           # Feature-specific view components
+│   ├── client/      # Client-related views
+│   └── medication/  # Medication-related views
+├── viewModels/      # MobX ViewModels for state management
+│   ├── client/      # Client-related state management
+│   └── medication/  # Medication-related state management
+├── services/        # API interfaces and implementations
+│   ├── api/         # API interfaces and implementations
+│   ├── mock/        # Mock API implementations
+│   ├── data/        # Data access services
+│   ├── validation/  # Data validation utilities
+│   ├── search/      # Search functionality
+│   ├── http/        # HTTP client utilities
+│   ├── adapters/    # External service adapters
+│   └── cache/       # Caching implementations
+├── contexts/        # React contexts and providers
+├── hooks/           # Custom React hooks
 ├── config/          # Application configuration
 │   ├── timings.ts   # Centralized timing configuration
-│   └── mobx.config.ts  # MobX debugging configuration
-├── contexts/        # React contexts
-├── hooks/           # Custom React hooks
+│   ├── logging.config.ts # Logging system configuration
+│   ├── mobx.config.ts    # MobX debugging configuration
+│   └── oauth.config.ts   # Authentication configuration
+├── data/            # Static data and configurations
 ├── mocks/           # Mock data for development
-├── services/        # API interfaces and implementations
-│   ├── api/         # API interfaces
-│   └── mock/        # Mock API implementations
+├── styles/          # CSS and styling files
+├── constants/       # Application constants
 ├── types/           # TypeScript type definitions
+│   └── models/      # Domain model types
 ├── utils/           # Utility functions
-├── viewModels/      # MobX ViewModels for state management
-└── views/           # Feature-specific components
-    ├── client/      # Client-related views
-    └── medication/  # Medication-related views
+└── test/            # Test setup and utilities
 ```
 
 ## Development Guidelines
