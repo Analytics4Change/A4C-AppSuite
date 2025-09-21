@@ -72,12 +72,14 @@ class AlignmentResult {
     };
   }
 
-  addMisalignment(category, source, doc, details) {
+  addMisalignment(category, source, doc, details, suggestion = null, lineNumber = null) {
     this.misalignments.push({
       category,
       source,
       doc,
       details,
+      suggestion,
+      lineNumber,
       severity: this.calculateSeverity(details)
     });
     this.updateScore();
@@ -172,10 +174,15 @@ class AlignmentResult {
 
   printMisalignment(m) {
     const severityIcon = m.severity === 'high' ? '🔴' : m.severity === 'medium' ? '🟡' : '🔵';
-    console.log(`  ${severityIcon} ${chalk.bold(m.category)}`);
-    console.log(`     Source: ${chalk.gray(m.source)}`);
-    console.log(`     Doc: ${chalk.gray(m.doc)}`);
+    console.log(`  ${severityIcon} ${chalk.bold(m.category)} - ${chalk.cyan(m.source)}${m.lineNumber ? `:${m.lineNumber}` : ''}`);
     console.log(`     Issue: ${m.details}`);
+    if (m.doc) {
+      console.log(`     Doc: ${chalk.gray(m.doc)}`);
+    }
+    if (m.suggestion) {
+      console.log(`     💡 Fix: ${chalk.green(m.suggestion)}`);
+    }
+    console.log(); // Add spacing
   }
 
   getScoreColor(score) {
@@ -189,8 +196,71 @@ class AlignmentResult {
       aligned: this.isAligned(),
       misalignments: this.misalignments,
       suggestions: this.suggestions,
-      stats: this.stats
+      stats: this.stats,
+      timestamp: new Date().toISOString(),
+      prSummary: this.generatePRSummary()
     };
+  }
+
+  generatePRSummary() {
+    const lines = [];
+    
+    lines.push('### 🔍 Code-Documentation Alignment Details\n');
+    
+    if (this.misalignments.length === 0) {
+      lines.push('✅ **All documentation is aligned with code**\n');
+      return lines.join('\n');
+    }
+
+    const grouped = this.groupBySeverity();
+    
+    if (grouped.high.length > 0) {
+      lines.push('#### 🔴 High Priority Issues (Must Fix)');
+      grouped.high.slice(0, 5).forEach(m => {
+        lines.push(`- **${m.source}${m.lineNumber ? `:${m.lineNumber}` : ''}**: ${m.details}`);
+        if (m.suggestion) {
+          lines.push(`  - 💡 **Fix**: ${m.suggestion}`);
+        }
+      });
+      if (grouped.high.length > 5) {
+        lines.push(`- *...and ${grouped.high.length - 5} more high priority issues*`);
+      }
+      lines.push('');
+    }
+
+    if (grouped.medium.length > 0) {
+      lines.push('#### 🟡 Medium Priority Issues');
+      grouped.medium.slice(0, 3).forEach(m => {
+        lines.push(`- **${m.source}**: ${m.details}`);
+        if (m.suggestion) {
+          lines.push(`  - 💡 **Fix**: ${m.suggestion}`);
+        }
+      });
+      if (grouped.medium.length > 3) {
+        lines.push(`- *...and ${grouped.medium.length - 3} more medium priority issues*`);
+      }
+      lines.push('');
+    }
+
+    // Add summary statistics
+    lines.push('#### 📊 Summary');
+    lines.push(`- **Total Issues**: ${this.misalignments.length}`);
+    lines.push(`- **High Priority**: ${grouped.high.length}`);
+    lines.push(`- **Medium Priority**: ${grouped.medium.length}`);
+    lines.push(`- **Low Priority**: ${grouped.low.length}`);
+    lines.push(`- **Alignment Score**: ${this.stats.alignmentScore}%\n`);
+
+    if (this.suggestions.length > 0) {
+      lines.push('#### 💡 General Suggestions');
+      this.suggestions.slice(0, 3).forEach(s => {
+        lines.push(`- ${s.message}`);
+      });
+      lines.push('');
+    }
+
+    lines.push('**📋 Next Steps**: Download the detailed alignment report artifact for complete file listings and fix suggestions.');
+    
+    return lines.join('\n');
   }
 }
 

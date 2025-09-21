@@ -20,7 +20,11 @@
     "knip:watch": "knip --watch",
     "docs:validate": "node scripts/documentation/validate-docs.cjs",
     "docs:check-alignment": "node scripts/documentation/check-doc-alignment.cjs",
-    "docs:generate-metrics": "node scripts/documentation/generate-metrics-dashboard.cjs"
+    "docs:generate-metrics": "node scripts/documentation/generate-metrics-dashboard.cjs",
+    "docs:check": "npm run docs:validate && npm run docs:check-alignment",
+    "docs:check:quick": "npm run docs:check-alignment",
+    "docs:lint": "markdownlint docs/**/*.md README.md CLAUDE.md",
+    "docs:fix": "markdownlint --fix docs/**/*.md README.md CLAUDE.md"
   },
   "repository": {
     "type": "git",

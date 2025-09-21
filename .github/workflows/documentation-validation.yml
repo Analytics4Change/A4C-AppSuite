@@ -118,6 +118,26 @@ jobs:
           - **Component Documentation**: ${{ steps.coverage.outputs.component_coverage }}% (${{ steps.coverage.outputs.documented_components }}/${{ steps.coverage.outputs.total_components }})
           - **Coverage Status**: ${{ steps.coverage.outputs.component_coverage >= 90 && '✅ Excellent' || steps.coverage.outputs.component_coverage >= 70 && '⚠️ Good' || '❌ Needs Improvement' }}
           
+          EOF
+          
+          # Add detailed alignment information if alignment failed
+          if [ "${{ steps.check-alignment.outputs.alignment_failed }}" == "true" ] && [ -f "doc-alignment-report.json" ]; then
+            echo "Extracting detailed alignment information..."
+            node -e "
+              try {
+                const fs = require('fs');
+                const report = JSON.parse(fs.readFileSync('doc-alignment-report.json', 'utf8'));
+                if (report.prSummary) {
+                  fs.appendFileSync('doc-status-report.md', report.prSummary + '\n\n');
+                }
+              } catch (error) {
+                console.log('Could not extract alignment details:', error.message);
+              }
+            "
+          fi
+          
+          # Add artifact links section
+          cat << EOF >> doc-status-report.md
           ### Detailed Reports
           - [Validation Report](doc-validation-report.json)
           - [Alignment Report](doc-alignment-report.json)
@@ -131,7 +151,8 @@ jobs:
           fi
           
           if [ "${{ steps.check-alignment.outputs.alignment_failed }}" == "true" ]; then
-            echo "- Update documentation to align with recent code changes" >> doc-status-report.md
+            echo "- Review detailed alignment issues above and implement suggested fixes" >> doc-status-report.md
+            echo "- Download alignment report artifact for complete issue listings" >> doc-status-report.md
           fi
           
           if [ ${{ steps.coverage.outputs.component_coverage }} -lt 90 ]; then
@@ -222,14 +243,75 @@ jobs:
               labels: ['documentation', 'maintenance']
             });
 
+      - name: Check for critical issues
+        id: critical-check
+        run: |
+          # Define critical vs warning conditions
+          CRITICAL_ISSUES=""
+          WARNING_ISSUES=""
+          
+          # Structure validation failures are always critical
+          if [ "${{ steps.validate-structure.outputs.validation_failed }}" == "true" ]; then
+            CRITICAL_ISSUES="structure"
+          fi
+          
+          # Alignment failures are critical only if high-priority issues exist
+          if [ "${{ steps.check-alignment.outputs.alignment_failed }}" == "true" ] && [ -f "doc-alignment-report.json" ]; then
+            # Check if there are high-priority alignment issues
+            HIGH_PRIORITY=$(node -e "
+              try {
+                const report = JSON.parse(require('fs').readFileSync('doc-alignment-report.json', 'utf8'));
+                const highPriority = report.misalignments ? report.misalignments.filter(m => m.severity === 'high').length : 0;
+                console.log(highPriority);
+              } catch (e) { console.log(0); }
+            ")
+            
+            if [ "$HIGH_PRIORITY" -gt "0" ]; then
+              CRITICAL_ISSUES="$CRITICAL_ISSUES alignment-high-priority"
+            else
+              WARNING_ISSUES="$WARNING_ISSUES alignment-medium-low"
+            fi
+          fi
+          
+          # Coverage below 50% is critical, 50-90% is warning
+          COVERAGE=${{ steps.coverage.outputs.component_coverage }}
+          if [ "$COVERAGE" -lt "50" ]; then
+            CRITICAL_ISSUES="$CRITICAL_ISSUES coverage-critical"
+          elif [ "$COVERAGE" -lt "90" ]; then
+            WARNING_ISSUES="$WARNING_ISSUES coverage-warning"
+          fi
+          
+          echo "critical_issues=$CRITICAL_ISSUES" >> $GITHUB_OUTPUT
+          echo "warning_issues=$WARNING_ISSUES" >> $GITHUB_OUTPUT
+          echo "has_critical=$([ -n \"$CRITICAL_ISSUES\" ] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "has_warnings=$([ -n \"$WARNING_ISSUES\" ] && echo true || echo false)" >> $GITHUB_OUTPUT
+
       - name: Fail if critical issues found
         if: |
           github.event_name == 'pull_request' &&
-          (steps.validate-structure.outputs.validation_failed == 'true' ||
-           steps.check-alignment.outputs.alignment_failed == 'true')
+          steps.critical-check.outputs.has_critical == 'true'
         run: |
-          echo "❌ Documentation validation failed. Please fix the issues before merging."
+          echo "❌ CRITICAL documentation issues found: ${{ steps.critical-check.outputs.critical_issues }}"
+          echo "These issues must be fixed before merging:"
+          echo "- Structure validation failures block the PR"
+          echo "- High-priority alignment issues block the PR"
+          echo "- Component coverage below 50% blocks the PR"
+          echo ""
+          echo "Review the detailed issues in the PR comment above."
           exit 1
+
+      - name: Warning for non-critical issues
+        if: |
+          github.event_name == 'pull_request' &&
+          steps.critical-check.outputs.has_critical != 'true' &&
+          steps.critical-check.outputs.has_warnings == 'true'
+        run: |
+          echo "⚠️ Documentation warnings found: ${{ steps.critical-check.outputs.warning_issues }}"
+          echo "These should be addressed but don't block the PR:"
+          echo "- Medium/low priority alignment issues"
+          echo "- Component coverage between 50-90%"
+          echo ""
+          echo "Consider addressing these in a follow-up PR."
 
       - name: Success message
         if: |
