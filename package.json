@@ -18,9 +18,9 @@
     "knip:fix": "knip --fix",
     "knip:production": "knip --production",
     "knip:watch": "knip --watch",
-    "docs:validate": "node scripts/documentation/validate-docs.js",
-    "docs:check-alignment": "node scripts/documentation/check-doc-alignment.js",
-    "docs:generate-metrics": "node scripts/documentation/generate-metrics-dashboard.js"
+    "docs:validate": "node scripts/documentation/validate-docs.cjs",
+    "docs:check-alignment": "node scripts/documentation/check-doc-alignment.cjs",
+    "docs:generate-metrics": "node scripts/documentation/generate-metrics-dashboard.cjs"
   },
   "repository": {
     "type": "git",
@@ -61,7 +61,7 @@
     "@typescript-eslint/eslint-plugin": "^8.39.0",
     "@typescript-eslint/parser": "^8.39.0",
     "autoprefixer": "^10.4.21",
-    "chalk": "^5.3.0",
+    "chalk": "^4.1.2",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
@@ -72,8 +72,6 @@
     "playwright": "^1.54.2",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.12",
-    "typedoc": "^0.25.4",
-    "typedoc-plugin-markdown": "^3.17.1",
     "typescript": "^5.9.2"
   }
 }

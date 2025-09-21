@@ -8,7 +8,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
-const { sanitizePath, escapeShellArg, isValidProjectPath, DOC_CONFIG } = require('./security-utils');
+const { sanitizePath, escapeShellArg, isValidProjectPath, DOC_CONFIG } = require('./security-utils.cjs');
 const { promisify } = require('util');
 const glob = require('glob');
 const chalk = require('chalk');
