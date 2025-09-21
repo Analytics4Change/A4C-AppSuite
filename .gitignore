@@ -90,3 +90,14 @@ debug.log
 debug.txt
 memory-pressure.log
 pressure-*.log
+
+# E2E test screenshots (should be in test-results/)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.webp
+step*.png
+page-*.png
+screenshot-*.png

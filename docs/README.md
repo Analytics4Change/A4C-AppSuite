@@ -240,9 +240,18 @@ npx knip
 ## Documentation
 
 ### Core Documentation
-- **[Testing Strategies](./testing-strategies.md)** - Comprehensive testing patterns and methodologies
-- **[UI Patterns](./ui-patterns.md)** - Modal architecture, focus management, and component patterns
-- **[Focus Management](./focus-management/)** - Detailed focus management system documentation
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - CI/CD pipeline and deployment guide
+- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Development setup and cross-platform guidelines
+- **[TESTING.md](./TESTING.md)** - Comprehensive testing strategies with Playwright
+- **[API.md](./API.md)** - Component and service API reference
+- **[UI Patterns](./ui-patterns.md)** - Modal architecture and component patterns
+
+### Implementation Docs
+- **[DESIGN_PATTERNS_MIGRATION_GUIDE.md](./DESIGN_PATTERNS_MIGRATION_GUIDE.md)** - Design patterns and migration strategies
+- **[FocusTrappedCheckboxGroup_plan.md](./FocusTrappedCheckboxGroup_plan.md)** - Focus management implementation
+- **[GHCR_TOKEN_ROTATION.md](./GHCR_TOKEN_ROTATION.md)** - Token management procedures
+- **[medication-search-implementation.md](./medication-search-implementation.md)** - Search functionality details
+- **[rxnorm-medication-autocomplete.md](./rxnorm-medication-autocomplete.md)** - RxNorm integration
 
 ### Additional Resources
 - **[CLAUDE.md](../CLAUDE.md)** - Project instructions and development guidelines
