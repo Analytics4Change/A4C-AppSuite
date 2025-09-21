@@ -30,12 +30,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           fetch-depth: 0  # Full history for better diff analysis
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
         with:
           node-version: '20'
           cache: 'npm'
@@ -43,8 +43,6 @@ jobs:
       - name: Install dependencies
         run: |
           npm ci
-          # Install global markdown linting tool
-          npm install -g markdownlint-cli@0.39.0
 
       - name: Run documentation structure validation
         id: validate-structure
@@ -61,11 +59,11 @@ jobs:
       - name: Lint markdown files
         id: lint-markdown
         run: |
-          markdownlint 'docs/**/*.md' '*.md' --config .markdownlint.json || echo "lint_failed=true" >> $GITHUB_OUTPUT
+          npm run docs:lint || echo "lint_failed=true" >> $GITHUB_OUTPUT
         continue-on-error: true
 
       - name: Check for broken links
-        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        uses: gaurav-nelson/github-action-markdown-link-check@d53a906aa6b22b8979d33bc86170567e619495ec # v1.0.15
         with:
           use-quiet-mode: 'yes'
           use-verbose-mode: 'no'
@@ -123,17 +121,8 @@ jobs:
           # Add detailed alignment information if alignment failed
           if [ "${{ steps.check-alignment.outputs.alignment_failed }}" == "true" ] && [ -f "doc-alignment-report.json" ]; then
             echo "Extracting detailed alignment information..."
-            node -e "
-              try {
-                const fs = require('fs');
-                const report = JSON.parse(fs.readFileSync('doc-alignment-report.json', 'utf8'));
-                if (report.prSummary) {
-                  fs.appendFileSync('doc-status-report.md', report.prSummary + '\n\n');
-                }
-              } catch (error) {
-                console.log('Could not extract alignment details:', error.message);
-              }
-            "
+            # Use a dedicated Node.js script instead of inline execution
+            node scripts/documentation/extract-alignment-summary.cjs || echo "Could not extract alignment details"
           fi
           
           # Add artifact links section
@@ -165,7 +154,7 @@ jobs:
 
       - name: Post PR comment with documentation status
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -203,7 +192,7 @@ jobs:
 
       - name: Upload documentation reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
         with:
           name: documentation-reports
           path: |
@@ -218,7 +207,7 @@ jobs:
           (steps.validate-structure.outputs.validation_failed == 'true' ||
            steps.check-alignment.outputs.alignment_failed == 'true' ||
            steps.coverage.outputs.component_coverage < 90)
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -258,13 +247,7 @@ jobs:
           # Alignment failures are critical only if high-priority issues exist
           if [ "${{ steps.check-alignment.outputs.alignment_failed }}" == "true" ] && [ -f "doc-alignment-report.json" ]; then
             # Check if there are high-priority alignment issues
-            HIGH_PRIORITY=$(node -e "
-              try {
-                const report = JSON.parse(require('fs').readFileSync('doc-alignment-report.json', 'utf8'));
-                const highPriority = report.misalignments ? report.misalignments.filter(m => m.severity === 'high').length : 0;
-                console.log(highPriority);
-              } catch (e) { console.log(0); }
-            ")
+            HIGH_PRIORITY=$(node scripts/documentation/count-high-priority-issues.cjs 2>/dev/null || echo "0")
             
             if [ "$HIGH_PRIORITY" -gt "0" ]; then
               CRITICAL_ISSUES="$CRITICAL_ISSUES alignment-high-priority"
