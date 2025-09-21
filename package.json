@@ -19,12 +19,23 @@
     "knip:production": "knip --production",
     "knip:watch": "knip --watch",
     "docs:validate": "node scripts/documentation/validate-docs.cjs",
-    "docs:check-alignment": "node scripts/documentation/check-doc-alignment.cjs",
-    "docs:generate-metrics": "node scripts/documentation/generate-metrics-dashboard.cjs",
+    "docs:check-alignment": "npm run scripts:build && node dist/scripts/documentation/check-doc-alignment.js",
+    "docs:generate-metrics": "npm run scripts:build && node dist/scripts/documentation/generate-metrics-dashboard.js",
+    "docs:cli": "npm run scripts:build && node dist/scripts/cli/index.js",
     "docs:check": "npm run docs:validate && npm run docs:check-alignment",
     "docs:check:quick": "npm run docs:check-alignment",
     "docs:lint": "markdownlint docs/**/*.md README.md CLAUDE.md",
-    "docs:fix": "markdownlint --fix docs/**/*.md README.md CLAUDE.md"
+    "docs:fix": "markdownlint --fix docs/**/*.md README.md CLAUDE.md",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "scripts:build": "tsc --project tsconfig.scripts.json",
+    "scripts:dev": "tsc --project tsconfig.scripts.json --watch",
+    "scripts:check-alignment": "node dist/scripts/documentation/check-doc-alignment.js",
+    "scripts:generate-metrics": "node dist/scripts/documentation/generate-metrics-dashboard.js",
+    "test:scripts": "vitest --config vitest.config.scripts.ts",
+    "test:scripts:run": "vitest run --config vitest.config.scripts.ts",
+    "test:scripts:coverage": "vitest run --coverage --config vitest.config.scripts.ts"
   },
   "repository": {
     "type": "git",
@@ -76,6 +87,12 @@
     "playwright": "1.54.2",
     "postcss": "8.5.6",
     "tailwindcss": "4.1.12",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vitest": "2.1.8",
+    "@vitest/coverage-v8": "2.1.8",
+    "commander": "12.1.0",
+    "ora": "5.4.1",
+    "cli-progress": "3.12.0",
+    "@types/cli-progress": "3.11.5"
   }
 }
