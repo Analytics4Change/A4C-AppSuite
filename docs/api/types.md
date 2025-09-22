@@ -155,6 +155,160 @@ interface SelectionChangeEvent<T> {
 }
 ```
 
+### Dropdown and UI Types
+
+```typescript
+// From types/dropdown.ts
+interface DropdownHighlightState {
+  typingHighlight: boolean;
+  navigationHighlight: boolean;
+  highlightedIndex: number;
+}
+
+interface DropdownPosition {
+  top: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+}
+
+interface DropdownConfig {
+  searchDebounceMs: number;
+  maxVisibleItems: number;
+  minSearchLength: number;
+  closeOnSelect: boolean;
+  allowCustomValue: boolean;
+}
+
+// From types/medication-search.types.ts
+interface MedicationSearchConfig {
+  debounceDelay: number;
+  minSearchLength: number;
+  maxResults: number;
+  enableHighlighting: boolean;
+  searchFields: string[];
+}
+
+interface MedicationSearchFilters {
+  categories: string[];
+  forms: string[];
+  strengths: string[];
+  manufacturers: string[];
+  isGeneric?: boolean;
+  isPrescription?: boolean;
+}
+
+interface MedicationSearchResult {
+  medications: Medication[];
+  totalCount: number;
+  searchTime: number;
+  hasMore: boolean;
+  appliedFilters: MedicationSearchFilters;
+}
+```
+
+### Domain Model Types
+
+```typescript
+// From types/models/Medication.ts
+interface Medication {
+  id: string;
+  name: string;
+  activeIngredient: string;
+  rxNormCode?: string;
+  strength?: string;
+  form: DosageForm;
+  manufacturer?: string;
+  isControlled?: boolean;
+  controlledSchedule?: string;
+  isPsychotropic?: boolean;
+  psychotropicCategory?: string;
+  therapeutic Classes?: TherapeuticClass[];
+  interactions?: DrugInteraction[];
+  contraindications?: Contraindication[];
+  sideEffects?: SideEffect[];
+  warnings?: Warning[];
+}
+
+interface TherapeuticClass {
+  id: string;
+  name: string;
+  category: string;
+  level: number;
+}
+
+interface DrugInteraction {
+  id: string;
+  interactingMedication: string;
+  severity: 'mild' | 'moderate' | 'severe' | 'contraindicated';
+  description: string;
+  mechanism: string;
+  clinicalSignificance: string;
+}
+
+// From types/models/Dosage.ts
+interface Dosage {
+  amount: number;
+  unit: string;
+  frequency: DosageFrequency;
+  route: string;
+  instructions?: string;
+  startDate?: Date;
+  endDate?: Date;
+  timing: DosageTiming;
+  foodRequirements?: FoodRequirement;
+  specialInstructions?: SpecialInstruction[];
+}
+
+interface DosageTiming {
+  times: string[];
+  interval?: number;
+  intervalUnit?: 'hours' | 'days' | 'weeks';
+  asNeeded: boolean;
+  maxDailyDoses?: number;
+  minimumInterval?: number;
+}
+
+interface FoodRequirement {
+  timing: 'with_food' | 'without_food' | 'before_food' | 'after_food' | 'any';
+  instructions?: string;
+  restrictions?: string[];
+}
+
+// From types/models/Client.ts
+interface Client {
+  id: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: Date;
+  medications?: ClientMedication[];
+  allergies?: Allergy[];
+  conditions?: MedicalCondition[];
+  preferences?: ClientPreferences;
+  emergencyContacts?: EmergencyContact[];
+  permissions: ClientPermissions;
+}
+
+interface ClientMedication {
+  id: string;
+  medication: Medication;
+  dosage: Dosage;
+  prescribedBy: string;
+  prescribedDate: Date;
+  status: 'active' | 'paused' | 'discontinued' | 'completed';
+  adherence?: AdherenceRecord[];
+  notes?: string;
+}
+
+interface ClientPermissions {
+  canView: boolean;
+  canEdit: boolean;
+  canPrescribe: boolean;
+  canAdminister: boolean;
+  restrictedMedications?: string[];
+}
+```
+
 ## Enums
 
 ### Common Enumerations
@@ -182,6 +336,38 @@ enum UserRole {
   HEALTHCARE_PROVIDER = 'healthcare_provider',
   CAREGIVER = 'caregiver',
   VIEWER = 'viewer'
+}
+
+// Dropdown and UI Enums
+enum HighlightType {
+  NONE = 'none',
+  TYPING = 'typing',
+  NAVIGATION = 'navigation',
+  BOTH = 'both'
+}
+
+enum DropdownState {
+  CLOSED = 'closed',
+  OPENING = 'opening',
+  OPEN = 'open',
+  CLOSING = 'closing'
+}
+
+// Medication-specific Enums
+enum ControlledSchedule {
+  SCHEDULE_I = 'I',
+  SCHEDULE_II = 'II',
+  SCHEDULE_III = 'III',
+  SCHEDULE_IV = 'IV',
+  SCHEDULE_V = 'V'
+}
+
+enum MedicationStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  DISCONTINUED = 'discontinued',
+  PENDING = 'pending',
+  SUSPENDED = 'suspended'
 }
 ```
 

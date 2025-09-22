@@ -232,6 +232,47 @@ src/
 - Define interfaces for all props and complex data structures
 - Use type inference where possible, explicit types where necessary
 
+## Configuration Management
+
+### Application Configuration
+
+The application uses centralized configuration files for consistent behavior across environments:
+
+#### API Configuration (`/src/config/medication-search.config.ts`)
+- **API_CONFIG**: RXNorm API endpoints and request parameters
+  - Base URL for RXNorm services
+  - API keys and authentication settings
+  - Rate limiting and retry configurations
+  - Request timeout and cache settings
+
+- **INDEXED_DB_CONFIG**: Local caching and storage configuration
+  - Database name and version
+  - Object store configurations
+  - Cache retention policies
+  - Storage quota management
+
+#### Timing Configuration (`/src/config/timings.ts`)
+- Centralized timing delays for consistent UX
+- Automatic test environment optimization (0ms delays)
+- Search debouncing delays
+- Animation and transition timings
+
+#### Environment Variables
+```env
+# API Configuration
+VITE_RXNORM_API_URL=https://rxnav.nlm.nih.gov/REST
+VITE_API_TIMEOUT=5000
+
+# Cache Configuration  
+VITE_CACHE_TTL=3600000
+VITE_CACHE_MAX_SIZE=50MB
+
+# Debug Configuration
+VITE_DEBUG_MOBX=false
+VITE_DEBUG_PERFORMANCE=false
+VITE_DEBUG_LOGS=false
+```
+
 ## Search and Development Resources
 
 - For code base searches use the serena mcp server
