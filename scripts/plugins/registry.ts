@@ -242,7 +242,7 @@ export class PluginRegistry {
   /**
    * Get plugin metrics
    */
-  getMetrics(pluginName?: string): PluginMetrics | Map<string, PluginMetrics> {
+  getMetrics(pluginName?: string): PluginMetrics | Map<string, PluginMetrics> | undefined {
     if (pluginName) {
       return this.metrics.get(pluginName);
     }

@@ -1,26 +1,20 @@
 {
-  "timestamp": "2025-09-21T22:15:34.619Z",
+  "timestamp": "2025-09-22T00:03:21.051Z",
   "coverage": {
     "components": {
       "total": 24,
-      "documented": 0,
-      "percentage": 0,
+      "documented": 2,
+      "percentage": 8,
       "missing": [
         "searchable-dropdown",
         "label",
         "input",
         "dropdown-portal",
-        "checkbox",
         "card",
         "button",
         "MultiSelectDropdown",
         "EnhancedAutocompleteDropdown",
         "EditableDropdown",
-        "example-usage",
-        "RangeHoursInput",
-        "FocusTrappedCheckboxGroup",
-        "EnhancedFocusTrappedCheckboxGroup",
-        "DynamicAdditionalInput",
         "MedicationStatusIndicator",
         "MedicationSearchModal",
         "MedicationPurposeDropdown",
@@ -29,7 +23,11 @@
         "LogOverlay",
         "DebugControlPanel",
         "ProtectedRoute",
-        "OAuthProviders"
+        "OAuthProviders",
+        "example-usage",
+        "RangeHoursInput",
+        "EnhancedFocusTrappedCheckboxGroup",
+        "DynamicAdditionalInput"
       ]
     },
     "apis": {
@@ -43,14 +41,14 @@
       ]
     },
     "types": {
-      "total": 6,
+      "total": 44,
       "documented": 0,
       "percentage": 0
     },
     "overall": {
-      "total": 33,
-      "documented": 0,
-      "percentage": 0
+      "total": 71,
+      "documented": 2,
+      "percentage": 3
     }
   },
   "quality": {
@@ -61,7 +59,7 @@
       "staleFiles": []
     },
     "codeExamples": {
-      "total": 115,
+      "total": 0,
       "invalid": 0,
       "validPercentage": 100
     },
@@ -72,9 +70,9 @@
   },
   "process": {
     "recentActivity": {
-      "commitsWithDocs": 16,
-      "totalCommits": 53,
-      "percentage": 30
+      "commitsWithDocs": 0,
+      "totalCommits": 0,
+      "percentage": 0
     },
     "issues": {
       "open": 0,
