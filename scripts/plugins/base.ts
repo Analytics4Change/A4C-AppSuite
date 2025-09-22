@@ -316,7 +316,7 @@ export abstract class BaseProcessorPlugin extends BasePlugin implements Processo
         results.push({
           success: false,
           filePath: file.path,
-          metadata: { error: error.toString() }
+          metadata: { error: error instanceof Error ? error.toString() : String(error) }
         });
       }
     }

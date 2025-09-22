@@ -806,6 +806,9 @@ async function main(): Promise<void> {
   }
 }
 
+// Export the main function for CLI usage
+export { main };
+
 // Execute if called directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(error => {

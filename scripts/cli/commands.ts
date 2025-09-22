@@ -40,18 +40,33 @@ export function createCLI(): Command {
       // Override logging level based on options
       if (options.verbose) {
         configManager.override({
-          logging: { level: 'debug' }
+          logging: { 
+            level: 'debug',
+            enableColors: true,
+            enableTimestamps: true,
+            format: 'simple'
+          }
         });
       } else if (options.silent) {
         configManager.override({
-          logging: { level: 'error' }
+          logging: { 
+            level: 'error',
+            enableColors: true,
+            enableTimestamps: true,
+            format: 'simple'
+          }
         });
       }
       
       // Override progress style if specified
       if (options.progress) {
         configManager.override({
-          progress: { style: options.progress as any }
+          progress: { 
+            style: options.progress as any,
+            showPercentage: true,
+            showEta: true,
+            refreshRate: 100
+          }
         });
       }
     });
@@ -86,7 +101,7 @@ function createCheckCommand(): Command {
         console.log(chalk.bold('🔍 Checking Documentation-Code Alignment...'));
         
         // Dynamic import to avoid circular dependencies
-        const { main: checkAlignment } = await import('../documentation/check-doc-alignment.js');
+        const { main: checkAlignment } = await import('../documentation/check-doc-alignment');
         
         // Set up progress reporting
         const progress = createProgress({
@@ -131,7 +146,7 @@ function createGenerateCommand(): Command {
         console.log(chalk.bold('📊 Generating Documentation Metrics...'));
         
         // Dynamic import to avoid circular dependencies
-        const { main: generateMetrics } = await import('../documentation/generate-metrics-dashboard.js');
+        const { main: generateMetrics } = await import('../documentation/generate-metrics-dashboard');
         
         // Set up progress reporting
         const progress = createProgress({

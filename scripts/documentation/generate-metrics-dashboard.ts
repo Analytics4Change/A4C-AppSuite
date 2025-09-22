@@ -303,8 +303,8 @@ async function analyzeComponents(): Promise<ComponentInfo[]> {
         const componentName = basename(file, '.tsx');
         
         // Check if component has props interface/type
-        const hasPropsInterface = /interface\\s+\\w*Props/.test(content) || /type\\s+\\w*Props\\s*=/.test(content);
-        const propsMatches = content.match(/(interface|type)\\s+\\w*Props/g);
+        const hasPropsInterface = /interface\s+\w*Props/.test(content) || /type\s+\w*Props\s*=/.test(content);
+        const propsMatches = content.match(/(interface|type)\s+\w*Props/g);
         const propsCount = propsMatches ? propsMatches.length : 0;
         
         // Check if component is documented
@@ -357,9 +357,9 @@ async function analyzeAPIs(): Promise<ApiInfo[]> {
         const apiName = basename(file, '.ts');
         
         // Extract method names
-        const methodMatches = content.match(/(?:async\\s+)?(\\w+)\\s*\\([^)]*\\)\\s*(?::\\s*Promise<[^>]+>)?/g);
+        const methodMatches = content.match(/(?:async\s+)?(\w+)\s*\([^)]*\)\s*(?::\s*Promise<[^>]+>)?/g);
         const methods = methodMatches ? methodMatches.map(match => {
-          const methodName = match.match(/(\\w+)\\s*\\(/);
+          const methodName = match.match(/(\w+)\s*\(/);
           return methodName ? methodName[1] : '';
         }).filter(name => name && !['constructor', 'toString', 'valueOf'].includes(name)) : [];
         
@@ -409,8 +409,8 @@ async function analyzeTypes(): Promise<number> {
         const content = await fs.readFile(file, 'utf-8');
         
         // Count exported interfaces and types
-        const interfaceMatches = content.match(/export\\s+interface\\s+\\w+/g);
-        const typeMatches = content.match(/export\\s+type\\s+\\w+/g);
+        const interfaceMatches = content.match(/export\s+interface\s+\w+/g);
+        const typeMatches = content.match(/export\s+type\s+\w+/g);
         
         const interfaceCount = interfaceMatches ? interfaceMatches.length : 0;
         const typeCount = typeMatches ? typeMatches.length : 0;
@@ -461,12 +461,12 @@ async function analyzeDocumentation(): Promise<DocFileInfo[]> {
         }
         
         // Find broken links (simple regex check)
-        const linkMatches = content.match(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g);
+        const linkMatches = content.match(/\[([^\]]+)\]\(([^)]+)\)/g);
         const brokenLinks: string[] = [];
         
         if (linkMatches) {
           for (const link of linkMatches) {
-            const urlMatch = link.match(/\\(([^)]+)\\)/);
+            const urlMatch = link.match(/\(([^)]+)\)/);
             if (urlMatch) {
               const url = urlMatch[1];
               // Check for obvious broken links
@@ -928,6 +928,9 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 }
+
+// Export the main function for CLI usage
+export { main };
 
 // Execute if called directly
 if (import.meta.url === `file://${process.argv[1]}`) {
