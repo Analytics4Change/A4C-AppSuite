@@ -69,6 +69,7 @@ jobs:
         continue-on-error: true
 
       - name: Check for broken links
+        id: link-check
         uses: gaurav-nelson/github-action-markdown-link-check@d53a906aa6b22b8979d33bc86170567e619495ec # v1.0.15
         with:
           use-quiet-mode: 'yes'
@@ -270,6 +271,11 @@ jobs:
             WARNING_ISSUES="$WARNING_ISSUES coverage-warning"
           fi
           
+          # Broken links are always critical
+          if [ "${{ steps.link-check.outcome }}" == "failure" ]; then
+            CRITICAL_ISSUES="$CRITICAL_ISSUES broken-links"
+          fi
+          
           # Debug output for troubleshooting
           echo "DEBUG: CRITICAL_ISSUES='$CRITICAL_ISSUES'"
           echo "DEBUG: WARNING_ISSUES='$WARNING_ISSUES'"
@@ -301,6 +307,7 @@ jobs:
           echo "- Structure validation failures block the PR"
           echo "- High-priority alignment issues block the PR"
           echo "- Component coverage below 50% blocks the PR"
+          echo "- Broken links block the PR"
           echo ""
           echo "Review the detailed issues in the PR comment above."
           exit 1

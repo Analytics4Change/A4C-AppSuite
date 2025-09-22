@@ -385,11 +385,96 @@ class DocumentValidator {
   }
 
   private async validateLinks(): Promise<void> {
-    logger.debug('Validating links and references');
+    logger.debug('Validating internal links and references');
     
-    // For now, this is a placeholder for more sophisticated link validation
-    // Could be enhanced to check internal links, external links, etc.
-    this.result.addInfo('Link validation completed (basic checks only)');
+    try {
+      const markdownFiles = await glob('**/*.md', { 
+        cwd: process.cwd(),
+        ignore: ['node_modules/**', 'dist/**', '.git/**'] 
+      });
+
+      let linksChecked = 0;
+      let brokenLinks = 0;
+
+      for (const file of markdownFiles) {
+        if (!isValidProjectPath(file)) continue;
+        
+        try {
+          const linkCount = await this.validateFileLinks(file);
+          linksChecked += linkCount.total;
+          brokenLinks += linkCount.broken;
+        } catch (error) {
+          this.result.addWarning(
+            `Failed to validate links in ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            file
+          );
+        }
+      }
+
+      if (brokenLinks > 0) {
+        this.result.addError(`Found ${brokenLinks} broken internal links that must be fixed`);
+      } else {
+        this.result.addInfo(`Link validation completed: ${linksChecked} internal links checked, all valid`);
+      }
+    } catch (error) {
+      this.result.addError(`Failed to validate links: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private async validateFileLinks(filePath: string): Promise<{ total: number; broken: number }> {
+    const safePath = sanitizePath(filePath);
+    const content = await fs.readFile(safePath, 'utf-8');
+    const lines = content.split('\n');
+    
+    let totalLinks = 0;
+    let brokenLinks = 0;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineNum = i + 1;
+      
+      // Find markdown links [text](path)
+      const linkMatches = line.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g);
+      
+      for (const match of linkMatches) {
+        const linkPath = match[2];
+        const linkText = match[1];
+        
+        // Check internal links (relative paths)
+        if (linkPath.startsWith('./') || linkPath.startsWith('../') || (linkPath.startsWith('/') && !linkPath.startsWith('//'))) {
+          totalLinks++;
+          const resolvedPath = this.resolveRelativePath(filePath, linkPath);
+          
+          try {
+            await fs.access(resolvedPath);
+            logger.debug('Valid internal link found', { filePath, linkPath, resolvedPath });
+          } catch (error) {
+            brokenLinks++;
+            this.result.addError(
+              `Broken internal link: "${linkText}" -> "${linkPath}" at line ${lineNum}`,
+              filePath
+            );
+            logger.warn('Broken internal link detected', { filePath, linkPath, resolvedPath, lineNum });
+          }
+        }
+      }
+    }
+    
+    return { total: totalLinks, broken: brokenLinks };
+  }
+
+  private resolveRelativePath(fromFile: string, linkPath: string): string {
+    // Remove any anchor fragments
+    const cleanPath = linkPath.split('#')[0];
+    
+    if (cleanPath.startsWith('/')) {
+      // Absolute path from project root
+      return sanitizePath(join(process.cwd(), cleanPath.substring(1)));
+    } else {
+      // Relative path from current file
+      const fromDir = join(process.cwd(), fromFile, '..');
+      return sanitizePath(join(fromDir, cleanPath));
+    }
   }
 }
 
