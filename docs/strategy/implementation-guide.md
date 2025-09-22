@@ -360,7 +360,7 @@ Track these metrics weekly:
 
 - [Main Strategy Document](./documentation-alignment-strategy.md)
 - [Templates](../templates/)
-- [Style Guide](../STYLE_GUIDE.md)
+- [Code Style Guidelines](../../CLAUDE.md#development-guidelines)
 
 ### Tools
 

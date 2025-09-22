@@ -5,6 +5,11 @@
       "message": "Component documentation missing Usage section",
       "file": "docs/components/example-usage.md",
       "severity": "warning"
+    },
+    {
+      "message": "API documentation missing TypeScript examples",
+      "file": "docs/api/README.md",
+      "severity": "warning"
     }
   ],
   "info": [
@@ -170,7 +175,7 @@
       "severity": "info"
     },
     {
-      "message": "Internal link found: ../STYLE_GUIDE.md",
+      "message": "Internal link found: ../../CLAUDE.md#development-guidelines",
       "file": "docs/strategy/implementation-guide.md",
       "severity": "info"
     },
@@ -250,20 +255,60 @@
       "severity": "info"
     },
     {
-      "message": "Link validation completed (basic checks only)",
+      "message": "Internal link found: ./client-api.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./medication-api.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./cache-service.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./types.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../../CLAUDE.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../architecture/overview.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../components/",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../TESTING.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Link validation completed: 53 internal links checked, all valid",
       "severity": "info"
     }
   ],
   "stats": {
-    "totalFiles": 52,
-    "validFiles": 52,
+    "totalFiles": 53,
+    "validFiles": 53,
     "componentsDocumented": 24,
-    "apisDocumented": 4
+    "apisDocumented": 5
   },
-  "timestamp": "2025-09-22T03:01:04.147Z",
+  "timestamp": "2025-09-22T03:40:55.250Z",
   "summary": {
     "hasErrors": false,
     "hasWarnings": true,
-    "totalIssues": 1
+    "totalIssues": 2
   }
 }
