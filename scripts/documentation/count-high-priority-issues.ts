@@ -7,9 +7,27 @@
  */
 
 import { existsSync, readFileSync } from 'fs';
-import { getLogger } from '../utils/logger.js';
 
-const logger = getLogger('count-issues');
+// For CI environment, only use essential logging to avoid pollution
+const isCI = process.env.NODE_ENV === 'ci' || process.env.CI === 'true';
+
+const logger = {
+  debug: (msg: string, data?: any) => {
+    if (!isCI && process.env.DEBUG) {
+      console.error(`DEBUG: ${msg}`, data || '');
+    }
+  },
+  info: (msg: string) => {
+    if (!isCI) {
+      console.error(`INFO: ${msg}`);
+    }
+  },
+  warn: (msg: string, error?: any) => {
+    if (!isCI) {
+      console.error(`WARN: ${msg}`, error || '');
+    }
+  }
+};
 
 interface AlignmentReport {
   misalignments?: Array<{

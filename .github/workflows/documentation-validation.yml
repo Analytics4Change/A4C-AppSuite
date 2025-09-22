@@ -307,9 +307,22 @@ jobs:
           echo "has_warnings=$([ ${#WARNING_ARRAY[@]} -gt 0 ] && echo true || echo false)" >> $GITHUB_OUTPUT
           
           # Debug output for troubleshooting
-          echo "DEBUG: CRITICAL_ARRAY=(${CRITICAL_ARRAY[*]})"
-          echo "DEBUG: WARNING_ARRAY=(${WARNING_ARRAY[*]})"
-          echo "DEBUG: COVERAGE=$COVERAGE"
+          echo "DEBUG: Step outcomes:"
+          echo "DEBUG:   - validate-structure: ${{ steps.validate-structure.outputs.validation_failed }}"
+          echo "DEBUG:   - check-alignment: ${{ steps.check-alignment.outputs.alignment_failed }}"
+          echo "DEBUG:   - lint-markdown: ${{ steps.lint-markdown.outputs.lint_failed }}"
+          echo "DEBUG:   - link-check: ${{ steps.link-check.outcome }}"
+          echo "DEBUG: Calculated values:"
+          echo "DEBUG:   - COVERAGE=$COVERAGE"
+          echo "DEBUG:   - HIGH_PRIORITY=$HIGH_PRIORITY"
+          echo "DEBUG: Issue arrays:"
+          echo "DEBUG:   - CRITICAL_ARRAY=(${CRITICAL_ARRAY[*]})"
+          echo "DEBUG:   - WARNING_ARRAY=(${WARNING_ARRAY[*]})"
+          echo "DEBUG: Final outputs:"
+          echo "DEBUG:   - critical_issues='$CRITICAL_ISSUES'"
+          echo "DEBUG:   - warning_issues='$WARNING_ISSUES'"
+          echo "DEBUG:   - has_critical=$([ ${#CRITICAL_ARRAY[@]} -gt 0 ] && echo true || echo false)"
+          echo "DEBUG:   - has_warnings=$([ ${#WARNING_ARRAY[@]} -gt 0 ] && echo true || echo false)"
 
       - name: Fail if critical issues found
         if: |
@@ -318,10 +331,26 @@ jobs:
         run: |
           echo "❌ CRITICAL documentation issues found: ${{ steps.critical-check.outputs.critical_issues }}"
           echo "These issues must be fixed before merging:"
-          echo "- Structure validation failures block the PR"
-          echo "- High-priority alignment issues block the PR"
-          echo "- Component coverage below 50% blocks the PR"
-          echo "- Broken links block the PR"
+          
+          # Only show error descriptions for issues that actually occurred
+          CRITICAL_ISSUES="${{ steps.critical-check.outputs.critical_issues }}"
+          
+          if [[ "$CRITICAL_ISSUES" == *"structure"* ]]; then
+            echo "- Structure validation failures detected - fix validation errors"
+          fi
+          
+          if [[ "$CRITICAL_ISSUES" == *"alignment-high-priority"* ]]; then
+            echo "- High-priority alignment issues detected - address code-documentation mismatches"
+          fi
+          
+          if [[ "$CRITICAL_ISSUES" == *"coverage-critical"* ]]; then
+            echo "- Component coverage below 50% - add documentation for more components"
+          fi
+          
+          if [[ "$CRITICAL_ISSUES" == *"external-links"* ]]; then
+            echo "- Broken external links detected - fix or update broken URLs"
+          fi
+          
           echo ""
           echo "Review the detailed issues in the PR comment above."
           exit 1
@@ -334,8 +363,18 @@ jobs:
         run: |
           echo "⚠️ Documentation warnings found: ${{ steps.critical-check.outputs.warning_issues }}"
           echo "These should be addressed but don't block the PR:"
-          echo "- Medium/low priority alignment issues"
-          echo "- Component coverage between 50-90%"
+          
+          # Only show warning descriptions for issues that actually occurred
+          WARNING_ISSUES="${{ steps.critical-check.outputs.warning_issues }}"
+          
+          if [[ "$WARNING_ISSUES" == *"alignment-medium-low"* ]]; then
+            echo "- Medium/low priority alignment issues detected - review and update documentation"
+          fi
+          
+          if [[ "$WARNING_ISSUES" == *"coverage-warning"* ]]; then
+            echo "- Component coverage between 50-90% - consider adding more documentation"
+          fi
+          
           echo ""
           echo "Consider addressing these in a follow-up PR."
 
