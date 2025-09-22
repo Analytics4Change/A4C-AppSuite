@@ -91,6 +91,7 @@ mkdir -p .github/workflows
 ### Step 1: Deploy Validation Scripts
 
 Copy the provided scripts to your project:
+
 - `scripts/documentation/validate-docs.js`
 - `scripts/documentation/check-doc-alignment.js`
 - `scripts/documentation/generate-metrics-dashboard.js`
@@ -104,6 +105,7 @@ chmod +x scripts/documentation/*.js
 ### Step 2: Configure GitHub Actions
 
 Copy the workflow file:
+
 - `.github/workflows/documentation-validation.yml`
 
 Commit and push to enable the workflow:
@@ -158,6 +160,7 @@ open docs/dashboard.html
 ### Step 1: Create Documentation Templates
 
 Copy template files to `docs/templates/`:
+
 - Component template
 - API endpoint template
 - Architecture decision record template
@@ -196,6 +199,7 @@ Before submitting a PR:
 ### Step 4: Create Documentation Style Guide
 
 Create `docs/STYLE_GUIDE.md` with:
+
 - Writing tone and voice
 - Code example formatting
 - Heading hierarchy
@@ -223,6 +227,7 @@ Add to CI/CD pipeline or run daily:
 ### Step 2: Set Up Notifications
 
 Configure GitHub notifications for:
+
 - Failed documentation checks
 - Weekly audit issues
 - Stale documentation alerts
@@ -230,6 +235,7 @@ Configure GitHub notifications for:
 ### Step 3: Create Documentation Backlog
 
 1. Run initial audit:
+
    ```bash
    npm run docs:check > initial-audit.txt
    ```
@@ -248,36 +254,42 @@ Configure GitHub notifications for:
 ## Rollout Schedule
 
 ### Week 1: Foundation
+
 - [x] Install dependencies
 - [x] Configure scripts
 - [x] Set up git hooks
 - [x] Create folder structure
 
 ### Week 2: Automation
+
 - [ ] Deploy validation scripts
 - [ ] Configure GitHub Actions
 - [ ] Set up TypeDoc
 - [ ] Test automation
 
 ### Week 3: Team Integration
+
 - [ ] Create templates
 - [ ] Update guidelines
 - [ ] Train team
 - [ ] Assign champions
 
 ### Week 4: Monitoring
+
 - [ ] Enable dashboard
 - [ ] Set up notifications
 - [ ] Create backlog
 - [ ] Establish reviews
 
 ### Week 5-8: Stabilization
+
 - [ ] Address initial issues
 - [ ] Refine processes
 - [ ] Gather feedback
 - [ ] Optimize performance
 
 ### Week 9-12: Optimization
+
 - [ ] Analyze metrics
 - [ ] Improve automation
 - [ ] Enhance templates
@@ -290,7 +302,8 @@ Configure GitHub notifications for:
 #### 1. Validation Script Errors
 
 **Problem**: Scripts fail with module not found
-**Solution**: 
+**Solution**:
+
 ```bash
 npm install glob chalk --save-dev
 ```
@@ -308,7 +321,8 @@ npm install glob chalk --save-dev
 #### 4. Performance Issues
 
 **Problem**: Scripts take too long
-**Solution**: 
+**Solution**:
+
 - Implement caching
 - Run checks in parallel
 - Optimize regex patterns
@@ -323,16 +337,19 @@ npm install glob chalk --save-dev
 Track these metrics weekly:
 
 ### Coverage Metrics
+
 - [ ] Component documentation: Target 95%
 - [ ] API documentation: Target 100%
 - [ ] Type documentation: Target 90%
 
 ### Quality Metrics
+
 - [ ] Valid code examples: Target 100%
 - [ ] Average doc age: Target <30 days
 - [ ] Broken links: Target 0
 
 ### Process Metrics
+
 - [ ] PRs with doc updates: Target 80%
 - [ ] Doc review time: Target <24 hours
 - [ ] Team satisfaction: Target 4/5
@@ -340,19 +357,22 @@ Track these metrics weekly:
 ## Resources
 
 ### Documentation
+
 - [Main Strategy Document](./documentation-alignment-strategy.md)
 - [Templates](../templates/)
-- [Style Guide](../STYLE_GUIDE.md)
+- [Code Style Guidelines](../../CLAUDE.md#development-guidelines)
 
 ### Tools
+
 - [TypeDoc](https://typedoc.org/)
 - [Markdownlint](https://github.com/DavidAnson/markdownlint)
 - [Husky](https://typicode.github.io/husky/)
 
 ### Support
+
 - Documentation channel: #docs
 - Documentation owner: @tech-lead
-- Questions: docs@team.com
+- Questions: <docs@team.com>
 
 ## Next Steps
 

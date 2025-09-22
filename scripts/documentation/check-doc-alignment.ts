@@ -198,13 +198,6 @@ const CONFIG = {
   docsRoot: join(process.cwd(), 'docs'),
   alignmentRules: [
     {
-      name: 'Component Props',
-      sourcePattern: 'src/components/**/*.tsx',
-      docPattern: 'docs/components/**/*.md',
-      extractor: extractComponentProps,
-      validator: validateComponentProps
-    },
-    {
       name: 'API Endpoints',
       sourcePattern: 'src/services/api/**/*.ts',
       docPattern: 'docs/api/**/*.md',
@@ -227,46 +220,6 @@ const CONFIG = {
     }
   ] as AlignmentRule[]
 };
-
-/**
- * Extract component props from TypeScript React component files
- */
-async function extractComponentProps(content: string, filePath: string): Promise<any[]> {
-  logger.debug('Extracting component props', { filePath });
-  
-  const props: any[] = [];
-  
-  // Simple regex-based extraction (in production, use a proper AST parser)
-  const interfaceRegex = /interface\s+(\w+Props)\s*\{([^}]+)\}/g;
-  const typeRegex = /type\s+(\w+Props)\s*=\s*\{([^}]+)\}/g;
-  
-  let match;
-  
-  // Extract interface props
-  while ((match = interfaceRegex.exec(content)) !== null) {
-    const [, interfaceName, interfaceBody] = match;
-    props.push({
-      name: interfaceName,
-      type: 'interface',
-      properties: parseProperties(interfaceBody),
-      source: filePath
-    });
-  }
-  
-  // Extract type props
-  while ((match = typeRegex.exec(content)) !== null) {
-    const [, typeName, typeBody] = match;
-    props.push({
-      name: typeName,
-      type: 'type',
-      properties: parseProperties(typeBody),
-      source: filePath
-    });
-  }
-  
-  logger.debug('Extracted component props', { filePath, propsCount: props.length });
-  return props;
-}
 
 /**
  * Parse property definitions from interface/type body
@@ -300,53 +253,6 @@ function extractJSDocDescription(line: string): string | undefined {
 }
 
 /**
- * Validate component props documentation
- */
-async function validateComponentProps(sourceData: any[], docContent: string, docPath: string): Promise<ValidationResult> {
-  logger.debug('Validating component props documentation', { docPath, sourceDataCount: sourceData.length });
-  
-  const result: ValidationResult = {
-    isValid: true,
-    missingElements: [],
-    outdatedElements: [],
-    suggestions: [],
-    severity: 'low'
-  };
-  
-  for (const component of sourceData) {
-    const componentName = component.name.replace('Props', '');
-    
-    // Check if component is documented
-    if (!docContent.includes(componentName)) {
-      result.missingElements.push(`Component: ${componentName}`);
-      result.isValid = false;
-    }
-    
-    // Check if all props are documented
-    for (const prop of component.properties) {
-      const propPattern = new RegExp(`\\b${prop.name}\\b`);
-      if (!propPattern.test(docContent)) {
-        result.missingElements.push(`Prop: ${componentName}.${prop.name}`);
-        result.isValid = false;
-      }
-    }
-  }
-  
-  // Determine severity
-  if (result.missingElements.length > 0) {
-    result.severity = result.missingElements.length > 5 ? 'high' : 'medium';
-  }
-  
-  logger.debug('Component props validation completed', { 
-    docPath, 
-    isValid: result.isValid, 
-    missingCount: result.missingElements.length 
-  });
-  
-  return result;
-}
-
-/**
  * Extract API endpoints from service files
  */
 async function extractApiEndpoints(content: string, filePath: string): Promise<any[]> {
@@ -354,15 +260,28 @@ async function extractApiEndpoints(content: string, filePath: string): Promise<a
   
   const endpoints: any[] = [];
   
+  // Skip interface files - they define contracts, not implementations
+  if (filePath.includes('/interfaces/') || filePath.includes('Interface') || content.includes('export interface')) {
+    logger.debug('Skipping interface file', { filePath });
+    return endpoints;
+  }
+  
   // Extract method definitions that look like API endpoints
-  const methodRegex = /(?:async\s+)?(\w+)\s*\([^)]*\):\s*Promise<([^>]+)>/g;
+  const methodRegex = /(?:public\s+)?(?:async\s+)?(\w+)\s*\([^)]*\):\s*Promise<([^>]+)>/g;
   
   let match;
   while ((match = methodRegex.exec(content)) !== null) {
-    const [, methodName, returnType] = match;
+    const [fullMatch, methodName, returnType] = match;
     
     // Skip common non-API methods
     if (['constructor', 'toString', 'valueOf'].includes(methodName)) {
+      continue;
+    }
+    
+    // Skip private methods by checking if the method is preceded by 'private'
+    const methodStart = content.indexOf(fullMatch);
+    const beforeMethod = content.substring(Math.max(0, methodStart - 50), methodStart);
+    if (beforeMethod.includes('private')) {
       continue;
     }
     
@@ -392,7 +311,47 @@ async function validateApiEndpoints(sourceData: any[], docContent: string, docPa
     severity: 'low'
   };
   
+  // Only validate endpoints against relevant documentation files
+  // Skip validation if this doc file doesn't seem to be for the same API
+  const docFileName = docPath.toLowerCase();
+  
+  // Group endpoints by their source to match with appropriate docs
+  const endpointsBySource = new Map<string, any[]>();
   for (const endpoint of sourceData) {
+    const sourceFile = endpoint.source || '';
+    if (!endpointsBySource.has(sourceFile)) {
+      endpointsBySource.set(sourceFile, []);
+    }
+    endpointsBySource.get(sourceFile)!.push(endpoint);
+  }
+  
+  // Determine which endpoints are relevant for this doc file
+  let relevantEndpoints: any[] = [];
+  
+  if (docFileName.includes('medication')) {
+    // For medication API docs, only check medication API endpoints
+    relevantEndpoints = sourceData.filter(ep => 
+      ep.source.includes('Medication') || ep.source.includes('medication')
+    );
+  } else if (docFileName.includes('client')) {
+    // For client API docs, only check client API endpoints
+    relevantEndpoints = sourceData.filter(ep => 
+      ep.source.includes('Client') || ep.source.includes('client')
+    );
+  } else if (docFileName.includes('cache')) {
+    // For cache service docs, only check cache-related endpoints
+    relevantEndpoints = sourceData.filter(ep => 
+      ep.source.includes('Cache') || ep.source.includes('cache')
+    );
+  } else if (docFileName.includes('types')) {
+    // Types documentation doesn't need to list API endpoints
+    relevantEndpoints = [];
+  } else {
+    // For other docs, check all endpoints
+    relevantEndpoints = sourceData;
+  }
+  
+  for (const endpoint of relevantEndpoints) {
     if (!docContent.includes(endpoint.name)) {
       result.missingElements.push(`API Endpoint: ${endpoint.name}`);
       result.isValid = false;

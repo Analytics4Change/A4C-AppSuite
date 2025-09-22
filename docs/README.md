@@ -77,7 +77,7 @@ The application follows modern React patterns with TypeScript, emphasizing maint
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/lars-tice/A4C-FrontEnd.git
+   git clone https://github.com/Analytics4Change/A4C-FrontEnd.git
    cd A4C-FrontEnd
    ```
 

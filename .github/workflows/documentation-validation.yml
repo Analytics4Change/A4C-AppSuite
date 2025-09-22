@@ -44,31 +44,51 @@ jobs:
         run: |
           npm ci
 
+      - name: Build TypeScript scripts
+        run: |
+          npm run scripts:build
+
       - name: Run documentation structure validation
         id: validate-structure
         run: |
-          node scripts/documentation/validate-docs.cjs || echo "validation_failed=true" >> $GITHUB_OUTPUT
+          if node dist/scripts/documentation/validate-docs.js; then
+            echo "validation_failed=false" >> $GITHUB_OUTPUT
+          else
+            echo "validation_failed=true" >> $GITHUB_OUTPUT
+          fi
         continue-on-error: true
 
       - name: Check code-documentation alignment
         id: check-alignment
+        env:
+          NODE_ENV: ci
         run: |
-          node scripts/documentation/check-doc-alignment.cjs || echo "alignment_failed=true" >> $GITHUB_OUTPUT
+          if node dist/scripts/documentation/check-doc-alignment.js; then
+            echo "alignment_failed=false" >> $GITHUB_OUTPUT
+          else
+            echo "alignment_failed=true" >> $GITHUB_OUTPUT
+          fi
         continue-on-error: true
 
       - name: Lint markdown files
         id: lint-markdown
         run: |
-          npm run docs:lint || echo "lint_failed=true" >> $GITHUB_OUTPUT
+          if npm run docs:lint; then
+            echo "lint_failed=false" >> $GITHUB_OUTPUT
+          else
+            echo "lint_failed=true" >> $GITHUB_OUTPUT
+          fi
         continue-on-error: true
 
       - name: Check for broken links
+        id: link-check
         uses: gaurav-nelson/github-action-markdown-link-check@d53a906aa6b22b8979d33bc86170567e619495ec # v1.0.15
         with:
           use-quiet-mode: 'yes'
           use-verbose-mode: 'no'
           folder-path: 'docs'
           file-path: './README.md, ./CLAUDE.md'
+          config-file: 'mlc_config.json'
         continue-on-error: true
 
       - name: Generate documentation coverage report
@@ -77,7 +97,13 @@ jobs:
           # Count documented vs undocumented components
           total_components=$(find src/components -name "*.tsx" -not -path "*/test/*" | wc -l)
           documented_components=$(find docs/components -name "*.md" | wc -l)
-          coverage=$((documented_components * 100 / total_components))
+          
+          # Ensure we don't divide by zero
+          if [ "$total_components" -gt 0 ]; then
+            coverage=$((documented_components * 100 / total_components))
+          else
+            coverage=100
+          fi
           
           echo "component_coverage=$coverage" >> $GITHUB_OUTPUT
           echo "total_components=$total_components" >> $GITHUB_OUTPUT
@@ -122,7 +148,7 @@ jobs:
           if [ "${{ steps.check-alignment.outputs.alignment_failed }}" == "true" ] && [ -f "doc-alignment-report.json" ]; then
             echo "Extracting detailed alignment information..."
             # Use a dedicated Node.js script instead of inline execution
-            node scripts/documentation/extract-alignment-summary.cjs || echo "Could not extract alignment details"
+            node dist/scripts/documentation/extract-alignment-summary.js || echo "Could not extract alignment details"
           fi
           
           # Add artifact links section
@@ -235,39 +261,55 @@ jobs:
       - name: Check for critical issues
         id: critical-check
         run: |
-          # Define critical vs warning conditions
-          CRITICAL_ISSUES=""
-          WARNING_ISSUES=""
+          # Initialize arrays instead of strings for proper handling
+          CRITICAL_ARRAY=()
+          WARNING_ARRAY=()
           
           # Structure validation failures are always critical
-          if [ "${{ steps.validate-structure.outputs.validation_failed }}" == "true" ]; then
-            CRITICAL_ISSUES="structure"
+          if [ "${{ steps.validate-structure.outputs.validation_failed }}" = "true" ]; then
+            CRITICAL_ARRAY+=("structure")
           fi
           
           # Alignment failures are critical only if high-priority issues exist
-          if [ "${{ steps.check-alignment.outputs.alignment_failed }}" == "true" ] && [ -f "doc-alignment-report.json" ]; then
+          if [ "${{ steps.check-alignment.outputs.alignment_failed }}" = "true" ] && [ -f "doc-alignment-report.json" ]; then
             # Check if there are high-priority alignment issues
-            HIGH_PRIORITY=$(node scripts/documentation/count-high-priority-issues.cjs 2>/dev/null || echo "0")
+            HIGH_PRIORITY=$(node dist/scripts/documentation/count-high-priority-issues.js 2>/dev/null || echo "0")
             
             if [ "$HIGH_PRIORITY" -gt "0" ]; then
-              CRITICAL_ISSUES="$CRITICAL_ISSUES alignment-high-priority"
+              CRITICAL_ARRAY+=("alignment-high-priority")
             else
-              WARNING_ISSUES="$WARNING_ISSUES alignment-medium-low"
+              WARNING_ARRAY+=("alignment-medium-low")
             fi
           fi
           
-          # Coverage below 50% is critical, 50-90% is warning
-          COVERAGE=${{ steps.coverage.outputs.component_coverage }}
-          if [ "$COVERAGE" -lt "50" ]; then
-            CRITICAL_ISSUES="$CRITICAL_ISSUES coverage-critical"
-          elif [ "$COVERAGE" -lt "90" ]; then
-            WARNING_ISSUES="$WARNING_ISSUES coverage-warning"
+          # Coverage check with proper defaults
+          COVERAGE="${{ steps.coverage.outputs.component_coverage }}"
+          COVERAGE=${COVERAGE:-0}  # Default to 0 if not set
+          if [ "$COVERAGE" -lt 50 ]; then
+            CRITICAL_ARRAY+=("coverage-critical")
+          elif [ "$COVERAGE" -lt 90 ]; then
+            WARNING_ARRAY+=("coverage-warning")
           fi
           
+          # External link check - distinguish from internal link validation
+          if [ "${{ steps.link-check.outcome }}" = "failure" ]; then
+            CRITICAL_ARRAY+=("external-links")
+          fi
+          
+          # Convert arrays to strings
+          CRITICAL_ISSUES=$(IFS=' '; echo "${CRITICAL_ARRAY[*]}")
+          WARNING_ISSUES=$(IFS=' '; echo "${WARNING_ARRAY[*]}")
+          
+          # Set outputs with proper boolean handling
           echo "critical_issues=$CRITICAL_ISSUES" >> $GITHUB_OUTPUT
           echo "warning_issues=$WARNING_ISSUES" >> $GITHUB_OUTPUT
-          echo "has_critical=$([ -n \"$CRITICAL_ISSUES\" ] && echo true || echo false)" >> $GITHUB_OUTPUT
-          echo "has_warnings=$([ -n \"$WARNING_ISSUES\" ] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "has_critical=$([ ${#CRITICAL_ARRAY[@]} -gt 0 ] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "has_warnings=$([ ${#WARNING_ARRAY[@]} -gt 0 ] && echo true || echo false)" >> $GITHUB_OUTPUT
+          
+          # Debug output for troubleshooting
+          echo "DEBUG: CRITICAL_ARRAY=(${CRITICAL_ARRAY[*]})"
+          echo "DEBUG: WARNING_ARRAY=(${WARNING_ARRAY[*]})"
+          echo "DEBUG: COVERAGE=$COVERAGE"
 
       - name: Fail if critical issues found
         if: |
@@ -279,6 +321,7 @@ jobs:
           echo "- Structure validation failures block the PR"
           echo "- High-priority alignment issues block the PR"
           echo "- Component coverage below 50% blocks the PR"
+          echo "- Broken links block the PR"
           echo ""
           echo "Review the detailed issues in the PR comment above."
           exit 1

@@ -19,7 +19,7 @@ For immediate deployment:
 git push origin main
 
 # Monitor deployment
-# Visit: https://github.com/lars-tice/A4C-FrontEnd/actions
+# Visit: https://github.com/Analytics4Change/A4C-FrontEnd/actions
 
 # Verify deployment
 curl -f https://a4c.firstovertheline.com/

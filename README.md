@@ -27,14 +27,14 @@ A4C-FrontEnd is a sophisticated healthcare application designed for managing cli
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm package manager
 
 ### Local Development
 
 ```bash
 # Clone and install
-git clone https://github.com/lars-tice/A4C-FrontEnd.git
+git clone https://github.com/Analytics4Change/A4C-FrontEnd.git
 cd A4C-FrontEnd
 npm install
 
@@ -159,18 +159,21 @@ setTimeout(() => setShow(false), 200); // DON'T DO THIS
 ## Key Features
 
 ### Medication Management
+
 - Real-time medication search with debouncing
 - Complex dosage configuration (forms, amounts, frequencies)
 - Therapeutic category selection with multi-select support
 - Date management with calendar integration
 
 ### User Experience
+
 - Responsive mobile-first design
 - Full keyboard navigation support
 - Loading states and error handling
 - Multi-step form management
 
 ### Developer Experience
+
 - Hot module replacement in development
 - Comprehensive TypeScript coverage
 - Automated accessibility testing
@@ -189,6 +192,7 @@ Press `Ctrl+Shift+D` to access the debug control panel:
 ### Common Issues
 
 **MobX Reactivity Not Working:**
+
 1. Ensure components are wrapped with `observer`
 2. Check for array spreading breaking observable chain
 3. Use immutable updates in ViewModels
@@ -227,6 +231,6 @@ The live application includes:
 
 ---
 
-**Repository**: [GitHub](https://github.com/lars-tice/A4C-FrontEnd)  
+**Repository**: [GitHub](https://github.com/Analytics4Change/A4C-FrontEnd)  
 **Live Application**: [https://a4c.firstovertheline.com](https://a4c.firstovertheline.com)  
 **License**: ISC

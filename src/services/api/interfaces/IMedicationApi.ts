@@ -7,4 +7,7 @@ export interface IMedicationApi {
   getMedicationHistory(clientId: string): Promise<MedicationHistory[]>;
   updateMedication(id: string, dosageInfo: Partial<DosageInfo>): Promise<void>;
   deleteMedication(id: string): Promise<void>;
+  clearCache(): Promise<void>;
+  getHealthStatus(): Promise<any>;
+  cancelAllRequests(): void;
 }

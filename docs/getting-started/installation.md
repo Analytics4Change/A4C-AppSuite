@@ -27,6 +27,7 @@ npm install
 ```
 
 This will install all required dependencies including:
+
 - React 19.1.1 and React DOM
 - TypeScript 5.9.2
 - MobX 6.13.7 for state management
@@ -40,7 +41,7 @@ This will install all required dependencies including:
 npm run dev
 ```
 
-The application will be available at: http://localhost:5173
+The application will be available at: <http://localhost:5173>
 
 ### 4. Verify Installation
 
@@ -83,6 +84,7 @@ To verify everything is working correctly:
 ### Development Environment
 
 No additional configuration needed. The application will run with:
+
 - Hot module replacement enabled
 - Development logging active
 - Mock services for API calls
@@ -95,6 +97,7 @@ npm run preview
 ```
 
 The production build includes:
+
 - Optimized bundle size
 - Tree-shaking for unused code
 - Minification and compression
@@ -104,22 +107,26 @@ The production build includes:
 ### Common Issues
 
 **Port already in use:**
+
 ```bash
 npm run dev -- --port 3000
 ```
 
 **Type errors:**
+
 ```bash
 npm run typecheck
 ```
 
 **Dependency issues:**
+
 ```bash
 rm -rf node_modules package-lock.json
 npm install
 ```
 
 **Testing issues:**
+
 ```bash
 npx playwright install
 ```
