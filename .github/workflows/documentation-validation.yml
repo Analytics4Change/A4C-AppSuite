@@ -268,10 +268,26 @@ jobs:
             WARNING_ISSUES="$WARNING_ISSUES coverage-warning"
           fi
           
+          # Debug output for troubleshooting
+          echo "DEBUG: CRITICAL_ISSUES='$CRITICAL_ISSUES'"
+          echo "DEBUG: WARNING_ISSUES='$WARNING_ISSUES'"
+          echo "DEBUG: COVERAGE=$COVERAGE"
+          
           echo "critical_issues=$CRITICAL_ISSUES" >> $GITHUB_OUTPUT
           echo "warning_issues=$WARNING_ISSUES" >> $GITHUB_OUTPUT
-          echo "has_critical=$([ -n \"$CRITICAL_ISSUES\" ] && echo true || echo false)" >> $GITHUB_OUTPUT
-          echo "has_warnings=$([ -n \"$WARNING_ISSUES\" ] && echo true || echo false)" >> $GITHUB_OUTPUT
+          
+          # Use conditional blocks instead of escaped quotes in command substitution
+          if [ -n "$CRITICAL_ISSUES" ]; then
+            echo "has_critical=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_critical=false" >> $GITHUB_OUTPUT
+          fi
+          
+          if [ -n "$WARNING_ISSUES" ]; then
+            echo "has_warnings=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_warnings=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Fail if critical issues found
         if: |
