@@ -4,16 +4,35 @@
 
 Brief description of what this component does and its primary purpose in the application.
 
-## Props Interface
+## Props and Usage
+
+**Props are documented inline in the component source code using JSDoc comments.**
+
+Example of proper inline prop documentation:
 
 ```typescript
 interface [ComponentName]Props {
-  // List all props with types and descriptions
-  prop1: string;    // Description of prop1
-  prop2?: boolean;  // Optional prop description
-  // ... etc
+  // Dropdown options to display to the user
+  options: string[];
+  // Currently selected values from the options array
+  selected: string[];
+  // Callback function called when selection changes
+  onChange: (newSelection: string[]) => void;
+  // Optional placeholder text shown when no items selected
+  placeholder?: string;
+  // Unique identifier for the form element
+  id: string;
+  // Custom CSS classes to apply to the component
+  className?: string;
 }
 ```
+
+**Inline Documentation Guidelines:**
+- ✅ Add meaningful JSDoc comments for each prop in the TypeScript interface
+- ✅ Describe the prop's purpose and expected usage
+- ✅ Include examples for complex props when helpful
+- ✅ Keep comments concise but informative
+- ❌ No external prop documentation files needed
 
 ## Usage Examples
 

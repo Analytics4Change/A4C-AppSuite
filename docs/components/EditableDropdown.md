@@ -8,22 +8,22 @@ The EditableDropdown component provides a sophisticated dropdown with edit-mode 
 
 ```typescript
 interface EditableDropdownProps {
-  id: string;
-  label: string;
-  value: string;
-  options: string[];
-  placeholder?: string;
-  disabled?: boolean;
-  disabledMessage?: string;
-  error?: string;
-  tabIndex: number;
-  targetTabIndex?: number;
-  onChange: (value: string) => void;
-  onDropdownOpen?: (elementId: string) => void;
-  filterMode?: 'contains' | 'startsWith';
-  testIdPrefix?: string;
-  className?: string;
-  showLabel?: boolean;
+  id: string;                                      // Unique identifier for the dropdown
+  label: string;                                   // Accessible label text
+  value: string;                                   // Current selected value
+  options: string[];                               // Array of available options
+  placeholder?: string;                            // Placeholder text when no value selected
+  disabled?: boolean;                              // Whether the dropdown is disabled
+  disabledMessage?: string;                        // Message to show when disabled
+  error?: string;                                  // Error message to display
+  tabIndex: number;                                // Tab order position
+  targetTabIndex?: number;                         // Tab index to advance to after selection
+  onChange: (value: string) => void;               // Callback when value changes
+  onDropdownOpen?: (elementId: string) => void;    // Callback when dropdown opens
+  filterMode?: 'contains' | 'startsWith';          // How to filter options during search
+  testIdPrefix?: string;                           // Prefix for test IDs
+  className?: string;                              // Additional CSS classes
+  showLabel?: boolean;                             // Whether to show the label
 }
 ```
 

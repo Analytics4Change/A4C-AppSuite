@@ -8,25 +8,25 @@ The EnhancedAutocompleteDropdown component provides advanced autocomplete functi
 
 ```typescript
 interface EnhancedAutocompleteDropdownProps {
-  options: string[];
-  value: string;
-  onChange: (value: string) => void;
-  onSelect?: (value: string) => void;
-  placeholder?: string;
-  className?: string;
-  disabled?: boolean;
-  error?: boolean;
-  id?: string;
-  tabIndex?: number;
-  'aria-label'?: string;
-  'aria-describedby'?: string;
-  'aria-invalid'?: boolean;
-  'aria-required'?: boolean;
-  autoFocus?: boolean;
-  onBlur?: () => void;
-  onFocus?: () => void;
-  allowCustomValue?: boolean;
-  filterStrategy?: 'contains' | 'startsWith';
+  options: string[];                               // Array of available options to select from
+  value: string;                                   // Current input value
+  onChange: (value: string) => void;               // Callback when input value changes
+  onSelect?: (value: string) => void;              // Callback when option is selected
+  placeholder?: string;                            // Placeholder text for input
+  className?: string;                              // Additional CSS classes for styling
+  disabled?: boolean;                              // Whether the dropdown is disabled
+  error?: boolean;                                 // Whether to show error styling
+  id?: string;                                     // Unique identifier for the input
+  tabIndex?: number;                               // Tab order position
+  'aria-label'?: string;                           // Accessible label for screen readers
+  'aria-describedby'?: string;                     // ID of element describing this input
+  'aria-invalid'?: boolean;                        // Whether input has validation errors
+  'aria-required'?: boolean;                       // Whether input is required
+  autoFocus?: boolean;                             // Whether to auto-focus on mount
+  onBlur?: () => void;                             // Callback when input loses focus
+  onFocus?: () => void;                            // Callback when input gains focus
+  allowCustomValue?: boolean;                      // Whether to allow custom values not in options
+  filterStrategy?: 'contains' | 'startsWith';      // How to filter options based on input
 }
 ```
 

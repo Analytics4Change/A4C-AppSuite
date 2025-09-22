@@ -731,3 +731,80 @@ Need text input?
 - Include all required ARIA attributes for accessibility
 - Follow the unified highlighting pattern for consistency
 - Use centralized timing configuration for delays
+
+## Definition of Done
+
+### Code Quality Requirements
+
+All code must meet the following standards before being considered complete:
+
+#### Documentation Compliance
+- **ALL components, ViewModels, and types must be fully documented** in compliance with our documentation strategy
+- **Component documentation** must include:
+  - Complete Props Interface with exact TypeScript interface matching
+  - All props documented with types and descriptions
+  - Usage examples (basic and advanced)
+  - Accessibility compliance details (WCAG 2.1 Level AA)
+  - ARIA attributes and keyboard navigation patterns
+- **ViewModel documentation** must include:
+  - All observable properties with types
+  - Action methods with parameters and return types
+  - Computed properties and their dependencies
+  - Usage patterns and integration examples
+- **Type documentation** must include:
+  - Interface properties with descriptions
+  - Union types with all possible values
+  - Generic constraints and usage examples
+
+#### Documentation Standards
+- **Templates**: Use standardized templates located at `/docs/templates/`
+  - `/docs/templates/component-template.md` for React components
+  - Additional templates for ViewModels and types as needed
+- **Exact Interface Matching**: Documentation must exactly match TypeScript interfaces
+  - Every prop, property, and method must be documented
+  - Types must match exactly (no missing optional markers, etc.)
+  - Descriptions must be clear and accurate
+- **Validation**: All documentation must pass automated validation
+  - Run `npm run docs:check` locally before submitting PRs
+  - Zero high-priority alignment issues required for merge
+  - Component coverage must be 100%
+
+#### Code Standards
+- **TypeScript**: Strict mode compliance, no `any` types
+- **Testing**: Unit tests for components, E2E tests for user flows
+- **Accessibility**: WCAG 2.1 Level AA compliance with full keyboard navigation
+- **Performance**: Optimized rendering, proper memoization for complex components
+- **Linting**: ESLint and TypeScript checks must pass
+
+#### Git Standards
+- **Commits**: Clear, descriptive commit messages
+- **PRs**: Include documentation validation results
+- **Branches**: Feature branches from main, clean history preferred
+
+### Validation Process
+
+Before marking any task as complete:
+
+1. **Run Documentation Validation**:
+   ```bash
+   npm run docs:check
+   ```
+
+2. **Verify Zero Critical Issues**:
+   - No missing component documentation
+   - No prop/interface mismatches
+   - 100% component coverage
+
+3. **Run Code Quality Checks**:
+   ```bash
+   npm run typecheck
+   npm run lint
+   npm run build
+   ```
+
+4. **Test Accessibility**:
+   - Manual keyboard navigation testing
+   - Screen reader compatibility verification
+   - ARIA attribute validation
+
+**Remember**: Documentation is not optional—it's a core requirement for maintainable, professional code. The validation system ensures our documentation stays current and accurate as the codebase evolves.

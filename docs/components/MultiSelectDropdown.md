@@ -8,17 +8,17 @@ The MultiSelectDropdown component provides a unified multi-selection interface w
 
 ```typescript
 interface MultiSelectDropdownProps {
-  options: string[];
-  selected: string[];
-  onChange: (selected: string[]) => void;
-  placeholder?: string;
-  label?: string;
-  id: string;
-  tabIndex?: number;
-  buttonTabIndex?: number;
-  maxHeight?: string;
-  closeOnSelect?: boolean;
-  onClose?: () => void;
+  options: string[];                           // Array of option values to display in dropdown
+  selected: string[];                          // Array of currently selected option values
+  onChange: (selected: string[]) => void;      // Callback when selection changes
+  placeholder?: string;                        // Text to show when no items selected
+  label?: string;                              // Accessible label for the dropdown
+  id: string;                                  // Unique identifier for the dropdown
+  tabIndex?: number;                           // Tab order for dropdown trigger
+  buttonTabIndex?: number;                     // Tab order for internal buttons
+  maxHeight?: string;                          // Maximum height of dropdown list
+  closeOnSelect?: boolean;                     // Whether to close dropdown after selection
+  onClose?: () => void;                        // Callback when dropdown closes
 }
 ```
 

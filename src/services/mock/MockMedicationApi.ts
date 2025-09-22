@@ -85,6 +85,29 @@ export class MockMedicationApi implements IMedicationApi {
     console.log('Mock: Deleted medication', id);
   }
 
+  async clearCache(): Promise<void> {
+    await this.simulateDelay(100);
+    // Mock implementation - could clear internal state if needed
+    console.log('Mock: Cache cleared');
+  }
+
+  async getHealthStatus(): Promise<any> {
+    await this.simulateDelay(50);
+    return {
+      status: 'healthy',
+      uptime: Date.now(),
+      cacheSize: this.medicationHistory.length,
+      requestCount: 100,
+      averageResponseTime: 250,
+      errorRate: 0.0
+    };
+  }
+
+  cancelAllRequests(): void {
+    // Mock implementation - no actual requests to cancel
+    console.log('Mock: All requests cancelled');
+  }
+
   private simulateDelay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }

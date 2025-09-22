@@ -1,95 +1,139 @@
 {
-  "errors": [
-    {
-      "message": "Required documentation file missing: docs/architecture/overview.md",
-      "file": null,
-      "severity": "error"
-    },
-    {
-      "message": "Required documentation file missing: docs/getting-started/installation.md",
-      "file": null,
-      "severity": "error"
-    }
-  ],
+  "errors": [],
   "warnings": [
     {
-      "message": "Missing documentation for component: searchable-dropdown",
-      "file": "ui/searchable-dropdown.tsx",
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/searchable-dropdown.md",
       "severity": "warning"
     },
     {
-      "message": "Missing documentation for component: label",
-      "file": "ui/label.tsx",
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/mobx-debugger.md",
       "severity": "warning"
     },
     {
-      "message": "Missing documentation for component: input",
-      "file": "ui/input.tsx",
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/medication-search-modal.md",
       "severity": "warning"
     },
     {
-      "message": "Missing documentation for component: dropdown-portal",
-      "file": "ui/dropdown-portal.tsx",
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/medication-purpose-dropdown.md",
       "severity": "warning"
     },
     {
-      "message": "Missing documentation for component: checkbox",
-      "file": "ui/checkbox.tsx",
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/label.md",
       "severity": "warning"
     },
     {
-      "message": "Missing documentation for component: card",
-      "file": "ui/card.tsx",
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/input.md",
       "severity": "warning"
     },
     {
-      "message": "Missing documentation for component: button",
-      "file": "ui/button.tsx",
+      "message": "Missing section: Props",
+      "file": "components/example-usage.md",
       "severity": "warning"
     },
     {
-      "message": "Missing documentation for component: MultiSelectDropdown",
-      "file": "ui/MultiSelectDropdown.tsx",
+      "message": "Missing section: Usage",
+      "file": "components/example-usage.md",
       "severity": "warning"
     },
     {
-      "message": "Missing documentation for component: EnhancedAutocompleteDropdown",
-      "file": "ui/EnhancedAutocompleteDropdown.tsx",
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/example-usage.md",
       "severity": "warning"
     },
     {
-      "message": "Missing documentation for component: EditableDropdown",
-      "file": "ui/EditableDropdown.tsx",
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
       "severity": "warning"
     },
     {
-      "message": "Missing documentation for component: example-usage",
-      "file": "ui/FocusTrappedCheckboxGroup/example-usage.tsx",
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/dropdown-portal.md",
       "severity": "warning"
     },
     {
-      "message": "Missing documentation for component: RangeHoursInput",
-      "file": "ui/FocusTrappedCheckboxGroup/RangeHoursInput.tsx",
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/checkbox.md",
       "severity": "warning"
     },
     {
-      "message": "Missing documentation for component: FocusTrappedCheckboxGroup",
-      "file": "ui/FocusTrappedCheckboxGroup/FocusTrappedCheckboxGroup.tsx",
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/card.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/button.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/RangeHoursInput.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/ProtectedRoute.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/OAuthProviders.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/MultiSelectDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/MedicationStatusIndicator.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/MainLayout.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/LogOverlay.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/FocusTrappedCheckboxGroup.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/EnhancedAutocompleteDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/EditableDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/DynamicAdditionalInput.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Missing section: Keyboard Navigation",
+      "file": "components/DebugControlPanel.md",
       "severity": "warning"
     },
     {
       "message": "Missing documentation for component: EnhancedFocusTrappedCheckboxGroup",
       "file": "ui/FocusTrappedCheckboxGroup/EnhancedFocusTrappedCheckboxGroup.tsx",
-      "severity": "warning"
-    },
-    {
-      "message": "Missing documentation for component: DynamicAdditionalInput",
-      "file": "ui/FocusTrappedCheckboxGroup/DynamicAdditionalInput.tsx",
-      "severity": "warning"
-    },
-    {
-      "message": "Missing documentation for component: MedicationStatusIndicator",
-      "file": "medication/MedicationStatusIndicator.tsx",
       "severity": "warning"
     },
     {
@@ -103,33 +147,8 @@
       "severity": "warning"
     },
     {
-      "message": "Missing documentation for component: MainLayout",
-      "file": "layouts/MainLayout.tsx",
-      "severity": "warning"
-    },
-    {
       "message": "Missing documentation for component: MobXDebugger",
       "file": "debug/MobXDebugger.tsx",
-      "severity": "warning"
-    },
-    {
-      "message": "Missing documentation for component: LogOverlay",
-      "file": "debug/LogOverlay.tsx",
-      "severity": "warning"
-    },
-    {
-      "message": "Missing documentation for component: DebugControlPanel",
-      "file": "debug/DebugControlPanel.tsx",
-      "severity": "warning"
-    },
-    {
-      "message": "Missing documentation for component: ProtectedRoute",
-      "file": "auth/ProtectedRoute.tsx",
-      "severity": "warning"
-    },
-    {
-      "message": "Missing documentation for component: OAuthProviders",
-      "file": "auth/OAuthProviders.tsx",
       "severity": "warning"
     },
     {
@@ -213,13 +232,33 @@
       "severity": "warning"
     },
     {
-      "message": "Potentially broken relative link: ../templates/",
+      "message": "Potentially broken relative link: ../STYLE_GUIDE.md",
       "file": "strategy/implementation-guide.md",
       "severity": "warning"
     },
     {
-      "message": "Potentially broken relative link: ../STYLE_GUIDE.md",
-      "file": "strategy/implementation-guide.md",
+      "message": "Potentially broken relative link: ../strategy/mobx-patterns.md",
+      "file": "architecture/viewmodels.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: ./components.md",
+      "file": "architecture/viewmodels.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: ../testing/viewmodel-testing.md",
+      "file": "architecture/viewmodels.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: ../performance/mobx-optimization.md",
+      "file": "architecture/viewmodels.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Potentially broken relative link: ./README.md",
+      "file": "api/types.md",
       "severity": "warning"
     },
     {
@@ -436,6 +475,761 @@
       "message": "React code example might be missing imports",
       "file": "API.md",
       "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "templates/api-template.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "getting-started/validation-guide.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "getting-started/validation-guide.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/searchable-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/searchable-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/searchable-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/searchable-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/searchable-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/searchable-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/searchable-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/searchable-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/searchable-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/mobx-debugger.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/mobx-debugger.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/mobx-debugger.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/mobx-debugger.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/mobx-debugger.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/medication-search-modal.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/medication-search-modal.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/medication-search-modal.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/medication-search-modal.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/medication-search-modal.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/medication-search-modal.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/medication-purpose-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/medication-purpose-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/medication-purpose-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/medication-purpose-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/medication-purpose-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/medication-purpose-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/medication-purpose-dropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/label.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/label.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/label.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/label.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/label.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/label.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/label.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/label.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/input.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/input.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/input.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/input.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/input.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/example-usage.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/example-usage.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/example-usage.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/dropdown-portal.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/checkbox.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/checkbox.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/checkbox.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/checkbox.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/checkbox.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/checkbox.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/checkbox.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/checkbox.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/checkbox.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/checkbox.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/checkbox.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/card.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/card.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/card.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/card.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/card.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/card.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/card.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/card.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/button.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/button.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/button.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/button.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/button.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/RangeHoursInput.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/ProtectedRoute.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/ProtectedRoute.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/MultiSelectDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/MultiSelectDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/MultiSelectDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/MultiSelectDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/MultiSelectDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/MultiSelectDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/MultiSelectDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/MultiSelectDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/MedicationStatusIndicator.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/MainLayout.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/FocusTrappedCheckboxGroup.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EnhancedAutocompleteDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EnhancedAutocompleteDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EnhancedAutocompleteDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EnhancedAutocompleteDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EnhancedAutocompleteDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EnhancedAutocompleteDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EnhancedAutocompleteDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EnhancedAutocompleteDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EditableDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EditableDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EditableDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EditableDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EditableDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EditableDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EditableDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EditableDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EditableDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/EditableDropdown.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "components/DynamicAdditionalInput.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "architecture/viewmodels.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "architecture/viewmodels.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "architecture/viewmodels.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/types.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/types.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/types.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/types.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/medication-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/medication-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/medication-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/medication-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/medication-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/client-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/client-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/client-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/client-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/client-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/client-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/client-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/client-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/client-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/client-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/client-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/client-api.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "React code example might be missing imports",
+      "file": "api/cache-service.md",
+      "severity": "warning"
     }
   ],
   "info": [
@@ -478,13 +1272,193 @@
       "message": "Code example contains console.log statement",
       "file": "DESIGN_PATTERNS_MIGRATION_GUIDE.md",
       "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/medication-search-modal.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/medication-search-modal.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/medication-purpose-dropdown.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/medication-purpose-dropdown.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/input.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/example-usage.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/example-usage.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/enhanced-focus-trapped-checkbox-group.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/checkbox.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/button.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/OAuthProviders.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/MultiSelectDropdown.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/MultiSelectDropdown.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/LogOverlay.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/FocusTrappedCheckboxGroup.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/EnhancedAutocompleteDropdown.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/EnhancedAutocompleteDropdown.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/EnhancedAutocompleteDropdown.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/EnhancedAutocompleteDropdown.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "components/EditableDropdown.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "api/medication-api.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "api/medication-api.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "api/medication-api.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "api/medication-api.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "api/medication-api.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "api/client-api.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "api/client-api.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "api/client-api.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "api/client-api.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "api/cache-service.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "api/cache-service.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "api/cache-service.md",
+      "severity": "info"
+    },
+    {
+      "message": "Code example contains console.log statement",
+      "file": "api/cache-service.md",
+      "severity": "info"
     }
   ],
   "stats": {
-    "totalFiles": 17,
-    "validFiles": 15,
-    "componentsDocumented": 0,
+    "totalFiles": 49,
+    "validFiles": 45,
+    "componentsDocumented": 24,
     "apisDocumented": 0
   },
-  "success": false
+  "success": true
 }

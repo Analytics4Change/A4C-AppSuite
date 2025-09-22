@@ -18,7 +18,7 @@
     "knip:fix": "knip --fix",
     "knip:production": "knip --production",
     "knip:watch": "knip --watch",
-    "docs:validate": "node scripts/documentation/validate-docs.cjs",
+    "docs:validate": "npm run scripts:build && node dist/scripts/documentation/validate-docs.js",
     "docs:check-alignment": "npm run scripts:build && node dist/scripts/documentation/check-doc-alignment.js",
     "docs:generate-metrics": "npm run scripts:build && node dist/scripts/documentation/generate-metrics-dashboard.js",
     "docs:cli": "npm run scripts:build && node dist/scripts/cli/index.js",

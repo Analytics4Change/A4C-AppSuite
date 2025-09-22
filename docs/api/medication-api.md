@@ -14,6 +14,9 @@ interface IMedicationApi {
   getMedicationHistory(clientId: string): Promise<MedicationHistory[]>;
   updateMedication(id: string, dosageInfo: Partial<DosageInfo>): Promise<void>;
   deleteMedication(id: string): Promise<void>;
+  clearCache(): Promise<void>;
+  getHealthStatus(): Promise<any>;
+  cancelAllRequests(): void;
 }
 ```
 
@@ -203,6 +206,91 @@ Removes a medication prescription (typically marks as discontinued).
 // Discontinue medication
 await medicationApi.deleteMedication('prescription_789');
 console.log('Medication discontinued');
+```
+
+### clearCache()
+
+Clears all internal caches for testing or memory management purposes.
+
+**Parameters:**
+- None
+
+**Returns:**
+- `Promise<void>`: Resolves when cache clearing is complete
+
+**Example Usage:**
+```typescript
+// Clear all caches
+await medicationApi.clearCache();
+console.log('All caches cleared');
+
+// Useful for testing scenarios
+beforeEach(async () => {
+  await medicationApi.clearCache(); // Start with clean cache
+});
+```
+
+### getHealthStatus()
+
+Retrieves API health status and performance statistics.
+
+**Parameters:**
+- None
+
+**Returns:**
+- `Promise<any>`: Health status object with API statistics
+
+**Example Usage:**
+```typescript
+// Get API health information
+const healthStatus = await medicationApi.getHealthStatus();
+
+console.log(healthStatus);
+// {
+//   status: 'healthy',
+//   uptime: 3600000,
+//   cacheSize: 1024,
+//   requestCount: 150,
+//   averageResponseTime: 250,
+//   errorRate: 0.02
+// }
+
+// Check if API is available
+if (healthStatus.status === 'healthy') {
+  console.log('API is operating normally');
+} else {
+  console.warn('API may be experiencing issues');
+}
+```
+
+### cancelAllRequests()
+
+Cancels all pending API requests immediately.
+
+**Parameters:**
+- None
+
+**Returns:**
+- `void`: Synchronous operation
+
+**Example Usage:**
+```typescript
+// Cancel all pending requests (e.g., on component unmount)
+medicationApi.cancelAllRequests();
+console.log('All pending requests cancelled');
+
+// In React component cleanup
+useEffect(() => {
+  return () => {
+    medicationApi.cancelAllRequests();
+  };
+}, []);
+
+// During navigation away from medication search
+const handlePageLeave = () => {
+  medicationApi.cancelAllRequests();
+  navigate('/other-page');
+};
 ```
 
 ## Data Types
