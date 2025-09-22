@@ -8,10 +8,110 @@
 const fs = require('fs').promises;
 const path = require('path');
 const glob = require('glob');
-const { exec } = require('child_process');
+const { spawn } = require('child_process');
 const { promisify } = require('util');
 
-const execAsync = promisify(exec);
+// Cache for glob results to improve performance
+const globCache = new Map();
+
+/**
+ * Cached glob function to improve performance by avoiding repeated filesystem scans
+ * @param {string} pattern - Glob pattern
+ * @param {Object} options - Glob options
+ * @returns {string[]} - Array of matched files
+ */
+function cachedGlob(pattern, options = {}) {
+  const cacheKey = JSON.stringify({ pattern, options });
+  
+  if (globCache.has(cacheKey)) {
+    return globCache.get(cacheKey);
+  }
+  
+  const result = glob.sync(pattern, options);
+  globCache.set(cacheKey, result);
+  return result;
+}
+
+/**
+ * Secure wrapper for executing git commands using spawn with argument arrays
+ * @param {string[]} args - Git command arguments
+ * @param {Object} options - Additional options
+ * @param {number} options.timeout - Timeout in milliseconds (default: 10000)
+ * @returns {Promise<string>} - Command output
+ */
+async function secureGitExec(args, options = {}) {
+  const { timeout = 10000 } = options;
+  
+  return new Promise((resolve, reject) => {
+    // Validate input arguments
+    if (!Array.isArray(args) || args.length === 0) {
+      reject(new Error('Git arguments must be a non-empty array'));
+      return;
+    }
+    
+    // Validate argument safety
+    for (const arg of args) {
+      if (typeof arg !== 'string') {
+        reject(new Error(`Invalid git argument type: ${typeof arg}`));
+        return;
+      }
+      // Allow some special characters that are safe in git commands
+      if (!/^[a-zA-Z0-9._\/-]+$/.test(arg) && !['--', '...', '@', '^', '~'].some(safe => arg.includes(safe))) {
+        reject(new Error(`Potentially unsafe git argument: ${arg}`));
+        return;
+      }
+    }
+
+    const gitProcess = spawn('git', args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: false, // Explicitly disable shell to prevent injection
+      timeout: timeout
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let timeoutId;
+
+    // Set up timeout
+    if (timeout > 0) {
+      timeoutId = setTimeout(() => {
+        gitProcess.kill('SIGTERM');
+        reject(new Error(`Git command timed out after ${timeout}ms: git ${args.join(' ')}`));
+      }, timeout);
+    }
+
+    gitProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    gitProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    gitProcess.on('close', (code) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      if (code === 0) {
+        resolve(stdout);
+      } else {
+        const errorMsg = stderr.trim() || `Git command exited with code ${code}`;
+        reject(new Error(`Git command failed: ${errorMsg} (Command: git ${args.join(' ')})`));
+      }
+    });
+
+    gitProcess.on('error', (error) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      if (error.code === 'ENOENT') {
+        reject(new Error('Git is not installed or not in PATH'));
+      } else if (error.code === 'EACCES') {
+        reject(new Error('Permission denied executing git command'));
+      } else {
+        reject(new Error(`Failed to execute git command: ${error.message}`));
+      }
+    });
+  });
+}
 
 // Configuration
 const CONFIG = {
@@ -48,23 +148,26 @@ class MetricsCollector {
     console.log('  Analyzing coverage...');
     
     // Component coverage
-    const componentFiles = glob.sync('**/*.tsx', {
+    const componentFiles = cachedGlob('**/*.tsx', {
       cwd: path.join(CONFIG.srcRoot, 'components'),
       ignore: ['**/*.test.tsx', '**/*.spec.tsx']
     });
     
-    const documentedComponents = [];
-    for (const component of componentFiles) {
+    // Check component documentation in parallel for better performance
+    const componentChecks = componentFiles.map(async (component) => {
       const componentName = path.basename(component, '.tsx');
       const docPath = path.join(CONFIG.docsRoot, 'components', `${componentName}.md`);
       
       try {
         await fs.access(docPath);
-        documentedComponents.push(componentName);
+        return componentName;
       } catch (error) {
-        // Not documented
+        return null; // Not documented
       }
-    }
+    });
+    
+    const componentResults = await Promise.all(componentChecks);
+    const documentedComponents = componentResults.filter(name => name !== null);
     
     this.metrics.coverage.components = {
       total: componentFiles.length,
@@ -76,23 +179,26 @@ class MetricsCollector {
     };
     
     // API coverage
-    const apiFiles = glob.sync('**/api/**/*.ts', {
+    const apiFiles = cachedGlob('**/api/**/*.ts', {
       cwd: CONFIG.srcRoot,
       ignore: ['**/*.test.ts', '**/*.spec.ts']
     });
     
-    const documentedApis = [];
-    for (const apiFile of apiFiles) {
+    // Check API documentation in parallel for better performance
+    const apiChecks = apiFiles.map(async (apiFile) => {
       const apiName = path.basename(apiFile, '.ts');
       const docPath = path.join(CONFIG.docsRoot, 'api', `${apiName}.md`);
       
       try {
         await fs.access(docPath);
-        documentedApis.push(apiName);
+        return apiName;
       } catch (error) {
-        // Not documented
+        return null; // Not documented
       }
-    }
+    });
+    
+    const apiResults = await Promise.all(apiChecks);
+    const documentedApis = apiResults.filter(name => name !== null);
     
     this.metrics.coverage.apis = {
       total: apiFiles.length,
@@ -201,21 +307,23 @@ class MetricsCollector {
     
     // Git statistics (if in git repo)
     try {
-      // Recent commits with documentation changes
-      const { stdout: recentCommits } = await execAsync(
-        'git log --since="7 days ago" --grep="doc" --oneline | wc -l'
-      );
+      // Recent commits with documentation changes (secure command execution)
+      const recentCommitsOutput = await secureGitExec([
+        'log', '--since=7 days ago', '--grep=doc', '--oneline'
+      ]);
+      const commitsWithDocs = recentCommitsOutput.trim().split('\n').filter(line => line.length > 0).length;
       
-      // PRs merged in last week (simplified)
-      const { stdout: totalCommits } = await execAsync(
-        'git log --since="7 days ago" --oneline | wc -l'
-      );
+      // Total commits in last week (secure command execution)
+      const totalCommitsOutput = await secureGitExec([
+        'log', '--since=7 days ago', '--oneline'
+      ]);
+      const totalCommits = totalCommitsOutput.trim().split('\n').filter(line => line.length > 0).length;
       
       this.metrics.process.recentActivity = {
-        commitsWithDocs: parseInt(recentCommits.trim()),
-        totalCommits: parseInt(totalCommits.trim()),
-        percentage: parseInt(totalCommits.trim()) > 0
-          ? Math.round((parseInt(recentCommits.trim()) / parseInt(totalCommits.trim())) * 100)
+        commitsWithDocs,
+        totalCommits,
+        percentage: totalCommits > 0
+          ? Math.round((commitsWithDocs / totalCommits) * 100)
           : 0
       };
     } catch (error) {
@@ -778,34 +886,177 @@ class DashboardGenerator {
 
 // Main execution
 async function main() {
+  let collector;
+  let metrics;
+  let dashboardPath;
+  let metricsPath;
+  
   try {
-    // Collect metrics
-    const collector = new MetricsCollector();
-    const metrics = await collector.collect();
+    console.log('📊 Collecting documentation metrics...');
+    console.log('');
     
-    // Generate dashboard
-    const generator = new DashboardGenerator(metrics);
-    const html = generator.generate();
+    // Initialize metrics collector with validation
+    try {
+      collector = new MetricsCollector();
+    } catch (initError) {
+      console.error('❌ Failed to initialize metrics collector:');
+      console.error(`  ${initError.message}`);
+      console.log('\n🔧 Troubleshooting:');
+      console.log('  • Ensure you are in the project root directory');
+      console.log('  • Verify that src/ and docs/ directories exist');
+      console.log('  • Check that package.json contains valid configuration');
+      process.exit(1);
+    }
     
-    // Save dashboard
-    await fs.writeFile(CONFIG.outputPath, html);
-    console.log(`\n✅ Dashboard generated successfully: ${CONFIG.outputPath}`);
+    // Collect metrics with comprehensive error handling
+    try {
+      metrics = await collector.collect();
+      
+      // Validate collected metrics
+      if (!metrics || typeof metrics !== 'object') {
+        throw new Error('Invalid metrics object returned from collector');
+      }
+      
+      // Ensure required properties exist
+      const requiredProps = ['coverage', 'quality', 'process', 'trends'];
+      for (const prop of requiredProps) {
+        if (!metrics[prop]) {
+          console.warn(`⚠️ Warning: Missing metrics property '${prop}' - using defaults`);
+          metrics[prop] = {};
+        }
+      }
+      
+    } catch (collectionError) {
+      console.error('❌ Error during metrics collection:');
+      console.error(`  ${collectionError.message}`);
+      console.log('\n💡 This could be due to:');
+      console.log('  • Missing or inaccessible source files');
+      console.log('  • Git repository access issues');
+      console.log('  • File permission problems');
+      console.log('  • Network connectivity issues');
+      
+      // Try to provide fallback metrics
+      console.log('\n📊 Generating dashboard with minimal metrics...');
+      metrics = {
+        timestamp: new Date().toISOString(),
+        coverage: { 
+          overall: { percentage: 0, documented: 0, total: 0 },
+          components: { percentage: 0, documented: 0, total: 0 },
+          apis: { percentage: 0, documented: 0, total: 0 }
+        },
+        quality: { 
+          codeExamples: { validPercentage: 0, total: 0, valid: 0 },
+          freshness: { averageAge: 0 }
+        },
+        process: { 
+          recentActivity: { commitsWithDocs: 0, totalCommits: 0, percentage: 0 },
+          issues: { open: 0, closed: 0 }
+        },
+        trends: { coverage: {}, quality: {} }
+      };
+    }
     
-    // Save metrics as JSON
-    const metricsPath = path.join(CONFIG.docsRoot, 'metrics.json');
-    await fs.writeFile(metricsPath, JSON.stringify(metrics, null, 2));
-    console.log(`📊 Metrics saved to: ${metricsPath}`);
+    // Generate dashboard HTML with error handling
+    let html;
+    try {
+      const generator = new DashboardGenerator(metrics);
+      html = generator.generate();
+      
+      if (!html || typeof html !== 'string' || html.length < 100) {
+        throw new Error('Generated HTML appears to be invalid or too short');
+      }
+      
+    } catch (generateError) {
+      console.error('❌ Error generating dashboard HTML:');
+      console.error(`  ${generateError.message}`);
+      console.log('\n🔧 Recovery actions:');
+      console.log('  • Check template syntax and structure');
+      console.log('  • Verify metrics data integrity');
+      console.log('  • Ensure all required dependencies are available');
+      process.exit(1);
+    }
     
-    // Print summary
-    console.log('\n📈 Summary:');
-    console.log(`  Overall Coverage: ${metrics.coverage.overall.percentage}%`);
-    console.log(`  Components: ${metrics.coverage.components.percentage}%`);
-    console.log(`  APIs: ${metrics.coverage.apis.percentage}%`);
-    console.log(`  Code Quality: ${metrics.quality.codeExamples.validPercentage}%`);
-    console.log(`  Avg Doc Age: ${metrics.quality.freshness.averageAge} days`);
+    // Save dashboard with error handling
+    dashboardPath = CONFIG.outputPath;
+    try {
+      // Ensure output directory exists
+      await fs.mkdir(path.dirname(dashboardPath), { recursive: true });
+      await fs.writeFile(dashboardPath, html);
+      console.log(`✅ Dashboard generated successfully: ${dashboardPath}`);
+    } catch (saveError) {
+      console.error(`❌ Could not save dashboard to ${dashboardPath}:`);
+      console.error(`  ${saveError.message}`);
+      
+      // Try alternative location
+      const fallbackPath = path.join(process.cwd(), 'dashboard.html');
+      try {
+        await fs.writeFile(fallbackPath, html);
+        console.log(`✅ Dashboard saved to fallback location: ${fallbackPath}`);
+        dashboardPath = fallbackPath;
+      } catch (fallbackError) {
+        console.error('❌ Failed to save dashboard to fallback location');
+        console.log('\n🔧 Check:');
+        console.log('  • Write permissions in target directory');
+        console.log('  • Available disk space');
+        console.log('  • File system limitations');
+        process.exit(1);
+      }
+    }
+    
+    // Save metrics JSON with error handling
+    metricsPath = path.join(CONFIG.docsRoot, 'metrics.json');
+    try {
+      await fs.mkdir(path.dirname(metricsPath), { recursive: true });
+      await fs.writeFile(metricsPath, JSON.stringify(metrics, null, 2));
+      console.log(`📊 Metrics saved to: ${metricsPath}`);
+    } catch (jsonSaveError) {
+      console.warn(`⚠️ Warning: Could not save metrics JSON to ${metricsPath}:`);
+      console.warn(`  ${jsonSaveError.message}`);
+      console.log('Dashboard generation continued without saving metrics JSON');
+    }
+    
+    // Print summary with error handling
+    try {
+      console.log('\n📈 Summary:');
+      console.log(`  Overall Coverage: ${metrics.coverage?.overall?.percentage || 0}%`);
+      console.log(`  Components: ${metrics.coverage?.components?.percentage || 0}%`);
+      console.log(`  APIs: ${metrics.coverage?.apis?.percentage || 0}%`);
+      console.log(`  Code Quality: ${metrics.quality?.codeExamples?.validPercentage || 0}%`);
+      console.log(`  Avg Doc Age: ${metrics.quality?.freshness?.averageAge || 0} days`);
+    } catch (printError) {
+      console.warn('⚠️ Warning: Error displaying summary statistics');
+      console.log('Dashboard was generated successfully despite summary display issues');
+    }
     
   } catch (error) {
-    console.error('Error generating dashboard:', error);
+    console.error('\n💥 Unexpected error during dashboard generation:');
+    console.error(`  ${error.message}`);
+    
+    if (error.stack) {
+      console.log('\n🔍 Stack trace:');
+      console.log(error.stack);
+    }
+    
+    console.log('\n🔧 Recovery actions:');
+    console.log('  • Ensure all dependencies are installed: npm ci');
+    console.log('  • Verify Node.js version compatibility (18+)');
+    console.log('  • Check file system permissions');
+    console.log('  • Verify project structure and configuration');
+    
+    if (dashboardPath) {
+      console.log(`  • Check if partial dashboard exists: ${dashboardPath}`);
+    }
+    
+    if (metricsPath) {
+      console.log(`  • Check if partial metrics exist: ${metricsPath}`);
+    }
+    
+    console.log('\n📋 Report this issue with:');
+    console.log('  • Node.js version: ' + process.version);
+    console.log('  • Operating system: ' + process.platform);
+    console.log('  • Current working directory: ' + process.cwd());
+    console.log('  • Available memory: ' + Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB');
+    
     process.exit(1);
   }
 }

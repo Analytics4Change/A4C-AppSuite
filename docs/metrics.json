@@ -1,0 +1,96 @@
+{
+  "timestamp": "2025-09-21T22:15:34.619Z",
+  "coverage": {
+    "components": {
+      "total": 24,
+      "documented": 0,
+      "percentage": 0,
+      "missing": [
+        "searchable-dropdown",
+        "label",
+        "input",
+        "dropdown-portal",
+        "checkbox",
+        "card",
+        "button",
+        "MultiSelectDropdown",
+        "EnhancedAutocompleteDropdown",
+        "EditableDropdown",
+        "example-usage",
+        "RangeHoursInput",
+        "FocusTrappedCheckboxGroup",
+        "EnhancedFocusTrappedCheckboxGroup",
+        "DynamicAdditionalInput",
+        "MedicationStatusIndicator",
+        "MedicationSearchModal",
+        "MedicationPurposeDropdown",
+        "MainLayout",
+        "MobXDebugger",
+        "LogOverlay",
+        "DebugControlPanel",
+        "ProtectedRoute",
+        "OAuthProviders"
+      ]
+    },
+    "apis": {
+      "total": 3,
+      "documented": 0,
+      "percentage": 0,
+      "missing": [
+        "RXNormMedicationApi",
+        "IMedicationApi",
+        "IClientApi"
+      ]
+    },
+    "types": {
+      "total": 6,
+      "documented": 0,
+      "percentage": 0
+    },
+    "overall": {
+      "total": 33,
+      "documented": 0,
+      "percentage": 0
+    }
+  },
+  "quality": {
+    "freshness": {
+      "averageAge": 3,
+      "maxAge": 22,
+      "staleCount": 0,
+      "staleFiles": []
+    },
+    "codeExamples": {
+      "total": 115,
+      "invalid": 0,
+      "validPercentage": 100
+    },
+    "brokenLinks": {
+      "count": 0,
+      "files": []
+    }
+  },
+  "process": {
+    "recentActivity": {
+      "commitsWithDocs": 16,
+      "totalCommits": 53,
+      "percentage": 30
+    },
+    "issues": {
+      "open": 0,
+      "closed": 0,
+      "avgResolutionTime": 0
+    }
+  },
+  "trends": {
+    "coverage": {
+      "components": 0,
+      "apis": 0,
+      "overall": 0
+    },
+    "quality": {
+      "freshness": 0,
+      "codeExamples": 0
+    }
+  }
+}
