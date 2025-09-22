@@ -30,8 +30,9 @@ npm run lint       # Run ESLint
 ## Current Features
 
 ### Medication Management
+
 - **Medication Search**: Real-time search with debouncing
-- **Dosage Configuration**: 
+- **Dosage Configuration**:
   - Form categories (Solid, Liquid, etc.)
   - Dosage amounts and units
   - Frequency and condition settings
@@ -40,10 +41,12 @@ npm run lint       # Run ESLint
 - **Category Selection**: Broad and specific medication categorization
 
 ### Client Management
+
 - Client selection interface
 - Client-specific medication tracking
 
 ### Form Infrastructure
+
 - Complex multi-step forms with validation
 - Accessible form controls with ARIA labels
 - **Keyboard Navigation Standards**:
@@ -63,6 +66,7 @@ npm run lint       # Run ESLint
 ### Accessibility & WCAG Compliance
 
 #### WCAG 2.1 Level AA Requirements
+
 - **ALL interactive elements** must meet WCAG 2.1 Level AA standards
 - Color contrast ratios: 4.5:1 for normal text, 3:1 for large text
 - All functionality available via keyboard
@@ -71,6 +75,7 @@ npm run lint       # Run ESLint
 - Make all functionality available from keyboard interface
 
 #### Focus Management Standards
+
 - **TabIndex Guidelines**:
   - **Prefer natural DOM order** (no explicit tabIndex) whenever possible
   - **Use tabIndex only when needed** to override natural order for UX reasons
@@ -96,6 +101,7 @@ npm run lint       # Run ESLint
   - Handle cases where trigger element is removed from DOM
 
 #### ARIA Requirements
+
 - **Required ARIA attributes for all components**:
   - `role` for non-semantic elements (dialog, navigation, main, etc.)
   - `aria-label` or `aria-labelledby` for ALL interactive elements
@@ -121,11 +127,12 @@ npm run lint       # Run ESLint
   - `aria-describedby` for dialog description if present
 
 #### Keyboard Navigation Requirements
-- **Tab Order**: 
+
+- **Tab Order**:
   - Logical left-to-right, top-to-bottom flow
   - Header → Main Content → Sidebar → Footer
   - Within modals: Header → Content → Footer buttons
-- **Focus Indicators**: 
+- **Focus Indicators**:
   - Visible focus rings on ALL interactive elements
   - High contrast focus indicators (not just browser default)
   - Focus indicator must meet color contrast requirements
@@ -140,6 +147,7 @@ npm run lint       # Run ESLint
     - Arrow keys for navigation within components
 
 #### Testing Requirements
+
 - **Manual Testing**:
   - Test with keyboard only (unplug mouse)
   - Tab through entire application
@@ -207,12 +215,14 @@ src/
 ## Development Guidelines
 
 ### Architecture Patterns
+
 - **MVVM Pattern**: ViewModels (MobX) handle business logic, Views (React) handle presentation
 - **Composition over Inheritance**: Use component composition for complex UIs
 - **Interface-based Services**: All services implement interfaces for easy mocking/testing
 - **Unified Component Pattern**: Create single, reusable components for similar functionality (e.g., MultiSelectDropdown for all multi-select needs)
 
 ### State Management with MobX
+
 - Use MobX ViewModels for complex state logic
 - Keep component state minimal and UI-focused
 - **CRITICAL**: Always wrap components with `observer` HOC from mobx-react-lite for reactive components
@@ -228,6 +238,7 @@ src/
   4. Parent components in render chain are also wrapped with `observer`
 
 ### TypeScript Guidelines
+
 - Strict mode is enabled - avoid `any` types
 - Define interfaces for all props and complex data structures
 - Use type inference where possible, explicit types where necessary
@@ -239,6 +250,7 @@ src/
 The application uses centralized configuration files for consistent behavior across environments:
 
 #### API Configuration (`/src/config/medication-search.config.ts`)
+
 - **API_CONFIG**: RXNorm API endpoints and request parameters
   - Base URL for RXNorm services
   - API keys and authentication settings
@@ -252,12 +264,14 @@ The application uses centralized configuration files for consistent behavior acr
   - Storage quota management
 
 #### Timing Configuration (`/src/config/timings.ts`)
+
 - Centralized timing delays for consistent UX
 - Automatic test environment optimization (0ms delays)
 - Search debouncing delays
 - Animation and transition timings
 
 #### Environment Variables
+
 ```env
 # API Configuration
 VITE_RXNORM_API_URL=https://rxnav.nlm.nih.gov/REST
@@ -283,9 +297,11 @@ VITE_DEBUG_LOGS=false
 ## Logging and Diagnostics
 
 ### Configuration-Driven Logging System
+
 The application uses a zero-overhead logging system that can be configured per environment:
 
 #### Logger Usage
+
 ```typescript
 import { Logger } from '@/utils/logger';
 
@@ -300,11 +316,13 @@ log.error('Error occurred', error);
 ```
 
 #### Configuration (`/src/config/logging.config.ts`)
+
 - **Development**: Full logging with all categories enabled
 - **Test**: Minimal logging (errors only) for fast test execution
 - **Production**: Disabled by default, console methods removed during build
 
 #### Log Categories
+
 - `main` - Application startup and lifecycle
 - `mobx` - MobX state management and reactions
 - `viewmodel` - ViewModel business logic
@@ -315,15 +333,18 @@ log.error('Error occurred', error);
 - `diagnostics` - Debug tool controls
 
 #### Output Targets
+
 - `console` - Standard console output (preserves E2E test compatibility)
 - `memory` - In-memory buffer for debugging
 - `remote` - Placeholder for remote logging services
 - `none` - No output (complete silence)
 
 ### Debug Diagnostics System
+
 The application includes a comprehensive diagnostics system for development:
 
 #### Debug Control Panel
+
 - **Activation**: Press `Ctrl+Shift+D` to toggle the control panel
 - **Features**:
   - Toggle individual debug monitors
@@ -335,6 +356,7 @@ The application includes a comprehensive diagnostics system for development:
 #### Available Debug Monitors
 
 ##### MobX State Monitor
+
 - **Keyboard Shortcut**: `Ctrl+Shift+M`
 - **Purpose**: Visualize MobX observable state in real-time
 - **Shows**:
@@ -344,19 +366,23 @@ The application includes a comprehensive diagnostics system for development:
 - **Usage**: Automatically appears when enabled via control panel
 
 ##### Performance Monitor
+
 - **Keyboard Shortcut**: `Ctrl+Shift+P`
 - **Purpose**: Track rendering performance and optimization opportunities
 - **Metrics**: FPS, render time, memory usage
 
 ##### Log Overlay
+
 - **Purpose**: Display console logs directly in the UI
 - **Features**: Filter by category, search, clear buffer
 
 ##### Network Monitor
+
 - **Purpose**: Track API calls and responses
 - **Shows**: Request timing, payload size, status codes
 
 #### Environment Variables for Initial State
+
 ```bash
 # Enable specific monitors on startup
 VITE_DEBUG_MOBX=true
@@ -365,6 +391,7 @@ VITE_DEBUG_LOGS=true
 ```
 
 #### DiagnosticsContext Usage
+
 ```typescript
 import { useDiagnostics } from '@/contexts/DiagnosticsContext';
 
@@ -379,12 +406,14 @@ const MyComponent = () => {
 ```
 
 ### Production Build Optimization
+
 - All `console.*` statements automatically removed via Vite's esbuild
 - Debug components tree-shaken when not imported
 - Logger checks `import.meta.env.PROD` at initialization
 - Zero runtime overhead when diagnostics disabled
 
 ### Testing Considerations
+
 - Logger uses actual console methods to maintain E2E test compatibility
 - All timing delays set to 0ms in test environment
 - Debug monitors automatically disabled in tests
@@ -393,6 +422,7 @@ const MyComponent = () => {
 ## Code Organization Guidelines
 
 ### File Size Standards
+
 - All code files should be approximately 300 lines or less
 - Only exceed 300 lines when splitting would negatively affect:
   - Implementation complexity
@@ -401,7 +431,9 @@ const MyComponent = () => {
   - Performance
 
 ### Component Structure for Large Forms
+
 When dealing with complex forms (like medication entry):
+
 1. Split form sections into separate components (e.g., DosageFormInputs, TotalAmountInputs)
 2. Keep validation logic in separate files or services
 3. Use composition pattern in main component
@@ -410,10 +442,12 @@ When dealing with complex forms (like medication entry):
 ## Timing and Async Patterns
 
 ### Timing Abstractions
+
 The codebase uses centralized timing configuration to ensure testability and maintainability:
+
 - **Configuration**: All timing delays are defined in `/src/config/timings.ts`
 - **Test Environment**: All delays automatically set to 0ms when `NODE_ENV === 'test'`
-- **Custom Hooks**: 
+- **Custom Hooks**:
   - `useDropdownBlur` - Dropdown blur delays
   - `useScrollToElement` - Scroll animations
   - `useDebounce` - General value debouncing
@@ -421,10 +455,11 @@ The codebase uses centralized timing configuration to ensure testability and mai
 
 ### Best Practices for setTimeout
 
-#### ✅ ACCEPTABLE Uses:
+#### ✅ ACCEPTABLE Uses
+
 1. **Dropdown onBlur delays (200ms)**: Industry-standard UX pattern to allow clicking dropdown items without premature closure
 2. **DOM update delays for animations**: When waiting for React renders before scrolling (use `useScrollToElement` hook)
-3. **Debouncing/Throttling**: 
+3. **Debouncing/Throttling**:
    - Search input delays (300-500ms typical) - use `useDebounce` or `useSearchDebounce` hooks
    - Form validation delays
    - API call rate limiting
@@ -432,13 +467,15 @@ The codebase uses centralized timing configuration to ensure testability and mai
 5. **Third-party library workarounds**: When you genuinely need to wait for external code
 6. **Event listener setup delays**: Preventing immediate trigger of global listeners (e.g., click-outside handlers that shouldn't fire on the opening click)
 
-#### ❌ AVOID setTimeout for:
+#### ❌ AVOID setTimeout for
+
 1. **Focus management**: Use `useEffect` with proper dependencies or `autoFocus` attribute instead
 2. **State synchronization**: Use React lifecycle hooks
 3. **API call sequencing**: Use async/await or promises
 4. **Component mounting**: Use useEffect or useLayoutEffect
 
 ### Focus Management Patterns
+
 - Focus traps should always respect tabIndex order
 - Always use `useEffect` hooks for focus transitions after state changes
 - Never use setTimeout for focus changes - use React lifecycle instead
@@ -447,7 +484,8 @@ The codebase uses centralized timing configuration to ensure testability and mai
 
 ### Example Patterns
 
-#### Dropdown Blur Pattern:
+#### Dropdown Blur Pattern
+
 ```typescript
 // ❌ DON'T DO THIS:
 onBlur={() => setTimeout(() => setShow(false), 200)}
@@ -459,7 +497,8 @@ const handleBlur = useDropdownBlur(setShow);
 onBlur={handleBlur}
 ```
 
-#### Focus Management Pattern:
+#### Focus Management Pattern
+
 ```typescript
 // ❌ DON'T DO THIS:
 setTimeout(() => element.focus(), 100);
@@ -475,7 +514,8 @@ useEffect(() => {
 <input autoFocus />
 ```
 
-#### Scroll Animation Pattern:
+#### Scroll Animation Pattern
+
 ```typescript
 // ❌ DON'T DO THIS:
 setTimeout(() => {
@@ -488,7 +528,8 @@ const scrollTo = useScrollToElement(scrollFunction);
 scrollTo(elementId);
 ```
 
-#### Search Debouncing Pattern:
+#### Search Debouncing Pattern
+
 ```typescript
 // ❌ DON'T DO THIS:
 const timeoutRef = useRef();
@@ -508,7 +549,8 @@ const { handleSearchChange } = useSearchDebounce(
 );
 ```
 
-#### Click-Outside Pattern:
+#### Click-Outside Pattern
+
 ```typescript
 // ❌ DON'T DO THIS:
 setTimeout(() => {
@@ -523,6 +565,7 @@ const timeoutId = setTimeout(() => {
 ```
 
 ### Testing Considerations
+
 - All timing delays should be injectable or configurable
 - Use centralized timing configuration that sets to 0ms in test environment
 - Tests should run instantly without fake timers when properly abstracted
@@ -531,19 +574,23 @@ const timeoutId = setTimeout(() => {
 ## Testing Patterns
 
 ### E2E Testing with Playwright
+
 - **Keyboard Navigation Tests**: Always test full keyboard flow for forms
 - **Multi-Select Testing**: Verify Space key toggles, Enter accepts, Escape cancels
 - **Focus Management**: Ensure focus moves predictably through Tab order
 - **Accessibility**: Test ARIA attributes and screen reader compatibility
 
 ### Debugging MobX Reactivity Issues
+
 When components don't re-render despite state changes:
 
 1. **Enable MobX debugging** in `/src/config/mobx.config.ts`
 2. **Add diagnostic logging** to track state changes:
+
    ```typescript
    console.log('[Component] Rendering with:', observableArray.slice());
    ```
+
 3. **Use MobXDebugger component** in development to visualize state
 4. **Check for array spreading** that breaks observable chain
 5. **Verify observer wrapping** on all components in render hierarchy
@@ -551,6 +598,7 @@ When components don't re-render despite state changes:
 ### Common Pitfalls and Solutions
 
 #### ❌ Problem: Array spreading breaks reactivity
+
 ```typescript
 // BAD - Creates new non-observable array
 <CategorySelection 
@@ -559,6 +607,7 @@ When components don't re-render despite state changes:
 ```
 
 #### ✅ Solution: Pass observable directly
+
 ```typescript
 // GOOD - Maintains observable chain
 <CategorySelection 
@@ -567,12 +616,14 @@ When components don't re-render despite state changes:
 ```
 
 #### ❌ Problem: Direct array mutation doesn't trigger updates
+
 ```typescript
 // BAD - MobX might not detect the change
 this.selectedItems.push(newItem);
 ```
 
 #### ✅ Solution: Use immutable updates
+
 ```typescript
 // GOOD - Creates new array reference
 runInAction(() => {
@@ -587,12 +638,15 @@ runInAction(() => {
 #### When to Use Each Component
 
 ##### **SearchableDropdown** (`/components/ui/searchable-dropdown.tsx`)
+
 **Use when:** You need a searchable selection from a large dataset (100+ items)
+
 - Real-time search with debouncing
 - Async data loading support
 - Highlighted search matches with unified behavior
 - Clear selection capability
 **Example use cases:** Medication search, client search, diagnosis lookup
+
 ```typescript
 <SearchableDropdown
   value={searchValue}
@@ -604,11 +658,14 @@ runInAction(() => {
 ```
 
 ##### **EditableDropdown** (`/components/ui/EditableDropdown.tsx`)
+
 **Use when:** You need a dropdown that can be edited after selection
+
 - Small to medium option sets (< 100 items)
 - Edit mode for changing selections
 - Uses EnhancedAutocompleteDropdown internally for unified highlighting
 **Example use cases:** Dosage form, route, unit, frequency selection
+
 ```typescript
 <EditableDropdown
   id="dosage-form"
@@ -621,11 +678,14 @@ runInAction(() => {
 ```
 
 ##### **EnhancedAutocompleteDropdown** (`/components/ui/EnhancedAutocompleteDropdown.tsx`)
+
 **Use when:** You need autocomplete with unified highlighting behavior
+
 - Type-ahead functionality
 - Distinct typing vs navigation modes
 - Custom value support optional
 **Example use cases:** Form fields with predefined options but allow custom input
+
 ```typescript
 <EnhancedAutocompleteDropdown
   options={options}
@@ -637,11 +697,14 @@ runInAction(() => {
 ```
 
 ##### **MultiSelectDropdown** (`/components/ui/MultiSelectDropdown.tsx`)
+
 **Use when:** Users need to select multiple items from a list
+
 - Checkbox-based multi-selection
 - Selected items summary display
 - Full keyboard navigation support
 **Example use cases:** Category selection, tag assignment, permission settings
+
 ```typescript
 <MultiSelectDropdown
   id="categories"
@@ -653,7 +716,9 @@ runInAction(() => {
 ```
 
 ##### **EnhancedFocusTrappedCheckboxGroup** (`/components/ui/FocusTrappedCheckboxGroup/`)
+
 **Use when:** You need a group of checkboxes with complex interactions
+
 - Focus trapping within the group
 - Dynamic additional inputs based on selection
 - Validation rules and metadata support
@@ -662,13 +727,14 @@ runInAction(() => {
 
 **Focus Region Tracking:**
 The component uses a focus region state system to properly handle keyboard events:
+
 - **Focus Regions**: `'header' | 'checkbox' | 'input' | 'button'`
 - **Keyboard Handling by Region**:
   - `'checkbox'`: Arrow keys navigate, Space toggles selection
   - `'input'`: All keyboard events handled natively by input
   - `'button'`: Standard button keyboard behavior
   - `'header'`: Arrow keys can enter checkbox group
-- **Benefits**: 
+- **Benefits**:
   - Works with any custom component via strategy pattern
   - No fragile DOM inspection or event target checking
   - Clear separation of keyboard handling concerns
@@ -687,6 +753,7 @@ The component uses a focus region state system to properly handle keyboard event
 ```
 
 ##### **Basic UI Components**
+
 - **Button** (`button.tsx`): Standard button with variants (primary, secondary, ghost)
 - **Input** (`input.tsx`): Basic text input with error states
 - **Label** (`label.tsx`): Form labels with proper accessibility
@@ -696,11 +763,13 @@ The component uses a focus region state system to properly handle keyboard event
 #### Dropdown Highlighting Behavior
 
 All dropdown components use the unified highlighting system:
+
 - **Typing Mode**: Multiple blue highlights for items starting with typed text
 - **Navigation Mode**: Single box-shadow highlight for arrow-selected item
 - **Combined Mode**: Both highlights when navigating to a typed match
 
 The highlighting is powered by:
+
 - `useDropdownHighlighting` hook for state management
 - `/styles/dropdown-highlighting.css` for consistent styling
 - `HighlightType` enum for clear state representation
@@ -739,6 +808,7 @@ Need text input?
 All code must meet the following standards before being considered complete:
 
 #### Documentation Compliance
+
 - **ALL components, ViewModels, and types must be fully documented** in compliance with our documentation strategy
 - **Component documentation** must include:
   - Complete Props Interface with exact TypeScript interface matching
@@ -757,6 +827,7 @@ All code must meet the following standards before being considered complete:
   - Generic constraints and usage examples
 
 #### Documentation Standards
+
 - **Templates**: Use standardized templates located at `/docs/templates/`
   - `/docs/templates/component-template.md` for React components
   - Additional templates for ViewModels and types as needed
@@ -770,6 +841,7 @@ All code must meet the following standards before being considered complete:
   - Component coverage must be 100%
 
 #### Code Standards
+
 - **TypeScript**: Strict mode compliance, no `any` types
 - **Testing**: Unit tests for components, E2E tests for user flows
 - **Accessibility**: WCAG 2.1 Level AA compliance with full keyboard navigation
@@ -777,6 +849,7 @@ All code must meet the following standards before being considered complete:
 - **Linting**: ESLint and TypeScript checks must pass
 
 #### Git Standards
+
 - **Commits**: Clear, descriptive commit messages
 - **PRs**: Include documentation validation results
 - **Branches**: Feature branches from main, clean history preferred
@@ -786,6 +859,7 @@ All code must meet the following standards before being considered complete:
 Before marking any task as complete:
 
 1. **Run Documentation Validation**:
+
    ```bash
    npm run docs:check
    ```
@@ -796,6 +870,7 @@ Before marking any task as complete:
    - 100% component coverage
 
 3. **Run Code Quality Checks**:
+
    ```bash
    npm run typecheck
    npm run lint

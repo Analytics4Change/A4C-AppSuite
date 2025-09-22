@@ -21,17 +21,20 @@ interface [ServiceName] {
 **Description**: What this method does.
 
 **Parameters**:
+
 - `param1` (Type1): Description of parameter
 - `param2` (Type2): Description of parameter
 
 **Returns**: `Promise<ReturnType>` - Description of return value
 
 **Example**:
+
 ```typescript
 const result = await apiService.method1('value1', { prop: 'value2' });
 ```
 
 **Error Handling**:
+
 - `ErrorType1`: When this error occurs
 - `ErrorType2`: When this error occurs
 

@@ -20,6 +20,7 @@ interface CheckboxProps extends React.ComponentProps<typeof CheckboxPrimitive.Ro
 ```
 
 The component extends Radix UI's Checkbox primitive, inheriting all native checkbox functionality including:
+
 - `checked`: Controls the checked state (boolean or 'indeterminate')
 - `onCheckedChange`: Callback fired when checked state changes
 - `disabled`: Disables the checkbox
@@ -365,7 +366,7 @@ function CustomStyledCheckboxes() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab to focus the checkbox
   - Space to toggle checked state
   - Focus indicators clearly visible
@@ -430,17 +431,20 @@ function CustomStyledCheckboxes() {
 The checkbox includes comprehensive state-based styling:
 
 #### Base Styles
+
 - **Layout**: `size-4 shrink-0 rounded-[4px] border shadow-xs`
 - **Transitions**: `transition-shadow outline-none`
 - **Focus**: `focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]`
 
 #### State Styles
+
 - **Default**: `border bg-input-background dark:bg-input/30`
 - **Checked**: `data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:border-primary`
 - **Disabled**: `disabled:cursor-not-allowed disabled:opacity-50`
 - **Invalid**: `aria-invalid:ring-destructive/20 aria-invalid:border-destructive`
 
 #### Indicator
+
 - **Layout**: `flex items-center justify-center text-current`
 - **Icon**: CheckIcon from Lucide React at `size-3.5`
 - **Transition**: `transition-none` for instant appearance
@@ -448,6 +452,7 @@ The checkbox includes comprehensive state-based styling:
 ### Theme Support
 
 The component supports both light and dark themes:
+
 - Light theme: Standard colors with proper contrast
 - Dark theme: Adjusted background and border colors
 - Invalid states: Red border and ring for errors
@@ -507,6 +512,7 @@ const [checked, setChecked] = useState(false);
 ### Unit Tests
 
 Located in `src/components/ui/__tests__/checkbox.test.tsx`:
+
 - Checked/unchecked state changes
 - Indeterminate state handling
 - Keyboard interaction (Space key)
@@ -517,6 +523,7 @@ Located in `src/components/ui/__tests__/checkbox.test.tsx`:
 ### E2E Tests
 
 Covered in form and preference tests:
+
 - Checkbox selection workflows
 - Form submission with checkbox data
 - Keyboard navigation through checkbox groups

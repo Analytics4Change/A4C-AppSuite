@@ -301,7 +301,7 @@ function MedicationDetailsForm() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab to focus the field
   - Enter/Space to enter edit mode when value is displayed
   - All autocomplete keyboard interactions when editing
@@ -370,17 +370,20 @@ function MedicationDetailsForm() {
 ### CSS Classes
 
 #### Read-Only Display State
+
 - **Selected**: `border-blue-500 bg-blue-50 hover:bg-blue-100` (blue theme)
 - **Disabled**: `cursor-not-allowed opacity-50 bg-gray-100`
 - **Interactive**: `cursor-pointer` with hover effects
 - **Layout**: `w-full px-3 py-2 pr-10 border rounded-md`
 
 #### Edit Button
+
 - **Positioning**: `absolute right-1 top-1/2 transform -translate-y-1/2`
 - **Styling**: `p-1.5 hover:bg-gray-100 rounded`
 - **Icon**: Edit2 icon from Lucide React
 
 #### Edit Mode
+
 - Uses EnhancedAutocompleteDropdown styling
 - Inherits all autocomplete visual states
 - Custom className applied to underlying input
@@ -451,6 +454,7 @@ const handleSelect = (selectedValue: string) => {
 ### Unit Tests
 
 Located in `src/components/ui/__tests__/editable-dropdown.test.tsx`:
+
 - Display and edit mode transitions
 - Keyboard interactions and focus management
 - Error state handling and validation
@@ -460,6 +464,7 @@ Located in `src/components/ui/__tests__/editable-dropdown.test.tsx`:
 ### E2E Tests
 
 Covered in medication form tests:
+
 - Complete edit workflow (select, display, edit, reselect)
 - Keyboard navigation through forms
 - Error handling and recovery

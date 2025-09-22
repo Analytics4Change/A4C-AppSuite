@@ -97,7 +97,7 @@ function ContextualInputs() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab/Shift+Tab navigation between dynamic inputs
   - Input-specific keyboard handling (inherited from rendered components)
   - Proper focus flow within parent focus trap
@@ -123,6 +123,7 @@ function ContextualInputs() {
 ### CSS Classes
 
 The component applies styling through the rendered input components:
+
 - Inherits styles from specific input types (RangeHoursInput, etc.)
 - Maintains consistent visual design
 - Supports theme variations
@@ -179,6 +180,7 @@ const inputStrategies = {
 ### Unit Tests
 
 Located in component test suite. Covers:
+
 - Input type rendering based on metadata
 - Props passing to child components
 - Keyboard event delegation
@@ -188,6 +190,7 @@ Located in component test suite. Covers:
 ### Integration Tests
 
 Tested within FocusTrappedCheckboxGroup:
+
 - Selection-based input showing/hiding
 - Multi-input coordination
 - Form submission with dynamic inputs

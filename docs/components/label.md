@@ -15,6 +15,7 @@ interface LabelProps extends React.ComponentProps<typeof LabelPrimitive.Root> {
 ```
 
 The component extends Radix UI's Label primitive, inheriting all native label functionality including:
+
 - `htmlFor`: Associates the label with a form control
 - `onClick`: Click handling that focuses associated control
 - `onMouseDown`: Mouse interaction handling
@@ -116,7 +117,7 @@ function DisabledField() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Clicking label focuses the associated form control
   - Supports all standard keyboard interactions via association
 
@@ -227,6 +228,7 @@ The component uses the "use client" directive for Next.js compatibility, ensurin
 ### Unit Tests
 
 Located in `src/components/ui/__tests__/label.test.tsx`:
+
 - Form control association
 - Click behavior (focusing associated control)
 - Disabled state handling
@@ -235,6 +237,7 @@ Located in `src/components/ui/__tests__/label.test.tsx`:
 ### E2E Tests
 
 Covered in form interaction tests:
+
 - Label-control association functionality
 - Keyboard navigation between labeled controls
 - Screen reader compatibility

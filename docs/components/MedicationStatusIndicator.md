@@ -200,7 +200,7 @@ function MedicationStatusWithFallback() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab/Shift+Tab navigation between status controls
   - Arrow keys for radio button navigation (in fallback mode)
   - Space to select radio button options
@@ -317,11 +317,13 @@ function MedicationStatusWithFallback() {
 ### Regulatory Compliance
 
 #### Controlled Substances
+
 - **DEA Schedules**: I (highest restriction) through V (lowest restriction)
 - **Schedule Information**: Displayed with appropriate warnings and styling
 - **Documentation**: Maintains audit trail for controlled substance handling
 
 #### Psychotropic Medications
+
 - **Categories**: Antipsychotics, Antidepressants, Anxiolytics, Mood Stabilizers
 - **Monitoring Requirements**: Special handling and monitoring protocols
 - **Reporting**: Integration with psychotropic monitoring systems
@@ -345,6 +347,7 @@ function MedicationStatusWithFallback() {
 ### Unit Tests
 
 Located in `MedicationStatusIndicator.test.tsx`. Covers:
+
 - Status display for all states (positive, negative, null, loading)
 - Manual selection functionality in fallback mode
 - Error handling and recovery
@@ -361,6 +364,7 @@ Located in `MedicationStatusIndicator.test.tsx`. Covers:
 ### E2E Tests
 
 Covered in medication management workflows:
+
 - Complete medication entry with status checking
 - Manual status override scenarios
 - Error recovery and retry functionality

@@ -45,7 +45,7 @@ const CONFIG: ValidationConfig = {
   patterns: {
     component: /^# Component: (.+)$/m,
     props: /^## Props$/m,
-    usage: /^## Usage$/m,
+    usage: /^## Usage( Examples?)?$/m,
     accessibility: /^## Accessibility$/m,
     keyboard: /^## Keyboard Navigation$/m
   }

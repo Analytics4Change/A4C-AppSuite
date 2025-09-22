@@ -27,12 +27,15 @@ interface IMedicationApi {
 Searches for medications based on a text query.
 
 **Parameters:**
+
 - `query` (string): Search term for medication name, active ingredient, or brand name
 
 **Returns:**
+
 - `Promise<Medication[]>`: Array of matching medications
 
 **Example Usage:**
+
 ```typescript
 const medicationApi = new RXNormMedicationApi();
 
@@ -46,6 +49,7 @@ const partialResults = await medicationApi.searchMedications('aspir');
 ```
 
 **Error Handling:**
+
 ```typescript
 try {
   const medications = await medicationApi.searchMedications('invalid-query');
@@ -63,12 +67,15 @@ try {
 Retrieves detailed information for a specific medication.
 
 **Parameters:**
+
 - `id` (string): Unique medication identifier
 
 **Returns:**
+
 - `Promise<Medication>`: Complete medication details
 
 **Example Usage:**
+
 ```typescript
 // Get specific medication
 const medication = await medicationApi.getMedication('med_12345');
@@ -86,6 +93,7 @@ console.log(medication);
 ```
 
 **Error Handling:**
+
 ```typescript
 try {
   const medication = await medicationApi.getMedication('non-existent');
@@ -101,12 +109,15 @@ try {
 Saves a new medication prescription with dosage information.
 
 **Parameters:**
+
 - `dosageInfo` (DosageInfo): Complete medication and dosage information
 
 **Returns:**
+
 - `Promise<void>`: Resolves when save is complete
 
 **Example Usage:**
+
 ```typescript
 const dosageInfo: DosageInfo = {
   clientId: 'client_123',
@@ -137,12 +148,15 @@ console.log('Medication saved successfully');
 Retrieves medication history for a specific client.
 
 **Parameters:**
+
 - `clientId` (string): Client identifier
 
 **Returns:**
+
 - `Promise<MedicationHistory[]>`: Array of historical medication records
 
 **Example Usage:**
+
 ```typescript
 const history = await medicationApi.getMedicationHistory('client_123');
 
@@ -166,13 +180,16 @@ console.log(history);
 Updates an existing medication prescription.
 
 **Parameters:**
+
 - `id` (string): Medication record identifier
 - `dosageInfo` (Partial<DosageInfo>): Fields to update
 
 **Returns:**
+
 - `Promise<void>`: Resolves when update is complete
 
 **Example Usage:**
+
 ```typescript
 // Update dosage amount
 await medicationApi.updateMedication('prescription_789', {
@@ -196,12 +213,15 @@ await medicationApi.updateMedication('prescription_789', {
 Removes a medication prescription (typically marks as discontinued).
 
 **Parameters:**
+
 - `id` (string): Medication record identifier
 
 **Returns:**
+
 - `Promise<void>`: Resolves when deletion is complete
 
 **Example Usage:**
+
 ```typescript
 // Discontinue medication
 await medicationApi.deleteMedication('prescription_789');
@@ -213,12 +233,15 @@ console.log('Medication discontinued');
 Clears all internal caches for testing or memory management purposes.
 
 **Parameters:**
+
 - None
 
 **Returns:**
+
 - `Promise<void>`: Resolves when cache clearing is complete
 
 **Example Usage:**
+
 ```typescript
 // Clear all caches
 await medicationApi.clearCache();
@@ -235,12 +258,15 @@ beforeEach(async () => {
 Retrieves API health status and performance statistics.
 
 **Parameters:**
+
 - None
 
 **Returns:**
+
 - `Promise<any>`: Health status object with API statistics
 
 **Example Usage:**
+
 ```typescript
 // Get API health information
 const healthStatus = await medicationApi.getHealthStatus();
@@ -268,12 +294,15 @@ if (healthStatus.status === 'healthy') {
 Cancels all pending API requests immediately.
 
 **Parameters:**
+
 - None
 
 **Returns:**
+
 - `void`: Synchronous operation
 
 **Example Usage:**
+
 ```typescript
 // Cancel all pending requests (e.g., on component unmount)
 medicationApi.cancelAllRequests();

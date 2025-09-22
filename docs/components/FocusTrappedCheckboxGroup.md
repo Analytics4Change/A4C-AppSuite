@@ -92,7 +92,7 @@ function ValidatedSelection() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab/Shift+Tab navigates between checkbox group and buttons
   - Arrow keys navigate within checkbox options
   - Space toggles checkbox selection
@@ -167,6 +167,7 @@ All interactive elements have visible focus rings that meet contrast requirement
 ### Unit Tests
 
 Located in `FocusTrappedCheckboxGroup.test.tsx`. Covers:
+
 - Checkbox selection and deselection
 - Keyboard navigation behavior
 - ARIA attribute correctness
@@ -176,6 +177,7 @@ Located in `FocusTrappedCheckboxGroup.test.tsx`. Covers:
 ### E2E Tests
 
 Covered in medication form E2E tests:
+
 - Complete keyboard-only workflows
 - Screen reader compatibility
 - Focus trapping behavior

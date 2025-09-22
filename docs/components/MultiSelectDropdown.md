@@ -208,7 +208,7 @@ const DynamicMultiSelect = observer(() => {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab to focus the dropdown button
   - Enter/Space to open dropdown
   - Arrow keys (↑/↓) to navigate options
@@ -285,16 +285,19 @@ const DynamicMultiSelect = observer(() => {
 ### CSS Classes
 
 #### Button (Trigger)
+
 - **Layout**: Uses Button component with `variant="outline"`
 - **Sizing**: `w-full justify-between min-h-[44px]` for touch accessibility
 - **State**: Shows selection count with check icon when items selected
 
 #### Dropdown Container
+
 - **Positioning**: `absolute z-50 mt-1 w-full`
 - **Theme**: `bg-white border rounded-lg shadow-lg`
 - **Scrolling**: `overflow-auto` with configurable `maxHeight`
 
 #### Options
+
 - **Layout**: `flex items-center gap-3 px-3 py-2 rounded`
 - **Focus**: `bg-blue-50 outline outline-2 outline-blue-500` for focused item
 - **Hover**: `hover:bg-gray-50` for non-focused items
@@ -372,6 +375,7 @@ const BrokenSelect = observer(() => {
 ### Unit Tests
 
 Located in `src/components/ui/__tests__/multi-select-dropdown.test.tsx`:
+
 - Selection and deselection functionality
 - Keyboard navigation through options
 - Focus management and trapping
@@ -382,6 +386,7 @@ Located in `src/components/ui/__tests__/multi-select-dropdown.test.tsx`:
 ### E2E Tests
 
 Covered in medication form and category selection tests:
+
 - Full multi-selection workflow
 - Keyboard-only interaction testing
 - Screen reader compatibility

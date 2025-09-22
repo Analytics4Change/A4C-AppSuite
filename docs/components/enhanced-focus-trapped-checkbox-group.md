@@ -421,7 +421,7 @@ function ValidatedCheckboxGroup() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab cycles through: Checkbox Group → Back Button (optional) → Cancel → Continue
   - Within checkbox group: Arrow keys navigate between checkboxes
   - Space toggles checkbox selection
@@ -513,6 +513,7 @@ type FocusSource = 'keyboard' | 'mouse';
 ### Unit Tests
 
 Located in `src/components/ui/FocusTrappedCheckboxGroup/__tests__/`:
+
 - Focus trap functionality and keyboard navigation
 - Dynamic input rendering and interaction
 - State management and selection tracking
@@ -522,6 +523,7 @@ Located in `src/components/ui/FocusTrappedCheckboxGroup/__tests__/`:
 ### E2E Tests
 
 Covered in medication timing and form workflow tests:
+
 - Complete focus trap interaction via keyboard only
 - Dynamic input entry and validation
 - Multi-step form navigation with back/continue

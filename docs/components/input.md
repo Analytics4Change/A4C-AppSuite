@@ -14,6 +14,7 @@ interface InputProps extends React.ComponentProps<"input"> {
 ```
 
 The component extends all standard HTML input attributes including:
+
 - `value`, `defaultValue`
 - `onChange`, `onBlur`, `onFocus`
 - `placeholder`, `disabled`, `required`
@@ -125,7 +126,7 @@ function UncontrolledInput() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab/Shift+Tab for focus navigation
   - Standard text input keyboard interactions
   - Cursor keys for text navigation
@@ -202,6 +203,7 @@ The input includes comprehensive styling:
 ### File Input Styling
 
 Special styling for file inputs:
+
 - `file:inline-flex file:h-7 file:border-0 file:bg-transparent`
 - `file:text-sm file:font-medium file:text-foreground`
 
@@ -245,6 +247,7 @@ Special styling for file inputs:
 ### Unit Tests
 
 Located in `src/components/ui/__tests__/input.test.tsx`:
+
 - Value handling (controlled/uncontrolled)
 - Event handling (onChange, onBlur, onFocus)
 - Accessibility attributes
@@ -254,6 +257,7 @@ Located in `src/components/ui/__tests__/input.test.tsx`:
 ### E2E Tests
 
 Covered in form interaction tests:
+
 - Tab navigation
 - Text input and editing
 - Form submission

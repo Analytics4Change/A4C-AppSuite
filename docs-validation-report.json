@@ -3,36 +3,6 @@
   "warnings": [
     {
       "message": "Component documentation missing Usage section",
-      "file": "docs/components/searchable-dropdown.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/mobx-debugger.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/medication-search-modal.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/medication-purpose-dropdown.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/label.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/input.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
       "file": "docs/components/example-usage.md",
       "severity": "warning"
     },
@@ -42,97 +12,12 @@
       "severity": "warning"
     },
     {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/enhanced-focus-trapped-checkbox-group.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/dropdown-portal.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/checkbox.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/card.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/button.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/RangeHoursInput.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/ProtectedRoute.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/OAuthProviders.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/MultiSelectDropdown.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/MedicationStatusIndicator.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/MainLayout.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/LogOverlay.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/FocusTrappedCheckboxGroup.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/EnhancedAutocompleteDropdown.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/EditableDropdown.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/DynamicAdditionalInput.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Usage section",
-      "file": "docs/components/DebugControlPanel.md",
-      "severity": "warning"
-    },
-    {
       "message": "Unmatched code block at line 157",
       "file": "README.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 803",
+      "message": "Unmatched code block at line 878",
       "file": "CLAUDE.md",
       "severity": "warning"
     },
@@ -197,42 +82,42 @@
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 58",
+      "message": "Unmatched code block at line 59",
       "file": "docs/templates/component-template.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 94",
+      "message": "Unmatched code block at line 97",
       "file": "docs/templates/api-template.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 385",
+      "message": "Unmatched code block at line 405",
       "file": "docs/strategy/implementation-guide.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 580",
+      "message": "Unmatched code block at line 609",
       "file": "docs/strategy/documentation-alignment-strategy.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 274",
+      "message": "Unmatched code block at line 319",
       "file": "docs/incomplete_planned_implementations/code-documentation-alignment-plan.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 295",
+      "message": "Unmatched code block at line 324",
       "file": "docs/getting-started/validation-guide.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 125",
+      "message": "Unmatched code block at line 132",
       "file": "docs/getting-started/installation.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 475",
+      "message": "Unmatched code block at line 477",
       "file": "docs/components/searchable-dropdown.md",
       "severity": "warning"
     },
@@ -242,22 +127,22 @@
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 688",
+      "message": "Unmatched code block at line 690",
       "file": "docs/components/medication-search-modal.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 680",
+      "message": "Unmatched code block at line 682",
       "file": "docs/components/medication-purpose-dropdown.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 332",
+      "message": "Unmatched code block at line 335",
       "file": "docs/components/label.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 315",
+      "message": "Unmatched code block at line 319",
       "file": "docs/components/input.md",
       "severity": "warning"
     },
@@ -267,7 +152,7 @@
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 661",
+      "message": "Unmatched code block at line 663",
       "file": "docs/components/enhanced-focus-trapped-checkbox-group.md",
       "severity": "warning"
     },
@@ -277,12 +162,12 @@
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 662",
+      "message": "Unmatched code block at line 669",
       "file": "docs/components/checkbox.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 429",
+      "message": "Unmatched code block at line 439",
       "file": "docs/components/card.md",
       "severity": "warning"
     },
@@ -302,12 +187,12 @@
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 273",
+      "message": "Unmatched code block at line 275",
       "file": "docs/components/OAuthProviders.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 516",
+      "message": "Unmatched code block at line 521",
       "file": "docs/components/MultiSelectDropdown.md",
       "severity": "warning"
     },
@@ -317,12 +202,12 @@
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 343",
+      "message": "Unmatched code block at line 346",
       "file": "docs/components/MainLayout.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 354",
+      "message": "Unmatched code block at line 357",
       "file": "docs/components/LogOverlay.md",
       "severity": "warning"
     },
@@ -332,33 +217,23 @@
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 768",
+      "message": "Unmatched code block at line 774",
       "file": "docs/components/EnhancedAutocompleteDropdown.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 609",
+      "message": "Unmatched code block at line 614",
       "file": "docs/components/EditableDropdown.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 217",
+      "message": "Unmatched code block at line 220",
       "file": "docs/components/DynamicAdditionalInput.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 271",
+      "message": "Unmatched code block at line 275",
       "file": "docs/components/DebugControlPanel.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 449",
-      "file": "docs/architecture/viewmodels.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 70",
-      "file": "docs/architecture/overview.md",
       "severity": "warning"
     },
     {
@@ -367,18 +242,28 @@
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 680",
+      "message": "Unmatched code block at line 709",
       "file": "docs/api/medication-api.md",
       "severity": "warning"
     },
     {
-      "message": "Unmatched code block at line 921",
+      "message": "Unmatched code block at line 945",
       "file": "docs/api/client-api.md",
       "severity": "warning"
     },
     {
       "message": "Unmatched code block at line 774",
       "file": "docs/api/cache-service.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Unmatched code block at line 472",
+      "file": "docs/architecture/viewmodels.md",
+      "severity": "warning"
+    },
+    {
+      "message": "Unmatched code block at line 77",
+      "file": "docs/architecture/overview.md",
       "severity": "warning"
     }
   ],
@@ -530,6 +415,21 @@
       "severity": "info"
     },
     {
+      "message": "Internal link found: ../components/",
+      "file": "docs/api/types.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./README.md",
+      "file": "docs/api/types.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../architecture/overview.md",
+      "file": "docs/api/types.md",
+      "severity": "info"
+    },
+    {
       "message": "Internal link found: ../strategy/mobx-patterns.md",
       "file": "docs/architecture/viewmodels.md",
       "severity": "info"
@@ -550,21 +450,6 @@
       "severity": "info"
     },
     {
-      "message": "Internal link found: ../components/",
-      "file": "docs/api/types.md",
-      "severity": "info"
-    },
-    {
-      "message": "Internal link found: ./README.md",
-      "file": "docs/api/types.md",
-      "severity": "info"
-    },
-    {
-      "message": "Internal link found: ../architecture/overview.md",
-      "file": "docs/api/types.md",
-      "severity": "info"
-    },
-    {
       "message": "Link validation completed (basic checks only)",
       "severity": "info"
     }
@@ -575,10 +460,10 @@
     "componentsDocumented": 24,
     "apisDocumented": 4
   },
-  "timestamp": "2025-09-22T02:25:56.436Z",
+  "timestamp": "2025-09-22T02:39:11.283Z",
   "summary": {
     "hasErrors": false,
     "hasWarnings": true,
-    "totalIssues": 76
+    "totalIssues": 53
   }
 }

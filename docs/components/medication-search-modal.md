@@ -425,7 +425,7 @@ function MedicationSearchWithStates() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab to focus modal elements in logical order
   - Escape key closes modal and returns focus
   - Enter key activates focused elements
@@ -528,6 +528,7 @@ useKeyboardNavigation({
 ### Unit Tests
 
 Located in `src/components/medication/__tests__/MedicationSearchModal.test.tsx`:
+
 - Modal open/close functionality
 - Focus trapping and restoration
 - Search interaction and selection
@@ -537,6 +538,7 @@ Located in `src/components/medication/__tests__/MedicationSearchModal.test.tsx`:
 ### E2E Tests
 
 Covered in medication selection and prescription workflow tests:
+
 - Complete medication search and selection flow
 - Keyboard-only interaction
 - Screen reader compatibility

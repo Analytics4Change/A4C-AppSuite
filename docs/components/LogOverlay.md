@@ -82,7 +82,7 @@ function ComponentWithLogging() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab/Shift+Tab navigation through controls
   - Enter/Space for filter toggles and actions
   - Arrow keys for log navigation
@@ -197,12 +197,14 @@ console.log = (...args) => {
 ### Filtering and Search
 
 #### Available Filters
+
 - **Log Level**: Debug, Info, Warn, Error
 - **Category**: Component, ViewModel, API, etc.
 - **Time Range**: Last 5min, 15min, 1hr, All
 - **Source**: Specific component or module
 
 #### Search Features
+
 - **Text Search**: Search within log messages
 - **Regex Support**: Advanced pattern matching
 - **Case Sensitivity**: Toggle case-sensitive search
@@ -245,6 +247,7 @@ const defaultBufferConfig: LogBuffer = {
 ### Unit Tests
 
 Located in `LogOverlay.test.tsx`. Covers:
+
 - Log entry display and formatting
 - Filter functionality
 - Search capabilities

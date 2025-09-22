@@ -24,12 +24,15 @@ interface IClientApi {
 Retrieves all clients in the system.
 
 **Parameters:**
+
 - None
 
 **Returns:**
+
 - `Promise<Client[]>`: Array of all client records
 
 **Example Usage:**
+
 ```typescript
 const clientApi = new MockClientApi();
 
@@ -43,6 +46,7 @@ console.log(allClients);
 ```
 
 **Performance Considerations:**
+
 ```typescript
 // For large datasets, consider pagination
 interface PaginatedClientRequest {
@@ -68,12 +72,15 @@ async getClientsPaginated(request: PaginatedClientRequest): Promise<{
 Retrieves a specific client by their unique identifier.
 
 **Parameters:**
+
 - `id` (string): Unique client identifier
 
 **Returns:**
+
 - `Promise<Client>`: Complete client information
 
 **Example Usage:**
+
 ```typescript
 // Get specific client
 const client = await clientApi.getClient('client_123');
@@ -103,6 +110,7 @@ console.log(client);
 ```
 
 **Error Handling:**
+
 ```typescript
 try {
   const client = await clientApi.getClient('non-existent');
@@ -120,12 +128,15 @@ try {
 Searches for clients based on various criteria.
 
 **Parameters:**
+
 - `query` (string): Search term matching name, email, phone, or other identifying information
 
 **Returns:**
+
 - `Promise<Client[]>`: Array of matching clients
 
 **Example Usage:**
+
 ```typescript
 // Search by name
 const nameResults = await clientApi.searchClients('John Doe');
@@ -142,6 +153,7 @@ const partialResults = await clientApi.searchClients('Joh');
 ```
 
 **Advanced Search Implementation:**
+
 ```typescript
 interface ClientSearchFilters {
   query?: string;
@@ -164,12 +176,15 @@ async searchClientsAdvanced(filters: ClientSearchFilters): Promise<Client[]> {
 Creates a new client record.
 
 **Parameters:**
+
 - `client` (Omit<Client, 'id'>): Client data without ID (ID is generated)
 
 **Returns:**
+
 - `Promise<Client>`: The created client with generated ID
 
 **Example Usage:**
+
 ```typescript
 const newClientData = {
   firstName: 'Alice',
@@ -202,6 +217,7 @@ console.log('Created client with ID:', createdClient.id);
 ```
 
 **Validation Example:**
+
 ```typescript
 // Client creation with validation
 const validateClientData = (clientData: Omit<Client, 'id'>): void => {
@@ -235,13 +251,16 @@ try {
 Updates an existing client's information.
 
 **Parameters:**
+
 - `id` (string): Client identifier
 - `client` (Partial<Client>): Fields to update
 
 **Returns:**
+
 - `Promise<Client>`: The updated client record
 
 **Example Usage:**
+
 ```typescript
 // Update contact information
 const updatedClient = await clientApi.updateClient('client_123', {
@@ -272,6 +291,7 @@ await clientApi.updateClient('client_123', {
 ```
 
 **Optimistic Updates:**
+
 ```typescript
 // Implement optimistic updates for better UX
 class ClientViewModel {
@@ -312,12 +332,15 @@ class ClientViewModel {
 Removes a client from the system.
 
 **Parameters:**
+
 - `id` (string): Client identifier
 
 **Returns:**
+
 - `Promise<void>`: Resolves when deletion is complete
 
 **Example Usage:**
+
 ```typescript
 // Hard delete (permanent removal)
 await clientApi.deleteClient('client_123');
@@ -345,6 +368,7 @@ class ExtendedClientApi implements IClientApi {
 ```
 
 **Confirmation Pattern:**
+
 ```typescript
 // Safe deletion with confirmation
 const deleteClientSafely = async (clientId: string): Promise<boolean> => {

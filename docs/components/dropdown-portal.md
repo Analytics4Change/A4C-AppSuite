@@ -108,6 +108,7 @@ Portal content is rendered at the document root, so positioning should be handle
 ### Unit Tests
 
 Located in component test files. Key scenarios:
+
 - Portal renders children when open
 - Portal doesn't render when closed
 - Event handling works across portal boundary

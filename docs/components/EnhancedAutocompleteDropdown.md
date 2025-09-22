@@ -396,7 +396,7 @@ function AsyncAutocomplete() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab to focus input field
   - Type to filter and show dropdown
   - Arrow keys (↑/↓) to navigate options
@@ -477,6 +477,7 @@ function AsyncAutocomplete() {
 ### CSS Classes
 
 #### Input Field
+
 - **Base**: `w-full px-3 py-2 pr-10 border rounded-md`
 - **Focus**: `focus:outline-none focus:ring-2 focus:ring-blue-500`
 - **Error**: `border-red-500` (when error prop is true)
@@ -484,12 +485,15 @@ function AsyncAutocomplete() {
 - **Disabled**: `bg-gray-100 cursor-not-allowed`
 
 #### Dropdown Container
+
 - **Positioning**: `absolute z-50 w-full mt-1`
 - **Theme**: `bg-white border border-gray-200 rounded-md shadow-lg`
 - **Scrolling**: `max-h-60 overflow-auto`
 
 #### Options (Unified Highlighting)
+
 Uses the unified highlighting system with CSS classes:
+
 - **Typed Match**: `dropdown-item-typed-match` (blue background)
 - **Navigation**: `dropdown-item-navigation` (box shadow outline)
 - **Both**: `dropdown-item-both` (combined highlighting)
@@ -581,6 +585,7 @@ filtered.sort((a, b) => {
 ### Unit Tests
 
 Located in `src/components/ui/__tests__/enhanced-autocomplete-dropdown.test.tsx`:
+
 - Input filtering and option display
 - Keyboard navigation (arrows, home, end, enter, escape)
 - Highlight state management
@@ -591,6 +596,7 @@ Located in `src/components/ui/__tests__/enhanced-autocomplete-dropdown.test.tsx`
 ### E2E Tests
 
 Covered in form and medication entry tests:
+
 - Complete autocomplete workflow
 - Keyboard-only interaction
 - Screen reader compatibility

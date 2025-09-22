@@ -166,6 +166,7 @@ ProtectedRoute doesn't render visible UI - it either renders child routes or red
 ### Unit Tests
 
 Located in `ProtectedRoute.test.tsx`. Covers:
+
 - Authenticated user access (renders Outlet)
 - Unauthenticated user redirect
 - Navigation behavior and path preservation
@@ -174,6 +175,7 @@ Located in `ProtectedRoute.test.tsx`. Covers:
 ### E2E Tests
 
 Covered in authentication flow tests:
+
 - Complete login flow with protected route access
 - Logout and redirect behavior
 - Direct URL access when not authenticated

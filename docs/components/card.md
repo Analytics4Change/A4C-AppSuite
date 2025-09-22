@@ -199,7 +199,7 @@ function CardGrid() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Interactive cards should include `tabIndex={0}`
   - Handle Enter and Space key events for activation
   - Focus indicators for keyboard users
@@ -262,31 +262,38 @@ function CardGrid() {
 ### CSS Classes
 
 #### Card (Container)
+
 - **Layout**: `flex flex-col gap-6 rounded-xl border`
 - **Theme**: `bg-card text-card-foreground`
 
 #### CardHeader
+
 - **Layout**: `@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5`
 - **Spacing**: `px-6 pt-6 has-data-[slot=card-action]:grid-cols-[1fr_auto]`
 - **Conditional**: `[.border-b]:pb-6` (adds bottom padding when border present)
 
 #### CardTitle
+
 - **Typography**: `leading-none`
 - **Element**: Renders as `<h4>` for semantic hierarchy
 
 #### CardDescription
+
 - **Theme**: `text-muted-foreground`
 - **Element**: Renders as `<p>` for semantic content
 
 #### CardAction
+
 - **Grid**: `col-start-2 row-span-2 row-start-1 self-start justify-self-end`
 - **Positioning**: Automatically positions in header grid
 
 #### CardContent
+
 - **Spacing**: `px-6 [&:last-child]:pb-6`
 - **Conditional**: Bottom padding only if last child
 
 #### CardFooter
+
 - **Layout**: `flex items-center`
 - **Spacing**: `px-6 pb-6 [.border-t]:pt-6`
 - **Conditional**: Top padding only when border present
@@ -330,6 +337,7 @@ function CardGrid() {
 ### Layout System
 
 The Card uses a sophisticated grid system in the header:
+
 - Title and description stack in first column
 - Action button spans full height in second column
 - Automatic grid columns when action is present
@@ -340,6 +348,7 @@ The Card uses a sophisticated grid system in the header:
 ### Unit Tests
 
 Located in `src/components/ui/__tests__/card.test.tsx`:
+
 - Component composition and rendering
 - Conditional styling application
 - Grid layout behavior with/without actions
@@ -348,6 +357,7 @@ Located in `src/components/ui/__tests__/card.test.tsx`:
 ### E2E Tests
 
 Covered in content display and interaction tests:
+
 - Card selection and interaction
 - Keyboard navigation through card content
 - Focus management in card grids

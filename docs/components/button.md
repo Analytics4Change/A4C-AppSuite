@@ -94,7 +94,7 @@ function MyComponent() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab/Shift+Tab for focus navigation
   - Space and Enter keys activate the button
   - Focus is trapped appropriately in modal contexts
@@ -174,6 +174,7 @@ The `glass-disabled` variant provides a modern glassmorphic appearance for disab
 ### Unit Tests
 
 Located in `src/components/ui/__tests__/button.test.tsx`:
+
 - Variant rendering
 - Click event handling
 - Accessibility attributes
@@ -182,6 +183,7 @@ Located in `src/components/ui/__tests__/button.test.tsx`:
 ### E2E Tests
 
 Covered in keyboard navigation and form interaction tests:
+
 - Tab navigation order
 - Click and keyboard activation
 - Focus management in complex workflows

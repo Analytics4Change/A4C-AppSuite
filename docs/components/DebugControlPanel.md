@@ -74,7 +74,7 @@ function DevelopmentWrapper() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab/Shift+Tab navigation between controls
   - Enter/Space to toggle debug features
   - Arrow keys for slider controls (opacity, position)
@@ -155,18 +155,21 @@ function DevelopmentWrapper() {
 ### Available Debug Controls
 
 #### Monitor Toggles
+
 - **MobX Monitor**: Real-time MobX state observation
 - **Performance Monitor**: FPS and performance metrics
 - **Network Monitor**: API request tracking
 - **Log Overlay**: Console log display overlay
 
 #### Panel Configuration
+
 - **Position**: Four corner positions (top-left, top-right, bottom-left, bottom-right)
 - **Opacity**: Adjustable from 30% to 100%
 - **Font Size**: Small, medium, large options
 - **Minimized State**: Collapse to small indicator
 
 #### Keyboard Shortcuts
+
 - `Ctrl+Shift+D`: Toggle control panel visibility
 - `Ctrl+Shift+M`: Toggle MobX monitor
 - `Ctrl+Shift+P`: Toggle performance monitor
@@ -210,6 +213,7 @@ interface DebugSettings {
 ### Unit Tests
 
 Located in `DebugControlPanel.test.tsx`. Covers:
+
 - Panel rendering and visibility
 - Toggle functionality for each monitor
 - Settings persistence and restoration

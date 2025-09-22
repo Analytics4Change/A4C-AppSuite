@@ -200,7 +200,7 @@ function ControlledSearch() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab to focus the search input
   - Arrow keys to navigate through results
   - Enter to select highlighted result
@@ -405,6 +405,7 @@ function useSearchableDropdown<T>({
 ### Unit Tests
 
 Located in `src/components/ui/__tests__/searchable-dropdown.test.tsx`:
+
 - Search input and debouncing
 - Result rendering and selection
 - Keyboard navigation
@@ -414,6 +415,7 @@ Located in `src/components/ui/__tests__/searchable-dropdown.test.tsx`:
 ### E2E Tests
 
 Covered in medication search and form tests:
+
 - Full search workflow
 - Keyboard-only interaction
 - Screen reader compatibility

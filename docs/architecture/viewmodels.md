@@ -28,6 +28,7 @@ The A4C-FrontEnd application uses the MVVM (Model-View-ViewModel) pattern with M
 **Purpose**: Central coordinator for all medication-related operations including search, selection, dosage configuration, and form management.
 
 **Key Responsibilities**:
+
 - Medication search and selection
 - Integration with multiple sub-ViewModels
 - Form validation and submission
@@ -35,6 +36,7 @@ The A4C-FrontEnd application uses the MVVM (Model-View-ViewModel) pattern with M
 - State coordination across medication workflow
 
 **Observable State**:
+
 ```typescript
 @observable selectedMedication: Medication | null
 @observable searchResults: Medication[]
@@ -44,6 +46,7 @@ The A4C-FrontEnd application uses the MVVM (Model-View-ViewModel) pattern with M
 ```
 
 **Key Actions**:
+
 - `searchMedications(query: string)`: Search for medications
 - `selectMedication(medication: Medication)`: Select a medication
 - `validateForm()`: Validate current form state
@@ -57,12 +60,14 @@ The A4C-FrontEnd application uses the MVVM (Model-View-ViewModel) pattern with M
 **Purpose**: Manages dosage timing configuration including scheduled times, PRN (as needed) settings, and custom timing requirements.
 
 **Key Responsibilities**:
+
 - Dosage timing selection and validation
 - PRN medication configuration
 - Custom timing schedule creation
 - Integration with checkbox group components
 
 **Observable State**:
+
 ```typescript
 @observable selectedTimings: string[]
 @observable additionalTimingData: Record<string, string>
@@ -71,6 +76,7 @@ The A4C-FrontEnd application uses the MVVM (Model-View-ViewModel) pattern with M
 ```
 
 **Key Actions**:
+
 - `setSelectedTimings(timings: string[])`: Update timing selections
 - `setAdditionalData(key: string, value: string)`: Set additional timing data
 - `validateTimingConfiguration()`: Validate timing setup
@@ -83,12 +89,14 @@ The A4C-FrontEnd application uses the MVVM (Model-View-ViewModel) pattern with M
 **Purpose**: Handles medication frequency configuration including daily frequencies, custom schedules, and interval-based dosing.
 
 **Key Responsibilities**:
+
 - Frequency selection (daily, BID, TID, QID, custom)
 - Interval-based dosing configuration
 - Schedule validation and conflict resolution
 - Integration with timing constraints
 
 **Observable State**:
+
 ```typescript
 @observable selectedFrequency: DosageFrequency
 @observable customInterval: number | null
@@ -97,6 +105,7 @@ The A4C-FrontEnd application uses the MVVM (Model-View-ViewModel) pattern with M
 ```
 
 **Key Actions**:
+
 - `setFrequency(frequency: DosageFrequency)`: Set dosage frequency
 - `setCustomInterval(interval: number, unit: TimeUnit)`: Configure custom frequency
 - `validateFrequency()`: Validate frequency configuration
@@ -109,12 +118,14 @@ The A4C-FrontEnd application uses the MVVM (Model-View-ViewModel) pattern with M
 **Purpose**: Manages special medication restrictions including controlled substance handling, psychotropic medication requirements, and regulatory compliance.
 
 **Key Responsibilities**:
+
 - Controlled substance classification
 - Psychotropic medication handling
 - Regulatory compliance checking
 - Special handling requirements
 
 **Observable State**:
+
 ```typescript
 @observable isControlled: boolean | null
 @observable controlledSchedule: string | null
@@ -124,6 +135,7 @@ The A4C-FrontEnd application uses the MVVM (Model-View-ViewModel) pattern with M
 ```
 
 **Key Actions**:
+
 - `checkMedicationStatus(medication: Medication)`: Verify regulatory status
 - `setControlledStatus(isControlled: boolean)`: Set controlled substance status
 - `setPsychotropicStatus(isPsychotropic: boolean)`: Set psychotropic status
@@ -136,12 +148,14 @@ The A4C-FrontEnd application uses the MVVM (Model-View-ViewModel) pattern with M
 **Purpose**: Handles food-related medication administration requirements including timing relative to meals, food restrictions, and dietary considerations.
 
 **Key Responsibilities**:
+
 - Food timing configuration (with meals, before meals, after meals)
 - Dietary restriction management
 - Food interaction warnings
 - Nutritional consideration tracking
 
 **Observable State**:
+
 ```typescript
 @observable foodTiming: FoodTimingOption
 @observable dietaryRestrictions: DietaryRestriction[]
@@ -150,6 +164,7 @@ The A4C-FrontEnd application uses the MVVM (Model-View-ViewModel) pattern with M
 ```
 
 **Key Actions**:
+
 - `setFoodTiming(timing: FoodTimingOption)`: Configure food timing
 - `addDietaryRestriction(restriction: DietaryRestriction)`: Add dietary restriction
 - `checkFoodInteractions(medication: Medication)`: Check for food interactions
@@ -162,12 +177,14 @@ The A4C-FrontEnd application uses the MVVM (Model-View-ViewModel) pattern with M
 **Purpose**: Manages client selection and client-specific medication management including client search, selection, and context management.
 
 **Key Responsibilities**:
+
 - Client search and selection
 - Client-specific medication history
 - Permission and access control
 - Client context management
 
 **Observable State**:
+
 ```typescript
 @observable selectedClient: Client | null
 @observable clientSearchResults: Client[]
@@ -177,6 +194,7 @@ The A4C-FrontEnd application uses the MVVM (Model-View-ViewModel) pattern with M
 ```
 
 **Key Actions**:
+
 - `searchClients(query: string)`: Search for clients
 - `selectClient(client: Client)`: Select a client
 - `loadClientMedications()`: Load client's medication history
@@ -263,6 +281,7 @@ class ExampleViewModel {
 ### Array Reactivity Guidelines
 
 **Critical Pattern**: Never spread observable arrays in component props
+
 ```typescript
 // ❌ DON'T DO THIS - Breaks MobX reactivity
 <Component items={[...vm.observableArray]} />
@@ -272,6 +291,7 @@ class ExampleViewModel {
 ```
 
 **ViewModel Array Updates**: Always use immutable updates
+
 ```typescript
 // ❌ Mutation might not trigger reactivity
 this.items.push(newItem);
@@ -370,6 +390,7 @@ test('component updates when ViewModel state changes', () => {
 ### Computed Values
 
 Use `@computed` for expensive calculations that depend on observable state:
+
 ```typescript
 @computed
 get expensiveCalculation() {
@@ -416,6 +437,7 @@ class ViewModel {
 ### MobX Developer Tools
 
 Enable MobX debugging in development:
+
 ```typescript
 // In development configuration
 import { configure } from 'mobx';
@@ -434,6 +456,7 @@ if (import.meta.env.DEV) {
 ### MobX State Inspection
 
 Use the MobXDebugger component for real-time state inspection:
+
 ```typescript
 // Available in development builds
 import { MobXDebugger } from '@/components/debug/MobXDebugger';

@@ -108,7 +108,7 @@ function DashboardPage() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Navigation Structure**: 
+- **Navigation Structure**:
   - Semantic HTML landmarks (`nav`, `main`, `header`, `aside`)
   - Proper heading hierarchy (h1 → h2 → h3)
   - Skip links for keyboard navigation
@@ -186,6 +186,7 @@ function DashboardPage() {
 ### Glassmorphic Design
 
 The layout implements glassmorphic design principles:
+
 - Semi-transparent backgrounds with backdrop blur
 - Subtle border effects
 - Layered visual hierarchy
@@ -251,6 +252,7 @@ const navItems = [
 ### Unit Tests
 
 Located in `MainLayout.test.tsx`. Covers:
+
 - Layout structure rendering
 - Navigation item rendering and interaction
 - Responsive behavior simulation
@@ -260,6 +262,7 @@ Located in `MainLayout.test.tsx`. Covers:
 ### E2E Tests
 
 Covered in application navigation tests:
+
 - Complete navigation workflows
 - Mobile sidebar interaction
 - Keyboard navigation through layout

@@ -132,7 +132,7 @@ function AuthenticationPage() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab/Shift+Tab navigation between provider buttons
   - Enter/Space to activate OAuth providers
   - Focus indicators on all interactive elements
@@ -173,6 +173,7 @@ function AuthenticationPage() {
 ### Provider Branding
 
 Each provider button follows official brand guidelines:
+
 - **Google**: Uses official Google colors and logo
 - **Facebook**: Uses official Facebook blue and logo
 - **Apple**: Uses Apple's sign-in button design standards
@@ -231,6 +232,7 @@ Each provider button follows official brand guidelines:
 ### Unit Tests
 
 Located in `OAuthProviders.test.tsx`. Covers:
+
 - Provider button rendering
 - Click handlers and OAuth initiation
 - Loading state management
@@ -275,6 +277,7 @@ VITE_OAUTH_REDIRECT_URL=https://yourdomain.com/auth/callback
 ### Provider Setup
 
 Each OAuth provider requires specific setup:
+
 - **Google**: Configure in Google Cloud Console
 - **Facebook**: Configure in Facebook Developers
 - **Apple**: Configure in Apple Developer Portal

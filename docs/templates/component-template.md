@@ -28,6 +28,7 @@ interface [ComponentName]Props {
 ```
 
 **Inline Documentation Guidelines:**
+
 - ✅ Add meaningful JSDoc comments for each prop in the TypeScript interface
 - ✅ Describe the prop's purpose and expected usage
 - ✅ Include examples for complex props when helpful
@@ -61,7 +62,7 @@ function MyComponent() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab/Shift+Tab for navigation
   - Space/Enter for activation
   - Arrow keys for internal navigation (if applicable)

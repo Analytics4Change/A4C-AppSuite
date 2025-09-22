@@ -453,7 +453,7 @@ Displays validation errors when form validation fails or user input is invalid.
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Full keyboard access in all states
   - Tab navigation between form elements
   - EditableDropdown keyboard functionality when available
@@ -552,6 +552,7 @@ const purposes = [
 ### Unit Tests
 
 Located in `src/components/medication/__tests__/MedicationPurposeDropdown.test.tsx`:
+
 - Loading state display and behavior
 - Successful API response handling
 - Error state and fallback functionality
@@ -561,6 +562,7 @@ Located in `src/components/medication/__tests__/MedicationPurposeDropdown.test.t
 ### E2E Tests
 
 Covered in medication prescription workflow tests:
+
 - Complete purpose selection flow
 - API failure recovery scenarios
 - Form integration and validation

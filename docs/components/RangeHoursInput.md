@@ -78,7 +78,7 @@ function ValidatedHoursInput() {
 
 ### WCAG 2.1 Level AA Compliance
 
-- **Keyboard Navigation**: 
+- **Keyboard Navigation**:
   - Tab/Shift+Tab for field navigation
   - Arrow keys and typing for input
   - Enter to submit/confirm value
@@ -153,6 +153,7 @@ function ValidatedHoursInput() {
 ### Unit Tests
 
 Located alongside component tests. Covers:
+
 - Input value changes
 - Validation logic
 - Keyboard interaction
@@ -162,6 +163,7 @@ Located alongside component tests. Covers:
 ### E2E Tests
 
 Tested as part of medication timing workflows:
+
 - Complete form submission with hour ranges
 - Keyboard-only navigation
 - Error recovery flows
