@@ -44,16 +44,20 @@ jobs:
         run: |
           npm ci
 
+      - name: Build TypeScript scripts
+        run: |
+          npm run scripts:build
+
       - name: Run documentation structure validation
         id: validate-structure
         run: |
-          node scripts/documentation/validate-docs.cjs || echo "validation_failed=true" >> $GITHUB_OUTPUT
+          node dist/scripts/documentation/validate-docs.js || echo "validation_failed=true" >> $GITHUB_OUTPUT
         continue-on-error: true
 
       - name: Check code-documentation alignment
         id: check-alignment
         run: |
-          node scripts/documentation/check-doc-alignment.cjs || echo "alignment_failed=true" >> $GITHUB_OUTPUT
+          node dist/scripts/documentation/check-doc-alignment.js || echo "alignment_failed=true" >> $GITHUB_OUTPUT
         continue-on-error: true
 
       - name: Lint markdown files
@@ -122,7 +126,7 @@ jobs:
           if [ "${{ steps.check-alignment.outputs.alignment_failed }}" == "true" ] && [ -f "doc-alignment-report.json" ]; then
             echo "Extracting detailed alignment information..."
             # Use a dedicated Node.js script instead of inline execution
-            node scripts/documentation/extract-alignment-summary.cjs || echo "Could not extract alignment details"
+            node dist/scripts/documentation/extract-alignment-summary.js || echo "Could not extract alignment details"
           fi
           
           # Add artifact links section
@@ -247,7 +251,7 @@ jobs:
           # Alignment failures are critical only if high-priority issues exist
           if [ "${{ steps.check-alignment.outputs.alignment_failed }}" == "true" ] && [ -f "doc-alignment-report.json" ]; then
             # Check if there are high-priority alignment issues
-            HIGH_PRIORITY=$(node scripts/documentation/count-high-priority-issues.cjs 2>/dev/null || echo "0")
+            HIGH_PRIORITY=$(node dist/scripts/documentation/count-high-priority-issues.js 2>/dev/null || echo "0")
             
             if [ "$HIGH_PRIORITY" -gt "0" ]; then
               CRITICAL_ISSUES="$CRITICAL_ISSUES alignment-high-priority"
@@ -257,7 +261,7 @@ jobs:
           fi
           
           # Coverage below 50% is critical, 50-90% is warning
-          COVERAGE=${{ steps.coverage.outputs.component_coverage }}
+          COVERAGE="${{ steps.coverage.outputs.component_coverage || '0' }}"
           if [ "$COVERAGE" -lt "50" ]; then
             CRITICAL_ISSUES="$CRITICAL_ISSUES coverage-critical"
           elif [ "$COVERAGE" -lt "90" ]; then

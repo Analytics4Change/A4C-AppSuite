@@ -503,6 +503,6 @@ function DevelopmentApp() {
 ## Related Documentation
 
 - [MobX Integration Patterns](../strategy/mobx-patterns.md)
-- [Component Architecture](./components.md)
+- [Component Architecture](../components.md)
 - [Testing Strategies](../testing/viewmodel-testing.md)
 - [Performance Optimization](../performance/mobx-optimization.md)

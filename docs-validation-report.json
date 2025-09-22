@@ -5,266 +5,6 @@
       "message": "Component documentation missing Usage section",
       "file": "docs/components/example-usage.md",
       "severity": "warning"
-    },
-    {
-      "message": "Component documentation missing Accessibility section",
-      "file": "docs/components/example-usage.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 157",
-      "file": "README.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 878",
-      "file": "CLAUDE.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 584",
-      "file": "docs/ui-patterns.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 661",
-      "file": "docs/rxnorm-medication-autocomplete.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 172",
-      "file": "docs/medication-search-implementation.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 155",
-      "file": "docs/components.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 553",
-      "file": "docs/TESTING.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 487",
-      "file": "docs/README.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 100",
-      "file": "docs/GHCR_TOKEN_ROTATION.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 305",
-      "file": "docs/FocusTrappedCheckboxGroup_plan.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 432",
-      "file": "docs/DEVELOPMENT.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 264",
-      "file": "docs/DESIGN_PATTERNS_MIGRATION_GUIDE.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 265",
-      "file": "docs/DEPLOYMENT.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 696",
-      "file": "docs/API.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 59",
-      "file": "docs/templates/component-template.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 97",
-      "file": "docs/templates/api-template.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 405",
-      "file": "docs/strategy/implementation-guide.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 609",
-      "file": "docs/strategy/documentation-alignment-strategy.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 319",
-      "file": "docs/incomplete_planned_implementations/code-documentation-alignment-plan.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 324",
-      "file": "docs/getting-started/validation-guide.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 132",
-      "file": "docs/getting-started/installation.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 477",
-      "file": "docs/components/searchable-dropdown.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 480",
-      "file": "docs/components/mobx-debugger.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 690",
-      "file": "docs/components/medication-search-modal.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 682",
-      "file": "docs/components/medication-purpose-dropdown.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 335",
-      "file": "docs/components/label.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 319",
-      "file": "docs/components/input.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 434",
-      "file": "docs/components/example-usage.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 663",
-      "file": "docs/components/enhanced-focus-trapped-checkbox-group.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 61",
-      "file": "docs/components/dropdown-portal.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 669",
-      "file": "docs/components/checkbox.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 439",
-      "file": "docs/components/card.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 151",
-      "file": "docs/components/button.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 75",
-      "file": "docs/components/RangeHoursInput.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 127",
-      "file": "docs/components/ProtectedRoute.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 275",
-      "file": "docs/components/OAuthProviders.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 521",
-      "file": "docs/components/MultiSelectDropdown.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 298",
-      "file": "docs/components/MedicationStatusIndicator.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 346",
-      "file": "docs/components/MainLayout.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 357",
-      "file": "docs/components/LogOverlay.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 89",
-      "file": "docs/components/FocusTrappedCheckboxGroup.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 774",
-      "file": "docs/components/EnhancedAutocompleteDropdown.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 614",
-      "file": "docs/components/EditableDropdown.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 220",
-      "file": "docs/components/DynamicAdditionalInput.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 275",
-      "file": "docs/components/DebugControlPanel.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 764",
-      "file": "docs/api/types.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 709",
-      "file": "docs/api/medication-api.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 945",
-      "file": "docs/api/client-api.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 774",
-      "file": "docs/api/cache-service.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 472",
-      "file": "docs/architecture/viewmodels.md",
-      "severity": "warning"
-    },
-    {
-      "message": "Unmatched code block at line 77",
-      "file": "docs/architecture/overview.md",
-      "severity": "warning"
     }
   ],
   "info": [
@@ -380,6 +120,46 @@
       "severity": "info"
     },
     {
+      "message": "Internal link found: ../strategy/mobx-patterns.md",
+      "file": "docs/testing/viewmodel-testing.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../TESTING.md",
+      "file": "docs/testing/viewmodel-testing.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../performance/mobx-optimization.md",
+      "file": "docs/testing/viewmodel-testing.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../architecture/overview.md",
+      "file": "docs/testing/viewmodel-testing.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../testing/viewmodel-testing.md",
+      "file": "docs/strategy/mobx-patterns.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../performance/mobx-optimization.md",
+      "file": "docs/strategy/mobx-patterns.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../architecture/overview.md",
+      "file": "docs/strategy/mobx-patterns.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../components.md",
+      "file": "docs/strategy/mobx-patterns.md",
+      "severity": "info"
+    },
+    {
       "message": "Internal link found: ./documentation-alignment-strategy.md",
       "file": "docs/strategy/implementation-guide.md",
       "severity": "info"
@@ -392,6 +172,26 @@
     {
       "message": "Internal link found: ../STYLE_GUIDE.md",
       "file": "docs/strategy/implementation-guide.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../testing/viewmodel-testing.md",
+      "file": "docs/performance/mobx-optimization.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../strategy/mobx-patterns.md",
+      "file": "docs/performance/mobx-optimization.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../architecture/overview.md",
+      "file": "docs/performance/mobx-optimization.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../components.md",
+      "file": "docs/performance/mobx-optimization.md",
       "severity": "info"
     },
     {
@@ -415,6 +215,26 @@
       "severity": "info"
     },
     {
+      "message": "Internal link found: ../strategy/mobx-patterns.md",
+      "file": "docs/architecture/viewmodels.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../components.md",
+      "file": "docs/architecture/viewmodels.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../testing/viewmodel-testing.md",
+      "file": "docs/architecture/viewmodels.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../performance/mobx-optimization.md",
+      "file": "docs/architecture/viewmodels.md",
+      "severity": "info"
+    },
+    {
       "message": "Internal link found: ../components/",
       "file": "docs/api/types.md",
       "severity": "info"
@@ -430,40 +250,20 @@
       "severity": "info"
     },
     {
-      "message": "Internal link found: ../strategy/mobx-patterns.md",
-      "file": "docs/architecture/viewmodels.md",
-      "severity": "info"
-    },
-    {
-      "message": "Internal link found: ./components.md",
-      "file": "docs/architecture/viewmodels.md",
-      "severity": "info"
-    },
-    {
-      "message": "Internal link found: ../testing/viewmodel-testing.md",
-      "file": "docs/architecture/viewmodels.md",
-      "severity": "info"
-    },
-    {
-      "message": "Internal link found: ../performance/mobx-optimization.md",
-      "file": "docs/architecture/viewmodels.md",
-      "severity": "info"
-    },
-    {
       "message": "Link validation completed (basic checks only)",
       "severity": "info"
     }
   ],
   "stats": {
-    "totalFiles": 49,
-    "validFiles": 49,
+    "totalFiles": 52,
+    "validFiles": 52,
     "componentsDocumented": 24,
     "apisDocumented": 4
   },
-  "timestamp": "2025-09-22T02:39:11.283Z",
+  "timestamp": "2025-09-22T03:01:04.147Z",
   "summary": {
     "hasErrors": false,
     "hasWarnings": true,
-    "totalIssues": 53
+    "totalIssues": 1
   }
 }

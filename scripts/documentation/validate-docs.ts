@@ -46,7 +46,7 @@ const CONFIG: ValidationConfig = {
     component: /^# Component: (.+)$/m,
     props: /^## Props$/m,
     usage: /^## Usage( Examples?)?$/m,
-    accessibility: /^## Accessibility$/m,
+    accessibility: /^## Accessibility( Examples?)?$/m,
     keyboard: /^## Keyboard Navigation$/m
   }
 };
@@ -344,22 +344,25 @@ class DocumentValidator {
     // Basic markdown checks
     const lines = content.split('\n');
     
+    // Track code block state properly
+    let inCodeBlock = false;
+    let codeBlockStartLine = -1;
+    
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const lineNum = i + 1;
       
-      // Check for unbalanced code blocks
-      if (line.includes('```') && line.split('```').length === 2) {
-        // This is a single ``` on a line, check if it has a matching close
-        let foundMatch = false;
-        for (let j = i + 1; j < lines.length; j++) {
-          if (lines[j].includes('```')) {
-            foundMatch = true;
-            break;
-          }
-        }
-        if (!foundMatch) {
-          this.result.addWarning(`Unmatched code block at line ${lineNum}`, filePath);
+      // Check for code block markers (lines that start with ```)
+      const trimmedLine = line.trim();
+      if (trimmedLine.startsWith('```')) {
+        if (inCodeBlock) {
+          // This closes a code block
+          inCodeBlock = false;
+          codeBlockStartLine = -1;
+        } else {
+          // This opens a code block
+          inCodeBlock = true;
+          codeBlockStartLine = lineNum;
         }
       }
       
@@ -373,6 +376,11 @@ class DocumentValidator {
           this.result.addInfo(`Internal link found: ${linkPath}`, filePath);
         }
       }
+    }
+    
+    // Check if there's an unclosed code block at the end
+    if (inCodeBlock) {
+      this.result.addWarning(`Unmatched code block starting at line ${codeBlockStartLine}`, filePath);
     }
   }
 
