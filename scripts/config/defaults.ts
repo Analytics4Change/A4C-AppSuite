@@ -160,7 +160,7 @@ export const environmentConfig: EnvironmentConfig = {
   
   ci: {
     logging: {
-      level: 'info',
+      level: 'warn',
       enableColors: false,
       enableTimestamps: true,
       format: 'structured'
