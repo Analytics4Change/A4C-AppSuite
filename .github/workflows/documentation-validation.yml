@@ -56,6 +56,8 @@ jobs:
 
       - name: Check code-documentation alignment
         id: check-alignment
+        env:
+          NODE_ENV: ci
         run: |
           node dist/scripts/documentation/check-doc-alignment.js || echo "alignment_failed=true" >> $GITHUB_OUTPUT
         continue-on-error: true
