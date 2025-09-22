@@ -39,15 +39,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lars-tice/A4C-FrontEnd.git"
+    "url": "git+https://github.com/Analytics4Change/A4C-FrontEnd.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/lars-tice/A4C-FrontEnd/issues"
+    "url": "https://github.com/Analytics4Change/A4C-FrontEnd/issues"
   },
-  "homepage": "https://github.com/lars-tice/A4C-FrontEnd#readme",
+  "homepage": "https://github.com/Analytics4Change/A4C-FrontEnd#readme",
   "description": "",
   "dependencies": {
     "@radix-ui/react-checkbox": "1.3.2",

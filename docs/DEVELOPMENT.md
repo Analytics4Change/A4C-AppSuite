@@ -15,7 +15,7 @@ Comprehensive guide for developing the A4C-FrontEnd application across multiple 
 
 ```bash
 # Clone repository
-git clone https://github.com/lars-tice/A4C-FrontEnd.git
+git clone https://github.com/Analytics4Change/A4C-FrontEnd.git
 cd A4C-FrontEnd
 
 # Install exact dependencies

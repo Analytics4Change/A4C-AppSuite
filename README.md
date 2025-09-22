@@ -34,7 +34,7 @@ A4C-FrontEnd is a sophisticated healthcare application designed for managing cli
 
 ```bash
 # Clone and install
-git clone https://github.com/lars-tice/A4C-FrontEnd.git
+git clone https://github.com/Analytics4Change/A4C-FrontEnd.git
 cd A4C-FrontEnd
 npm install
 
@@ -231,6 +231,6 @@ The live application includes:
 
 ---
 
-**Repository**: [GitHub](https://github.com/lars-tice/A4C-FrontEnd)  
+**Repository**: [GitHub](https://github.com/Analytics4Change/A4C-FrontEnd)  
 **Live Application**: [https://a4c.firstovertheline.com](https://a4c.firstovertheline.com)  
 **License**: ISC
