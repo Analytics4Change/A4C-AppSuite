@@ -17,9 +17,6 @@
     },
     {
       "pattern": "^https://github.com/Analytics4Change"
-    },
-    {
-      "pattern": "^https://github.com/lars-tice"
     }
   ],
   "timeout": "30s",
