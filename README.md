@@ -4,6 +4,8 @@ A React-based medication management application for healthcare professionals, de
 
 🌐 **Live Application**: [https://a4c.firstovertheline.com](https://a4c.firstovertheline.com)
 
+<!-- trigger documentation validation -->
+
 ## Overview
 
 A4C-FrontEnd is a sophisticated healthcare application designed for managing client medication profiles. The application provides healthcare professionals with tools to:
