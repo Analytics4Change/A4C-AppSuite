@@ -1,4 +1,4 @@
-name: Documentation Validation
+name: Validate Documentation
 
 on:
   pull_request:
