@@ -137,7 +137,7 @@ npm run docs:check-alignment
 #### GitHub Actions Workflow
 
 ```yaml
-name: Documentation Validation
+name: Validate Documentation
 
 on:
   pull_request:
