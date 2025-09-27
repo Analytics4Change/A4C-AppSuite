@@ -112,17 +112,36 @@ ingress:
 
 The following DNS records must be created in Cloudflare Dashboard:
 
-#### Required A Records
+#### Required DNS Records
+
+**Important Note**: Your subdomain setup will depend on whether you have an A record or CNAME record configuration.
+
+##### Option A: If Using A Records
 ```
 Type: A
 Name: access
-Content: [same-ip-as-a4c-record] 
+Content: [same-ip-as-a4c-record]
 Proxy: ✅ Proxied through Cloudflare (orange cloud)
 TTL: Auto
 
 Type: A
-Name: vnc  
+Name: vnc
 Content: [same-ip-as-a4c-record]
+Proxy: ✅ Proxied through Cloudflare (orange cloud)
+TTL: Auto
+```
+
+##### Option B: If Using CNAME Records (Common for Subdomains)
+```
+Type: CNAME
+Name: access
+Target: firstovertheline.com (or same target as a4c)
+Proxy: ✅ Proxied through Cloudflare (orange cloud)
+TTL: Auto
+
+Type: CNAME
+Name: vnc
+Target: firstovertheline.com (or same target as a4c)
 Proxy: ✅ Proxied through Cloudflare (orange cloud)
 TTL: Auto
 ```
@@ -133,26 +152,42 @@ TTL: Auto
    - Select domain: `firstovertheline.com`
    - Navigate to DNS → Records
 
-2. **Find Existing Tunnel IP**
-   - Locate existing `a4c.firstovertheline.com` A record
-   - Note the IP address (this is your tunnel IP)
-   - This IP should be used for both new records
+2. **Identify Your Current Setup**
+   - Locate existing `a4c.firstovertheline.com` record
+   - **If it's an A Record**: Note the IP address shown
+   - **If it's a CNAME Record**: Note the target domain (e.g., `firstovertheline.com`)
+   - You'll use the same type and content for new records
 
 3. **Add Access Subdomain**
    - Click "Add record"
-   - Type: A
-   - Name: `access`
-   - IPv4 address: [same as a4c record]
+   - **For A Record Setup**:
+     - Type: A
+     - Name: `access`
+     - IPv4 address: [same IP as a4c record]
+   - **For CNAME Setup**:
+     - Type: CNAME
+     - Name: `access`
+     - Target: [same target as a4c record]
    - Proxy status: Proxied (orange cloud icon)
    - Save record
 
 4. **Add VNC Subdomain**
    - Click "Add record"
-   - Type: A
-   - Name: `vnc`
-   - IPv4 address: [same as a4c record]
+   - **For A Record Setup**:
+     - Type: A
+     - Name: `vnc`
+     - IPv4 address: [same IP as a4c record]
+   - **For CNAME Setup**:
+     - Type: CNAME
+     - Name: `vnc`
+     - Target: [same target as a4c record]
    - Proxy status: Proxied (orange cloud icon)
    - Save record
+
+**Note About IP Addresses**:
+- **A Records**: Will show an IP address in the Content field (either your server IP or Cloudflare IPs if proxied)
+- **CNAME Records**: Will NOT show an IP address - only the target domain name
+- Both configurations work perfectly with Cloudflare Tunnel - the proxy handles the routing regardless
 
 #### Verification Commands
 ```bash
@@ -169,10 +204,11 @@ curl -I https://vnc.firstovertheline.com
 ```
 
 #### Expected Results
-- Both subdomains should resolve to Cloudflare proxy IPs
+- Both subdomains should resolve to Cloudflare proxy IPs (172.67.x.x or 104.21.x.x)
 - HTTP requests should return Cloudflare Access authentication page
 - No direct server IP exposure
 - DNS propagation typically takes 1-5 minutes
+- **Note**: If using CNAME records, the Cloudflare dashboard won't show IP addresses, only the target domain
 
 ### VNC Server Configuration
 ```bash

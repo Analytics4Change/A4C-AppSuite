@@ -121,77 +121,111 @@ vncserver -kill :1
 
 Add DNS records in Cloudflare dashboard with detailed step-by-step instructions:
 
-#### Step 1: Find Your Existing Tunnel IP
+#### Step 1: Find Your Existing Tunnel Configuration
 
 1. **Navigate to Cloudflare DNS Dashboard**
    - Log into Cloudflare Dashboard
    - Select your domain: `firstovertheline.com`
    - Click on the **"DNS"** tab in the left sidebar
 
-2. **Locate Existing A Record**
+2. **Locate the Existing `a4c` Record**
    - Look for the record with name `a4c` (represents `a4c.firstovertheline.com`)
-   - Note the **"Content"** field - this is your tunnel IP
-   - Should look like: `172.64.x.x` or `104.21.x.x` (Cloudflare proxy IPs)
+   - Check the **"Type"** column to see if it's an A or CNAME record
+   - Note the **"Content"** field - this is what you'll copy
    - **Orange cloud should be enabled** (shows "Proxied")
 
-3. **Copy the IP Address**
-   - Copy the exact IP address from the `a4c` record
-   - This IP will be used for both new records
+3. **Copy the Content from the `a4c` Record**
+   - **If `a4c` is an A Record**: Copy the IP address (e.g., `172.64.x.x` or `104.21.x.x`)
+   - **If `a4c` is a CNAME Record**: Copy the target domain (e.g., `firstovertheline.com`)
+   - This same content will be used for both new records
 
 #### Step 2: Create Access Subdomain Record
 
 1. **Click "Add record" button** (blue button at top of DNS records table)
 
-2. **Configure SSH Access Record:**
+2. **Configure SSH Access Record (match your `a4c` record type):**
+
+   **If your `a4c` is an A Record:**
    ```
-   Type: A (should be selected by default)
+   Type: A
    Name: access
-   IPv4 address: [paste the IP from step 1]
+   IPv4 address: [paste the IP from the a4c record]
+   Proxy status: Proxied (orange cloud icon - should be enabled)
+   TTL: Auto (default)
+   ```
+
+   **If your `a4c` is a CNAME Record:**
+   ```
+   Type: CNAME
+   Name: access
+   Target: [paste the target domain from the a4c record]
    Proxy status: Proxied (orange cloud icon - should be enabled)
    TTL: Auto (default)
    ```
 
 3. **Verify Settings:**
    - Record will create: `access.firstovertheline.com`
-   - IP matches your `a4c` record exactly
+   - Content matches your `a4c` record exactly
    - Orange cloud is enabled (showing "Proxied")
 
-4. **Click "Save"**
+4. **Click "Save"
 
 #### Step 3: Create VNC Subdomain Record
 
 1. **Click "Add record" button** again
 
-2. **Configure VNC Access Record:**
+2. **Configure VNC Access Record (same type as `a4c` and `access`):**
+
+   **If using A Records:**
    ```
    Type: A
    Name: vnc
-   IPv4 address: [same IP as access record]
+   IPv4 address: [same IP as a4c and access records]
+   Proxy status: Proxied (orange cloud icon - should be enabled)
+   TTL: Auto (default)
+   ```
+
+   **If using CNAME Records:**
+   ```
+   Type: CNAME
+   Name: vnc
+   Target: [same target as a4c and access records]
    Proxy status: Proxied (orange cloud icon - should be enabled)
    TTL: Auto (default)
    ```
 
 3. **Verify Settings:**
    - Record will create: `vnc.firstovertheline.com`
-   - IP matches both `a4c` and `access` records
+   - Content matches `a4c` and `access` records exactly
    - Orange cloud is enabled (showing "Proxied")
 
-4. **Click "Save"**
+4. **Click "Save"
 
 #### Step 4: Verify DNS Records
 
-**Your DNS records should now look like:**
+**Your DNS records should now look like one of these:**
+
+**Option A - If Using A Records:**
 ```
-Type  Name     Content (IPv4)    Proxy    TTL
-A     a4c      172.64.x.x       Proxied  Auto    (existing)
-A     access   172.64.x.x       Proxied  Auto    (new)
-A     vnc      172.64.x.x       Proxied  Auto    (new)
+Type  Name     Content          Proxy    TTL
+A     a4c      172.64.x.x      Proxied  Auto    (existing)
+A     access   172.64.x.x      Proxied  Auto    (new)
+A     vnc      172.64.x.x      Proxied  Auto    (new)
+```
+
+**Option B - If Using CNAME Records:**
+```
+Type   Name     Content                  Proxy    TTL
+CNAME  a4c      firstovertheline.com    Proxied  Auto    (existing)
+CNAME  access   firstovertheline.com    Proxied  Auto    (new)
+CNAME  vnc      firstovertheline.com    Proxied  Auto    (new)
 ```
 
 **Important Notes:**
-- All three records MUST have identical IP addresses
+- All three records MUST have identical content (matching your `a4c` record)
 - All three records MUST be "Proxied" (orange cloud enabled)
 - DNS propagation typically takes 1-5 minutes
+- **Note**: CNAME records show target domains, not IP addresses - this is normal and expected
 
 #### Step 5: Test DNS Configuration
 
