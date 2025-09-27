@@ -1,0 +1,228 @@
+import { UserManager, UserManagerSettings, User as OidcUser } from 'oidc-client-ts';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('api');
+
+export interface ZitadelUser {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  organizationId: string;
+  organizations: Organization[];
+  roles: string[];
+  permissions: string[];
+  accessToken: string;
+  refreshToken?: string;
+  idToken: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  type: 'healthcare_facility' | 'var' | 'admin';
+  metadata?: Record<string, any>;
+}
+
+class ZitadelService {
+  private userManager: UserManager;
+  private readonly settings: UserManagerSettings;
+
+  constructor() {
+    const instanceUrl = import.meta.env.VITE_ZITADEL_INSTANCE_URL || '';
+    const clientId = import.meta.env.VITE_ZITADEL_CLIENT_ID || '';
+    const redirectUri = import.meta.env.VITE_AUTH_REDIRECT_URI || `${window.location.origin}/auth/callback`;
+    const postLogoutUri = import.meta.env.VITE_AUTH_POST_LOGOUT_URI || window.location.origin;
+
+    this.settings = {
+      authority: instanceUrl,
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      post_logout_redirect_uri: postLogoutUri,
+      response_type: 'code',
+      scope: 'openid profile email offline_access',
+      automaticSilentRenew: true,
+      silent_redirect_uri: `${window.location.origin}/auth/silent-callback`,
+      loadUserInfo: true,
+      // PKCE is automatically enabled for public clients
+    };
+
+    this.userManager = new UserManager(this.settings);
+
+    // Set up event handlers
+    this.setupEventHandlers();
+  }
+
+  private setupEventHandlers(): void {
+    this.userManager.events.addUserLoaded((user) => {
+      log.info('User loaded', { userId: user.profile.sub });
+    });
+
+    this.userManager.events.addUserUnloaded(() => {
+      log.info('User unloaded');
+    });
+
+    this.userManager.events.addAccessTokenExpiring(() => {
+      log.warn('Access token expiring');
+    });
+
+    this.userManager.events.addAccessTokenExpired(() => {
+      log.error('Access token expired');
+      this.renewToken();
+    });
+
+    this.userManager.events.addSilentRenewError((error) => {
+      log.error('Silent renew error', error);
+    });
+  }
+
+  async login(): Promise<void> {
+    try {
+      await this.userManager.signinRedirect();
+    } catch (error) {
+      log.error('Login redirect failed', error);
+      throw error;
+    }
+  }
+
+  async handleCallback(): Promise<ZitadelUser | null> {
+    try {
+      const oidcUser = await this.userManager.signinRedirectCallback();
+      return this.transformUser(oidcUser);
+    } catch (error) {
+      log.error('Callback handling failed', error);
+      throw error;
+    }
+  }
+
+  async logout(): Promise<void> {
+    try {
+      await this.userManager.signoutRedirect();
+    } catch (error) {
+      log.error('Logout redirect failed', error);
+      throw error;
+    }
+  }
+
+  async getUser(): Promise<ZitadelUser | null> {
+    try {
+      const oidcUser = await this.userManager.getUser();
+      if (!oidcUser) return null;
+      return this.transformUser(oidcUser);
+    } catch (error) {
+      log.error('Failed to get user', error);
+      return null;
+    }
+  }
+
+  async renewToken(): Promise<void> {
+    try {
+      await this.userManager.signinSilent();
+      log.info('Token renewed successfully');
+    } catch (error) {
+      log.error('Token renewal failed', error);
+      throw error;
+    }
+  }
+
+  async removeUser(): Promise<void> {
+    await this.userManager.removeUser();
+  }
+
+  private transformUser(oidcUser: OidcUser): ZitadelUser {
+    const profile = oidcUser.profile as any;
+
+    return {
+      id: profile.sub,
+      email: profile.email || '',
+      name: profile.name || profile.preferred_username || '',
+      picture: profile.picture,
+      organizationId: profile['urn:zitadel:iam:org:id'] || profile.org_id || '',
+      organizations: this.parseOrganizations(profile),
+      roles: this.parseRoles(profile),
+      permissions: this.parsePermissions(profile),
+      accessToken: oidcUser.access_token,
+      refreshToken: oidcUser.refresh_token,
+      idToken: oidcUser.id_token || '',
+    };
+  }
+
+  private parseOrganizations(profile: any): Organization[] {
+    // Zitadel may provide organization data in various claims
+    const orgs = profile['urn:zitadel:iam:orgs'] || profile.orgs || [];
+
+    if (Array.isArray(orgs)) {
+      return orgs.map((org: any) => ({
+        id: org.id || org,
+        name: org.name || '',
+        type: this.determineOrgType(org),
+        metadata: org.metadata || {},
+      }));
+    }
+
+    // If only single org, create array with current org
+    if (profile['urn:zitadel:iam:org:id']) {
+      return [{
+        id: profile['urn:zitadel:iam:org:id'],
+        name: profile['urn:zitadel:iam:org:name'] || '',
+        type: 'healthcare_facility',
+        metadata: {},
+      }];
+    }
+
+    return [];
+  }
+
+  private parseRoles(profile: any): string[] {
+    // Zitadel provides roles in various formats
+    const roles = profile['urn:zitadel:iam:org:project:roles'] ||
+                  profile.roles ||
+                  profile['https://claims.zitadel.com/roles'] ||
+                  [];
+
+    if (typeof roles === 'object' && !Array.isArray(roles)) {
+      // Roles might be an object with role names as keys
+      return Object.keys(roles);
+    }
+
+    return Array.isArray(roles) ? roles : [];
+  }
+
+  private parsePermissions(profile: any): string[] {
+    // Extract permissions from roles or dedicated claim
+    const permissions = profile.permissions ||
+                       profile['urn:zitadel:iam:permissions'] ||
+                       [];
+
+    return Array.isArray(permissions) ? permissions : [];
+  }
+
+  private determineOrgType(org: any): 'healthcare_facility' | 'var' | 'admin' {
+    // Determine organization type based on metadata or naming convention
+    if (org.type) return org.type;
+    if (org.metadata?.type) return org.metadata.type;
+
+    // Default to healthcare_facility for now
+    return 'healthcare_facility';
+  }
+
+  // Check if user has specific role
+  hasRole(user: ZitadelUser, role: string): boolean {
+    return user.roles.includes(role);
+  }
+
+  // Check if user has specific permission
+  hasPermission(user: ZitadelUser, permission: string): boolean {
+    return user.permissions.includes(permission);
+  }
+
+  // Switch organization context (for users with access to multiple orgs)
+  async switchOrganization(orgId: string): Promise<void> {
+    // This would typically involve calling Zitadel API to switch context
+    // For now, we'll store the selected org and use it in API calls
+    sessionStorage.setItem('selected_org_id', orgId);
+    log.info('Switched organization', { orgId });
+  }
+}
+
+export const zitadelService = new ZitadelService();

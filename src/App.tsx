@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { LoginPage } from '@/pages/auth/LoginPage';
+import { AuthCallback } from '@/pages/auth/AuthCallback';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { ClientListPage } from '@/pages/clients/ClientListPage';
 import { ClientDetailLayout } from '@/pages/clients/ClientDetailLayout';
@@ -51,7 +52,8 @@ function App() {
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<LoginPage />} />
-            
+            <Route path="/auth/callback" element={<AuthCallback />} />
+
             {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>
               {/* Redirect root to clients */}

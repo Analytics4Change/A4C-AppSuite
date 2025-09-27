@@ -11,7 +11,7 @@ import { OAuthProviders } from '@/components/auth/OAuthProviders';
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, loginWithOAuth } = useAuth();
+  const { login, loginWithOAuth, loginWithZitadel } = useAuth();
   
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -65,6 +65,16 @@ export const LoginPage: React.FC = () => {
 
   const handleOAuthError = (provider: string, error: Error) => {
     setError(`${provider} login failed: ${error.message}`);
+  };
+
+  const handleZitadelLogin = async () => {
+    try {
+      setIsLoading(true);
+      await loginWithZitadel();
+    } catch (err) {
+      setError('Failed to initiate Zitadel login');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -134,7 +144,33 @@ export const LoginPage: React.FC = () => {
                 {isLoading ? 'Signing in...' : 'Sign In'}
               </Button>
 
-              {/* OAuth Providers */}
+              {/* Zitadel SSO Login */}
+              {import.meta.env.VITE_AUTH_MODE === 'production' && (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-gray-300/50" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-white/80 backdrop-blur-sm px-2 text-gray-500">
+                        Or
+                      </span>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleZitadelLogin}
+                    disabled={isLoading}
+                  >
+                    Sign in with Enterprise SSO
+                  </Button>
+                </div>
+              )}
+
+              {/* OAuth Providers (Mock Mode) */}
               <OAuthProviders
                 onSuccess={handleOAuthSuccess}
                 onError={handleOAuthError}
