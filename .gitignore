@@ -29,6 +29,10 @@ test-validation/
 .env.test.local
 # .env.production and .env.staging can be encrypted with git-crypt if needed
 
+# Git-crypt keys (should never be committed)
+*.git-crypt.key
+*-git-crypt.key
+
 # IDE files
 .vscode/settings.json
 .idea/
