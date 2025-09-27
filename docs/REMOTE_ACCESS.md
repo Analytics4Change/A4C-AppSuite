@@ -5,7 +5,7 @@ Secure SSH and VNC access to the A4C development environment via Cloudflare tunn
 ## Overview
 
 This guide provides secure remote access to the development environment through:
-- **SSH access**: `access.firstovertheline.com` (port 22)
+- **SSH access**: `ssh.firstovertheline.com` (port 22)
 - **VNC access**: `vnc.firstovertheline.com:5901` (display :1)
 - **Security**: Cloudflare Zero Trust with `a4c-developers` team authentication
 - **No Impact**: Public application at `a4c.firstovertheline.com` remains unaffected
@@ -28,7 +28,7 @@ This guide provides secure remote access to the development environment through:
 
 ### SSH Access
 ```bash
-ssh access.firstovertheline.com
+ssh ssh.firstovertheline.com
 ```
 1. Browser opens for Zero Trust authentication
 2. Authenticate with your authorized email + MFA
@@ -119,6 +119,35 @@ vncserver -kill :1
 
 ### DNS Configuration (Administrator)
 
+Add DNS records in Cloudflare dashboard. You can do this either through the web interface or using the Cloudflare CLI for automation.
+
+#### Option 1: CLI-Based Configuration (Recommended for automation)
+
+**Prerequisites:**
+```bash
+# Install Cloudflare CLI
+npm install -g cloudflare-cli
+
+# Configure CLI with API token
+echo "defaults:" > ~/.cfcli.yml
+echo "  token: YOUR_API_TOKEN" >> ~/.cfcli.yml
+echo "  domain: firstovertheline.com" >> ~/.cfcli.yml
+```
+
+**Create DNS records:**
+```bash
+# Create SSH access record
+cfcli -t CNAME add ssh c9fbbb48-792d-4ba1-86b7-c7a141c1eea6.cfargotunnel.com
+
+# Create VNC access record  
+cfcli -t CNAME add vnc c9fbbb48-792d-4ba1-86b7-c7a141c1eea6.cfargotunnel.com
+
+# Verify records were created
+cfcli ls | grep -E "(ssh|vnc)"
+```
+
+#### Option 2: Web Interface Configuration
+
 Add DNS records in Cloudflare dashboard with detailed step-by-step instructions:
 
 #### Step 1: Find Your Existing Tunnel Configuration
@@ -139,7 +168,7 @@ Add DNS records in Cloudflare dashboard with detailed step-by-step instructions:
    - **If `a4c` is a CNAME Record**: Copy the target domain (e.g., `firstovertheline.com`)
    - This same content will be used for both new records
 
-#### Step 2: Create Access Subdomain Record
+#### Step 2: Create SSH Subdomain Record
 
 1. **Click "Add record" button** (blue button at top of DNS records table)
 
@@ -157,15 +186,15 @@ Add DNS records in Cloudflare dashboard with detailed step-by-step instructions:
    **If your `a4c` is a CNAME Record:**
    ```
    Type: CNAME
-   Name: access
-   Target: [paste the target domain from the a4c record]
+   Name: ssh
+   Target: c9fbbb48-792d-4ba1-86b7-c7a141c1eea6.cfargotunnel.com
    Proxy status: Proxied (orange cloud icon - should be enabled)
    TTL: Auto (default)
    ```
 
 3. **Verify Settings:**
-   - Record will create: `access.firstovertheline.com`
-   - Content matches your `a4c` record exactly
+   - Record will create: `ssh.firstovertheline.com`
+   - Target points to tunnel hostname
    - Orange cloud is enabled (showing "Proxied")
 
 4. **Click "Save"
@@ -178,25 +207,16 @@ Add DNS records in Cloudflare dashboard with detailed step-by-step instructions:
 
    **If using A Records:**
    ```
-   Type: A
-   Name: vnc
-   IPv4 address: [same IP as a4c and access records]
-   Proxy status: Proxied (orange cloud icon - should be enabled)
-   TTL: Auto (default)
-   ```
-
-   **If using CNAME Records:**
-   ```
    Type: CNAME
    Name: vnc
-   Target: [same target as a4c and access records]
+   Target: c9fbbb48-792d-4ba1-86b7-c7a141c1eea6.cfargotunnel.com
    Proxy status: Proxied (orange cloud icon - should be enabled)
    TTL: Auto (default)
    ```
 
 3. **Verify Settings:**
    - Record will create: `vnc.firstovertheline.com`
-   - Content matches `a4c` and `access` records exactly
+   - Target points to tunnel hostname (same as SSH record)
    - Orange cloud is enabled (showing "Proxied")
 
 4. **Click "Save"
@@ -215,15 +235,15 @@ A     vnc      172.64.x.x      Proxied  Auto    (new)
 
 **Option B - If Using CNAME Records:**
 ```
-Type   Name     Content                  Proxy    TTL
-CNAME  a4c      firstovertheline.com    Proxied  Auto    (existing)
-CNAME  access   firstovertheline.com    Proxied  Auto    (new)
-CNAME  vnc      firstovertheline.com    Proxied  Auto    (new)
+Type   Name     Content                                    Proxy    TTL
+A      a4c      172.64.x.x                                Proxied  Auto    (existing)
+CNAME  ssh      c9fbbb48...cfargotunnel.com              Proxied  Auto    (new)
+CNAME  vnc      c9fbbb48...cfargotunnel.com              Proxied  Auto    (new)
 ```
 
 **Important Notes:**
-- All three records MUST have identical content (matching your `a4c` record)
-- All three records MUST be "Proxied" (orange cloud enabled)
+- SSH and VNC records MUST point to your tunnel hostname
+- All records MUST be "Proxied" (orange cloud enabled)  
 - DNS propagation typically takes 1-5 minutes
 - **Note**: CNAME records show target domains, not IP addresses - this is normal and expected
 
@@ -233,10 +253,10 @@ CNAME  vnc      firstovertheline.com    Proxied  Auto    (new)
 
 ```bash
 # Test new records resolve to Cloudflare IPs
-dig access.firstovertheline.com +short
+dig ssh.firstovertheline.com +short
 dig vnc.firstovertheline.com +short
 
-# Should return Cloudflare proxy IPs (not your server IP)
+# Should return Cloudflare proxy IPs (not your tunnel hostname or server IP)
 # Both commands should return identical results
 ```
 
@@ -249,7 +269,7 @@ dig vnc.firstovertheline.com +short
 **Test HTTP Connectivity:**
 ```bash
 # Should return Cloudflare headers (not tunnel errors)
-curl -I https://access.firstovertheline.com
+curl -I https://ssh.firstovertheline.com
 curl -I https://vnc.firstovertheline.com
 
 # Expected: HTTP 200 or Cloudflare Access authentication page
@@ -259,7 +279,7 @@ curl -I https://vnc.firstovertheline.com
 #### Troubleshooting DNS Issues
 
 **Records Not Resolving:**
-- Check DNS propagation: `dig @1.1.1.1 access.firstovertheline.com`
+- Check DNS propagation: `dig @1.1.1.1 ssh.firstovertheline.com`
 - Verify IP matches existing `a4c` record exactly
 - Ensure orange cloud (Proxy) is enabled on all records
 
@@ -274,6 +294,63 @@ curl -I https://vnc.firstovertheline.com
 - Contact Cloudflare support if unsure about tunnel IP
 
 ### Zero Trust Team Setup (Administrator)
+
+Zero Trust configuration can be done through the web interface or programmatically via the Cloudflare API. The API approach is recommended for automation and reproducible setups.
+
+#### Option 1: API-Based Configuration (Recommended for automation)
+
+**Prerequisites:**
+```bash
+# Enhanced API token with permissions for:
+# - Zone.Zone:Read, Zone.DNS:Edit
+# - Access.App:Edit, Access.Group:Edit
+# - Account.Access:Read
+export CF_API_TOKEN="your-enhanced-api-token"
+export CF_ACCOUNT_ID="your-account-id"
+```
+
+**Create Zero Trust team and policies:**
+```bash
+# Create Zero Trust team
+curl -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/access/teams" \
+  -H "Authorization: Bearer $CF_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "a4c-developers"}'
+
+# Create SSH access application
+curl -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/access/apps" \
+  -H "Authorization: Bearer $CF_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "SSH Access",
+    "domain": "ssh.firstovertheline.com",
+    "type": "self_hosted",
+    "session_duration": "8h",
+    "policies": [{
+      "name": "Allow a4c-developers",
+      "decision": "allow",
+      "include": [{"email": {"email": "*@*"}}]
+    }]
+  }'
+
+# Create VNC access application  
+curl -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/access/apps" \
+  -H "Authorization: Bearer $CF_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "VNC Access",
+    "domain": "vnc.firstovertheline.com", 
+    "type": "self_hosted",
+    "session_duration": "8h",
+    "policies": [{
+      "name": "Allow a4c-developers",
+      "decision": "allow",
+      "include": [{"email": {"email": "*@*"}}]
+    }]
+  }'
+```
+
+#### Option 2: Web Interface Configuration
 
 Detailed step-by-step Zero Trust configuration for first-time and existing users:
 
@@ -372,7 +449,7 @@ Detailed step-by-step Zero Trust configuration for first-time and existing users
    
    **Should see two applications:**
    ```
-   Application: access.firstovertheline.com
+   Application: ssh.firstovertheline.com
    Status: Active
    Policies: Allow a4c-developers team
    
@@ -388,7 +465,7 @@ Detailed step-by-step Zero Trust configuration for first-time and existing users
    - **Application type:** Self-hosted
    - **Application name:** `SSH Access`
    - **Session duration:** 8 hours (adjust as needed)
-   - **Application domain:** `access.firstovertheline.com`
+   - **Application domain:** `ssh.firstovertheline.com`
    - **Next** → **Add a policy**
    - **Policy name:** `Allow a4c-developers`
    - **Action:** Allow
@@ -418,7 +495,7 @@ Detailed step-by-step Zero Trust configuration for first-time and existing users
    - Enter verification code to confirm
 
 3. **Test Access**
-   - Try accessing: `https://access.firstovertheline.com`
+   - Try accessing: `https://ssh.firstovertheline.com`
    - Should redirect to authentication page
    - Complete email + MFA flow
    - Should see "You are authenticated" or similar success message
@@ -441,7 +518,7 @@ Detailed step-by-step Zero Trust configuration for first-time and existing users
    - Users can successfully authenticate
 
 4. **Applications Protected**
-   - `access.firstovertheline.com` → Protected ✓
+   - `ssh.firstovertheline.com` → Protected ✓
    - `vnc.firstovertheline.com` → Protected ✓
    - Both redirect to authentication when accessed
 
@@ -726,22 +803,22 @@ Zero Trust Dashboard:
 **macOS/Linux (Terminal):**
 ```bash
 # Basic connection
-ssh access.firstovertheline.com
+ssh ssh.firstovertheline.com
 
 # With specific user
-ssh username@access.firstovertheline.com
+ssh username@ssh.firstovertheline.com
 
 # With X11 forwarding for GUI apps
-ssh -X access.firstovertheline.com
+ssh -X ssh.firstovertheline.com
 
 # With local port forwarding
-ssh -L 8080:localhost:8080 access.firstovertheline.com
+ssh -L 8080:localhost:8080 ssh.firstovertheline.com
 ```
 
 **Windows (PowerShell/WSL):**
 ```powershell
 # Using built-in SSH client (Windows 10+)
-ssh access.firstovertheline.com
+ssh ssh.firstovertheline.com
 
 # Or use PuTTY, WSL, or Git Bash
 ```
@@ -787,7 +864,7 @@ vinagre vnc://vnc.firstovertheline.com:5901
 ### Zero Trust Authentication Process
 
 1. **Initiate Connection**
-   - SSH: `ssh access.firstovertheline.com`
+   - SSH: `ssh ssh.firstovertheline.com`
    - VNC: Connect to `vnc.firstovertheline.com:5901`
 
 2. **Browser Authentication**
@@ -845,7 +922,7 @@ sudo systemctl status ssh
 sudo systemctl status cloudflared
 
 # Verify DNS resolution
-nslookup access.firstovertheline.com
+nslookup ssh.firstovertheline.com
 ```
 
 **Authentication Failures:**
@@ -925,7 +1002,7 @@ Comprehensive testing procedures to verify the complete setup:
 **Basic DNS Tests:**
 ```bash
 # Test new subdomain resolution
-dig access.firstovertheline.com +short
+dig ssh.firstovertheline.com +short
 dig vnc.firstovertheline.com +short
 
 # Should return Cloudflare proxy IPs (172.64.x.x or 104.21.x.x)
@@ -934,7 +1011,7 @@ dig vnc.firstovertheline.com +short
 
 **Expected DNS Output:**
 ```
-$ dig access.firstovertheline.com +short
+$ dig ssh.firstovertheline.com +short
 172.64.98.19
 172.64.99.19
 
@@ -946,27 +1023,27 @@ $ dig vnc.firstovertheline.com +short
 **Comprehensive DNS Verification:**
 ```bash
 # Test against multiple DNS servers
-dig @1.1.1.1 access.firstovertheline.com +short    # Cloudflare DNS
-dig @8.8.8.8 access.firstovertheline.com +short    # Google DNS
+dig @1.1.1.1 ssh.firstovertheline.com +short    # Cloudflare DNS
+dig @8.8.8.8 ssh.firstovertheline.com +short    # Google DNS
 dig @208.67.222.222 vnc.firstovertheline.com +short # OpenDNS
 
 # Check DNS propagation status
 for server in 1.1.1.1 8.8.8.8 208.67.222.222; do
   echo "Testing $server:"
-  dig @$server access.firstovertheline.com +short
+  dig @$server ssh.firstovertheline.com +short
 done
 ```
 
 **DNS Troubleshooting:**
 ```bash
 # Check for CNAME conflicts
-dig access.firstovertheline.com ANY
+dig ssh.firstovertheline.com ANY
 
 # Verify TTL values
-dig access.firstovertheline.com +ttlid
+dig ssh.firstovertheline.com +ttlid
 
 # Test with trace for debugging
-dig access.firstovertheline.com +trace
+dig ssh.firstovertheline.com +trace
 ```
 
 #### HTTP Connectivity Testing
@@ -974,7 +1051,7 @@ dig access.firstovertheline.com +trace
 **Test Access Authentication Pages:**
 ```bash
 # Test SSH access endpoint (should get Cloudflare Access page)
-curl -I https://access.firstovertheline.com
+curl -I https://ssh.firstovertheline.com
 
 # Test VNC access endpoint
 curl -I https://vnc.firstovertheline.com
@@ -1008,13 +1085,13 @@ cf-ray: [ray-id]
 **Advanced HTTP Testing:**
 ```bash
 # Test with verbose output
-curl -v https://access.firstovertheline.com 2>&1 | grep -E "(HTTP|location|cf-)"
+curl -v https://ssh.firstovertheline.com 2>&1 | grep -E "(HTTP|location|cf-)"
 
 # Test SSL certificate
-openssl s_client -connect access.firstovertheline.com:443 -servername access.firstovertheline.com < /dev/null 2>&1 | grep -A5 "Certificate chain"
+openssl s_client -connect ssh.firstovertheline.com:443 -servername ssh.firstovertheline.com < /dev/null 2>&1 | grep -A5 "Certificate chain"
 
 # Test redirect chain
-curl -L -v https://access.firstovertheline.com 2>&1 | grep -E "(HTTP|Location)"
+curl -L -v https://ssh.firstovertheline.com 2>&1 | grep -E "(HTTP|Location)"
 ```
 
 #### Tunnel Configuration Testing
@@ -1037,7 +1114,7 @@ $ cloudflared tunnel info a4c-k3s-tunnel
 Tunnel ID: c9fbbb48-792d-4ba1-86b7-c7a141c1eea6
 Created: [date]
 Connections: 4/4 connected
-Hostnames: access.firstovertheline.com, vnc.firstovertheline.com, a4c.firstovertheline.com, k8s.firstovertheline.com
+Hostnames: ssh.firstovertheline.com, vnc.firstovertheline.com, a4c.firstovertheline.com, k8s.firstovertheline.com
 ```
 
 **Configuration Verification:**
@@ -1069,7 +1146,7 @@ watch -n 5 'cloudflared tunnel info a4c-k3s-tunnel'
 **Manual Authentication Test:**
 ```bash
 # Test authentication redirect
-curl -s -I https://access.firstovertheline.com | grep -i location
+curl -s -I https://ssh.firstovertheline.com | grep -i location
 
 # Should return: location: https://a4c-developers.cloudflareaccess.com/...
 ```
@@ -1108,7 +1185,7 @@ done
 **SSH Authentication Flow:**
 ```bash
 # Initiate SSH connection (will trigger browser authentication)
-ssh -o ConnectTimeout=10 access.firstovertheline.com echo "SSH test"
+ssh -o ConnectTimeout=10 ssh.firstovertheline.com echo "SSH test"
 
 # Expected behavior:
 # 1. Browser opens automatically
@@ -1134,7 +1211,7 @@ open vnc://vnc.firstovertheline.com:5901
 ps aux | grep -i browser
 
 # Verify no authentication bypass
-curl -H "CF-Access-Client-Id: test" https://access.firstovertheline.com
+curl -H "CF-Access-Client-Id: test" https://ssh.firstovertheline.com
 
 # Should still require authentication, not bypass
 ```
@@ -1144,13 +1221,13 @@ curl -H "CF-Access-Client-Id: test" https://access.firstovertheline.com
 **Basic Performance Tests:**
 ```bash
 # Test response times
-time curl -s -o /dev/null https://access.firstovertheline.com
+time curl -s -o /dev/null https://ssh.firstovertheline.com
 time curl -s -o /dev/null https://vnc.firstovertheline.com
 time curl -s -o /dev/null https://a4c.firstovertheline.com
 
 # Test multiple concurrent connections
 for i in {1..5}; do
-  curl -s -I https://access.firstovertheline.com &
+  curl -s -I https://ssh.firstovertheline.com &
 done
 wait
 ```
@@ -1158,8 +1235,8 @@ wait
 **Network Quality Testing:**
 ```bash
 # Test from different locations (if available)
-curl -H "CF-IPCountry: US" -I https://access.firstovertheline.com
-curl -H "CF-IPCountry: EU" -I https://access.firstovertheline.com
+curl -H "CF-IPCountry: US" -I https://ssh.firstovertheline.com
+curl -H "CF-IPCountry: EU" -I https://ssh.firstovertheline.com
 
 # Monitor bandwidth usage during VNC session
 iftop -i eth0  # Replace eth0 with your interface
@@ -1232,10 +1309,10 @@ This comprehensive testing suite ensures every component of the remote access sy
 ### SSH Performance
 ```bash
 # Use compression for slow connections
-ssh -C access.firstovertheline.com
+ssh -C ssh.firstovertheline.com
 
 # Multiplex connections
-ssh -o ControlMaster=auto -o ControlPath=/tmp/%r@%h:%p access.firstovertheline.com
+ssh -o ControlMaster=auto -o ControlPath=/tmp/%r@%h:%p ssh.firstovertheline.com
 ```
 
 ### VNC Performance
@@ -1309,7 +1386,7 @@ iotop
 ssh-keygen -t ed25519 -C "your-email@example.com"
 
 # Copy public key to server
-ssh-copy-id access.firstovertheline.com
+ssh-copy-id ssh.firstovertheline.com
 ```
 
 **Disable password authentication:**
