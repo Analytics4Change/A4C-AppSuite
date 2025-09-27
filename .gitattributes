@@ -1,0 +1,14 @@
+# Git-crypt encryption configuration
+# Files matching these patterns will be encrypted in the repository
+
+# Environment files with secrets
+.env.local filter=git-crypt diff=git-crypt
+.env.production filter=git-crypt diff=git-crypt
+.env.staging filter=git-crypt diff=git-crypt
+
+# Any other sensitive configuration files
+*.secret filter=git-crypt diff=git-crypt
+**/secrets/* filter=git-crypt diff=git-crypt
+
+# Note: These files will appear encrypted in the repository
+# but will be transparently decrypted for users with the git-crypt key

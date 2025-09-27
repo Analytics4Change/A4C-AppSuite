@@ -24,10 +24,10 @@ test-validation/
 
 # Environment files
 .env
-.env.local
+# .env.local is now encrypted with git-crypt and tracked
 .env.development.local
 .env.test.local
-.env.production.local
+# .env.production and .env.staging can be encrypted with git-crypt if needed
 
 # IDE files
 .vscode/settings.json
