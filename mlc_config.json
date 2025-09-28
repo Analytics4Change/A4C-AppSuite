@@ -17,6 +17,10 @@
     },
     {
       "pattern": "^https://github.com/Analytics4Change"
+    },
+    {
+      "pattern": "^https?://(?!127\\.0\\.0\\.1|localhost).*",
+      "comment": "Ignore all external HTTP/HTTPS links except localhost - check internal links only"
     }
   ],
   "timeout": "30s",
