@@ -116,3 +116,9 @@ test-*.html
 *-test.html
 focus-*.html
 keyboard-*.html
+
+# Git-crypt keys and deployment files
+*git-crypt.key
+*.deb
+*.rpm
+*.msi
