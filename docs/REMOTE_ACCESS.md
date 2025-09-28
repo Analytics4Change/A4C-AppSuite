@@ -92,6 +92,7 @@ dig ssh.firstovertheline.com +short
 
 **Test HTTP connectivity:**
 ```bash
+# Note: Replace firstovertheline.com with your actual domain
 curl -I https://ssh.firstovertheline.com
 # Should return 302 redirect to Cloudflare Access authentication
 ```
@@ -263,7 +264,7 @@ ssh-copy-id username@ssh.firstovertheline.com
 **Browser Authentication Not Working:**
 - Try different browser or incognito mode
 - Check corporate firewall settings
-- Manually visit: `https://firstovertheline.cloudflareaccess.com`
+- Manually visit: `https://firstovertheline.cloudflareaccess.com` (replace with your team domain)
 - Verify team membership status in dashboard
 
 **Team Access Denied:**
@@ -287,6 +288,7 @@ dig @8.8.8.8 ssh.firstovertheline.com +short
 **Test HTTP connectivity:**
 ```bash
 # Should return 302 redirect to authentication
+# Note: Replace firstovertheline.com with your actual domain
 curl -I https://ssh.firstovertheline.com
 
 # Should show Cloudflare Access headers
