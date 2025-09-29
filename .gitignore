@@ -1,0 +1,75 @@
+# Git-crypt key (NEVER commit this!)
+*-git-crypt.key
+*.key.backup
+
+# Terraform local files
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform.lock.hcl
+terraform.tfstate.d/
+crash.log
+crash.*.log
+
+# Override files as they are usually used for local overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# CLI configuration files
+.terraformrc
+terraform.rc
+
+# Local environment files (unencrypted versions during development)
+.env.local.decrypted
+*.decrypted
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+dist/
+build/
+out/
+target/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+.env/
+
+# Secrets that should never be committed (even encrypted)
+*-PLAINTEXT.txt
+*-UNENCRYPTED.*
+DO-NOT-COMMIT-*

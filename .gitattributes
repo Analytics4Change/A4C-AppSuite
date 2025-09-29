@@ -1,0 +1,44 @@
+# Git-crypt encryption configuration
+# Files matching these patterns will be encrypted in the repository
+
+# Environment files with secrets
+.env filter=git-crypt diff=git-crypt
+.env.local filter=git-crypt diff=git-crypt
+.env.production filter=git-crypt diff=git-crypt
+.env.staging filter=git-crypt diff=git-crypt
+.env.development filter=git-crypt diff=git-crypt
+*.env filter=git-crypt diff=git-crypt
+
+# Terraform files with sensitive data
+terraform.tfvars filter=git-crypt diff=git-crypt
+*.tfvars filter=git-crypt diff=git-crypt
+*.auto.tfvars filter=git-crypt diff=git-crypt
+
+# Service account keys and credentials
+*-service-account.json filter=git-crypt diff=git-crypt
+*-service-account.key filter=git-crypt diff=git-crypt
+*.key filter=git-crypt diff=git-crypt
+*.pem filter=git-crypt diff=git-crypt
+*.p12 filter=git-crypt diff=git-crypt
+*.pfx filter=git-crypt diff=git-crypt
+
+# Backend configuration with credentials
+backend.tf filter=git-crypt diff=git-crypt
+backend-config.hcl filter=git-crypt diff=git-crypt
+backend.hcl filter=git-crypt diff=git-crypt
+
+# Any files in secrets or credentials directories
+**/secrets/** filter=git-crypt diff=git-crypt
+**/credentials/** filter=git-crypt diff=git-crypt
+**/.secrets/** filter=git-crypt diff=git-crypt
+
+# Supabase specific sensitive files
+supabase-access-token.txt filter=git-crypt diff=git-crypt
+supabase-service-role.txt filter=git-crypt diff=git-crypt
+
+# Zitadel specific sensitive files
+zitadel-service-account.json filter=git-crypt diff=git-crypt
+zitadel-credentials.json filter=git-crypt diff=git-crypt
+
+# Note: These files will appear encrypted in the repository
+# but will be transparently decrypted for users with the git-crypt key
