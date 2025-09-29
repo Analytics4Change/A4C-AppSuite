@@ -1,4 +1,5 @@
 import { test, expect, Page, chromium, firefox, webkit, Browser, BrowserContext } from '@playwright/test';
+import * as fs from 'fs';
 
 /**
  * Focus Intent Pattern Test Suite
@@ -146,7 +147,6 @@ BROWSERS.forEach(browserConfig => {
       ).join('\n');
       
       // Save logs to file
-      const fs = require('fs');
       const logFileName = `logs-${browserConfig.name.toLowerCase()}-${Date.now()}.txt`;
       fs.writeFileSync(logFileName, logContent);
       console.log(`Logs saved to ${logFileName}`);
