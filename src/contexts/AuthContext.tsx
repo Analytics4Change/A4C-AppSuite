@@ -10,7 +10,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'clinician' | 'nurse' | 'viewer';
+  role: 'super_admin' | 'partner_onboarder' | 'administrator' | 'provider_admin' | 'admin' | 'clinician' | 'nurse' | 'caregiver' | 'viewer';
   provider?: 'local' | 'google' | 'facebook' | 'apple' | 'zitadel';
   picture?: string;
 }

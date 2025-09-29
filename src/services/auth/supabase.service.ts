@@ -68,37 +68,36 @@ class SupabaseService {
   async updateAuthToken(user: ZitadelUser | null): Promise<void> {
     this.currentUser = user;
 
+    // Instead of recreating the client, just update the headers
+    // This prevents the "Multiple GoTrueClient instances" warning
     if (user?.accessToken) {
-      // Set the Zitadel JWT as the auth token for Supabase
-      this.client = createClient<Database>(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY,
-        {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-          },
-          global: {
-            headers: {
-              Authorization: `Bearer ${user.accessToken}`,
-              'X-Organization-Id': user.organizationId, // Pass org ID for RLS
-            },
-          },
-        }
-      );
+      // Update headers for authenticated requests
+      (this.client as any).rest.headers = {
+        ...((this.client as any).rest?.headers || {}),
+        Authorization: `Bearer ${user.accessToken}`,
+        'X-Organization-Id': user.organizationId,
+      };
+      
+      // Also update the realtime headers if needed
+      if ((this.client as any).realtime) {
+        (this.client as any).realtime.headers = {
+          ...((this.client as any).realtime?.headers || {}),
+          Authorization: `Bearer ${user.accessToken}`,
+          'X-Organization-Id': user.organizationId,
+        };
+      }
+      
       log.info('Supabase auth token updated');
     } else {
       // Reset to anonymous access
-      this.client = createClient<Database>(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY,
-        {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-          },
-        }
-      );
+      (this.client as any).rest.headers = {
+        ...((this.client as any).rest?.headers || {}),
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      };
+      
+      delete (this.client as any).rest.headers.Authorization;
+      delete (this.client as any).rest.headers['X-Organization-Id'];
+      
       log.info('Supabase reset to anonymous access');
     }
   }
@@ -116,6 +115,20 @@ class SupabaseService {
     }
 
     return this.client;
+  }
+
+  /**
+   * Get the current authenticated user
+   */
+  async getCurrentUser(): Promise<ZitadelUser | null> {
+    // Ensure we have the latest user from Zitadel
+    const currentZitadelUser = await zitadelService.getUser();
+
+    if (currentZitadelUser?.accessToken !== this.currentUser?.accessToken) {
+      await this.updateAuthToken(currentZitadelUser);
+    }
+
+    return this.currentUser;
   }
 
   /**
@@ -219,9 +232,9 @@ class SupabaseService {
     }
 
     const client = await this.getClient();
-    const result = await client
+    const result = await (client as any)
       .from(tableName)
-      .update(updates as any)
+      .update(updates)
       .eq('id', id)
       .eq('organization_id', this.currentUser.organizationId) // Ensure org scope
       .select()

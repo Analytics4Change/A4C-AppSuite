@@ -40,7 +40,7 @@ class ZitadelService {
       redirect_uri: redirectUri,
       post_logout_redirect_uri: postLogoutUri,
       response_type: 'code',
-      scope: 'openid profile email offline_access',
+      scope: 'openid profile email offline_access urn:zitadel:iam:org:project:id:zitadel:aud',
       automaticSilentRenew: true,
       silent_redirect_uri: `${window.location.origin}/auth/silent-callback`,
       loadUserInfo: true,
@@ -87,9 +87,18 @@ class ZitadelService {
 
   async handleCallback(): Promise<ZitadelUser | null> {
     try {
+      console.log('[Zitadel] Starting callback handling...');
+      console.log('[Zitadel] URL:', window.location.href);
+      
       const oidcUser = await this.userManager.signinRedirectCallback();
-      return this.transformUser(oidcUser);
+      console.log('[Zitadel] OIDC User received:', oidcUser);
+      
+      const transformedUser = this.transformUser(oidcUser);
+      console.log('[Zitadel] Transformed user:', transformedUser);
+      
+      return transformedUser;
     } catch (error) {
+      console.error('[Zitadel] Callback handling failed:', error);
       log.error('Callback handling failed', error);
       throw error;
     }
@@ -132,6 +141,13 @@ class ZitadelService {
   private transformUser(oidcUser: OidcUser): ZitadelUser {
     const profile = oidcUser.profile as any;
 
+    // Debug log the entire profile to see what claims are available
+    console.log('[Zitadel] Full OIDC Profile:', profile);
+    console.log('[Zitadel] Profile keys:', Object.keys(profile));
+
+    const roles = this.parseRoles(profile);
+    console.log('[Zitadel] Parsed roles:', roles);
+
     return {
       id: profile.sub,
       email: profile.email || '',
@@ -139,7 +155,7 @@ class ZitadelService {
       picture: profile.picture,
       organizationId: profile['urn:zitadel:iam:org:id'] || profile.org_id || '',
       organizations: this.parseOrganizations(profile),
-      roles: this.parseRoles(profile),
+      roles: roles,
       permissions: this.parsePermissions(profile),
       accessToken: oidcUser.access_token,
       refreshToken: oidcUser.refresh_token,
@@ -174,18 +190,33 @@ class ZitadelService {
   }
 
   private parseRoles(profile: any): string[] {
+    // Debug: Log all potential role claims
+    console.log('[Zitadel] Checking role claims:');
+    console.log('  - urn:zitadel:iam:org:project:roles:', profile['urn:zitadel:iam:org:project:roles']);
+    console.log('  - roles:', profile.roles);
+    console.log('  - https://claims.zitadel.com/roles:', profile['https://claims.zitadel.com/roles']);
+    console.log('  - urn:zitadel:iam:org:project:339658577486583889:roles:', profile['urn:zitadel:iam:org:project:339658577486583889:roles']);
+
+    // Check for project-specific roles (using your Project ID)
+    const projectRolesKey = 'urn:zitadel:iam:org:project:339658577486583889:roles';
+
     // Zitadel provides roles in various formats
     const roles = profile['urn:zitadel:iam:org:project:roles'] ||
+                  profile[projectRolesKey] ||
                   profile.roles ||
                   profile['https://claims.zitadel.com/roles'] ||
                   [];
 
     if (typeof roles === 'object' && !Array.isArray(roles)) {
       // Roles might be an object with role names as keys
-      return Object.keys(roles);
+      const roleNames = Object.keys(roles);
+      console.log('[Zitadel] Roles found as object keys:', roleNames);
+      return roleNames;
     }
 
-    return Array.isArray(roles) ? roles : [];
+    const result = Array.isArray(roles) ? roles : [];
+    console.log('[Zitadel] Final parsed roles:', result);
+    return result;
   }
 
   private parsePermissions(profile: any): string[] {
@@ -214,6 +245,72 @@ class ZitadelService {
   // Check if user has specific permission
   hasPermission(user: ZitadelUser, permission: string): boolean {
     return user.permissions.includes(permission);
+  }
+
+  /**
+   * Check if the current user has Zitadel manager roles (ORG_OWNER, IAM_OWNER)
+   * These roles are not included in OIDC tokens and must be fetched via Management API
+   */
+  async checkUserManagementRoles(): Promise<{
+    isOrgOwner: boolean;
+    isIAMOwner: boolean;
+    memberships: any[];
+  }> {
+    try {
+      const user = await this.getUser();
+      if (!user) {
+        return { isOrgOwner: false, isIAMOwner: false, memberships: [] };
+      }
+
+      // Call Zitadel Management API to get user memberships
+      const managementUrl = import.meta.env.VITE_ZITADEL_MANAGEMENT_URL ||
+                           import.meta.env.VITE_ZITADEL_INSTANCE_URL?.replace('https://', 'https://api.');
+
+      if (!managementUrl) {
+        log.warn('Zitadel Management API URL not configured');
+        return { isOrgOwner: false, isIAMOwner: false, memberships: [] };
+      }
+
+      const response = await fetch(`${managementUrl}/v1/users/${user.id}/memberships`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${user.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        log.warn('Failed to fetch user memberships', { status: response.status });
+        return { isOrgOwner: false, isIAMOwner: false, memberships: [] };
+      }
+
+      const data = await response.json();
+      const memberships = data.result || [];
+
+      // Check for manager roles in memberships
+      const isOrgOwner = memberships.some((m: any) =>
+        m.roles?.includes('ORG_OWNER') ||
+        m.roles?.includes('org_owner')
+      );
+
+      const isIAMOwner = memberships.some((m: any) =>
+        m.roles?.includes('IAM_OWNER') ||
+        m.roles?.includes('iam_owner') ||
+        m.type === 'TYPE_IAM'
+      );
+
+      log.info('User management roles checked', {
+        userId: user.id,
+        isOrgOwner,
+        isIAMOwner,
+        membershipCount: memberships.length
+      });
+
+      return { isOrgOwner, isIAMOwner, memberships };
+    } catch (error) {
+      log.error('Error checking management roles', error);
+      return { isOrgOwner: false, isIAMOwner: false, memberships: [] };
+    }
   }
 
   // Switch organization context (for users with access to multiple orgs)
