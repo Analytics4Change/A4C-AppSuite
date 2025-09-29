@@ -7,7 +7,7 @@
 *.tfstate
 *.tfstate.*
 *.tfstate.backup
-.terraform.lock.hcl
+# Note: .terraform.lock.hcl should be committed to ensure consistent provider versions
 terraform.tfstate.d/
 crash.log
 crash.*.log
