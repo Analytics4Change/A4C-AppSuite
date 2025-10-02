@@ -1,37 +1,93 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  Users, 
-  Pill, 
-  FileText, 
-  Settings, 
+import {
+  Users,
+  Pill,
+  FileText,
+  Settings,
   LogOut,
   Heart,
   Menu,
-  X
+  X,
+  Building,
+  UserCog
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ImpersonationBanner } from '@/components/auth/ImpersonationBanner';
+import { ImpersonationModal } from '@/components/auth/ImpersonationModal';
+import { useImpersonationUI } from '@/hooks/useImpersonationUI';
 
 export const MainLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
+  // Impersonation UI hook
+  const {
+    session,
+    isImpersonating,
+    canImpersonate,
+    isModalOpen,
+    openImpersonationModal,
+    closeImpersonationModal,
+    handleImpersonationStart,
+    handleEndImpersonation
+  } = useImpersonationUI();
+
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const navItems = [
-    { to: '/clients', icon: Users, label: 'Clients' },
-    { to: '/medications', icon: Pill, label: 'Medications' },
-    { to: '/reports', icon: FileText, label: 'Reports' },
-    { to: '/settings', icon: Settings, label: 'Settings' },
+  // Define all possible nav items with their required roles
+  const allNavItems = [
+    { to: '/clients', icon: Users, label: 'Clients', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse', 'caregiver'] },
+    { to: '/providers', icon: Building, label: 'Providers', roles: ['super_admin', 'a4c_partner'] },
+    { to: '/medications', icon: Pill, label: 'Medications', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse'] },
+    { to: '/reports', icon: FileText, label: 'Reports', roles: ['super_admin', 'provider_admin', 'administrator'] },
+    { to: '/settings', icon: Settings, label: 'Settings', roles: ['super_admin', 'provider_admin', 'administrator'] },
   ];
 
+  // Filter nav items based on user role
+  const userRole = user?.role || 'caregiver'; // Default to most restrictive role
+
+  // Debug logging
+  console.log('[MainLayout] Current user:', {
+    email: user?.email,
+    role: user?.role,
+    userRole: userRole,
+    userRoleLowercase: userRole.toLowerCase()
+  });
+
+  const navItems = allNavItems.filter(item => {
+    const included = item.roles.includes(userRole.toLowerCase());
+    // Debug: Uncomment to log navigation filtering
+    // console.log(`[MainLayout] ${item.label}: roles=${item.roles.join(',')}, userRole=${userRole.toLowerCase()}, included=${included}`);
+    return included;
+  });
+
   return (
-    <div className="min-h-screen flex">
+    <>
+      {/* Impersonation Banner - Always at the top */}
+      {isImpersonating && session && (
+        <ImpersonationBanner
+          session={session}
+          onEndImpersonation={handleEndImpersonation}
+        />
+      )}
+
+      {/* Impersonation Modal */}
+      {canImpersonate && user && (
+        <ImpersonationModal
+          isOpen={isModalOpen}
+          onClose={closeImpersonationModal}
+          currentUser={user}
+          onImpersonationStart={handleImpersonationStart}
+        />
+      )}
+
+      <div className="min-h-screen flex">
       {/* Mobile menu button */}
       <button
         className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white/80 backdrop-blur-md rounded-md shadow-md"
@@ -116,10 +172,47 @@ export const MainLayout: React.FC = () => {
         }}>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-sm font-medium text-gray-800">{user?.name}</p>
-              <p className="text-xs text-gray-600">{user?.role}</p>
+              <p className="text-sm font-medium text-gray-800">
+                {isImpersonating && session ? session.context.impersonatedUserEmail : user?.name}
+              </p>
+              <p className="text-xs text-gray-600">
+                {isImpersonating && session ? session.context.impersonatedUserRole : user?.role}
+              </p>
+              {isImpersonating && session && (
+                <p className="text-xs text-yellow-600 font-medium mt-1">Impersonating</p>
+              )}
             </div>
           </div>
+
+          {/* Impersonation button for super admins */}
+          {canImpersonate && !isImpersonating && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-gray-700 hover:text-gray-900 rounded-lg transition-all duration-300 mb-2"
+              onClick={openImpersonationModal}
+              style={{
+                background: 'rgba(255, 255, 255, 0.3)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 193, 7, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(255, 193, 7, 0.3)';
+                e.currentTarget.style.boxShadow = '0 0 20px rgba(255, 193, 7, 0.15) inset';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <UserCog className="mr-2" size={16} />
+              Impersonate User
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             size="sm"
@@ -155,5 +248,6 @@ export const MainLayout: React.FC = () => {
         </div>
       </main>
     </div>
+    </>
   );
 };

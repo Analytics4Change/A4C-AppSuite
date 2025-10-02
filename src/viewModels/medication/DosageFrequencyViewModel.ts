@@ -324,7 +324,7 @@ export class DosageFrequencyViewModel {
           }
           break;
           
-        case 'range':
+        case 'range': {
           const numValue = Number(data);
           if (rule.min !== undefined && numValue < rule.min) {
             return rule.message;
@@ -333,6 +333,7 @@ export class DosageFrequencyViewModel {
             return rule.message;
           }
           break;
+        }
           
         case 'pattern':
           if (rule.pattern && !rule.pattern.test(String(data))) {

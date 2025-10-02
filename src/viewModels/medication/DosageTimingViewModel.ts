@@ -350,7 +350,7 @@ export class DosageTimingViewModel {
           }
           break;
           
-        case 'range':
+        case 'range': {
           const numValue = Number(data);
           if (rule.min !== undefined && numValue < rule.min) {
             return rule.message;
@@ -359,6 +359,7 @@ export class DosageTimingViewModel {
             return rule.message;
           }
           break;
+        }
           
         case 'pattern':
           if (rule.pattern && !rule.pattern.test(String(data))) {

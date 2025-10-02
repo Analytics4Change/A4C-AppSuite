@@ -71,17 +71,19 @@ export const LogOverlay: React.FC = () => {
           ).join(' ');
         }
 
-        // Add to log list
-        setLogs(prev => {
-          const newLogs = [...prev, {
-            timestamp,
-            category,
-            level: level as any,
-            message,
-            data
-          }];
-          // Keep last 500 logs
-          return newLogs.slice(-500);
+        // Add to log list (deferred to avoid setState-during-render)
+        queueMicrotask(() => {
+          setLogs(prev => {
+            const newLogs = [...prev, {
+              timestamp,
+              category,
+              level: level as any,
+              message,
+              data
+            }];
+            // Keep last 500 logs
+            return newLogs.slice(-500);
+          });
         });
       };
     };

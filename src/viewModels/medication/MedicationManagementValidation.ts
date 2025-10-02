@@ -164,10 +164,10 @@ export class MedicationManagementValidation {
     }
     
     // Basic validation: allow digits, spaces, hyphens, parentheses, plus, and dots
-    const basicPhoneRegex = /^[\d\s\-\(\)\+\.]+$/;
-    
+    const basicPhoneRegex = /^[\d\s\-()+.]+$/;
+
     // More strict US phone format (optional)
-    const usPhoneRegex = /^\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
+    // const usPhoneRegex = /^\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
     
     if (!basicPhoneRegex.test(this.vm.pharmacyPhone)) {
       this.setError('pharmacyPhone', 'Please enter a valid phone number');

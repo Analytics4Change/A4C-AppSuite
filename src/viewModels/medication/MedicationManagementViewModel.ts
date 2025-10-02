@@ -1,12 +1,12 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { IMedicationApi } from '@/services/api/interfaces/IMedicationApi';
-import { 
-  Medication, 
-  DosageInfo, 
+import {
+  Medication,
+  DosageInfo,
   DosageForm,  // Now refers to broad categories (Solid, Liquid, etc.)
   DosageRoute, // Specific routes (Tablet, Capsule, etc.)
   DosageUnit,
-  DosageFrequency 
+  DosageFrequency
 } from '@/types/models';
 import { DosageValidator } from '@/services/validation/DosageValidator';
 import { IDosageDataService } from '@/services/data/interfaces/IDosageDataService';
@@ -14,6 +14,9 @@ import { DataServiceFactory } from '@/services/data/DataServiceFactory';
 import { MedicationManagementValidation } from './MedicationManagementValidation';
 import { Logger } from '@/utils/logger';
 import { RXNormAdapter } from '@/services/adapters/RXNormAdapter';
+import { IOrganizationService } from '@/services/organization/IOrganizationService';
+import { eventEmitter } from '@/lib/events/event-emitter';
+import { zitadelService } from '@/services/auth/zitadel.service';
 
 const log = Logger.getLogger('viewmodel');
 
@@ -83,6 +86,7 @@ export class MedicationManagementViewModel {
   constructor(
     private medicationApi: IMedicationApi,
     private validator: DosageValidator,
+    private organizationService: IOrganizationService,
     dosageService?: IDosageDataService
   ) {
     this.dosageService = dosageService || DataServiceFactory.createDosageDataService();
@@ -90,7 +94,7 @@ export class MedicationManagementViewModel {
     this.validation = new MedicationManagementValidation(this);
     this.validation.setupReactions();
     this.rxnormAdapter = new RXNormAdapter();
-    
+
     // Initialize dosage forms
     this.initializeDosageForms();
   }
@@ -520,36 +524,81 @@ export class MedicationManagementViewModel {
     }
   }
 
-  async save() {
+  async save(clientId: string) {
     // Validate all required fields
     if (!this.validation.validateRequiredFields()) {
       return;
     }
-    
-    if (!this.canSave) return;
 
-    const dosageInfo: DosageInfo = {
-      medicationId: this.selectedMedication!.id,
-      form: this.dosageForm as DosageForm,  // Broad category (Solid, Liquid, etc.)
-      route: this.dosageRoute as DosageRoute,  // Specific route (Tablet, Capsule, etc.)
-      amount: parseFloat(this.dosageAmount),
-      unit: this.dosageUnit as DosageUnit,
-      frequency: this.selectedFrequencies as DosageFrequency[],
-      timings: this.selectedTimings,  // Now sending array of timings
-      foodConditions: this.selectedFoodConditions,  // Food conditions array
-      specialRestrictions: this.selectedSpecialRestrictions,  // Special restrictions array
-      startDate: this.startDate || undefined,
-      discontinueDate: this.discontinueDate || undefined,
-      prescribingDoctor: this.prescribingDoctor || undefined,
-      notes: this.notes || undefined
-    };
+    if (!this.canSave) return;
 
     runInAction(() => {
       this.isLoading = true;
     });
-    
+
     try {
-      await this.medicationApi.saveMedication(dosageInfo);
+      // Get organization ID from DI service
+      const organizationId = await this.organizationService.getCurrentOrganizationId();
+
+      // Get current user for metadata
+      const user = await zitadelService.getUser();
+      if (!user) {
+        throw new Error('No authenticated user found');
+      }
+
+      // Build event data matching MedicationPrescribedEventData interface
+      const eventData = {
+        organization_id: organizationId,
+        client_id: clientId,
+        medication_id: this.selectedMedication!.id,
+        medication_name: this.selectedMedication!.name,
+
+        // Prescription details
+        prescription_date: new Date().toISOString().split('T')[0],
+        start_date: this.startDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+        end_date: this.discontinueDate?.toISOString().split('T')[0],
+        prescriber_name: this.prescriberName || undefined,
+
+        // Dosage information
+        dosage_amount: parseFloat(this.dosageAmount),
+        dosage_unit: this.dosageUnit,
+        dosage_form: this.dosageForm as string,
+        frequency: this.selectedFrequencies,
+        timings: this.selectedTimings,
+        food_conditions: this.selectedFoodConditions,
+        special_restrictions: this.selectedSpecialRestrictions,
+        route: this.dosageRoute,
+        instructions: this.notes || undefined,
+
+        // Inventory
+        inventory_quantity: this.inventoryQuantity ? parseFloat(this.inventoryQuantity) : undefined,
+        inventory_unit: this.inventoryUnit || undefined,
+
+        // Pharmacy
+        pharmacy_name: this.pharmacyName || undefined,
+        pharmacy_phone: this.pharmacyPhone || undefined,
+        rx_number: this.rxNumber || undefined,
+
+        // Notes
+        notes: this.notes || undefined,
+      };
+
+      // Emit medication.prescribed event
+      const streamId = crypto.randomUUID();
+      await eventEmitter.emit(
+        streamId,
+        'medication_history',
+        'medication.prescribed',
+        eventData,
+        'New Medication Added', // Page-driven reason
+        {
+          controlled_substance: this.isControlled || false,
+          therapeutic_purpose: this.selectedPurpose || undefined,
+        }
+      );
+
+      log.info('Medication prescribed event emitted', { streamId, medication: this.selectedMedication!.name });
+
       this.reset();
     } catch (error) {
       this.validation.handleError('Failed to save medication', error);
