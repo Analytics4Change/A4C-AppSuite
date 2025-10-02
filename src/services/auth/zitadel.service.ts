@@ -41,8 +41,8 @@ class ZitadelService {
       post_logout_redirect_uri: postLogoutUri,
       response_type: 'code',
       scope: 'openid profile email offline_access urn:zitadel:iam:org:project:id:zitadel:aud',
-      automaticSilentRenew: true,
-      silent_redirect_uri: `${window.location.origin}/auth/silent-callback`,
+      automaticSilentRenew: false, // Disabled - Zitadel CSP blocks iframe-based renewal
+      // silent_redirect_uri: `${window.location.origin}/auth/silent-callback`,
       loadUserInfo: true,
       // PKCE is automatically enabled for public clients
     };
@@ -67,8 +67,10 @@ class ZitadelService {
     });
 
     this.userManager.events.addAccessTokenExpired(() => {
-      log.error('Access token expired');
-      this.renewToken();
+      log.error('Access token expired - redirecting to login');
+      // Don't attempt silent renewal - just redirect to login
+      this.userManager.removeUser();
+      window.location.href = '/login';
     });
 
     this.userManager.events.addSilentRenewError((error) => {
@@ -125,13 +127,11 @@ class ZitadelService {
   }
 
   async renewToken(): Promise<void> {
-    try {
-      await this.userManager.signinSilent();
-      log.info('Token renewed successfully');
-    } catch (error) {
-      log.error('Token renewal failed', error);
-      throw error;
-    }
+    // Note: Silent renewal disabled due to Zitadel CSP restrictions
+    // When tokens expire, user will be redirected to login
+    log.warn('renewToken called but silent renewal is disabled - redirecting to login');
+    await this.userManager.removeUser();
+    window.location.href = '/login';
   }
 
   async removeUser(): Promise<void> {
