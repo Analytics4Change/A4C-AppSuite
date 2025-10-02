@@ -1,40 +1,35 @@
 /**
  * Event System Type Definitions
  *
- * Types for the CQRS/Event Sourcing architecture.
- * Events are immutable records of domain changes with metadata.
+ * This file re-exports types from the generated schema contracts
+ * and adds application-specific extensions.
+ *
+ * Generated types are synced from A4C-Infrastructure/supabase/contracts/types
  */
 
-/**
- * Base domain event structure stored in domain_events table
- */
-export interface DomainEvent {
-  id: string;
-  stream_id: string;
-  stream_type: 'client' | 'medication' | 'medication_history' | 'dosage' | 'user' | 'organization';
-  stream_version: number;
-  event_type: string;
-  event_data: Record<string, unknown>;
-  event_metadata: EventMetadata;
-  created_at: string;
-  processed_at?: string;
-  processing_error?: string;
-  retry_count?: number;
-}
+// Re-export core types from generated schema
+export type {
+  DomainEvent,
+  EventMetadata,
+  StreamType,
+  AllDomainEvents,
+  ClientRegisteredEvent,
+  ClientAdmittedEvent,
+  ClientInformationUpdatedEvent,
+  ClientDischargedEvent,
+  MedicationPrescribedEvent,
+  MedicationAdministeredEvent,
+  MedicationSkippedEvent,
+  MedicationRefusedEvent,
+  MedicationDiscontinuedEvent,
+  UserSyncedFromZitadelEvent,
+  UserOrganizationSwitchedEvent,
+} from './generated/events';
 
-/**
- * Metadata attached to every event
- */
-export interface EventMetadata {
-  user_id: string;
-  user_email?: string;
-  reason: string; // Required: Why this change happened (min 10 chars)
-  source?: string; // Source system/component
-  approval_chain?: ApprovalRecord[];
-  correlation_id?: string; // Link related events
-  causation_id?: string; // Event that caused this event
-  [key: string]: unknown; // Allow additional metadata
-}
+// Import types needed for extensions
+import type { EventMetadata, StreamType } from './generated/events';
+
+// Application-specific type extensions
 
 /**
  * Approval record for events requiring approval
@@ -48,9 +43,15 @@ export interface ApprovalRecord {
 }
 
 /**
- * Stream types for event categorization
+ * Extended EventMetadata with app-specific fields
  */
-export type StreamType = DomainEvent['stream_type'];
+export interface ExtendedEventMetadata extends EventMetadata {
+  source?: string; // Source system/component
+  approval_chain?: ApprovalRecord[];
+  user_email?: string; // Legacy field, prefer using user_id
+  user_name?: string; // Legacy field, prefer using user_id
+  [key: string]: unknown; // Allow additional metadata
+}
 
 /**
  * Medication-related event types

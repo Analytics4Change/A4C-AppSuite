@@ -1,6 +1,9 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { DomainEvent, EventMetadata, StreamType } from '@/types/events';
 import { supabaseService } from '@/services/auth/supabase.service';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('api');
 
 export class EventValidationError extends Error {
   constructor(message: string, public field: string, public code: string) {
@@ -65,6 +68,85 @@ export class EventEmitter {
     }
   }
 
+  private validateEventData(eventType: string, eventData: any): void {
+    log.debug('Validating event data', { eventType, hasData: !!eventData });
+
+    if (!eventData || typeof eventData !== 'object') {
+      throw new EventValidationError(
+        'Event data must be a valid object',
+        'event_data',
+        'INVALID_EVENT_DATA'
+      );
+    }
+
+    // Validate required fields based on event type
+    const validationRules: Record<string, { required: string[]; description: string }> = {
+      'client.registered': {
+        required: ['organization_id', 'first_name', 'last_name', 'date_of_birth'],
+        description: 'Client registration data'
+      },
+      'client.admitted': {
+        required: ['admission_date', 'facility_id', 'admission_type'],
+        description: 'Client admission data'
+      },
+      'client.information_updated': {
+        required: ['changes'],
+        description: 'Client update data'
+      },
+      'client.discharged': {
+        required: ['discharge_date', 'discharge_type', 'discharge_disposition'],
+        description: 'Client discharge data'
+      },
+      'medication.prescribed': {
+        required: [],
+        description: 'Medication prescription data'
+      },
+      'medication.administered': {
+        required: [],
+        description: 'Medication administration data'
+      },
+      'medication.skipped': {
+        required: [],
+        description: 'Medication skip data'
+      },
+      'medication.refused': {
+        required: [],
+        description: 'Medication refusal data'
+      },
+      'medication.discontinued': {
+        required: [],
+        description: 'Medication discontinuation data'
+      },
+      'user.synced_from_zitadel': {
+        required: [],
+        description: 'User sync data'
+      },
+      'user.organization_switched': {
+        required: [],
+        description: 'Organization switch data'
+      }
+    };
+
+    const rules = validationRules[eventType];
+    if (!rules) {
+      log.warn('No validation rules defined for event type', { eventType });
+      return; // Allow unknown event types for extensibility
+    }
+
+    // Validate required fields
+    for (const field of rules.required) {
+      if (!(field in eventData) || eventData[field] === null || eventData[field] === undefined) {
+        throw new EventValidationError(
+          `Missing required field '${field}' for ${rules.description}`,
+          field,
+          'MISSING_REQUIRED_FIELD'
+        );
+      }
+    }
+
+    log.debug('Event data validation passed', { eventType });
+  }
+
   async emit<T = any>(
     streamId: string,
     streamType: StreamType,
@@ -75,6 +157,7 @@ export class EventEmitter {
   ): Promise<DomainEvent<T>> {
     this.validateReason(reason);
     this.validateEventType(eventType);
+    this.validateEventData(eventType, eventData);
 
     const user = await this.supabase.auth.getUser();
     if (!user.data.user) {
@@ -91,9 +174,8 @@ export class EventEmitter {
       event_data: eventData,
       event_metadata: {
         user_id: user.data.user.id,
+        organization_id: user.data.user.user_metadata?.organization_id || '',
         reason,
-        user_email: user.data.user.email,
-        user_name: user.data.user.user_metadata?.name,
         ...additionalMetadata
       }
     };
@@ -144,6 +226,7 @@ export class EventEmitter {
       events.map(async (e) => {
         this.validateReason(e.reason);
         this.validateEventType(e.eventType);
+        this.validateEventData(e.eventType, e.eventData);
 
         const version = await this.getNextVersion(e.streamId, e.streamType);
 
@@ -155,9 +238,8 @@ export class EventEmitter {
           event_data: e.eventData,
           event_metadata: {
             user_id: user.data.user!.id,
+            organization_id: user.data.user!.user_metadata?.organization_id || '',
             reason: e.reason,
-            user_email: user.data.user!.email,
-            user_name: user.data.user!.user_metadata?.name,
             ...e.additionalMetadata
           }
         };
@@ -222,7 +304,7 @@ export class EventEmitter {
       eventTypes?: string[];
     }
   ) {
-    let channel = this.supabase
+    const channel = this.supabase
       .channel('domain-events')
       .on('postgres_changes', {
         event: 'INSERT',

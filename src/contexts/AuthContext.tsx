@@ -2,7 +2,6 @@ import React, { createContext, useState, useContext, ReactNode, useEffect } from
 import { Logger } from '@/utils/logger';
 import { zitadelService, ZitadelUser } from '@/services/auth/zitadel.service';
 import { supabaseService } from '@/services/auth/supabase.service';
-import { mockOAuthResponses } from '@/config/oauth.config';
 
 const log = Logger.getLogger('main');
 
@@ -75,13 +74,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             picture: existingUser.picture,
           });
           setIsAuthenticated(true);
-        } else {
-          // Check for legacy session storage (for mock login)
-          const storedUser = sessionStorage.getItem('user');
-          if (storedUser) {
-            setUser(JSON.parse(storedUser));
-            setIsAuthenticated(true);
-          }
         }
       } catch (error) {
         log.error('Failed to restore session', error);
@@ -91,105 +83,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkExistingSession();
   }, []);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
-    log.info('Login attempt', { username });
-
-    // DEVELOPMENT ONLY: Mock authentication for testing
-    // In production, this should be replaced with actual authentication service
-    // Mock credentials are configured via environment variables with defaults disabled in production
-    const isDevelopment = import.meta.env.MODE === 'development';
-    const mockAdminUser = import.meta.env.VITE_MOCK_ADMIN_USERNAME || (isDevelopment ? 'admin' : '');
-    const mockAdminPass = import.meta.env.VITE_MOCK_ADMIN_PASSWORD || (isDevelopment ? 'admin123' : '');
-    const mockDemoUser = import.meta.env.VITE_MOCK_DEMO_USERNAME || (isDevelopment ? 'demo' : '');
-    const mockDemoPass = import.meta.env.VITE_MOCK_DEMO_PASSWORD || (isDevelopment ? 'demo123' : '');
-
-    if (
-      (mockAdminUser && username === mockAdminUser && password === mockAdminPass) ||
-      (mockDemoUser && username === mockDemoUser && password === mockDemoPass)
-    ) {
-      const mockUser: User = {
-        id: '1',
-        name: username === mockAdminUser ? 'Admin User' : 'Demo User',
-        email: `${username}@a4c-medical.com`,
-        role: username === mockAdminUser ? 'admin' : 'clinician',
-        provider: 'local'
-      };
-
-      log.info('Login successful', { user: mockUser });
-      setUser(mockUser);
-      setIsAuthenticated(true);
-
-      // Store in sessionStorage for page refresh persistence
-      sessionStorage.setItem('user', JSON.stringify(mockUser));
-
-      return true;
-    }
-
-    log.warn('Login failed - invalid credentials');
-    return false;
+  const login = async (_username: string, _password: string): Promise<boolean> => {
+    log.warn('Direct username/password login is deprecated. Please use Zitadel authentication.');
+    // Redirect to Zitadel login
+    await loginWithZitadel();
+    return false; // Return false as the page will redirect
   };
 
   const loginWithOAuth = async (
     provider: 'google' | 'facebook' | 'apple',
-    oauthData: any
+    _oauthData: any
   ): Promise<boolean> => {
-    log.info('OAuth login attempt', { provider });
-
-    try {
-      // Transform OAuth response to User format
-      let user: User;
-
-      switch (provider) {
-        case 'google':
-          user = {
-            id: oauthData.sub,
-            name: oauthData.name,
-            email: oauthData.email,
-            role: 'clinician', // Default role for OAuth users
-            provider: 'google',
-            picture: oauthData.picture
-          };
-          break;
-
-        case 'facebook':
-          user = {
-            id: oauthData.id,
-            name: oauthData.name,
-            email: oauthData.email,
-            role: 'clinician',
-            provider: 'facebook',
-            picture: oauthData.picture?.data?.url
-          };
-          break;
-
-        case 'apple':
-          user = {
-            id: oauthData.sub,
-            name: oauthData.name ?
-              `${oauthData.name.firstName} ${oauthData.name.lastName}` :
-              'Apple User',
-            email: oauthData.email,
-            role: 'clinician',
-            provider: 'apple'
-          };
-          break;
-
-        default:
-          throw new Error(`Unknown OAuth provider: ${provider}`);
-      }
-
-      log.info('OAuth login successful', { provider, user });
-      setUser(user);
-      setIsAuthenticated(true);
-
-      // Store in sessionStorage
-      sessionStorage.setItem('user', JSON.stringify(user));
-
-      return true;
-    } catch (error) {
-      log.error('OAuth login failed', { provider, error });
-      return false;
-    }
+    log.warn(`Direct OAuth login (${provider}) is deprecated. Please use Zitadel authentication.`);
+    // Redirect to Zitadel login
+    await loginWithZitadel();
+    return false; // Return false as the page will redirect
   };
 
   const loginWithZitadel = async (): Promise<void> => {
@@ -214,7 +122,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     setZitadelUser(null);
     setIsAuthenticated(false);
-    sessionStorage.removeItem('user');
 
     // Clear Supabase auth
     await supabaseService.updateAuthToken(null);
@@ -224,10 +131,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsAuthenticated(state.isAuthenticated);
     setUser(state.user);
     setZitadelUser(state.zitadelUser || null);
-
-    if (state.user) {
-      sessionStorage.setItem('user', JSON.stringify(state.user));
-    }
   };
 
   const hasRole = (role: string): boolean => {
