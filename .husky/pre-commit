@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-# Run documentation validation before commit
-npm run docs:check
+# Run lint-staged: ESLint + TypeScript on staged files only
+npx lint-staged

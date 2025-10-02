@@ -52,6 +52,12 @@
   },
   "homepage": "https://github.com/Analytics4Change/A4C-FrontEnd#readme",
   "description": "",
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "tsc-files --noEmit"
+    ]
+  },
   "dependencies": {
     "@radix-ui/react-checkbox": "1.3.2",
     "@radix-ui/react-label": "2.1.7",
