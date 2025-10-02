@@ -88,9 +88,9 @@ export const MedicationManagementPage = observer(() => {
 
   // Handle save
   const handleSave = async () => {
-    if (isFormComplete()) {
+    if (isFormComplete() && clientId) {
       log.info('Saving medication');
-      await vm.save();
+      await vm.save(clientId);
       navigate(`/clients/${clientId}/medications`);
     }
   };

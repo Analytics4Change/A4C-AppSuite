@@ -6,17 +6,19 @@ import { MockClientApi } from '@/services/mock/MockClientApi';
 import { DosageValidator } from '@/services/validation/DosageValidator';
 import { MedicationManagementViewModel } from '@/viewModels/medication/MedicationManagementViewModel';
 import { ClientSelectionViewModel } from '@/viewModels/client/ClientSelectionViewModel';
+import { serviceFactory } from '@/services/ServiceFactory';
 
 // Determine which API to use based on environment
 const USE_RXNORM = import.meta.env.VITE_USE_RXNORM_API === 'true' || import.meta.env.PROD;
 
 // Create singleton instances
-const medicationApi: IMedicationApi = USE_RXNORM 
-  ? new RXNormMedicationApi() 
+const medicationApi: IMedicationApi = USE_RXNORM
+  ? new RXNormMedicationApi()
   : new MockMedicationApi();
 
 const clientApi = new MockClientApi();
 const dosageValidator = new DosageValidator();
+const organizationService = serviceFactory.getOrganizationService();
 
 // Log which API is being used
 if (import.meta.env.DEV) {
@@ -37,15 +39,15 @@ export function useViewModel<T>(
     }
 
     let instance: T;
-    
+
     if (ViewModelClass === MedicationManagementViewModel as any) {
-      instance = new MedicationManagementViewModel(medicationApi, dosageValidator) as T;
+      instance = new MedicationManagementViewModel(medicationApi, dosageValidator, organizationService) as T;
     } else if (ViewModelClass === ClientSelectionViewModel as any) {
       instance = new ClientSelectionViewModel(clientApi) as T;
     } else {
       throw new Error(`Unknown ViewModel class: ${className}`);
     }
-    
+
     // Store the instance for reuse
     viewModelInstances.set(className, instance);
     return instance;
