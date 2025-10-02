@@ -23,7 +23,8 @@ event_metadata: {
 
 ### 1. Install Event Types
 ```bash
-# Copy generated types from Infrastructure repo
+# Copy generated types from Infrastructure repo (for local development when both repos are checked out side-by-side)
+# For remote access, see: https://github.com/Analytics4Change/A4C-Infrastructure/tree/main/supabase/contracts/generated/typescript
 cp ../A4C-Infrastructure/supabase/contracts/generated/typescript/* src/types/
 ```
 
@@ -800,10 +801,10 @@ await emitEvent(...);
 
 ## Resources
 
-- [Infrastructure Documentation](../A4C-Infrastructure/supabase/docs/)
-- [AsyncAPI Contracts](../A4C-Infrastructure/supabase/contracts/asyncapi/)
-- [OpenAPI Specification](../A4C-Infrastructure/supabase/contracts/openapi/)
-- [SQL Event Processing](../A4C-Infrastructure/supabase/sql/03-functions/event-processing/)
+- [Infrastructure Documentation](https://github.com/Analytics4Change/A4C-Infrastructure/tree/main/supabase/docs)
+- [AsyncAPI Contracts](https://github.com/Analytics4Change/A4C-Infrastructure/tree/main/supabase/contracts/asyncapi)
+- [OpenAPI Specification](https://github.com/Analytics4Change/A4C-Infrastructure/tree/main/supabase/contracts/openapi)
+- [SQL Event Processing](https://github.com/Analytics4Change/A4C-Infrastructure/tree/main/supabase/sql/03-functions/event-processing)
 
 ## Next Steps
 

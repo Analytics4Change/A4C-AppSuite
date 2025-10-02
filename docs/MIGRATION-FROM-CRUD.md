@@ -475,7 +475,7 @@ const { data } = await supabase.from('clients').select('*');
 
 - **Documentation**: See [EVENT-DRIVEN-GUIDE.md](./EVENT-DRIVEN-GUIDE.md)
 - **Examples**: Check `src/examples/` directory
-- **Infrastructure**: See [A4C-Infrastructure/supabase/docs/](../../A4C-Infrastructure/supabase/docs/)
+- **Infrastructure**: See [A4C-Infrastructure/supabase/docs/](https://github.com/Analytics4Change/A4C-Infrastructure/tree/main/supabase/docs)
 
 ## Timeline
 
