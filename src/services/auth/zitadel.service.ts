@@ -41,8 +41,8 @@ class ZitadelService {
       post_logout_redirect_uri: postLogoutUri,
       response_type: 'code',
       scope: 'openid profile email offline_access urn:zitadel:iam:org:project:id:zitadel:aud',
-      automaticSilentRenew: false, // Disabled - Zitadel CSP blocks iframe-based renewal
-      // silent_redirect_uri: `${window.location.origin}/auth/silent-callback`,
+      automaticSilentRenew: true, // Enabled - uses refresh token grant (no iframe)
+      useRefreshTokens: true, // Use refresh_token grant instead of iframe-based renewal
       loadUserInfo: true,
       // PKCE is automatically enabled for public clients
     };
@@ -67,10 +67,14 @@ class ZitadelService {
     });
 
     this.userManager.events.addAccessTokenExpired(() => {
-      log.error('Access token expired - redirecting to login');
-      // Don't attempt silent renewal - just redirect to login
-      this.userManager.removeUser();
-      window.location.href = '/login';
+      log.warn('Access token expired - attempting renewal with refresh token');
+      // Attempt silent renewal using refresh token
+      this.renewToken().catch((error) => {
+        log.error('Refresh token renewal failed - redirecting to login', error);
+        // If refresh fails, redirect to login
+        this.userManager.removeUser();
+        window.location.href = '/login';
+      });
     });
 
     this.userManager.events.addSilentRenewError((error) => {
@@ -127,11 +131,14 @@ class ZitadelService {
   }
 
   async renewToken(): Promise<void> {
-    // Note: Silent renewal disabled due to Zitadel CSP restrictions
-    // When tokens expire, user will be redirected to login
-    log.warn('renewToken called but silent renewal is disabled - redirecting to login');
-    await this.userManager.removeUser();
-    window.location.href = '/login';
+    try {
+      // Uses refresh_token grant (no iframe needed)
+      await this.userManager.signinSilent();
+      log.info('Token renewed successfully via refresh token');
+    } catch (error) {
+      log.error('Token renewal failed', error);
+      throw error;
+    }
   }
 
   async removeUser(): Promise<void> {
