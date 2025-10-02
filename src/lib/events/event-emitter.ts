@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { DomainEvent, EventMetadata, StreamType } from '@/types/event-types';
+import { DomainEvent, EventMetadata, StreamType } from '@/types/events';
+import { supabaseService } from '@/services/auth/supabase.service';
 
 export class EventValidationError extends Error {
   constructor(message: string, public field: string, public code: string) {
@@ -261,3 +262,68 @@ export function getEventEmitter(): EventEmitter {
   }
   return eventEmitterInstance;
 }
+
+// Lazy-initialized singleton for easy import
+// Automatically initializes with Supabase client on first use
+async function getOrCreateEventEmitter(): Promise<EventEmitter> {
+  if (!eventEmitterInstance) {
+    const client = await supabaseService.getClient();
+    eventEmitterInstance = new EventEmitter(client);
+  }
+  return eventEmitterInstance;
+}
+
+// Export singleton with proxy methods for synchronous-looking API
+export const eventEmitter = {
+  async emit<T = any>(
+    streamId: string,
+    streamType: StreamType,
+    eventType: string,
+    eventData: T,
+    reason: string,
+    additionalMetadata?: Partial<EventMetadata>
+  ): Promise<DomainEvent<T>> {
+    const instance = await getOrCreateEventEmitter();
+    return instance.emit(streamId, streamType, eventType, eventData, reason, additionalMetadata);
+  },
+
+  async emitBatch<T = any>(
+    events: Array<{
+      streamId: string;
+      streamType: StreamType;
+      eventType: string;
+      eventData: T;
+      reason: string;
+      additionalMetadata?: Partial<EventMetadata>;
+    }>
+  ): Promise<DomainEvent<T>[]> {
+    const instance = await getOrCreateEventEmitter();
+    return instance.emitBatch(events);
+  },
+
+  async getEventHistory(
+    streamId: string,
+    streamType?: StreamType,
+    options?: {
+      limit?: number;
+      offset?: number;
+      eventTypes?: string[];
+    }
+  ): Promise<DomainEvent[]> {
+    const instance = await getOrCreateEventEmitter();
+    return instance.getEventHistory(streamId, streamType, options);
+  },
+
+  subscribeToEvents(
+    callback: (event: DomainEvent) => void,
+    filters?: {
+      streamId?: string;
+      streamType?: StreamType;
+      eventTypes?: string[];
+    }
+  ) {
+    // For subscriptions, we need the instance synchronously
+    // This will throw if not initialized, which is acceptable
+    return getEventEmitter().subscribeToEvents(callback, filters);
+  }
+};
