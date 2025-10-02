@@ -94,16 +94,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (username: string, password: string): Promise<boolean> => {
     log.info('Login attempt', { username });
 
-    // Mock authentication - accept admin/admin123 or demo/demo123
+    // DEVELOPMENT ONLY: Mock authentication for testing
+    // In production, this should be replaced with actual authentication service
+    // Mock credentials are configured via environment variables with defaults disabled in production
+    const isDevelopment = import.meta.env.MODE === 'development';
+    const mockAdminUser = import.meta.env.VITE_MOCK_ADMIN_USERNAME || (isDevelopment ? 'admin' : '');
+    const mockAdminPass = import.meta.env.VITE_MOCK_ADMIN_PASSWORD || (isDevelopment ? 'admin123' : '');
+    const mockDemoUser = import.meta.env.VITE_MOCK_DEMO_USERNAME || (isDevelopment ? 'demo' : '');
+    const mockDemoPass = import.meta.env.VITE_MOCK_DEMO_PASSWORD || (isDevelopment ? 'demo123' : '');
+
     if (
-      (username === 'admin' && password === 'admin123') ||
-      (username === 'demo' && password === 'demo123')
+      (mockAdminUser && username === mockAdminUser && password === mockAdminPass) ||
+      (mockDemoUser && username === mockDemoUser && password === mockDemoPass)
     ) {
       const mockUser: User = {
         id: '1',
-        name: username === 'admin' ? 'Admin User' : 'Demo User',
+        name: username === mockAdminUser ? 'Admin User' : 'Demo User',
         email: `${username}@a4c-medical.com`,
-        role: username === 'admin' ? 'admin' : 'clinician',
+        role: username === mockAdminUser ? 'admin' : 'clinician',
         provider: 'local'
       };
 

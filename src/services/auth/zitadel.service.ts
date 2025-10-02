@@ -41,10 +41,10 @@ class ZitadelService {
       post_logout_redirect_uri: postLogoutUri,
       response_type: 'code',
       scope: 'openid profile email offline_access urn:zitadel:iam:org:project:id:zitadel:aud',
-      automaticSilentRenew: true, // Enabled - uses refresh token grant (no iframe)
-      useRefreshTokens: true, // Use refresh_token grant instead of iframe-based renewal
+      automaticSilentRenew: true, // Enabled - uses refresh token grant via offline_access scope (no iframe)
       loadUserInfo: true,
       // PKCE is automatically enabled for public clients
+      // Refresh tokens are enabled via offline_access scope
     };
 
     this.userManager = new UserManager(this.settings);

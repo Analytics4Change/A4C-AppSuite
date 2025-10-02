@@ -101,12 +101,15 @@
     "glob": "10.3.10",
     "husky": "9.1.7",
     "knip": "5.63.0",
+    "lint-staged": "16.2.3",
     "markdownlint-cli": "0.37.0",
     "ora": "5.4.1",
     "playwright": "1.54.2",
     "postcss": "8.5.6",
     "tailwindcss": "4.1.12",
+    "tsc-files": "1.1.4",
     "typescript": "5.9.2",
+    "vite-plugin-checker": "0.11.0",
     "vitest": "2.1.8"
   }
 }
