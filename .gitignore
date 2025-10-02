@@ -73,3 +73,9 @@ venv/
 *-PLAINTEXT.txt
 *-UNENCRYPTED.*
 DO-NOT-COMMIT-*
+
+# Tool directories
+.serena/
+
+# Zitadel inventory data (contains tokens)
+zitadel-inventory-data-*/
