@@ -83,13 +83,13 @@ components:
           type: string
           minLength: 1
           maxLength: 100
-          pattern: '^[a-zA-Z\s\-\'\.]+$'
+          pattern: "^[a-zA-Z\\s\\-'\\.]+$"
           description: Client's legal first name
         last_name:
           type: string
           minLength: 1
           maxLength: 100
-          pattern: '^[a-zA-Z\s\-\'\.]+$'
+          pattern: "^[a-zA-Z\\s\\-'\\.]+$"
           description: Client's legal last name
         date_of_birth:
           type: string
@@ -110,7 +110,7 @@ components:
           description: Client's email address
         phone:
           type: string
-          pattern: '^\+?1?\d{10,14}$'
+          pattern: "^\\+?1?\\d{10,14}$"
           description: Client's primary phone number
         address:
           $ref: '../components/schemas.yaml#/components/schemas/Address'
