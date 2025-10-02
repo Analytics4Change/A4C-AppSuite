@@ -62,7 +62,8 @@ export const MainLayout: React.FC = () => {
 
   const navItems = allNavItems.filter(item => {
     const included = item.roles.includes(userRole.toLowerCase());
-    console.log(`[MainLayout] ${item.label}: roles=${item.roles.join(',')}, userRole=${userRole.toLowerCase()}, included=${included}`);
+    // Debug: Uncomment to log navigation filtering
+    // console.log(`[MainLayout] ${item.label}: roles=${item.roles.join(',')}, userRole=${userRole.toLowerCase()}, included=${included}`);
     return included;
   });
 
