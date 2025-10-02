@@ -1,0 +1,11 @@
+{
+  "name": "@a4c/event-types",
+  "version": "1.0.0",
+  "description": "TypeScript type definitions for A4C domain events",
+  "main": "events.ts",
+  "types": "events.ts",
+  "private": true,
+  "keywords": ["events", "domain-events", "typescript", "types"],
+  "author": "A4C Development Team",
+  "license": "Private"
+}

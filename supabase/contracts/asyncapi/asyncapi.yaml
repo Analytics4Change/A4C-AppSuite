@@ -113,19 +113,3 @@ components:
           type: string
           description: Error message if processing failed
           nullable: true
-
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: Supabase JWT token
-    apiKey:
-      type: apiKey
-      in: header
-      name: apikey
-      description: Supabase anon key
-
-security:
-  - bearerAuth: []
-  - apiKey: []
