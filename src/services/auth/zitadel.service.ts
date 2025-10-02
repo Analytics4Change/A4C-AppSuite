@@ -93,18 +93,16 @@ class ZitadelService {
 
   async handleCallback(): Promise<ZitadelUser | null> {
     try {
-      console.log('[Zitadel] Starting callback handling...');
-      console.log('[Zitadel] URL:', window.location.href);
-      
+      log.debug('Starting callback handling', { url: window.location.href });
+
       const oidcUser = await this.userManager.signinRedirectCallback();
-      console.log('[Zitadel] OIDC User received:', oidcUser);
-      
+      log.debug('OIDC User received', { userId: oidcUser.profile.sub });
+
       const transformedUser = this.transformUser(oidcUser);
-      console.log('[Zitadel] Transformed user:', transformedUser);
-      
+      log.debug('Transformed user', { userId: transformedUser.id, email: transformedUser.email });
+
       return transformedUser;
     } catch (error) {
-      console.error('[Zitadel] Callback handling failed:', error);
       log.error('Callback handling failed', error);
       throw error;
     }
@@ -149,11 +147,10 @@ class ZitadelService {
     const profile = oidcUser.profile as any;
 
     // Debug log the entire profile to see what claims are available
-    console.log('[Zitadel] Full OIDC Profile:', profile);
-    console.log('[Zitadel] Profile keys:', Object.keys(profile));
+    log.debug('OIDC Profile received', { profileKeys: Object.keys(profile) });
 
     const roles = this.parseRoles(profile);
-    console.log('[Zitadel] Parsed roles:', roles);
+    log.debug('Parsed roles from profile', { roles });
 
     return {
       id: profile.sub,
@@ -198,11 +195,12 @@ class ZitadelService {
 
   private parseRoles(profile: any): string[] {
     // Debug: Log all potential role claims
-    console.log('[Zitadel] Checking role claims:');
-    console.log('  - urn:zitadel:iam:org:project:roles:', profile['urn:zitadel:iam:org:project:roles']);
-    console.log('  - roles:', profile.roles);
-    console.log('  - https://claims.zitadel.com/roles:', profile['https://claims.zitadel.com/roles']);
-    console.log('  - urn:zitadel:iam:org:project:339658577486583889:roles:', profile['urn:zitadel:iam:org:project:339658577486583889:roles']);
+    log.debug('Checking role claims', {
+      projectRoles: profile['urn:zitadel:iam:org:project:roles'],
+      roles: profile.roles,
+      zitadelRoles: profile['https://claims.zitadel.com/roles'],
+      specificProjectRoles: profile['urn:zitadel:iam:org:project:339658577486583889:roles']
+    });
 
     // Check for project-specific roles (using your Project ID)
     const projectRolesKey = 'urn:zitadel:iam:org:project:339658577486583889:roles';
@@ -217,12 +215,12 @@ class ZitadelService {
     if (typeof roles === 'object' && !Array.isArray(roles)) {
       // Roles might be an object with role names as keys
       const roleNames = Object.keys(roles);
-      console.log('[Zitadel] Roles found as object keys:', roleNames);
+      log.debug('Roles found as object keys', { roleNames });
       return roleNames;
     }
 
     const result = Array.isArray(roles) ? roles : [];
-    console.log('[Zitadel] Final parsed roles:', result);
+    log.debug('Final parsed roles', { roles: result });
     return result;
   }
 

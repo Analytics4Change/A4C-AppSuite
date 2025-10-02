@@ -92,6 +92,9 @@ memory-reports/snapshots/*.heapsnapshot
 # Generated metrics and reports
 .metrics/
 
+# Generated schema files (synced from Infrastructure repo)
+src/types/generated/
+
 # MCP server caches
 .serena/
 
