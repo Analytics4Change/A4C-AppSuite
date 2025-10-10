@@ -35,6 +35,16 @@ BEGIN
       WHEN 'organization' THEN
         PERFORM process_organization_event(NEW);
 
+      -- RBAC stream types
+      WHEN 'permission' THEN
+        PERFORM process_rbac_event(NEW);
+
+      WHEN 'role' THEN
+        PERFORM process_rbac_event(NEW);
+
+      WHEN 'access_grant' THEN
+        PERFORM process_rbac_event(NEW);
+
       ELSE
         RAISE WARNING 'Unknown stream type: %', NEW.stream_type;
     END CASE;

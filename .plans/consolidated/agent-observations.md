@@ -6,6 +6,34 @@ Enterprise-grade **multi-tenant B2B SaaS platform** for healthcare organizations
 
 ---
 
+## CQRS/Event Sourcing Foundation
+
+**CRITICAL**: The A4C platform uses an **Event-First Architecture with CQRS (Command Query Responsibility Segregation)** where all state changes flow through an immutable event log before being projected to normalized tables for efficient querying.
+
+**Primary Documentation**:
+- `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - Full CQRS architecture specification
+- `/frontend/docs/EVENT-DRIVEN-GUIDE.md` - Frontend implementation patterns
+
+**Core Principles**:
+- **Events are the single source of truth**: The `domain_events` table is append-only and immutable
+- **All database tables are projections**: Read-model tables are automatically maintained by database triggers that process events
+- **Audit by design**: Every change captures WHO, WHAT, WHEN, and WHY (required `reason` field)
+- **Temporal queries**: Can reconstruct state at any point in time
+- **HIPAA compliance**: Immutable audit trail with 7-year retention
+
+**How It Works**:
+```
+Application emits event → domain_events table → Database trigger fires → Event processor updates projections → Application queries projected tables
+```
+
+**Implications for Architecture**:
+- All schemas shown in this document are CQRS projections (NOT source-of-truth tables)
+- Permission changes, role assignments, cross-tenant grants are all event-sourced
+- RLS policies query projections for performance
+- Full audit trail for every state change (compliance requirement)
+
+---
+
 ## Architectural Pillars
 
 ### 1. Multi-Tenancy Foundation
@@ -45,24 +73,23 @@ Organization (Zitadel Org = Tenant)
 2. Subdomain resolver maps to `org_id: acme_healthcare_001`
 3. OAuth2/OIDC redirect to Zitadel with organization context
 4. Zitadel authenticates within specific organization
-5. ID token includes: `org_id`, `user_id`, roles, hierarchy claims
+5. ID token includes: `org_id`, `user_id`, roles, permissions, hierarchy claims
 6. Frontend stores tokens, API validates on every request
 
-**Role Hierarchy (from most to least privileged):**
-```
-System Administrator (A4C staff - cross-tenant)
-  └── Org Owner (customer admin)
-      └── Facility Admin
-          └── Program Manager
-              └── Team Lead
-                  └── Care Provider
-                      └── Support Staff
-```
+**Initial Role Model (Phase 1):**
+- **`super_admin`**: IAM_OWNER (Zitadel instance-level), all permissions across all organizations
+- **`provider_admin`**: ORG_OWNER (Zitadel org-level), all permissions within their organization
+
+**Future Roles (Event-Driven Extensibility):**
+- `facility_admin`, `program_manager`, `clinician`, `read_only_auditor`, `var_partner_admin`
+- New roles added via event sourcing (no schema migrations required)
 
 **Authorization Model:**
-- **Hierarchical Inheritance**: Facility Admins can manage all programs/teams within their facility
-- **ltree Queries**: `WHERE hierarchy <@ 'org_123.facility_456'` grants facility-wide access
-- **Zitadel Roles**: Synchronized to PostgreSQL for consistent authorization
+- **Permission-Based RBAC**: Permissions are atomic units (e.g., `medication.create`, `provider.impersonate`)
+- **Roles collect permissions**: Flexible for future expansion
+- **Event-Sourced**: All role/permission changes captured as immutable events
+- **Zitadel Synchronization**: Roles synchronized to PostgreSQL projections for consistent authorization
+- **Hierarchical Scoping**: ltree-based permission scoping for facility/program-level access (future)
 
 ---
 
@@ -174,9 +201,12 @@ Developer Workstation
 - **Social Services**: Social workers, case managers (assigned client access)
 - **Family Members**: Parents/guardians in shared "A4C-Families" org (client-scoped grants)
 
-**Access Grant Model:**
+**Access Grant Model (CQRS Projection):**
 ```sql
-CREATE TABLE cross_tenant_access_grants (
+-- NOTE: This is a projection table, maintained by event processors
+-- Source of truth: access_grant.created/revoked events in domain_events table
+
+CREATE TABLE cross_tenant_access_grants_projection (
   id UUID PRIMARY KEY,
   consultant_org_id TEXT NOT NULL,        -- Provider Partner org
   consultant_user_id UUID,                 -- Specific user (NULL = org-wide)
@@ -196,9 +226,10 @@ CREATE TABLE cross_tenant_access_grants (
 **Enhanced RLS Policies:**
 ```sql
 -- Hybrid access: same-tenant OR cross-tenant grant
+-- NOTE: Queries the projection table for performance
 WHERE organization_id = current_setting('app.current_org')
    OR EXISTS (
-     SELECT 1 FROM cross_tenant_access_grants
+     SELECT 1 FROM cross_tenant_access_grants_projection
      WHERE consultant_org_id = current_setting('app.current_org')
        AND provider_org_id = organization_id
        AND (expires_at IS NULL OR expires_at > NOW())
@@ -263,26 +294,96 @@ impersonation.started → [user actions with metadata] → impersonation.renewed
 
 ---
 
+### 7. Permission-Based RBAC Architecture
+**Primary Document:** `.plans/rbac-permissions/architecture.md`
+
+**Problem Statement:** Healthcare applications require granular, auditable access control that can evolve without schema migrations. Permission changes must be traceable for compliance.
+
+**Solution Architecture:**
+
+**Permission Model:**
+- Permissions defined per **applet** (medication, provider, client, user, etc.)
+- Naming convention: `applet.action` (e.g., `medication.create`, `provider.impersonate`)
+- Permission types: CRUD (`create`, `view`, `update`, `delete`) + custom (`approve`, `impersonate`)
+- Metadata includes MFA requirements and hierarchical scope types
+
+**Event-Driven RBAC (CQRS Projections):**
+```sql
+-- ALL tables are projections from domain_events
+
+permissions_projection (id, applet, action, name, description, scope_type, requires_mfa)
+roles_projection (id, name, description, zitadel_org_id, org_hierarchy_scope)
+role_permissions_projection (role_id, permission_id)
+user_roles_projection (user_id, role_id, org_id, scope_path)
+```
+
+**Event Schemas:**
+- `permission.defined` - New permission created
+- `role.created` - New role defined
+- `role.permission.granted` - Permission added to role
+- `role.permission.revoked` - Permission removed from role
+- `user.role.assigned` - Role granted to user
+- `user.role.revoked` - Role removed from user
+
+**Authorization Patterns:**
+- SQL function: `user_has_permission(user_id, permission_name, org_id, scope_path)`
+- RLS policies integrate permission checks
+- Frontend queries permissions before rendering UI
+- API validates permissions before processing commands
+
+**Initial Role Definitions:**
+
+**super_admin:**
+- Zitadel: IAM_OWNER
+- Scope: All organizations (`org_id = '*'`)
+- Permissions: ALL (`*`)
+- Use cases: Platform support, emergency access, compliance audits
+
+**provider_admin:**
+- Zitadel: ORG_OWNER
+- Scope: Single organization (`org_id = specific org`)
+- Permissions: ALL within their organization
+- Use cases: Healthcare org administrators, facility directors
+
+**Key Design Decisions:**
+- Start with 2 foundational roles, extend via events (no migrations)
+- Impersonation inherits target user's permissions (not super admin's)
+- Cross-tenant grants also event-sourced for full audit trail
+- MFA required for sensitive permissions (`provider.impersonate`, `access_grant.create`)
+
+**Compliance:**
+- Full audit trail of all permission changes
+- Query pattern: "Who granted what permission to whom, when, and why?"
+- 7-year retention for HIPAA compliance
+- Immutable events prevent tampering
+
+---
+
 ## Dependency Graph
 
 ```
-Multi-Tenancy Foundation (CRITICAL PATH)
+CQRS/Event Sourcing Foundation (FOUNDATIONAL LAYER)
   │
-  ├─→ Cross-Tenant Access Model (BLOCKS: Auth Integration)
-  │     │
-  │     └─→ Auth Integration (BLOCKS: Impersonation, Event Resilience)
-  │           │
-  │           ├─→ Impersonation (DEPENDS ON: JWT structure with cross-org context)
-  │           │
-  │           └─→ Event Resilience (DEPENDS ON: org_id + impersonation metadata in events)
-  │
-  └─→ Remote Access (DEPENDS ON: Tenant isolation for developer DB access)
+  └─→ Multi-Tenancy Foundation (CRITICAL PATH)
+        │
+        ├─→ Cross-Tenant Access Model (BLOCKS: Auth Integration)
+        │     │
+        │     └─→ Auth Integration (BLOCKS: RBAC, Impersonation, Event Resilience)
+        │           │
+        │           ├─→ RBAC/Permissions (DEPENDS ON: Event-sourced roles/permissions)
+        │           │     │
+        │           │     └─→ Impersonation (DEPENDS ON: Permission inheritance from target user)
+        │           │
+        │           └─→ Event Resilience (DEPENDS ON: org_id + impersonation metadata in events)
+        │
+        └─→ Remote Access (DEPENDS ON: Tenant isolation for developer DB access)
 ```
 
 **Rationale:**
+- **CQRS/Event Sourcing is foundational** because all state changes (including permissions) are event-sourced
 - **Cross-tenant access model must precede auth** because JWT structure needs to include Provider Partner access grants
-- **Auth must precede impersonation** because impersonation builds on authentication foundation
-- **Impersonation parallel to event resilience** (both depend on auth)
+- **Auth must precede RBAC** because authentication provides user context for permission checks
+- **RBAC must precede impersonation** because impersonation inherits target user's permissions
 - **Event resilience depends on auth** because queued events need org_id AND cross-org/impersonation context
 - **Remote access orthogonal** to business logic features (developer infrastructure)
 
@@ -291,11 +392,12 @@ Multi-Tenancy Foundation (CRITICAL PATH)
 ## Cross-Cutting Concerns
 
 ### Audit Logging
-**Implied Requirements:**
+**Event-Sourced Audit Trail:**
+- **Primary Source**: The `domain_events` table IS the audit log (immutable, append-only)
 - Healthcare compliance (HIPAA/state regulations) requires immutable audit trails
-- Must log: user actions, data access, authentication events, failed authorization attempts
-- **PostgreSQL Approach**: Append-only `audit_log` table with `org_id`, `user_id`, `action`, `resource`, `timestamp`
+- Every state change captured: user actions, data access, authentication events, permission changes
 - **Retention**: 7 years (typical healthcare requirement)
+- **Query Pattern**: Filter `domain_events` by `stream_type`, `event_type`, `event_metadata->>'user_id'`
 
 **Cross-Tenant Disclosure Tracking:**
 - **HIPAA Requirement:** All Provider Partner access to Provider data must be logged (45 CFR § 164.528)
@@ -409,4 +511,35 @@ The A4C AppSuite architecture demonstrates **cohesive design across security, re
 5. **Provider Partner Collaboration:** Granular access grants enable court, VAR, family access without compromising isolation
 6. **Transparent Support Operations:** Impersonation audit trail + visual indicators ensure accountable Super Admin access
 
-**Next Immediate Action:** Complete Phase 1 (multi-tenancy foundation) and verify RLS policies with penetration testing before proceeding to event resilience implementation.
+**Next Immediate Action:** Complete Phase 1 (multi-tenancy foundation + RBAC) and verify RLS policies with penetration testing before proceeding to event resilience implementation.
+
+---
+
+## Related Documentation Index
+
+### CQRS/Event Sourcing
+- `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - Complete event sourcing specification
+- `/frontend/docs/EVENT-DRIVEN-GUIDE.md` - Frontend event implementation patterns
+
+### Multi-Tenancy & Auth
+- `.plans/multi-tenancy/multi-tenancy-organization.html` - Multi-tenancy architecture
+- `.plans/auth-integration/tenants-as-organization-thoughts.md` - Zitadel integration
+
+### RBAC/Permissions
+- `.plans/rbac-permissions/architecture.md` - Permission-based RBAC with event sourcing
+
+### Cross-Tenant Access
+- (See Multi-Tenancy and RBAC documents for cross-tenant grant model)
+
+### Impersonation
+- `.plans/impersonation/architecture.md` - Impersonation system design
+- `.plans/impersonation/event-schema.md` - Impersonation events
+- `.plans/impersonation/ui-specification.md` - Visual indicators and UX
+- `.plans/impersonation/security-controls.md` - Security measures
+
+### Event Resilience
+- `.plans/event-resilience/plan.md` - Offline queue and retry architecture
+
+### Developer Operations
+- `.plans/cloudflare-remote-access/plan.md` - Zero Trust remote access
+- `.plans/cloudflare-remote-access/todo.md` - Implementation checklist
