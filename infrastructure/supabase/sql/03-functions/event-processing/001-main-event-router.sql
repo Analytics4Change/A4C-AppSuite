@@ -45,6 +45,10 @@ BEGIN
       WHEN 'access_grant' THEN
         PERFORM process_rbac_event(NEW);
 
+      -- Impersonation stream type
+      WHEN 'impersonation' THEN
+        PERFORM process_impersonation_event(NEW);
+
       ELSE
         RAISE WARNING 'Unknown stream type: %', NEW.stream_type;
     END CASE;

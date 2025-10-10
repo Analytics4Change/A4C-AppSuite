@@ -2,11 +2,21 @@
 
 ## Overview
 
-This document defines the event schemas for impersonation lifecycle events in the A4C platform. These events integrate with the existing event-driven architecture to provide comprehensive audit trails for Super Admin impersonation sessions.
+This document defines the event schemas for impersonation lifecycle events in the A4C platform. These events follow the **CQRS/Event Sourcing architecture** and integrate with the existing event-driven infrastructure to provide comprehensive audit trails for Super Admin impersonation sessions.
+
+### CQRS/Event Sourcing Implementation
+
+- **AsyncAPI Contract**: Event schemas formally defined in `/infrastructure/supabase/contracts/asyncapi/domains/impersonation.yaml`
+- **Event Storage**: All events stored in `domain_events` table with `stream_type = 'impersonation'`
+- **Projection**: `impersonation_sessions_projection` table maintains queryable session state
+- **Event Processor**: `process_impersonation_event()` function projects events to table
+- **Type Generation**: Run `./scripts/generate-contracts.sh` to generate TypeScript types from AsyncAPI schemas
 
 **Related Documents:**
-- `.plans/impersonation/architecture.md` - Overall impersonation architecture
-- `/docs/EVENT-DRIVEN-GUIDE.md` - Event-driven architecture guide (Frontend)
+- `.plans/impersonation/architecture.md` - Overall impersonation architecture (includes CQRS details)
+- `/infrastructure/supabase/contracts/asyncapi/domains/impersonation.yaml` - AsyncAPI event schemas
+- `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - CQRS foundation documentation
+- `/frontend/docs/EVENT-DRIVEN-GUIDE.md` - Frontend event-driven guide
 
 ---
 
@@ -46,7 +56,7 @@ interface DomainEvent {
 interface ImpersonationStartedEvent {
   id: string;                    // UUID
   streamId: string;              // Super Admin user ID
-  streamType: 'user';
+  streamType: 'impersonation';   // Dedicated stream type for impersonation
   eventType: 'impersonation.started';
   data: {
     sessionId: string;           // Unique session identifier
@@ -92,7 +102,7 @@ interface ImpersonationStartedEvent {
 {
   "id": "evt_9a7b3c5d-1e2f-4a6b-8c9d-0e1f2a3b4c5d",
   "streamId": "user_super_admin_123",
-  "streamType": "user",
+  "streamType": "impersonation",
   "eventType": "impersonation.started",
   "data": {
     "sessionId": "session_abc123xyz",
@@ -146,7 +156,7 @@ interface ImpersonationStartedEvent {
 interface ImpersonationRenewedEvent {
   id: string;                    // UUID
   streamId: string;              // Super Admin user ID
-  streamType: 'user';
+  streamType: 'impersonation';
   eventType: 'impersonation.renewed';
   data: {
     sessionId: string;           // Session identifier
@@ -174,7 +184,7 @@ interface ImpersonationRenewedEvent {
 {
   "id": "evt_1b2c3d4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e",
   "streamId": "user_super_admin_123",
-  "streamType": "user",
+  "streamType": "impersonation",
   "eventType": "impersonation.renewed",
   "data": {
     "sessionId": "session_abc123xyz",
@@ -210,7 +220,7 @@ interface ImpersonationRenewedEvent {
 interface ImpersonationEndedEvent {
   id: string;                    // UUID
   streamId: string;              // Super Admin user ID
-  streamType: 'user';
+  streamType: 'impersonation';
   eventType: 'impersonation.ended';
   data: {
     sessionId: string;           // Session identifier
@@ -245,7 +255,7 @@ interface ImpersonationEndedEvent {
 {
   "id": "evt_2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f",
   "streamId": "user_super_admin_123",
-  "streamType": "user",
+  "streamType": "impersonation",
   "eventType": "impersonation.ended",
   "data": {
     "sessionId": "session_abc123xyz",
@@ -279,7 +289,7 @@ interface ImpersonationEndedEvent {
 {
   "id": "evt_3d4e5f6a-7b8c-9d0e-1f2a-3b4c5d6e7f8a",
   "streamId": "user_super_admin_123",
-  "streamType": "user",
+  "streamType": "impersonation",
   "eventType": "impersonation.ended",
   "data": {
     "sessionId": "session_xyz789abc",
@@ -453,7 +463,7 @@ class ImpersonationService {
     // Emit impersonation.started event
     await this.eventEmitter.emit(
       session.superAdminId,
-      'user',
+      'impersonation',  // stream_type
       'impersonation.started',
       {
         sessionId: session.sessionId,
@@ -474,7 +484,7 @@ class ImpersonationService {
 
     await this.eventEmitter.emit(
       session.superAdminId,
-      'user',
+      'impersonation',  // stream_type
       'impersonation.renewed',
       {
         sessionId: session.sessionId,
@@ -497,7 +507,7 @@ class ImpersonationService {
 
     await this.eventEmitter.emit(
       session.superAdminId,
-      'user',
+      'impersonation',  // stream_type
       'impersonation.ended',
       {
         sessionId: session.sessionId,
@@ -519,29 +529,57 @@ class ImpersonationService {
 
 ### Backend Event Storage
 
-Events are stored in Supabase `events` table following the existing schema:
+Events are stored in Supabase `domain_events` table following the CQRS architecture:
 
+**Event Store Queries (Complete History):**
 ```sql
--- Query all impersonation sessions
-SELECT * FROM events
-WHERE event_type LIKE 'impersonation.%'
-ORDER BY timestamp DESC;
+-- Query all impersonation lifecycle events
+SELECT * FROM domain_events
+WHERE stream_type = 'impersonation'
+ORDER BY created_at DESC;
 
--- Query specific session timeline
-SELECT * FROM events
-WHERE metadata->>'impersonationSessionId' = 'session_abc123xyz'
-ORDER BY timestamp ASC;
+-- Query specific session timeline from event store
+SELECT * FROM domain_events
+WHERE stream_type = 'impersonation'
+  AND (
+    event_data->>'session_id' = 'session_abc123xyz'
+    OR event_metadata->>'impersonation_session_id' = 'session_abc123xyz'
+  )
+ORDER BY created_at ASC;
 
 -- Query all sessions for a Super Admin
-SELECT * FROM events
-WHERE event_type = 'impersonation.started'
-  AND data->>'superAdmin'->>'userId' = 'user_super_admin_123'
-ORDER BY timestamp DESC;
+SELECT * FROM domain_events
+WHERE stream_type = 'impersonation'
+  AND stream_id = 'user_super_admin_123'::uuid
+ORDER BY created_at DESC;
 
--- Count actions performed during a session
-SELECT COUNT(*) FROM events
-WHERE metadata->>'impersonationSessionId' = 'session_abc123xyz'
-  AND event_type != 'impersonation.renewed';
+-- Count actions performed during a session (from event metadata)
+SELECT COUNT(*) FROM domain_events
+WHERE event_metadata->>'impersonation_session_id' = 'session_abc123xyz'
+  AND event_type NOT LIKE 'impersonation.%';
+```
+
+**Projection Queries (Optimized for Read Performance):**
+```sql
+-- Query active impersonation sessions
+SELECT * FROM impersonation_sessions_projection
+WHERE status = 'active'
+  AND expires_at > NOW()
+ORDER BY started_at DESC;
+
+-- Query specific session details
+SELECT * FROM impersonation_sessions_projection
+WHERE session_id = 'session_abc123xyz';
+
+-- Get user's active impersonation sessions (helper function)
+SELECT * FROM get_user_active_impersonation_sessions('user_super_admin_123'::uuid);
+
+-- Get organization impersonation audit (helper function)
+SELECT * FROM get_org_impersonation_audit(
+  'org_sunshine_youth_001',
+  NOW() - INTERVAL '30 days',
+  NOW()
+);
 ```
 
 ---
@@ -550,49 +588,76 @@ WHERE metadata->>'impersonationSessionId' = 'session_abc123xyz'
 
 ### Super Admin Activity Report
 
+**Using Projection Table (Recommended):**
 ```sql
 -- All impersonation sessions by Super Admin in date range
 SELECT
-  e.timestamp as started_at,
-  e.data->>'target'->>'email' as target_user,
-  e.data->>'target'->>'orgName' as target_org,
-  e.data->>'justification'->>'reason' as reason,
-  e.data->>'justification'->>'referenceId' as reference,
-  (SELECT data->>'totalDuration'
-   FROM events
+  started_at,
+  target_email as target_user,
+  target_org_name as target_org,
+  justification_reason as reason,
+  justification_reference_id as reference,
+  total_duration_ms as duration_ms,
+  renewal_count,
+  actions_performed,
+  status
+FROM impersonation_sessions_projection
+WHERE super_admin_user_id = :super_admin_id
+  AND started_at BETWEEN :start_date AND :end_date
+ORDER BY started_at DESC;
+```
+
+**Using Event Store (Complete History):**
+```sql
+-- All impersonation sessions by Super Admin in date range
+SELECT
+  e.created_at as started_at,
+  e.event_data->'target'->>'email' as target_user,
+  e.event_data->'target'->>'orgName' as target_org,
+  e.event_data->'justification'->>'reason' as reason,
+  e.event_data->'justification'->>'referenceId' as reference,
+  (SELECT event_data->>'total_duration'
+   FROM domain_events
    WHERE event_type = 'impersonation.ended'
-     AND data->>'sessionId' = e.data->>'sessionId'
-  ) as duration_ms
-FROM events e
+     AND stream_type = 'impersonation'
+     AND event_data->>'session_id' = e.event_data->>'session_id'
+  )::integer as duration_ms
+FROM domain_events e
 WHERE e.event_type = 'impersonation.started'
-  AND e.data->>'superAdmin'->>'userId' = :super_admin_id
-  AND e.timestamp BETWEEN :start_date AND :end_date
-ORDER BY e.timestamp DESC;
+  AND e.stream_type = 'impersonation'
+  AND e.stream_id = :super_admin_id
+  AND e.created_at BETWEEN :start_date AND :end_date
+ORDER BY e.created_at DESC;
 ```
 
 ### Provider Access Report
 
+**Using Projection Table (Recommended):**
 ```sql
 -- All Super Admin access to specific Provider org
 SELECT
-  e.timestamp as accessed_at,
-  e.data->>'superAdmin'->>'email' as super_admin,
-  e.data->>'target'->>'email' as impersonated_user,
-  e.data->>'justification'->>'reason' as reason,
-  (SELECT data->>'totalDuration'
-   FROM events
-   WHERE event_type = 'impersonation.ended'
-     AND data->>'sessionId' = e.data->>'sessionId'
-  ) as duration_ms,
-  (SELECT data->>'actionsPerformed'
-   FROM events
-   WHERE event_type = 'impersonation.ended'
-     AND data->>'sessionId' = e.data->>'sessionId'
-  ) as actions_count
-FROM events e
-WHERE e.event_type = 'impersonation.started'
-  AND e.data->>'target'->>'orgId' = :provider_org_id
-ORDER BY e.timestamp DESC;
+  started_at as accessed_at,
+  super_admin_email as super_admin,
+  target_email as impersonated_user,
+  justification_reason as reason,
+  justification_reference_id as reference,
+  total_duration_ms as duration_ms,
+  actions_performed as actions_count,
+  renewal_count,
+  status
+FROM impersonation_sessions_projection
+WHERE target_org_id = :provider_org_id
+ORDER BY started_at DESC;
+```
+
+**Using Helper Function:**
+```sql
+-- All impersonation access to specific Provider org (last 30 days)
+SELECT * FROM get_org_impersonation_audit(
+  :provider_org_id,
+  NOW() - INTERVAL '30 days',
+  NOW()
+);
 ```
 
 ---
@@ -601,21 +666,32 @@ ORDER BY e.timestamp DESC;
 
 **Requirement:** Healthcare regulations require 7-year audit trail retention
 
-**Implementation:**
-- All impersonation events stored in `events` table
-- Never deleted (append-only)
+**CQRS Implementation:**
+- All impersonation events stored in `domain_events` table (immutable, append-only)
+- Events never deleted, providing complete audit trail
+- Projection table (`impersonation_sessions_projection`) can be rebuilt from events
 - Archived to cold storage after 90 days (hot storage limit)
 - Archived events still queryable for compliance reports
+- Event store serves as source of truth for forensic analysis
 
 ---
 
 ## Related Documents
 
-- `.plans/impersonation/architecture.md` - Overall architecture
+### Planning Documents
+- `.plans/impersonation/architecture.md` - Overall architecture (includes CQRS details)
+- `.plans/impersonation/implementation-guide.md` - Step-by-step implementation guide
 - `.plans/impersonation/ui-specification.md` - Visual indicators and UX
 - `.plans/impersonation/security-controls.md` - Security measures
 - `.plans/event-resilience/plan.md` - Event resilience and offline handling
-- `/docs/EVENT-DRIVEN-GUIDE.md` - Frontend event-driven guide
+- `/frontend/docs/EVENT-DRIVEN-GUIDE.md` - Frontend event-driven guide
+
+### Infrastructure Files
+- `/infrastructure/supabase/contracts/asyncapi/domains/impersonation.yaml` - AsyncAPI event schemas (canonical)
+- `/infrastructure/supabase/sql/02-tables/impersonation/001-impersonation_sessions_projection.sql` - Projection table
+- `/infrastructure/supabase/sql/03-functions/event-processing/005-process-impersonation-events.sql` - Event processor and helper functions
+- `/infrastructure/supabase/sql/03-functions/event-processing/001-main-event-router.sql` - Event router (includes impersonation)
+- `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - CQRS foundation documentation
 
 ---
 

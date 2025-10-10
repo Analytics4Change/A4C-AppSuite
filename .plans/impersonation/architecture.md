@@ -98,37 +98,62 @@ Platform support, emergency access, and compliance audits require Super Admin ab
 
 ## Architecture Overview
 
+### CQRS/Event Sourcing Foundation
+
+Impersonation follows the platform's **event-sourced CQRS architecture**:
+
+- **Events**: All impersonation state changes captured as immutable events in `domain_events` table
+- **Stream Type**: `'impersonation'` (dedicated stream)
+- **Projections**: `impersonation_sessions_projection` table for read queries
+- **Event Processor**: `process_impersonation_event()` maintains projection state
+- **Audit Trail**: Complete event history provides compliance and forensics
+
+For CQRS architecture details, see:
+- `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md`
+- `.plans/consolidated/agent-observations.md` (CQRS Foundation section)
+
+### System Architecture
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                  Super Admin Console                     │
 │  - User selection dropdown                               │
 │  - Organization selection                                │
-│  - Justification capture                                 │
-│  - MFA challenge                                         │
+│  - Justification capture (required for events)           │
+│  - MFA challenge (provider.impersonate permission)       │
 └──────────────────────┬──────────────────────────────────┘
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────┐
 │             Impersonation Service (Backend)              │
-│  - Validates Super Admin permissions                     │
+│  - Validates provider.impersonate permission (RBAC)      │
 │  - Verifies MFA                                          │
 │  - Creates impersonation session (Redis)                 │
-│  - Emits impersonation.started event                     │
+│  - Emits impersonation.started event (domain_events)     │
 │  - Issues JWT with impersonation context                 │
 └──────────────────────┬──────────────────────────────────┘
                        │
           ┌────────────┴────────────┐
           │                         │
           ▼                         ▼
-┌──────────────────┐      ┌──────────────────────┐
-│  Redis Session   │      │   Event Emitter      │
-│  - sessionId     │      │  - Audit trail       │
-│  - expiresAt     │      │  - Lifecycle events  │
-│  - targetUser    │      │  - Action metadata   │
-│  - TTL: 30 min   │      │                      │
-└──────────────────┘      └──────────────────────┘
-          │                         │
-          ▼                         ▼
+┌──────────────────┐      ┌──────────────────────────────┐
+│  Redis Session   │      │   domain_events table        │
+│  - sessionId     │      │  - stream_type: impersonation│
+│  - expiresAt     │      │  - Event processor projects  │
+│  - targetUser    │      │    to projection table       │
+│  - TTL: 30 min   │      │  - Audit trail preserved     │
+└──────────────────┘      └──────────┬───────────────────┘
+          │                          │
+          │                          ▼
+          │              ┌──────────────────────────────┐
+          │              │ impersonation_sessions_      │
+          │              │        projection            │
+          │              │  - Active sessions (query)   │
+          │              │  - Audit reports             │
+          │              │  - Compliance dashboard      │
+          │              └──────────────────────────────┘
+          │
+          ▼
 ┌─────────────────────────────────────────────────────────┐
 │                  Application Layer                       │
 │  - Visual indicators (red border, banner)                │
@@ -184,7 +209,7 @@ await redis.setex(
 
 await eventEmitter.emit(
   superAdminId,
-  'user',
+  'impersonation',  // stream_type
   'impersonation.started',
   session,
   'Super Admin started impersonation session'
@@ -204,7 +229,7 @@ session.renewalCount += 1;
 
 await eventEmitter.emit(
   superAdminId,
-  'user',
+  'impersonation',  // stream_type
   'impersonation.renewed',
   { sessionId, renewalCount, newExpiresAt },
   'Impersonation session renewed'
@@ -221,7 +246,7 @@ await redis.del(`impersonation:${sessionId}`);
 
 await eventEmitter.emit(
   superAdminId,
-  'user',
+  'impersonation',  // stream_type
   'impersonation.ended',
   { sessionId, reason, duration, actionsPerformed },
   'Impersonation session ended'
@@ -273,7 +298,7 @@ setInterval(async () => {
       // Emit timeout event if not already ended
       await eventEmitter.emit(
         session.superAdminId,
-        'user',
+        'impersonation',  // stream_type
         'impersonation.ended',
         { sessionId, reason: 'timeout', ...session },
         'Impersonation session timed out'
@@ -290,9 +315,31 @@ setInterval(async () => {
 
 **Philosophy:** Leverage existing event-driven architecture for comprehensive audit logging.
 
+### CQRS Implementation
+
+**Event Storage:**
+- All impersonation events stored in `domain_events` table with `stream_type = 'impersonation'`
+- Events are immutable and provide complete audit trail
+- Stream ID is the Super Admin's user UUID
+
+**Projection Table:**
+- `impersonation_sessions_projection` maintains current session state
+- Updated by `process_impersonation_event()` function via database trigger
+- Optimized for queries: active sessions, audit reports, compliance dashboards
+
+**AsyncAPI Contract:**
+- Event schemas defined in `/infrastructure/supabase/contracts/asyncapi/domains/impersonation.yaml`
+- TypeScript types generated via `./scripts/generate-contracts.sh`
+- Ensures type safety across frontend and backend
+
+**Related Infrastructure:**
+- Event processor: `/infrastructure/supabase/sql/03-functions/event-processing/005-process-impersonation-events.sql`
+- Projection table: `/infrastructure/supabase/sql/02-tables/impersonation/001-impersonation_sessions_projection.sql`
+- Event router: `/infrastructure/supabase/sql/03-functions/event-processing/001-main-event-router.sql`
+
 ### Impersonation Lifecycle Events
 
-See `.plans/impersonation/event-schema.md` for detailed event definitions.
+See `.plans/impersonation/event-schema.md` for detailed event definitions and `/infrastructure/supabase/contracts/asyncapi/domains/impersonation.yaml` for AsyncAPI schemas.
 
 **Event Flow:**
 ```
@@ -326,23 +373,57 @@ impersonation.started
 ### Audit Queries
 
 **Example queries for compliance:**
+
+**Query Projection Table (Optimized):**
 ```sql
 -- All impersonation sessions by Super Admin X
-SELECT * FROM events
-WHERE event_type LIKE 'impersonation.%'
-  AND metadata->>'impersonatedBy' = :super_admin_id
-ORDER BY timestamp DESC;
+SELECT * FROM impersonation_sessions_projection
+WHERE super_admin_user_id = :super_admin_id
+ORDER BY started_at DESC;
+
+-- Active impersonation sessions
+SELECT * FROM impersonation_sessions_projection
+WHERE status = 'active'
+  AND expires_at > NOW()
+ORDER BY started_at DESC;
+
+-- All impersonation access to Provider Y (using helper function)
+SELECT * FROM get_org_impersonation_audit(
+  :provider_org_id,
+  NOW() - INTERVAL '30 days',
+  NOW()
+);
+
+-- Get user's active impersonation sessions
+SELECT * FROM get_user_active_impersonation_sessions(:user_id);
+```
+
+**Query Event Store (Complete History):**
+```sql
+-- All impersonation lifecycle events for Super Admin X
+SELECT * FROM domain_events
+WHERE stream_type = 'impersonation'
+  AND stream_id = :super_admin_id
+ORDER BY created_at DESC;
 
 -- All actions performed during specific impersonation session
-SELECT * FROM events
-WHERE metadata->>'impersonationSessionId' = :session_id
-ORDER BY timestamp ASC;
+SELECT * FROM domain_events
+WHERE event_metadata->>'impersonation_session_id' = :session_id
+ORDER BY created_at ASC;
 
--- All impersonation access to Provider Y
-SELECT * FROM events
-WHERE event_type = 'impersonation.started'
-  AND data->>'targetOrgId' = :provider_org_id
-ORDER BY timestamp DESC;
+-- Detailed event history for specific session
+SELECT
+  event_type,
+  event_data,
+  event_metadata,
+  created_at
+FROM domain_events
+WHERE stream_type = 'impersonation'
+  AND (
+    event_data->>'session_id' = :session_id
+    OR event_metadata->>'impersonation_session_id' = :session_id
+  )
+ORDER BY created_at ASC;
 ```
 
 ---
@@ -542,11 +623,21 @@ interface ImpersonationJustification {
 
 ## Related Documents
 
-- `.plans/impersonation/event-schema.md` - Detailed event definitions
+### Planning Documents
+- `.plans/impersonation/event-schema.md` - Detailed event definitions (markdown)
 - `.plans/impersonation/ui-specification.md` - Visual indicators and UX flows
 - `.plans/impersonation/security-controls.md` - Comprehensive security measures
+- `.plans/impersonation/implementation-guide.md` - Step-by-step implementation guide
 - `.plans/consolidated/agent-observations.md` - Overall architecture context
+- `.plans/rbac-permissions/architecture.md` - RBAC system (includes provider.impersonate permission)
 - `.plans/auth-integration/tenants-as-organization-thoughts.md` - Authentication foundation
+
+### Infrastructure Files
+- `/infrastructure/supabase/contracts/asyncapi/domains/impersonation.yaml` - AsyncAPI event schemas
+- `/infrastructure/supabase/sql/02-tables/impersonation/001-impersonation_sessions_projection.sql` - Projection table
+- `/infrastructure/supabase/sql/03-functions/event-processing/005-process-impersonation-events.sql` - Event processor
+- `/infrastructure/supabase/sql/03-functions/event-processing/001-main-event-router.sql` - Event router (includes impersonation)
+- `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - CQRS foundation documentation
 
 ---
 
