@@ -32,6 +32,8 @@ Healthcare applications require high reliability for event delivery. Critical ev
 2. **Service Outages**: Supabase or backend service temporarily unavailable
 3. **Rate Limiting**: Too many requests in a short period
 4. **Client-Side Errors**: Browser crashes, page refreshes during event emission
+5. **Cross-Tenant Audit Events**: Provider Partner access disclosure tracking MUST be synchronous (HIPAA compliance, no IndexedDB queue - data leakage risk)
+6. **Impersonation Audit Events**: Session lifecycle events cannot be lost (compliance requirement for Super Admin impersonation)
 
 ## Proposed Solution
 
@@ -48,6 +50,7 @@ Healthcare applications require high reliability for event delivery. Critical ev
 │                  Resilient Event Emitter                             │
 │  - Wraps EventEmitter with resilience features                      │
 │  - Detects failures and queues events                                │
+│  - EXCEPTION: Cross-tenant audit + impersonation events → Sync only │
 │  - Manages retry logic                                               │
 └──────────────────────┬──────────────────────────────────────────────┘
                        │
@@ -324,6 +327,31 @@ interface HealthStatus {
 3. Option to manually sync or clear old failed events
 4. Log to error tracking service
 5. Degrade gracefully: continue without queue
+
+### Scenario 6: Impersonation Session During Network Failure
+**Trigger**: Super Admin impersonating user, network disconnects mid-session
+**Behavior**:
+1. `impersonation.started` event already sent (synchronous at session start)
+2. User actions during session queued (standard event resilience)
+3. `impersonation.renewed` event attempted, fails, queued
+4. On timeout: Local-only `impersonation.ended` event with special flag
+5. On reconnection:
+   - Send queued user action events (with impersonation metadata)
+   - Send queued renewal events
+   - Send deferred `impersonation.ended` event
+6. Server reconciles session timeline from events
+
+**Critical:** Session timeout still enforced client-side even if network offline.
+
+### Scenario 7: Cross-Tenant Access During Network Failure
+**Trigger**: Provider Partner user attempts to access Provider data while offline
+**Behavior**:
+1. Access MUST be blocked if audit event cannot be written synchronously
+2. User sees: "Network required for compliance audit logging"
+3. No IndexedDB queue for cross-tenant audit (prevents data exposure if device stolen)
+4. Rationale: HIPAA requires disclosure tracking before data access
+
+**Security Note:** Cross-tenant audit events contain sensitive metadata (who accessed which org) and must not be persisted in client-accessible storage.
 
 ## Testing Strategy
 

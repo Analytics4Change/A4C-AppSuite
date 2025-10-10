@@ -2,7 +2,7 @@
 
 ## Core Mission
 
-Enterprise-grade **multi-tenant B2B SaaS platform** for healthcare organizations serving at-risk youth. The system enables secure, hierarchical organizational structures where multiple facilities, programs, and teams collaborate while maintaining strict data isolation and healthcare compliance requirements.
+Enterprise-grade **multi-tenant B2B SaaS platform** for healthcare organizations serving at-risk youth, with controlled cross-organizational access for external stakeholders (Value-Added Resellers, court systems, social services, families). The system enables secure, hierarchical organizational structures where multiple facilities, programs, and teams collaborate while maintaining strict data isolation and healthcare compliance requirements.
 
 ---
 
@@ -157,21 +157,134 @@ Developer Workstation
 
 ---
 
+### 5. Cross-Tenant Access & Provider Partner Collaboration
+**Primary Documents:** `.plans/auth-integration/tenants-as-organization-thoughts.md`, `.plans/multi-tenancy/multi-tenancy-organization.html`
+
+**Tenant Classification:**
+
+**Provider (Data Owner):**
+- Healthcare organizations (group homes, detention centers, residential facilities)
+- Own patient/client data
+- Isolated Zitadel organization per Provider
+- Self-contained user base
+
+**Provider Partner (External Stakeholder):**
+- **Value-Added Resellers (VARs)**: Manage multiple Provider customers, scope-limited aggregate dashboards
+- **Court System**: Judges, guardian ad-litem (case-based access via court orders)
+- **Social Services**: Social workers, case managers (assigned client access)
+- **Family Members**: Parents/guardians in shared "A4C-Families" org (client-scoped grants)
+
+**Access Grant Model:**
+```sql
+CREATE TABLE cross_tenant_access_grants (
+  id UUID PRIMARY KEY,
+  consultant_org_id TEXT NOT NULL,        -- Provider Partner org
+  consultant_user_id UUID,                 -- Specific user (NULL = org-wide)
+  provider_org_id TEXT NOT NULL,          -- Target Provider org
+  scope TEXT NOT NULL CHECK (scope IN ('full_org', 'facility', 'client')),
+  scope_id UUID,                           -- Specific resource ID
+  granted_by UUID NOT NULL,                -- Authorization actor
+  granted_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ,                  -- Time-limited access
+  revoked_at TIMESTAMPTZ,
+  authorization_type TEXT NOT NULL,        -- 'court_order' | 'parental_consent' | 'var_contract'
+  legal_reference TEXT,                    -- Court order #, consent form ID
+  metadata JSONB
+);
+```
+
+**Enhanced RLS Policies:**
+```sql
+-- Hybrid access: same-tenant OR cross-tenant grant
+WHERE organization_id = current_setting('app.current_org')
+   OR EXISTS (
+     SELECT 1 FROM cross_tenant_access_grants
+     WHERE consultant_org_id = current_setting('app.current_org')
+       AND provider_org_id = organization_id
+       AND (expires_at IS NULL OR expires_at > NOW())
+       AND revoked_at IS NULL
+       AND check_scope_authorization(scope, scope_id, resource_id)
+   )
+```
+
+**Dashboard Access Tiers:**
+- **Super Admin:** All Providers (unrestricted aggregate analytics)
+- **VAR:** Own portfolio only (scope-limited aggregate dashboards)
+- **Provider Admin:** Own Provider only (no cross-tenant visibility)
+
+---
+
+### 6. Super Admin Impersonation & Support Operations
+**Primary Document:** `.plans/impersonation/architecture.md`
+
+**Problem Statement:** Platform support, emergency access, and compliance audits require Super Admin ability to view/operate as any user in any Provider organization while maintaining comprehensive audit trails.
+
+**Solution Architecture:**
+
+**Session Management:**
+- 30-minute time-limited sessions (configurable)
+- Renewal modal at 1-minute warning
+- Automatic logout on timeout
+- Server-side session tracking (Redis with TTL)
+
+**Event-Driven Audit:**
+```
+impersonation.started → [user actions with metadata] → impersonation.renewed* → impersonation.ended
+```
+
+**Visual Indicators:**
+- Bright red border around entire viewport
+- Sticky banner: "Impersonating: [User] ([Org])"
+- Favicon change to warning icon
+- Browser title prefix: "[IMPERSONATING]"
+- Session timer countdown
+
+**Security Controls:**
+- MFA required before impersonation
+- Justification required (support ticket, emergency, audit, training)
+- Nested impersonation prevented
+- Comprehensive audit logging (who, what, when, why, how long)
+
+**JWT Structure:**
+```json
+{
+  "sub": "target-user-id",
+  "org_id": "target-org-id",
+  "impersonation": {
+    "sessionId": "uuid",
+    "originalUserId": "super-admin-id",
+    "targetUserId": "target-user-id",
+    "expiresAt": 1728484200
+  }
+}
+```
+
+**Compliance:** All impersonation events immutable in audit log, 7-year retention for healthcare regulations.
+
+---
+
 ## Dependency Graph
 
 ```
 Multi-Tenancy Foundation (CRITICAL PATH)
   │
-  ├─→ Auth Integration (BLOCKS: Event Resilience, Remote Access)
-  │     └─→ Event Resilience (DEPENDS ON: org_id claims in JWT)
+  ├─→ Cross-Tenant Access Model (BLOCKS: Auth Integration)
+  │     │
+  │     └─→ Auth Integration (BLOCKS: Impersonation, Event Resilience)
+  │           │
+  │           ├─→ Impersonation (DEPENDS ON: JWT structure with cross-org context)
+  │           │
+  │           └─→ Event Resilience (DEPENDS ON: org_id + impersonation metadata in events)
   │
-  └─→ Remote Access (DEPENDS ON: Tenant isolation for DB connections)
+  └─→ Remote Access (DEPENDS ON: Tenant isolation for developer DB access)
 ```
 
 **Rationale:**
-- **Auth must precede event resilience** because queued events need `org_id` context to route correctly on replay
-- **Multi-tenancy must precede remote access** to ensure developers only access data for authorized tenants
-- **Event resilience is independent** of remote access (orthogonal concerns)
+- **Cross-tenant access model must precede auth** because JWT structure needs to include Provider Partner access grants
+- **Auth must precede impersonation** because impersonation builds on authentication foundation
+- **Impersonation parallel to event resilience** (both depend on auth)
+- **Event resilience depends on auth** because queued events need org_id AND cross-org/impersonation context
+- **Remote access orthogonal** to business logic features (developer infrastructure)
 
 ---
 
@@ -183,6 +296,18 @@ Multi-Tenancy Foundation (CRITICAL PATH)
 - Must log: user actions, data access, authentication events, failed authorization attempts
 - **PostgreSQL Approach**: Append-only `audit_log` table with `org_id`, `user_id`, `action`, `resource`, `timestamp`
 - **Retention**: 7 years (typical healthcare requirement)
+
+**Cross-Tenant Disclosure Tracking:**
+- **HIPAA Requirement:** All Provider Partner access to Provider data must be logged (45 CFR § 164.528)
+- Audit events: consultant org, user, provider org, resource, authorization type
+- Cross-tenant audit events MUST be synchronous (no IndexedDB queue - data leakage risk)
+- Track legal authorization basis (court order #, consent form ID, contract reference)
+
+**Impersonation Audit Trail:**
+- All impersonation lifecycle events (started, renewed, ended)
+- All user actions during impersonation include metadata (original user, session ID)
+- Query pattern: "Show all actions by Super Admin X while impersonating in org Y"
+- Immutable audit log with 7-year retention for compliance
 
 ### Performance & Caching
 **Inferred from Architecture:**
@@ -207,6 +332,11 @@ Multi-Tenancy Foundation (CRITICAL PATH)
 - PostgreSQL ltree + RLS implemented
 - Subdomain routing functional
 - JWT claims include `org_id` and hierarchy path
+- Cross-tenant access grants table schema
+- Enhanced RLS policies (same-tenant OR cross-org grant)
+- JWT structure supports Provider Partner access context
+- Impersonation session management (Redis store, 30-min TTL)
+- Impersonation event schema (started, renewed, ended)
 
 ### Phase 2: Resilience (Next Priority)
 **Goal:** Healthcare-grade reliability for critical events
@@ -240,6 +370,11 @@ Multi-Tenancy Foundation (CRITICAL PATH)
 3. **Cross-Tenant Collaboration:** Do any use cases require sharing data between organizations (e.g., inter-facility referrals)?
 4. **Event Retention:** How long should failed events persist in IndexedDB before alerting users?
 5. **Developer Access Audit:** What is the approval workflow for granting Cloudflare Zero Trust access?
+6. **Provider Partner Onboarding:** Self-service VAR signup vs. manual Super Admin approval? Court order integration workflow?
+7. **Family Access Portal:** Dedicated subdomain (families.a4c.app) vs. email magic links for parents?
+8. **Impersonation Justification:** Dropdown values sufficient, or free-text notes required for all sessions?
+9. **Concurrent Impersonation:** Allow Super Admin to impersonate multiple users in different tabs simultaneously?
+10. **Provider Notifications:** Email Provider Admins when Super Admin accesses their org? (transparency vs. friction trade-off)
 
 ---
 
@@ -248,10 +383,14 @@ Multi-Tenancy Foundation (CRITICAL PATH)
 ### High Risk
 - **RLS Policy Correctness:** Incorrect policies could leak tenant data (requires extensive testing)
 - **Token Expiration Handling:** Must gracefully handle expired tokens mid-session without data loss
+- **Cross-Tenant Grant Validation:** Incorrect scope checks could expose unauthorized Provider data to Provider Partners
+- **Impersonation Session Hijacking:** JWT replay or stolen session could allow unauthorized impersonation
 
 ### Medium Risk
 - **IndexedDB Quota Limits:** Browsers cap storage (50MB-1GB) - needs monitoring and user alerts
 - **ltree Migration Complexity:** Changing hierarchy structure after production launch is high-risk
+- **Impersonation Audit Gaps:** Browser crashes before `impersonation.ended` event could lose session end time (mitigated by server-side cleanup)
+- **Legal Authorization Tracking:** Missing or incorrect legal basis documentation could violate HIPAA disclosure requirements
 
 ### Low Risk
 - **Cloudflare Tunnel Reliability:** Fallback to bastion host if Cloudflare has extended outage
@@ -267,5 +406,7 @@ The A4C AppSuite architecture demonstrates **cohesive design across security, re
 2. **Healthcare Reliability:** Offline-first event handling prevents data loss
 3. **Developer Productivity:** Cloudflare Zero Trust eliminates VPN friction
 4. **Scalable Hierarchy:** ltree supports unlimited nesting without schema changes
+5. **Provider Partner Collaboration:** Granular access grants enable court, VAR, family access without compromising isolation
+6. **Transparent Support Operations:** Impersonation audit trail + visual indicators ensure accountable Super Admin access
 
 **Next Immediate Action:** Complete Phase 1 (multi-tenancy foundation) and verify RLS policies with penetration testing before proceeding to event resilience implementation.
