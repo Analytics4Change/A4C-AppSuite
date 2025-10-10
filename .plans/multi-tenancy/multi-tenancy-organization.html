@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics4Change Multi-Tenant Architecture Specification</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f8f9fa;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header .meta {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: white;
+            min-height: 100vh;
+        }
+        
+        .toc {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px 30px;
+            margin: 30px 0;
+            border-radius: 4px;
+        }
+        
+        .toc h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .toc ul {
+            list-style: none;
+        }
+        
+        .toc li {
+            margin: 8px 0;
+        }
+        
+        .toc a {
+            color: #495057;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .toc a:hover {
+            color: #667eea;
+        }
+        
+        section {
+            margin: 50px 0;
+            scroll-margin-top: 20px;
+        }
+        
+        h2 {
+            color: #667eea;
+            font-size: 2em;
+            margin: 40px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        h3 {
+            color: #495057;
+            font-size: 1.5em;
+            margin: 30px 0 15px 0;
+        }
+        
+        h4 {
+            color: #6c757d;
+            font-size: 1.2em;
+            margin: 20px 0 10px 0;
+        }
+        
+        p {
+            margin: 15px 0;
+            color: #495057;
+        }
+        
+        ul, ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+        
+        li {
+            margin: 8px 0;
+            color: #495057;
+        }
+        
+        code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        
+        pre {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 20px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 20px 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        
+        pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .badge-confirmed {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .callout {
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid;
+            border-radius: 4px;
+        }
+        
+        .callout-info {
+            background: #d1ecf1;
+            border-color: #0c5460;
+            color: #0c5460;
+        }
+        
+        .callout-warning {
+            background: #fff3cd;
+            border-color: #856404;
+            color: #856404;
+        }
+        
+        .callout-success {
+            background: #d4edda;
+            border-color: #155724;
+            color: #155724;
+        }
+        
+        .diagram {
+            background: white;
+            border: 2px solid #e9ecef;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre;
+            overflow-x: auto;
+        }
+        
+        .footer {
+            background: #343a40;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            margin-top: 60px;
+        }
+        
+        .back-to-top {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #667eea;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 50px;
+            text-decoration: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            display: none;
+        }
+        
+        .back-to-top:hover {
+            background: #764ba2;
+        }
+        
+        @media print {
+            .back-to-top, .toc {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Analytics4Change Multi-Tenant Architecture Specification</h1>
+        <div class="meta">
+            <strong>Version:</strong> 1.0 | 
+            <strong>Date:</strong> September 30, 2025 | 
+            <strong>Status:</strong> <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 15px;">Final Design Document</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="toc">
+            <h2>📋 Table of Contents</h2>
+            <ul>
+                <li><a href="#section-1">1. Executive Summary</a></li>
+                <li><a href="#section-2">2. System Architecture Overview</a></li>
+                <li><a href="#section-3">3. Authentication & Authorization</a></li>
+                <li><a href="#section-4">4. Multi-Tenancy Implementation</a></li>
+                <li><a href="#section-5">5. SSO Configuration Strategy</a></li>
+                <li><a href="#section-6">6. Tenant Identification & Routing</a></li>
+                <li><a href="#section-7">7. Organizational Hierarchy Management</a></li>
+                <li><a href="#section-8">8. Tenant Onboarding Flow</a></li>
+                <li><a href="#section-9">9. Data Architecture</a></li>
+                <li><a href="#section-10">10. Security & Compliance</a></li>
+                <li><a href="#section-11">11. User Experience & UI</a></li>
+                <li><a href="#section-12">12. Technical Setup Guide</a></li>
+                <li><a href="#section-13">13. Implementation Roadmap</a></li>
+                <li><a href="#section-14">14. Appendix</a></li>
+            </ul>
+        </div>
+
+        <section id="section-1">
+            <h2>1. Executive Summary</h2>
+            
+            <h3>1.1 Project Overview</h3>
+            <p>Analytics4Change (A4C) is implementing a multi-tenant B2B SaaS platform with enterprise-grade identity and access management powered by Zitadel Cloud.</p>
+            
+            <h3>1.2 Key Architectural Decisions</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Decision</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Identity Provider</strong></td>
+                        <td>Zitadel Cloud (Free Plan)</td>
+                        <td><span class="badge badge-confirmed">✅ Confirmed</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Tenant Isolation</strong></td>
+                        <td>One Zitadel organization per tenant</td>
+                        <td><span class="badge badge-confirmed">✅ Confirmed</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Hierarchy Model</strong></td>
+                        <td>Unlimited depth using PostgreSQL ltree</td>
+                        <td><span class="badge badge-confirmed">✅ Confirmed</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Tenant Routing</strong></td>
+                        <td>Subdomain-based (*.yourapp.com)</td>
+                        <td><span class="badge badge-confirmed">✅ Confirmed</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Data Storage</strong></td>
+                        <td>Shared database with tenant_id + RLS</td>
+                        <td><span class="badge badge-confirmed">✅ Confirmed</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>SSO Strategy</strong></td>
+                        <td>Instance-level social, org-level enterprise</td>
+                        <td><span class="badge badge-confirmed">✅ Confirmed</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Onboarding</strong></td>
+                        <td>Manual admin-created tenants</td>
+                        <td><span class="badge badge-confirmed">✅ Confirmed</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Caching</strong></td>
+                        <td>Redis for state management & lookups</td>
+                        <td><span class="badge badge-confirmed">✅ Confirmed</span></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>1.3 Technology Stack</h3>
+            <ul>
+                <li><strong>Identity Platform:</strong> Zitadel Cloud</li>
+                <li><strong>Database:</strong> Supabase (PostgreSQL with ltree extension)</li>
+                <li><strong>Cache:</strong> Redis (Kubernetes-hosted)</li>
+                <li><strong>Infrastructure:</strong> Kubernetes cluster</li>
+                <li><strong>DNS/CDN:</strong> Cloudflare (provider-agnostic implementation)</li>
+            </ul>
+        </section>
+
+        <section id="section-2">
+            <h2>2. System Architecture Overview</h2>
+            
+            <h3>2.1 High-Level Architecture</h3>
+            <div class="diagram">
+┌─────────────────────────────────────────────────────────────┐
+│                     Internet / Users                         │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Cloudflare (DNS/CDN)                        │
+│  - Wildcard DNS: *.yourapp.com                              │
+│  - Custom domains (Post-launch)                             │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Kubernetes Cluster (Application)                │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Application Layer                                    │  │
+│  │  - Subdomain parsing middleware                       │  │
+│  │  - Tenant context resolution                          │  │
+│  │  - Authorization middleware                           │  │
+│  │  - API endpoints                                      │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                         │                                    │
+│  ┌──────────────────────┼───────────────────────────────┐  │
+│  │  Redis Cache                                          │  │
+│  │  - OAuth state                                        │  │
+│  │  - Tenant lookups                                     │  │
+│  │  - User sessions                                      │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────┬────────────────────────────────────┘
+                          │
+         ┌────────────────┴────────────────┐
+         │                                  │
+         ▼                                  ▼
+┌──────────────────────┐         ┌──────────────────────┐
+│  Zitadel Cloud       │         │  Supabase            │
+│  - Organizations     │         │  - PostgreSQL        │
+│  - Users             │         │  - ltree extension   │
+│  - SSO configs       │         │  - RLS policies      │
+│  - OIDC/OAuth        │         │  - Application data  │
+└──────────────────────┘         └──────────────────────┘
+            </div>
+
+            <h3>2.2 Authentication Flow</h3>
+            <div class="callout callout-info">
+                <strong>User Authentication Process:</strong>
+                <ol>
+                    <li>User visits: customer-abc.yourapp.com</li>
+                    <li>App extracts subdomain "customer-abc"</li>
+                    <li>App queries Redis cache for tenant (with Supabase fallback)</li>
+                    <li>Generate OAuth state token, store in Redis (10 min TTL)</li>
+                    <li>Build OIDC auth URL with organization context</li>
+                    <li>Redirect to Zitadel login</li>
+                    <li>User authenticates (password/SSO/social)</li>
+                    <li>Zitadel redirects back with code + state</li>
+                    <li>App retrieves tenant context from Redis</li>
+                    <li>Exchange code for tokens</li>
+                    <li>Verify token's org matches expected tenant</li>
+                    <li>Create session with tenant context</li>
+                    <li>User logged in to customer-abc.yourapp.com</li>
+                </ol>
+            </div>
+        </section>
+
+        <section id="section-3">
+            <h2>3. Authentication & Authorization</h2>
+            
+            <h3>3.1 Organization Structure in Zitadel</h3>
+            <p><strong>Decision:</strong> One Zitadel organization per tenant <span class="badge badge-confirmed">Confirmed</span></p>
+            
+            <p><strong>Implementation:</strong></p>
+            <ul>
+                <li>Each customer tenant = separate Zitadel organization</li>
+                <li>AnalyticsForChange organization hosts A4C Portal project</li>
+                <li>Service user with IAM_OWNER role manages all organizations</li>
+            </ul>
+            
+            <p><strong>Benefits:</strong></p>
+            <ul>
+                <li>✅ Clean tenant isolation</li>
+                <li>✅ Tenant-specific SSO configurations</li>
+                <li>✅ Clear security boundaries</li>
+                <li>✅ Independent branding per tenant</li>
+            </ul>
+
+            <h3>3.2 Service User Configuration</h3>
+            <table>
+                <tr>
+                    <td><strong>Role:</strong></td>
+                    <td>IAM_OWNER (Instance-level)</td>
+                </tr>
+                <tr>
+                    <td><strong>Location:</strong></td>
+                    <td>AnalyticsForChange organization</td>
+                </tr>
+                <tr>
+                    <td><strong>Purpose:</strong></td>
+                    <td>Automated tenant and user management</td>
+                </tr>
+            </table>
+
+            <p><strong>Capabilities:</strong></p>
+            <ul>
+                <li>Create new Zitadel organizations</li>
+                <li>Create users in any organization</li>
+                <li>Configure organization-level identity providers</li>
+                <li>Manage roles and permissions across organizations</li>
+                <li>Grant project access to organizations</li>
+            </ul>
+
+            <div class="callout callout-warning">
+                <strong>Security Note:</strong> Service user credentials are stored in Kubernetes secrets, access is limited to backend services only, and all operations are logged for audit.
+            </div>
+
+            <h3>3.3 Role Structure (Hybrid Approach)</h3>
+            
+            <h4>Zitadel Roles (Defined in A4C Portal Project)</h4>
+            <ul>
+                <li><code>provider_admin</code> - Full tenant management</li>
+                <li><code>manager</code> - Limited management capabilities</li>
+                <li><code>member</code> - Standard user access</li>
+                <li><code>viewer</code> - Read-only access</li>
+            </ul>
+
+            <h4>Application-Level Roles (Stored in Database)</h4>
+            <ul>
+                <li><code>super_admin</code> - Full platform access (AnalyticsForChange staff)</li>
+                <li><code>support_agent</code> - Read-only cross-tenant access</li>
+                <li><code>sales_agent</code> - Limited sales operations</li>
+            </ul>
+
+            <div class="callout callout-info">
+                <strong>Why Hybrid?</strong> Application roles enable cross-tenant operations for internal staff and support complex business logic that Zitadel's RBAC cannot handle alone.
+            </div>
+        </section>
+
+        <section id="section-4">
+            <h2>4. Multi-Tenancy Implementation</h2>
+            
+            <h3>4.1 Tenant Data Storage Strategy</h3>
+            <p><strong>Approach:</strong> Shared database with Row-Level Security (RLS)</p>
+            
+            <p><strong>Every data table includes tenant reference:</strong></p>
+            <pre><code>CREATE TABLE example_data (
+  id UUID PRIMARY KEY,
+  organization_id UUID REFERENCES organizations(id) NOT NULL,
+  -- other columns...
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX example_data_org_id_idx ON example_data(organization_id);</code></pre>
+
+            <h3>4.2 Row-Level Security (RLS) Policies</h3>
+            <pre><code>ALTER TABLE example_data ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Tenant isolation"
+ON example_data FOR SELECT
+USING (
+  organization_id IN (
+    SELECT id FROM organizations
+    WHERE path &lt;@ (
+      SELECT path FROM organizations
+      WHERE zitadel_org_id = auth.jwt() -&gt;&gt; 'urn:zitadel:iam:org:id'
+    )
+  )
+);</code></pre>
+
+            <div class="callout callout-success">
+                <strong>RLS Benefits:</strong>
+                <ul>
+                    <li>Database-level enforcement (cannot be bypassed)</li>
+                    <li>Automatic tenant isolation</li>
+                    <li>Supports organizational hierarchy</li>
+                    <li>No application-level filtering needed</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="section-5">
+            <h2>5. SSO Configuration Strategy</h2>
+            
+            <h3>5.1 Social Login Providers (Instance-Level)</h3>
+            <p><strong>Configuration:</strong> Instance-level (shared across all tenants)</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Provider</th>
+                        <th>Configuration Level</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Google OAuth</td>
+                        <td>Instance</td>
+                        <td><span class="badge badge-confirmed">MVP</span></td>
+                    </tr>
+                    <tr>
+                        <td>Facebook OAuth</td>
+                        <td>Instance</td>
+                        <td><span class="badge badge-confirmed">MVP</span></td>
+                    </tr>
+                    <tr>
+                        <td>Apple Sign In</td>
+                        <td>Instance</td>
+                        <td><span class="badge badge-confirmed">MVP</span></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>5.2 Enterprise SSO Providers (Organization-Level)</h3>
+            <p><strong>Configuration:</strong> Organization-level (per tenant)</p>
+            <p><strong>Timeline:</strong> <span class="badge badge-warning">Post-Launch</span></p>
+            
+            <ul>
+                <li>Azure AD / Entra ID</li>
+                <li>Okta</li>
+                <li>Google Workspace (with domain restrictions)</li>
+                <li>Generic OIDC</li>
+                <li>SAML 2.0</li>
+            </ul>
+
+            <div class="callout callout-info">
+                <strong>MVP Approach:</strong> Scaffold support for enterprise SSO in database schema and UI, but implement post-launch when enterprise customers request it.
+            </div>
+        </section>
+
+        <section id="section-6">
+            <h2>6. Tenant Identification & Routing</h2>
+            
+            <h3>6.1 Subdomain-Based Routing (Primary)</h3>
+            <p><strong>Pattern:</strong> <code>{tenant-slug}.yourapp.com</code></p>
+            
+            <p><strong>Examples:</strong></p>
+            <ul>
+                <li><code>customer-abc.yourapp.com</code> → Tenant: "Customer ABC"</li>
+                <li><code>acme-corp.yourapp.com</code> → Tenant: "Acme Corp"</li>
+                <li><code>bigenterprise-na.yourapp.com</code> → Tenant: "BigEnterprise North America"</li>
+            </ul>
+
+            <h3>6.2 DNS Configuration (Cloudflare)</h3>
+            <table>
+                <tr>
+                    <td><strong>Type:</strong></td>
+                    <td>CNAME</td>
+                </tr>
+                <tr>
+                    <td><strong>Name:</strong></td>
+                    <td>*</td>
+                </tr>
+                <tr>
+                    <td><strong>Value:</strong></td>
+                    <td>your-kubernetes-ingress.example.com</td>
+                </tr>
+                <tr>
+                    <td><strong>Proxy:</strong></td>
+                    <td>Enabled (Cloudflare orange cloud)</td>
+                </tr>
+            </table>
+
+            <h3>6.3 Provider-Agnostic Subdomain Provisioning</h3>
+            <div class="callout callout-info">
+                <strong>Design Pattern:</strong> Implementation uses dependency injection to ensure DNS provider can be swapped (Cloudflare → Route53 → Azure DNS) without code changes.
+            </div>
+
+            <h3>6.4 Role Impersonation</h3>
+            <p>AnalyticsForChange organization members (super admins, support agents) can view/manage any tenant without switching subdomains.</p>
+        </section>
+
+        <section id="section-7">
+            <h2>7. Organizational Hierarchy Management</h2>
+            
+            <h3>7.1 Hierarchy Model</h3>
+            <p><strong>Decision:</strong> Unlimited depth using PostgreSQL ltree extension <span class="badge badge-confirmed">Confirmed</span></p>
+            
+            <p><strong>Path Format:</strong> <code>root.segment1.segment2.segment3...</code></p>
+            
+            <p><strong>Examples:</strong></p>
+            <div class="diagram">
+root                                    (AnalyticsForChange)
+root.partner_a                          (Partner A)
+root.partner_a.customer_1               (Partner A's Customer 1)
+root.partner_a.customer_1.division_na   (Customer 1 North America)
+root.partner_b                          (Partner B)
+root.enterprise_direct                  (Direct enterprise customer)
+            </div>
+
+            <h3>7.2 Database Schema</h3>
+            <pre><code>CREATE EXTENSION IF NOT EXISTS ltree;
+
+CREATE TABLE organizations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  zitadel_org_id TEXT UNIQUE NOT NULL,
+  type TEXT NOT NULL CHECK (type IN (
+    'platform_owner',
+    'reseller',
+    'enterprise',
+    'division',
+    'end_customer'
+  )),
+  path ltree NOT NULL UNIQUE,
+  parent_path ltree,
+  depth INTEGER GENERATED ALWAYS AS (nlevel(path)) STORED,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Performance indexes
+CREATE INDEX organizations_path_gist_idx 
+  ON organizations USING GIST (path);
+CREATE INDEX organizations_path_btree_idx 
+  ON organizations USING BTREE (path);</code></pre>
+
+            <h3>7.3 Query Examples</h3>
+            <pre><code>-- Get all descendants of Partner A
+SELECT * FROM organizations
+WHERE path &lt;@ 'root.partner_a';
+
+-- Get immediate children only
+SELECT * FROM organizations
+WHERE path ~ 'root.partner_a.*{1}';
+
+-- Get all ancestors
+SELECT * FROM organizations
+WHERE 'root.partner_a.customer_1' &lt;@ path
+ORDER BY nlevel(path);</code></pre>
+        </section>
+
+        <section id="section-8">
+            <h2>8. Tenant Onboarding Flow</h2>
+            
+            <h3>8.1 Onboarding Method</h3>
+            <p><strong>Decision:</strong> Manual admin-created tenants <span class="badge badge-confirmed">Confirmed</span></p>
+            
+            <h3>8.2 Process Flow</h3>
+            <ol>
+                <li>Sales/Admin decides to onboard customer</li>
+                <li>Super Admin accesses admin panel</li>
+                <li>Fill tenant creation form (company name, subdomain, admin details)</li>
+                <li>System validates input</li>
+                <li>Backend creates tenant:
+                    <ul>
+                        <li>Create Zitadel organization</li>
+                        <li>Provision subdomain (DNS)</li>
+                        <li>Create database record</li>
+                        <li>Create Provider Admin role</li>
+                        <li>Create admin user in Zitadel</li>
+                        <li>Grant project access</li>
+                        <li>Generate invitation token</li>
+                        <li>Send invitation email</li>
+                    </ul>
+                </li>
+                <li>Admin receives invitation email</li>
+                <li>Admin clicks link and sets password/passkey</li>
+                <li>Admin completes setup</li>
+                <li>Redirect to tenant dashboard</li>
+            </ol>
+
+            <h3>8.3 Invitation System</h3>
+            <p><strong>Token Expiration:</strong> 48 hours</p>
+            <p><strong>Email Template:</strong> Professional invitation with branding</p>
+            <p><strong>Acceptance Flow:</strong> Set password or register passkey, accept terms, complete profile</p>
+        </section>
+
+        <section id="section-9">
+            <h2>9. Data Architecture</h2>
+            
+            <h3>9.1 Core Tables</h3>
+            <ul>
+                <li><strong>organizations:</strong> Tenant hierarchy (ltree)</li>
+                <li><strong>users:</strong> User profiles linked to organizations</li>
+                <li><strong>audit_logs:</strong> Comprehensive activity logging</li>
+                <li><strong>invitation_tokens:</strong> Onboarding invitations</li>
+                <li><strong>[application_data]:</strong> All include organization_id</li>
+            </ul>
+
+            <h3>9.2 Caching Strategy</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data Type</th>
+                        <th>TTL</th>
+                        <th>Priority</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Tenant lookups (slug → org ID)</td>
+                        <td>5 minutes</td>
+                        <td>High</td>
+                    </tr>
+                    <tr>
+                        <td>OAuth state tokens</td>
+                        <td>10 minutes</td>
+                        <td>Critical</td>
+                    </tr>
+                    <tr>
+                        <td>User sessions</td>
+                        <td>1 hour</td>
+                        <td>High</td>
+                    </tr>
+                    <tr>
+                        <td>Organization hierarchies</td>
+                        <td>1 hour</td>
+                        <td>Medium</td>
+                    </tr>
+                    <tr>
+                        <td>User permissions/roles</td>
+                        <td>10 minutes</td>
+                        <td>High</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>9.3 Audit Logging</h3>
+            <p><strong>Comprehensive logging includes:</strong></p>
+            <ul>
+                <li>✅ Authentication events (login, logout, failures)</li>
+                <li>✅ Tenant creation/modification/deletion</li>
+                <li>✅ User management actions</li>
+                <li>✅ Data access (read, write, update, delete)</li>
+                <li>✅ Configuration changes</li>
+                <li>✅ API calls (all endpoints)</li>
+                <li>✅ Permission violations</li>
+            </ul>
+
+            <p><strong>Retention:</strong></p>
+            <ul>
+                <li>Active logs: 90 days in hot storage</li>
+                <li>Archive: 7 years in cold storage</li>
+            </ul>
+        </section>
+
+        <section id="section-10">
+            <h2>10. Security & Compliance</h2>
+            
+            <h3>10.1 Multi-Factor Authentication (MFA)</h3>
+            <p><strong>Policy:</strong></p>
+            <ul>
+                <li>✅ <strong>Required</strong> for all top-level organization admins</li>
+                <li>🔧 <strong>Optional</strong> for tenant users (tenant decides)</li>
+            </ul>
+
+            <p><strong>Supported Methods:</strong></p>
+            <ul>
+                <li>Authenticator App (TOTP)</li>
+                <li>Security Key (U2F/WebAuthn)</li>
+                <li>SMS (not recommended for high security)</li>
+            </ul>
+
+            <h3>10.2 Data Encryption</h3>
+            <table>
+                <tr>
+                    <td><strong>At Rest:</strong></td>
+                    <td>AES-256 (Supabase default)</td>
+                </tr>
+                <tr>
+                    <td><strong>In Transit:</strong></td>
+                    <td>HTTPS/TLS 1.3</td>
+                </tr>
+                <tr>
+                    <td><strong>Database Connections:</strong></td>
+                    <td>SSL/TLS</td>
+                </tr>
+                <tr>
+                    <td><strong>Sensitive Fields:</strong></td>
+                    <td>Application-level encryption (AES-256-GCM)</td>
+                </tr>
+            </table>
+
+            <h3>10.3 Security Headers</h3>
+            <ul>
+                <li>Content Security Policy (CSP)</li>
+                <li>HTTP Strict Transport Security (HSTS)</li>
+                <li>X-Frame-Options: DENY</li>
+                <li>X-Content-Type-Options: nosniff</li>
+                <li>Referrer-Policy: strict-origin-when-cross-origin</li>
+            </ul>
+
+            <h3>10.4 Rate Limiting</h3>
+            <ul>
+                <li><strong>API Endpoints:</strong> 100 requests per 15 minutes</li>
+                <li><strong>Authentication:</strong> 5 attempts per 15 minutes</li>
+                <li><strong>Public Pages:</strong> 200 requests per 15 minutes</li>
+            </ul>
+
+            <h3>10.5 Data Residency</h3>
+            <p><strong>MVP:</strong> Single region (US) <span class="badge badge-confirmed">Confirmed</span></p>
+            <p><strong>Post-Launch:</strong> Multi-region support (EU, US, AP) <span class="badge badge-warning">Planned</span></p>
+        </section>
+
+        <section id="section-11">
+            <h2>11. User Experience & UI</h2>
+            
+            <h3>11.1 Organization Switcher</h3>
+            <p><strong>Decision:</strong> Only for internal AnalyticsForChange staff <span class="badge badge-confirmed">Confirmed</span></p>
+            
+            <p><strong>Rationale:</strong></p>
+            <ul>
+                <li>Tenant users view everything through their top-level organization</li>
+                <li>Content limited by roles and hierarchy</li>
+                <li>Internal staff need cross-tenant access for support/management</li>
+            </ul>
+
+            <h3>11.2 Branding & White-Labeling</h3>
+            <p><strong>Decision:</strong> Tiered approach <span class="badge badge-warning">Post-Launch</span></p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tier</th>
+                        <th>Features</th>
+                        <th>Timeline</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Standard</td>
+                        <td>Default A4C branding</td>
+                        <td>MVP</td>
+                    </tr>
+                    <tr>
+                        <td>Professional</td>
+                        <td>Logo + colors</td>
+                        <td>Post-Launch Q1</td>
+                    </tr>
+                    <tr>
+                        <td>Enterprise</td>
+                        <td>Full white-labeling + custom domain</td>
+                        <td>Post-Launch Q2</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout callout-info">
+                <strong>MVP Approach:</strong> Scaffold UI for branding settings but feature-flag it as "Coming Soon - Enterprise Feature"
+            </div>
+        </section>
+
+        <section id="section-12">
+            <h2>12. Technical Setup Guide</h2>
+            
+            <h3>12.1 Prerequisites</h3>
+            <ul>
+                <li>✅ Zitadel Cloud account (Free plan)</li>
+                <li>✅ Supabase account and project</li>
+                <li>✅ Kubernetes cluster</li>
+                <li>✅ Cloudflare account with domain</li>
+                <li>✅ Domain name (yourapp.com)</li>
+            </ul>
+
+            <h3>12.2 Step-by-Step Setup</h3>
+            
+            <h4>Step 1: Zitadel Configuration</h4>
+            <ol>
+                <li>Create Zitadel Cloud instance</li>
+                <li>Create service user</li>
+                <li>Grant IAM_OWNER role</li>
+                <li>Generate service user credentials</li>
+                <li>Create A4C Portal project</li>
+                <li>Create application with OIDC</li>
+                <li>Create project roles (provider_admin, manager, member, viewer)</li>
+                <li>Configure instance-level social login (Google, Facebook, Apple)</li>
+            </ol>
+
+            <h4>Step 2: Supabase Configuration</h4>
+            <ol>
+                <li>Create Supabase project</li>
+                <li>Enable ltree extension</li>
+                <li>Create organizations table</li>
+                <li>Create users table</li>
+                <li>Create audit_logs table</li>
+                <li>Create invitation_tokens table</li>
+                <li>Configure RLS policies</li>
+                <li>Configure authentication settings</li>
+            </ol>
+
+            <h4>Step 3: Kubernetes & Redis Setup</h4>
+            <ol>
+                <li>Create namespace</li>
+                <li>Deploy Redis</li>
+                <li>Verify Redis is running</li>
+                <li>Configure persistent volumes</li>
+            </ol>
+
+            <h4>Step 4: DNS Configuration (Cloudflare)</h4>
+            <ol>
+                <li>Add domain to Cloudflare</li>
+                <li>Create wildcard DNS record (*)</li>
+                <li>Create root domain record (@)</li>
+                <li>Enable SSL/TLS (Full strict)</li>
+                <li>Enable Always Use HTTPS</li>
+            </ol>
+
+            <h4>Step 5: Application Deployment</h4>
+            <ol>
+                <li>Configure environment variables</li>
+                <li>Create Kubernetes secrets</li>
+                <li>Initialize root organization</li>
+                <li>Build Docker image</li>
+                <li>Deploy to Kubernetes</li>
+                <li>Verify deployment</li>
+            </ol>
+
+            <h4>Step 6: Testing</h4>
+            <div class="callout callout-success">
+                <strong>Testing Checklist:</strong>
+                <ul>
+                    <li>☐ Root domain loads</li>
+                    <li>☐ Wildcard subdomain works</li>
+                    <li>☐ Service user can create organizations</li>
+                    <li>☐ Subdomain provisioning works</li>
+                    <li>☐ OAuth flow completes successfully</li>
+                    <li>☐ User lands in correct tenant after login</li>
+                    <li>☐ RLS policies enforce tenant isolation</li>
+                    <li>☐ Redis caching works</li>
+                    <li>☐ Audit logs are created</li>
+                    <li>☐ ltree queries work correctly</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="section-13">
+            <h2>13. Implementation Roadmap</h2>
+            
+            <h3>13.1 MVP Scope (Phase 1)</h3>
+            <p><strong>Timeline:</strong> 8-12 weeks</p>
+            
+            <h4>Week 1-2: Foundation</h4>
+            <ul>
+                <li>Set up Zitadel Cloud instance</li>
+                <li>Configure service user with IAM_OWNER</li>
+                <li>Set up Supabase project</li>
+                <li>Enable ltree extension</li>
+                <li>Set up Kubernetes cluster</li>
+                <li>Deploy Redis</li>
+                <li>Configure Cloudflare DNS</li>
+            </ul>
+
+            <h4>Week 3-4: Authentication</h4>
+            <ul>
+                <li>Implement OIDC integration</li>
+                <li>Build OAuth flow</li>
+                <li>Implement state management</li>
+                <li>Create session management</li>
+                <li>Configure social login</li>
+            </ul>
+
+            <h4>Week 5-6: Multi-Tenancy Core</h4>
+            <ul>
+                <li>Implement subdomain routing</li>
+                <li>Build tenant context resolution</li>
+                <li>Implement caching</li>
+                <li>Create RLS policies</li>
+                <li>Build subdomain provisioning</li>
+            </ul>
+
+            <h4>Week 7-8: User Management</h4>
+            <ul>
+                <li>Build admin panel for tenant creation</li>
+                <li>Implement Zitadel org creation</li>
+                <li>Create invitation system</li>
+                <li>Build role assignment</li>
+            </ul>
+
+            <h4>Week 9-10: Security & Compliance</h4>
+            <ul>
+                <li>Implement audit logging</li>
+                <li>Add MFA enforcement</li>
+                <li>Configure security headers</li>
+                <li>Implement rate limiting</li>
+            </ul>
+
+            <h4>Week 11-12: Polish & Testing</h4>
+            <ul>
+                <li>Build tenant dashboard</li>
+                <li>Create admin impersonation</li>
+                <li>Integration tests</li>
+                <li>Security audit</li>
+                <li>Load testing</li>
+                <li>Deploy to production</li>
+            </ul>
+
+            <h3>13.2 Post-Launch Features (Phase 2)</h3>
+            <p><strong>Timeline:</strong> 3-6 months after MVP</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Quarter</th>
+                        <th>Features</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Q1 Post-Launch</td>
+                        <td>
+                            <ul>
+                                <li>Enterprise SSO configuration UI</li>
+                                <li>Branding customization (Professional tier)</li>
+                                <li>Enhanced audit log filtering</li>
+                                <li>Bulk user import/export</li>
+                            </ul>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Q2 Post-Launch</td>
+                        <td>
+                            <ul>
+                                <li>Full white-labeling (Enterprise tier)</li>
+                                <li>Custom domains</li>
+                                <li>API for third-party integrations</li>
+                                <li>Billing integration</li>
+                            </ul>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Q3 Post-Launch</td>
+                        <td>
+                            <ul>
+                                <li>Multi-region support (EU, US, AP)</li>
+                                <li>Mobile applications (iOS, Android)</li>
+                                <li>Advanced analytics</li>
+                            </ul>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="section-14">
+            <h2>14. Appendix</h2>
+            
+            <h3>14.1 Glossary</h3>
+            <ul>
+                <li><strong>A4C:</strong> Analytics4Change (platform owner)</li>
+                <li><strong>IAM:</strong> Identity and Access Management</li>
+                <li><strong>IDP:</strong> Identity Provider (e.g., Google, Okta)</li>
+                <li><strong>ltree:</strong> PostgreSQL extension for hierarchical structures</li>
+                <li><strong>MFA:</strong> Multi-Factor Authentication</li>
+                <li><strong>OIDC:</strong> OpenID Connect (authentication protocol)</li>
+                <li><strong>Provider Admin:</strong> Tenant administrator role</li>
+                <li><strong>RLS:</strong> Row-Level Security (PostgreSQL feature)</li>
+                <li><strong>SSO:</strong> Single Sign-On</li>
+                <li><strong>Super Admin:</strong> Internal staff role with platform-wide access</li>
+            </ul>
+
+            <h3>14.2 Reference Links</h3>
+            <ul>
+                <li><strong>Zitadel Documentation:</strong> <a href="https://zitadel.com/docs" target="_blank">https://zitadel.com/docs</a></li>
+                <li><strong>Supabase Documentation:</strong> <a href="https://supabase.com/docs" target="_blank">https://supabase.com/docs</a></li>
+                <li><strong>PostgreSQL ltree:</strong> <a href="https://www.postgresql.org/docs/current/ltree.html" target="_blank">https://www.postgresql.org/docs/current/ltree.html</a></li>
+                <li><strong>Cloudflare API:</strong> <a href="https://developers.cloudflare.com/api/" target="_blank">https://developers.cloudflare.com/api/</a></li>
+            </ul>
+
+            <h3>14.3 Document Status</h3>
+            <div class="callout callout-success">
+                <h4>✅ FINAL - READY FOR IMPLEMENTATION</h4>
+                <p><strong>Next Steps:</strong></p>
+                <ol>
+                    <li>Review and approve this specification</li>
+                    <li>Set up development environment following Section 12</li>
+                    <li>Begin Phase 1 implementation per Section 13.1</li>
+                    <li>Schedule weekly standups to track progress</li>
+                    <li>Create project board with tasks from roadmap</li>
+                </ol>
+            </div>
+        </section>
+    </div>
+
+    <div class="footer">
+        <p><strong>Analytics4Change Multi-Tenant Architecture Specification v1.0</strong></p>
+        <p>© 2025 Analytics4Change. All decisions documented and ready for implementation.</p>
+        <p style="margin-top: 20px; font-size: 0.9em; opacity: 0.8;">
+            This is a comprehensive technical specification document. For questions or updates, contact the project lead.
+        </p>
+    </div>
+
+    <a href="#" class="back-to-top" id="backToTop">↑ Top</a>
+
+    <script>
+        // Back to top button
+        const backToTop = document.getElementById('backToTop');
+        
+        window.addEventListener('scroll', () => {
+            if (window.pageYOffset > 300) {
+                backToTop.style.display = 'block';
+            } else {
+                backToTop.style.display = 'none';
+            }
+        });
+        
+        backToTop.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
