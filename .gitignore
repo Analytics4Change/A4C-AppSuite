@@ -79,3 +79,7 @@ DO-NOT-COMMIT-*
 
 # Zitadel inventory data (contains tokens)
 zitadel-inventory-data-*/
+
+# AsyncAPI generated files
+supabase/contracts/asyncapi-bundled.yaml
+supabase/contracts/generated/
