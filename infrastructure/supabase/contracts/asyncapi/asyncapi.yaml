@@ -1,0 +1,115 @@
+asyncapi: 2.6.0
+info:
+  title: A4C Domain Events
+  version: 1.0.0
+  description: |
+    Event-driven architecture specification for Analytics4Change platform.
+    All events capture WHO, WHAT, WHEN, and most importantly WHY changes occur.
+  contact:
+    name: A4C Development Team
+  license:
+    name: Private
+
+servers:
+  development:
+    url: postgresql://localhost:54322/postgres
+    protocol: postgresql
+    description: Local Supabase development instance
+  production:
+    url: postgresql://{project-ref}.supabase.co:5432/postgres
+    protocol: postgresql
+    description: Production Supabase instance
+    variables:
+      project-ref:
+        default: tmrjlswbsxmbglmaclxu
+        description: Supabase project reference
+
+defaultContentType: application/json
+
+channels:
+  domain_events:
+    description: Main event stream for all domain events
+    publish:
+      summary: Publish domain events to the system
+      operationId: publishDomainEvent
+      message:
+        oneOf:
+          - $ref: './domains/client.yaml#/components/messages/ClientRegistered'
+          - $ref: './domains/client.yaml#/components/messages/ClientAdmitted'
+          - $ref: './domains/client.yaml#/components/messages/ClientInformationUpdated'
+          - $ref: './domains/client.yaml#/components/messages/ClientDischarged'
+          - $ref: './domains/medication.yaml#/components/messages/MedicationAddedToFormulary'
+          - $ref: './domains/medication.yaml#/components/messages/MedicationPrescribed'
+          - $ref: './domains/medication.yaml#/components/messages/MedicationAdministered'
+          - $ref: './domains/medication.yaml#/components/messages/MedicationSkipped'
+          - $ref: './domains/medication.yaml#/components/messages/MedicationRefused'
+          - $ref: './domains/medication.yaml#/components/messages/MedicationDiscontinued'
+          - $ref: './domains/user.yaml#/components/messages/UserSyncedFromZitadel'
+          - $ref: './domains/user.yaml#/components/messages/UserOrganizationSwitched'
+    subscribe:
+      summary: Subscribe to domain events
+      operationId: onDomainEvent
+      message:
+        $ref: '#/channels/domain_events/publish/message'
+
+components:
+  schemas:
+    DomainEvent:
+      type: object
+      required:
+        - id
+        - stream_id
+        - stream_type
+        - stream_version
+        - event_type
+        - event_data
+        - event_metadata
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique event identifier
+        stream_id:
+          type: string
+          format: uuid
+          description: The entity/aggregate this event belongs to
+        stream_type:
+          type: string
+          enum:
+            - client
+            - medication
+            - medication_history
+            - dosage
+            - user
+            - organization
+          description: Type of entity this event affects
+        stream_version:
+          type: integer
+          minimum: 1
+          description: Version number within this stream
+        event_type:
+          type: string
+          pattern: '^[a-z_]+\.[a-z_]+$'
+          description: Event type in format domain.action
+          examples:
+            - client.registered
+            - medication.prescribed
+        event_data:
+          type: object
+          description: The actual event payload
+        event_metadata:
+          $ref: './components/schemas.yaml#/components/schemas/EventMetadata'
+        created_at:
+          type: string
+          format: date-time
+          description: When the event was created
+        processed_at:
+          type: string
+          format: date-time
+          description: When the event was successfully processed
+          nullable: true
+        processing_error:
+          type: string
+          description: Error message if processing failed
+          nullable: true

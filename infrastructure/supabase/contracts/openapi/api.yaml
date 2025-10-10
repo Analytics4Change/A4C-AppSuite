@@ -1,0 +1,354 @@
+openapi: 3.1.0
+info:
+  title: A4C Event API
+  description: |
+    REST API for submitting domain events to the A4C platform.
+    All events are validated against AsyncAPI schemas before processing.
+  version: 1.0.0
+  contact:
+    name: A4C Development Team
+
+servers:
+  - url: https://tmrjlswbsxmbglmaclxu.supabase.co
+    description: Production Supabase instance
+  - url: http://localhost:54321
+    description: Local Supabase instance
+
+paths:
+  /rest/v1/rpc/submit_event:
+    post:
+      summary: Submit a domain event
+      description: |
+        Submit a domain event for processing. The event will be validated
+        against the appropriate schema and then processed asynchronously.
+        All events must include a 'reason' in metadata explaining why the change is occurring.
+      operationId: submitEvent
+      tags:
+        - Events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainEventRequest'
+            examples:
+              clientRegistered:
+                summary: Register a new client
+                value:
+                  stream_id: "550e8400-e29b-41d4-a716-446655440000"
+                  stream_type: "client"
+                  event_type: "client.registered"
+                  event_data:
+                    organization_id: "660e8400-e29b-41d4-a716-446655440000"
+                    first_name: "John"
+                    last_name: "Doe"
+                    date_of_birth: "1990-01-15"
+                  event_metadata:
+                    user_id: "770e8400-e29b-41d4-a716-446655440000"
+                    reason: "Initial intake from emergency department referral #12345"
+              medicationPrescribed:
+                summary: Prescribe medication
+                value:
+                  stream_id: "880e8400-e29b-41d4-a716-446655440000"
+                  stream_type: "medication_history"
+                  event_type: "medication.prescribed"
+                  event_data:
+                    client_id: "550e8400-e29b-41d4-a716-446655440000"
+                    medication_id: "990e8400-e29b-41d4-a716-446655440000"
+                    dosage_amount: 50
+                    dosage_unit: "mg"
+                    frequency: "Twice daily"
+                    route: "oral"
+                    start_date: "2024-02-01"
+                  event_metadata:
+                    user_id: "770e8400-e29b-41d4-a716-446655440000"
+                    reason: "Initial prescription for diagnosed major depressive disorder per DSM-5 criteria"
+                    approval_chain:
+                      - approver_id: "aa0e8400-e29b-41d4-a716-446655440000"
+                        role: "physician"
+                        approved_at: "2024-01-30T14:30:00Z"
+      responses:
+        '201':
+          description: Event accepted and queued for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '400':
+          description: Invalid request format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Event validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+
+  /rest/v1/domain_events:
+    get:
+      summary: Query domain events
+      description: Retrieve domain events with filtering
+      operationId: queryEvents
+      tags:
+        - Events
+      parameters:
+        - name: stream_id
+          in: query
+          description: Filter by stream ID
+          schema:
+            type: string
+            format: uuid
+        - name: stream_type
+          in: query
+          description: Filter by stream type
+          schema:
+            type: string
+            enum: [client, medication, medication_history, dosage, user, organization]
+        - name: event_type
+          in: query
+          description: Filter by event type
+          schema:
+            type: string
+        - name: created_after
+          in: query
+          description: Events created after this timestamp
+          schema:
+            type: string
+            format: date-time
+        - name: created_before
+          in: query
+          description: Events created before this timestamp
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: Maximum number of events to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+        - name: offset
+          in: query
+          description: Number of events to skip
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DomainEvent'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+
+components:
+  schemas:
+    DomainEventRequest:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The entity/aggregate ID this event belongs to
+        stream_type:
+          type: string
+          enum:
+            - client
+            - medication
+            - medication_history
+            - dosage
+            - user
+            - organization
+          description: Type of entity this event affects
+        event_type:
+          type: string
+          pattern: '^[a-z_]+\.[a-z_]+$'
+          description: Event type in format domain.action
+        event_data:
+          type: object
+          description: Event-specific data payload
+        event_metadata:
+          type: object
+          required:
+            - user_id
+            - reason
+          properties:
+            user_id:
+              type: string
+              format: uuid
+              description: User initiating this event
+            reason:
+              type: string
+              minLength: 10
+              maxLength: 500
+              description: |
+                REQUIRED: Business justification for this change.
+                This captures the "WHY" behind every system change.
+            correlation_id:
+              type: string
+              format: uuid
+              description: ID to correlate related events
+            approval_chain:
+              type: array
+              items:
+                type: object
+                properties:
+                  approver_id:
+                    type: string
+                    format: uuid
+                  role:
+                    type: string
+                  approved_at:
+                    type: string
+                    format: date-time
+
+    DomainEvent:
+      allOf:
+        - $ref: '#/components/schemas/DomainEventRequest'
+        - type: object
+          required:
+            - id
+            - sequence_number
+            - stream_version
+            - created_at
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: Event ID
+            sequence_number:
+              type: integer
+              description: Global sequence number
+            stream_version:
+              type: integer
+              description: Version within stream
+            created_at:
+              type: string
+              format: date-time
+            processed_at:
+              type: string
+              format: date-time
+              nullable: true
+            processing_error:
+              type: string
+              nullable: true
+
+    EventResponse:
+      type: object
+      required:
+        - id
+        - status
+        - message
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Event ID
+        status:
+          type: string
+          enum: [accepted, processing, processed]
+        message:
+          type: string
+        sequence_number:
+          type: integer
+        stream_version:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+    ValidationErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - validation_errors
+      properties:
+        error:
+          type: string
+          const: validation_failed
+        message:
+          type: string
+        validation_errors:
+          type: array
+          items:
+            type: object
+            required:
+              - field
+              - message
+              - code
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+              code:
+                type: string
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase authentication token
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: apikey
+      description: Supabase anon or service role key
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+tags:
+  - name: Events
+    description: Domain event operations

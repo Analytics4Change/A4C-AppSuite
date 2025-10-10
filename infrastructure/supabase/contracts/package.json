@@ -1,0 +1,17 @@
+{
+  "name": "@a4c/event-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Event schema contracts and code generation",
+  "scripts": {
+    "bundle": "cd asyncapi && asyncapi bundle asyncapi.yaml -o ../asyncapi-bundled.yaml",
+    "generate": "npm run bundle && npm run generate:typescript && npm run generate:json-schema",
+    "generate:typescript": "asyncapi generate fromTemplate asyncapi-bundled.yaml @asyncapi/ts-nats-template -o generated/typescript --force-write",
+    "generate:json-schema": "asyncapi generate fromTemplate asyncapi-bundled.yaml @asyncapi/json-schema-template -o generated/json-schema --force-write",
+    "validate": "asyncapi validate asyncapi/asyncapi.yaml",
+    "clean": "rm -rf generated/typescript/* generated/json-schema/* asyncapi-bundled.yaml"
+  },
+  "devDependencies": {
+    "@asyncapi/cli": "^1.2.0"
+  }
+}

@@ -1,0 +1,659 @@
+components:
+  messages:
+    MedicationAddedToFormulary:
+      name: medication.added_to_formulary
+      title: Medication Added to Formulary
+      summary: A new medication has been added to the organization's formulary
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/MedicationAddedToFormularyEvent'
+
+    MedicationPrescribed:
+      name: medication.prescribed
+      title: Medication Prescribed
+      summary: A medication has been prescribed to a client
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/MedicationPrescribedEvent'
+
+    MedicationAdministered:
+      name: medication.administered
+      title: Medication Administered
+      summary: A medication dose has been administered to a client
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/MedicationAdministeredEvent'
+
+    MedicationSkipped:
+      name: medication.skipped
+      title: Medication Skipped
+      summary: A scheduled medication dose was skipped
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/MedicationSkippedEvent'
+
+    MedicationRefused:
+      name: medication.refused
+      title: Medication Refused
+      summary: A client refused a medication dose
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/MedicationRefusedEvent'
+
+    MedicationDiscontinued:
+      name: medication.discontinued
+      title: Medication Discontinued
+      summary: A medication prescription has been discontinued
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/MedicationDiscontinuedEvent'
+
+  schemas:
+    MedicationAddedToFormularyEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The medication ID
+        stream_type:
+          type: string
+          const: medication
+        event_type:
+          type: string
+          const: medication.added_to_formulary
+        event_data:
+          $ref: '#/components/schemas/MedicationFormularyData'
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  examples:
+                    - "Added per P&T Committee approval for depression treatment protocol"
+                    - "New generic alternative to reduce costs while maintaining efficacy"
+                    - "Required addition for new pediatric treatment guidelines"
+
+    MedicationFormularyData:
+      type: object
+      required:
+        - organization_id
+        - name
+        - generic_name
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Medication brand name
+        generic_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Generic name
+        brand_names:
+          type: array
+          items:
+            type: string
+        rxnorm_cui:
+          type: string
+          pattern: '^\d+$'
+          description: RXNorm Concept Unique Identifier
+        ndc_codes:
+          type: array
+          description: National Drug Codes
+          items:
+            type: string
+            pattern: '^\d{5}-\d{4}-\d{2}$'
+        category_broad:
+          type: string
+          maxLength: 100
+          examples:
+            - Psychotropic
+            - Cardiovascular
+            - Antibiotic
+        category_specific:
+          type: string
+          maxLength: 100
+          examples:
+            - Antidepressant
+            - Beta Blocker
+            - Penicillin
+        drug_class:
+          type: string
+          maxLength: 100
+        is_psychotropic:
+          type: boolean
+          default: false
+        is_controlled:
+          type: boolean
+          default: false
+        controlled_substance_schedule:
+          type: string
+          enum:
+            - Schedule I
+            - Schedule II
+            - Schedule III
+            - Schedule IV
+            - Schedule V
+        is_narcotic:
+          type: boolean
+          default: false
+        requires_monitoring:
+          type: boolean
+          default: false
+        is_high_alert:
+          type: boolean
+          default: false
+        active_ingredients:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              strength:
+                type: number
+              unit:
+                type: string
+        available_forms:
+          type: array
+          items:
+            type: string
+            enum:
+              - tablet
+              - capsule
+              - liquid
+              - injection
+              - patch
+              - cream
+              - ointment
+              - inhaler
+              - suppository
+        available_strengths:
+          type: array
+          items:
+            type: string
+        manufacturer:
+          type: string
+          maxLength: 200
+        warnings:
+          type: array
+          items:
+            type: string
+        black_box_warning:
+          type: string
+          maxLength: 2000
+
+    MedicationPrescribedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The medication_history ID
+        stream_type:
+          type: string
+          const: medication_history
+        event_type:
+          type: string
+          const: medication.prescribed
+        event_data:
+          $ref: '#/components/schemas/MedicationPrescriptionData'
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  examples:
+                    - "Initial prescription for diagnosed major depressive disorder per DSM-5 criteria"
+                    - "Switching from previous medication due to adverse side effects reported on 2024-01-15"
+                    - "Dosage increase due to insufficient therapeutic response after 4-week trial"
+                approval_chain:
+                  minItems: 1
+                  description: Prescription requires at least one approval
+
+    MedicationPrescriptionData:
+      type: object
+      required:
+        - organization_id
+        - client_id
+        - medication_id
+        - prescription_date
+        - start_date
+        - dosage_amount
+        - dosage_unit
+        - frequency
+        - route
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+          description: Client receiving the prescription
+        medication_id:
+          type: string
+          format: uuid
+          description: Medication being prescribed
+        prescription_date:
+          type: string
+          format: date
+          description: Date prescription was written
+        start_date:
+          type: string
+          format: date
+          description: Date to start medication
+        end_date:
+          type: string
+          format: date
+          description: Date to end medication (if known)
+        prescriber_name:
+          type: string
+          maxLength: 200
+          description: Name of prescribing provider
+        prescriber_npi:
+          type: string
+          pattern: '^\d{10}$'
+          description: National Provider Identifier
+        prescriber_license:
+          type: string
+          maxLength: 50
+          description: Provider's license number
+        dosage_amount:
+          type: number
+          minimum: 0
+          description: Amount per dose
+        dosage_unit:
+          type: string
+          maxLength: 20
+          examples:
+            - mg
+            - ml
+            - units
+            - tablets
+        frequency:
+          type: string
+          maxLength: 100
+          examples:
+            - Once daily
+            - Twice daily
+            - Every 8 hours
+            - As needed
+        route:
+          type: string
+          enum:
+            - oral
+            - sublingual
+            - buccal
+            - rectal
+            - intravenous
+            - intramuscular
+            - subcutaneous
+            - transdermal
+            - inhalation
+            - nasal
+            - ophthalmic
+            - otic
+            - topical
+        instructions:
+          type: string
+          maxLength: 500
+          description: Special instructions
+        is_prn:
+          type: boolean
+          default: false
+          description: Is this an as-needed medication
+        prn_reason:
+          type: string
+          maxLength: 200
+          description: Reason for PRN use
+        refills_authorized:
+          type: integer
+          minimum: 0
+          maximum: 12
+        pharmacy_name:
+          type: string
+          maxLength: 200
+        notes:
+          type: string
+          maxLength: 2000
+
+    MedicationAdministeredEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The dosage_info ID
+        stream_type:
+          type: string
+          const: dosage
+        event_type:
+          type: string
+          const: medication.administered
+        event_data:
+          $ref: '#/components/schemas/MedicationAdministrationData'
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  examples:
+                    - "Scheduled morning medication administered with breakfast"
+                    - "PRN medication given for reported pain level 7/10"
+                    - "Emergency medication administered for acute anxiety episode"
+
+    MedicationAdministrationData:
+      type: object
+      required:
+        - organization_id
+        - client_id
+        - medication_history_id
+        - scheduled_datetime
+        - administered_at
+        - administered_by
+        - scheduled_amount
+        - administered_amount
+        - unit
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        medication_history_id:
+          type: string
+          format: uuid
+          description: Reference to prescription
+        scheduled_datetime:
+          type: string
+          format: date-time
+          description: When dose was scheduled
+        administered_at:
+          type: string
+          format: date-time
+          description: Actual administration time
+        administered_by:
+          type: string
+          format: uuid
+          description: ID of administering staff
+        scheduled_amount:
+          type: number
+          minimum: 0
+        administered_amount:
+          type: number
+          minimum: 0
+          description: Actual amount given
+        unit:
+          type: string
+          maxLength: 20
+        method:
+          type: string
+          description: Administration method
+        witnessed_by:
+          type: string
+          format: uuid
+          description: Witness for controlled substances
+        vitals_before:
+          $ref: '../components/schemas.yaml#/components/schemas/Vitals'
+        vitals_after:
+          $ref: '../components/schemas.yaml#/components/schemas/Vitals'
+        side_effects:
+          type: array
+          items:
+            type: string
+            maxLength: 200
+        notes:
+          type: string
+          maxLength: 1000
+
+    MedicationSkippedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: dosage
+        event_type:
+          type: string
+          const: medication.skipped
+        event_data:
+          $ref: '#/components/schemas/MedicationSkipData'
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  examples:
+                    - "Client was NPO for scheduled procedure"
+                    - "Medication held due to low blood pressure reading"
+                    - "Skipped per physician order due to lab results"
+
+    MedicationSkipData:
+      type: object
+      required:
+        - organization_id
+        - client_id
+        - medication_history_id
+        - scheduled_datetime
+        - skip_reason
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        medication_history_id:
+          type: string
+          format: uuid
+        scheduled_datetime:
+          type: string
+          format: date-time
+        scheduled_amount:
+          type: number
+        unit:
+          type: string
+        skip_reason:
+          type: string
+          enum:
+            - client_absent
+            - client_npo
+            - medication_unavailable
+            - clinical_hold
+            - physician_order
+            - vital_signs_out_of_range
+            - other
+        skip_details:
+          type: string
+          maxLength: 500
+
+    MedicationRefusedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: dosage
+        event_type:
+          type: string
+          const: medication.refused
+        event_data:
+          $ref: '#/components/schemas/MedicationRefusalData'
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  examples:
+                    - "Client exercised right to refuse medication"
+                    - "Client reported severe nausea from previous dose"
+                    - "Client wants to discuss with family before continuing"
+
+    MedicationRefusalData:
+      type: object
+      required:
+        - organization_id
+        - client_id
+        - medication_history_id
+        - scheduled_datetime
+        - refusal_reason
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        medication_history_id:
+          type: string
+          format: uuid
+        scheduled_datetime:
+          type: string
+          format: date-time
+        refusal_reason:
+          type: string
+          maxLength: 500
+        client_stated_reason:
+          type: string
+          maxLength: 500
+          description: Client's stated reason in their own words
+        education_provided:
+          type: boolean
+          description: Was education about risks provided
+        provider_notified:
+          type: boolean
+          description: Was provider notified of refusal
+        follow_up_plan:
+          type: string
+          maxLength: 1000
+
+    MedicationDiscontinuedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: medication_history
+        event_type:
+          type: string
+          const: medication.discontinued
+        event_data:
+          $ref: '#/components/schemas/MedicationDiscontinuationData'
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  examples:
+                    - "Discontinued due to severe allergic reaction requiring emergency intervention"
+                    - "Treatment completed successfully, medication no longer needed"
+                    - "Switching to alternative medication for better efficacy"
+                    - "Discontinued per client request after informed consent discussion"
+
+    MedicationDiscontinuationData:
+      type: object
+      required:
+        - medication_history_id
+        - discontinue_date
+        - discontinue_reason_category
+      properties:
+        medication_history_id:
+          type: string
+          format: uuid
+        discontinue_date:
+          type: string
+          format: date
+        discontinue_reason_category:
+          type: string
+          enum:
+            - adverse_reaction
+            - ineffective
+            - client_request
+            - treatment_complete
+            - cost
+            - drug_interaction
+            - contraindication
+            - other
+        discontinue_details:
+          type: string
+          maxLength: 2000
+        adverse_events:
+          type: array
+          items:
+            type: string
+            maxLength: 500
+        alternative_medication:
+          type: string
+          maxLength: 200
+          description: Alternative medication if switching
+        tapering_schedule:
+          type: string
+          maxLength: 1000
+          description: Tapering instructions if applicable

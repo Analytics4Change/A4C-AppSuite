@@ -1,0 +1,406 @@
+components:
+  messages:
+    ClientRegistered:
+      name: client.registered
+      title: Client Registered
+      summary: A new client has been registered in the system
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientRegisteredEvent'
+
+    ClientAdmitted:
+      name: client.admitted
+      title: Client Admitted
+      summary: A client has been admitted to a facility
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientAdmittedEvent'
+
+    ClientInformationUpdated:
+      name: client.information_updated
+      title: Client Information Updated
+      summary: Client information has been modified
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientInformationUpdatedEvent'
+
+    ClientDischarged:
+      name: client.discharged
+      title: Client Discharged
+      summary: A client has been discharged from a facility
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientDischargedEvent'
+
+  schemas:
+    ClientRegisteredEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The client ID
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.registered
+        event_data:
+          $ref: '#/components/schemas/ClientRegistrationData'
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  examples:
+                    - "Initial intake from emergency department referral #12345"
+                    - "Transfer from pediatric unit per Dr. Smith's discharge summary"
+                    - "New admission for outpatient therapy program starting 2024-02-01"
+
+    ClientRegistrationData:
+      type: object
+      required:
+        - organization_id
+        - first_name
+        - last_name
+        - date_of_birth
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization this client belongs to
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: "^[a-zA-Z\\s\\-'\\.]+$"
+          description: Client's legal first name
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: "^[a-zA-Z\\s\\-'\\.]+$"
+          description: Client's legal last name
+        date_of_birth:
+          type: string
+          format: date
+          description: Client's date of birth (YYYY-MM-DD)
+        gender:
+          type: string
+          enum:
+            - male
+            - female
+            - other
+            - prefer_not_to_say
+          description: Client's gender identity
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Client's email address
+        phone:
+          type: string
+          pattern: "^\\+?1?\\d{10,14}$"
+          description: Client's primary phone number
+        address:
+          $ref: '../components/schemas.yaml#/components/schemas/Address'
+        emergency_contact:
+          $ref: '../components/schemas.yaml#/components/schemas/EmergencyContact'
+        allergies:
+          type: array
+          description: Known allergies
+          items:
+            type: string
+            maxLength: 200
+        medical_conditions:
+          type: array
+          description: Pre-existing medical conditions
+          items:
+            type: string
+            maxLength: 200
+        blood_type:
+          type: string
+          enum:
+            - A+
+            - A-
+            - B+
+            - B-
+            - AB+
+            - AB-
+            - O+
+            - O-
+          description: Client's blood type
+        insurance_provider:
+          type: string
+          maxLength: 200
+          description: Primary insurance provider
+        insurance_policy_number:
+          type: string
+          maxLength: 100
+          description: Insurance policy number
+        notes:
+          type: string
+          maxLength: 2000
+          description: Additional registration notes
+
+    ClientAdmittedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.admitted
+        event_data:
+          $ref: '#/components/schemas/ClientAdmissionData'
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  examples:
+                    - "Scheduled admission for substance abuse treatment program"
+                    - "Emergency admission due to mental health crisis per court order #2024-123"
+                    - "Routine admission for medication stabilization and monitoring"
+
+    ClientAdmissionData:
+      type: object
+      required:
+        - admission_date
+        - facility_id
+        - admission_type
+      properties:
+        admission_date:
+          type: string
+          format: date
+          description: Date of admission
+        facility_id:
+          type: string
+          format: uuid
+          description: Facility where client is admitted
+        admission_type:
+          type: string
+          enum:
+            - scheduled
+            - emergency
+            - transfer
+            - readmission
+          description: Type of admission
+        referring_provider:
+          type: string
+          maxLength: 200
+          description: Name of referring provider
+        referring_organization:
+          type: string
+          maxLength: 200
+          description: Referring organization
+        primary_diagnosis:
+          type: string
+          maxLength: 500
+          description: Primary diagnosis or reason for admission
+        secondary_diagnoses:
+          type: array
+          items:
+            type: string
+            maxLength: 500
+        expected_length_of_stay:
+          type: integer
+          minimum: 1
+          maximum: 365
+          description: Expected length of stay in days
+        admission_notes:
+          type: string
+          maxLength: 5000
+
+    ClientInformationUpdatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.information_updated
+        event_data:
+          $ref: '#/components/schemas/ClientUpdateData'
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  examples:
+                    - "Updated emergency contact per client's request during intake"
+                    - "Corrected date of birth based on verified government ID"
+                    - "Added new allergy discovered during medication administration"
+                    - "Updated address after client relocation notification"
+
+    ClientUpdateData:
+      type: object
+      required:
+        - changes
+      properties:
+        changes:
+          type: object
+          description: Fields that were changed (only include changed fields)
+          properties:
+            first_name:
+              type: string
+            last_name:
+              type: string
+            email:
+              type: string
+              format: email
+            phone:
+              type: string
+            address:
+              $ref: '../components/schemas.yaml#/components/schemas/Address'
+            emergency_contact:
+              $ref: '../components/schemas.yaml#/components/schemas/EmergencyContact'
+            allergies:
+              type: array
+              items:
+                type: string
+            medical_conditions:
+              type: array
+              items:
+                type: string
+            blood_type:
+              type: string
+            insurance_provider:
+              type: string
+            insurance_policy_number:
+              type: string
+            notes:
+              type: string
+        previous_values:
+          type: object
+          description: Previous values of changed fields (for audit trail)
+
+    ClientDischargedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.discharged
+        event_data:
+          $ref: '#/components/schemas/ClientDischargeData'
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  examples:
+                    - "Treatment completed successfully, goals achieved"
+                    - "Discharged against medical advice per client request"
+                    - "Transfer to higher level of care at regional facility"
+                    - "Insurance coverage exhausted, transitioning to outpatient"
+
+    ClientDischargeData:
+      type: object
+      required:
+        - discharge_date
+        - discharge_type
+        - discharge_disposition
+      properties:
+        discharge_date:
+          type: string
+          format: date
+          description: Date of discharge
+        discharge_type:
+          type: string
+          enum:
+            - planned
+            - against_medical_advice
+            - transfer
+            - administrative
+            - death
+          description: Type of discharge
+        discharge_disposition:
+          type: string
+          enum:
+            - home
+            - home_with_services
+            - skilled_nursing_facility
+            - rehabilitation_facility
+            - acute_care_hospital
+            - psychiatric_hospital
+            - hospice
+            - deceased
+            - left_against_advice
+            - other
+          description: Where client went after discharge
+        follow_up_appointments:
+          type: array
+          items:
+            type: object
+            properties:
+              provider:
+                type: string
+              date:
+                type: string
+                format: date
+              type:
+                type: string
+        discharge_medications:
+          type: array
+          description: Medications at discharge
+          items:
+            type: string
+        discharge_instructions:
+          type: string
+          maxLength: 5000
+          description: Instructions given to client/family
+        discharge_summary:
+          type: string
+          maxLength: 10000
+          description: Clinical discharge summary

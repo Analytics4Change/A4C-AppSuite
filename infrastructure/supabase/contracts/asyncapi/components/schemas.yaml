@@ -1,0 +1,195 @@
+components:
+  schemas:
+    EventMetadata:
+      type: object
+      required:
+        - user_id
+        - reason
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: ID of the user who initiated this event
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 500
+          description: |
+            Business justification for this action. This field captures the "WHY"
+            behind every change and is REQUIRED for all events.
+          examples:
+            - "Patient showed allergic reaction to previous medication"
+            - "Dosage adjustment per physician consultation on 2024-01-15"
+            - "Regular intake from emergency department referral #12345"
+        user_email:
+          type: string
+          format: email
+          description: Email of the user who initiated this event
+        user_name:
+          type: string
+          description: Name of the user who initiated this event
+        correlation_id:
+          type: string
+          format: uuid
+          description: ID to correlate related events across the system
+        causation_id:
+          type: string
+          format: uuid
+          description: ID of the event that caused this event
+        ip_address:
+          type: string
+          format: ipv4
+          description: IP address of the client
+        user_agent:
+          type: string
+          description: User agent string of the client
+        approval_chain:
+          type: array
+          description: Chain of approvals for this action
+          items:
+            $ref: '#/components/schemas/Approval'
+        notes:
+          type: string
+          maxLength: 2000
+          description: Additional context or notes
+
+    Approval:
+      type: object
+      required:
+        - approver_id
+        - approved_at
+        - role
+      properties:
+        approver_id:
+          type: string
+          format: uuid
+          description: ID of the approver
+        approver_name:
+          type: string
+          description: Name of the approver
+        approver_email:
+          type: string
+          format: email
+        approved_at:
+          type: string
+          format: date-time
+          description: When approval was granted
+        role:
+          type: string
+          enum:
+            - physician
+            - nurse_practitioner
+            - pharmacist
+            - administrator
+            - supervisor
+          description: Role of the approver
+        notes:
+          type: string
+          description: Approval notes or conditions
+
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+          maxLength: 200
+        city:
+          type: string
+          maxLength: 100
+        state:
+          type: string
+          maxLength: 2
+          pattern: '^[A-Z]{2}$'
+        zip_code:
+          type: string
+          pattern: '^\d{5}(-\d{4})?$'
+        country:
+          type: string
+          default: USA
+          maxLength: 100
+
+    EmergencyContact:
+      type: object
+      required:
+        - name
+        - relationship
+        - phone
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        relationship:
+          type: string
+          enum:
+            - parent
+            - guardian
+            - spouse
+            - sibling
+            - child
+            - friend
+            - other
+        phone:
+          type: string
+          pattern: '^\+?1?\d{10,14}$'
+        alternate_phone:
+          type: string
+          pattern: '^\+?1?\d{10,14}$'
+        email:
+          type: string
+          format: email
+
+    Vitals:
+      type: object
+      properties:
+        blood_pressure_systolic:
+          type: integer
+          minimum: 40
+          maximum: 300
+        blood_pressure_diastolic:
+          type: integer
+          minimum: 20
+          maximum: 200
+        heart_rate:
+          type: integer
+          minimum: 20
+          maximum: 300
+        temperature_fahrenheit:
+          type: number
+          minimum: 85.0
+          maximum: 115.0
+        respiratory_rate:
+          type: integer
+          minimum: 5
+          maximum: 60
+        oxygen_saturation:
+          type: integer
+          minimum: 50
+          maximum: 100
+        pain_scale:
+          type: integer
+          minimum: 0
+          maximum: 10
+
+    ValidationError:
+      type: object
+      required:
+        - field
+        - message
+        - code
+      properties:
+        field:
+          type: string
+          description: Field that failed validation
+        message:
+          type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: Machine-readable error code
+          enum:
+            - required
+            - invalid_format
+            - out_of_range
+            - duplicate
+            - unauthorized
+            - business_rule_violation
