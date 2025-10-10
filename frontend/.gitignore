@@ -1,0 +1,131 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+/coverage
+test-results/
+playwright-report/
+test-results.json
+test-results.xml
+user_unit_test_run*.txt
+test-batch-*.txt
+test-exclusions.txt
+test-*.log
+safe-test-*.json
+safe-test-*.log
+test-metrics.json
+test-validation/
+
+# Production builds
+/build
+/dist
+
+# Environment files
+.env
+# .env.local is now encrypted with git-crypt and tracked
+.env.development.local
+.env.test.local
+# .env.production and .env.staging can be encrypted with git-crypt if needed
+
+# Git-crypt keys (should never be committed)
+*.git-crypt.key
+*-git-crypt.key
+
+# IDE files
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+*.log
+
+# Memory Reports - Generated Content
+memory-reports/*.json
+memory-reports/html/*.html
+memory-reports/markdown/*.md
+memory-reports/data/*.json
+memory-reports/snapshots/*.heapsnapshot
+
+# Memory Reports - Keep Directory Structure
+!memory-reports/
+!memory-reports/html/
+!memory-reports/markdown/
+!memory-reports/data/
+!memory-reports/snapshots/
+!memory-reports/analysis/
+!memory-reports/test-snapshots/
+
+# Memory Reports - Keep Sample/Template Files
+!memory-reports/html/.gitkeep
+!memory-reports/markdown/.gitkeep
+!memory-reports/data/.gitkeep
+!memory-reports/snapshots/.gitkeep
+
+# Temporary files
+*.tmp
+*.temp
+
+# Cache
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.vite/
+
+# Generated metrics and reports
+.metrics/
+
+# Generated schema files (synced from Infrastructure repo)
+src/types/generated/
+
+# MCP server caches
+.serena/
+
+# Claude Code settings
+.claude/settings.local.json
+
+# Debug
+debug.log
+debug.txt
+memory-pressure.log
+pressure-*.log
+
+# E2E test screenshots (should be in test-results/)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.webp
+step*.png
+page-*.png
+screenshot-*.png
+
+# Test documentation artifacts (should be in test-results/)
+test-*.html
+*-test.html
+focus-*.html
+keyboard-*.html
+
+# Git-crypt keys and deployment files
+*git-crypt.key
+*.deb
+*.rpm
+*.msi

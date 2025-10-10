@@ -1,0 +1,61 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "react-native-tools.showUserTips": false,
+  "react-native-tools.projectRoot": "./",
+  "react-native-tools.packager.port": 19000,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "files.associations": {
+    "*.tsx": "typescriptreact",
+    "*.ts": "typescript"
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/*.code-search": true,
+    "ios/Pods": true,
+    "android/.gradle": true,
+    "android/.idea": true,
+    "android/build": true,
+    ".expo": true,
+    ".expo-shared": true
+  },
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/*/**": true,
+    "**/.expo/**": true,
+    "**/.expo-shared/**": true
+  },
+  "emmet.includeLanguages": {
+    "javascript": "javascriptreact",
+    "typescript": "typescriptreact"
+  },
+  "javascript.updateImportsOnFileMove.enabled": "always",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "editor.quickSuggestions": {
+    "strings": true
+  },
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "terminal.integrated.env.osx": {
+    "EXPO_DEBUG": "true"
+  },
+  "terminal.integrated.env.linux": {
+    "EXPO_DEBUG": "true"
+  },
+  "terminal.integrated.env.windows": {
+    "EXPO_DEBUG": "true"
+  }
+}

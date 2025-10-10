@@ -1,0 +1,60 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Expo App",
+      "type": "reactnative",
+      "request": "launch",
+      "platform": "exponent",
+      "expoHostType": "local",
+      "port": 19000,
+      "preLaunchTask": "expo:start"
+    },
+    {
+      "name": "Debug iOS",
+      "type": "reactnative",
+      "request": "launch",
+      "platform": "ios",
+      "target": "simulator"
+    },
+    {
+      "name": "Debug Android",
+      "type": "reactnative",
+      "request": "launch",
+      "platform": "android"
+    },
+    {
+      "name": "Attach to Packager",
+      "type": "reactnative",
+      "request": "attach",
+      "port": 19000
+    },
+    {
+      "name": "Debug in Chrome",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:19000",
+      "webRoot": "${workspaceFolder}"
+    },
+    {
+      "name": "Debug Web",
+      "type": "node",
+      "request": "launch",
+      "name": "Expo Web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "web"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug iOS + Chrome DevTools",
+      "configurations": ["Debug iOS", "Debug in Chrome"]
+    },
+    {
+      "name": "Debug Android + Chrome DevTools",
+      "configurations": ["Debug Android", "Debug in Chrome"]
+    }
+  ]
+}

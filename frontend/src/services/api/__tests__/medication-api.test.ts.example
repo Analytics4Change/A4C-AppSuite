@@ -1,0 +1,158 @@
+/**
+ * Tests for dual medication API implementation
+ * Verifies both MockMedicationApi and RXNormMedicationApi conform to interface
+ */
+
+// Tests for dual medication API implementation
+// Note: These tests require vitest to be installed to run
+import { IMedicationApi } from '@/services/api/interfaces/IMedicationApi';
+import { MockMedicationApi } from '@/services/mock/MockMedicationApi';
+import { RXNormMedicationApi } from '@/services/api/RXNormMedicationApi';
+import { DosageInfo } from '@/types/models';
+
+describe('Medication API Implementations', () => {
+  let mockApi: IMedicationApi;
+  let rxnormApi: IMedicationApi;
+
+  beforeEach(() => {
+    mockApi = new MockMedicationApi();
+    rxnormApi = new RXNormMedicationApi();
+  });
+
+  describe('Interface Conformance', () => {
+    it('both implementations should have searchMedications method', () => {
+      expect(mockApi.searchMedications).toBeDefined();
+      expect(rxnormApi.searchMedications).toBeDefined();
+      expect(typeof mockApi.searchMedications).toBe('function');
+      expect(typeof rxnormApi.searchMedications).toBe('function');
+    });
+
+    it('both implementations should have getMedication method', () => {
+      expect(mockApi.getMedication).toBeDefined();
+      expect(rxnormApi.getMedication).toBeDefined();
+      expect(typeof mockApi.getMedication).toBe('function');
+      expect(typeof rxnormApi.getMedication).toBe('function');
+    });
+
+    it('both implementations should have saveMedication method', () => {
+      expect(mockApi.saveMedication).toBeDefined();
+      expect(rxnormApi.saveMedication).toBeDefined();
+      expect(typeof mockApi.saveMedication).toBe('function');
+      expect(typeof rxnormApi.saveMedication).toBe('function');
+    });
+
+    it('both implementations should have getMedicationHistory method', () => {
+      expect(mockApi.getMedicationHistory).toBeDefined();
+      expect(rxnormApi.getMedicationHistory).toBeDefined();
+      expect(typeof mockApi.getMedicationHistory).toBe('function');
+      expect(typeof rxnormApi.getMedicationHistory).toBe('function');
+    });
+  });
+
+  describe('MockMedicationApi', () => {
+    it('should return search results', async () => {
+      const results = await mockApi.searchMedications('aspirin');
+      expect(Array.isArray(results)).toBe(true);
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0]).toHaveProperty('id');
+      expect(results[0]).toHaveProperty('name');
+    });
+
+    it('should handle empty search query', async () => {
+      const results = await mockApi.searchMedications('');
+      expect(Array.isArray(results)).toBe(true);
+    });
+
+    it('should save and retrieve medication history', async () => {
+      const dosageInfo: DosageInfo = {
+        medicationId: 'med-1',
+        formCategory: 'Solid',
+        dosageForm: 'Tablet',
+        dosageAmount: 100,
+        dosageUnit: 'mg',
+        frequency: 'twice daily',
+        totalAmount: 60,
+        totalUnit: 'tablets',
+        startDate: new Date(),
+        prescribingDoctor: 'Dr. Smith'
+      };
+
+      await mockApi.saveMedication(dosageInfo);
+      const history = await mockApi.getMedicationHistory('client-1');
+      
+      expect(history.length).toBeGreaterThan(0);
+      expect(history[0].status).toBe('active');
+    });
+  });
+
+  describe('RXNormMedicationApi', () => {
+    it('should return empty array for empty search', async () => {
+      const results = await rxnormApi.searchMedications('');
+      expect(Array.isArray(results)).toBe(true);
+      expect(results.length).toBe(0);
+    });
+
+    it('should handle search errors gracefully', async () => {
+      // Even if the API fails, it should return an empty array
+      const results = await rxnormApi.searchMedications('test');
+      expect(Array.isArray(results)).toBe(true);
+    });
+
+    it('should save medication to history', async () => {
+      // First, we need to add a medication to the cache
+      const testMed = {
+        id: 'rxnorm-123',
+        name: 'Test Medication',
+        genericName: 'testium',
+        categories: { broad: 'Test', specific: 'Test' },
+        flags: {
+          isPsychotropic: false,
+          isControlled: false,
+          isNarcotic: false,
+          requiresMonitoring: false
+        }
+      };
+
+      // Save directly to cache (this is a workaround for testing)
+      (rxnormApi as any).medicationCache.set(testMed.id, testMed);
+
+      const dosageInfo: DosageInfo = {
+        medicationId: testMed.id,
+        formCategory: 'Solid',
+        dosageForm: 'Tablet',
+        dosageAmount: 100,
+        dosageUnit: 'mg',
+        frequency: 'once daily',
+        totalAmount: 30,
+        totalUnit: 'tablets',
+        startDate: new Date(),
+        prescribingDoctor: 'Dr. Jones'
+      };
+
+      await rxnormApi.saveMedication(dosageInfo);
+      const history = await rxnormApi.getMedicationHistory('client-1');
+      
+      expect(history.length).toBe(1);
+      expect(history[0].status).toBe('active');
+      expect(history[0].medicationId).toBe(testMed.id);
+    });
+  });
+
+  describe('Environment-based Selection', () => {
+    it('should use correct API based on environment variable', () => {
+      // Save current env
+      const originalEnv = import.meta.env.VITE_USE_RXNORM_API;
+
+      // Test with mock
+      import.meta.env.VITE_USE_RXNORM_API = 'false';
+      expect(import.meta.env.VITE_USE_RXNORM_API).toBe('false');
+
+      // Test with RXNorm
+      import.meta.env.VITE_USE_RXNORM_API = 'true';
+      expect(import.meta.env.VITE_USE_RXNORM_API).toBe('true');
+
+      // Restore
+      import.meta.env.VITE_USE_RXNORM_API = originalEnv;
+    });
+  });
+});

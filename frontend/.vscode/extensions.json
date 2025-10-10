@@ -1,0 +1,20 @@
+{
+  "recommendations": [
+    "msjsdiag.vscode-react-native",
+    "expo.vscode-expo-tools",
+    "dsznajder.es7-react-js-snippets",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "formulahendry.auto-rename-tag",
+    "formulahendry.auto-close-tag",
+    "christian-kohler.path-intellisense",
+    "visualstudioexptteam.vscodeintellicode",
+    "prisma.prisma",
+    "styled-components.vscode-styled-components",
+    "mikestead.dotenv",
+    "orta.vscode-jest",
+    "ms-vscode.vscode-typescript-tslint-plugin"
+  ],
+  "unwantedRecommendations": []
+}

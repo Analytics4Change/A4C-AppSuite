@@ -1,0 +1,226 @@
+name: Deploy A4C-FrontEnd
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: analytics4change/a4c-frontend
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Get GitHub App Token
+      id: app-token
+      uses: tibdex/github-app-token@v1
+      with:
+        app_id: ${{ secrets.APP_ID }}
+        private_key: ${{ secrets.APP_PRIVATE_KEY }}
+        installation_id: ${{ secrets.INSTALLATION_ID }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests  
+      run: echo "Skipping tests - no unit tests configured"
+
+    - name: Build React application
+      run: npm run build
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: analytics4change-ghcr-bot
+        password: ${{ secrets.GHCR_PULL_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Get GitHub App Token
+      id: app-token
+      uses: tibdex/github-app-token@v1
+      with:
+        app_id: ${{ secrets.APP_ID }}
+        private_key: ${{ secrets.APP_PRIVATE_KEY }}
+        installation_id: ${{ secrets.INSTALLATION_ID }}
+
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+
+    - name: Configure kubectl
+      run: |
+        mkdir -p ~/.kube
+        echo "Checking KUBECONFIG secret..."
+        if [ -z "${{ secrets.KUBECONFIG }}" ]; then
+          echo "❌ KUBECONFIG secret is empty"
+          exit 1
+        fi
+        echo "✓ KUBECONFIG secret exists and is not empty"
+        echo "Secret length: $(echo '${{ secrets.KUBECONFIG }}' | wc -c) characters"
+        
+        # Try to decode the secret
+        if echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config 2>/dev/null; then
+          echo "✓ Successfully decoded KUBECONFIG secret"
+        else
+          echo "❌ Failed to decode KUBECONFIG secret as base64"
+          echo "Trying to use secret as plain text kubeconfig..."
+          echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+        fi
+        
+        chmod 600 ~/.kube/config
+        
+        # Debug the config file format
+        echo "--- Config file debug info ---"
+        echo "First few lines of config:"
+        head -5 ~/.kube/config || true
+        echo "--- End debug info ---"
+        
+        # Test kubectl connectivity
+        echo "Testing kubectl configuration..."
+        if timeout 30 kubectl cluster-info 2>/dev/null; then
+          echo "✓ kubectl configuration is valid and cluster is reachable"
+        else
+          echo "❌ kubectl cluster connection failed"
+          echo ""
+          echo "🌐 NETWORK CONNECTIVITY ISSUE"
+          echo "The kubeconfig format is valid, but the cluster is not reachable from GitHub Actions."
+          echo ""
+          echo "Possible solutions:"
+          echo "1. Ensure your k3s cluster has a public IP or domain name"
+          echo "2. Use a VPN or tunnel service (like ngrok, Cloudflare Tunnel)"
+          echo "3. Set up a bastion host or jump server"
+          echo "4. Use a cloud-hosted Kubernetes cluster (EKS, GKE, AKS)"
+          echo ""
+          echo "Current cluster endpoint: $(grep 'server:' ~/.kube/config | head -1)"
+          echo "This appears to be a private network address not accessible from GitHub Actions."
+          exit 1
+        fi
+        
+        echo "✓ kubectl configuration complete"
+
+    - name: Create image pull secret
+      run: |
+        kubectl create secret docker-registry ghcr-secret \
+          --docker-server=ghcr.io \
+          --docker-username=analytics4change-ghcr-bot \
+          --docker-password=${{ secrets.GHCR_PULL_TOKEN }} \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Deploy to k3s
+      run: |
+        # Get the first image tag from the multi-line output
+        IMAGE_TAG=$(echo "${{ needs.build.outputs.image-tag }}" | head -n1)
+        echo "Using image tag: $IMAGE_TAG"
+        
+        # Update deployment YAML with new image tag
+        sed -i "s|image: ghcr.io/analytics4change/a4c-frontend:.*|image: $IMAGE_TAG|g" k8s/deployment.yaml
+        
+        # Apply the updated deployment (preserves imagePullSecrets)
+        kubectl apply -f k8s/deployment.yaml
+
+    - name: Wait for rollout
+      run: |
+        # First attempt with standard timeout
+        if kubectl rollout status deployment/a4c-frontend --timeout=300s; then
+          echo "✅ Rollout completed successfully"
+        else
+          echo "⚠️ First rollout attempt timed out, checking actual deployment status..."
+          
+          # Check if deployment actually succeeded despite timeout
+          READY_REPLICAS=$(kubectl get deployment a4c-frontend -o jsonpath='{.status.readyReplicas}')
+          DESIRED_REPLICAS=$(kubectl get deployment a4c-frontend -o jsonpath='{.spec.replicas}')
+          
+          if [ "$READY_REPLICAS" = "$DESIRED_REPLICAS" ] && [ "$READY_REPLICAS" != "" ]; then
+            echo "✅ Deployment actually completed successfully ($READY_REPLICAS/$DESIRED_REPLICAS ready)"
+          else
+            echo "❌ Deployment failed - only $READY_REPLICAS/$DESIRED_REPLICAS replicas ready"
+            kubectl get pods -l app=a4c-frontend
+            kubectl describe deployment a4c-frontend
+            exit 1
+          fi
+        fi
+
+    - name: Verify deployment
+      run: |
+        kubectl get pods -l app=a4c-frontend
+        kubectl get service a4c-frontend-service
+        kubectl get ingress a4c-frontend-ingress
+
+    - name: Health check
+      run: |
+        # Wait a bit for the service to be ready
+        sleep 30
+        
+        # Test the application
+        if curl -f --retry 5 --retry-delay 10 https://a4c.firstovertheline.com/; then
+          echo "✅ Deployment successful - application is responding"
+        else
+          echo "❌ Deployment failed - application not responding"
+          exit 1
+        fi
+
+    - name: Report deployment status
+      if: always()
+      run: |
+        if [ ${{ job.status }} == 'success' ]; then
+          echo "🎉 Deployment completed successfully!"
+          echo "🌐 Application URL: https://a4c.firstovertheline.com"
+        else
+          echo "❌ Deployment failed. Check the logs above for details."
+        fi

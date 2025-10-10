@@ -1,0 +1,30 @@
+{
+  "entry": [
+    "src/main.tsx",
+    "src/**/*.test.{ts,tsx}",
+    "e2e/**/*.spec.ts",
+    "playwright.config.ts",
+    "vite.config.ts",
+    "tailwind.config.js",
+    "postcss.config.js"
+  ],
+  "ignore": [
+    "archive/**",
+    "components/figma/**",
+    "**/*.d.ts",
+    "e2e/test-helpers.ts",
+    "src/components/CalendarPicker.tsx",
+    "src/hooks/useAutoComplete.ts",
+    "src/hooks/useDebounce.ts",
+    "src/views/medication/SideEffectsSelection.tsx",
+    ".pre-commit-memory.config.js"
+  ],
+  "ignoreDependencies": [],
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    ".": {
+      "entry": "src/main.tsx",
+      "ignoreDependencies": []
+    }
+  }
+}

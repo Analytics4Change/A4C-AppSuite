@@ -1,0 +1,30 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^http://localhost"
+    },
+    {
+      "pattern": "^https://localhost"
+    },
+    {
+      "pattern": "^mailto:"
+    },
+    {
+      "pattern": "^http://example\\."
+    },
+    {
+      "pattern": "^https://example\\."
+    },
+    {
+      "pattern": "^https://github.com/Analytics4Change"
+    },
+    {
+      "pattern": "^https?://(?!127\\.0\\.0\\.1|localhost).*",
+      "comment": "Ignore all external HTTP/HTTPS links except localhost - check internal links only"
+    }
+  ],
+  "timeout": "30s",
+  "retryOn429": true,
+  "retryCount": 3,
+  "aliveStatusCodes": [200, 206, 999]
+}

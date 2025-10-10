@@ -1,0 +1,314 @@
+{
+  "errors": [],
+  "warnings": [
+    {
+      "message": "Component documentation missing Usage section",
+      "file": "docs/components/example-usage.md",
+      "severity": "warning"
+    },
+    {
+      "message": "API documentation missing TypeScript examples",
+      "file": "docs/api/README.md",
+      "severity": "warning"
+    }
+  ],
+  "info": [
+    {
+      "message": "Required file exists: CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Required file exists: README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Required file exists: docs/architecture/overview.md",
+      "severity": "info"
+    },
+    {
+      "message": "Required file exists: docs/getting-started/installation.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./docs/README.md",
+      "file": "README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./docs/TESTING.md",
+      "file": "README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./docs/ui-patterns.md",
+      "file": "README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./CLAUDE.md",
+      "file": "README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./DEPLOYMENT.md",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./DEVELOPMENT.md",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./TESTING.md",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./API.md",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./ui-patterns.md",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./DESIGN_PATTERNS_MIGRATION_GUIDE.md",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./FocusTrappedCheckboxGroup_plan.md",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./GHCR_TOKEN_ROTATION.md",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./medication-search-implementation.md",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./rxnorm-medication-autocomplete.md",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../CLAUDE.md",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../package.json",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../tsconfig.json",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../vite.config.ts",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../tailwind.config.js",
+      "file": "docs/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../strategy/mobx-patterns.md",
+      "file": "docs/testing/viewmodel-testing.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../TESTING.md",
+      "file": "docs/testing/viewmodel-testing.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../performance/mobx-optimization.md",
+      "file": "docs/testing/viewmodel-testing.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../architecture/overview.md",
+      "file": "docs/testing/viewmodel-testing.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../testing/viewmodel-testing.md",
+      "file": "docs/strategy/mobx-patterns.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../performance/mobx-optimization.md",
+      "file": "docs/strategy/mobx-patterns.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../architecture/overview.md",
+      "file": "docs/strategy/mobx-patterns.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../components.md",
+      "file": "docs/strategy/mobx-patterns.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./documentation-alignment-strategy.md",
+      "file": "docs/strategy/implementation-guide.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../templates/",
+      "file": "docs/strategy/implementation-guide.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../../CLAUDE.md#development-guidelines",
+      "file": "docs/strategy/implementation-guide.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../testing/viewmodel-testing.md",
+      "file": "docs/performance/mobx-optimization.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../strategy/mobx-patterns.md",
+      "file": "docs/performance/mobx-optimization.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../architecture/overview.md",
+      "file": "docs/performance/mobx-optimization.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../components.md",
+      "file": "docs/performance/mobx-optimization.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../../CLAUDE.md",
+      "file": "docs/getting-started/validation-guide.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../../README.md",
+      "file": "docs/getting-started/installation.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../DEVELOPMENT.md",
+      "file": "docs/getting-started/installation.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../TESTING.md",
+      "file": "docs/getting-started/installation.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../strategy/mobx-patterns.md",
+      "file": "docs/architecture/viewmodels.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../components.md",
+      "file": "docs/architecture/viewmodels.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../testing/viewmodel-testing.md",
+      "file": "docs/architecture/viewmodels.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../performance/mobx-optimization.md",
+      "file": "docs/architecture/viewmodels.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../components/",
+      "file": "docs/api/types.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./README.md",
+      "file": "docs/api/types.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../architecture/overview.md",
+      "file": "docs/api/types.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./client-api.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./medication-api.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./cache-service.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./types.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../../CLAUDE.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../architecture/overview.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../components/",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../TESTING.md",
+      "file": "docs/api/README.md",
+      "severity": "info"
+    },
+    {
+      "message": "Link validation completed: 53 internal links checked, all valid",
+      "severity": "info"
+    }
+  ],
+  "stats": {
+    "totalFiles": 53,
+    "validFiles": 53,
+    "componentsDocumented": 24,
+    "apisDocumented": 5
+  },
+  "timestamp": "2025-09-22T03:55:11.078Z",
+  "summary": {
+    "hasErrors": false,
+    "hasWarnings": true,
+    "totalIssues": 2
+  }
+}

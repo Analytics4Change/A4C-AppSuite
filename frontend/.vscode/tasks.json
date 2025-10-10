@@ -1,0 +1,108 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "expo:start",
+      "type": "shell",
+      "command": "expo",
+      "args": ["start"],
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "expo",
+        "pattern": {
+          "regexp": "^(ERROR|WARNING):\\s+(.*)$",
+          "severity": 1,
+          "message": 2
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^Starting Metro Bundler",
+          "endsPattern": "^Metro waiting on"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "expo:ios",
+      "type": "shell",
+      "command": "expo",
+      "args": ["start", "--ios"],
+      "problemMatcher": []
+    },
+    {
+      "label": "expo:android",
+      "type": "shell",
+      "command": "expo",
+      "args": ["start", "--android"],
+      "problemMatcher": []
+    },
+    {
+      "label": "expo:web",
+      "type": "shell",
+      "command": "expo",
+      "args": ["start", "--web"],
+      "problemMatcher": []
+    },
+    {
+      "label": "expo:clear",
+      "type": "shell",
+      "command": "expo",
+      "args": ["start", "--clear"],
+      "problemMatcher": []
+    },
+    {
+      "label": "expo:build:ios",
+      "type": "shell",
+      "command": "expo",
+      "args": ["build:ios"],
+      "problemMatcher": []
+    },
+    {
+      "label": "expo:build:android",
+      "type": "shell",
+      "command": "expo",
+      "args": ["build:android"],
+      "problemMatcher": []
+    },
+    {
+      "label": "expo:publish",
+      "type": "shell",
+      "command": "expo",
+      "args": ["publish"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Clear Metro Cache",
+      "type": "shell",
+      "command": "watchman watch-del-all && rm -rf node_modules/.cache && expo start --clear",
+      "windows": {
+        "command": "rmdir /s /q node_modules\\.cache && expo start --clear"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Install Dependencies",
+      "type": "shell",
+      "command": "npm",
+      "args": ["install"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Tests",
+      "type": "shell",
+      "command": "npm",
+      "args": ["test"],
+      "problemMatcher": {
+        "owner": "jest",
+        "pattern": {
+          "regexp": "^\\s*(FAIL|PASS)\\s+(.*)$",
+          "severity": 1,
+          "file": 2
+        }
+      }
+    }
+  ]
+}

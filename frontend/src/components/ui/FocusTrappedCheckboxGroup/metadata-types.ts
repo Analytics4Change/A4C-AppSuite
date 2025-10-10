@@ -1,0 +1,153 @@
+/**
+ * Enhanced metadata types for FocusTrappedCheckboxGroup with dynamic input support
+ */
+
+/**
+ * Strategy for managing focus in dynamic additional inputs
+ */
+export interface FocusStrategy {
+  autoFocus: boolean;
+  returnFocusTo?: 'checkbox' | 'continue' | 'cancel';
+  trapFocus?: boolean;
+  requiresInput?: boolean; // Whether the input is required (true) or optional (false)
+}
+
+/**
+ * Validation rule for additional input fields
+ */
+export interface ValidationRule {
+  type: 'required' | 'range' | 'pattern' | 'custom' | 'minLength' | 'maxLength';
+  message: string;
+  min?: number;
+  max?: number;
+  pattern?: RegExp;
+  validate?: (value: any) => boolean;
+}
+
+/**
+ * Strategy pattern for defining additional input components
+ */
+export interface AdditionalInputStrategy {
+  componentType: 'numeric' | 'text' | 'textarea' | 'select' | 'date' | 'time' | 'custom';
+  componentProps: Record<string, any>;
+  validationRules?: ValidationRule[];
+  focusManagement?: FocusStrategy;
+}
+
+/**
+ * Enhanced checkbox metadata with support for additional inputs
+ */
+export interface CheckboxMetadata {
+  id: string;
+  label: string;
+  value: string;
+  checked: boolean;
+  disabled?: boolean;
+  description?: string;
+  
+  // Strategy Pattern Extension
+  requiresAdditionalInput?: boolean;
+  additionalInputStrategy?: AdditionalInputStrategy;
+  
+  // Sorting support
+  originalIndex?: number;
+}
+
+/**
+ * Focus source tracking for hybrid interactions
+ */
+export type FocusSource = 'keyboard' | 'mouse' | 'programmatic';
+
+/**
+ * Focus intent for preventing unwanted auto-focus
+ */
+export type FocusIntent = 
+  | { type: 'none' }
+  | { type: 'checkbox'; checkboxId: string; source: FocusSource }
+  | { type: 'input'; checkboxId: string; source: FocusSource }
+  | { type: 'tab-to-input'; checkboxId: string; source: FocusSource }
+  | { type: 'returning-to-checkbox'; checkboxId: string; source: FocusSource }
+  | { type: 'external-blur'; from: 'input' | 'checkbox' };
+
+/**
+ * Props for components that render dynamic additional inputs
+ */
+export interface DynamicAdditionalInputProps {
+  strategy: AdditionalInputStrategy;
+  checkboxId: string;
+  currentValue?: any;
+  onDataChange: (data: any) => void;
+  onSelectionChange?: (checkboxId: string, checked: boolean) => void;
+  tabIndexBase: number;
+  shouldFocus: boolean;
+  focusIntent?: FocusIntent;
+  onFocusHandled: () => void;
+  onInputFocus?: () => void;
+  onInputBlur?: () => void;
+  onIntentionalExit?: (checkboxId: string, save: boolean) => void;
+  onNaturalBlur?: (checkboxId: string, relatedTarget: HTMLElement | null) => void;
+  onDirectFocus?: (checkboxId: string) => void;
+}
+
+/**
+ * Strategy for Continue button enablement behavior
+ */
+export interface ContinueButtonBehavior {
+  allowSkipSelection?: boolean; // Allow continuing without any selection
+  skipMessage?: string; // Message for screen readers when skip is allowed
+  customEnableLogic?: (checkboxes: CheckboxMetadata[]) => boolean; // Custom logic for enabling
+}
+
+/**
+ * Enhanced props for FocusTrappedCheckboxGroup with metadata support
+ */
+export interface EnhancedCheckboxGroupProps {
+  id: string;
+  title: string;
+  checkboxes: CheckboxMetadata[];
+  onSelectionChange: (id: string, checked: boolean) => void;
+  onAdditionalDataChange?: (checkboxId: string, data: any) => void;
+  onFieldBlur?: (checkboxId: string) => void;  // Called when additional input field loses focus
+  onContinue: (selectedIds: string[], additionalData: Map<string, any>) => void;
+  onCancel: () => void;
+  
+  // Display configuration (new for reusability)
+  showLabel?: boolean; // Show title label above container (default: true)
+  maxVisibleItems?: number; // Max items before scrolling (default: 7)
+  
+  // Reordering configuration (new for reusability)
+  enableReordering?: boolean; // Enable smart reordering (default: false)
+  reorderTrigger?: 'onBlur' | 'onChange' | 'manual'; // When to trigger reorder (default: 'onBlur')
+  onFocusLost?: () => void; // Callback when focus leaves the checkbox group
+  
+  // Summary display (new for reusability)
+  summaryRenderer?: (checkboxId: string, data: any) => string; // Custom summary generation
+  
+  // Collapsible behavior (deprecated - will be removed)
+  isCollapsible?: boolean;
+  initialExpanded?: boolean;
+  
+  // Focus management
+  baseTabIndex?: number;
+  nextTabIndex?: number;
+  
+  // ARIA support
+  ariaLabel?: string;
+  ariaLabelledBy?: string;
+  ariaDescribedBy?: string;
+  isRequired?: boolean;
+  hasError?: boolean;
+  errorMessage?: string;
+  helpText?: string;
+  
+  // Button customization
+  continueButtonText?: string;
+  cancelButtonText?: string;
+  continueButtonBehavior?: ContinueButtonBehavior; // Strategy for Continue button enablement
+  
+  // Back navigation
+  onBack?: () => void;
+  showBackButton?: boolean;
+  backButtonText?: string;
+  previousTabIndex?: number;
+}

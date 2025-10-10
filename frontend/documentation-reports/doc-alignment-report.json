@@ -1,0 +1,1493 @@
+{
+  "aligned": false,
+  "misalignments": [
+    {
+      "category": "Component Props",
+      "source": "components/ui/dropdown-portal.tsx",
+      "doc": "docs/components/dropdown-portal.md",
+      "details": "Prop 'children' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/dropdown-portal.tsx",
+      "doc": "docs/components/dropdown-portal.md",
+      "details": "Prop 'isOpen' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/MultiSelectDropdown.tsx",
+      "doc": "docs/components/MultiSelectDropdown.md",
+      "details": "Prop 'options' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/MultiSelectDropdown.tsx",
+      "doc": "docs/components/MultiSelectDropdown.md",
+      "details": "Prop 'selected' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/MultiSelectDropdown.tsx",
+      "doc": "docs/components/MultiSelectDropdown.md",
+      "details": "Prop 'onChange' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/MultiSelectDropdown.tsx",
+      "doc": "docs/components/MultiSelectDropdown.md",
+      "details": "Prop 'placeholder' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/MultiSelectDropdown.tsx",
+      "doc": "docs/components/MultiSelectDropdown.md",
+      "details": "Prop 'label' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/MultiSelectDropdown.tsx",
+      "doc": "docs/components/MultiSelectDropdown.md",
+      "details": "Prop 'id' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/MultiSelectDropdown.tsx",
+      "doc": "docs/components/MultiSelectDropdown.md",
+      "details": "Prop 'tabIndex' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/MultiSelectDropdown.tsx",
+      "doc": "docs/components/MultiSelectDropdown.md",
+      "details": "Prop 'buttonTabIndex' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/MultiSelectDropdown.tsx",
+      "doc": "docs/components/MultiSelectDropdown.md",
+      "details": "Prop 'maxHeight' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/MultiSelectDropdown.tsx",
+      "doc": "docs/components/MultiSelectDropdown.md",
+      "details": "Prop 'closeOnSelect' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/MultiSelectDropdown.tsx",
+      "doc": "docs/components/MultiSelectDropdown.md",
+      "details": "Prop 'onClose' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'options' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'value' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'onChange' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'onSelect' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'placeholder' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'className' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'disabled' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'error' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'id' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'tabIndex' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'autoFocus' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'onBlur' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'onFocus' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'allowCustomValue' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EnhancedAutocompleteDropdown.tsx",
+      "doc": "docs/components/EnhancedAutocompleteDropdown.md",
+      "details": "Prop 'filterStrategy' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'id' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'label' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'value' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'options' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'placeholder' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'disabled' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'disabledMessage' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'error' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'tabIndex' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'targetTabIndex' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'onChange' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'onDropdownOpen' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'filterMode' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'testIdPrefix' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'className' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/EditableDropdown.tsx",
+      "doc": "docs/components/EditableDropdown.md",
+      "details": "Prop 'showLabel' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/FocusTrappedCheckboxGroup/example-usage.tsx",
+      "doc": "docs/components/example-usage.md",
+      "details": "Missing Props section in documentation",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/FocusTrappedCheckboxGroup/RangeHoursInput.tsx",
+      "doc": "docs/components/RangeHoursInput.md",
+      "details": "Prop 'value' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/ui/FocusTrappedCheckboxGroup/EnhancedFocusTrappedCheckboxGroup.tsx",
+      "doc": "docs/components/EnhancedFocusTrappedCheckboxGroup.md",
+      "details": "Documentation file not found: /home/runner/work/A4C-FrontEnd/A4C-FrontEnd/docs/components/EnhancedFocusTrappedCheckboxGroup.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationStatusIndicator.tsx",
+      "doc": "docs/components/MedicationStatusIndicator.md",
+      "details": "Prop 'isControlled' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationStatusIndicator.tsx",
+      "doc": "docs/components/MedicationStatusIndicator.md",
+      "details": "Prop 'isPsychotropic' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationStatusIndicator.tsx",
+      "doc": "docs/components/MedicationStatusIndicator.md",
+      "details": "Prop 'controlledSchedule' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationStatusIndicator.tsx",
+      "doc": "docs/components/MedicationStatusIndicator.md",
+      "details": "Prop 'psychotropicCategory' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationStatusIndicator.tsx",
+      "doc": "docs/components/MedicationStatusIndicator.md",
+      "details": "Prop 'isCheckingControlled' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationStatusIndicator.tsx",
+      "doc": "docs/components/MedicationStatusIndicator.md",
+      "details": "Prop 'isCheckingPsychotropic' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationStatusIndicator.tsx",
+      "doc": "docs/components/MedicationStatusIndicator.md",
+      "details": "Prop 'controlledCheckFailed' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationStatusIndicator.tsx",
+      "doc": "docs/components/MedicationStatusIndicator.md",
+      "details": "Prop 'psychotropicCheckFailed' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationStatusIndicator.tsx",
+      "doc": "docs/components/MedicationStatusIndicator.md",
+      "details": "Prop 'onControlledChange' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationStatusIndicator.tsx",
+      "doc": "docs/components/MedicationStatusIndicator.md",
+      "details": "Prop 'onPsychotropicChange' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationStatusIndicator.tsx",
+      "doc": "docs/components/MedicationStatusIndicator.md",
+      "details": "Prop 'controlledTabIndex' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationStatusIndicator.tsx",
+      "doc": "docs/components/MedicationStatusIndicator.md",
+      "details": "Prop 'psychotropicTabIndex' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationSearchModal.tsx",
+      "doc": "docs/components/MedicationSearchModal.md",
+      "details": "Documentation file not found: /home/runner/work/A4C-FrontEnd/A4C-FrontEnd/docs/components/MedicationSearchModal.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/medication/MedicationPurposeDropdown.tsx",
+      "doc": "docs/components/MedicationPurposeDropdown.md",
+      "details": "Documentation file not found: /home/runner/work/A4C-FrontEnd/A4C-FrontEnd/docs/components/MedicationPurposeDropdown.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/debug/MobXDebugger.tsx",
+      "doc": "docs/components/MobXDebugger.md",
+      "details": "Documentation file not found: /home/runner/work/A4C-FrontEnd/A4C-FrontEnd/docs/components/MobXDebugger.md",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/auth/OAuthProviders.tsx",
+      "doc": "docs/components/OAuthProviders.md",
+      "details": "Prop 'onSuccess' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Component Props",
+      "source": "components/auth/OAuthProviders.tsx",
+      "doc": "docs/components/OAuthProviders.md",
+      "details": "Prop 'onError' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/SpecialRestrictionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'displayCheckboxes' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/SpecialRestrictionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'hasSelectedItems' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/SpecialRestrictionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'selectedSpecialRestrictionIds' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/SpecialRestrictionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleFocusEntered' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/SpecialRestrictionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleFocusLost' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/SpecialRestrictionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'triggerSort' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/SpecialRestrictionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleCheckboxChange' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/SpecialRestrictionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleAdditionalDataChange' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/SpecialRestrictionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'markFieldTouched' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/SpecialRestrictionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'switch' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'isValidAmount' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'canSave' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'clearMedication' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setDosageForm' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setDosageRoute' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'updateDosageAmount' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setDosageUnit' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'updateInventoryQuantity' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setInventoryUnit' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setSelectedFrequencies' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setSelectedFoodConditions' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setSelectedSpecialRestrictions' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setStartDate' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setDiscontinueDate' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setPrescriberName' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setPharmacyName' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setPharmacyPhone' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setRxNumber' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setSelectedPurpose' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/MedicationManagementViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'save' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/FoodConditionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'displayCheckboxes' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/FoodConditionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'hasSelectedItems' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/FoodConditionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'selectedFoodConditionIds' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/FoodConditionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleFocusEntered' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/FoodConditionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleFocusLost' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/FoodConditionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'triggerSort' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/FoodConditionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleCheckboxChange' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/FoodConditionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleAdditionalDataChange' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/FoodConditionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'markFieldTouched' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/FoodConditionsViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'switch' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageTimingViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'displayCheckboxes' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageTimingViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'hasSelectedItems' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageTimingViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'selectedTimingIds' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageTimingViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleFocusEntered' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageTimingViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleFocusLost' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageTimingViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'triggerSort' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageTimingViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'setSelectedFrequencies' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageTimingViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleCheckboxChange' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageTimingViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleAdditionalDataChange' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageTimingViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'markFieldTouched' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageTimingViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'switch' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageFrequencyViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'displayCheckboxes' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageFrequencyViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'hasSelectedItems' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageFrequencyViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Computed property 'selectedFrequencyIds' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageFrequencyViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleFocusEntered' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageFrequencyViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleFocusLost' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageFrequencyViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'triggerSort' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageFrequencyViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleCheckboxChange' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageFrequencyViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'handleAdditionalDataChange' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageFrequencyViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'markFieldTouched' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/medication/DosageFrequencyViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'switch' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/client/ClientSelectionViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'loadClients' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "ViewModels",
+      "source": "viewModels/client/ClientSelectionViewModel.ts",
+      "doc": "docs/architecture/viewmodels.md",
+      "details": "Action 'clearSelection' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'CircuitState' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'RXNormDisplayNamesResponse' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'CacheStats' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'SearchOptions' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'CircuitBreakerConfig' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'HttpRequestConfig' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'CacheConfig' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'HealthStatus' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'ControlledStatus' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'PsychotropicStatus' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'RXNormRelationsResponse' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'RXNormClassResponse' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/medication-search.types.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'MedicationPurpose' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/dropdown.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'InteractionMode' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/dropdown.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'SelectionMethod' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Medication.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'MedicationFlags' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Medication.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'MedicationHistory' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Medication.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'DosageInfo' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'SolidDosageForm' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'LiquidDosageForm' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'TopicalDosageForm' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'InhalationDosageForm' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'InjectableDosageForm' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'RectalVaginalDosageForm' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'OphthalmicOticDosageForm' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'MiscellaneousDosageForm' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'DosageRoute' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'DosageUnit' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'DosageFormHierarchy' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'DosageRouteOption' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'DosageFormMap' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Dosage.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'DosageFormUnits' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Client.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'ContactInfo' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    },
+    {
+      "category": "Types and Interfaces",
+      "source": "types/models/Client.ts",
+      "doc": "docs/api/types.md",
+      "details": "Type 'Address' is not documented",
+      "suggestion": null,
+      "lineNumber": null,
+      "severity": "low"
+    }
+  ],
+  "suggestions": [
+    {
+      "message": "Consider running documentation generation for Component Props",
+      "files": [
+        "components/ui/dropdown-portal.tsx",
+        "components/ui/dropdown-portal.tsx",
+        "components/ui/MultiSelectDropdown.tsx"
+      ]
+    },
+    {
+      "message": "Consider running documentation generation for ViewModels",
+      "files": [
+        "viewModels/medication/SpecialRestrictionsViewModel.ts",
+        "viewModels/medication/SpecialRestrictionsViewModel.ts",
+        "viewModels/medication/SpecialRestrictionsViewModel.ts"
+      ]
+    },
+    {
+      "message": "Consider running documentation generation for Types and Interfaces",
+      "files": [
+        "types/medication-search.types.ts",
+        "types/medication-search.types.ts",
+        "types/medication-search.types.ts"
+      ]
+    },
+    {
+      "message": "Documentation is significantly out of sync. Consider a documentation sprint.",
+      "files": []
+    }
+  ],
+  "stats": {
+    "filesChecked": 45,
+    "alignmentScore": 0,
+    "componentsChecked": 24,
+    "apisChecked": 3,
+    "typesChecked": 6
+  },
+  "timestamp": "2025-09-22T01:26:11.783Z",
+  "prSummary": "### 🔍 Code-Documentation Alignment Details\n\n#### 📊 Summary\n- **Total Issues**: 161\n- **High Priority**: 0\n- **Medium Priority**: 0\n- **Low Priority**: 161\n- **Alignment Score**: 0%\n\n#### 💡 General Suggestions\n- Consider running documentation generation for Component Props\n- Consider running documentation generation for ViewModels\n- Consider running documentation generation for Types and Interfaces\n\n**📋 Next Steps**: Download the detailed alignment report artifact for complete file listings and fix suggestions."
+}
