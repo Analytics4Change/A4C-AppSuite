@@ -1,16 +1,24 @@
 tunnel: a4c-k3s-tunnel
-credentials-file: /etc/cloudflared/credentials.json
+credentials-file: /etc/cloudflared/c9fbbb48-792d-4ba1-86b7-c7a141c1eea6.json
 
 ingress:
-  # k8s API endpoint
+  
+  # SSH access - Requires cloudflared proxy for connections
+  - hostname: ssh.firstovertheline.com
+    service: ssh://192.168.122.1:22
+    originRequest:
+
+  # k8s API endpoint (FIXED - pointing to VM where k3s runs)
   - hostname: k8s.firstovertheline.com
     service: https://192.168.122.42:6443
     originRequest:
       noTLSVerify: true
   
-  # Application endpoint (your existing one)
+  # Public app - NO restrictions (EXISTING - unchanged)
   - hostname: a4c.firstovertheline.com
     service: http://192.168.122.42:80
+    originRequest:
+      httpHostHeader: a4c.firstovertheline.com
   
-  # Catch-all rule (required)
+  # Catch-all rule (EXISTING - unchanged)
   - service: http_status:404

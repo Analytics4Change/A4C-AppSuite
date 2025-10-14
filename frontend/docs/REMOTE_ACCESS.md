@@ -6,8 +6,129 @@ Secure SSH access to the A4C development environment via Cloudflare tunnels with
 
 This guide provides secure remote access to the development environment through:
 - **SSH access**: `ssh.firstovertheline.com` (port 22)
+- **K8s API access**: `k8s.firstovertheline.com` (kubectl via Cloudflare tunnel)
+- **Application access**: `a4c.firstovertheline.com` (public A4C medication management app)
 - **Security**: Cloudflare Zero Trust with `firstovertheline` team authentication
-- **No Impact**: Public application at `a4c.firstovertheline.com` remains unaffected
+
+## Recent Infrastructure Improvements (October 2025)
+
+### Problem Solved
+The infrastructure experienced a service outage due to a configuration mismatch and lack of resilience mechanisms:
+
+**Root Cause**: 
+- K3s Kubernetes cluster runs inside a VM (`k3s-server`) at `192.168.122.42:6443`
+- Cloudflare tunnel was incorrectly configured to point to `192.168.122.1:6443` (host)
+- VM was not set to autostart, requiring manual intervention after host reboots
+- No automated monitoring or recovery systems in place
+
+**Impact**: 
+- `a4c.firstovertheline.com` returned 502 Bad Gateway errors
+- `k8s.firstovertheline.com` was inaccessible for cluster management
+- `ssh.firstovertheline.com` worked (points to host SSH service)
+
+### Solutions Implemented
+
+#### 1. **Configuration Fix**
+- Updated `/etc/cloudflared/config.yml` to point K8s API endpoint to correct VM address
+- Changed from `https://192.168.122.1:6443` → `https://192.168.122.42:6443`
+- Restarted cloudflared service to apply changes
+
+#### 2. **Resilience Improvements**
+- **VM Autostart**: Enabled `virsh autostart k3s-server` - VM now starts automatically on host boot
+- **Hybrid kubectl Access**: Created dual-context kubeconfig:
+  ```bash
+  kubectl config use-context local   # Direct VM access (fast)
+  kubectl config use-context remote  # Cloudflare tunnel access (external)
+  ```
+
+#### 3. **Automated Monitoring & Recovery**
+- **Health Check Script**: `/usr/local/bin/k3s-health-check` monitors all services
+- **Auto-Recovery**: Automatically starts VMs and restarts failed services  
+- **Systemd Timer**: Health checks run every 5 minutes (`k3s-health-check.timer`)
+- **Logging**: Comprehensive logging to `/var/log/k3s-health-check.log`
+- **Alerting Framework**: Extensible alert system (`/usr/local/bin/k3s-alert`)
+
+#### 4. **Monitoring Scope**
+The health check system monitors:
+- **VM Status**: `k3s-server` virtual machine state
+- **K8s API**: Both local (`192.168.122.42:6443`) and remote (`k8s.firstovertheline.com`) endpoints
+- **Web Service**: Application availability at `a4c.firstovertheline.com`
+- **SSH Service**: Remote access via `ssh.firstovertheline.com` 
+- **Cloudflared Service**: Tunnel daemon health and connectivity
+
+### Benefits Achieved
+- **Zero Manual Intervention**: System recovers automatically from common failures
+- **Faster Development**: Local kubectl context provides direct, low-latency access
+- **External Accessibility**: Remote context enables external access via Cloudflare tunnels
+- **Proactive Monitoring**: Issues detected and resolved before users notice
+- **Production Readiness**: Resilient architecture suitable for production workloads
+
+### Architecture Summary
+```
+External Users → Cloudflare Tunnel → Host (192.168.122.1) → VM (192.168.122.42)
+├── ssh.firstovertheline.com → SSH service (port 22)
+├── k8s.firstovertheline.com → K3s API (port 6443) 
+└── a4c.firstovertheline.com → Web app (port 80)
+```
+
+**Lesson Learned**: Always implement autostart, monitoring, and recovery mechanisms for production-like environments to minimize downtime and operational overhead.
+
+## Remote SSH Access Update (October 2025)
+
+### Simplified Remote SSH Access
+
+**For remote machines outside the local network**, use the cloudflared proxy method:
+
+#### **Step 1: Install cloudflared on Remote Machine**
+
+**macOS:**
+```bash
+brew install cloudflare/cloudflare/cloudflared
+```
+
+**Ubuntu/Debian:**
+```bash
+curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i cloudflared.deb
+```
+
+**Windows:**
+Download from: https://github.com/cloudflare/cloudflared/releases
+
+#### **Step 2: Two-Command SSH Access**
+
+**Terminal 1 - Start SSH Proxy:**
+```bash
+cloudflared access tcp --hostname ssh.firstovertheline.com --listener 127.0.0.1:2222
+```
+
+**Terminal 2 - SSH Connection:**
+```bash
+ssh -p 2222 username@127.0.0.1
+```
+
+#### **Alternative: One-Command Method**
+```bash
+# Start proxy in background and connect
+cloudflared access tcp --hostname ssh.firstovertheline.com --listener 127.0.0.1:2222 &
+sleep 2
+ssh -p 2222 username@127.0.0.1
+```
+
+### Authentication Methods Available
+- **Password Authentication**: Enabled (MaxAuthTries=3)
+- **SSH Key Authentication**: Also supported
+- **Choose either method** during login prompt
+
+### Why This Method?
+- ✅ **No Zero Trust setup required** - works with current configuration
+- ✅ **Secure** - all traffic encrypted through Cloudflare tunnel
+- ✅ **Works from any network** - no VPN or special network setup needed
+- ✅ **One-time setup** - install cloudflared once per remote machine
+- ✅ **Proven reliable** - tested and verified approach
+
+### Technical Note
+Direct SSH to `ssh.firstovertheline.com` is not possible due to Cloudflare tunnel limitations. The cloudflared proxy method is the standard approach for SSH access through Cloudflare tunnels.
 
 ## Prerequisites
 
