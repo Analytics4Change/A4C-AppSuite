@@ -100,7 +100,7 @@ SELECT
   )
 FROM permissions_projection
 WHERE name != 'provider.impersonate'  -- Exclude super admin-only permission
-  AND scope_type IN ('org', 'facility', 'program', 'client')  -- Only org-scoped permissions
+  AND scope_type IN ('org', 'unit', 'client')  -- Only org-scoped permissions (unit = provider-defined organizational unit)
 ORDER BY name;
 ```
 
@@ -206,11 +206,30 @@ SELECT user_has_permission(
 -- Expected: FALSE
 
 -- Test provider admin has medication.create permission in their org
+-- Example 1: Detention Center (complex hierarchy)
 SELECT user_has_permission(
   '<PROVIDER_ADMIN_UUID>'::UUID,
   'medication.create',
-  'their_org_id',
-  'org_their_org_id'::LTREE
+  'youth_detention_org_id',
+  'org_youth_detention_services.main_facility.behavioral_health_wing.crisis_stabilization'::LTREE
+);
+-- Expected: TRUE (if user is scoped to this unit or parent)
+
+-- Example 2: Group Home Provider (simple flat hierarchy)
+SELECT user_has_permission(
+  '<PROVIDER_ADMIN_UUID>'::UUID,
+  'medication.create',
+  'homes_inc_org_id',
+  'org_homes_inc.home_3'::LTREE
+);
+-- Expected: TRUE
+
+-- Example 3: Treatment Center (campus-based hierarchy)
+SELECT user_has_permission(
+  '<PROVIDER_ADMIN_UUID>'::UUID,
+  'medication.create',
+  'healing_horizons_org_id',
+  'org_healing_horizons.south_campus.residential_unit_c'::LTREE
 );
 -- Expected: TRUE
 ```
@@ -416,20 +435,42 @@ USING (
 - [ ] Provider admin cannot impersonate users
 - [ ] Permission checks work for all CRUD operations
 - [ ] Cross-tenant grants work correctly
-- [ ] Hierarchical scoping works (facility/program level)
+- [ ] Hierarchical scoping works with provider-defined units (various structures: facility/program, campus/unit, home, pod/wing)
 - [ ] Revoked permissions are enforced immediately
 - [ ] Expired access grants are denied
 
 ### Performance Testing
 
 ```sql
--- Test permission check performance
+-- Test permission check performance with various provider hierarchies
+
+-- Example 1: Simple flat hierarchy (2 levels)
 EXPLAIN ANALYZE
 SELECT user_has_permission(
   '<USER_UUID>'::UUID,
   'medication.create',
-  'acme_healthcare_001',
-  'org_acme_healthcare_001.facility_456'::LTREE
+  'homes_inc_org_id',
+  'org_homes_inc.home_2'::LTREE
+);
+-- Target: < 10ms
+
+-- Example 2: Complex deep hierarchy (5 levels)
+EXPLAIN ANALYZE
+SELECT user_has_permission(
+  '<USER_UUID>'::UUID,
+  'medication.create',
+  'youth_detention_org_id',
+  'org_youth_detention_services.main_facility.general_population.pod_b'::LTREE
+);
+-- Target: < 10ms (ltree indexes should maintain performance regardless of depth)
+
+-- Example 3: Campus-based hierarchy (4 levels)
+EXPLAIN ANALYZE
+SELECT user_has_permission(
+  '<USER_UUID>'::UUID,
+  'client.view',
+  'healing_horizons_org_id',
+  'org_healing_horizons.north_campus.residential_unit_a'::LTREE
 );
 -- Target: < 10ms
 ```
@@ -573,13 +614,15 @@ REINDEX TABLE role_permissions_projection;
 
 ### C. Common Permission Patterns
 
-| Use Case | Permission | Scope |
-|----------|------------|-------|
-| Create medication | `medication.create` | org |
-| View client records | `client.view` | org/facility |
-| Impersonate user | `provider.impersonate` | global |
-| Grant cross-tenant access | `access_grant.create` | org |
-| Export audit logs | `audit.export` | org |
+| Use Case | Permission | Scope | Notes |
+|----------|------------|-------|-------|
+| Create medication | `medication.create` | org/unit | Unit can be: facility, campus, home, wing, pod, etc. (provider-defined) |
+| View client records | `client.view` | org/unit | Hierarchical scoping via ltree path |
+| Impersonate user | `provider.impersonate` | global | Super admin only |
+| Grant cross-tenant access | `access_grant.create` | org | Provider admin can grant access to their org data |
+| Export audit logs | `audit.export` | org | Full org scope or scoped to specific unit |
+
+**Note**: Scope values are semantic labels. Actual scoping uses ltree paths with provider-defined hierarchies.
 
 ---
 

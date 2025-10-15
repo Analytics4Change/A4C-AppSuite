@@ -67,30 +67,74 @@ Sub-providers (e.g., group homes within a larger organization) will be implement
 
 ## Organizational Hierarchy
 
+### CRITICAL ARCHITECTURAL PRINCIPLE
+
+**All Provider organizations exist at the root level in Zitadel.** VAR (Value-Added Reseller) relationships with Providers are tracked as **business metadata** in the `var_partnerships_projection` table, NOT as hierarchical ownership in Zitadel.
+
+**Rationale**: VAR contract expiration cannot trigger Zitadel organization restructuring or ltree path changes. Provider organizational structure must remain stable regardless of business relationships.
+
+### Platform-Wide Zitadel Organization Structure (Flat Model)
+
 ```
-Analytics4Change (Zitadel Org) - Internal A4C Organization
-├── Super Admin (role) - Can manage all providers
-├── Provider Admin (role) - Can create/manage providers
-├── Support roles - Created by Super Admin for impersonation
-└── Internal A4C users
-
-A4C Partner (Zitadel Org) - Value Added Reseller/Partner
-├── Administrator (static role)
-├── Partner-specific roles
-└── Gets cross-org grants to view their referred providers
-
-Provider A (Zitadel Org) - Healthcare Provider Organization
-├── Administrator (static role - top-level admin for entire provider)
-├── Custom roles (defined by Administrator)
-├── Sub-Provider: Group Home 1
-├── Sub-Provider: Group Home 2
-└── Sub-Provider: Residential Facility
-
-A4C-Demo (Zitadel Org) - Demo/Development Provider
-├── Administrator (for testing)
-├── Demo data for sales/development
-└── Safe impersonation testing environment
+Zitadel Instance: analytics4change-zdswvg.us1.zitadel.cloud
+│
+├── Analytics4Change (Zitadel Org) - Internal A4C Organization
+│   ├── Super Admin (role) - Can manage all providers
+│   ├── Provider Admin (role) - Can create/manage providers
+│   ├── Support roles - Created by Super Admin for impersonation
+│   └── Internal A4C users
+│
+├── VAR Partner XYZ (Zitadel Org) - Value Added Reseller/Partner
+│   ├── Administrator (static role)
+│   ├── Partner-specific roles
+│   └── Access: Via cross_tenant_access_grants (NOT hierarchical ownership)
+│       └── Partnership metadata in var_partnerships_projection table
+│
+├── Provider A (Zitadel Org) - Healthcare Provider Organization
+│   ├── Administrator (static role - top-level admin for entire provider)
+│   ├── Custom roles (defined by Administrator)
+│   ├── Sub-Provider: Group Home 1 (database record, not separate Zitadel org)
+│   ├── Sub-Provider: Group Home 2 (database record, not separate Zitadel org)
+│   └── Sub-Provider: Residential Facility (database record, not separate Zitadel org)
+│   └── Note: May be associated with VAR via var_partnerships_projection
+│
+├── Provider B (Zitadel Org) - Direct Customer (No VAR)
+│   ├── Administrator
+│   ├── Custom roles
+│   └── Sub-Providers (database records)
+│
+├── A4C-Demo (Zitadel Org) - Demo/Development Provider
+│   ├── Administrator (for testing)
+│   ├── Demo data for sales/development
+│   └── Safe impersonation testing environment
+│
+└── A4C-Families (Zitadel Org) - Shared Family Access
+    └── Family members accessing client data via grants
 ```
+
+### VAR Partnership Model (Event-Sourced Metadata)
+
+**NOT in Zitadel hierarchy** - tracked in PostgreSQL:
+
+```sql
+-- CQRS projection table (never updated directly)
+CREATE TABLE var_partnerships_projection (
+  id UUID PRIMARY KEY,
+  var_org_id UUID NOT NULL,        -- VAR Partner XYZ's org UUID
+  provider_org_id UUID NOT NULL,   -- Provider A's org UUID
+  contract_start_date DATE NOT NULL,
+  contract_end_date DATE,          -- NULL = ongoing
+  status TEXT CHECK (status IN ('active', 'expired', 'terminated')),
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+```
+
+**Access Model**:
+- VAR gets cross-tenant access grants to Provider data
+- Grants reference partnership for authorization basis
+- Partnership expiration automatically revokes grants (event-driven)
+- Provider Zitadel org remains unchanged when VAR relationship ends
 
 ## User Roles and Access Patterns
 
@@ -102,15 +146,30 @@ A4C-Demo (Zitadel Org) - Demo/Development Provider
 - **Administrator**: Top-level role within each provider, manages all sub-providers and defines custom roles
 - **Custom Roles**: Defined by each provider's Administrator based on their needs
 
-### A4C Partner Roles:
-- **Administrator**: Manages partner organization
-- **Viewer**: Read-only access to referred providers list
+### VAR Partner Roles:
+- **VAR Administrator**: Manages VAR organization
+- **VAR Consultant**: Access to Provider data based on grants
 
 ### Key Access Rules:
 - Users can belong to multiple sub-providers within the same provider organization
 - Users CANNOT belong to multiple provider organizations (would require separate logins)
-- Cross-organization access only via Zitadel Project Grants for special cases
-- A4C Partners get read-only visibility to their referred providers by default
+- Cross-organization access via `cross_tenant_access_grants_projection` table (event-sourced)
+- VAR Partners access Provider data through grants (NOT hierarchical ownership):
+  - Grants created when partnership is active
+  - Grants reference `var_partnerships_projection` for authorization basis
+  - Grants automatically revoked when partnership expires (event-driven)
+  - Provider org structure unchanged when VAR relationship ends
+
+### VAR Access Lifecycle:
+1. **Partnership Created**: `var_partnership.created` event → partnership record in projection
+2. **Grant Issued**: Super Admin creates cross-tenant grant for VAR
+   - Event: `access_grant.created`
+   - Authorization type: `var_contract`
+   - Legal reference: partnership UUID
+3. **VAR Accesses Data**: RLS policies check grant validity + partnership status
+4. **Contract Expires**: Background job detects expiration → `var_partnership.expired` event
+5. **Automatic Revocation**: Event processor emits `access_grant.revoked` events
+6. **Access Denied**: RLS policies now exclude VAR (grant revoked)
 
 ## Provider Information Requirements
 

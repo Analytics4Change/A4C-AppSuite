@@ -53,12 +53,26 @@ This document specifies the user interface and user experience for Super Admin i
 
 **Purpose:** Display impersonation details and controls
 
+**Organizational Context:**
+- Displays target user's organization (root-level Provider or VAR Partner org)
+- For Provider internal hierarchy, optionally shows user's scoped unit path
+- All Providers exist at root level in Zitadel (flat structure)
+- VAR Partner orgs also at root level (NOT hierarchical parent of Providers)
+
 **Layout:**
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │ ⚠️  Impersonating: John Doe (Sunshine Youth Services)            │
 │     Session expires in: 14:32  [Renewals: 1]  [End Session]      │
 └──────────────────────────────────────────────────────────────────┘
+```
+
+**Layout with Provider Internal Hierarchy (Optional):**
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ⚠️  Impersonating: Jane Smith (Healing Horizons > South Campus > Unit C) │
+│     Session expires in: 14:32  [Renewals: 1]  [End Session]              │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Component Structure:**
@@ -253,20 +267,35 @@ During:  "[IMPERSONATING] Medication Management | A4C Platform"
 **Steps:**
 
 1. **User Selection Dialog**
+
+**Organizational Context:**
+- All organizations listed at root level (flat structure)
+- Provider organizations (healthcare providers)
+- VAR Partner organizations (Value-Added Resellers)
+- Each organization type displayed with icon/label for clarity
+
 ```tsx
 <Dialog title="Start Impersonation Session">
   <Form onSubmit={handleStartImpersonation}>
     {/* Organization Selection */}
     <FormField label="Organization">
       <Select
-        options={organizations}
+        options={organizations} // Includes Providers + VAR Partners (all root level)
         value={selectedOrg}
         onChange={setSelectedOrg}
-        placeholder="Select Provider organization..."
+        placeholder="Select organization..."
+        renderOption={(org) => (
+          <div className="org-option">
+            <Badge variant={org.type === 'provider' ? 'primary' : 'secondary'}>
+              {org.type === 'provider' ? 'Provider' : 'VAR Partner'}
+            </Badge>
+            <span>{org.name}</span>
+          </div>
+        )}
       />
     </FormField>
 
-    {/* User Selection */}
+    {/* User Selection (with optional scope path) */}
     <FormField label="User to Impersonate">
       <Select
         options={usersInOrg}
@@ -274,6 +303,16 @@ During:  "[IMPERSONATING] Medication Management | A4C Platform"
         onChange={setSelectedUser}
         placeholder="Select user..."
         disabled={!selectedOrg}
+        renderOption={(user) => (
+          <div className="user-option">
+            <span>{user.name} ({user.email})</span>
+            {user.scopePath && (
+              <span className="user-scope-path">
+                Scope: {formatScopePath(user.scopePath)}
+              </span>
+            )}
+          </div>
+        )}
       />
     </FormField>
 
@@ -724,10 +763,20 @@ export function ImpersonationLayout({ children }) {
 
 ## Related Documents
 
-- `.plans/impersonation/architecture.md` - Overall architecture
-- `.plans/impersonation/event-schema.md` - Event definitions
+### Impersonation Specification
+- `.plans/impersonation/architecture.md` - Overall architecture (includes VAR Partner context)
+- `.plans/impersonation/event-schema.md` - Event definitions (includes VAR cross-tenant examples)
+- `.plans/impersonation/implementation-guide.md` - Implementation steps (includes Phase 4.5 VAR support)
 - `.plans/impersonation/security-controls.md` - Security measures
+
+### Platform Architecture
+- `.plans/consolidated/agent-observations.md` - Overall architecture (hierarchy model, VAR partnerships)
+- `.plans/auth-integration/tenants-as-organization-thoughts.md` - Organizational structure (flat Provider model)
+- `.plans/multi-tenancy/multi-tenancy-organization.html` - Multi-tenancy specification (VAR partnerships as metadata)
+
+### Development Guidelines
 - `frontend/CLAUDE.md` - Component development guidelines
+- `.plans/event-resilience/plan.md` - Event handling during network failures
 
 ---
 

@@ -343,15 +343,53 @@ interface HealthStatus {
 
 **Critical:** Session timeout still enforced client-side even if network offline.
 
-### Scenario 7: Cross-Tenant Access During Network Failure
-**Trigger**: Provider Partner user attempts to access Provider data while offline
+### Scenario 7: VAR Partner Cross-Tenant Access During Network Failure
+**Trigger**: VAR Partner (Value-Added Reseller) user attempts to access Provider data while offline
+
+**Organizational Context:**
+- All Provider organizations exist at root level in Zitadel (flat structure)
+- VAR Partner organizations also exist at root level (NOT hierarchical parent of Providers)
+- VAR partnerships tracked in `var_partnerships_projection` table (event-sourced metadata)
+- Cross-tenant access via `cross_tenant_access_grants_projection` (NOT Zitadel hierarchy)
+
 **Behavior**:
 1. Access MUST be blocked if audit event cannot be written synchronously
-2. User sees: "Network required for compliance audit logging"
+2. User sees: "Network required for compliance audit logging. Cross-tenant access requires real-time disclosure tracking."
 3. No IndexedDB queue for cross-tenant audit (prevents data exposure if device stolen)
 4. Rationale: HIPAA requires disclosure tracking before data access
+5. VAR partnership metadata validation requires online connection:
+   - Check `var_partnerships_projection.status = 'active'`
+   - Validate `contract_end_date` has not expired
+   - Verify `cross_tenant_access_grants_projection.revoked_at IS NULL`
 
-**Security Note:** Cross-tenant audit events contain sensitive metadata (who accessed which org) and must not be persisted in client-accessible storage.
+**Security Note:** Cross-tenant audit events contain sensitive metadata (who accessed which org, partnership status, grant IDs) and must not be persisted in client-accessible storage.
+
+**Enhanced Cross-Tenant Event Metadata:**
+```typescript
+{
+  eventType: 'client.viewed',
+  streamId: 'client_uuid',
+  streamType: 'client',
+  metadata: {
+    userId: 'var_consultant_uuid',
+    orgId: 'provider_org_uuid',  // Cross-tenant access (not consultant's org)
+    crossTenantAccess: {
+      consultantOrgId: 'var_partner_org_uuid',  // VAR Partner org (root level)
+      grantId: 'grant_uuid',
+      authorizationType: 'var_contract',
+      partnershipId: 'partnership_uuid',  // Reference to var_partnerships_projection
+      partnershipStatus: 'active',  // Validated at access time
+      contractEndDate: '2026-12-31'  // For audit purposes
+    },
+    timestamp: '2025-10-09T...'
+  }
+}
+```
+
+**Related Architecture:**
+- `.plans/consolidated/agent-observations.md` - Hierarchy model, VAR partnerships
+- `.plans/auth-integration/tenants-as-organization-thoughts.md` - Flat Provider structure
+- `.plans/multi-tenancy/multi-tenancy-organization.html` - VAR partnerships as metadata
 
 ## Testing Strategy
 
@@ -454,8 +492,16 @@ If critical issues arise:
 
 ### B. Related Documents
 
+#### Platform Architecture
+- `.plans/consolidated/agent-observations.md` - Overall architecture (hierarchy model, VAR partnerships)
+- `.plans/auth-integration/tenants-as-organization-thoughts.md` - Organizational structure (flat Provider model)
+- `.plans/multi-tenancy/multi-tenancy-organization.html` - Multi-tenancy specification (VAR partnerships as metadata)
+
+#### Event-Driven Architecture
 - `/docs/EVENT-DRIVEN-GUIDE.md` - Event-driven architecture guide
 - `/docs/MIGRATION-FROM-CRUD.md` - Migration from CRUD to events
+- `.plans/impersonation/event-schema.md` - Impersonation event schemas (includes VAR context)
+- `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - CQRS foundation
 
 ### C. Code Examples
 

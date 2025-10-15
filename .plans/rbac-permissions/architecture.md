@@ -110,7 +110,9 @@ Each permission includes:
 - **name**: Full permission identifier (e.g., "medication.create")
 - **description**: Human-readable explanation
 - **requires_mfa**: Boolean flag for sensitive operations
-- **scope_type**: `'global' | 'org' | 'facility' | 'program' | 'client'` - Defines hierarchical scope
+- **scope_type**: `'global' | 'org' | 'unit' | 'client'` - **Semantic tag** for permission scope (NOT enforced hierarchy levels)
+
+**IMPORTANT**: `scope_type` values are semantic labels, not enforced organizational structure. Providers define their own hierarchies (`facility`, `program`, `campus`, `home`, `pod`, etc.), and permissions use flexible `scope_path` (ltree) for actual scoping.
 
 ---
 
@@ -416,7 +418,7 @@ CREATE TABLE permissions_projection (
   action TEXT NOT NULL,
   name TEXT GENERATED ALWAYS AS (applet || '.' || action) STORED,
   description TEXT NOT NULL,
-  scope_type TEXT NOT NULL CHECK (scope_type IN ('global', 'org', 'facility', 'program', 'client')),
+  scope_type TEXT NOT NULL CHECK (scope_type IN ('global', 'org', 'unit', 'client')),  -- Semantic tags, not enforced levels
   requires_mfa BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -425,6 +427,11 @@ CREATE TABLE permissions_projection (
 
 CREATE INDEX idx_permissions_applet ON permissions_projection(applet);
 CREATE INDEX idx_permissions_name ON permissions_projection(name);
+
+COMMENT ON COLUMN permissions_projection.scope_type IS
+  'Semantic label for permission scope. Values are flexible tags (not enforced hierarchy levels).
+   Providers define their own organizational structure (facility/campus/home/pod/wing/etc).
+   Actual scoping uses ltree paths in user_roles_projection.scope_path.';
 ```
 
 ### Roles Projection
@@ -522,16 +529,36 @@ END;
 $$ LANGUAGE plpgsql STABLE;
 ```
 
-**Usage Example**:
+**Usage Examples (Provider-Defined Hierarchies)**:
+
 ```sql
--- Check if user can create medications in a specific organization
+-- Check if user can create medications in a specific organizational unit
+-- Example 1: Detention Center (complex hierarchy)
 SELECT user_has_permission(
   'user-uuid',
   'medication.create',
-  'acme_healthcare_001',
-  'org_acme_healthcare_001.facility_456'::LTREE
+  'youth_detention_services_org_id',
+  'org_youth_detention_services.main_facility.behavioral_health_wing'::LTREE
+);
+
+-- Example 2: Group Home Provider (simple flat hierarchy)
+SELECT user_has_permission(
+  'user-uuid',
+  'medication.create',
+  'homes_inc_org_id',
+  'org_homes_inc.home_2'::LTREE
+);
+
+-- Example 3: Treatment Center (campus-based hierarchy)
+SELECT user_has_permission(
+  'user-uuid',
+  'medication.create',
+  'healing_horizons_org_id',
+  'org_healing_horizons.north_campus.residential_unit_a'::LTREE
 );
 ```
+
+**Note**: Each Provider defines their own organizational structure. The permission system uses ltree paths for scoping, NOT prescribed hierarchy levels.
 
 ### Row-Level Security with Permissions
 

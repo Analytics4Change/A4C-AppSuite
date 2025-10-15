@@ -518,6 +518,39 @@ interface ImpersonationJustification {
 
 **Capability:** Super Admin can impersonate users in **any** Provider organization
 
+### Organizational Hierarchy Context
+
+**CRITICAL ARCHITECTURAL PRINCIPLE:**
+All Provider organizations exist at the **root level** in Zitadel (flat structure). VAR (Value-Added Reseller) relationships with Providers are tracked as **business metadata** in the `var_partnerships_projection` table, NOT as hierarchical ownership in Zitadel.
+
+**Hierarchy Model Reference:**
+```
+Zitadel Instance: analytics4change-zdswvg.us1.zitadel.cloud
+│
+├── Analytics4Change (Zitadel Org) - Internal A4C Organization
+│   └── Super Admin (role) - Can impersonate any user across all orgs
+│
+├── VAR Partner XYZ (Zitadel Org) - Value Added Reseller/Partner
+│   ├── Administrator (role)
+│   └── Access: Via cross_tenant_access_grants (NOT hierarchical ownership)
+│       └── Partnership metadata in var_partnerships_projection table
+│
+├── Provider A (Zitadel Org) - Healthcare Provider Organization
+│   ├── Administrator (role)
+│   └── Provider-defined internal hierarchy (flexible structure)
+│       └── Example: facility → wing → pod
+│       └── Example: home_1, home_2, home_3 (flat)
+│       └── Example: campus → residential_unit → clinic
+│
+└── Provider B (Zitadel Org) - Direct Customer (No VAR)
+    └── Provider-defined internal hierarchy
+```
+
+For complete hierarchy model details, see:
+- `.plans/consolidated/agent-observations.md` (Hierarchy Model section)
+- `.plans/auth-integration/tenants-as-organization-thoughts.md` (Organizational Hierarchy section)
+- `.plans/multi-tenancy/multi-tenancy-organization.html` (Section 7.1)
+
 ### Security Considerations
 
 **Risk:** Super Admin could access Provider data without legitimate need
@@ -528,19 +561,82 @@ interface ImpersonationJustification {
 3. **Provider Notification (Post-Launch):** Email Provider Admin when Super Admin accesses their org
 4. **Anomaly Detection (Future):** Alert on unusual patterns (same admin accessing many orgs rapidly)
 
-### Provider Partner Impersonation
+### VAR Partner Impersonation
 
-**Use Case:** Super Admin needs to verify VAR dashboard shows correct data
+**Use Case:** Super Admin needs to verify VAR Partner dashboard shows correct data
 
 **Implementation:**
-- Impersonate VAR user in Provider Partner org
-- View scoped dashboards (only their referred Providers)
+- Impersonate VAR user in VAR Partner org (root-level Zitadel org)
+- View scoped dashboards (only Providers with active partnerships)
 - Verify cross-tenant access grants functioning correctly
+- Test VAR access to Provider data via metadata-based grants
 
 **Special Handling:**
-- VAR dashboards aggregate data from multiple Providers
+- VAR dashboards aggregate data from multiple Providers (via `cross_tenant_access_grants_projection`)
+- Partnership status checked via `var_partnerships_projection` (event-sourced metadata)
 - Impersonation audit must log which Provider data was viewed
 - Enhanced metadata: `accessedProviderOrgs: ['org-1', 'org-2']`
+
+**VAR Access Model:**
+```typescript
+// VAR access is NOT hierarchical - it's metadata-based
+interface VARAccess {
+  // VAR org is root-level (NOT parent of Provider)
+  varOrgId: UUID;
+
+  // Partnership tracked in projection table (event-sourced)
+  partnerships: VARPartnership[];  // From var_partnerships_projection
+
+  // Access via grants (NOT Zitadel hierarchy)
+  grants: CrossTenantGrant[];  // From cross_tenant_access_grants_projection
+
+  // Provider orgs remain at root level
+  providerOrgIds: UUID[];  // All root-level orgs
+}
+```
+
+### Provider Internal Hierarchy Impersonation
+
+**Use Case:** Super Admin troubleshoots permission issue in Provider's organizational structure
+
+**Implementation:**
+- Impersonate user scoped to specific unit within Provider
+- Provider defines their own hierarchy (no prescribed structure)
+- Examples of diverse Provider hierarchies:
+  - **Group Home Provider:** `org_homes_inc.home_3` (flat, 2 levels)
+  - **Detention Center:** `org_youth_detention.main_facility.behavioral_health_wing.crisis_stabilization` (deep, 5 levels)
+  - **Treatment Center:** `org_healing_horizons.south_campus.residential_unit_c.art_therapy` (medium, 4 levels)
+
+**Impersonation Context:**
+```typescript
+{
+  sessionId: 'session-uuid',
+  targetUserId: 'user-uuid',
+  targetOrgId: 'org_healing_horizons',  // Root Provider org
+  targetOrgPath: 'org_healing_horizons.south_campus.residential_unit_c',  // User's scope
+  originalUserId: 'super-admin-uuid',
+  justification: {
+    reason: 'support_ticket',
+    referenceId: 'TICKET-8901',
+    notes: 'User cannot view clients in Residential Unit C'
+  }
+}
+```
+
+**Audit Trail:**
+```sql
+-- Query impersonation sessions scoped to specific Provider units
+SELECT
+  ips.*,
+  o.org_name,
+  ips.target_scope_path,
+  nlevel(ips.target_scope_path) AS hierarchy_depth
+FROM impersonation_sessions_projection ips
+JOIN organizations o ON ips.target_org_id = o.id
+WHERE ips.target_org_id = :provider_org_id
+  AND ips.target_scope_path <@ 'org_healing_horizons.south_campus'::LTREE
+ORDER BY ips.started_at DESC;
+```
 
 ---
 
@@ -628,9 +724,10 @@ interface ImpersonationJustification {
 - `.plans/impersonation/ui-specification.md` - Visual indicators and UX flows
 - `.plans/impersonation/security-controls.md` - Comprehensive security measures
 - `.plans/impersonation/implementation-guide.md` - Step-by-step implementation guide
-- `.plans/consolidated/agent-observations.md` - Overall architecture context
+- `.plans/consolidated/agent-observations.md` - Overall architecture context (includes hierarchy model)
 - `.plans/rbac-permissions/architecture.md` - RBAC system (includes provider.impersonate permission)
-- `.plans/auth-integration/tenants-as-organization-thoughts.md` - Authentication foundation
+- `.plans/auth-integration/tenants-as-organization-thoughts.md` - Authentication foundation (flat Provider structure)
+- `.plans/multi-tenancy/multi-tenancy-organization.html` - Multi-tenancy specification (VAR partnerships as metadata)
 
 ### Infrastructure Files
 - `/infrastructure/supabase/contracts/asyncapi/domains/impersonation.yaml` - AsyncAPI event schemas

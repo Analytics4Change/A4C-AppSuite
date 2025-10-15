@@ -96,7 +96,7 @@ interface ImpersonationStartedEvent {
 }
 ```
 
-### Example
+### Example: Provider User Impersonation
 
 ```json
 {
@@ -139,6 +139,60 @@ interface ImpersonationStartedEvent {
   },
   "timestamp": "2025-10-09T15:00:00Z",
   "reason": "Super Admin started impersonation session for support ticket TICKET-7890"
+}
+```
+
+### Example: VAR Partner User Impersonation
+
+**Organizational Context:**
+- All Provider organizations exist at root level in Zitadel (flat structure)
+- VAR Partner organizations also exist at root level (NOT hierarchical parent of Providers)
+- VAR partnerships tracked in `var_partnerships_projection` table (event-sourced metadata)
+- VAR access to Provider data via `cross_tenant_access_grants_projection` (NOT Zitadel hierarchy)
+
+**Use Case:** Super Admin verifying VAR Partner dashboard shows correct Provider data
+
+```json
+{
+  "id": "evt_8a6b2c4d-0e1f-3a5b-7c8d-9e0f1a2b3c4d",
+  "streamId": "user_super_admin_123",
+  "streamType": "impersonation",
+  "eventType": "impersonation.started",
+  "data": {
+    "sessionId": "session_var_xyz456",
+    "superAdmin": {
+      "userId": "user_super_admin_123",
+      "email": "admin@a4c.com",
+      "name": "Alice Admin",
+      "orgId": "org_a4c_platform"
+    },
+    "target": {
+      "userId": "user_var_consultant_789",
+      "email": "consultant@var-partner-xyz.com",
+      "name": "Bob Consultant",
+      "orgId": "org_var_partner_xyz",
+      "orgName": "VAR Partner XYZ",
+      "orgType": "provider_partner"
+    },
+    "justification": {
+      "reason": "audit",
+      "referenceId": "AUDIT-2025-Q4-001",
+      "notes": "Verifying VAR dashboard displays correct cross-tenant Provider data and partnership metadata"
+    },
+    "sessionConfig": {
+      "duration": 1800000,
+      "expiresAt": "2025-10-09T17:00:00Z"
+    },
+    "ipAddress": "192.168.1.100",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
+  },
+  "metadata": {
+    "userId": "user_super_admin_123",
+    "orgId": "org_a4c_platform",
+    "timestamp": "2025-10-09T16:30:00Z"
+  },
+  "timestamp": "2025-10-09T16:30:00Z",
+  "reason": "Super Admin started impersonation session to verify VAR Partner dashboard"
 }
 ```
 
@@ -660,6 +714,99 @@ SELECT * FROM get_org_impersonation_audit(
 );
 ```
 
+### VAR Partner Cross-Tenant Access Report
+
+**Use Case:** Track Super Admin impersonation of VAR Partner users to verify cross-tenant access
+
+**VAR Partnership Context:**
+- VAR Partner orgs are root-level (NOT hierarchical parent of Providers)
+- Partnership metadata in `var_partnerships_projection` table
+- Cross-tenant access via `cross_tenant_access_grants_projection` table
+- During impersonation, Super Admin sees VAR dashboard aggregating multiple Provider data
+
+**Query VAR Partner Impersonation Sessions:**
+```sql
+-- All Super Admin impersonation of VAR Partner users
+SELECT
+  ips.started_at,
+  ips.super_admin_email,
+  ips.target_email as var_consultant,
+  ips.target_org_name as var_partner_org,
+  ips.justification_reason,
+  ips.justification_reference_id,
+  ips.total_duration_ms,
+  ips.actions_performed,
+  -- Count active partnerships for this VAR at time of impersonation
+  (SELECT COUNT(*)
+   FROM var_partnerships_projection vp
+   WHERE vp.var_org_id = ips.target_org_id
+     AND vp.status = 'active'
+     AND vp.contract_start_date <= ips.started_at
+     AND (vp.contract_end_date IS NULL OR vp.contract_end_date >= ips.started_at)
+  ) AS active_partnerships_count,
+  -- Count active cross-tenant grants at time of impersonation
+  (SELECT COUNT(*)
+   FROM cross_tenant_access_grants_projection ctag
+   WHERE ctag.consultant_org_id = ips.target_org_id
+     AND ctag.authorization_type = 'var_contract'
+     AND ctag.revoked_at IS NULL
+     AND ctag.granted_at <= ips.started_at
+  ) AS active_grants_count
+FROM impersonation_sessions_projection ips
+JOIN organizations o ON ips.target_org_id = o.id
+WHERE o.org_type = 'provider_partner'
+  AND ips.started_at BETWEEN :start_date AND :end_date
+ORDER BY ips.started_at DESC;
+```
+
+**Query Provider Data Accessed During VAR Impersonation:**
+```sql
+-- Find which Provider orgs' data was accessed during VAR Partner impersonation
+-- (By analyzing events emitted during impersonation session)
+SELECT DISTINCT
+  ips.session_id,
+  ips.started_at,
+  ips.target_org_name AS var_partner_org,
+  de.stream_type,
+  de.event_type,
+  de.event_metadata->>'orgId' AS accessed_provider_org_id,
+  o.org_name AS accessed_provider_org_name,
+  COUNT(*) OVER (PARTITION BY ips.session_id, de.event_metadata->>'orgId') AS access_count
+FROM impersonation_sessions_projection ips
+JOIN domain_events de ON de.event_metadata->>'impersonation_session_id' = ips.session_id::text
+LEFT JOIN organizations o ON o.id::text = de.event_metadata->>'orgId'
+WHERE ips.session_id = :session_id
+  AND de.event_type NOT LIKE 'impersonation.%'  -- Exclude lifecycle events
+  AND de.event_metadata->>'orgId' IS NOT NULL
+  AND de.event_metadata->>'orgId' != ips.target_org_id::text  -- Cross-tenant access
+ORDER BY de.created_at;
+```
+
+**Enhanced Metadata for VAR Impersonation:**
+
+During VAR Partner user impersonation, when Super Admin views Provider data via cross-tenant access, events include:
+
+```json
+{
+  "eventType": "client.viewed",
+  "streamId": "client_12345",
+  "streamType": "client",
+  "metadata": {
+    "userId": "user_var_consultant_789",
+    "orgId": "org_sunshine_youth_001",  // Provider org (cross-tenant)
+    "impersonatedBy": "user_super_admin_123",
+    "impersonationSessionId": "session_var_xyz456",
+    "crossTenantAccess": {
+      "consultantOrgId": "org_var_partner_xyz",  // VAR org
+      "grantId": "grant_uuid",
+      "authorizationType": "var_contract",
+      "partnershipId": "partnership_uuid"
+    },
+    "timestamp": "2025-10-09T16:35:00Z"
+  }
+}
+```
+
 ---
 
 ## Compliance Retention
@@ -679,11 +826,14 @@ SELECT * FROM get_org_impersonation_audit(
 ## Related Documents
 
 ### Planning Documents
-- `.plans/impersonation/architecture.md` - Overall architecture (includes CQRS details)
+- `.plans/impersonation/architecture.md` - Overall architecture (includes CQRS details and VAR context)
 - `.plans/impersonation/implementation-guide.md` - Step-by-step implementation guide
 - `.plans/impersonation/ui-specification.md` - Visual indicators and UX
 - `.plans/impersonation/security-controls.md` - Security measures
 - `.plans/event-resilience/plan.md` - Event resilience and offline handling
+- `.plans/consolidated/agent-observations.md` - Platform architecture (includes hierarchy model, VAR partnerships)
+- `.plans/auth-integration/tenants-as-organization-thoughts.md` - Organizational structure (flat Provider model)
+- `.plans/multi-tenancy/multi-tenancy-organization.html` - Multi-tenancy specification (VAR partnerships as metadata)
 - `/frontend/docs/EVENT-DRIVEN-GUIDE.md` - Frontend event-driven guide
 
 ### Infrastructure Files

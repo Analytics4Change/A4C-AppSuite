@@ -638,17 +638,75 @@ USING (
             
             <h3>7.1 Hierarchy Model</h3>
             <p><strong>Decision:</strong> Unlimited depth using PostgreSQL ltree extension <span class="badge badge-confirmed">Confirmed</span></p>
-            
+
+            <div class="callout callout-warning">
+                <strong>⚠️ CRITICAL ARCHITECTURAL PRINCIPLE:</strong> All Provider organizations exist at root level. VAR (Value-Added Reseller) relationships are tracked as metadata in <code>var_partnerships_projection</code> table, NOT as hierarchical ownership. This ensures Provider ltree paths remain stable when VAR contracts expire.
+            </div>
+
             <p><strong>Path Format:</strong> <code>root.segment1.segment2.segment3...</code></p>
-            
-            <p><strong>Examples:</strong></p>
+
+            <h4>Platform-Wide Structure (Flat Provider Model)</h4>
             <div class="diagram">
-root                                    (AnalyticsForChange)
-root.partner_a                          (Partner A)
-root.partner_a.customer_1               (Partner A's Customer 1)
-root.partner_a.customer_1.division_na   (Customer 1 North America)
-root.partner_b                          (Partner B)
-root.enterprise_direct                  (Direct enterprise customer)
+root                                    (AnalyticsForChange Platform - Virtual Root)
+├── root.org_a4c_internal               (A4C Internal Organization)
+├── root.org_acme_healthcare            (Provider - Direct Customer)
+│   ├── root.org_acme_healthcare.north_campus
+│   └── root.org_acme_healthcare.outpatient_services
+├── root.org_sunshine_youth             (Provider - VAR Customer)
+│   ├── root.org_sunshine_youth.home_1
+│   ├── root.org_sunshine_youth.home_2
+│   └── root.org_sunshine_youth.home_3
+├── root.org_var_partner_xyz            (Provider Partner - VAR)
+└── root.org_families_shared            (Shared Family Access)
+            </div>
+
+            <div class="callout callout-info">
+                <strong>Key Principles:</strong>
+                <ul>
+                    <li><strong>Flat Provider Structure:</strong> All Providers at root level (not nested under VARs)</li>
+                    <li><strong>VAR Relationships are Metadata:</strong> Tracked in <code>var_partnerships_projection</code> table</li>
+                    <li><strong>Provider-Defined Hierarchies:</strong> No prescribed structure below Provider root</li>
+                    <li><strong>ltree Path Stability:</strong> Provider paths NEVER change due to business relationships</li>
+                </ul>
+            </div>
+
+            <h4>Real-World Provider Hierarchy Examples</h4>
+
+            <p><strong>Example 1: Group Home Provider (Simple Flat Structure)</strong></p>
+            <div class="diagram">
+root.org_homes_inc
+├── root.org_homes_inc.home_1
+├── root.org_homes_inc.home_2
+├── root.org_homes_inc.home_3
+└── root.org_homes_inc.home_4
+            </div>
+
+            <p><strong>Example 2: Residential Treatment Center (Campus-Based Structure)</strong></p>
+            <div class="diagram">
+root.org_healing_horizons
+├── root.org_healing_horizons.north_campus
+│   ├── root.org_healing_horizons.north_campus.residential_unit_a
+│   ├── root.org_healing_horizons.north_campus.residential_unit_b
+│   └── root.org_healing_horizons.north_campus.outpatient_clinic
+├── root.org_healing_horizons.south_campus
+│   ├── root.org_healing_horizons.south_campus.residential_unit_c
+│   └── root.org_healing_horizons.south_campus.family_therapy_center
+└── root.org_healing_horizons.administrative_office
+            </div>
+
+            <p><strong>Example 3: Detention Center (Complex Hierarchical Structure)</strong></p>
+            <div class="diagram">
+root.org_youth_detention_services
+└── root.org_youth_detention_services.main_facility
+    ├── root.org_youth_detention_services.main_facility.intake_unit
+    ├── root.org_youth_detention_services.main_facility.general_population
+    │   ├── root.org_youth_detention_services.main_facility.general_population.pod_a
+    │   ├── root.org_youth_detention_services.main_facility.general_population.pod_b
+    │   └── root.org_youth_detention_services.main_facility.general_population.pod_c
+    ├── root.org_youth_detention_services.main_facility.behavioral_health_wing
+    │   ├── root.org_youth_detention_services.main_facility.behavioral_health_wing.crisis_stabilization
+    │   └── root.org_youth_detention_services.main_facility.behavioral_health_wing.treatment_program
+    └── root.org_youth_detention_services.main_facility.education_services
             </div>
 
             <h3>7.2 Database Schema</h3>
@@ -680,18 +738,32 @@ CREATE INDEX organizations_path_btree_idx
   ON organizations USING BTREE (path);</code></pre>
 
             <h3>7.3 Query Examples</h3>
-            <pre><code>-- Get all descendants of Partner A
+            <pre><code>-- Get all organizational units within a Provider
 SELECT * FROM organizations
-WHERE path &lt;@ 'root.partner_a';
+WHERE path &lt;@ 'root.org_acme_healthcare';
 
--- Get immediate children only
+-- Get immediate children only (first-level units)
 SELECT * FROM organizations
-WHERE path ~ 'root.partner_a.*{1}';
+WHERE path ~ 'root.org_acme_healthcare.*{1}';
 
--- Get all ancestors
+-- Get all ancestors of a specific unit
 SELECT * FROM organizations
-WHERE 'root.partner_a.customer_1' &lt;@ path
-ORDER BY nlevel(path);</code></pre>
+WHERE 'root.org_acme_healthcare.north_campus.residential_unit_a' &lt;@ path
+ORDER BY nlevel(path);
+
+-- Get all Providers (root-level organizations)
+SELECT * FROM organizations
+WHERE nlevel(path) = 2  -- root.org_* = level 2
+  AND path ~ 'root.org_.*{1}';
+
+-- Get all Providers associated with a VAR (via metadata join)
+SELECT o.*
+FROM organizations o
+INNER JOIN var_partnerships_projection vp
+  ON o.id = vp.provider_org_id
+WHERE vp.var_org_id = 'var_xyz_uuid'
+  AND vp.status = 'active'
+  AND nlevel(o.path) = 2;  -- Only root Provider organizations</code></pre>
         </section>
 
         <section id="section-8">

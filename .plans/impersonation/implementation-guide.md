@@ -5,10 +5,13 @@
 This guide provides step-by-step instructions for implementing the Super Admin impersonation system in the A4C AppSuite. All components are event-sourced and follow the CQRS architecture.
 
 **Related Documents:**
-- `.plans/impersonation/architecture.md` - Complete architecture specification
-- `.plans/impersonation/event-schema.md` - Event definitions and schemas
+- `.plans/impersonation/architecture.md` - Complete architecture specification (includes VAR Partner impersonation)
+- `.plans/impersonation/event-schema.md` - Event definitions and schemas (includes VAR cross-tenant examples)
 - `.plans/impersonation/security-controls.md` - Security measures
 - `.plans/rbac-permissions/implementation-guide.md` - RBAC setup (provider.impersonate permission)
+- `.plans/consolidated/agent-observations.md` - Platform architecture (hierarchy model, VAR partnerships)
+- `.plans/auth-integration/tenants-as-organization-thoughts.md` - Organizational structure (flat Provider model)
+- `.plans/multi-tenancy/multi-tenancy-organization.html` - Multi-tenancy specification (VAR partnerships as metadata)
 - `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - CQRS foundation
 
 ---
@@ -768,6 +771,287 @@ export class EventEmitter {
     });
   }
 }
+```
+
+---
+
+## Phase 4.5: Cross-Tenant Impersonation (VAR Partner Support)
+
+### Organizational Context
+
+**CRITICAL ARCHITECTURAL PRINCIPLE:**
+All Provider organizations exist at the **root level** in Zitadel (flat structure). VAR (Value-Added Reseller) Partner organizations also exist at root level. VAR partnerships are tracked as **business metadata** in the `var_partnerships_projection` table, NOT as hierarchical ownership.
+
+**Hierarchy Model Reference:**
+```
+Zitadel Instance
+│
+├── Analytics4Change (A4C Internal Org) - Root level
+├── VAR Partner XYZ (VAR Org) - Root level (NOT parent of Providers)
+├── Provider A (Provider Org) - Root level
+├── Provider B (Provider Org) - Root level
+└── Provider C (Provider Org) - Root level
+
+VAR Relationships (Metadata):
+- var_partnerships_projection: VAR Partner XYZ ↔ Provider A (active)
+- cross_tenant_access_grants_projection: VAR Partner XYZ → Provider A data
+```
+
+For complete hierarchy model details, see:
+- `.plans/consolidated/agent-observations.md` (Hierarchy Model section)
+- `.plans/auth-integration/tenants-as-organization-thoughts.md` (Organizational Hierarchy section)
+
+### VAR Partner Impersonation Implementation
+
+When Super Admin impersonates a VAR Partner user to verify their dashboard:
+
+**Enhanced Event Metadata:**
+```typescript
+// During VAR Partner impersonation, track cross-tenant Provider data access
+interface VARImpersonationMetadata {
+  userId: string;  // VAR consultant user ID
+  orgId: string;   // Provider org ID (cross-tenant access)
+  impersonatedBy: string;  // Super Admin user ID
+  impersonationSessionId: string;
+  crossTenantAccess: {
+    consultantOrgId: string;  // VAR Partner org ID
+    grantId: string;          // Access grant UUID
+    authorizationType: 'var_contract';
+    partnershipId: string;    // Partnership UUID
+  };
+  timestamp: string;
+}
+```
+
+**Service Extension for VAR Context:**
+```typescript
+// src/services/impersonation/impersonation.service.ts (extension)
+
+export class ImpersonationService {
+  // ... existing methods
+
+  async trackCrossTenantAccess(
+    sessionId: string,
+    accessedProviderOrgId: string
+  ): Promise<void> {
+    // When VAR user (impersonated by Super Admin) accesses Provider data,
+    // track which Provider orgs were accessed during the session
+    const session = await this.sessionStore.get(sessionId);
+    if (!session) return;
+
+    // Check if this is VAR Partner impersonation
+    const targetOrgType = await this.getOrgType(session.targetOrgId);
+    if (targetOrgType !== 'provider_partner') return;
+
+    // Record accessed Provider org
+    await this.redis.sadd(
+      `impersonation:${sessionId}:accessed_orgs`,
+      accessedProviderOrgId
+    );
+
+    // Set TTL to match session TTL
+    await this.redis.expire(
+      `impersonation:${sessionId}:accessed_orgs`,
+      1800
+    );
+  }
+
+  async getAccessedProviderOrgs(sessionId: string): Promise<string[]> {
+    // Get list of Provider orgs accessed during VAR impersonation session
+    const orgs = await this.redis.smembers(
+      `impersonation:${sessionId}:accessed_orgs`
+    );
+    return orgs;
+  }
+
+  // Override emitEnded for VAR impersonation to include accessed orgs
+  async emitEndedWithVARContext(
+    sessionId: string,
+    superAdminId: string,
+    reason: string,
+    // ... other params
+  ): Promise<void> {
+    const session = await this.sessionStore.get(sessionId);
+    if (!session) return;
+
+    const targetOrgType = await this.getOrgType(session.targetOrgId);
+    const accessedProviderOrgs = targetOrgType === 'provider_partner'
+      ? await this.getAccessedProviderOrgs(sessionId)
+      : [];
+
+    await this.eventEmitter.emit(
+      superAdminId,
+      'impersonation',
+      'impersonation.ended',
+      {
+        session_id: sessionId,
+        reason,
+        // ... other standard fields
+        accessed_provider_orgs: accessedProviderOrgs,  // VAR-specific
+        target_org_type: targetOrgType,
+        // ... rest of data
+      },
+      `Impersonation session ended: ${reason}`
+    );
+
+    // Cleanup VAR-specific tracking
+    if (accessedProviderOrgs.length > 0) {
+      await this.redis.del(`impersonation:${sessionId}:accessed_orgs`);
+    }
+
+    // Delete session
+    await this.sessionStore.delete(sessionId);
+  }
+}
+```
+
+### VAR Partnership Audit Queries
+
+**Query VAR Impersonation Sessions:**
+```sql
+-- All Super Admin impersonation of VAR Partner users
+SELECT
+  ips.started_at,
+  ips.super_admin_email,
+  ips.target_email AS var_consultant,
+  ips.target_org_name AS var_partner_org,
+  ips.justification_reason,
+  ips.total_duration_ms,
+  ips.actions_performed,
+  -- Count active partnerships at time of impersonation
+  (SELECT COUNT(*)
+   FROM var_partnerships_projection vp
+   WHERE vp.var_org_id = ips.target_org_id
+     AND vp.status = 'active'
+     AND vp.contract_start_date <= ips.started_at
+     AND (vp.contract_end_date IS NULL OR vp.contract_end_date >= ips.started_at)
+  ) AS active_partnerships_count,
+  -- Count active cross-tenant grants
+  (SELECT COUNT(*)
+   FROM cross_tenant_access_grants_projection ctag
+   WHERE ctag.consultant_org_id = ips.target_org_id
+     AND ctag.authorization_type = 'var_contract'
+     AND ctag.revoked_at IS NULL
+     AND ctag.granted_at <= ips.started_at
+  ) AS active_grants_count
+FROM impersonation_sessions_projection ips
+JOIN organizations o ON ips.target_org_id = o.id
+WHERE o.org_type = 'provider_partner'
+ORDER BY ips.started_at DESC;
+```
+
+**Query Provider Orgs Accessed During VAR Impersonation:**
+```sql
+-- Which Provider orgs' data was accessed during VAR impersonation?
+SELECT DISTINCT
+  ips.session_id,
+  ips.started_at,
+  ips.target_org_name AS var_partner_org,
+  de.stream_type,
+  de.event_type,
+  de.event_metadata->>'orgId' AS accessed_provider_org_id,
+  o.org_name AS accessed_provider_org_name,
+  COUNT(*) OVER (PARTITION BY ips.session_id, de.event_metadata->>'orgId') AS access_count
+FROM impersonation_sessions_projection ips
+JOIN domain_events de ON de.event_metadata->>'impersonation_session_id' = ips.session_id::text
+LEFT JOIN organizations o ON o.id::text = de.event_metadata->>'orgId'
+WHERE ips.session_id = :session_id
+  AND de.event_type NOT LIKE 'impersonation.%'
+  AND de.event_metadata->>'orgId' IS NOT NULL
+  AND de.event_metadata->>'orgId' != ips.target_org_id::text  -- Cross-tenant only
+ORDER BY de.created_at;
+```
+
+### Provider Internal Hierarchy Impersonation
+
+**Use Case:** Super Admin troubleshoots permission issue within Provider's organizational structure
+
+**Provider-Defined Hierarchies (Examples):**
+- **Group Home Provider (simple):** `org_homes_inc.home_3` (2 levels)
+- **Detention Center (complex):** `org_youth_detention.main_facility.behavioral_health_wing.crisis_stabilization` (5 levels)
+- **Treatment Center (campus-based):** `org_healing_horizons.south_campus.residential_unit_c.art_therapy` (4 levels)
+
+**Impersonation Session with Scope:**
+```typescript
+const session: ImpersonationSession = {
+  sessionId: 'session_uuid',
+  superAdminId: 'super_admin_uuid',
+  targetUserId: 'user_uuid',
+  targetOrgId: 'org_healing_horizons',  // Root Provider org
+  targetOrgPath: 'org_healing_horizons.south_campus.residential_unit_c',  // User's scope within Provider
+  startedAt: new Date(),
+  expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+  justification: {
+    reason: 'support_ticket',
+    referenceId: 'TICKET-8901',
+    notes: 'User cannot view clients in Residential Unit C'
+  },
+  // ... other fields
+};
+```
+
+**Audit Query for Scoped Impersonation:**
+```sql
+-- Query impersonation sessions scoped to specific Provider units
+SELECT
+  ips.*,
+  o.org_name,
+  ips.target_scope_path,
+  nlevel(ips.target_scope_path) AS hierarchy_depth,
+  -- Extract unit name from path
+  subpath(ips.target_scope_path, -1, 1)::text AS target_unit_name
+FROM impersonation_sessions_projection ips
+JOIN organizations o ON ips.target_org_id = o.id
+WHERE ips.target_org_id = :provider_org_id
+  -- Find sessions scoped to specific branch
+  AND ips.target_scope_path <@ 'org_healing_horizons.south_campus'::LTREE
+ORDER BY ips.started_at DESC;
+```
+
+### Testing VAR Partner Impersonation
+
+**Integration Test Checklist (VAR-Specific):**
+- [ ] Super Admin can impersonate VAR Partner user
+- [ ] VAR user's dashboard loads with correct Provider data
+- [ ] Cross-tenant access grants validated during data fetch
+- [ ] Partnership metadata checked (active status, contract dates)
+- [ ] Events include cross-tenant access metadata
+- [ ] Accessed Provider orgs tracked in Redis set
+- [ ] Impersonation.ended event includes accessed_provider_orgs list
+- [ ] Audit queries return VAR-specific metrics
+
+**Example Integration Test:**
+```typescript
+describe('VAR Partner Impersonation', () => {
+  it('should track cross-tenant Provider access during VAR impersonation', async () => {
+    // 1. Super Admin starts impersonation of VAR consultant
+    const { session, jwt } = await impersonationService.start(
+      superAdminId,
+      varConsultantUserId,
+      {
+        reason: 'audit',
+        referenceId: 'AUDIT-2025-Q4-001',
+        notes: 'Verifying VAR dashboard cross-tenant access'
+      }
+    );
+
+    expect(session.targetOrgId).toBe('org_var_partner_xyz');
+
+    // 2. VAR consultant (impersonated) views Provider A data
+    await clientService.getClients('org_provider_a');  // Cross-tenant access
+
+    // 3. Verify cross-tenant tracking
+    const accessedOrgs = await impersonationService.getAccessedProviderOrgs(session.sessionId);
+    expect(accessedOrgs).toContain('org_provider_a');
+
+    // 4. End session
+    await impersonationService.endWithVARContext(session.sessionId, 'manual_logout');
+
+    // 5. Verify ended event includes accessed orgs
+    const endedEvent = await getEvent('impersonation.ended', session.sessionId);
+    expect(endedEvent.data.accessed_provider_orgs).toEqual(['org_provider_a']);
+  });
+});
 ```
 
 ---

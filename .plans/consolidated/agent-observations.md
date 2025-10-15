@@ -48,14 +48,311 @@ Application emits event → domain_events table → Database trigger fires → E
 - **Subdomain Routing**: `{tenant}.a4c.app` for tenant-specific access
 
 **Hierarchy Model:**
+
+**Platform-Wide Structure (Flat Provider Model):**
 ```
-Organization (Zitadel Org = Tenant)
-├── Facilities (ltree: "org_123")
-│   ├── Programs (ltree: "org_123.facility_456")
-│   │   └── Teams (ltree: "org_123.facility_456.program_789")
-│   └── Teams (ltree: "org_123.facility_456")
-└── Programs (ltree: "org_123")
+root (Analytics4Change Platform - Virtual Root)
+│
+├── org_a4c_internal (A4C Internal Organization - Zitadel Org)
+│   └── Users: super_admin, support_agent
+│
+├── org_acme_healthcare (Provider - Direct Customer - Zitadel Org)
+│   └── [Provider-defined internal hierarchy - see examples below]
+│
+├── org_sunshine_youth (Provider - VAR Customer - Zitadel Org)
+│   └── [Provider-defined internal hierarchy - see examples below]
+│
+├── org_var_partner_xyz (Provider Partner - VAR - Zitadel Org)
+│   └── Users: var_admin, var_consultant
+│       └── Access: Managed via cross_tenant_access_grants (metadata, not hierarchy)
+│
+└── org_families_shared (Shared Family Access - Zitadel Org)
+    └── Users: family_member_1, family_member_2
+        └── Access: Client-scoped grants to Provider data
 ```
+
+**CRITICAL ARCHITECTURAL PRINCIPLES:**
+
+1. **All Providers are at Root Level**: VAR relationships do NOT create hierarchical ownership
+   - Rationale: VAR contract expiration cannot trigger ltree path reorganization
+   - VAR partnerships tracked in `var_partnerships_projection` table (metadata)
+   - Provider ltree paths remain stable regardless of business relationships
+
+2. **Provider-Defined Internal Hierarchies**: No prescribed structure below Provider root
+   - Providers create their own organizational taxonomy
+   - System enforces ltree relationships, NOT semantic levels
+   - Rationale: Cannot predict how Providers name their organizational units
+
+3. **VAR Relationships are Optional**: Not all Providers are associated with VARs
+   - Default: Direct Provider customer (e.g., `org_acme_healthcare`)
+   - Optional: VAR partnership tracked in projection table
+   - Flexible: Providers can change VARs without data migration
+
+**Real-World Provider Hierarchy Examples:**
+
+**Example 1: Group Home Provider (Simple Flat Structure)**
+```
+org_homes_inc (Provider Root)
+├── org_homes_inc.home_1
+├── org_homes_inc.home_2
+├── org_homes_inc.home_3
+└── org_homes_inc.home_4
+```
+- Use Case: Small operator with 4 independent group homes
+- No intermediate levels needed
+- Each home operates autonomously
+
+**Example 2: Residential Treatment Center (Campus-Based Structure)**
+```
+org_healing_horizons (Provider Root)
+├── org_healing_horizons.north_campus
+│   ├── org_healing_horizons.north_campus.residential_unit_a
+│   ├── org_healing_horizons.north_campus.residential_unit_b
+│   └── org_healing_horizons.north_campus.outpatient_clinic
+├── org_healing_horizons.south_campus
+│   ├── org_healing_horizons.south_campus.residential_unit_c
+│   └── org_healing_horizons.south_campus.family_therapy_center
+└── org_healing_horizons.administrative_office
+```
+- Use Case: Multi-campus treatment facility
+- Intermediate: campus level
+- Leaf nodes: specific units/clinics
+
+**Example 3: Detention Center (Complex Hierarchical Structure)**
+```
+org_youth_detention_services (Provider Root)
+└── org_youth_detention_services.main_facility
+    ├── org_youth_detention_services.main_facility.intake_unit
+    ├── org_youth_detention_services.main_facility.general_population
+    │   ├── org_youth_detention_services.main_facility.general_population.pod_a
+    │   ├── org_youth_detention_services.main_facility.general_population.pod_b
+    │   └── org_youth_detention_services.main_facility.general_population.pod_c
+    ├── org_youth_detention_services.main_facility.behavioral_health_wing
+    │   ├── org_youth_detention_services.main_facility.behavioral_health_wing.crisis_stabilization
+    │   └── org_youth_detention_services.main_facility.behavioral_health_wing.treatment_program
+    └── org_youth_detention_services.main_facility.education_services
+```
+- Use Case: Large detention facility with multiple specialized units
+- Deep nesting: facility → wing → pod
+- Hierarchical permission scoping for security roles
+
+---
+
+### VAR Partnership Model (Event-Sourced Metadata)
+
+**Problem Statement:** Value-Added Reseller (VAR) relationships with Providers cannot be hierarchical because contract expiration would require ltree path reorganization. VAR partnerships must be tracked as business metadata that can change without affecting Provider organizational structure.
+
+**Solution Architecture: Event-Sourced VAR Partnerships**
+
+**Projection Table (CQRS Read Model):**
+```sql
+-- NOTE: This is a CQRS projection table - NEVER updated directly
+-- Source of truth: domain_events table with stream_type='var_partnership'
+-- Updated ONLY by event processor: process_var_partnership_event()
+
+CREATE TABLE var_partnerships_projection (
+  id UUID PRIMARY KEY,
+  var_org_id UUID NOT NULL REFERENCES organizations(id),
+  provider_org_id UUID NOT NULL REFERENCES organizations(id),
+  contract_start_date DATE NOT NULL,
+  contract_end_date DATE,  -- NULL = ongoing/indefinite
+  status TEXT NOT NULL CHECK (status IN ('active', 'expired', 'terminated')),
+  revenue_share_percentage DECIMAL(5,2),
+  support_level TEXT,  -- 'basic' | 'premium' | 'enterprise'
+  terms JSONB,  -- Flexible contract terms
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (var_org_id, provider_org_id)
+);
+
+CREATE INDEX idx_var_partnerships_var_org ON var_partnerships_projection(var_org_id) WHERE status = 'active';
+CREATE INDEX idx_var_partnerships_provider_org ON var_partnerships_projection(provider_org_id) WHERE status = 'active';
+CREATE INDEX idx_var_partnerships_expiring ON var_partnerships_projection(contract_end_date) WHERE status = 'active' AND contract_end_date IS NOT NULL;
+
+COMMENT ON TABLE var_partnerships_projection IS
+  'CQRS projection of VAR partnerships. Maintained by event processor, never updated directly.
+   Tracks business relationships between VARs and Providers without hierarchical coupling.';
+```
+
+**Event Schemas:**
+
+**1. var_partnership.created**
+```typescript
+{
+  event_type: 'var_partnership.created',
+  stream_id: 'partnership-uuid',
+  stream_type: 'var_partnership',
+  stream_version: 1,
+  event_data: {
+    partnership_id: 'partnership-uuid',
+    var_org_id: 'var_xyz_org_uuid',
+    provider_org_id: 'sunshine_youth_org_uuid',
+    contract_start_date: '2025-01-01',
+    contract_end_date: '2025-12-31',
+    revenue_share_percentage: 15.00,
+    support_level: 'premium',
+    terms: {
+      billing_cycle: 'monthly',
+      minimum_commitment: '12_months',
+      renewal_type: 'auto_renew'
+    }
+  },
+  event_metadata: {
+    user_id: 'super_admin_uuid',
+    reason: 'New VAR partnership signed with Sunshine Youth Services',
+    timestamp: '2025-01-01T00:00:00Z'
+  }
+}
+```
+
+**2. var_partnership.renewed**
+```typescript
+{
+  event_type: 'var_partnership.renewed',
+  stream_id: 'partnership-uuid',
+  stream_type: 'var_partnership',
+  stream_version: 2,
+  event_data: {
+    partnership_id: 'partnership-uuid',
+    new_contract_end_date: '2026-12-31',
+    revenue_share_percentage: 12.50,  // Negotiated discount
+    renewal_reason: 'auto_renewal'
+  },
+  event_metadata: {
+    user_id: '00000000-0000-0000-0000-000000000000',  // System user
+    reason: 'Automatic contract renewal per terms',
+    automated: true,
+    timestamp: '2025-12-01T00:00:00Z'
+  }
+}
+```
+
+**3. var_partnership.expired**
+```typescript
+{
+  event_type: 'var_partnership.expired',
+  stream_id: 'partnership-uuid',
+  stream_type: 'var_partnership',
+  stream_version: 3,
+  event_data: {
+    partnership_id: 'partnership-uuid',
+    var_org_id: 'var_xyz_org_uuid',
+    provider_org_id: 'sunshine_youth_org_uuid',
+    contract_end_date: '2025-12-31',
+    expiration_reason: 'contract_term_ended'
+  },
+  event_metadata: {
+    user_id: '00000000-0000-0000-0000-000000000000',  // System user
+    reason: 'Automated contract expiration: contract term ended on 2025-12-31',
+    automated: true,
+    timestamp: '2026-01-01T00:00:00Z'
+  }
+}
+```
+
+**4. var_partnership.terminated**
+```typescript
+{
+  event_type: 'var_partnership.terminated',
+  stream_id: 'partnership-uuid',
+  stream_type: 'var_partnership',
+  stream_version: 4,
+  event_data: {
+    partnership_id: 'partnership-uuid',
+    var_org_id: 'var_xyz_org_uuid',
+    provider_org_id: 'sunshine_youth_org_uuid',
+    termination_date: '2025-06-30',
+    termination_reason: 'provider_requested',
+    termination_notes: 'Provider transitioning to direct customer relationship'
+  },
+  event_metadata: {
+    user_id: 'provider_admin_uuid',
+    reason: 'Provider requested early contract termination',
+    timestamp: '2025-06-30T00:00:00Z'
+  }
+}
+```
+
+**Event Processing & Cascading Effects:**
+
+**Background Job: Contract Expiration Detection**
+```typescript
+// Scheduled job: Daily at 00:00 UTC
+async function detectExpiredPartnerships() {
+  const today = new Date().toISOString().split('T')[0];
+
+  const expiredPartnerships = await supabase
+    .from('var_partnerships_projection')
+    .select('*')
+    .eq('status', 'active')
+    .lte('contract_end_date', today);
+
+  for (const partnership of expiredPartnerships.data) {
+    // Emit event (not direct update) ✅ CORRECT EVENT-SOURCED PATTERN
+    await emitEvent({
+      stream_id: partnership.id,
+      stream_type: 'var_partnership',
+      event_type: 'var_partnership.expired',
+      event_data: {
+        partnership_id: partnership.id,
+        var_org_id: partnership.var_org_id,
+        provider_org_id: partnership.provider_org_id,
+        contract_end_date: partnership.contract_end_date,
+        expiration_reason: 'contract_term_ended'
+      },
+      event_metadata: {
+        user_id: SYSTEM_USER_ID,
+        reason: `Automated expiration: contract term ended on ${partnership.contract_end_date}`,
+        automated: true
+      }
+    });
+  }
+}
+```
+
+**Event Processor: Cascading Access Grant Revocation**
+```sql
+-- process_var_partnership_event() excerpt
+WHEN 'var_partnership.expired' THEN
+  -- 1. Update projection status
+  UPDATE var_partnerships_projection
+  SET
+    status = 'expired',
+    updated_at = p_event.created_at
+  WHERE id = (p_event.event_data->>'partnership_id')::UUID;
+
+  -- 2. Emit cascading access grant revocation events
+  INSERT INTO domain_events (stream_id, stream_type, event_type, event_data, event_metadata)
+  SELECT
+    grant.id,
+    'access_grant',
+    'access_grant.revoked',
+    jsonb_build_object(
+      'grant_id', grant.id,
+      'revocation_reason', 'var_partnership_expired',
+      'partnership_id', (p_event.event_data->>'partnership_id')::UUID
+    ),
+    jsonb_build_object(
+      'user_id', '00000000-0000-0000-0000-000000000000',
+      'reason', 'Automatically revoking access grant due to expired VAR partnership',
+      'automated', true,
+      'triggered_by_event_id', p_event.id
+    )
+  FROM cross_tenant_access_grants_projection grant
+  WHERE grant.consultant_org_id = (p_event.event_data->>'var_org_id')::UUID
+    AND grant.provider_org_id = (p_event.event_data->>'provider_org_id')::UUID
+    AND grant.authorization_type = 'var_contract'
+    AND grant.revoked_at IS NULL;
+```
+
+**Key Architectural Guarantees:**
+
+1. **ltree Path Stability**: Provider organizational structure (`org_sunshine_youth.*`) NEVER changes due to VAR relationship changes
+2. **Event-Sourced Lifecycle**: All partnership state changes captured as immutable events (created → renewed → expired/terminated)
+3. **Automated Expiration**: Background job detects expired contracts and emits events (not direct updates)
+4. **Cascading Revocations**: Partnership expiration automatically triggers access grant revocation events
+5. **Audit Trail**: Complete history of VAR relationships with WHO, WHAT, WHEN, WHY for every change
+6. **Temporal Queries**: Can reconstruct "Which Providers were partnered with VAR X on date Y?"
 
 **Security Architecture:**
 - JWT tokens contain `org_id` claim
@@ -192,14 +489,34 @@ Developer Workstation
 **Provider (Data Owner):**
 - Healthcare organizations (group homes, detention centers, residential facilities)
 - Own patient/client data
-- Isolated Zitadel organization per Provider
+- Isolated Zitadel organization per Provider (e.g., `org_acme_healthcare`)
 - Self-contained user base
+- **Structural Independence**: Providers exist at root level regardless of business relationships
 
 **Provider Partner (External Stakeholder):**
-- **Value-Added Resellers (VARs)**: Manage multiple Provider customers, scope-limited aggregate dashboards
+- **Value-Added Resellers (VARs)**: Manage multiple Provider customers via cross-tenant grants (NOT hierarchical ownership)
+  - VAR access managed through `cross_tenant_access_grants_projection`
+  - Partnership metadata tracked in `var_partnerships_projection`
+  - Contract expiration automatically revokes grants (event-driven)
+  - Scope-limited aggregate dashboards (portfolio view)
 - **Court System**: Judges, guardian ad-litem (case-based access via court orders)
 - **Social Services**: Social workers, case managers (assigned client access)
 - **Family Members**: Parents/guardians in shared "A4C-Families" org (client-scoped grants)
+
+**CRITICAL ARCHITECTURAL PRINCIPLE: VAR Access via Grants, Not Hierarchy**
+
+VARs do NOT own Provider organizations hierarchically. Instead:
+1. Provider organizations remain at root level (e.g., `org_sunshine_youth`)
+2. VAR partnership creates metadata relationship in `var_partnerships_projection`
+3. Cross-tenant access grants authorize specific VAR users to access Provider data
+4. Grants reference partnership for authorization basis
+5. Partnership expiration cascades to automatic grant revocation
+
+**Why This Matters:**
+- Provider ltree paths (`org_sunshine_youth.home_1`) NEVER change when VAR contracts expire
+- No data migration required when Provider changes VARs
+- Provider can operate independently if VAR relationship ends
+- Clear separation between business relationships (metadata) and data structure (hierarchy)
 
 **Access Grant Model (CQRS Projection):**
 ```sql
@@ -208,40 +525,66 @@ Developer Workstation
 
 CREATE TABLE cross_tenant_access_grants_projection (
   id UUID PRIMARY KEY,
-  consultant_org_id TEXT NOT NULL,        -- Provider Partner org
+  consultant_org_id UUID NOT NULL,         -- Provider Partner org (e.g., VAR org)
   consultant_user_id UUID,                 -- Specific user (NULL = org-wide)
-  provider_org_id TEXT NOT NULL,          -- Target Provider org
-  scope TEXT NOT NULL CHECK (scope IN ('full_org', 'facility', 'client')),
-  scope_id UUID,                           -- Specific resource ID
+  provider_org_id UUID NOT NULL,           -- Target Provider org
+  scope TEXT NOT NULL CHECK (scope IN ('full_org', 'facility', 'program', 'client')),
+  scope_id UUID,                           -- Specific resource ID (NULL for full_org)
   granted_by UUID NOT NULL,                -- Authorization actor
   granted_at TIMESTAMPTZ NOT NULL,
-  expires_at TIMESTAMPTZ,                  -- Time-limited access
-  revoked_at TIMESTAMPTZ,
-  authorization_type TEXT NOT NULL,        -- 'court_order' | 'parental_consent' | 'var_contract'
-  legal_reference TEXT,                    -- Court order #, consent form ID
-  metadata JSONB
+  expires_at TIMESTAMPTZ,                  -- Time-limited access (NULL = indefinite)
+  revoked_at TIMESTAMPTZ,                  -- Revocation timestamp
+  authorization_type TEXT NOT NULL,        -- 'var_contract' | 'court_order' | 'parental_consent'
+  legal_reference TEXT,                    -- Court order #, consent form ID, partnership ID
+  metadata JSONB,                          -- Additional context
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
 );
+
+CREATE INDEX idx_cross_tenant_grants_consultant ON cross_tenant_access_grants_projection(consultant_org_id) WHERE revoked_at IS NULL;
+CREATE INDEX idx_cross_tenant_grants_provider ON cross_tenant_access_grants_projection(provider_org_id) WHERE revoked_at IS NULL;
+CREATE INDEX idx_cross_tenant_grants_expiring ON cross_tenant_access_grants_projection(expires_at) WHERE revoked_at IS NULL AND expires_at IS NOT NULL;
+
+COMMENT ON TABLE cross_tenant_access_grants_projection IS
+  'CQRS projection of cross-tenant access grants. Enables Provider Partners (VARs, courts, families)
+   to access Provider data without hierarchical ownership. Maintained by event processor.';
 ```
 
 **Enhanced RLS Policies:**
 ```sql
 -- Hybrid access: same-tenant OR cross-tenant grant
 -- NOTE: Queries the projection table for performance
-WHERE organization_id = current_setting('app.current_org')
+WHERE organization_id = current_setting('app.current_org')::UUID
    OR EXISTS (
-     SELECT 1 FROM cross_tenant_access_grants_projection
-     WHERE consultant_org_id = current_setting('app.current_org')
-       AND provider_org_id = organization_id
-       AND (expires_at IS NULL OR expires_at > NOW())
-       AND revoked_at IS NULL
-       AND check_scope_authorization(scope, scope_id, resource_id)
+     SELECT 1 FROM cross_tenant_access_grants_projection grant
+     WHERE grant.consultant_org_id = current_setting('app.current_org')::UUID
+       AND grant.provider_org_id = organization_id
+       AND (grant.expires_at IS NULL OR grant.expires_at > NOW())
+       AND grant.revoked_at IS NULL
+       AND check_scope_authorization(grant.scope, grant.scope_id, resource_id)
    )
 ```
 
 **Dashboard Access Tiers:**
 - **Super Admin:** All Providers (unrestricted aggregate analytics)
-- **VAR:** Own portfolio only (scope-limited aggregate dashboards)
+- **VAR Admin:** Portfolio view only (Providers with active grants + active partnerships)
+  - Filtered by: `WHERE EXISTS (SELECT 1 FROM cross_tenant_access_grants_projection WHERE consultant_org_id = current_var_org AND authorization_type = 'var_contract' AND revoked_at IS NULL)`
+  - Automatically loses access when partnership expires (cascading grant revocation)
 - **Provider Admin:** Own Provider only (no cross-tenant visibility)
+
+**VAR Access Lifecycle Example:**
+
+1. **Partnership Created**: `var_partnership.created` event emitted
+2. **Grant Issued**: Super Admin creates cross-tenant grant for VAR
+   - Event: `access_grant.created`
+   - Data: `{ consultant_org_id: 'var_xyz', provider_org_id: 'sunshine_youth', authorization_type: 'var_contract', legal_reference: 'partnership-uuid' }`
+3. **VAR Accesses Data**: RLS policy checks grant validity + partnership status
+4. **Contract Expires**: Background job detects expiration date reached
+   - Event: `var_partnership.expired` emitted
+5. **Automatic Revocation**: Event processor detects expired partnership
+   - Cascading Event: `access_grant.revoked` emitted for all VAR grants
+6. **Access Denied**: RLS policy now excludes VAR (grant revoked)
+7. **Audit Trail**: Complete history preserved in `domain_events` table
 
 ---
 
