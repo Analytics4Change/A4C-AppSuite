@@ -712,58 +712,91 @@ root.org_youth_detention_services
             <h3>7.2 Database Schema</h3>
             <pre><code>CREATE EXTENSION IF NOT EXISTS ltree;
 
-CREATE TABLE organizations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- Organizations Projection Table (CQRS)
+-- Source of truth: organization.* events in domain_events table
+CREATE TABLE organizations_projection (
+  id UUID PRIMARY KEY,
   name TEXT NOT NULL,
+  display_name TEXT,
   slug TEXT UNIQUE NOT NULL,
-  zitadel_org_id TEXT UNIQUE NOT NULL,
+  zitadel_org_id TEXT UNIQUE, -- NULL for sub-organizations
   type TEXT NOT NULL CHECK (type IN (
-    'platform_owner',
-    'reseller',
-    'enterprise',
-    'division',
-    'end_customer'
+    'platform_owner',    -- A4C internal organization (impersonation capability)
+    'provider',          -- Healthcare organizations serving clients (data owners)
+    'provider_partner'   -- External stakeholders (VARs, families, courts - access via grants)
   )),
-  path ltree NOT NULL UNIQUE,
-  parent_path ltree,
+  path LTREE NOT NULL UNIQUE,
+  parent_path LTREE,
   depth INTEGER GENERATED ALWAYS AS (nlevel(path)) STORED,
-  metadata JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  
+  -- Lifecycle management
+  is_active BOOLEAN DEFAULT true,
+  deactivated_at TIMESTAMPTZ,
+  deleted_at TIMESTAMPTZ,
+  
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Performance indexes
-CREATE INDEX organizations_path_gist_idx 
-  ON organizations USING GIST (path);
-CREATE INDEX organizations_path_btree_idx 
-  ON organizations USING BTREE (path);</code></pre>
+-- Business Profiles for top-level organizations only
+CREATE TABLE organization_business_profiles_projection (
+  organization_id UUID PRIMARY KEY REFERENCES organizations_projection(id),
+  organization_type TEXT NOT NULL CHECK (organization_type IN ('provider', 'provider_partner')),
+  provider_profile JSONB,     -- Provider-specific business data
+  partner_profile JSONB,      -- Provider Partner-specific business data
+  mailing_address JSONB,
+  physical_address JSONB,
+  created_at TIMESTAMPTZ NOT NULL,
+  
+  CHECK (
+    (organization_type = 'provider' AND provider_profile IS NOT NULL AND partner_profile IS NULL)
+    OR
+    (organization_type = 'provider_partner' AND partner_profile IS NOT NULL AND provider_profile IS NULL)
+  )
+);
+
+-- Performance indexes for hierarchy queries
+CREATE INDEX organizations_path_gist_idx ON organizations_projection USING GIST (path);
+CREATE INDEX organizations_path_btree_idx ON organizations_projection USING BTREE (path);
+CREATE INDEX organizations_type_idx ON organizations_projection(type);
+CREATE INDEX organizations_active_idx ON organizations_projection(is_active) WHERE is_active = true;</code></pre>
 
             <h3>7.3 Query Examples</h3>
             <pre><code>-- Get all organizational units within a Provider
-SELECT * FROM organizations
-WHERE path &lt;@ 'root.org_acme_healthcare';
+SELECT * FROM organizations_projection
+WHERE path &lt;@ 'root.org_acme_healthcare'
+  AND deleted_at IS NULL;
 
 -- Get immediate children only (first-level units)
-SELECT * FROM organizations
-WHERE path ~ 'root.org_acme_healthcare.*{1}';
+SELECT * FROM organizations_projection
+WHERE path ~ 'root.org_acme_healthcare.*{1}'
+  AND deleted_at IS NULL;
 
 -- Get all ancestors of a specific unit
-SELECT * FROM organizations
+SELECT * FROM organizations_projection
 WHERE 'root.org_acme_healthcare.north_campus.residential_unit_a' &lt;@ path
+  AND deleted_at IS NULL
 ORDER BY nlevel(path);
 
--- Get all Providers (root-level organizations)
-SELECT * FROM organizations
+-- Get all active Providers (root-level organizations)
+SELECT * FROM organizations_projection
 WHERE nlevel(path) = 2  -- root.org_* = level 2
-  AND path ~ 'root.org_.*{1}';
+  AND type = 'provider'
+  AND is_active = true
+  AND deleted_at IS NULL;
 
--- Get all Providers associated with a VAR (via metadata join)
-SELECT o.*
-FROM organizations o
-INNER JOIN var_partnerships_projection vp
-  ON o.id = vp.provider_org_id
-WHERE vp.var_org_id = 'var_xyz_uuid'
-  AND vp.status = 'active'
-  AND nlevel(o.path) = 2;  -- Only root Provider organizations</code></pre>
+-- Get Provider with business profile
+SELECT o.*, bp.provider_profile, bp.mailing_address
+FROM organizations_projection o
+LEFT JOIN organization_business_profiles_projection bp ON bp.organization_id = o.id
+WHERE o.type = 'provider'
+  AND o.deleted_at IS NULL;
+
+-- Get all Provider Partners (VARs, families, courts)
+SELECT * FROM organizations_projection
+WHERE type = 'provider_partner'
+  AND is_active = true
+  AND deleted_at IS NULL;</code></pre>
         </section>
 
         <section id="section-8">

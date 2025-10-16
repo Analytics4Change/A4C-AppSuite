@@ -1,0 +1,331 @@
+components:
+  messages:
+    AccessGrantCreated:
+      name: access_grant.created
+      title: Cross-Tenant Access Grant Created
+      summary: Cross-tenant access grant created for provider_partner to access provider data
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AccessGrantCreatedEvent'
+
+    AccessGrantRevoked:
+      name: access_grant.revoked
+      title: Cross-Tenant Access Grant Revoked
+      summary: Cross-tenant access grant permanently revoked with audit trail
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AccessGrantRevokedEvent'
+
+    AccessGrantExpired:
+      name: access_grant.expired
+      title: Cross-Tenant Access Grant Expired
+      summary: Cross-tenant access grant automatically expired based on time or contract terms
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AccessGrantExpiredEvent'
+
+    AccessGrantSuspended:
+      name: access_grant.suspended
+      title: Cross-Tenant Access Grant Suspended
+      summary: Cross-tenant access grant temporarily suspended (can be reactivated)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AccessGrantSuspendedEvent'
+
+    AccessGrantReactivated:
+      name: access_grant.reactivated
+      title: Cross-Tenant Access Grant Reactivated
+      summary: Previously suspended cross-tenant access grant restored to active status
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AccessGrantReactivatedEvent'
+
+  schemas:
+    AccessGrantCreatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Access grant UUID
+        stream_type:
+          type: string
+          enum: [access_grant]
+        event_type:
+          type: string
+          enum: [access_grant.created]
+        event_data:
+          $ref: '#/components/schemas/AccessGrantCreationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    AccessGrantCreationData:
+      type: object
+      required:
+        - consultant_org_id
+        - provider_org_id
+        - scope
+        - authorization_type
+        - granted_by
+      properties:
+        consultant_org_id:
+          type: string
+          format: uuid
+          description: Organization ID of the entity receiving access (provider_partner)
+        consultant_user_id:
+          type: string
+          format: uuid
+          description: Specific user ID if grant is user-specific (null for org-wide)
+        provider_org_id:
+          type: string
+          format: uuid
+          description: Organization ID of the data owner (provider)
+        scope:
+          type: string
+          enum: [full_org, facility, program, client_specific]
+          description: Scope of data access granted
+        scope_id:
+          type: string
+          format: uuid
+          description: Resource ID if scoped to specific facility/program/client
+        authorization_type:
+          type: string
+          enum: [var_contract, court_order, parental_consent, social_services_assignment, emergency_access]
+          description: Legal/business basis for granting cross-tenant access
+        legal_reference:
+          type: string
+          description: Reference to legal document, contract number, case number, etc.
+          examples:
+            - "Court Order #2024-CV-1234"
+            - "VAR Contract #VAR-2024-001"
+            - "Consent Form ID: CF-2024-456"
+        granted_by:
+          type: string
+          format: uuid
+          description: User ID of the person granting this access (typically provider_admin or super_admin)
+        expires_at:
+          type: string
+          format: date-time
+          description: When this grant expires (null for indefinite)
+        permissions:
+          type: array
+          items:
+            type: string
+          description: Specific permissions granted (default to standard set based on grant type)
+          examples:
+            - ["client.view", "medication.view", "reports.generate"]
+        terms:
+          type: object
+          description: Additional terms and conditions
+          properties:
+            read_only:
+              type: boolean
+              default: true
+              description: Whether this is read-only access
+            data_retention_days:
+              type: integer
+              description: How long consultant can retain copies of data
+            notification_required:
+              type: boolean
+              default: true
+              description: Whether to notify provider when data is accessed
+
+    AccessGrantRevokedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [access_grant]
+        event_type:
+          type: string
+          enum: [access_grant.revoked]
+        event_data:
+          $ref: '#/components/schemas/AccessGrantRevocationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    AccessGrantRevocationData:
+      type: object
+      required:
+        - grant_id
+        - revoked_by
+        - revocation_reason
+      properties:
+        grant_id:
+          type: string
+          format: uuid
+        revoked_by:
+          type: string
+          format: uuid
+          description: User ID of person revoking access
+        revocation_reason:
+          type: string
+          enum: [contract_expired, legal_basis_withdrawn, security_breach, administrative_decision, user_request]
+        revocation_details:
+          type: string
+          description: Additional context for revocation
+        effective_immediately:
+          type: boolean
+          default: true
+          description: Whether revocation takes effect immediately
+        grace_period_hours:
+          type: integer
+          description: Hours of continued access for transition (if not immediate)
+
+    AccessGrantExpiredEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [access_grant]
+        event_type:
+          type: string
+          enum: [access_grant.expired]
+        event_data:
+          $ref: '#/components/schemas/AccessGrantExpirationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    AccessGrantExpirationData:
+      type: object
+      required:
+        - grant_id
+        - expiration_type
+        - original_expires_at
+      properties:
+        grant_id:
+          type: string
+          format: uuid
+        expiration_type:
+          type: string
+          enum: [time_based, contract_based, automatic_cleanup]
+        original_expires_at:
+          type: string
+          format: date-time
+          description: Original expiration timestamp
+        expired_at:
+          type: string
+          format: date-time
+          description: Actual expiration processing time
+        renewal_available:
+          type: boolean
+          default: false
+          description: Whether this grant can be renewed
+
+    AccessGrantSuspendedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [access_grant]
+        event_type:
+          type: string
+          enum: [access_grant.suspended]
+        event_data:
+          $ref: '#/components/schemas/AccessGrantSuspensionData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    AccessGrantSuspensionData:
+      type: object
+      required:
+        - grant_id
+        - suspended_by
+        - suspension_reason
+      properties:
+        grant_id:
+          type: string
+          format: uuid
+        suspended_by:
+          type: string
+          format: uuid
+        suspension_reason:
+          type: string
+          enum: [investigation, contract_dispute, security_concern, administrative_hold]
+        suspension_details:
+          type: string
+        expected_resolution_date:
+          type: string
+          format: date-time
+          description: Expected date when suspension will be resolved
+
+    AccessGrantReactivatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [access_grant]
+        event_type:
+          type: string
+          enum: [access_grant.reactivated]
+        event_data:
+          $ref: '#/components/schemas/AccessGrantReactivationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    AccessGrantReactivationData:
+      type: object
+      required:
+        - grant_id
+        - reactivated_by
+        - resolution_details
+      properties:
+        grant_id:
+          type: string
+          format: uuid
+        reactivated_by:
+          type: string
+          format: uuid
+        resolution_details:
+          type: string
+          description: How the suspension was resolved
+        new_expires_at:
+          type: string
+          format: date-time
+          description: Updated expiration date if changed during reactivation
+        terms_modified:
+          type: boolean
+          default: false
+          description: Whether grant terms were modified during reactivation

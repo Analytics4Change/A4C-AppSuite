@@ -43,7 +43,7 @@ BEGIN
         PERFORM process_rbac_event(NEW);
 
       WHEN 'access_grant' THEN
-        PERFORM process_rbac_event(NEW);
+        PERFORM process_access_grant_event(NEW);
 
       -- Impersonation stream type
       WHEN 'impersonation' THEN

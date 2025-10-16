@@ -66,13 +66,18 @@ Permissions are defined per **applet** (distinct functional modules in the appli
 - `medication.delete` - Discontinue/archive medications
 - `medication.approve` - Approve prescription changes (requires higher role)
 
-#### Provider Management Applet
+#### Organization Management Applet
 
-- `provider.create` - Create new provider organizations
-- `provider.view` - View provider details and configurations
-- `provider.update` - Modify provider settings
-- `provider.delete` - Archive providers
-- `provider.impersonate` - Impersonate users within provider organizations (Super Admin only)
+- `organization.create_root` - Create top-level organizations (Platform Owner only) - **IMPLEMENTED ✅** via bootstrap architecture
+- `organization.create_sub` - Create sub-organizations within hierarchy
+- `organization.view` - View organization information and hierarchy
+- `organization.update` - Update organization information
+- `organization.deactivate` - Deactivate organizations (billing, compliance, operational)
+- `organization.delete` - Delete organizations with cascade handling
+- `organization.business_profile_create` - Create business profiles (Platform Owner only) - **IMPLEMENTED ✅** via bootstrap architecture
+- `organization.business_profile_update` - Update business profiles
+
+**Bootstrap Integration**: Organization creation now uses event-driven bootstrap architecture documented in `.plans/provider-management/bootstrap-workflows.md`. The `organization.create_root` permission triggers the `orchestrate_organization_bootstrap()` workflow.
 
 #### Client Management Applet
 
@@ -90,12 +95,17 @@ Permissions are defined per **applet** (distinct functional modules in the appli
 - `user.delete` - Deactivate users
 - `user.assign_role` - Grant roles to users
 
-#### Access Grant Applet (Cross-Tenant)
+#### Access Grant Applet (Cross-Tenant) - **IMPLEMENTED ✅**
 
-- `access_grant.create` - Create cross-tenant access grants
-- `access_grant.view` - View existing grants
-- `access_grant.revoke` - Revoke cross-tenant access
+- `access_grant.create` - Create cross-tenant access grants - **IMPLEMENTED ✅**
+- `access_grant.view` - View existing grants - **IMPLEMENTED ✅**
+- `access_grant.revoke` - Revoke cross-tenant access - **IMPLEMENTED ✅**
 - `access_grant.approve` - Approve Provider Partner access requests
+
+**Implementation Status**: Cross-tenant access grant management is fully implemented via event-sourced `access_grant.*` events. See:
+- Event contracts: `/infrastructure/supabase/contracts/asyncapi/domains/access_grant.yaml`
+- Event processors: `/infrastructure/supabase/sql/03-functions/event-processing/006-process-access-grant-events.sql`
+- Projection table: `/infrastructure/supabase/sql/02-tables/rbac/005-cross_tenant_access_grants_projection.sql`
 
 #### Audit Applet
 
@@ -211,7 +221,7 @@ The event-sourced architecture allows easy addition of new roles:
 - `program_manager` - Scoped to specific program
 - `clinician` - Limited to client care operations
 - `read_only_auditor` - Audit log access only
-- `var_partner_admin` - Provider Partner scoped access
+- `partner_admin` - Provider Partner scoped access
 
 **Adding a New Role**:
 1. Emit `role.created` event with role definition
@@ -380,6 +390,8 @@ VALUES (
 )
 ON CONFLICT (user_id, role_id, org_id) DO NOTHING;
 ```
+
+**Bootstrap Integration**: Role assignment events are automatically emitted during organization bootstrap. When a new provider organization is created via the bootstrap architecture, a `user.role.assigned` event is emitted to grant the `provider_admin` role to the initial administrator. See implementation in `/infrastructure/supabase/sql/04-triggers/bootstrap-event-listener.sql`.
 
 #### `user.role.revoked`
 
@@ -1049,7 +1061,7 @@ EXECUTE FUNCTION raise_exception('Events are immutable for audit integrity');
 | Applet | Permissions | Description |
 |--------|------------|-------------|
 | medication | create, view, update, delete, approve | Medication management |
-| provider | create, view, update, delete, impersonate | Provider organization management |
+| organization | create_root, create_sub, view, update, deactivate, delete, business_profile_create, business_profile_update | Organization management |
 | client | create, view, update, delete, discharge | Client records management |
 | user | create, view, update, delete, assign_role | User account management |
 | access_grant | create, view, revoke, approve | Cross-tenant access grants |
@@ -1060,9 +1072,14 @@ EXECUTE FUNCTION raise_exception('Events are immutable for audit integrity');
 | Permission | super_admin | provider_admin |
 |-----------|-------------|----------------|
 | medication.* | ✅ | ✅ |
-| provider.create | ✅ | ❌ |
-| provider.view | ✅ | ✅ (own org) |
-| provider.impersonate | ✅ | ❌ |
+| organization.create_root | ✅ | ❌ |
+| organization.create_sub | ✅ | ✅ (own org) |
+| organization.view | ✅ | ✅ (own org) |
+| organization.update | ✅ | ✅ (own org) |
+| organization.deactivate | ✅ | ✅ (own org) |
+| organization.delete | ✅ | ❌ |
+| organization.business_profile_create | ✅ | ❌ |
+| organization.business_profile_update | ✅ | ✅ (own org) |
 | client.* | ✅ | ✅ (own org) |
 | user.* | ✅ | ✅ (own org) |
 | access_grant.create | ✅ | ✅ (own org data) |

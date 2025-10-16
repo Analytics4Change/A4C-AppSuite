@@ -9,6 +9,13 @@ This guide provides step-by-step instructions for implementing the Super Admin i
 - `.plans/impersonation/event-schema.md` - Event definitions and schemas (includes VAR cross-tenant examples)
 - `.plans/impersonation/security-controls.md` - Security measures
 - `.plans/rbac-permissions/implementation-guide.md` - RBAC setup (provider.impersonate permission)
+
+**Bootstrap Integration:**
+- ✅ `.plans/provider-management/bootstrap-workflows.md` - Organization bootstrap architecture
+- ✅ Bootstrap provides reliable organization structure for impersonation targets
+- ✅ Cross-tenant access grants via bootstrap enable VAR impersonation workflows
+
+**Platform Architecture:**
 - `.plans/consolidated/agent-observations.md` - Platform architecture (hierarchy model, VAR partnerships)
 - `.plans/auth-integration/tenants-as-organization-thoughts.md` - Organizational structure (flat Provider model)
 - `.plans/multi-tenancy/multi-tenancy-organization.html` - Multi-tenancy specification (VAR partnerships as metadata)

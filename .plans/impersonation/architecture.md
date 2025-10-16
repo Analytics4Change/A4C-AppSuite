@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document specifies the architecture for Super Admin impersonation capabilities in the A4C platform. Impersonation allows authorized administrators to view and operate the application as any user in any Provider organization while maintaining comprehensive audit trails for compliance and security.
+This document specifies the architecture for Super Admin impersonation capabilities in the A4C platform. Impersonation allows authorized administrators to view and operate the application as any user in any organization (provider or provider_partner types) while maintaining comprehensive audit trails for compliance and security.
 
 **Status:** Architectural Specification
 **Version:** 1.0
@@ -31,7 +31,7 @@ Platform support, emergency access, and compliance audits require Super Admin ab
 - View the application exactly as any user sees it
 - Perform actions on behalf of users (with full audit trail)
 - Troubleshoot user-reported issues in production
-- Access any Provider organization for support purposes
+- Access any provider or provider_partner organization for support purposes
 - Conduct compliance audits and data verification
 
 **Without impersonation**, support staff must:
@@ -67,11 +67,11 @@ Platform support, emergency access, and compliance audits require Super Admin ab
 5. Total time: 5 minutes instead of hours
 
 ### 2. Emergency Access
-**Scenario:** Provider Admin locked out of account, urgent medication update needed
+**Scenario:** provider_admin locked out of account, urgent medication update needed
 
 **Action:**
 1. Super Admin verifies emergency (phone call, support ticket)
-2. Impersonates Provider Admin
+2. Impersonates provider_admin
 3. Updates critical medication data
 4. Ends impersonation
 5. Full audit trail for compliance review
@@ -81,7 +81,7 @@ Platform support, emergency access, and compliance audits require Super Admin ab
 
 **Action:**
 1. Compliance Officer (Super Admin role) impersonates various roles
-2. Verifies data isolation (can't see other Provider data)
+2. Verifies data isolation (can't see other organization data)
 3. Tests RLS policies
 4. Documents findings with audit trail
 

@@ -1,0 +1,749 @@
+components:
+  messages:
+    OrganizationCreated:
+      name: organization.created
+      title: Organization Created
+      summary: A new organization has been created in the hierarchy
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationCreatedEvent'
+
+    OrganizationUpdated:
+      name: organization.updated
+      title: Organization Updated
+      summary: Organization information has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationUpdatedEvent'
+
+    OrganizationBusinessProfileCreated:
+      name: organization.business_profile.created
+      title: Organization Business Profile Created
+      summary: Business profile created for top-level organization during onboarding
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationBusinessProfileCreatedEvent'
+
+    OrganizationBusinessProfileUpdated:
+      name: organization.business_profile.updated
+      title: Organization Business Profile Updated
+      summary: Business profile information has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationBusinessProfileUpdatedEvent'
+
+    OrganizationDeactivated:
+      name: organization.deactivated
+      title: Organization Deactivated
+      summary: Organization has been deactivated (billing, compliance, operational)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationDeactivatedEvent'
+
+    OrganizationReactivated:
+      name: organization.reactivated
+      title: Organization Reactivated
+      summary: Organization has been restored to active status
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationReactivatedEvent'
+
+    OrganizationDeleted:
+      name: organization.deleted
+      title: Organization Deleted
+      summary: Organization has been logically deleted with cascade handling
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationDeletedEvent'
+
+    # Bootstrap Events - Organization creation via platform management
+    OrganizationBootstrapInitiated:
+      name: organization.bootstrap.initiated
+      title: Organization Bootstrap Initiated
+      summary: Bootstrap process started for new provider or provider_partner organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationBootstrapInitiatedEvent'
+
+    OrganizationZitadelCreated:
+      name: organization.zitadel.created
+      title: Organization Zitadel Created
+      summary: Zitadel organization and initial admin user successfully created
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationZitadelCreatedEvent'
+
+    OrganizationBootstrapCompleted:
+      name: organization.bootstrap.completed
+      title: Organization Bootstrap Completed
+      summary: Organization bootstrap process successfully completed
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationBootstrapCompletedEvent'
+
+    OrganizationBootstrapFailed:
+      name: organization.bootstrap.failed
+      title: Organization Bootstrap Failed
+      summary: Organization bootstrap process failed, triggering compensation
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationBootstrapFailedEvent'
+
+    OrganizationBootstrapCancelled:
+      name: organization.bootstrap.cancelled
+      title: Organization Bootstrap Cancelled
+      summary: Organization bootstrap process cancelled and cleanup completed
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationBootstrapCancelledEvent'
+
+  schemas:
+    OrganizationCreatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.created]
+        event_data:
+          $ref: '#/components/schemas/OrganizationCreationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationCreationData:
+      type: object
+      required:
+        - name
+        - slug
+        - type
+        - path
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          description: Human-readable organization name
+          examples:
+            - "ACME Healthcare Services"
+            - "North Campus"
+        display_name:
+          type: string
+          maxLength: 200
+          description: Display name for UI (may differ from name)
+        slug:
+          type: string
+          maxLength: 100
+          pattern: '^[a-z0-9-]+$'
+          description: URL-friendly identifier
+          examples:
+            - "acme-healthcare"
+            - "north-campus"
+        zitadel_org_id:
+          type: string
+          description: Zitadel organization ID (NULL for sub-organizations)
+        type:
+          type: string
+          enum: [platform_owner, provider, provider_partner]
+          description: |
+            Organization type determining access patterns and capabilities:
+            - platform_owner: A4C internal organization (impersonation capability)
+            - provider: Healthcare organizations serving clients (data owners)
+            - provider_partner: External stakeholders (VARs, families, courts - access via grants)
+        path:
+          type: string
+          description: ltree hierarchical path
+          examples:
+            - "root.org_acme_healthcare"
+            - "root.org_acme_healthcare.north_campus"
+        parent_path:
+          type: string
+          description: Parent organization ltree path (NULL for root organizations)
+        tax_number:
+          type: string
+          maxLength: 50
+          description: Tax identification number
+        phone_number:
+          type: string
+          maxLength: 20
+          description: Primary phone number
+        timezone:
+          type: string
+          default: "America/New_York"
+          description: Organization timezone
+        metadata:
+          type: object
+          description: Additional flexible data storage
+
+    OrganizationBusinessProfileCreatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.business_profile.created]
+        event_data:
+          $ref: '#/components/schemas/OrganizationBusinessProfileData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationBusinessProfileData:
+      type: object
+      required:
+        - organization_type
+      properties:
+        organization_type:
+          type: string
+          enum: [provider, provider_partner]
+          description: Type of business profile (platform_owner organizations don't have business profiles)
+        mailing_address:
+          $ref: '../components/schemas.yaml#/components/schemas/Address'
+        physical_address:
+          $ref: '../components/schemas.yaml#/components/schemas/Address'
+        provider_profile:
+          $ref: '#/components/schemas/ProviderBusinessProfile'
+        partner_profile:
+          $ref: '#/components/schemas/ProviderPartnerBusinessProfile'
+
+    ProviderBusinessProfile:
+      type: object
+      description: Business profile for Provider organizations (from Tenant-Management.png)
+      required:
+        - administrator_name
+        - administrator_email
+        - main_phone_number
+        - email
+        - program_name
+      properties:
+        # Billing Information (Provider-specific)
+        billing_name:
+          type: string
+          maxLength: 200
+        billing_tax:
+          type: string
+          maxLength: 50
+        billing_address:
+          $ref: '../components/schemas.yaml#/components/schemas/Address'
+        
+        # Provider Admin
+        administrator_name:
+          type: string
+          maxLength: 200
+        administrator_email:
+          type: string
+          format: email
+        email_provider:
+          type: string
+          maxLength: 100
+        
+        # Contact Information
+        main_phone_number:
+          type: string
+          maxLength: 20
+        additional_phone_number:
+          type: string
+          maxLength: 20
+        fax_number:
+          type: string
+          maxLength: 20
+        email:
+          type: string
+          format: email
+        
+        # Program Information (Provider-specific)
+        program_name:
+          type: string
+          maxLength: 200
+        service_types:
+          type: array
+          items:
+            type: string
+          description: Services offered by this provider
+
+    ProviderPartnerBusinessProfile:
+      type: object
+      description: Business profile for Provider Partner organizations (from Tenant-Management-Provider-Partner.png)
+      required:
+        - contact_name
+        - contact_email
+        - contact_phone
+        - administrator_name
+        - administrator_email
+      properties:
+        # Contact Information
+        contact_name:
+          type: string
+          maxLength: 200
+        contact_address:
+          $ref: '../components/schemas.yaml#/components/schemas/Address'
+        contact_email:
+          type: string
+          format: email
+        contact_phone:
+          type: string
+          maxLength: 20
+        
+        # Provider Partner Admin
+        administrator_name:
+          type: string
+          maxLength: 200
+        administrator_email:
+          type: string
+          format: email
+        email_provider:
+          type: string
+          maxLength: 100
+        
+        # Partner-specific metadata
+        partner_type:
+          type: string
+          enum: [var, family_access, court_system, social_services]
+          description: Type of provider partner relationship
+
+    OrganizationDeactivatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.deactivated]
+        event_data:
+          $ref: '#/components/schemas/OrganizationDeactivationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationDeactivationData:
+      type: object
+      required:
+        - organization_id
+        - deactivation_type
+        - effective_date
+        - cascade_to_children
+        - login_blocked
+        - role_assignment_blocked
+        - existing_users_affected
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        deactivation_type:
+          type: string
+          enum: [billing_suspension, compliance_violation, voluntary_suspension, maintenance]
+        effective_date:
+          type: string
+          format: date-time
+        cascade_to_children:
+          type: boolean
+          description: Whether deactivation affects child organizations
+        login_blocked:
+          type: boolean
+          description: Whether authentication is blocked (Platform Owner use case)
+        role_assignment_blocked:
+          type: boolean
+          description: Whether new role assignments are blocked (Descendant OU use case)
+        existing_users_affected:
+          type: boolean
+          description: Whether current user sessions are terminated
+        reactivation_conditions:
+          type: array
+          items:
+            type: string
+          description: Conditions that must be met for reactivation
+
+    OrganizationDeletedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.deleted]
+        event_data:
+          $ref: '#/components/schemas/OrganizationDeletionData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationDeletionData:
+      type: object
+      required:
+        - organization_id
+        - deleted_path
+        - deletion_strategy
+        - cascade_confirmed
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        deleted_path:
+          type: string
+          description: ltree path being deleted
+          examples:
+            - "root.org_acme_healthcare.north_campus"
+        deletion_strategy:
+          type: string
+          enum: [cascade_delete, block_if_children]
+          description: How to handle child organizations
+        cascade_confirmed:
+          type: boolean
+          description: User explicitly confirmed cascade deletion of children
+
+    # Placeholder schemas for update/reactivation events
+    OrganizationUpdatedEvent:
+      type: object
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.updated]
+
+    OrganizationBusinessProfileUpdatedEvent:
+      type: object
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.business_profile.updated]
+
+    OrganizationReactivatedEvent:
+      type: object
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.reactivated]
+
+    # Bootstrap Event Schemas
+    OrganizationBootstrapInitiatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization UUID (generated for new org)
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.bootstrap.initiated]
+        event_data:
+          $ref: '#/components/schemas/OrganizationBootstrapInitiationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationBootstrapInitiationData:
+      type: object
+      required:
+        - organization_type
+        - organization_name
+        - admin_email
+        - bootstrap_id
+      properties:
+        bootstrap_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this bootstrap process (for tracking)
+        organization_type:
+          type: string
+          enum: [provider, provider_partner]
+          description: Type of organization being bootstrapped
+        organization_name:
+          type: string
+          maxLength: 200
+          description: Human-readable organization name
+          examples:
+            - "ACME Healthcare Services"
+            - "XYZ Consulting Partners"
+        admin_email:
+          type: string
+          format: email
+          description: Email address for the initial organization administrator
+          examples:
+            - "admin@acmehealthcare.com"
+            - "director@xyzconsulting.com"
+        slug:
+          type: string
+          pattern: '^[a-z0-9_]+$'
+          description: URL-safe organization identifier (auto-generated if not provided)
+          examples:
+            - "acme_healthcare"
+            - "xyz_consulting"
+        contact_info:
+          type: object
+          description: Optional contact information for the organization
+          properties:
+            phone_number:
+              type: string
+            timezone:
+              type: string
+              default: "America/New_York"
+
+    OrganizationZitadelCreatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.zitadel.created]
+        event_data:
+          $ref: '#/components/schemas/OrganizationZitadelCreationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationZitadelCreationData:
+      type: object
+      required:
+        - bootstrap_id
+        - zitadel_org_id
+        - zitadel_user_id
+        - admin_email
+        - organization_name
+        - organization_type
+      properties:
+        bootstrap_id:
+          type: string
+          format: uuid
+          description: Links back to the bootstrap initiation
+        zitadel_org_id:
+          type: string
+          description: Zitadel organization ID returned from API
+        zitadel_user_id:
+          type: string
+          description: Zitadel user ID for the admin user
+        admin_email:
+          type: string
+          format: email
+        organization_name:
+          type: string
+        organization_type:
+          type: string
+          enum: [provider, provider_partner]
+        slug:
+          type: string
+          description: Final organization slug
+        invitation_sent:
+          type: boolean
+          description: Whether Zitadel invitation email was sent
+          default: true
+
+    OrganizationBootstrapCompletedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.bootstrap.completed]
+        event_data:
+          $ref: '#/components/schemas/OrganizationBootstrapCompletionData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationBootstrapCompletionData:
+      type: object
+      required:
+        - bootstrap_id
+        - organization_id
+        - admin_role_assigned
+        - permissions_granted
+      properties:
+        bootstrap_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        admin_role_assigned:
+          type: string
+          enum: [provider_admin, partner_admin]
+          description: Role assigned to the initial administrator
+        permissions_granted:
+          type: integer
+          description: Number of permissions granted to the admin role
+        zitadel_org_id:
+          type: string
+        ltree_path:
+          type: string
+          description: Organization ltree path in hierarchy
+          examples:
+            - "root.org_acme_healthcare"
+
+    OrganizationBootstrapFailedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.bootstrap.failed]
+        event_data:
+          $ref: '#/components/schemas/OrganizationBootstrapFailureData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationBootstrapFailureData:
+      type: object
+      required:
+        - bootstrap_id
+        - failure_stage
+        - error_message
+      properties:
+        bootstrap_id:
+          type: string
+          format: uuid
+        failure_stage:
+          type: string
+          enum: [zitadel_org_creation, zitadel_user_creation, organization_creation, role_assignment, permission_grants]
+          description: Stage where bootstrap process failed
+        error_message:
+          type: string
+          description: Error details for troubleshooting
+        zitadel_org_id:
+          type: string
+          description: Zitadel org ID if creation succeeded before failure
+        partial_cleanup_required:
+          type: boolean
+          description: Whether partial resources need cleanup
+          default: false
+
+    OrganizationBootstrapCancelledEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.bootstrap.cancelled]
+        event_data:
+          $ref: '#/components/schemas/OrganizationBootstrapCancellationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationBootstrapCancellationData:
+      type: object
+      required:
+        - bootstrap_id
+        - cleanup_completed
+      properties:
+        bootstrap_id:
+          type: string
+          format: uuid
+        cleanup_completed:
+          type: boolean
+          description: Whether all partial resources were successfully cleaned up
+        cleanup_actions:
+          type: array
+          items:
+            type: string
+          description: List of cleanup actions performed
+          examples:
+            - "deleted_zitadel_organization"
+            - "removed_partial_database_records"
+        original_failure_stage:
+          type: string
+          description: Original stage where bootstrap failed

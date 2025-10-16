@@ -9,6 +9,11 @@ This guide provides step-by-step instructions for implementing the permission-ba
 - `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - CQRS foundation
 - `/frontend/docs/EVENT-DRIVEN-GUIDE.md` - Frontend patterns
 
+**Bootstrap Integration:** 
+- ✅ `.plans/provider-management/bootstrap-workflows.md` - Organization bootstrap with role assignment
+- ✅ Role assignment events automatically emitted during bootstrap process
+- ✅ Cross-tenant access grants implemented and integrated
+
 ---
 
 ## Phase 1: Database Setup
@@ -38,6 +43,10 @@ psql -f sql/03-functions/event-processing/001-main-event-router.sql
 
 # 5. Seed initial permissions and roles
 psql -f sql/99-seeds/003-rbac-initial-setup.sql
+
+# NOTE: Cross-tenant access grants table already implemented ✅
+# The 005-cross_tenant_access_grants_projection.sql is already created
+# as part of the bootstrap architecture implementation
 ```
 
 ### Step 2: Verify Projections

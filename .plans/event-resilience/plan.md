@@ -343,24 +343,25 @@ interface HealthStatus {
 
 **Critical:** Session timeout still enforced client-side even if network offline.
 
-### Scenario 7: VAR Partner Cross-Tenant Access During Network Failure
-**Trigger**: VAR Partner (Value-Added Reseller) user attempts to access Provider data while offline
+### Scenario 7: Provider Partner Cross-Tenant Access During Network Failure
+**Trigger**: Provider Partner user (VAR consultant, court official, case worker, family member) attempts to access Provider data while offline
 
 **Organizational Context:**
 - All Provider organizations exist at root level in Zitadel (flat structure)
-- VAR Partner organizations also exist at root level (NOT hierarchical parent of Providers)
-- VAR partnerships tracked in `var_partnerships_projection` table (event-sourced metadata)
-- Cross-tenant access via `cross_tenant_access_grants_projection` (NOT Zitadel hierarchy)
+- Provider Partner organizations also exist at root level (NOT hierarchical parent of Providers)
+- Provider partner relationships tracked in type-specific projection tables (event-sourced metadata)
+- Cross-tenant access via `cross_tenant_access_grants_projection` (NOT Zitadel hierarchy) - **IMPLEMENTED ✅**
 
 **Behavior**:
 1. Access MUST be blocked if audit event cannot be written synchronously
 2. User sees: "Network required for compliance audit logging. Cross-tenant access requires real-time disclosure tracking."
 3. No IndexedDB queue for cross-tenant audit (prevents data exposure if device stolen)
 4. Rationale: HIPAA requires disclosure tracking before data access
-5. VAR partnership metadata validation requires online connection:
-   - Check `var_partnerships_projection.status = 'active'`
-   - Validate `contract_end_date` has not expired
-   - Verify `cross_tenant_access_grants_projection.revoked_at IS NULL`
+5. Provider partner relationship validation requires online connection:
+   - Check relationship-specific projection status (VAR partnerships, court orders, agency assignments, family consents)
+   - Validate time limits and expiration dates
+   - Verify `cross_tenant_access_grants_projection.revoked_at IS NULL` - **IMPLEMENTED ✅**
+   - Bootstrap architecture ensures organizations exist before grants can be created
 
 **Security Note:** Cross-tenant audit events contain sensitive metadata (who accessed which org, partnership status, grant IDs) and must not be persisted in client-accessible storage.
 

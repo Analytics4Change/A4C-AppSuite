@@ -79,8 +79,8 @@ Sub-providers (e.g., group homes within a larger organization) will be implement
 Zitadel Instance: analytics4change-zdswvg.us1.zitadel.cloud
 │
 ├── Analytics4Change (Zitadel Org) - Internal A4C Organization
-│   ├── Super Admin (role) - Can manage all providers
-│   ├── Provider Admin (role) - Can create/manage providers
+│   ├── Super Admin (role) - Can manage all organizations
+│   ├── Provider Admin (role) - Can create/manage provider organizations
 │   ├── Support roles - Created by Super Admin for impersonation
 │   └── Internal A4C users
 │
@@ -112,29 +112,36 @@ Zitadel Instance: analytics4change-zdswvg.us1.zitadel.cloud
     └── Family members accessing client data via grants
 ```
 
-### VAR Partnership Model (Event-Sourced Metadata)
+### Provider Partner Relationships (Event-Sourced Metadata)
 
-**NOT in Zitadel hierarchy** - tracked in PostgreSQL:
+**NOT in Zitadel hierarchy** - tracked in PostgreSQL via bootstrap architecture:
 
 ```sql
--- CQRS projection table (never updated directly)
+-- Provider partner relationships (type-specific projections) - IMPLEMENTED ✅
 CREATE TABLE var_partnerships_projection (
   id UUID PRIMARY KEY,
-  var_org_id UUID NOT NULL,        -- VAR Partner XYZ's org UUID
-  provider_org_id UUID NOT NULL,   -- Provider A's org UUID
+  partner_org_id UUID NOT NULL,    -- VAR partner org UUID (provider_partner type)
+  provider_org_id UUID NOT NULL,   -- Provider org UUID
+  partnership_type TEXT NOT NULL,  -- 'standard' or 'white_label'
   contract_start_date DATE NOT NULL,
   contract_end_date DATE,          -- NULL = ongoing
   status TEXT CHECK (status IN ('active', 'expired', 'terminated')),
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
+
+-- Unified cross-tenant access grants for all provider partner types - IMPLEMENTED ✅
+-- See: /infrastructure/supabase/sql/02-tables/rbac/005-cross_tenant_access_grants_projection.sql
 ```
 
-**Access Model**:
-- VAR gets cross-tenant access grants to Provider data
-- Grants reference partnership for authorization basis
+**Access Model (IMPLEMENTED ✅)**:
+- Provider partner organizations (VARs, courts, agencies, families) created via bootstrap architecture
+- Cross-tenant access grants via event-sourced `access_grant.*` events  
+- Grants reference relationship for authorization basis (VAR contracts, court orders, etc.)
 - Partnership expiration automatically revokes grants (event-driven)
-- Provider Zitadel org remains unchanged when VAR relationship ends
+- Provider Zitadel org remains unchanged when provider partner relationships end
+- Bootstrap completion required before provider partner relationship creation
+- Architecture supports multiple provider partner types: VARs, courts, social services, families
 
 ## User Roles and Access Patterns
 
@@ -142,34 +149,43 @@ CREATE TABLE var_partnerships_projection (
 - **Super Admin**: Complete system access, can impersonate any user, create support roles
 - **Provider Admin**: Create and manage provider organizations, set up initial administrators
 
+**Note**: These map to the 3-type organization system:
+- **platform_owner**: Analytics4Change org (Super Admin, Provider Admin roles)
+- **provider**: Healthcare provider organizations 
+- **provider_partner**: Provider partner organizations (VARs, courts, social services, families)
+
 ### Provider Organization Roles:
 - **Administrator**: Top-level role within each provider, manages all sub-providers and defines custom roles
 - **Custom Roles**: Defined by each provider's Administrator based on their needs
 
-### VAR Partner Roles:
-- **VAR Administrator**: Manages VAR organization
-- **VAR Consultant**: Access to Provider data based on grants
+### Provider Partner Roles:
+- **Partner Administrator**: Manages provider partner organization (VAR admin, court admin, agency admin, family admin)
+- **Partner Consultant**: Access to Provider data based on grants (VAR consultant, case worker, guardian, family member)
 
 ### Key Access Rules:
 - Users can belong to multiple sub-providers within the same provider organization
 - Users CANNOT belong to multiple provider organizations (would require separate logins)
 - Cross-organization access via `cross_tenant_access_grants_projection` table (event-sourced)
-- VAR Partners access Provider data through grants (NOT hierarchical ownership):
-  - Grants created when partnership is active
-  - Grants reference `var_partnerships_projection` for authorization basis
-  - Grants automatically revoked when partnership expires (event-driven)
-  - Provider org structure unchanged when VAR relationship ends
+- Provider Partners access Provider data through grants (NOT hierarchical ownership):
+  - Grants created when relationship is active (VAR contracts, court orders, agency assignments, family consents)
+  - Grants reference relationship-specific projection for authorization basis
+  - Grants automatically revoked when relationship expires/terminates (event-driven)
+  - Provider org structure unchanged when provider partner relationships end
 
-### VAR Access Lifecycle:
-1. **Partnership Created**: `var_partnership.created` event → partnership record in projection
-2. **Grant Issued**: Super Admin creates cross-tenant grant for VAR
+### Provider Partner Access Lifecycle:
+1. **Relationship Created**: Type-specific relationship event → relationship record in projection
+   - VAR: `provider_partner_relationship.created` (partnership terms)
+   - Court: `court_authorization.created` (court order)
+   - Agency: `agency_assignment.created` (case assignment)
+   - Family: `family_consent.created` (verified consent)
+2. **Grant Issued**: Admin creates cross-tenant grant for provider partner
    - Event: `access_grant.created`
-   - Authorization type: `var_contract`
-   - Legal reference: partnership UUID
-3. **VAR Accesses Data**: RLS policies check grant validity + partnership status
-4. **Contract Expires**: Background job detects expiration → `var_partnership.expired` event
+   - Authorization type: `var_contract`, `court_order`, `agency_assignment`, `family_consent`
+   - Legal reference: relationship UUID
+3. **Partner Accesses Data**: RLS policies check grant validity + relationship status
+4. **Relationship Expires**: Background job or manual action → relationship expiration event
 5. **Automatic Revocation**: Event processor emits `access_grant.revoked` events
-6. **Access Denied**: RLS policies now exclude VAR (grant revoked)
+6. **Access Denied**: RLS policies now exclude provider partner (grant revoked)
 
 ## Provider Information Requirements
 
@@ -238,28 +254,38 @@ Using Supabase's built-in capabilities:
 
 #### Schema Design:
 ```sql
--- Core provider table with all essential fields
-CREATE TABLE providers (
-  id UUID PRIMARY KEY, -- Matches Zitadel org_id
-  -- ... fields as defined above
-  metadata JSONB DEFAULT '{}', -- Extensible for future fields
-);
-
--- Hierarchical sub-providers
-CREATE TABLE sub_providers (
+-- CQRS Projection: Organizations (replaces providers table)
+CREATE TABLE organizations_projection (
   id UUID PRIMARY KEY,
-  provider_id UUID REFERENCES providers(id),
-  parent_id UUID REFERENCES sub_providers(id), -- Self-referential for hierarchy
-  level INT CHECK (level <= 3), -- Enforce maximum depth
+  name TEXT NOT NULL,
+  path LTREE NOT NULL UNIQUE,
+  type TEXT NOT NULL CHECK (type IN ('platform_owner', 'provider', 'provider_partner')),
+  parent_path LTREE,
+  depth INTEGER NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  deleted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
 );
 
--- Data-driven configuration tables
-CREATE TABLE provider_types (/* ... */);
-CREATE TABLE subscription_tiers (/* ... */);
+-- CQRS Projection: Business profiles for top-level organizations only
+CREATE TABLE organization_business_profiles_projection (
+  organization_id UUID PRIMARY KEY REFERENCES organizations_projection(id),
+  organization_type TEXT NOT NULL CHECK (organization_type IN ('provider', 'provider_partner')),
+  mailing_address JSONB,
+  physical_address JSONB,
+  provider_profile JSONB,    -- Only for type=provider
+  partner_profile JSONB,     -- Only for type=provider_partner
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
 
--- Comprehensive audit trail
-CREATE TABLE audit_log (
-  -- Captures all changes with user context
+-- Event-sourced VAR partnerships (unchanged)
+CREATE TABLE var_partnerships_projection (
+  id UUID PRIMARY KEY,
+  var_org_id UUID NOT NULL,
+  provider_org_id UUID NOT NULL,
+  -- ... rest unchanged
 );
 ```
 

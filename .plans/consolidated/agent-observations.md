@@ -59,34 +59,43 @@ root (Analytics4Change Platform - Virtual Root)
 ├── org_acme_healthcare (Provider - Direct Customer - Zitadel Org)
 │   └── [Provider-defined internal hierarchy - see examples below]
 │
-├── org_sunshine_youth (Provider - VAR Customer - Zitadel Org)
+├── org_sunshine_youth (Provider - Has VAR Partner - Zitadel Org)
 │   └── [Provider-defined internal hierarchy - see examples below]
 │
-├── org_var_partner_xyz (Provider Partner - VAR - Zitadel Org)
-│   └── Users: var_admin, var_consultant
+├── org_var_partner_xyz (Provider Partner - VAR Type - Zitadel Org)
+│   └── Users: partner_admin, var_consultant
 │       └── Access: Managed via cross_tenant_access_grants (metadata, not hierarchy)
 │
-└── org_families_shared (Shared Family Access - Zitadel Org)
-    └── Users: family_member_1, family_member_2
-        └── Access: Client-scoped grants to Provider data
+├── org_county_court (Provider Partner - Court Type - Zitadel Org)
+│   └── Users: court_admin, guardian_ad_litem
+│       └── Access: Court order-based grants to Provider data
+│
+├── org_cps_agency (Provider Partner - Social Services Type - Zitadel Org)
+│   └── Users: agency_admin, case_worker
+│       └── Access: Assignment-based grants to Provider data
+│
+└── org_johnson_family (Provider Partner - Family Type - Zitadel Org)
+    └── Users: parent_guardian
+        └── Access: Consent-based grants to family member data
 ```
 
 **CRITICAL ARCHITECTURAL PRINCIPLES:**
 
-1. **All Providers are at Root Level**: VAR relationships do NOT create hierarchical ownership
-   - Rationale: VAR contract expiration cannot trigger ltree path reorganization
-   - VAR partnerships tracked in `var_partnerships_projection` table (metadata)
-   - Provider ltree paths remain stable regardless of business relationships
+1. **All Organizations at Root Level**: Provider partner relationships do NOT create hierarchical ownership
+   - Rationale: Contract/agreement expiration cannot trigger ltree path reorganization
+   - Provider partner relationships tracked in type-specific projection tables (metadata)
+   - Provider ltree paths remain stable regardless of partner relationships
 
 2. **Provider-Defined Internal Hierarchies**: No prescribed structure below Provider root
    - Providers create their own organizational taxonomy
    - System enforces ltree relationships, NOT semantic levels
    - Rationale: Cannot predict how Providers name their organizational units
 
-3. **VAR Relationships are Optional**: Not all Providers are associated with VARs
+3. **Provider Partner Relationships are Optional**: Not all Providers have partner relationships
    - Default: Direct Provider customer (e.g., `org_acme_healthcare`)
-   - Optional: VAR partnership tracked in projection table
-   - Flexible: Providers can change VARs without data migration
+   - Optional: Provider partner relationships tracked in projection tables
+   - Flexible: Providers can change partners or end relationships without data migration
+   - Multiple types: VARs (commercial), courts (legal), agencies (statutory), families (consent-based)
 
 **Real-World Provider Hierarchy Examples:**
 
@@ -359,6 +368,57 @@ WHEN 'var_partnership.expired' THEN
 - RLS policies filter all queries: `WHERE org_id = current_setting('app.current_org')`
 - Connection pooling requires per-tenant isolation (Supavisor configuration)
 - API Gateway validates subdomain → org_id mapping
+
+---
+
+## Organization Bootstrap Architecture
+
+**Primary Documents:** `.plans/provider-management/bootstrap-workflows.md`, `.plans/provider-management/partner-bootstrap-sequence.md`, `.plans/zitadel-integration/bootstrap-api-flows.md`
+
+**Problem Statement:** Creating new Provider and Provider Partner organizations requires complex orchestration of Zitadel API calls, database updates, role assignments, and audit events while maintaining data consistency and error resilience.
+
+**Solution Architecture: Event-Driven Bootstrap Orchestration**
+
+The bootstrap architecture provides comprehensive workflows for creating organizations with proper Zitadel integration:
+
+**Key Components:**
+- **Bootstrap Orchestrator**: Coordinates multi-step organization creation process
+- **Circuit Breaker**: Protects against Zitadel API failures with exponential backoff
+- **Compensation Events**: Handles partial failures and cleanup of incomplete bootstrap attempts
+- **Event-Driven Status**: All bootstrap state changes captured as immutable events
+
+**Bootstrap Workflow:**
+```
+Platform Admin → Bootstrap UI → organization.bootstrap.initiated → Circuit Breaker Check → Zitadel API Calls → organization.zitadel.created → organization.created → user.role.assigned → organization.bootstrap.completed
+```
+
+**Event Schemas:**
+- `organization.bootstrap.initiated` - Bootstrap process started
+- `organization.zitadel.created` - Zitadel organization and user created successfully
+- `organization.created` - Database organization record created  
+- `organization.bootstrap.completed` - Full bootstrap process finished
+- `organization.bootstrap.failed` - Bootstrap failed, compensation required
+- `organization.bootstrap.cancelled` - Failed bootstrap cleaned up
+
+**Error Resilience:**
+- **Circuit Breaker**: Protects against Zitadel API outages (3 failures = 5-minute timeout)
+- **Exponential Backoff**: Retry failed API calls with 1s, 2s, 4s, 8s delays
+- **Compensation Events**: Clean up partial resources when bootstrap fails
+- **Manual Retry**: Failed bootstraps can be retried with new IDs
+
+**Organization Types Supported:**
+1. **Provider Organizations**: Healthcare providers serving at-risk youth
+   - Creates root-level Zitadel organization
+   - Assigns `provider_admin` role to initial administrator
+   - Establishes ltree path: `root.org_provider_name`
+
+2. **Provider Partner Organizations**: External stakeholders requiring cross-tenant access
+   - VAR partners, court systems, social services, family organizations
+   - Creates root-level Zitadel organization (NOT hierarchical child)
+   - Assigns `partner_admin` role to initial administrator
+   - Enables future cross-tenant access grant creation
+
+**Implementation Status:** ✅ **FULLY IMPLEMENTED** - Bootstrap infrastructure operational with comprehensive error handling and audit trails.
 
 ---
 
@@ -707,23 +767,29 @@ user_roles_projection (user_id, role_id, org_id, scope_path)
 ```
 CQRS/Event Sourcing Foundation (FOUNDATIONAL LAYER)
   │
-  └─→ Multi-Tenancy Foundation (CRITICAL PATH)
-        │
-        ├─→ Cross-Tenant Access Model (BLOCKS: Auth Integration)
-        │     │
-        │     └─→ Auth Integration (BLOCKS: RBAC, Impersonation, Event Resilience)
-        │           │
-        │           ├─→ RBAC/Permissions (DEPENDS ON: Event-sourced roles/permissions)
-        │           │     │
-        │           │     └─→ Impersonation (DEPENDS ON: Permission inheritance from target user)
-        │           │
-        │           └─→ Event Resilience (DEPENDS ON: org_id + impersonation metadata in events)
-        │
-        └─→ Remote Access (DEPENDS ON: Tenant isolation for developer DB access)
+  ├─→ Organization Bootstrap Architecture (FOUNDATIONAL INFRASTRUCTURE)
+  │     │
+  │     └─→ Multi-Tenancy Foundation (CRITICAL PATH)
+  │           │
+  │           ├─→ Cross-Tenant Access Model (BLOCKS: Auth Integration)
+  │           │     │
+  │           │     └─→ Auth Integration (BLOCKS: RBAC, Impersonation, Event Resilience)
+  │           │           │
+  │           │           ├─→ RBAC/Permissions (DEPENDS ON: Event-sourced roles/permissions)
+  │           │           │     │
+  │           │           │     └─→ Impersonation (DEPENDS ON: Permission inheritance from target user)
+  │           │           │
+  │           │           └─→ Event Resilience (DEPENDS ON: org_id + impersonation metadata in events)
+  │           │
+  │           └─→ Remote Access (DEPENDS ON: Tenant isolation for developer DB access)
+  │
+  └─→ [Bootstrap enables all organization creation for the entire platform]
 ```
 
 **Rationale:**
 - **CQRS/Event Sourcing is foundational** because all state changes (including permissions) are event-sourced
+- **Bootstrap Architecture is foundational infrastructure** because organizations must exist before any other platform features can function
+- **Multi-tenancy depends on bootstrap** because organizations are created through bootstrap workflows
 - **Cross-tenant access model must precede auth** because JWT structure needs to include Provider Partner access grants
 - **Auth must precede RBAC** because authentication provides user context for permission checks
 - **RBAC must precede impersonation** because impersonation inherits target user's permissions
@@ -773,6 +839,7 @@ CQRS/Event Sourcing Foundation (FOUNDATIONAL LAYER)
 ### Phase 1: Foundation (Current Focus)
 **Goal:** Establish multi-tenant identity and data isolation
 **Deliverables:**
+- ✅ **Organization Bootstrap Architecture**: Event-driven organization creation with comprehensive error handling
 - Zitadel organization-per-tenant configured
 - PostgreSQL ltree + RLS implemented
 - Subdomain routing functional
@@ -810,7 +877,7 @@ CQRS/Event Sourcing Foundation (FOUNDATIONAL LAYER)
 
 ## Open Questions for Product Team
 
-1. **Tenant Onboarding:** How will new organizations be provisioned in Zitadel? Self-service vs. manual?
+1. **Bootstrap UI/UX:** Should organization bootstrap be self-service (provider signup portal) vs. manual (platform admin only)? Current architecture supports both models.
 2. **Hierarchy Depth Limits:** Is there a practical maximum depth for facility → program → team nesting?
 3. **Cross-Tenant Collaboration:** Do any use cases require sharing data between organizations (e.g., inter-facility referrals)?
 4. **Event Retention:** How long should failed events persist in IndexedDB before alerting users?
@@ -863,6 +930,11 @@ The A4C AppSuite architecture demonstrates **cohesive design across security, re
 ### CQRS/Event Sourcing
 - `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - Complete event sourcing specification
 - `/frontend/docs/EVENT-DRIVEN-GUIDE.md` - Frontend event implementation patterns
+
+### Organization Bootstrap
+- `.plans/provider-management/bootstrap-workflows.md` - Organization bootstrap architecture and workflows
+- `.plans/provider-management/partner-bootstrap-sequence.md` - Provider partner bootstrap workflow
+- `.plans/zitadel-integration/bootstrap-api-flows.md` - Zitadel Management API integration
 
 ### Multi-Tenancy & Auth
 - `.plans/multi-tenancy/multi-tenancy-organization.html` - Multi-tenancy architecture
