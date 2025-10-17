@@ -58,6 +58,10 @@ coverage/
 .terraform/
 .terraform.lock.hcl
 
+# Kubernetes secrets (never commit actual secrets!)
+**/secrets.yaml
+!**/secrets-template.yaml
+
 # Git-crypt
 .git-crypt/
 

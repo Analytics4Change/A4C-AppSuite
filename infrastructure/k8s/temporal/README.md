@@ -27,21 +27,33 @@ kubectl apply -f namespace.yaml
 
 ### Step 2: Create Secrets
 
+**IMPORTANT**: Never commit `secrets.yaml` to git! It's already in `.gitignore`.
+
 ```bash
-# Copy secrets-template.yaml to secrets.yaml
+# Copy template
 cp secrets-template.yaml secrets.yaml
 
-# Edit secrets.yaml with actual credentials (git-crypted)
+# Edit secrets.yaml with actual credentials
 # Fill in:
-# - CLOUDFLARE_API_TOKEN
-# - CLOUDFLARE_ZONE_ID
-# - ZITADEL_API_URL
-# - ZITADEL_SERVICE_TOKEN
-# - SUPABASE_URL
-# - SUPABASE_SERVICE_ROLE_KEY
+# - CLOUDFLARE_API_TOKEN (from cert.pem or Cloudflare dashboard)
+# - CLOUDFLARE_ZONE_ID (from cert.pem or Cloudflare dashboard)
+# - ZITADEL_SERVICE_USER_ID (from Zitadel console)
+# - ZITADEL_SERVICE_USER_SECRET (from Zitadel console)
+# - SUPABASE_SERVICE_ROLE_KEY (from Supabase dashboard)
 
+# Apply to cluster
 kubectl apply -f secrets.yaml
+
+# Verify secret was created
+kubectl get secret -n temporal temporal-credentials
 ```
+
+**Security Best Practices**:
+- ✅ `secrets.yaml` is in `.gitignore` (never committed)
+- ✅ Use `secrets-template.yaml` for documentation only
+- ✅ Store actual secrets in password manager or sealed secrets
+- ✅ Rotate credentials regularly
+- ✅ Use RBAC to limit secret access in cluster
 
 ### Step 3: Create ConfigMaps
 
