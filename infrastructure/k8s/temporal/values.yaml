@@ -1,0 +1,130 @@
+# Temporal Helm Chart Values
+# For use with: helm install temporal temporalio/temporal -f values.yaml
+
+# Server configuration
+server:
+  replicaCount: 1
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+  # Temporal server configuration
+  config:
+    persistence:
+      default:
+        driver: "sql"
+        sql:
+          driver: "postgres"
+          host: "tmrjlswbsxmbglmaclxu.supabase.co"
+          port: 5432
+          database: "postgres"
+          maxConns: 20
+          maxConnLifetime: "1h"
+          # credentials from secret
+          existingSecret: "temporal-credentials"
+          secretName: "temporal-credentials"
+          user: "postgres"
+          password: "SUPABASE_SERVICE_ROLE_KEY" # Will be replaced by secret
+
+      visibility:
+        driver: "sql"
+        sql:
+          driver: "postgres"
+          host: "tmrjlswbsxmbglmaclxu.supabase.co"
+          port: 5432
+          database: "postgres"
+          maxConns: 10
+          maxConnLifetime: "1h"
+          existingSecret: "temporal-credentials"
+          secretName: "temporal-credentials"
+          user: "postgres"
+          password: "SUPABASE_SERVICE_ROLE_KEY"
+
+# Web UI configuration
+web:
+  enabled: true
+  replicaCount: 1
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  # UI configuration
+  config:
+    # Point to Temporal server
+    temporalGrpcAddress: "temporal-frontend.temporal.svc.cluster.local:7233"
+    # UI settings
+    auth:
+      enabled: false # Enable later if needed
+    cors:
+      allowOrigins:
+        - "*" # Restrict in production
+
+# Elasticsearch (disable - using PostgreSQL visibility)
+elasticsearch:
+  enabled: false
+
+# Prometheus (optional - enable for metrics)
+prometheus:
+  enabled: false
+
+# Grafana (optional - enable for dashboards)
+grafana:
+  enabled: false
+
+# Schema setup job
+schema:
+  setup:
+    enabled: true
+    backoffLimit: 100
+
+  update:
+    enabled: true
+
+# Cassandra (disable - using PostgreSQL)
+cassandra:
+  enabled: false
+
+# MySQL (disable - using PostgreSQL)
+mysql:
+  enabled: false
+
+# PostgreSQL (deploy dedicated instance or use existing)
+postgresql:
+  enabled: true # Set to false if using external Supabase PostgreSQL
+
+  auth:
+    postgresPassword: "temporal-dev-password" # Change in production
+    database: "temporal"
+
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+# Additional labels
+commonLabels:
+  app: temporal
+  managed-by: helm
+  project: a4c
