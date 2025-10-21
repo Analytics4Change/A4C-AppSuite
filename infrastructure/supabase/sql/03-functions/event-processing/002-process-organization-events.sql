@@ -4,7 +4,7 @@
 
 -- Main organization event processor
 CREATE OR REPLACE FUNCTION process_organization_event(
-  p_event domain_events
+  p_event RECORD
 ) RETURNS VOID AS $$
 DECLARE
   v_depth INTEGER;
@@ -41,10 +41,10 @@ BEGIN
         safe_jsonb_extract_text(p_event.event_data, 'zitadel_org_id'),
         safe_jsonb_extract_text(p_event.event_data, 'type'),
         (p_event.event_data->>'path')::LTREE,
-        CASE 
-          WHEN p_event.event_data ? 'parent_path' 
+        CASE
+          WHEN p_event.event_data ? 'parent_path'
           THEN (p_event.event_data->>'parent_path')::LTREE
-          ELSE NULL 
+          ELSE NULL
         END,
         nlevel((p_event.event_data->>'path')::LTREE),
         safe_jsonb_extract_text(p_event.event_data, 'tax_number'),
@@ -53,6 +53,70 @@ BEGIN
         COALESCE(p_event.event_data->'metadata', '{}'::jsonb),
         p_event.created_at
       );
+
+      -- Populate Zitadel organization mapping (if zitadel_org_id exists)
+      IF safe_jsonb_extract_text(p_event.event_data, 'zitadel_org_id') IS NOT NULL THEN
+        PERFORM upsert_org_mapping(
+          p_event.stream_id,
+          safe_jsonb_extract_text(p_event.event_data, 'zitadel_org_id'),
+          safe_jsonb_extract_text(p_event.event_data, 'name')
+        );
+      END IF;
+
+    -- Handle subdomain DNS record creation
+    WHEN 'organization.subdomain.dns_created' THEN
+      UPDATE organizations_projection
+      SET
+        subdomain_status = 'verifying',
+        cloudflare_record_id = safe_jsonb_extract_text(p_event.event_data, 'cloudflare_record_id'),
+        subdomain_metadata = jsonb_set(
+          COALESCE(subdomain_metadata, '{}'::jsonb),
+          '{dns_record}',
+          jsonb_build_object(
+            'type', safe_jsonb_extract_text(p_event.event_data, 'dns_record_type'),
+            'value', safe_jsonb_extract_text(p_event.event_data, 'dns_record_value'),
+            'zone_id', safe_jsonb_extract_text(p_event.event_data, 'cloudflare_zone_id'),
+            'created_at', p_event.created_at
+          )
+        ),
+        updated_at = p_event.created_at
+      WHERE id = p_event.stream_id;
+
+    -- Handle successful subdomain verification
+    WHEN 'organization.subdomain.verified' THEN
+      UPDATE organizations_projection
+      SET
+        subdomain_status = 'verified',
+        dns_verified_at = (p_event.event_data->>'verified_at')::TIMESTAMPTZ,
+        subdomain_metadata = jsonb_set(
+          COALESCE(subdomain_metadata, '{}'::jsonb),
+          '{verification}',
+          jsonb_build_object(
+            'method', safe_jsonb_extract_text(p_event.event_data, 'verification_method'),
+            'attempts', (p_event.event_data->>'verification_attempts')::INTEGER,
+            'verified_at', p_event.event_data->>'verified_at'
+          )
+        ),
+        updated_at = p_event.created_at
+      WHERE id = p_event.stream_id;
+
+    -- Handle subdomain verification failure
+    WHEN 'organization.subdomain.verification_failed' THEN
+      UPDATE organizations_projection
+      SET
+        subdomain_status = 'failed',
+        subdomain_metadata = jsonb_set(
+          COALESCE(subdomain_metadata, '{}'::jsonb),
+          '{failure}',
+          jsonb_build_object(
+            'reason', safe_jsonb_extract_text(p_event.event_data, 'failure_reason'),
+            'retry_count', (p_event.event_data->>'retry_count')::INTEGER,
+            'will_retry', safe_jsonb_extract_boolean(p_event.event_data, 'will_retry'),
+            'failed_at', p_event.created_at
+          )
+        ),
+        updated_at = p_event.created_at
+      WHERE id = p_event.stream_id;
 
     -- Handle business profile creation
     WHEN 'organization.business_profile.created' THEN

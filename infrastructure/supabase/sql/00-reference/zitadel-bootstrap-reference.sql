@@ -329,7 +329,7 @@ $$ LANGUAGE plpgsql;
 -- Function to continue bootstrap after Zitadel creation
 -- Emits organization.created and role assignment events
 CREATE OR REPLACE FUNCTION continue_bootstrap_after_zitadel(
-  p_event domain_events
+  p_event RECORD
 ) RETURNS VOID AS $$
 DECLARE
   v_bootstrap_id UUID;

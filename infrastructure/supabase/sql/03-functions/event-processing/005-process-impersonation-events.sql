@@ -3,7 +3,7 @@
 -- Handles: impersonation.started, impersonation.renewed, impersonation.ended
 
 CREATE OR REPLACE FUNCTION process_impersonation_event(
-  p_event domain_events
+  p_event RECORD
 ) RETURNS VOID AS $$
 DECLARE
   v_session_id TEXT;
@@ -52,12 +52,18 @@ BEGIN
         (p_event.event_data->'super_admin'->>'user_id')::UUID,
         p_event.event_data->'super_admin'->>'email',
         p_event.event_data->'super_admin'->>'name',
-        p_event.event_data->'super_admin'->>'org_id',
+        -- Convert super_admin org_id: NULL for platform super_admin, resolve Zitadel ID to UUID for org-scoped admin
+        CASE
+          WHEN p_event.event_data->'super_admin'->>'org_id' IS NULL THEN NULL
+          WHEN p_event.event_data->'super_admin'->>'org_id' = '*' THEN NULL
+          ELSE get_internal_org_id(p_event.event_data->'super_admin'->>'org_id')
+        END,
         -- Target
         (p_event.event_data->'target'->>'user_id')::UUID,
         p_event.event_data->'target'->>'email',
         p_event.event_data->'target'->>'name',
-        p_event.event_data->'target'->>'org_id',
+        -- Convert target org_id: Zitadel ID to internal UUID
+        get_internal_org_id(p_event.event_data->'target'->>'org_id'),
         p_event.event_data->'target'->>'org_name',
         p_event.event_data->'target'->>'org_type',
         -- Justification
@@ -185,7 +191,7 @@ COMMENT ON FUNCTION get_user_active_impersonation_sessions IS 'Returns all activ
 
 -- Get impersonation audit trail for an organization
 CREATE OR REPLACE FUNCTION get_org_impersonation_audit(
-  p_org_id TEXT,
+  p_org_id UUID,  -- Internal org UUID
   p_start_date TIMESTAMPTZ DEFAULT NOW() - INTERVAL '30 days',
   p_end_date TIMESTAMPTZ DEFAULT NOW()
 ) RETURNS TABLE (
@@ -250,7 +256,7 @@ CREATE OR REPLACE FUNCTION get_impersonation_session_details(
   session_id TEXT,
   super_admin_user_id UUID,
   target_user_id UUID,
-  target_org_id TEXT,
+  target_org_id UUID,  -- Internal UUID
   expires_at TIMESTAMPTZ,
   status TEXT
 ) AS $$

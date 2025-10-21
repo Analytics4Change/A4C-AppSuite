@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS clients (
 
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL,
 
   -- Basic Information
   first_name TEXT NOT NULL,
@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS clients (
   metadata JSONB DEFAULT '{}',
 
   -- Audit
-  created_by UUID REFERENCES users(id),
-  updated_by UUID REFERENCES users(id),
+  created_by UUID,
+  updated_by UUID,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

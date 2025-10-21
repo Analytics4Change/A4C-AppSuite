@@ -4,7 +4,7 @@
 
 -- Main access grant event processor
 CREATE OR REPLACE FUNCTION process_access_grant_event(
-  p_event domain_events
+  p_event RECORD
 ) RETURNS VOID AS $$
 DECLARE
   v_grant_id UUID;
@@ -157,9 +157,9 @@ BEGIN
   -- If user-specific grant, validate user belongs to consultant org
   IF p_user_id IS NOT NULL THEN
     IF NOT EXISTS (
-      SELECT 1 FROM user_roles_projection 
-      WHERE user_id = p_user_id 
-        AND org_id = p_consultant_org_id::TEXT
+      SELECT 1 FROM user_roles_projection
+      WHERE user_id = p_user_id
+        AND org_id = p_consultant_org_id
     ) THEN
       RETURN false;
     END IF;

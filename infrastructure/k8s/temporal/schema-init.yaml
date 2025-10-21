@@ -1,0 +1,97 @@
+---
+# Job to initialize Temporal database schemas
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: temporal-schema-init
+  namespace: temporal
+  labels:
+    app: temporal-schema-init
+    project: a4c
+spec:
+  template:
+    metadata:
+      labels:
+        app: temporal-schema-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: schema-setup
+        image: temporalio/admin-tools:1.29
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "Creating temporal database..."
+          temporal-sql-tool \
+            --plugin postgres12 \
+            --ep temporal-postgresql.temporal.svc.cluster.local \
+            --port 5432 \
+            --user postgres \
+            --password temporal-dev-password \
+            --database temporal \
+            create-database
+
+          echo "Setting up temporal schema..."
+          temporal-sql-tool \
+            --plugin postgres12 \
+            --ep temporal-postgresql.temporal.svc.cluster.local \
+            --port 5432 \
+            --user postgres \
+            --password temporal-dev-password \
+            --database temporal \
+            setup-schema -v 0.0
+
+          echo "Updating temporal schema..."
+          temporal-sql-tool \
+            --plugin postgres12 \
+            --ep temporal-postgresql.temporal.svc.cluster.local \
+            --port 5432 \
+            --user postgres \
+            --password temporal-dev-password \
+            --database temporal \
+            update-schema -d /etc/temporal/schema/postgresql/v12/temporal/versioned
+
+          echo "Creating temporal_visibility database..."
+          temporal-sql-tool \
+            --plugin postgres12 \
+            --ep temporal-postgresql.temporal.svc.cluster.local \
+            --port 5432 \
+            --user postgres \
+            --password temporal-dev-password \
+            --database temporal_visibility \
+            create-database
+
+          echo "Setting up visibility schema..."
+          temporal-sql-tool \
+            --plugin postgres12 \
+            --ep temporal-postgresql.temporal.svc.cluster.local \
+            --port 5432 \
+            --user postgres \
+            --password temporal-dev-password \
+            --database temporal_visibility \
+            setup-schema -v 0.0
+
+          echo "Updating visibility schema..."
+          temporal-sql-tool \
+            --plugin postgres12 \
+            --ep temporal-postgresql.temporal.svc.cluster.local \
+            --port 5432 \
+            --user postgres \
+            --password temporal-dev-password \
+            --database temporal_visibility \
+            update-schema -d /etc/temporal/schema/postgresql/v12/visibility/versioned
+
+          echo "Schema initialization complete!"
+        env:
+        - name: SQL_PLUGIN
+          value: "postgres12"
+        - name: SQL_HOST
+          value: "temporal-postgresql.temporal.svc.cluster.local"
+        - name: SQL_PORT
+          value: "5432"
+        - name: SQL_USER
+          value: "postgres"
+        - name: SQL_PASSWORD
+          value: "temporal-dev-password"

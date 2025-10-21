@@ -3,14 +3,14 @@
 CREATE TABLE IF NOT EXISTS dosage_info (
 
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  medication_history_id UUID NOT NULL REFERENCES medication_history(id) ON DELETE CASCADE,
-  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL,
+  medication_history_id UUID NOT NULL,
+  client_id UUID NOT NULL,
 
   -- Administration Details
   scheduled_datetime TIMESTAMPTZ NOT NULL,
   administered_datetime TIMESTAMPTZ,
-  administered_by UUID REFERENCES users(id),
+  administered_by UUID,
 
   -- Dosage
   scheduled_amount DECIMAL NOT NULL,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS dosage_info (
   adverse_reaction_details TEXT,
 
   -- Verification
-  verified_by UUID REFERENCES users(id),
+  verified_by UUID,
   verification_datetime TIMESTAMPTZ,
 
   -- Additional Data

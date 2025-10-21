@@ -3,8 +3,8 @@
 -- Source of truth: role.permission.granted/revoked events in domain_events table
 
 CREATE TABLE IF NOT EXISTS role_permissions_projection (
-  role_id UUID NOT NULL REFERENCES roles_projection(id) ON DELETE CASCADE,
-  permission_id UUID NOT NULL REFERENCES permissions_projection(id) ON DELETE CASCADE,
+  role_id UUID NOT NULL,
+  permission_id UUID NOT NULL,
   granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
   PRIMARY KEY (role_id, permission_id)

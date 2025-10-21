@@ -8,7 +8,7 @@
 // Base Event Structure
 // ============================================================================
 
-export type StreamType = 'client' | 'medication' | 'medication_history' | 'dosage' | 'user' | 'organization' | 'access_grant';
+export type StreamType = 'client' | 'medication' | 'medication_history' | 'dosage' | 'user' | 'organization' | 'access_grant' | 'subdomain';
 
 export interface EventMetadata {
   user_id: string;
@@ -232,6 +232,64 @@ export interface OrganizationCreationData {
 export interface OrganizationCreatedEvent extends DomainEvent<OrganizationCreationData> {
   stream_type: 'organization';
   event_type: 'organization.created';
+  event_metadata: EventMetadata & {
+    reason: string;
+  };
+}
+
+// ============================================================================
+// Subdomain Provisioning Events
+// ============================================================================
+
+export interface SubdomainDNSCreatedData {
+  organization_id: string;
+  slug: string;
+  base_domain: string;
+  full_subdomain: string;
+  cloudflare_record_id: string;
+  dns_record_type: 'CNAME' | 'A';
+  dns_record_value: string;
+  cloudflare_zone_id: string;
+}
+
+export interface SubdomainDNSCreatedEvent extends DomainEvent<SubdomainDNSCreatedData> {
+  stream_type: 'organization';
+  event_type: 'organization.subdomain.dns_created';
+  event_metadata: EventMetadata & {
+    reason: string;
+  };
+}
+
+export interface SubdomainVerifiedData {
+  organization_id: string;
+  slug: string;
+  full_subdomain: string;
+  verified_at: string;
+  verification_method: 'dns_lookup' | 'http_check';
+  verification_attempts: number;
+}
+
+export interface SubdomainVerifiedEvent extends DomainEvent<SubdomainVerifiedData> {
+  stream_type: 'organization';
+  event_type: 'organization.subdomain.verified';
+  event_metadata: EventMetadata & {
+    reason: string;
+  };
+}
+
+export interface SubdomainVerificationFailedData {
+  organization_id: string;
+  slug: string;
+  full_subdomain: string;
+  failure_reason: string;
+  retry_count: number;
+  will_retry: boolean;
+  next_retry_at?: string;
+}
+
+export interface SubdomainVerificationFailedEvent extends DomainEvent<SubdomainVerificationFailedData> {
+  stream_type: 'organization';
+  event_type: 'organization.subdomain.verification_failed';
   event_metadata: EventMetadata & {
     reason: string;
   };

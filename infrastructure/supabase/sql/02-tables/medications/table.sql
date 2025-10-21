@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS medications (
 
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL,
 
   -- Medication Information
   name TEXT NOT NULL,
@@ -41,8 +41,8 @@ CREATE TABLE IF NOT EXISTS medications (
   is_formulary BOOLEAN DEFAULT true,
 
   -- Audit
-  created_by UUID REFERENCES users(id),
-  updated_by UUID REFERENCES users(id),
+  created_by UUID,
+  updated_by UUID,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

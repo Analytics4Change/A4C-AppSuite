@@ -1,7 +1,7 @@
 -- Process Medication Events
 -- Projects medication-related events to medications, medication_history, and dosage_info tables
 CREATE OR REPLACE FUNCTION process_medication_event(
-  p_event domain_events
+  p_event RECORD
 ) RETURNS VOID AS $$
 BEGIN
   -- Validate event sequence
@@ -122,7 +122,7 @@ $$ LANGUAGE plpgsql;
 
 -- Process Medication History Events
 CREATE OR REPLACE FUNCTION process_medication_history_event(
-  p_event domain_events
+  p_event RECORD
 ) RETURNS VOID AS $$
 BEGIN
   -- Validate event sequence
@@ -297,7 +297,7 @@ $$ LANGUAGE plpgsql;
 
 -- Process Dosage Events
 CREATE OR REPLACE FUNCTION process_dosage_event(
-  p_event domain_events
+  p_event RECORD
 ) RETURNS VOID AS $$
 BEGIN
   CASE p_event.event_type

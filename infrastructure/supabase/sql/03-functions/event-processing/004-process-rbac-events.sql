@@ -1,7 +1,7 @@
 -- Process RBAC Events
 -- Projects RBAC-related events to permission, role, and access grant projection tables
 CREATE OR REPLACE FUNCTION process_rbac_event(
-  p_event domain_events
+  p_event RECORD
 ) RETURNS VOID AS $$
 BEGIN
   -- Validate event sequence
@@ -38,6 +38,7 @@ BEGIN
         id,
         name,
         description,
+        organization_id,
         zitadel_org_id,
         org_hierarchy_scope,
         created_at
@@ -45,6 +46,12 @@ BEGIN
         p_event.stream_id,
         safe_jsonb_extract_text(p_event.event_data, 'name'),
         safe_jsonb_extract_text(p_event.event_data, 'description'),
+        -- Resolve Zitadel org ID to internal UUID (NULL for super_admin)
+        CASE
+          WHEN safe_jsonb_extract_text(p_event.event_data, 'zitadel_org_id') IS NOT NULL
+          THEN get_internal_org_id(safe_jsonb_extract_text(p_event.event_data, 'zitadel_org_id'))
+          ELSE NULL
+        END,
         safe_jsonb_extract_text(p_event.event_data, 'zitadel_org_id'),
         CASE
           WHEN p_event.event_data->>'org_hierarchy_scope' IS NOT NULL
@@ -53,6 +60,19 @@ BEGIN
         END,
         p_event.created_at
       );
+
+    WHEN 'role.updated' THEN
+      UPDATE roles_projection
+      SET description = safe_jsonb_extract_text(p_event.event_data, 'description'),
+          updated_at = p_event.created_at
+      WHERE id = p_event.stream_id;
+
+    WHEN 'role.deleted' THEN
+      UPDATE roles_projection
+      SET deleted_at = p_event.created_at,
+          is_active = false,
+          updated_at = p_event.created_at
+      WHERE id = p_event.stream_id;
 
     WHEN 'role.permission.granted' THEN
       INSERT INTO role_permissions_projection (
@@ -84,7 +104,13 @@ BEGIN
       ) VALUES (
         p_event.stream_id,
         safe_jsonb_extract_uuid(p_event.event_data, 'role_id'),
-        safe_jsonb_extract_text(p_event.event_data, 'org_id'),
+        -- Convert org_id: '*' becomes NULL, otherwise resolve to UUID
+        CASE
+          WHEN safe_jsonb_extract_text(p_event.event_data, 'org_id') = '*' THEN NULL
+          WHEN safe_jsonb_extract_text(p_event.event_data, 'org_id') IS NOT NULL
+          THEN safe_jsonb_extract_uuid(p_event.event_data, 'org_id')
+          ELSE NULL
+        END,
         CASE
           WHEN p_event.event_data->>'scope_path' = '*' THEN NULL
           WHEN p_event.event_data->>'scope_path' IS NOT NULL
@@ -93,13 +119,21 @@ BEGIN
         END,
         p_event.created_at
       )
-      ON CONFLICT (user_id, role_id, org_id) DO NOTHING;  -- Idempotent
+      ON CONFLICT (user_id, role_id, COALESCE(org_id, '00000000-0000-0000-0000-000000000000'::UUID)) DO NOTHING;  -- Idempotent
 
     WHEN 'user.role.revoked' THEN
       DELETE FROM user_roles_projection
       WHERE user_id = p_event.stream_id
         AND role_id = safe_jsonb_extract_uuid(p_event.event_data, 'role_id')
-        AND org_id = safe_jsonb_extract_text(p_event.event_data, 'org_id');
+        AND COALESCE(org_id, '00000000-0000-0000-0000-000000000000'::UUID) = COALESCE(
+          CASE
+            WHEN safe_jsonb_extract_text(p_event.event_data, 'org_id') = '*' THEN NULL
+            WHEN safe_jsonb_extract_text(p_event.event_data, 'org_id') IS NOT NULL
+            THEN safe_jsonb_extract_uuid(p_event.event_data, 'org_id')
+            ELSE NULL
+          END,
+          '00000000-0000-0000-0000-000000000000'::UUID
+        );
 
     -- ========================================
     -- Cross-Tenant Access Grant Events
@@ -121,9 +155,9 @@ BEGIN
         metadata
       ) VALUES (
         p_event.stream_id,
-        safe_jsonb_extract_text(p_event.event_data, 'consultant_org_id'),
+        safe_jsonb_extract_uuid(p_event.event_data, 'consultant_org_id'),
         safe_jsonb_extract_uuid(p_event.event_data, 'consultant_user_id'),
-        safe_jsonb_extract_text(p_event.event_data, 'provider_org_id'),
+        safe_jsonb_extract_uuid(p_event.event_data, 'provider_org_id'),
         safe_jsonb_extract_text(p_event.event_data, 'scope'),
         safe_jsonb_extract_uuid(p_event.event_data, 'scope_id'),
         safe_jsonb_extract_uuid(p_event.event_metadata, 'user_id'),
@@ -169,9 +203,9 @@ BEGIN
   ) VALUES (
     CASE
       WHEN p_event.event_type LIKE 'access_grant.%' THEN
-        safe_jsonb_extract_text(p_event.event_data, 'provider_org_id')
+        safe_jsonb_extract_uuid(p_event.event_data, 'provider_org_id')
       WHEN p_event.event_type LIKE 'user.role.%' THEN
-        safe_jsonb_extract_text(p_event.event_data, 'org_id')
+        safe_jsonb_extract_uuid(p_event.event_data, 'org_id')
       ELSE
         NULL  -- Permissions and roles are global
     END,

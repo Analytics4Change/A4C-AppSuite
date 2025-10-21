@@ -1,6 +1,6 @@
 # Subdomain Provisioning Implementation
 
-## Status: Phase 0-1 Complete
+## Status: Phase 0-2 Complete
 
 **Date Started**: 2025-10-17
 **Architecture**: Temporal-first, greenfield implementation
@@ -90,14 +90,47 @@ Adding subdomain creation and provisioning as part of provider/provider-partner 
    kubectl port-forward -n temporal svc/temporal-ui 8080:8080
    ```
 
-### ⏳ Phase 2: Database Schema (Pending)
+### ✅ Phase 2: Database Schema (Complete)
 
-**Planned Changes**:
-- Add subdomain columns to `organizations_projection` table
-- Create `subdomain_status_enum` type
-- Add `get_base_domain()` function for environment detection
-- Update event types in `events.ts`
-- Update event processors for subdomain events
+**Actions Taken**:
+1. Created `subdomain_status` ENUM type (`infrastructure/supabase/sql/01-events/003-subdomain-status-enum.sql`)
+   - Values: `pending`, `dns_created`, `verifying`, `verified`, `failed`
+   - Tracks subdomain provisioning lifecycle
+
+2. Added subdomain columns to `organizations_projection` (`infrastructure/supabase/sql/02-tables/organizations/003-add-subdomain-columns.sql`)
+   - `subdomain_status` - Provisioning status tracking
+   - `cloudflare_record_id` - DNS record ID from Cloudflare
+   - `dns_verified_at` - Verification timestamp
+   - `subdomain_metadata` - JSONB for DNS record details, verification attempts, errors
+   - Indexes for status querying and failed attempts
+
+3. Created subdomain helper functions (`infrastructure/supabase/sql/03-functions/external-services/001-subdomain-helpers.sql`)
+   - `get_base_domain()` - Returns environment-based domain (firstovertheline.com vs analytics4change.com)
+   - `get_full_subdomain(slug)` - Computes {slug}.{base_domain}
+   - `get_organization_subdomain(org_id)` - Gets subdomain for organization
+
+4. Added subdomain event types (`infrastructure/supabase/contracts/types/events.ts`)
+   - `SubdomainDNSCreatedEvent` - DNS record created
+   - `SubdomainVerifiedEvent` - DNS verification successful
+   - `SubdomainVerificationFailedEvent` - Verification failed
+   - Updated `StreamType` to include `'subdomain'`
+
+5. Updated event processor (`infrastructure/supabase/sql/03-functions/event-processing/002-process-organization-events.sql`)
+   - Added handlers for all 3 subdomain events
+   - Updates `subdomain_status` and `subdomain_metadata` based on events
+   - Maintains CQRS projection integrity
+
+**Files Changed**:
+- `infrastructure/supabase/sql/01-events/003-subdomain-status-enum.sql` (new)
+- `infrastructure/supabase/sql/02-tables/organizations/003-add-subdomain-columns.sql` (new)
+- `infrastructure/supabase/sql/03-functions/external-services/001-subdomain-helpers.sql` (new)
+- `infrastructure/supabase/contracts/types/events.ts` (modified)
+- `infrastructure/supabase/sql/03-functions/event-processing/002-process-organization-events.sql` (modified)
+
+**Key Decision**: Store `slug` only, compute full subdomain dynamically from environment-based `BASE_DOMAIN`
+- No data migration needed when changing domains
+- Environment-agnostic database schema
+- Single source of truth for base domain (ConfigMaps)
 
 ### ⏳ Phase 3-10: Implementation (Pending)
 
@@ -184,9 +217,21 @@ bootstrapOrganizationWorkflow
 
 ## Success Criteria
 
+**Phase 0-1:**
 - ✅ Unused PostgreSQL functions archived (not deleted)
 - ✅ Temporal k8s manifests created
-- ⏳ Temporal running on k3s with UI accessible
+- ✅ Temporal running on k3s with UI accessible
+- ✅ PostgreSQL deployed for Temporal (dedicated instance)
+- ✅ Temporal schemas initialized
+
+**Phase 2:**
+- ✅ Subdomain database schema created
+- ✅ Event types defined for subdomain provisioning
+- ✅ Event processors handle subdomain lifecycle
+- ✅ Helper functions for environment-aware subdomains
+- ⏳ Schema changes applied and tested in Supabase
+
+**Future Phases:**
 - ⏳ Bootstrap workflow completes in <30 seconds
 - ⏳ Subdomain provisioned in background (1-10 minutes)
 - ⏳ All events recorded in domain_events table
@@ -196,7 +241,10 @@ bootstrapOrganizationWorkflow
 
 ## Next Actions
 
-1. Create `infrastructure/k8s/temporal/secrets.yaml` with actual credentials
-2. Deploy Temporal to k3s cluster
-3. Verify Temporal UI is accessible
-4. Begin Phase 2: Database schema updates
+1. ~~Create `infrastructure/k8s/temporal/secrets.yaml` with actual credentials~~ ✅
+2. ~~Deploy Temporal to k3s cluster~~ ✅
+3. ~~Verify Temporal UI is accessible~~ ✅
+4. ~~Begin Phase 2: Database schema updates~~ ✅
+5. **Apply Phase 2 schema changes to Supabase** ⬅ Current
+6. Test subdomain helper functions in dev environment
+7. Begin Phase 3: Cloudflare DNS integration (Temporal activities)

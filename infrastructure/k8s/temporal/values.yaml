@@ -1,9 +1,38 @@
-# Temporal Helm Chart Values
-# For use with: helm install temporal temporalio/temporal -f values.yaml
+# Temporal Helm Chart Values - PostgreSQL Configuration
+# Based on official values.postgresql.yaml from temporalio/helm-charts
+# PostgreSQL deployed separately (see postgresql.yaml)
+# Schemas initialized via schema-init.yaml job
 
-# Server configuration
 server:
   replicaCount: 1
+
+  config:
+    persistence:
+      default:
+        driver: "sql"
+        sql:
+          driver: "postgres12"
+          host: "temporal-postgresql.temporal.svc.cluster.local"
+          port: 5432
+          database: "temporal"
+          user: "postgres"
+          password: "temporal-dev-password"
+          maxConns: 20
+          maxIdleConns: 20
+          maxConnLifetime: "1h"
+
+      visibility:
+        driver: "sql"
+        sql:
+          driver: "postgres12"
+          host: "temporal-postgresql.temporal.svc.cluster.local"
+          port: 5432
+          database: "temporal_visibility"
+          user: "postgres"
+          password: "temporal-dev-password"
+          maxConns: 20
+          maxIdleConns: 20
+          maxConnLifetime: "1h"
 
   resources:
     limits:
@@ -13,47 +42,32 @@ server:
       cpu: 100m
       memory: 256Mi
 
-  # Temporal server configuration
-  config:
-    persistence:
-      default:
-        driver: "sql"
-        sql:
-          driver: "postgres"
-          host: "tmrjlswbsxmbglmaclxu.supabase.co"
-          port: 5432
-          database: "postgres"
-          maxConns: 20
-          maxConnLifetime: "1h"
-          # credentials from secret
-          existingSecret: "temporal-credentials"
-          secretName: "temporal-credentials"
-          user: "postgres"
-          password: "SUPABASE_SERVICE_ROLE_KEY" # Will be replaced by secret
+# Disable built-in datastores
+cassandra:
+  enabled: false
 
-      visibility:
-        driver: "sql"
-        sql:
-          driver: "postgres"
-          host: "tmrjlswbsxmbglmaclxu.supabase.co"
-          port: 5432
-          database: "postgres"
-          maxConns: 10
-          maxConnLifetime: "1h"
-          existingSecret: "temporal-credentials"
-          secretName: "temporal-credentials"
-          user: "postgres"
-          password: "SUPABASE_SERVICE_ROLE_KEY"
+mysql:
+  enabled: false
 
-# Web UI configuration
+postgresql:
+  enabled: false  # We deploy our own PostgreSQL
+
+elasticsearch:
+  enabled: false
+
+prometheus:
+  enabled: false
+
+grafana:
+  enabled: false
+
+# Web UI
 web:
   enabled: true
   replicaCount: 1
-
   service:
     type: ClusterIP
     port: 8080
-
   resources:
     limits:
       cpu: 500m
@@ -62,69 +76,18 @@ web:
       cpu: 100m
       memory: 128Mi
 
-  # UI configuration
-  config:
-    # Point to Temporal server
-    temporalGrpcAddress: "temporal-frontend.temporal.svc.cluster.local:7233"
-    # UI settings
-    auth:
-      enabled: false # Enable later if needed
-    cors:
-      allowOrigins:
-        - "*" # Restrict in production
-
-# Elasticsearch (disable - using PostgreSQL visibility)
-elasticsearch:
-  enabled: false
-
-# Prometheus (optional - enable for metrics)
-prometheus:
-  enabled: false
-
-# Grafana (optional - enable for dashboards)
-grafana:
-  enabled: false
-
-# Schema setup job
+# Schema setup - disabled because we initialize schemas manually
 schema:
+  createDatabase:
+    enabled: false
   setup:
-    enabled: true
-    backoffLimit: 100
-
+    enabled: false
   update:
-    enabled: true
+    enabled: false
 
-# Cassandra (disable - using PostgreSQL)
-cassandra:
-  enabled: false
-
-# MySQL (disable - using PostgreSQL)
-mysql:
-  enabled: false
-
-# PostgreSQL (deploy dedicated instance or use existing)
-postgresql:
-  enabled: true # Set to false if using external Supabase PostgreSQL
-
-  auth:
-    postgresPassword: "temporal-dev-password" # Change in production
-    database: "temporal"
-
-  primary:
-    persistence:
-      enabled: true
-      size: 10Gi
-
-    resources:
-      limits:
-        cpu: 1000m
-        memory: 512Mi
-      requests:
-        cpu: 100m
-        memory: 256Mi
-
-# Additional labels
+# Labels
 commonLabels:
   app: temporal
   managed-by: helm
   project: a4c
+  environment: development

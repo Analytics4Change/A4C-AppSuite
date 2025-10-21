@@ -1,9 +1,9 @@
 -- Audit Log Table
--- General system audit trail for all data changes
+-- CQRS projection for audit trail - General system audit trail for all data changes
 CREATE TABLE IF NOT EXISTS audit_log (
 
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+  organization_id UUID,
 
   -- Event Information
   event_type TEXT NOT NULL, -- create, update, delete, access, export, print, etc.
@@ -12,11 +12,11 @@ CREATE TABLE IF NOT EXISTS audit_log (
   event_description TEXT,
 
   -- Actor Information
-  user_id UUID REFERENCES users(id),
+  user_id UUID,
   user_email TEXT,
   user_name TEXT,
   user_roles TEXT[],
-  impersonated_by UUID REFERENCES users(id),
+  impersonated_by UUID,
 
   -- Resource Information
   resource_type TEXT, -- table name or resource type
@@ -49,4 +49,4 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 
 -- Add table comment
-COMMENT ON TABLE audit_log IS 'General system audit trail for all data changes';
+COMMENT ON TABLE audit_log IS 'CQRS projection for audit trail - General system audit trail for all data changes';

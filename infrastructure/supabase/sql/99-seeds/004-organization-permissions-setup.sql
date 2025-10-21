@@ -15,11 +15,11 @@ BEGIN
   -- 1. organization.create_root - Platform Owner only
   v_permission_id := gen_random_uuid();
   INSERT INTO domain_events (
-    id, stream_id, stream_type, event_type, event_data, event_metadata, created_at
+    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
   ) VALUES (
-    gen_random_uuid(),
     v_permission_id,
     'permission',
+    1,
     'permission.defined',
     jsonb_build_object(
       'applet', 'organization',
@@ -32,18 +32,17 @@ BEGIN
     jsonb_build_object(
       'user_id', '00000000-0000-0000-0000-000000000000',
       'reason', 'Platform initialization: defining organization.create_root permission'
-    ),
-    v_current_time
+    )
   );
 
   -- 2. organization.create_sub - Provider Admin within their org
   v_permission_id := gen_random_uuid();
   INSERT INTO domain_events (
-    id, stream_id, stream_type, event_type, event_data, event_metadata, created_at
+    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
   ) VALUES (
-    gen_random_uuid(),
     v_permission_id,
     'permission',
+    1,
     'permission.defined',
     jsonb_build_object(
       'applet', 'organization',
@@ -56,18 +55,17 @@ BEGIN
     jsonb_build_object(
       'user_id', '00000000-0000-0000-0000-000000000000',
       'reason', 'Platform initialization: defining organization.create_sub permission'
-    ),
-    v_current_time
+    )
   );
 
   -- 3. organization.deactivate - Organization deactivation
   v_permission_id := gen_random_uuid();
   INSERT INTO domain_events (
-    id, stream_id, stream_type, event_type, event_data, event_metadata, created_at
+    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
   ) VALUES (
-    gen_random_uuid(),
     v_permission_id,
     'permission',
+    1,
     'permission.defined',
     jsonb_build_object(
       'applet', 'organization',
@@ -80,18 +78,17 @@ BEGIN
     jsonb_build_object(
       'user_id', '00000000-0000-0000-0000-000000000000',
       'reason', 'Platform initialization: defining organization.deactivate permission'
-    ),
-    v_current_time
+    )
   );
 
   -- 4. organization.delete - Organization deletion (dangerous operation)
   v_permission_id := gen_random_uuid();
   INSERT INTO domain_events (
-    id, stream_id, stream_type, event_type, event_data, event_metadata, created_at
+    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
   ) VALUES (
-    gen_random_uuid(),
     v_permission_id,
     'permission',
+    1,
     'permission.defined',
     jsonb_build_object(
       'applet', 'organization',
@@ -104,18 +101,17 @@ BEGIN
     jsonb_build_object(
       'user_id', '00000000-0000-0000-0000-000000000000',
       'reason', 'Platform initialization: defining organization.delete permission'
-    ),
-    v_current_time
+    )
   );
 
   -- 5. organization.business_profile_create - Business profile creation
   v_permission_id := gen_random_uuid();
   INSERT INTO domain_events (
-    id, stream_id, stream_type, event_type, event_data, event_metadata, created_at
+    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
   ) VALUES (
-    gen_random_uuid(),
     v_permission_id,
     'permission',
+    1,
     'permission.defined',
     jsonb_build_object(
       'applet', 'organization',
@@ -128,18 +124,17 @@ BEGIN
     jsonb_build_object(
       'user_id', '00000000-0000-0000-0000-000000000000',
       'reason', 'Platform initialization: defining organization.business_profile_create permission'
-    ),
-    v_current_time
+    )
   );
 
   -- 6. organization.business_profile_update - Business profile updates
   v_permission_id := gen_random_uuid();
   INSERT INTO domain_events (
-    id, stream_id, stream_type, event_type, event_data, event_metadata, created_at
+    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
   ) VALUES (
-    gen_random_uuid(),
     v_permission_id,
     'permission',
+    1,
     'permission.defined',
     jsonb_build_object(
       'applet', 'organization',
@@ -152,18 +147,17 @@ BEGIN
     jsonb_build_object(
       'user_id', '00000000-0000-0000-0000-000000000000',
       'reason', 'Platform initialization: defining organization.business_profile_update permission'
-    ),
-    v_current_time
+    )
   );
 
   -- 7. organization.view - View organization information
   v_permission_id := gen_random_uuid();
   INSERT INTO domain_events (
-    id, stream_id, stream_type, event_type, event_data, event_metadata, created_at
+    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
   ) VALUES (
-    gen_random_uuid(),
     v_permission_id,
     'permission',
+    1,
     'permission.defined',
     jsonb_build_object(
       'applet', 'organization',
@@ -176,18 +170,17 @@ BEGIN
     jsonb_build_object(
       'user_id', '00000000-0000-0000-0000-000000000000',
       'reason', 'Platform initialization: defining organization.view permission'
-    ),
-    v_current_time
+    )
   );
 
   -- 8. organization.update - Update organization information
   v_permission_id := gen_random_uuid();
   INSERT INTO domain_events (
-    id, stream_id, stream_type, event_type, event_data, event_metadata, created_at
+    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
   ) VALUES (
-    gen_random_uuid(),
     v_permission_id,
     'permission',
+    1,
     'permission.defined',
     jsonb_build_object(
       'applet', 'organization',
@@ -200,8 +193,7 @@ BEGIN
     jsonb_build_object(
       'user_id', '00000000-0000-0000-0000-000000000000',
       'reason', 'Platform initialization: defining organization.update permission'
-    ),
-    v_current_time
+    )
   );
 
   RAISE NOTICE 'Organization permissions initialized via permission.defined events';
@@ -214,7 +206,3 @@ SELECT initialize_organization_permissions();
 
 -- Drop the initialization function after use (optional)
 DROP FUNCTION IF EXISTS initialize_organization_permissions();
-
--- Comments
-COMMENT ON FUNCTION initialize_organization_permissions IS 
-  'One-time initialization function that emits permission.defined events for organization lifecycle management';

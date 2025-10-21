@@ -1,7 +1,7 @@
 -- Process Client Events
 -- Projects client-related events to the clients table
 CREATE OR REPLACE FUNCTION process_client_event(
-  p_event domain_events
+  p_event RECORD
 ) RETURNS VOID AS $$
 BEGIN
   -- Validate event sequence

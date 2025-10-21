@@ -12,13 +12,13 @@ CREATE TABLE IF NOT EXISTS impersonation_sessions_projection (
   super_admin_user_id UUID NOT NULL,
   super_admin_email TEXT NOT NULL,
   super_admin_name TEXT NOT NULL,
-  super_admin_org_id TEXT NOT NULL,
+  super_admin_org_id UUID,  -- NULL for platform super_admin, UUID for org-scoped admin
 
   -- Target (the impersonated user)
   target_user_id UUID NOT NULL,
   target_email TEXT NOT NULL,
   target_name TEXT NOT NULL,
-  target_org_id TEXT NOT NULL,
+  target_org_id UUID NOT NULL,  -- Internal UUID of target organization
   target_org_name TEXT NOT NULL,
   target_org_type TEXT NOT NULL CHECK (target_org_type IN ('provider', 'provider_partner')),
 
@@ -79,47 +79,6 @@ CREATE INDEX idx_impersonation_sessions_justification
 -- Composite index for org-scoped audit queries
 CREATE INDEX idx_impersonation_sessions_org_started
   ON impersonation_sessions_projection(target_org_id, started_at DESC);
-
--- Row-Level Security
-ALTER TABLE impersonation_sessions_projection ENABLE ROW LEVEL SECURITY;
-
--- Policy: Super admins can view all sessions
-CREATE POLICY impersonation_sessions_super_admin_select
-  ON impersonation_sessions_projection
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles_projection ur
-      JOIN roles_projection r ON r.id = ur.role_id
-      WHERE ur.user_id = current_setting('app.current_user')::UUID
-        AND r.name = 'super_admin'
-        AND ur.org_id = '*'
-    )
-  );
-
--- Policy: Provider admins can view sessions affecting their organization
-CREATE POLICY impersonation_sessions_provider_admin_select
-  ON impersonation_sessions_projection
-  FOR SELECT
-  USING (
-    target_org_id = current_setting('app.current_org')
-    AND EXISTS (
-      SELECT 1 FROM user_roles_projection ur
-      JOIN roles_projection r ON r.id = ur.role_id
-      WHERE ur.user_id = current_setting('app.current_user')::UUID
-        AND r.name = 'provider_admin'
-        AND ur.org_id = target_org_id
-    )
-  );
-
--- Policy: Users can view their own impersonation sessions (as either super admin or target)
-CREATE POLICY impersonation_sessions_own_sessions_select
-  ON impersonation_sessions_projection
-  FOR SELECT
-  USING (
-    super_admin_user_id = current_setting('app.current_user')::UUID
-    OR target_user_id = current_setting('app.current_user')::UUID
-  );
 
 -- Comments
 COMMENT ON TABLE impersonation_sessions_projection IS 'CQRS projection of impersonation sessions. Source: domain_events with stream_type=impersonation. Tracks Super Admin impersonation sessions with full audit trail.';

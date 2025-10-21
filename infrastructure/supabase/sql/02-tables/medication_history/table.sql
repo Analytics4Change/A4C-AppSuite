@@ -3,9 +3,9 @@
 CREATE TABLE IF NOT EXISTS medication_history (
 
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-  medication_id UUID NOT NULL REFERENCES medications(id),
+  organization_id UUID NOT NULL,
+  client_id UUID NOT NULL,
+  medication_id UUID NOT NULL,
 
   -- Prescription Details
   prescription_date DATE NOT NULL,
@@ -62,8 +62,8 @@ CREATE TABLE IF NOT EXISTS medication_history (
   metadata JSONB DEFAULT '{}',
 
   -- Audit
-  created_by UUID REFERENCES users(id),
-  updated_by UUID REFERENCES users(id),
+  created_by UUID,
+  updated_by UUID,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

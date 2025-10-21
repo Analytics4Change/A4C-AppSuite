@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS api_audit_log (
 
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+  organization_id UUID,
 
   -- API Request
   request_id TEXT UNIQUE NOT NULL,
@@ -25,8 +25,8 @@ CREATE TABLE IF NOT EXISTS api_audit_log (
 
   -- Authentication
   auth_method TEXT, -- bearer_token, api_key, oauth, etc.
-  auth_user_id UUID REFERENCES users(id),
-  auth_organization_id UUID REFERENCES organizations(id),
+  auth_user_id UUID,
+  auth_organization_id UUID,
   auth_scopes TEXT[],
 
   -- Rate Limiting

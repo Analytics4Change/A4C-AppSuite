@@ -1,204 +1,226 @@
--- RBAC Initial Setup: Permissions, Roles, and Role-Permission Grants
--- This seed data creates the foundational RBAC structure via events
+-- RBAC Initial Setup: Minimal Viable Permissions for Platform Bootstrap
+-- This seed creates the foundational RBAC structure for:
+-- 1. Super Admin: Manages tenant onboarding and A4C internal roles
+-- 2. Provider Admin: Bootstrap role (permissions granted per organization later)
+-- 3. Partner Admin: Bootstrap role (permissions granted per organization later)
+--
 -- All inserts go through the event-sourced architecture
 
 -- ========================================
--- Initial Permissions
+-- Phase 1: Organization Management Permissions
+-- Super Admin manages tenant/provider onboarding
 -- ========================================
 
--- Medication Management Permissions
 INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
-  -- medication.create
+  -- organization.create
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "medication", "action": "create", "description": "Create new medication prescriptions", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining medication management permissions"}'::jsonb),
+   '{"applet": "organization", "action": "create", "description": "Create new tenant organizations", "scope_type": "global", "requires_mfa": false}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
 
-  -- medication.view
+  -- organization.view
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "medication", "action": "view", "description": "View medication history and prescriptions", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining medication management permissions"}'::jsonb),
+   '{"applet": "organization", "action": "view", "description": "View organization details and hierarchy", "scope_type": "global", "requires_mfa": false}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
 
-  -- medication.update
+  -- organization.update
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "medication", "action": "update", "description": "Modify existing prescriptions", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining medication management permissions"}'::jsonb),
+   '{"applet": "organization", "action": "update", "description": "Modify organization settings and configuration", "scope_type": "global", "requires_mfa": false}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
 
-  -- medication.delete
+  -- organization.deactivate
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "medication", "action": "delete", "description": "Discontinue/archive medications", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining medication management permissions"}'::jsonb),
+   '{"applet": "organization", "action": "deactivate", "description": "Deactivate organization (soft delete, reversible)", "scope_type": "global", "requires_mfa": true}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
 
-  -- medication.approve
+  -- organization.suspend
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "medication", "action": "approve", "description": "Approve prescription changes", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining medication management permissions"}'::jsonb);
+   '{"applet": "organization", "action": "suspend", "description": "Suspend organization access (e.g., payment issues)", "scope_type": "global", "requires_mfa": true}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
 
--- Provider Management Permissions
+  -- organization.activate
+  (gen_random_uuid(), 'permission', 1, 'permission.defined',
+   '{"applet": "organization", "action": "activate", "description": "Activate or reactivate organization", "scope_type": "global", "requires_mfa": false}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
+
+  -- organization.search
+  (gen_random_uuid(), 'permission', 1, 'permission.defined',
+   '{"applet": "organization", "action": "search", "description": "Search across all organizations", "scope_type": "global", "requires_mfa": false}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
+
+  -- organization.delete
+  (gen_random_uuid(), 'permission', 1, 'permission.defined',
+   '{"applet": "organization", "action": "delete", "description": "Permanently delete organization (irreversible)", "scope_type": "global", "requires_mfa": true}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb);
+
+
+-- ========================================
+-- Phase 2: A4C Internal Role Management Permissions
+-- Super Admin manages roles within Analytics4Change organization
+-- ========================================
+
 INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
-  -- provider.create
+  -- a4c_role.create
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "provider", "action": "create", "description": "Create new provider organizations", "scope_type": "global", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining provider management permissions"}'::jsonb),
+   '{"applet": "a4c_role", "action": "create", "description": "Create roles within A4C organization", "scope_type": "org", "requires_mfa": false}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb),
 
-  -- provider.view
+  -- a4c_role.view
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "provider", "action": "view", "description": "View provider details and configurations", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining provider management permissions"}'::jsonb),
+   '{"applet": "a4c_role", "action": "view", "description": "View A4C internal roles", "scope_type": "org", "requires_mfa": false}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb),
 
-  -- provider.update
+  -- a4c_role.update
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "provider", "action": "update", "description": "Modify provider settings", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining provider management permissions"}'::jsonb),
+   '{"applet": "a4c_role", "action": "update", "description": "Modify A4C internal roles", "scope_type": "org", "requires_mfa": false}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb),
 
-  -- provider.delete
+  -- a4c_role.delete
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "provider", "action": "delete", "description": "Archive providers", "scope_type": "global", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining provider management permissions"}'::jsonb),
+   '{"applet": "a4c_role", "action": "delete", "description": "Delete A4C internal roles", "scope_type": "org", "requires_mfa": false}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb),
 
-  -- provider.impersonate
+  -- a4c_role.assign
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "provider", "action": "impersonate", "description": "Impersonate users within provider organizations (Super Admin only)", "scope_type": "global", "requires_mfa": true}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining provider management permissions for Super Admin impersonation"}'::jsonb);
+   '{"applet": "a4c_role", "action": "assign", "description": "Assign A4C roles to A4C staff users", "scope_type": "org", "requires_mfa": false}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb);
 
--- Client Management Permissions
+
+-- ========================================
+-- Phase 3: Meta-Permissions (RBAC Management)
+-- Super Admin manages permissions and role grants
+-- ========================================
+
 INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
-  -- client.create
+  -- permission.grant
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "client", "action": "create", "description": "Register new clients", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining client management permissions"}'::jsonb),
+   '{"applet": "permission", "action": "grant", "description": "Grant permissions to roles", "scope_type": "global", "requires_mfa": true}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin RBAC management"}'::jsonb),
 
-  -- client.view
+  -- permission.revoke
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "client", "action": "view", "description": "View client records", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining client management permissions"}'::jsonb),
+   '{"applet": "permission", "action": "revoke", "description": "Revoke permissions from roles", "scope_type": "global", "requires_mfa": true}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin RBAC management"}'::jsonb),
 
-  -- client.update
+  -- role.grant
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "client", "action": "update", "description": "Modify client information", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining client management permissions"}'::jsonb),
-
-  -- client.delete
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "client", "action": "delete", "description": "Archive clients", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining client management permissions"}'::jsonb),
-
-  -- client.discharge
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "client", "action": "discharge", "description": "Discharge clients from programs", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining client management permissions"}'::jsonb);
-
--- User Management Permissions
-INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
-  -- user.create
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "user", "action": "create", "description": "Create new user accounts", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining user management permissions"}'::jsonb),
-
-  -- user.view
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "user", "action": "view", "description": "View user profiles", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining user management permissions"}'::jsonb),
-
-  -- user.update
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "user", "action": "update", "description": "Modify user accounts", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining user management permissions"}'::jsonb),
-
-  -- user.delete
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "user", "action": "delete", "description": "Deactivate users", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining user management permissions"}'::jsonb),
-
-  -- user.assign_role
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "user", "action": "assign_role", "description": "Grant roles to users", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining user management permissions"}'::jsonb);
-
--- Access Grant Permissions
-INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
-  -- access_grant.create
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "access_grant", "action": "create", "description": "Create cross-tenant access grants", "scope_type": "org", "requires_mfa": true}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining cross-tenant access grant permissions"}'::jsonb),
-
-  -- access_grant.view
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "access_grant", "action": "view", "description": "View existing grants", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining cross-tenant access grant permissions"}'::jsonb),
-
-  -- access_grant.revoke
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "access_grant", "action": "revoke", "description": "Revoke cross-tenant access", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining cross-tenant access grant permissions"}'::jsonb),
-
-  -- access_grant.approve
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "access_grant", "action": "approve", "description": "Approve Provider Partner access requests", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining cross-tenant access grant permissions"}'::jsonb);
-
--- Audit Permissions
-INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
-  -- audit.view
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "audit", "action": "view", "description": "View audit logs", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining audit log permissions"}'::jsonb),
-
-  -- audit.export
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "audit", "action": "export", "description": "Export audit trails for compliance", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: defining audit log permissions"}'::jsonb);
+   '{"applet": "role", "action": "grant", "description": "Assign roles to users", "scope_type": "global", "requires_mfa": true}'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin RBAC management"}'::jsonb);
 
 
 -- ========================================
 -- Initial Roles
 -- ========================================
 
--- Super Admin Role (global scope)
+-- A4C Platform Organization (owner of the application)
+INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'organization', 1, 'organization.registered',
+   '{
+     "name": "Analytics4Change",
+     "slug": "a4c",
+     "org_type": "platform_owner",
+     "parent_org_id": null,
+     "zitadel_org_id": "339658157368404786",
+     "settings": {
+       "is_active": true,
+       "is_internal": true,
+       "description": "Platform owner organization"
+     }
+   }'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating A4C platform organization"}'::jsonb);
+
+-- Super Admin Role (global scope, NULL org_id for platform-wide access)
 INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
   ('11111111-1111-1111-1111-111111111111', 'role', 1, 'role.created',
-   '{"name": "super_admin", "description": "Platform-wide administrator with all permissions across all organizations", "zitadel_org_id": null, "org_hierarchy_scope": null}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: creating super_admin role for A4C platform staff"}'::jsonb);
+   '{
+     "name": "super_admin",
+     "description": "Platform administrator who manages tenant onboarding and A4C internal roles"
+   }'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating super_admin role for A4C platform staff"}'::jsonb);
 
--- Provider Admin Role (org-scoped)
+-- Provider Admin Role Template (bootstrap only, actual roles created per organization)
 INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
   ('22222222-2222-2222-2222-222222222222', 'role', 1, 'role.created',
-   '{"name": "provider_admin", "description": "Organization administrator with all permissions within their healthcare organization", "zitadel_org_id": "placeholder", "org_hierarchy_scope": "placeholder"}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: creating provider_admin role template for organization-level management"}'::jsonb);
+   '{
+     "name": "provider_admin",
+     "description": "Organization administrator who manages their own provider organization (permissions granted during org provisioning)",
+     "zitadel_org_id": null,
+     "org_hierarchy_scope": null
+   }'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating provider_admin role template"}'::jsonb);
+
+-- Partner Admin Role Template (bootstrap only, actual roles created per organization)
+INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
+  ('33333333-3333-3333-3333-333333333333', 'role', 1, 'role.created',
+   '{
+     "name": "partner_admin",
+     "description": "Provider partner administrator who manages cross-tenant access (permissions granted during org provisioning)",
+     "zitadel_org_id": null,
+     "org_hierarchy_scope": null
+   }'::jsonb,
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating partner_admin role template"}'::jsonb);
 
 
 -- ========================================
 -- Grant All Permissions to Super Admin
 -- ========================================
 
--- Grant all permissions to super_admin role
--- This dynamically grants all permissions that exist in the permissions_projection table
+-- Grant all 16 permissions to super_admin role
+-- These will be processed by the event triggers into role_permissions_projection table
 
--- Note: The actual grant events will be generated after permissions are processed
--- This is a placeholder showing the pattern. In practice, you would:
--- 1. Wait for permission.defined events to be processed
--- 2. Query permissions_projection table
--- 3. Generate role.permission.granted events for each permission
+DO $$
+DECLARE
+  perm_record RECORD;
+  version_counter INT := 2;  -- Start at version 2 (version 1 was role.created)
+BEGIN
+  -- Wait for permissions to be processed into projection (in real deployment)
+  -- For seed script, we query permissions_projection after initial INSERT processing
 
--- Example for one permission (medication.create):
--- INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
--- SELECT
---   '11111111-1111-1111-1111-111111111111',
---   'role',
---   2 + row_number() OVER (),
---   'role.permission.granted',
---   jsonb_build_object('permission_id', id, 'permission_name', name),
---   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Initial RBAC setup: granting all permissions to super_admin role"}'::jsonb
--- FROM permissions_projection;
+  FOR perm_record IN
+    SELECT id, applet, action
+    FROM permissions_projection
+    WHERE applet IN ('organization', 'a4c_role', 'permission', 'role')
+  LOOP
+    INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      '11111111-1111-1111-1111-111111111111',  -- super_admin role stream_id
+      'role',
+      version_counter,
+      'role.permission.granted',
+      jsonb_build_object(
+        'permission_id', perm_record.id,
+        'permission_name', perm_record.applet || '.' || perm_record.action
+      ),
+      jsonb_build_object(
+        'user_id', '00000000-0000-0000-0000-000000000000',
+        'reason', 'Bootstrap: Granting ' || perm_record.applet || '.' || perm_record.action || ' to super_admin'
+      )
+    );
 
--- For now, we'll document this needs to be run after projection processing
+    version_counter := version_counter + 1;
+  END LOOP;
+END $$;
 
 
 -- ========================================
--- Grant All Permissions to Provider Admin (Template)
+-- Documentation
 -- ========================================
 
--- Similarly, provider_admin role would receive all org-scoped permissions
--- This will be instantiated per organization when orgs are created
+COMMENT ON EXTENSION "uuid-ossp" IS 'Used for generating UUIDs for permission and role IDs';
 
-
-COMMENT ON EXTENSION IF EXISTS "uuid-ossp" IS 'Used for generating UUIDs for permission and role IDs';
+-- Notes:
+-- 1. Provider Admin and Partner Admin roles have NO permissions in this seed
+--    - Permissions are granted during organization provisioning workflows
+--    - This ensures proper scoping: provider_admin manages their org, not others
+--
+-- 2. Super Admin manages two distinct areas:
+--    - Tenant/organization lifecycle (organization.*)
+--    - A4C internal role delegation (a4c_role.*)
+--
+-- 3. Super Admin does NOT create provider roles like "clinician" or "specialist"
+--    - Provider Admin creates those within their organization
+--    - Example: "Lars granted medication.create to clinician role on 2025-10-20"
+--      would be done by provider_admin, not super_admin
+--
+-- 4. Super Admin CAN impersonate any role via separate impersonation workflow
+--    - Impersonation is audited and logged
+--    - Super Admin acts under constraints of impersonated role

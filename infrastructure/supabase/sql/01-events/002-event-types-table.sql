@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS event_types (
 
   -- Audit
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES users(id)
+  created_by UUID  -- FK constraint deferred to avoid circular dependency (added in 02-tables/users/add-event-types-fk.sql)
 );
 
 -- Insert core event types
@@ -72,7 +72,7 @@ INSERT INTO event_types (event_type, stream_type, description, event_schema, pro
 
 -- User events
 ('user.synced_from_zitadel', 'user', 'User synchronized from Zitadel',
-  '{"type": "object", "required": ["external_id", "email", "roles"]}',
+  '{"type": "object", "required": ["zitadel_user_id", "email", "roles"]}',
   ARRAY['users']),
 
 ('user.organization_switched', 'user', 'User switched organization context',

@@ -103,7 +103,7 @@ $$ LANGUAGE SQL STABLE;
 
 -- Helper function to validate event sequence
 CREATE OR REPLACE FUNCTION validate_event_sequence(
-  p_event domain_events
+  p_event RECORD
 ) RETURNS BOOLEAN AS $$
 DECLARE
   v_expected_version INTEGER;
@@ -126,7 +126,7 @@ CREATE OR REPLACE FUNCTION safe_jsonb_extract_text(
   p_key TEXT,
   p_default TEXT DEFAULT NULL
 ) RETURNS TEXT AS $$
-  SELECT COALESCE(p_data->>, p_key, p_default);
+  SELECT COALESCE(p_data->>p_key, p_default);
 $$ LANGUAGE SQL IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION safe_jsonb_extract_uuid(
@@ -169,8 +169,8 @@ CREATE OR REPLACE FUNCTION get_organization_uuid_from_external_id(
   p_external_id TEXT
 ) RETURNS UUID AS $$
   SELECT id
-  FROM organizations
-  WHERE external_id = p_external_id
+  FROM organizations_projection
+  WHERE zitadel_org_id = p_external_id
   LIMIT 1;
 $$ LANGUAGE SQL STABLE;
 

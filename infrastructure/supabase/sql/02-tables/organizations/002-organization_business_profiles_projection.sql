@@ -3,7 +3,7 @@
 -- Source of truth: organization.business_profile.* events in domain_events table
 -- Contains rich business data for top-level organizations only
 CREATE TABLE IF NOT EXISTS organization_business_profiles_projection (
-  organization_id UUID PRIMARY KEY REFERENCES organizations_projection(id) ON DELETE CASCADE,
+  organization_id UUID PRIMARY KEY,
   organization_type TEXT NOT NULL CHECK (organization_type IN ('provider', 'provider_partner')),
   
   -- Common address fields
@@ -23,12 +23,11 @@ CREATE TABLE IF NOT EXISTS organization_business_profiles_projection (
     (organization_type = 'provider' AND provider_profile IS NOT NULL AND partner_profile IS NULL)
     OR
     (organization_type = 'provider_partner' AND partner_profile IS NOT NULL AND provider_profile IS NULL)
-  ),
-  
-  -- Only allow business profiles for root-level organizations (depth = 2)
-  CHECK (
-    (SELECT nlevel(path) FROM organizations_projection WHERE id = organization_id) = 2
   )
+
+  -- Note: Business profiles should only be created for root-level organizations (depth = 2)
+  -- This validation is enforced in the event processor, not via CHECK constraint
+  -- (CHECK constraints cannot contain subqueries in PostgreSQL)
 );
 
 -- Indexes for common queries

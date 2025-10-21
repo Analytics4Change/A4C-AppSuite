@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS domain_events (
 
   -- Constraints
   CONSTRAINT unique_stream_version UNIQUE(stream_id, stream_type, stream_version),
-  CONSTRAINT valid_event_type CHECK (event_type ~ '^[a-z_]+\.[a-z_]+$'), -- format: 'domain.action'
+  CONSTRAINT valid_event_type CHECK (event_type ~ '^[a-z_]+(\.[a-z_]+)+$'), -- format: 'domain.action' or 'domain.subdomain.action'
   CONSTRAINT event_data_not_empty CHECK (jsonb_typeof(event_data) = 'object')
 );
 
@@ -55,6 +55,6 @@ COMMENT ON TABLE domain_events IS 'Event store - single source of truth for all 
 COMMENT ON COLUMN domain_events.stream_id IS 'The aggregate/entity ID this event belongs to';
 COMMENT ON COLUMN domain_events.stream_type IS 'The type of entity (client, medication, etc.)';
 COMMENT ON COLUMN domain_events.stream_version IS 'Version number for this specific entity stream';
-COMMENT ON COLUMN domain_events.event_type IS 'Event type in format: domain.action (e.g., client.admitted)';
+COMMENT ON COLUMN domain_events.event_type IS 'Event type in format: domain.action (e.g., client.admitted) or domain.subdomain.action (e.g., organization.bootstrap.initiated)';
 COMMENT ON COLUMN domain_events.event_data IS 'The actual event payload with all data needed to project';
 COMMENT ON COLUMN domain_events.event_metadata IS 'Context including user, reason, approvals - the WHY';

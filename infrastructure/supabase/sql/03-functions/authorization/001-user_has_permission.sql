@@ -4,7 +4,7 @@
 CREATE OR REPLACE FUNCTION user_has_permission(
   p_user_id UUID,
   p_permission_name TEXT,
-  p_org_id TEXT,
+  p_org_id UUID,
   p_scope_path LTREE DEFAULT NULL
 ) RETURNS BOOLEAN AS $$
 BEGIN
@@ -16,8 +16,8 @@ BEGIN
     WHERE ur.user_id = p_user_id
       AND p.name = p_permission_name
       AND (
-        -- Super admin: wildcard org access (global scope)
-        ur.org_id = '*'
+        -- Super admin: NULL org_id means global scope
+        ur.org_id IS NULL
         OR
         -- Org-scoped: exact org match + hierarchical scope check
         (
@@ -47,7 +47,7 @@ COMMENT ON FUNCTION user_has_permission IS 'Checks if user has specified permiss
 -- Convenience function: Get all permissions for a user in an org
 CREATE OR REPLACE FUNCTION user_permissions(
   p_user_id UUID,
-  p_org_id TEXT
+  p_org_id UUID
 ) RETURNS TABLE (
   permission_name TEXT,
   applet TEXT,
@@ -73,7 +73,7 @@ BEGIN
   JOIN permissions_projection p ON p.id = rp.permission_id
   WHERE ur.user_id = p_user_id
     AND (
-      ur.org_id = '*'  -- Super admin sees all
+      ur.org_id IS NULL  -- Super admin sees all
       OR ur.org_id = p_org_id
     )
   ORDER BY p.applet, p.action;
@@ -94,7 +94,7 @@ BEGIN
     JOIN roles_projection r ON r.id = ur.role_id
     WHERE ur.user_id = p_user_id
       AND r.name = 'super_admin'
-      AND ur.org_id = '*'
+      AND ur.org_id IS NULL
   );
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
@@ -105,7 +105,7 @@ COMMENT ON FUNCTION is_super_admin IS 'Checks if user has super_admin role with 
 -- Check if user is provider admin for a specific org
 CREATE OR REPLACE FUNCTION is_provider_admin(
   p_user_id UUID,
-  p_org_id TEXT
+  p_org_id UUID
 ) RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
@@ -126,7 +126,7 @@ COMMENT ON FUNCTION is_provider_admin IS 'Checks if user has provider_admin role
 CREATE OR REPLACE FUNCTION user_organizations(
   p_user_id UUID
 ) RETURNS TABLE (
-  org_id TEXT,
+  org_id UUID,
   role_name TEXT,
   scope_path LTREE
 ) AS $$
