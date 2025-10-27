@@ -1,219 +1,368 @@
-# A4C Infrastructure as Code
+# A4C Infrastructure
 
-This repository manages the infrastructure for the Analytics4Change (A4C) platform using Terraform.
+Infrastructure as Code and database schema for the Analytics4Change (A4C) platform.
+
+---
 
 ## Overview
 
+**Status**: Supabase Auth migration complete (frontend), workflows in progress
+**Last Updated**: 2025-10-27
+
 The A4C platform consists of:
-- **Frontend**: React application (A4C-FrontEnd repository)
-- **Authentication**: Zitadel identity management
-- **Database**: Supabase (PostgreSQL + Auth + Edge Functions)
-- **Infrastructure**: Terraform configurations (this repository)
+- **Frontend**: React application with three-mode authentication system ✅
+- **Authentication**: Supabase Auth (OAuth2 + Enterprise SSO)
+- **Database**: Supabase PostgreSQL with event-driven schema (CQRS)
+- **Workflows**: Temporal.io for orchestration
+- **Infrastructure**: Kubernetes (k3s) for Temporal cluster
 
-## Migration Plan
+---
 
-This infrastructure repository is being created to properly manage resources that were initially configured manually. The goal is to create idempotent Terraform configurations that can:
+## Architecture
 
-1. **Import existing resources** without disrupting current services
-2. **Maintain state** of all infrastructure components
-3. **Enable reproducible deployments** across environments
-4. **Provide audit trail** of all infrastructure changes
+### Authentication & Authorization
 
-## Current Manual Configuration Inventory
+**Primary Provider**: Supabase Auth (replaced Zitadel)
 
-### Zitadel Configuration
+**Frontend Authentication** (✅ Complete 2025-10-27):
+- Three-mode system: Mock, Integration, Production
+- Provider interface pattern with dependency injection
+- JWT custom claims: `org_id`, `user_role`, `permissions`, `scope_path`
+- See: `.plans/supabase-auth-integration/frontend-auth-architecture.md`
 
-#### Organizations
-- **Primary Organization**: Analytics4Change
-  - Type: Root organization for platform administration
-  - Contains: Platform administrators, bootstrap configuration
+**Backend Integration** (🚧 In Progress):
+- Database hook for JWT custom claims enrichment
+- RLS policies using JWT claims for multi-tenant isolation
+- Organization management via Temporal workflows
+- See: `.plans/supabase-auth-integration/custom-claims-setup.md`
 
-#### Projects
-- **Project ID**: 339658577486583889
-- **Project Name**: A4C Platform
-- **Client Applications**:
-  - PKCE public client for React frontend
-  - Redirect URIs configured for localhost and production
+### Database (Supabase PostgreSQL)
 
-#### Roles (Manually Created)
-Need to inventory from Zitadel console:
-- [ ] List all existing roles
-- [ ] Document role permissions
-- [ ] Map to BOOTSTRAP_ROLES in frontend
+**Architecture**: Event-Driven with CQRS Projections
 
-#### Users
-- Initial admin users configured
-- Need to document user-role assignments
+- **Events**: `domain_events` table (source of truth)
+- **Projections**: Read models derived from event stream
+- **RLS**: Multi-tenant isolation via JWT `org_id` claim
+- **Triggers**: Automatic projection updates from events
+- **Functions**: JWT enrichment, authorization helpers
 
-### Supabase Configuration
+**Deployment**:
+```bash
+cd infrastructure/supabase
+psql -f DEPLOY_TO_SUPABASE_STUDIO.sql
+```
 
-#### Database Schema
-- [ ] Document existing tables
-- [ ] Document RLS policies
-- [ ] Document functions and triggers
+**See**: `infrastructure/supabase/README.md` for detailed schema documentation
 
-#### Authentication
-- [ ] Document auth providers configured
-- [ ] Document auth policies
+### Workflows (Temporal.io)
 
-#### Edge Functions
-- [ ] List any deployed edge functions
-- [ ] Document environment variables
+**Cluster**: Kubernetes deployment in `temporal` namespace
+
+**Use Cases**:
+- Organization bootstrap (provisioning, DNS, invitations)
+- User invitation workflows
+- DNS provisioning via Cloudflare API
+- Email delivery
+
+**Local Development**:
+```bash
+# Port-forward Temporal server
+kubectl port-forward -n temporal svc/temporal-frontend 7233:7233
+
+# Connect workers
+cd temporal
+TEMPORAL_ADDRESS=localhost:7233 npm run worker
+```
+
+**See**: `temporal/CLAUDE.md` for workflow development
+
+---
 
 ## Directory Structure
 
 ```
-A4C-Infrastructure/
-├── README.md                           # This file
-├── terraform/
-│   ├── environments/
-│   │   ├── dev/
-│   │   │   ├── main.tf
-│   │   │   ├── variables.tf
-│   │   │   └── terraform.tfvars
-│   │   ├── staging/
-│   │   │   ├── main.tf
-│   │   │   ├── variables.tf
-│   │   │   └── terraform.tfvars
-│   │   └── production/
-│   │       ├── main.tf
-│   │       ├── variables.tf
-│   │       └── terraform.tfvars
-│   ├── modules/
-│   │   ├── zitadel/
-│   │   │   ├── main.tf
-│   │   │   ├── variables.tf
-│   │   │   ├── outputs.tf
-│   │   │   ├── roles.tf
-│   │   │   ├── projects.tf
-│   │   │   └── applications.tf
-│   │   └── supabase/
-│   │       ├── main.tf
-│   │       ├── variables.tf
-│   │       ├── outputs.tf
-│   │       ├── database.tf
-│   │       ├── auth.tf
-│   │       └── edge-functions.tf
-│   └── global/
-│       ├── state.tf                   # Remote state configuration
-│       └── versions.tf                # Provider version constraints
-├── scripts/
-│   ├── import-existing.sh             # Import existing resources
-│   ├── backup-state.sh                # Backup terraform state
-│   └── validate-deployment.sh         # Post-deployment validation
-├── docs/
-│   ├── INVENTORY.md                   # Detailed inventory of existing resources
-│   ├── MIGRATION-PLAN.md              # Step-by-step migration plan
-│   └── RUNBOOK.md                     # Operational procedures
-└── .gitignore
+infrastructure/
+├── supabase/                    # Database schema and migrations
+│   ├── sql/                     # Event-driven SQL schema
+│   │   ├── 01-extensions/       # PostgreSQL extensions (ltree, uuid)
+│   │   ├── 02-tables/           # CQRS projection tables
+│   │   ├── 03-functions/        # JWT claims, authorization
+│   │   ├── 04-triggers/         # Event processors
+│   │   ├── 05-policies/         # RLS policies (deprecated location)
+│   │   ├── 06-rls/              # RLS policies (current)
+│   │   └── 99-seeds/            # Initial data
+│   ├── DEPLOY_TO_SUPABASE_STUDIO.sql   # Master deployment script
+│   ├── SUPABASE-AUTH-SETUP.md          # Auth configuration guide
+│   └── README.md                         # Schema documentation
+├── k8s/                         # Kubernetes deployments
+│   └── temporal/                # Temporal.io cluster
+│       ├── values.yaml          # Helm configuration
+│       └── worker-deployment.yaml  # Worker pods
+├── terraform/                   # Infrastructure as Code (future)
+│   ├── environments/            # Environment-specific configs
+│   └── modules/                 # Reusable modules
+└── CLAUDE.md                    # Developer guidance
 ```
 
-## Implementation Phases
+---
 
-### Phase 1: Discovery & Documentation (Current)
-- [x] Create infrastructure repository
-- [ ] Complete inventory of existing Zitadel configuration
-- [ ] Complete inventory of existing Supabase configuration
-- [ ] Document all manual configurations
-- [ ] Create terraform module structure
+## Environment Variables
 
-### Phase 2: Terraform Development
-- [ ] Configure Terraform providers for Zitadel and Supabase
-- [ ] Create modules for each service
-- [ ] Write import configurations for existing resources
-- [ ] Set up remote state management
+### Supabase (Database + Auth)
 
-### Phase 3: Import & Validation
-- [ ] Import existing Zitadel resources
-- [ ] Import existing Supabase resources
-- [ ] Validate imported state matches reality
-- [ ] Test plan/apply with no changes expected
-
-### Phase 4: Environment Expansion
-- [ ] Create dev environment configuration
-- [ ] Create staging environment configuration
-- [ ] Document environment promotion process
-- [ ] Set up CI/CD for infrastructure changes
-
-### Phase 5: Integration
-- [ ] Update A4C-FrontEnd to use IaC-managed resources
-- [ ] Create backend API proxy for Zitadel Management API
-- [ ] Document new development workflow
-- [ ] Train team on IaC processes
-
-## Required Environment Variables
-
-### For Terraform
 ```bash
-# Zitadel Provider
-export TF_VAR_zitadel_instance_url="https://analytics4change-zdswvg.us1.zitadel.cloud"
-export TF_VAR_zitadel_service_user_id=""  # To be created
-export TF_VAR_zitadel_service_user_secret=""  # To be created
-
-# Supabase Provider
-export TF_VAR_supabase_access_token=""  # From Supabase dashboard
-export TF_VAR_supabase_project_ref=""  # From Supabase dashboard
+# Required for SQL migrations
+export SUPABASE_URL="https://your-project.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+export SUPABASE_ANON_KEY="your-anon-key"
 ```
 
-## Prerequisites
+### Temporal Workers (Kubernetes Secrets)
 
-### Required Tools
-- Terraform >= 1.5.0
-- Git
-- jq (for JSON processing in scripts)
-- curl (for API validation)
+```bash
+# View secrets
+kubectl get secret temporal-worker-secrets -n temporal -o yaml
 
-### Provider Documentation
-- [Zitadel Terraform Provider](https://registry.terraform.io/providers/zitadel/zitadel/latest/docs)
-- [Supabase Terraform Provider](https://registry.terraform.io/providers/supabase/supabase/latest/docs)
+# Required:
+# - TEMPORAL_ADDRESS=temporal-frontend.temporal.svc.cluster.local:7233
+# - SUPABASE_URL=https://your-project.supabase.co
+# - SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+# - CLOUDFLARE_API_TOKEN=your-cloudflare-token
+# - SMTP_HOST, SMTP_USER, SMTP_PASS
+```
 
-## Security Considerations
+### Frontend (Auth Provider Selection)
 
-1. **State Management**: Terraform state contains sensitive data
-   - Use remote state with encryption (S3 + DynamoDB or Terraform Cloud)
-   - Enable state locking to prevent concurrent modifications
-   - Regular state backups
+```bash
+# Development (mock auth)
+VITE_AUTH_PROVIDER=mock
 
-2. **Secrets Management**:
-   - Never commit secrets to Git
-   - Use environment variables or secret management tools
-   - Consider using Terraform Cloud for secure variable storage
+# Integration (real auth for testing)
+VITE_AUTH_PROVIDER=supabase
+VITE_SUPABASE_URL=https://your-dev-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-dev-anon-key
 
-3. **Access Control**:
-   - Limit who can run Terraform apply in production
-   - Use separate service accounts per environment
-   - Audit all infrastructure changes
+# Production (real auth)
+VITE_AUTH_PROVIDER=supabase
+VITE_SUPABASE_URL=https://your-prod-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-prod-anon-key
+```
+
+---
+
+## Migration from Zitadel to Supabase Auth
+
+**Status**: Frontend complete, backend in progress
+
+### Completed (2025-10-27)
+✅ Frontend authentication architecture
+✅ Three-mode system (mock/integration/production)
+✅ Provider interface pattern
+✅ JWT claims structure defined
+✅ Mock development environment
+✅ Integration testing environment
+✅ Documentation complete
+
+### In Progress
+🚧 Database hook for JWT custom claims
+🚧 RLS policy migration to use JWT claims
+🚧 Temporal workflows for organization bootstrap
+🚧 User invitation system
+
+### Deprecated/Archived
+❌ Zitadel Terraform modules → Archived
+❌ Zitadel service integration → Removed from frontend
+❌ collect-zitadel-data.sh → Historical reference only
+
+**Note**: Some database tables retain "zitadel_" prefixes for backwards compatibility but are not actively used for authentication. These will be migrated in a future phase.
+
+---
+
+## Development Workflows
+
+### Database Changes
+
+1. **Create SQL migration** in `supabase/sql/<category>/`
+2. **Add to deployment script** `DEPLOY_TO_SUPABASE_STUDIO.sql`
+3. **Test locally** via `psql` or Supabase Studio
+4. **Deploy** by running full deployment script
+5. **Verify** with `VERIFY_DEPLOYMENT.sql`
+
+### Frontend Development
+
+1. **Mock Mode** - `npm run dev` (instant auth, UI iteration)
+2. **Integration Mode** - `npm run dev:auth` (test OAuth, RLS, JWT)
+3. **Production** - `npm run build` (auto-configured)
+
+See: `frontend/CLAUDE.md` for complete frontend development guide
+
+### Temporal Workflows
+
+1. **Port-forward Temporal** cluster
+2. **Start worker** in temporal/ directory
+3. **Trigger workflow** from frontend or CLI
+4. **Monitor** via Temporal Web UI (port 8080)
+
+See: `temporal/CLAUDE.md` for workflow development guide
+
+---
+
+## Key Technologies
+
+- **Supabase Auth**: OAuth2 PKCE (Google, GitHub) + Enterprise SSO (SAML 2.0)
+- **PostgreSQL**: Event sourcing + CQRS projections
+- **ltree**: Hierarchical organizational scopes
+- **Temporal.io**: Durable workflow orchestration
+- **Kubernetes (k3s)**: Temporal cluster hosting
+- **Cloudflare API**: DNS provisioning for subdomains
+
+---
+
+## Security
+
+### Multi-Tenant Isolation
+
+**Critical**: RLS policies are the ONLY line of defense
+
+```sql
+-- Example: Tenant isolation via JWT
+CREATE POLICY "tenant_isolation"
+ON clients FOR ALL
+USING (org_id = (auth.jwt()->>'org_id')::uuid);
+```
+
+**Never** trust `org_id` from client requests - always use JWT claims from `auth.jwt()`.
+
+### JWT Custom Claims
+
+Custom claims added via PostgreSQL database hook:
+
+```json
+{
+  "org_id": "uuid",
+  "user_role": "provider_admin",
+  "permissions": ["medication.create", "client.view"],
+  "scope_path": "org_acme_healthcare"
+}
+```
+
+**Hook Location**: `supabase/sql/03-functions/authorization/002-authentication-helpers.sql`
+
+---
+
+## Documentation
+
+### Planning Documents
+- `.plans/supabase-auth-integration/` - Authentication migration plans
+- `.plans/rbac-permissions/` - RBAC architecture
+- `.plans/temporal-integration/` - Workflow specifications
+- `.plans/auth-integration/` - Multi-tenancy architecture
+
+### Developer Guides
+- `CLAUDE.md` - Infrastructure development guide (this directory)
+- `frontend/CLAUDE.md` - Frontend development guide
+- `temporal/CLAUDE.md` - Workflow development guide
+- `supabase/SUPABASE-AUTH-SETUP.md` - Auth configuration
+
+### API Contracts
+- `supabase/contracts/` - Event schemas (AsyncAPI)
+- `supabase/contracts/types/` - TypeScript event types
+
+---
+
+## Common Tasks
+
+### Deploy Database Changes
+
+```bash
+cd infrastructure/supabase
+
+# Deploy all migrations
+psql -f DEPLOY_TO_SUPABASE_STUDIO.sql
+
+# Verify deployment
+psql -f VERIFY_DEPLOYMENT.sql
+```
+
+### Test JWT Claims Hook
+
+```sql
+-- Test custom claims function
+SELECT auth.custom_access_token_hook(
+  jsonb_build_object(
+    'user_id', 'your-user-uuid',
+    'claims', '{}'::jsonb
+  )
+);
+```
+
+### Port-Forward Temporal
+
+```bash
+# Frontend service (for workers)
+kubectl port-forward -n temporal svc/temporal-frontend 7233:7233
+
+# Web UI (for monitoring)
+kubectl port-forward -n temporal svc/temporal-web 8080:8080
+```
+
+### Check Temporal Workflows
+
+```bash
+# List workflows
+temporal workflow list
+
+# Describe workflow
+temporal workflow describe -w <workflow-id>
+
+# Show workflow history
+temporal workflow show -w <workflow-id>
+```
+
+---
 
 ## Next Steps
 
-1. **Immediate Actions**:
-   - [ ] Access Zitadel console and document all existing configurations
-   - [ ] Access Supabase dashboard and document all existing configurations
-   - [ ] Create service accounts for Terraform in both platforms
-   - [ ] Set up Terraform Cloud or S3 backend for state management
+### Phase 1: JWT Custom Claims (✅ Complete - Ready for Deployment)
+- [x] Implement database hook for JWT enrichment
+- [x] Create authentication helper functions for Supabase Auth
+- [x] Add JWT claims extraction functions (org_id, user_role, permissions, scope_path)
+- [x] Add organization switching functionality
+- [x] Update deployment script with all new functions
+- [ ] **Deploy to development** (Next: Follow `JWT-CLAIMS-SETUP.md`)
+- [ ] Test custom claims with real authentication
+- [ ] Deploy to production
+- [ ] Verify RLS policies work with JWT claims
 
-2. **Development Setup**:
-   - [ ] Initialize Terraform configuration
-   - [ ] Configure providers
-   - [ ] Create first module (start with Zitadel roles)
-   - [ ] Test import of one resource
+### Phase 2: Organization Workflows
+- [ ] Implement organization bootstrap workflow (Temporal)
+- [ ] DNS provisioning via Cloudflare API
+- [ ] User invitation system
+- [ ] Admin onboarding automation
 
-3. **Validation**:
-   - [ ] Run terraform plan to ensure no unexpected changes
-   - [ ] Create automated tests for infrastructure
-   - [ ] Document rollback procedures
+### Phase 3: Enterprise SSO
+- [ ] Configure SAML 2.0 providers (3-6 month timeline)
+- [ ] Test SAML flows in development
+- [ ] Document enterprise onboarding process
 
-## Contributing
+### Phase 4: Migration Cleanup
+- [ ] Remove deprecated Zitadel mapping tables
+- [ ] Archive Zitadel Terraform modules
+- [ ] Update all documentation
+- [ ] Remove zitadel_ prefixes from tables
 
-This infrastructure is critical to the A4C platform. All changes must:
-1. Be reviewed by at least one other team member
-2. Be tested in dev environment first
-3. Include documentation updates
-4. Follow the principle of least privilege
+---
 
 ## Support
 
 For questions or issues:
-- Create an issue in this repository
-- Contact the platform team
-- Refer to provider documentation links above
+- **Frontend Auth**: See `frontend/docs/auth-provider-architecture.md`
+- **Database Schema**: See `supabase/README.md`
+- **Workflows**: See `temporal/CLAUDE.md`
+- **Architecture Plans**: See `.plans/` directory
+
+---
+
+**Document Version**: 2.0
+**Last Updated**: 2025-10-27
+**Migration Status**: Frontend Complete, Backend In Progress

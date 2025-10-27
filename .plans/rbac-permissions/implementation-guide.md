@@ -4,12 +4,19 @@
 
 This guide provides step-by-step instructions for implementing the permission-based RBAC system in the A4C AppSuite. All components are event-sourced and follow the CQRS architecture.
 
+**Frontend Implementation Status**: ✅ Complete (2025-10-27)
+- Three-mode authentication system (mock/integration/production)
+- Permission checking via auth provider interface
+- JWT custom claims integration
+- See: `.plans/supabase-auth-integration/frontend-auth-architecture.md`
+
 **Related Documents:**
 - `.plans/rbac-permissions/architecture.md` - Complete architecture specification
+- `.plans/supabase-auth-integration/frontend-auth-architecture.md` - Frontend auth implementation ✅
 - `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - CQRS foundation
 - `/frontend/docs/EVENT-DRIVEN-GUIDE.md` - Frontend patterns
 
-**Bootstrap Integration:** 
+**Bootstrap Integration:**
 - ✅ `.plans/provider-management/bootstrap-workflows.md` - Organization bootstrap with role assignment
 - ✅ Role assignment events automatically emitted during bootstrap process
 - ✅ Cross-tenant access grants implemented and integrated
@@ -392,6 +399,172 @@ export function MedicationForm() {
 
 ---
 
+## Phase 4.5: Organization Deletion Workflows
+
+### Overview
+
+Implement zero-regret organizational deletion workflows with role-specific constraints and comprehensive UX safeguards.
+
+**Related Documentation**:
+- UX Specification: `.plans/rbac-permissions/organizational-deletion-ux.md`
+- Architecture: `.plans/rbac-permissions/architecture.md` (Section B.1)
+
+### Step 1: Create Deletion Impact Analysis Function
+
+```sql
+-- File: sql/03-functions/organization/get_deletion_impact.sql
+CREATE OR REPLACE FUNCTION get_deletion_impact(target_path LTREE)
+RETURNS JSONB
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_result JSONB;
+  v_ou_count INT;
+  v_role_count INT;
+  v_user_count INT;
+  v_client_count INT;
+  v_last_activity TIMESTAMPTZ;
+  v_risk_level TEXT;
+BEGIN
+  -- Count OUs to be deleted
+  SELECT COUNT(*) INTO v_ou_count
+  FROM organizations_projection
+  WHERE path <@ target_path AND deleted_at IS NULL;
+
+  -- Count roles to be deleted
+  SELECT COUNT(*) INTO v_role_count
+  FROM roles_projection
+  WHERE org_hierarchy_scope <@ target_path AND deleted_at IS NULL;
+
+  -- Count affected users
+  SELECT COUNT(DISTINCT user_id) INTO v_user_count
+  FROM user_roles_projection urp
+  JOIN roles_projection r ON urp.role_id = r.id
+  WHERE urp.scope_path <@ target_path AND r.deleted_at IS NULL;
+
+  -- Count affected clients (if applicable)
+  SELECT COUNT(*) INTO v_client_count
+  FROM clients_projection
+  WHERE organization_path <@ target_path AND deleted_at IS NULL;
+
+  -- Get last activity timestamp
+  SELECT MAX(created_at) INTO v_last_activity
+  FROM domain_events
+  WHERE event_metadata->>'org_path' = target_path::TEXT;
+
+  -- Determine risk level
+  v_risk_level := CASE
+    WHEN v_ou_count > 20 OR v_user_count > 50 THEN 'CRITICAL'
+    WHEN v_ou_count > 5 OR v_user_count > 10 THEN 'MEDIUM'
+    ELSE 'LOW'
+  END;
+
+  -- Build result
+  v_result := jsonb_build_object(
+    'ous_to_delete', v_ou_count,
+    'roles_to_delete', v_role_count,
+    'users_affected', v_user_count,
+    'clients_affected', v_client_count,
+    'last_activity', v_last_activity,
+    'risk_level', v_risk_level,
+    'is_empty', (v_role_count = 0 AND v_user_count = 0)
+  );
+
+  RETURN v_result;
+END;
+$$;
+
+COMMENT ON FUNCTION get_deletion_impact(LTREE) IS
+  'Analyzes the impact of deleting an organizational unit, including cascade effects. Used for pre-deletion validation and UX warnings.';
+```
+
+### Step 2: Create Deletion Validation Edge Function
+
+```typescript
+// File: supabase/functions/validate-organization-deletion/index.ts
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+serve(async (req) => {
+  const { userId, orgPath } = await req.json()
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+
+  // Get deletion impact
+  const { data: impact } = await supabase.rpc('get_deletion_impact', {
+    target_path: orgPath
+  })
+
+  // Get user's primary role
+  const { data: userRole } = await supabase.rpc('get_user_primary_role', {
+    p_user_id: userId
+  })
+
+  // Determine if deletion is allowed
+  const canDelete = userRole === 'super_admin' || impact.is_empty
+
+  // Build response
+  return new Response(JSON.stringify({
+    can_delete: canDelete,
+    must_cleanup: !impact.is_empty,
+    requires_mfa: impact.risk_level === 'CRITICAL',
+    impact: impact,
+    blockers: canDelete ? null : {
+      roles: impact.roles_to_delete,
+      users: impact.users_affected,
+      message: `Cannot delete: ${impact.roles_to_delete} roles and ${impact.users_affected} users must be reassigned first`
+    },
+    alternatives: ['deactivate', 'export'],
+    confirmation_type: impact.risk_level
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  })
+})
+```
+
+### Step 3: Implement Frontend Deletion Flow
+
+See detailed UX mockups and component specifications in `.plans/rbac-permissions/organizational-deletion-ux.md`.
+
+**Required Components**:
+1. `DeletionImpactAnalyzer` - Pre-deletion validation
+2. `DeletionBlockerDialog` - provider_admin guidance
+3. `DeletionConfirmationDialog` - Risk-tiered confirmations
+4. `GuidedCleanupWorkflow` - Step-by-step assistant
+5. `TypedConfirmationInput` - Prevent accidental clicks
+
+### Step 4: Test Deletion Workflows
+
+```sql
+-- Test: Empty OU deletion (provider_admin should succeed)
+SELECT get_deletion_impact('acme.region_east.facility_a.empty_program');
+-- Expected: is_empty=true, roles_to_delete=0, users_affected=0
+
+-- Test: OU with roles (provider_admin should be blocked)
+SELECT get_deletion_impact('acme.region_east.facility_b');
+-- Expected: is_empty=false, roles_to_delete=3, users_affected=12, risk_level='LOW'
+
+-- Test: Large deletion (super_admin, should require MFA)
+SELECT get_deletion_impact('acme.region_west');
+-- Expected: ous_to_delete=47, risk_level='CRITICAL', requires_mfa=true
+```
+
+### Rollout Checklist
+
+- [ ] Database function `get_deletion_impact()` deployed
+- [ ] Edge function `validate-organization-deletion` deployed
+- [ ] Frontend deletion components implemented
+- [ ] MFA integration tested
+- [ ] Typed confirmation patterns tested
+- [ ] Guided cleanup workflow tested
+- [ ] Audit logging verified
+- [ ] Documentation updated
+
+---
+
 ## Phase 5: RLS Policy Updates
 
 ### Update Existing RLS Policies
@@ -630,6 +803,7 @@ REINDEX TABLE role_permissions_projection;
 | Impersonate user | `provider.impersonate` | global | Super admin only |
 | Grant cross-tenant access | `access_grant.create` | org | Provider admin can grant access to their org data |
 | Export audit logs | `audit.export` | org | Full org scope or scoped to specific unit |
+| Delete empty OU | `organization.delete` | org | provider_admin: empty only; super_admin: unrestricted; see [deletion UX](./organizational-deletion-ux.md) |
 
 **Note**: Scope values are semantic labels. Actual scoping uses ltree paths with provider-defined hierarchies.
 

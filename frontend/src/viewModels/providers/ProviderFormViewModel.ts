@@ -7,7 +7,6 @@ import {
   SubProvider
 } from '@/types/provider.types';
 import { providerService } from '@/services/providers/provider.service';
-import { zitadelProviderService } from '@/services/providers/zitadel-provider.service';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('viewmodel');
@@ -232,11 +231,12 @@ export class ProviderFormViewModel {
           adminEmail: this.adminEmail
         };
 
-        // First create the Zitadel organization
-        const zitadelOrgId = await zitadelProviderService.createOrganization(createRequest);
+        // TODO: Implement organization provisioning workflow with Supabase Auth
+        // For now, generate a temporary organization ID
+        const tempOrgId = crypto.randomUUID();
 
-        // Then create the provider record in our database
-        const provider = await providerService.createProvider(createRequest, zitadelOrgId);
+        // Create the provider record in our database
+        const provider = await providerService.createProvider(createRequest, tempOrgId);
         providerId = provider.id;
 
         log.info('Provider created successfully', { providerId });

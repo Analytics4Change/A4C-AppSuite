@@ -1,6 +1,6 @@
 /**
  * Data-driven permission system configuration
- * All permissions are defined here and synced to Zitadel
+ * All permissions are defined here and stored in the database
  */
 
 export interface Permission {
@@ -24,7 +24,7 @@ export interface PermissionGroup {
 
 /**
  * All system permissions
- * These are synced to Zitadel and used for authorization
+ * These are stored in the database and used for authorization
  */
 export const PERMISSIONS: Record<string, Permission> = {
   // ============================================

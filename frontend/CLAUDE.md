@@ -221,6 +221,148 @@ src/
 - **Interface-based Services**: All services implement interfaces for easy mocking/testing
 - **Unified Component Pattern**: Create single, reusable components for similar functionality (e.g., MultiSelectDropdown for all multi-select needs)
 
+### Authentication Architecture
+
+**Status**: ✅ Supabase Auth with three-mode system (Completed 2025-10-27)
+
+The application uses **dependency injection** with multiple authentication modes to support both rapid development and production requirements.
+
+#### Three Authentication Modes
+
+1. **Mock Mode** (default for development)
+   - Instant authentication without network calls
+   - Complete JWT claims structure for testing
+   - Configurable user profiles (super_admin, provider_admin, etc.)
+   - Use: `npm run dev` or `npm run dev:mock`
+
+2. **Integration Mode** (for auth testing)
+   - Real OAuth flows with Google/GitHub
+   - Real JWT tokens from Supabase
+   - Custom claims from database hooks
+   - Use: `npm run dev:auth` or `npm run dev:integration`
+
+3. **Production Mode**
+   - Real Supabase Auth with social login
+   - Enterprise SSO support (SAML 2.0)
+   - JWT custom claims with RLS enforcement
+   - Auto-selected in production builds
+
+#### Provider Interface Pattern
+
+All authentication is accessed through the `IAuthProvider` interface:
+
+```typescript
+// ✅ GOOD - Uses abstraction
+import { getAuthProvider } from '@/services/auth/AuthProviderFactory';
+const auth = getAuthProvider();
+const user = await auth.getUser();
+
+// ❌ BAD - Direct dependency
+import { SupabaseAuthProvider } from './SupabaseAuthProvider';
+```
+
+**Key Files**:
+- `src/services/auth/IAuthProvider.ts` - Interface definition
+- `src/services/auth/DevAuthProvider.ts` - Mock provider
+- `src/services/auth/SupabaseAuthProvider.ts` - Real provider
+- `src/services/auth/AuthProviderFactory.ts` - Provider selection
+- `src/contexts/AuthContext.tsx` - React context wrapper
+- `src/config/dev-auth.config.ts` - Mock user configuration
+
+#### JWT Custom Claims
+
+The application uses custom JWT claims for multi-tenant isolation and RBAC:
+
+```typescript
+interface JWTClaims {
+  sub: string;              // User UUID
+  email: string;
+  org_id: string;          // Organization UUID (for RLS)
+  user_role: UserRole;     // User's role
+  permissions: string[];   // Permission strings
+  scope_path: string;      // Hierarchical scope (ltree)
+}
+```
+
+**Usage in Components**:
+
+```typescript
+import { useAuth } from '@/contexts/AuthContext';
+
+const MyComponent = () => {
+  const { session, hasPermission } = useAuth();
+
+  // Access claims
+  const orgId = session?.claims.org_id;
+  const role = session?.claims.user_role;
+  const permissions = session?.claims.permissions;
+
+  // Check permission
+  const canCreate = await hasPermission('medication.create');
+
+  return (
+    <div>
+      <p>Organization: {orgId}</p>
+      <p>Role: {role}</p>
+    </div>
+  );
+};
+```
+
+#### Environment Configuration
+
+Control authentication mode via environment variable:
+
+```bash
+# .env.development (mock mode)
+VITE_AUTH_PROVIDER=mock
+
+# .env.development.integration (real auth for testing)
+VITE_AUTH_PROVIDER=supabase
+VITE_SUPABASE_URL=https://your-dev-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-dev-anon-key
+
+# .env.production (real auth)
+VITE_AUTH_PROVIDER=supabase
+VITE_SUPABASE_URL=https://your-prod-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-prod-anon-key
+```
+
+#### Testing with Authentication
+
+**Unit Tests** (with mock auth):
+
+```typescript
+import { DevAuthProvider } from '@/services/auth/DevAuthProvider';
+import { PREDEFINED_PROFILES } from '@/config/dev-auth.config';
+
+const mockAuth = new DevAuthProvider({
+  profile: PREDEFINED_PROFILES.provider_admin
+});
+
+render(
+  <AuthProvider authProvider={mockAuth}>
+    <MyComponent />
+  </AuthProvider>
+);
+```
+
+**E2E Tests** (mock mode):
+
+```typescript
+test('user can login with any credentials', async ({ page }) => {
+  await page.goto('http://localhost:5173');
+  await page.fill('#email', 'test@example.com');
+  await page.fill('#password', 'any-password');
+  await page.click('button[type="submit"]');
+
+  // Mock auth provides instant authentication
+  await expect(page).toHaveURL(/\/clients/);
+});
+```
+
+**For complete authentication architecture**: See `.plans/supabase-auth-integration/frontend-auth-architecture.md`
+
 ### State Management with MobX
 
 - Use MobX ViewModels for complex state logic

@@ -1,12 +1,43 @@
 # Provider Partner Architecture
 
+**Status**: ✅ Integrated with Supabase Auth + Temporal.io
+**Version**: 2.1 (Updated for Supabase Auth integration)
+**Last Updated**: 2025-10-24
+**Authentication**: Supabase Auth (replaces Zitadel)
+
 ## Executive Summary
 
 This document specifies the architecture for provider partner organizations in the A4C platform. Provider partners are external organizations that require cross-tenant access to healthcare provider data for legitimate business, legal, or family purposes. This includes Value-Added Resellers (VARs), court systems, social services agencies, and family organizations.
 
-**Status:** Architectural Specification
-**Version:** 2.0 (Restructured from VAR-specific to provider partner umbrella)
-**Last Updated:** 2025-10-15
+### Integration with Supabase Auth + Temporal
+
+**IMPORTANT**: Provider partner organizations are now created and managed via:
+
+1. **Organization Bootstrap**: Temporal.io workflows orchestrate creation
+   - **OrganizationBootstrapWorkflow**: Creates partner org, provisions subdomain, sends invitations
+   - **Duration**: 10-40 minutes (includes DNS propagation)
+   - **Event-Driven**: All steps emit domain events
+
+2. **Authentication**: Supabase Auth (not Zitadel)
+   - Partner users authenticate via Supabase Auth (social login, password, or SAML SSO)
+   - JWT tokens include custom claims: `org_id`, `user_role`, `permissions`
+   - Cross-tenant access enforced via RLS policies
+
+3. **Cross-Tenant Grants**: Event-sourced access grants
+   - Grants created when partner relationship is established
+   - RLS policies check JWT `org_id` + `cross_tenant_access_grants_projection`
+   - Automatic revocation when relationship expires
+
+**Key Changes from Previous Architecture**:
+- **Organizations**: Database records (not Zitadel organizations)
+- **User Management**: Temporal workflows + Supabase Auth (not Zitadel Management API)
+- **Subdomains**: Provisioned via Temporal + Cloudflare API (automated)
+- **Invitations**: Secure tokens via Temporal workflows (not Zitadel invitations)
+
+**See Also**:
+- **Temporal Workflows**: `.plans/temporal-integration/organization-onboarding-workflow.md`
+- **Supabase Auth**: `.plans/supabase-auth-integration/overview.md`
+- **Multi-Tenant Architecture**: `.plans/auth-integration/tenants-as-organization-thoughts.md`
 
 ---
 

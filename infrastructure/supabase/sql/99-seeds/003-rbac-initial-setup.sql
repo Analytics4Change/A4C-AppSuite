@@ -17,21 +17,6 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
    '{"applet": "organization", "action": "create", "description": "Create new tenant organizations", "scope_type": "global", "requires_mfa": false}'::jsonb,
    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
 
-  -- organization.view
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "organization", "action": "view", "description": "View organization details and hierarchy", "scope_type": "global", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
-
-  -- organization.update
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "organization", "action": "update", "description": "Modify organization settings and configuration", "scope_type": "global", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
-
-  -- organization.deactivate
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "organization", "action": "deactivate", "description": "Deactivate organization (soft delete, reversible)", "scope_type": "global", "requires_mfa": true}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
-
   -- organization.suspend
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
    '{"applet": "organization", "action": "suspend", "description": "Suspend organization access (e.g., payment issues)", "scope_type": "global", "requires_mfa": true}'::jsonb,
@@ -45,11 +30,6 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
   -- organization.search
   (gen_random_uuid(), 'permission', 1, 'permission.defined',
    '{"applet": "organization", "action": "search", "description": "Search across all organizations", "scope_type": "global", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
-
-  -- organization.delete
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "organization", "action": "delete", "description": "Permanently delete organization (irreversible)", "scope_type": "global", "requires_mfa": true}'::jsonb,
    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb);
 
 

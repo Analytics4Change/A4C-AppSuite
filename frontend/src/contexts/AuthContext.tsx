@@ -1,41 +1,70 @@
+/**
+ * Authentication Context
+ *
+ * Provides authentication state and operations to the entire application.
+ * Uses dependency injection with IAuthProvider interface to support
+ * multiple authentication backends (mock, Supabase, etc.).
+ *
+ * The actual provider implementation is determined by VITE_AUTH_PROVIDER
+ * environment variable and created by AuthProviderFactory.
+ *
+ * Usage:
+ *   const { isAuthenticated, user, login, logout } = useAuth();
+ *
+ * See .plans/supabase-auth-integration/frontend-auth-architecture.md
+ */
+
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import { IAuthProvider } from '@/services/auth/IAuthProvider';
+import { getAuthProvider, logAuthConfig } from '@/services/auth/AuthProviderFactory';
+import {
+  User,
+  Session,
+  AuthState,
+  LoginCredentials,
+  OAuthProvider,
+  OAuthOptions,
+  UserRole,
+} from '@/types/auth.types';
 import { Logger } from '@/utils/logger';
-import { zitadelService, ZitadelUser } from '@/services/auth/zitadel.service';
-import { supabaseService } from '@/services/auth/supabase.service';
 
 const log = Logger.getLogger('main');
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'super_admin' | 'partner_onboarder' | 'administrator' | 'provider_admin' | 'admin' | 'clinician' | 'nurse' | 'caregiver' | 'viewer';
-  provider?: 'local' | 'google' | 'facebook' | 'apple' | 'zitadel';
-  picture?: string;
-}
-
-interface AuthState {
-  isAuthenticated: boolean;
-  user: User | null;
-  zitadelUser?: ZitadelUser | null;
-}
-
+/**
+ * Authentication context interface
+ * Exposed to all components via useAuth() hook
+ */
 interface AuthContextType {
+  /** Current authentication state */
   isAuthenticated: boolean;
   user: User | null;
-  zitadelUser?: ZitadelUser | null;
-  login: (username: string, password: string) => Promise<boolean>;
-  loginWithOAuth: (provider: 'google' | 'facebook' | 'apple', oauthData: any) => Promise<boolean>;
-  loginWithZitadel: () => Promise<void>;
-  logout: () => void;
-  setAuthState: (state: AuthState) => Promise<void>;
-  hasRole: (role: string) => boolean;
-  hasPermission: (permission: string) => boolean;
+  session: Session | null;
+  loading: boolean;
+  error: Error | null;
+
+  /** Authentication operations */
+  login: (credentials: LoginCredentials) => Promise<void>;
+  loginWithOAuth: (provider: OAuthProvider, options?: OAuthOptions) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshSession: () => Promise<void>;
+
+  /** Permission and role checks */
+  hasPermission: (permission: string) => Promise<boolean>;
+  hasRole: (role: UserRole) => boolean;
+
+  /** Organization management */
   switchOrganization: (orgId: string) => Promise<void>;
+
+  /** Provider information */
+  providerType: 'mock' | 'supabase';
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * useAuth hook
+ * Provides access to authentication context in any component
+ */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -46,150 +75,267 @@ export const useAuth = () => {
 
 interface AuthProviderProps {
   children: ReactNode;
+  /** Optional: Inject custom auth provider (useful for testing) */
+  authProvider?: IAuthProvider;
 }
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [zitadelUser, setZitadelUser] = useState<ZitadelUser | null>(null);
+/**
+ * AuthProvider component
+ * Wraps the application and provides authentication context
+ */
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvider: injectedProvider }) => {
+  // Get auth provider (injected or from factory)
+  const authProvider = injectedProvider || getAuthProvider();
 
-  log.debug('AuthProvider state', { isAuthenticated, user });
+  // Authentication state
+  const [authState, setAuthState] = useState<AuthState>({
+    isAuthenticated: false,
+    user: null,
+    session: null,
+    loading: true,
+    error: null,
+  });
 
-  // Check for existing Zitadel session on mount
+  // Initialize auth provider on mount
   useEffect(() => {
-    const checkExistingSession = async () => {
+    const initializeAuth = async () => {
       try {
-        const existingUser = await zitadelService.getUser();
-        if (existingUser) {
-          log.info('Existing Zitadel session found');
-          await supabaseService.updateAuthToken(existingUser);
+        log.info('AuthProvider: Initializing authentication');
+        logAuthConfig();
 
-          setZitadelUser(existingUser);
-          setUser({
-            id: existingUser.id,
-            name: existingUser.name,
-            email: existingUser.email,
-            role: mapZitadelRoleToAppRole(existingUser.roles),
-            provider: 'zitadel',
-            picture: existingUser.picture,
+        // Initialize the provider
+        await authProvider.initialize();
+
+        // Check for existing session
+        const session = await authProvider.getSession();
+
+        if (session) {
+          log.info('AuthProvider: Existing session found', {
+            user: session.user.email,
+            role: session.claims.user_role,
           });
-          setIsAuthenticated(true);
+
+          setAuthState({
+            isAuthenticated: true,
+            user: session.user,
+            session,
+            loading: false,
+            error: null,
+          });
+        } else {
+          log.info('AuthProvider: No existing session');
+          setAuthState({
+            isAuthenticated: false,
+            user: null,
+            session: null,
+            loading: false,
+            error: null,
+          });
         }
       } catch (error) {
-        log.error('Failed to restore session', error);
+        log.error('AuthProvider: Initialization failed', error);
+        setAuthState({
+          isAuthenticated: false,
+          user: null,
+          session: null,
+          loading: false,
+          error: error as Error,
+        });
       }
     };
 
-    checkExistingSession();
-  }, []);
+    initializeAuth();
+  }, [authProvider]);
 
-  const login = async (_username: string, _password: string): Promise<boolean> => {
-    log.warn('Direct username/password login is deprecated. Please use Zitadel authentication.');
-    // Redirect to Zitadel login
-    await loginWithZitadel();
-    return false; // Return false as the page will redirect
-  };
+  /**
+   * Login with email and password
+   */
+  const login = async (credentials: LoginCredentials): Promise<void> => {
+    try {
+      setAuthState((prev) => ({ ...prev, loading: true, error: null }));
 
-  const loginWithOAuth = async (
-    provider: 'google' | 'facebook' | 'apple',
-    _oauthData: any
-  ): Promise<boolean> => {
-    log.warn(`Direct OAuth login (${provider}) is deprecated. Please use Zitadel authentication.`);
-    // Redirect to Zitadel login
-    await loginWithZitadel();
-    return false; // Return false as the page will redirect
-  };
+      log.info('AuthProvider: Login attempt', { email: credentials.email });
+      const session = await authProvider.login(credentials);
 
-  const loginWithZitadel = async (): Promise<void> => {
-    log.info('Initiating Zitadel login');
+      setAuthState({
+        isAuthenticated: true,
+        user: session.user,
+        session,
+        loading: false,
+        error: null,
+      });
 
-    // Store the current location to return after auth
-    sessionStorage.setItem('auth_return_to', window.location.pathname);
-
-    // Redirect to Zitadel
-    await zitadelService.login();
-  };
-
-  const logout = async () => {
-    log.info('User logout');
-
-    if (zitadelUser) {
-      // Logout from Zitadel
-      await zitadelService.logout();
+      log.info('AuthProvider: Login successful', {
+        user: session.user.email,
+        role: session.claims.user_role,
+      });
+    } catch (error) {
+      log.error('AuthProvider: Login failed', error);
+      setAuthState((prev) => ({
+        ...prev,
+        loading: false,
+        error: error as Error,
+      }));
+      throw error;
     }
-
-    // Clear local state
-    setUser(null);
-    setZitadelUser(null);
-    setIsAuthenticated(false);
-
-    // Clear Supabase auth
-    await supabaseService.updateAuthToken(null);
   };
 
-  const setAuthState = async (state: AuthState): Promise<void> => {
-    setIsAuthenticated(state.isAuthenticated);
-    setUser(state.user);
-    setZitadelUser(state.zitadelUser || null);
+  /**
+   * Login with OAuth provider
+   */
+  const loginWithOAuth = async (provider: OAuthProvider, options?: OAuthOptions): Promise<void> => {
+    try {
+      setAuthState((prev) => ({ ...prev, loading: true, error: null }));
+
+      log.info('AuthProvider: OAuth login attempt', { provider });
+      const result = await authProvider.loginWithOAuth(provider, options);
+
+      // If result is a session, update state
+      // If void, OAuth redirect has been initiated
+      if (result) {
+        setAuthState({
+          isAuthenticated: true,
+          user: result.user,
+          session: result,
+          loading: false,
+          error: null,
+        });
+
+        log.info('AuthProvider: OAuth login successful', {
+          user: result.user.email,
+          role: result.claims.user_role,
+        });
+      } else {
+        // OAuth redirect initiated, keep loading state
+        log.info('AuthProvider: OAuth redirect initiated');
+      }
+    } catch (error) {
+      log.error('AuthProvider: OAuth login failed', error);
+      setAuthState((prev) => ({
+        ...prev,
+        loading: false,
+        error: error as Error,
+      }));
+      throw error;
+    }
   };
 
-  const hasRole = (role: string): boolean => {
-    if (!zitadelUser) return false;
-    return zitadelService.hasRole(zitadelUser, role);
+  /**
+   * Logout current user
+   */
+  const logout = async (): Promise<void> => {
+    try {
+      setAuthState((prev) => ({ ...prev, loading: true }));
+
+      log.info('AuthProvider: Logout');
+      await authProvider.logout();
+
+      setAuthState({
+        isAuthenticated: false,
+        user: null,
+        session: null,
+        loading: false,
+        error: null,
+      });
+
+      log.info('AuthProvider: Logout successful');
+    } catch (error) {
+      log.error('AuthProvider: Logout failed', error);
+      setAuthState((prev) => ({
+        ...prev,
+        loading: false,
+        error: error as Error,
+      }));
+      throw error;
+    }
   };
 
-  const hasPermission = (permission: string): boolean => {
-    if (!zitadelUser) return false;
-    return zitadelService.hasPermission(zitadelUser, permission);
+  /**
+   * Refresh current session
+   */
+  const refreshSession = async (): Promise<void> => {
+    try {
+      log.info('AuthProvider: Refreshing session');
+      const session = await authProvider.refreshSession();
+
+      setAuthState((prev) => ({
+        ...prev,
+        session,
+        user: session.user,
+      }));
+
+      log.info('AuthProvider: Session refreshed');
+    } catch (error) {
+      log.error('AuthProvider: Session refresh failed', error);
+      // If refresh fails, logout user
+      await logout();
+      throw error;
+    }
   };
 
+  /**
+   * Check if user has a specific permission
+   */
+  const hasPermission = async (permission: string): Promise<boolean> => {
+    const result = await authProvider.hasPermission(permission);
+    return result.hasPermission;
+  };
+
+  /**
+   * Check if user has a specific role
+   */
+  const hasRole = (role: UserRole): boolean => {
+    return authState.session?.claims.user_role === role;
+  };
+
+  /**
+   * Switch user's active organization
+   */
   const switchOrganization = async (orgId: string): Promise<void> => {
-    if (!zitadelUser) {
-      throw new Error('No authenticated user');
+    try {
+      setAuthState((prev) => ({ ...prev, loading: true }));
+
+      log.info('AuthProvider: Switching organization', { orgId });
+      const session = await authProvider.switchOrganization(orgId);
+
+      setAuthState((prev) => ({
+        ...prev,
+        session,
+        user: session.user,
+        loading: false,
+      }));
+
+      log.info('AuthProvider: Organization switched', {
+        orgId: session.claims.org_id,
+        orgName: session.claims.scope_path,
+      });
+    } catch (error) {
+      log.error('AuthProvider: Organization switch failed', error);
+      setAuthState((prev) => ({
+        ...prev,
+        loading: false,
+        error: error as Error,
+      }));
+      throw error;
     }
-
-    await zitadelService.switchOrganization(orgId);
-
-    // Update the current user's organization context
-    const updatedUser = {
-      ...zitadelUser,
-      organizationId: orgId,
-    };
-
-    setZitadelUser(updatedUser);
-    await supabaseService.updateAuthToken(updatedUser);
-
-    log.info('Organization switched', { orgId });
   };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        isAuthenticated,
-        user,
-        zitadelUser,
-        login,
-        loginWithOAuth,
-        loginWithZitadel,
-        logout,
-        setAuthState,
-        hasRole,
-        hasPermission,
-        switchOrganization,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  // Context value
+  const contextValue: AuthContextType = {
+    isAuthenticated: authState.isAuthenticated,
+    user: authState.user,
+    session: authState.session,
+    loading: authState.loading,
+    error: authState.error,
+    login,
+    loginWithOAuth,
+    logout,
+    refreshSession,
+    hasPermission,
+    hasRole,
+    switchOrganization,
+    providerType: import.meta.env.VITE_AUTH_PROVIDER || (import.meta.env.PROD ? 'supabase' : 'mock'),
+  };
+
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 };
-
-// Helper function to map Zitadel roles to app roles
-function mapZitadelRoleToAppRole(roles: string[]): 'admin' | 'clinician' | 'nurse' | 'viewer' {
-  // Priority order for role mapping
-  if (roles.includes('admin') || roles.includes('administrator')) return 'admin';
-  if (roles.includes('clinician') || roles.includes('doctor') || roles.includes('physician')) return 'clinician';
-  if (roles.includes('nurse')) return 'nurse';
-
-  // Default to viewer for any other role
-  return 'viewer';
-}

@@ -2,14 +2,14 @@
  * Organization Service Interface
  *
  * Abstracts organization ID resolution for multi-tenant architecture.
- * Supports both mock (development) and production (Zitadel-based) implementations.
+ * Supports both mock (development) and production (Supabase-based) implementations.
  */
 
 export interface IOrganizationService {
   /**
    * Get the current organization identifier
    *
-   * @returns Organization external ID (e.g., 'mock-dev-org' or Zitadel organization ID)
+   * @returns Organization ID from auth claims
    * @throws Error if no organization context available
    */
   getCurrentOrganizationId(): Promise<string>;

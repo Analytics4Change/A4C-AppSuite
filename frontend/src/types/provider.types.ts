@@ -34,7 +34,7 @@ export interface SubscriptionTier {
  */
 export interface Provider {
   // Identity
-  id: string; // Matches Zitadel organization ID
+  id: string; // Unique provider/organization identifier
   name: string;
   type: string; // References ProviderType
   status: ProviderStatus;

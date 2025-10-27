@@ -1,10 +1,45 @@
 # Permission-Based RBAC Architecture
 
+**Status**: ✅ Integrated with Supabase Auth + Temporal.io
+**Last Updated**: 2025-10-27
+**Authentication**: Supabase Auth with custom JWT claims (frontend implementation complete)
+
 ## Overview
 
 A4C AppSuite implements a **permission-based Role-Based Access Control (RBAC)** system built on an event-sourced foundation. All permission grants, role assignments, and authorization changes are captured as immutable events in the `domain_events` table and projected to queryable tables for efficient access control checks.
 
 **Core Principle**: Permissions are the atomic unit of authorization. Roles are collections of permissions. This provides maximum flexibility for future expansion while starting with just two foundational roles.
+
+### Integration with Supabase Auth
+
+**IMPORTANT**: This RBAC system is integrated with **Supabase Auth** (not Zitadel). Key integration points:
+
+1. **JWT Custom Claims**: User permissions are added to JWT tokens via database hook
+   - `permissions`: Array of permission strings (e.g., `["medication.create", "client.view"]`)
+   - `user_role`: User's primary role (e.g., `"provider_admin"`)
+   - `org_id`: User's active organization for RLS isolation
+   - `scope_path`: Hierarchical scope for ltree queries
+
+2. **RLS Policies**: Row-level security policies use JWT claims for authorization
+   ```sql
+   -- Example: Permission-based access
+   CREATE POLICY "medication_create"
+   ON medications FOR INSERT
+   USING (
+     'medication.create' = ANY(
+       string_to_array(auth.jwt()->>'permissions', ',')
+     )
+   );
+   ```
+
+3. **Event-Driven Updates**: Permission changes emit events that trigger:
+   - Projection updates (user_permissions_projection)
+   - JWT refresh required for updated claims
+
+**See Also**:
+- **Supabase Auth Integration**: `.plans/supabase-auth-integration/overview.md`
+- **Custom JWT Claims Setup**: `.plans/supabase-auth-integration/custom-claims-setup.md`
+- **Temporal Workflows**: `.plans/temporal-integration/` (for organization bootstrap and user invitations)
 
 ---
 
@@ -73,7 +108,7 @@ Permissions are defined per **applet** (distinct functional modules in the appli
 - `organization.view` - View organization information and hierarchy
 - `organization.update` - Update organization information
 - `organization.deactivate` - Deactivate organizations (billing, compliance, operational)
-- `organization.delete` - Delete organizations with cascade handling
+- `organization.delete` - Delete organizations with cascade handling (super_admin: unrestricted, provider_admin/partner_admin: empty OUs only) - See [Organizational Deletion UX](./organizational-deletion-ux.md)
 - `organization.business_profile_create` - Create business profiles (Platform Owner only) - **IMPLEMENTED ✅** via bootstrap architecture
 - `organization.business_profile_update` - Update business profiles
 
@@ -1077,7 +1112,7 @@ EXECUTE FUNCTION raise_exception('Events are immutable for audit integrity');
 | organization.view | ✅ | ✅ (own org) |
 | organization.update | ✅ | ✅ (own org) |
 | organization.deactivate | ✅ | ✅ (own org) |
-| organization.delete | ✅ | ❌ |
+| organization.delete | ✅ (unrestricted) | ✅ (empty OUs only) |
 | organization.business_profile_create | ✅ | ❌ |
 | organization.business_profile_update | ✅ | ✅ (own org) |
 | client.* | ✅ | ✅ (own org) |
@@ -1086,6 +1121,75 @@ EXECUTE FUNCTION raise_exception('Events are immutable for audit integrity');
 | access_grant.approve | ✅ | ✅ (own org data) |
 | audit.view | ✅ | ✅ (own org) |
 | audit.export | ✅ | ✅ (own org) |
+
+### B.1 Organization Deletion Constraints and UX Requirements
+
+The `organization.delete` permission implements role-specific constraints and mandatory UX safeguards to prevent accidental data loss while enabling safe organizational cleanup.
+
+#### Permission Behavior by Role
+
+**super_admin (Platform Owner)**:
+- **Scope**: Unrestricted deletion of any organization
+- **Constraints**: None (can delete organizations with active roles, users, and data)
+- **MFA**: Required for all deletions
+- **Use Case**: Platform-level cleanup, tenant offboarding, emergency operations
+
+**provider_admin / partner_admin**:
+- **Scope**: Organization-scoped deletion (`scope_type: 'org'`)
+- **Constraints**: Can only delete **empty** organizational units within their hierarchy
+- **MFA**: Required for all deletions
+- **Use Case**: Restructuring provider hierarchies, removing obsolete organizational units
+
+#### Empty Organizational Unit Definition
+
+An OU is considered **empty** when ALL of the following conditions are met:
+
+1. **No Roles Scoped to OU**: `COUNT(*) = 0 FROM roles_projection WHERE org_hierarchy_scope <@ target_ou_path AND deleted_at IS NULL`
+2. **No Users Assigned to OU**: `COUNT(*) = 0 FROM user_roles_projection WHERE scope_path <@ target_ou_path AND deleted_at IS NULL`
+3. **Child OUs Allowed**: Child organizational units do NOT block deletion (they will cascade delete if they are also empty)
+
+**Validation Point**: Emptiness validation is enforced at the command handler level BEFORE emitting `organization.deleted` events. The event processor performs the same cascade deletion logic for all roles.
+
+#### Cascade Deletion Behavior
+
+**Event Processing**:
+- Deletion emits `organization.deleted` event for parent OU
+- Event processor automatically emits child `organization.deleted` events for all descendant OUs
+- Roles scoped to deleted OUs receive `role.deleted` events
+- All events preserve audit trail with `parent_deletion_event_id` metadata
+
+**Soft Delete Strategy**:
+- Organizations are logically deleted (`deleted_at` timestamp set)
+- All data is preserved for audit/compliance
+- No physical data deletion occurs
+
+#### Mandatory UX Requirements
+
+All deletion interfaces MUST implement these UX safeguards:
+
+1. **Pre-Deletion Impact Analysis**: Display exact impact (OUs, roles, users, data) before allowing deletion
+2. **Risk-Tiered Warnings**: LOW/MEDIUM/CRITICAL based on deletion scope
+3. **Typed Confirmation**: Require user to type organization name (prevents accidental clicks)
+4. **MFA Challenge**: Enforce multi-factor authentication for CRITICAL deletions (>10 OUs OR >50 users)
+5. **Reversible Alternative**: Always offer `organization.deactivate` as safer option
+6. **Blocker Guidance**: For provider_admin, show exact blockers (roles, users) with actionable cleanup paths
+7. **Guided Workflow**: Optional step-by-step cleanup assistant for complex hierarchies
+8. **Export Option**: Allow data export before deletion (compliance requirement)
+
+**Detailed UX Specifications**: See [Organizational Deletion UX Guide](./organizational-deletion-ux.md)
+
+#### Implementation Status
+
+- ✅ Event processing: `organization.deleted` cascade implemented
+- ✅ Projection tables: Support logical deletion
+- ⏸️ Permission scope change: `scope_type: 'global'` → `'org'` (Phase B)
+- ⏸️ Command handler: Emptiness validation (Phase B)
+- ⏸️ Frontend UX: Zero-regret deletion flows (Phase B)
+
+**Related Documentation**:
+- Event processor: `/infrastructure/supabase/sql/03-functions/event-processing/002-process-organization-events.sql:168-237`
+- UX specification: `.plans/rbac-permissions/organizational-deletion-ux.md`
+- Implementation guide: `.plans/rbac-permissions/implementation-guide.md` (Phase 4.5)
 
 ### C. Event Naming Conventions
 
@@ -1100,17 +1204,69 @@ EXECUTE FUNCTION raise_exception('Events are immutable for audit integrity');
 
 **Tense**: Past tense for state changes (created, granted, assigned)
 
-### D. Related Documentation
+### D. Frontend Integration
 
-- `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - Event sourcing foundation
-- `.plans/multi-tenancy/multi-tenancy-organization.html` - Multi-tenancy architecture
-- `.plans/auth-integration/tenants-as-organization-thoughts.md` - Zitadel integration
-- `.plans/impersonation/architecture.md` - Super Admin impersonation
-- `.plans/consolidated/agent-observations.md` - Architectural overview
+The React frontend integrates with this RBAC system through the auth provider interface:
+
+#### Permission Checking
+
+```typescript
+import { useAuth } from '@/contexts/AuthContext';
+
+const MyComponent = () => {
+  const { hasPermission } = useAuth();
+
+  // Check single permission
+  const canCreate = await hasPermission('medication.create');
+
+  // Permissions available in session
+  const { session } = useAuth();
+  const permissions = session?.claims.permissions || [];
+};
+```
+
+#### Role-Based UI Rendering
+
+```typescript
+const AdminPanel = () => {
+  const { session } = useAuth();
+  const isAdmin = session?.claims.user_role === 'provider_admin';
+
+  if (!isAdmin) {
+    return <AccessDenied />;
+  }
+
+  return <AdminDashboard />;
+};
+```
+
+**See**: `.plans/supabase-auth-integration/frontend-auth-architecture.md` for complete frontend implementation
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-10-09
-**Status**: Approved for Implementation
+### E. Related Documentation
+
+#### Authentication & Authorization
+- **Frontend Auth**: `.plans/supabase-auth-integration/frontend-auth-architecture.md` ✅
+- **Supabase Auth Overview**: `.plans/supabase-auth-integration/overview.md`
+- **Custom JWT Claims**: `.plans/supabase-auth-integration/custom-claims-setup.md`
+- **Multi-tenancy**: `.plans/auth-integration/tenants-as-organization-thoughts.md`
+
+#### Event Sourcing
+- **Event-Driven Architecture**: `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md`
+- **Frontend Event Guide**: `/frontend/docs/EVENT-DRIVEN-GUIDE.md`
+
+#### Workflows
+- **Organization Bootstrap**: `.plans/temporal-integration/organization-onboarding-workflow.md`
+- **User Invitations**: `.plans/temporal-integration/activities-reference.md`
+
+#### Administration
+- **Super Admin Impersonation**: `.plans/impersonation/architecture.md`
+- **Implementation Guide**: `.plans/rbac-permissions/implementation-guide.md`
+
+---
+
+**Document Version**: 1.1
+**Last Updated**: 2025-10-27
+**Status**: Approved for Implementation (Frontend Complete)
 **Owner**: A4C Development Team

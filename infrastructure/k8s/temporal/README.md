@@ -1,13 +1,21 @@
 # Temporal Deployment on k3s
 
-This directory contains Kubernetes manifests for deploying Temporal to the existing k3s cluster at `192.168.122.42`.
+**Status**: ✅ Deployed (2025-10-17, 6+ days uptime)
+**Cluster**: k3s at `192.168.122.42`
+**Workers**: Node.js application containers executing organization bootstrap workflows
+
+This directory contains Kubernetes manifests for deploying Temporal to the existing k3s cluster.
 
 ## Architecture
 
-- **Temporal Server**: Workflow orchestration engine
-- **Temporal UI**: Web interface for monitoring workflows (port 8080)
-- **Temporal Worker**: Executes activities (Cloudflare DNS, Zitadel API calls)
-- **PostgreSQL**: Persistence layer (can reuse existing Supabase PostgreSQL or deploy dedicated instance)
+- **Temporal Server**: Workflow orchestration engine (gRPC on port 7233)
+- **Temporal Web UI**: Web interface for monitoring workflows (HTTP on port 8080)
+- **Temporal Worker**: Node.js application executing activities
+  - Organization creation (emits events to Supabase)
+  - DNS provisioning (Cloudflare API)
+  - User invitation generation (secure tokens)
+  - Email delivery (SMTP/transactional API)
+- **PostgreSQL**: Persistence layer for Temporal state (dedicated instance)
 
 ## Deployment
 
@@ -15,9 +23,9 @@ This directory contains Kubernetes manifests for deploying Temporal to the exist
 
 1. k3s cluster running and accessible
 2. `kubectl` configured to access the cluster
-3. Cloudflare API credentials
-4. Zitadel service account credentials
-5. Supabase service role key
+3. Cloudflare API credentials (for DNS provisioning)
+4. Supabase service role key (for event emission and database operations)
+5. SMTP credentials (for user invitation emails)
 
 ### Step 1: Create Namespace
 
@@ -35,17 +43,17 @@ cp secrets-template.yaml secrets.yaml
 
 # Edit secrets.yaml with actual credentials
 # Fill in:
-# - CLOUDFLARE_API_TOKEN (from cert.pem or Cloudflare dashboard)
-# - CLOUDFLARE_ZONE_ID (from cert.pem or Cloudflare dashboard)
-# - ZITADEL_SERVICE_USER_ID (from Zitadel console)
-# - ZITADEL_SERVICE_USER_SECRET (from Zitadel console)
-# - SUPABASE_SERVICE_ROLE_KEY (from Supabase dashboard)
+# - CLOUDFLARE_API_TOKEN (from Cloudflare dashboard)
+# - CLOUDFLARE_ZONE_ID (optional, can query by domain)
+# - SUPABASE_URL (e.g., https://your-project.supabase.co)
+# - SUPABASE_SERVICE_ROLE_KEY (from Supabase dashboard - has elevated permissions)
+# - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS (for email delivery)
 
 # Apply to cluster
 kubectl apply -f secrets.yaml
 
 # Verify secret was created
-kubectl get secret -n temporal temporal-credentials
+kubectl get secret -n temporal temporal-worker-secrets
 ```
 
 **Security Best Practices**:
@@ -126,10 +134,10 @@ Configured via `configmap-dev.yaml`:
 
 ### Secrets
 
-Configured via `secrets.yaml` (git-crypted):
-- Cloudflare API credentials
-- Zitadel service account
-- Supabase connection details
+Configured via `secrets.yaml` (git-ignored, never committed):
+- **Cloudflare API**: DNS provisioning credentials
+- **Supabase**: Service role key for event emission and database operations
+- **SMTP**: Email delivery credentials for user invitations
 
 ## Monitoring
 

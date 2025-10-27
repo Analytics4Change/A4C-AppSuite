@@ -1,120 +1,151 @@
 # Provider Management & Multi-Tenancy Architecture
 
+**Status**: ✅ Updated for Supabase Auth + Temporal.io integration
+**Last Updated**: 2025-10-27
+**Migration**: Zitadel → Supabase Auth (frontend complete, workflows pending)
+
 ## Document Overview
-This document captures the complete architectural decisions and implementation plan for the Provider Management feature and multi-tenancy support in the A4C platform. It represents the conversation and decisions made during the design phase of the `feat/auth-integration` branch.
+This document captures the complete architectural decisions and implementation plan for the Provider Management feature and multi-tenancy support in the A4C platform.
+
+**Major Architecture Change**: This document has been updated to reflect the migration from Zitadel to **Supabase Auth** for authentication and **Temporal.io** for organization bootstrap workflows.
+
+**Frontend Implementation**: ✅ Complete (2025-10-27)
+- Three-mode authentication system (mock/integration/production)
+- JWT custom claims integration with RLS
+- See: `.plans/supabase-auth-integration/frontend-auth-architecture.md`
 
 ## Table of Contents
 1. [Core Architecture Decisions](#core-architecture-decisions)
 2. [Organizational Hierarchy](#organizational-hierarchy)
 3. [User Roles and Access Patterns](#user-roles-and-access-patterns)
-4. [Provider Information Requirements](#provider-information-requirements)
-5. [Technical Implementation Strategy](#technical-implementation-strategy)
-6. [Navigation and Routes](#navigation-and-routes)
-7. [Implementation Plan](#implementation-plan)
+4. [Authentication and Authorization](#authentication-and-authorization)
+5. [Organization Bootstrap Workflow](#organization-bootstrap-workflow)
+6. [Provider Information Requirements](#provider-information-requirements)
+7. [Technical Implementation Strategy](#technical-implementation-strategy)
+8. [Navigation and Routes](#navigation-and-routes)
 
 ## Core Architecture Decisions
 
-### Providers as Zitadel Organizations
+### Organizations as Database Records (Event-Sourced)
 
-After careful consideration of multi-tenancy patterns, we've decided that **each Provider should be its own Zitadel Organization**. This decision was based on several key factors:
+Each Provider organization is represented as **database records** in the `organizations_projection` table, derived from an event-sourced architecture. Organizations are **NOT** separate authentication tenants (unlike the previous Zitadel architecture).
 
-#### Advantages of Separate Organizations:
-1. **True Multi-Tenant Isolation**: Complete data and user separation between providers
-2. **Built-in Cross-Provider Grants**: Zitadel's Project Grants handle cross-organization access elegantly
-3. **Security & Compliance**: Isolated authentication per provider, critical for healthcare
-4. **Clean RLS Integration**: Direct mapping of organization_id to Supabase row-level security
-5. **Provider-Specific Policies**: Each provider can have unique security requirements (MFA, password policies)
+#### Key Changes from Zitadel Architecture:
 
-#### Alternative Considered (Rejected):
-- **Single Organization with Metadata**: Simpler but less secure, would require complex permission logic
+| Aspect | Previous (Zitadel) | Current (Supabase Auth) |
+|--------|-------------------|------------------------|
+| **Organizations** | Zitadel organizations | Database records (`organizations_projection`) |
+| **Authentication** | Zitadel OAuth2 | Supabase Auth (social login + SAML SSO) |
+| **User Management** | Zitadel Management API | Supabase Auth + Temporal workflows |
+| **Multi-Tenant Isolation** | Zitadel org-level | RLS policies using JWT `org_id` claim |
+| **Organization Creation** | Zitadel API + DB record | Temporal workflow emitting events |
+| **User Invitations** | Zitadel invitation API | Temporal workflow + custom tokens |
+| **Subdomain Provisioning** | Manual DNS | Temporal workflow + Cloudflare API |
 
-#### Implementation Approach:
-```typescript
-// Abstraction to hide complexity
-class ProviderManagementService {
-  async createProvider(providerData) {
-    // 1. Create Zitadel Organization via Management API
-    const org = await zitadelAPI.createOrganization({
-      name: providerData.name,
-      // Set default roles, policies
-    });
+#### Advantages of Supabase Auth + Temporal:
 
-    // 2. Create Supabase provider record
-    const provider = await supabase.providers.insert({
-      id: org.id, // Use Zitadel org ID as provider ID
-      ...providerData,
-      organization_id: org.id
-    });
+1. **Unified Platform**: Authentication, database, and backend in single service
+2. **Event-Driven**: All state changes recorded as immutable events (CQRS)
+3. **Durable Workflows**: Organization bootstrap survives crashes (Temporal)
+4. **Better Social Login**: More providers, easier configuration
+5. **Enterprise SSO**: SAML 2.0 support on Pro plan
+6. **Simpler Architecture**: One service vs two (Supabase vs Supabase + Zitadel)
+7. **Custom JWT Claims**: Via database hooks, integrated with RLS
+8. **Workflow-First**: Clean compensation for rollback (Saga pattern)
 
-    // 3. Setup default admin user with email invitation
-    // 4. Configure RLS policies
+#### What We Build Ourselves:
 
-    return provider;
-  }
-}
-```
+1. **Organization Management**: Via Temporal workflows + database records
+2. **User Invitations**: Via Temporal workflows + secure tokens
+3. **DNS Provisioning**: Via Temporal workflows + Cloudflare API
+4. **Custom JWT Claims**: Via PostgreSQL database hooks
+5. **Enterprise SSO Configuration**: Via Supabase CLI + Temporal workflows
 
-### Sub-Provider Implementation
+### Sub-Provider Implementation (Unchanged)
 
-Sub-providers (e.g., group homes within a larger organization) will be implemented as:
-- **Database records** in a hierarchical structure (not separate Zitadel orgs)
+Sub-providers (e.g., group homes within a larger organization) are implemented as:
+- **Database records** in a hierarchical structure (`organizations_projection.path`)
 - **Maximum depth**: 3 levels
   - Level 1: Provider (e.g., "Sunshine Youth Services")
   - Level 2: Region/Division (e.g., "Northern Region")
   - Level 3: Location (e.g., "Oak Street Group Home")
 - **Permission inheritance**: From parent provider organization
-- **No separate billing**: Inherits from parent provider
+- **ltree paths**: Hierarchical queries using PostgreSQL ltree extension
 
 ## Organizational Hierarchy
 
 ### CRITICAL ARCHITECTURAL PRINCIPLE
 
-**All Provider organizations exist at the root level in Zitadel.** VAR (Value-Added Reseller) relationships with Providers are tracked as **business metadata** in the `var_partnerships_projection` table, NOT as hierarchical ownership in Zitadel.
+**All Provider organizations exist at the root level in the `organizations_projection` table.** VAR (Value-Added Reseller) relationships with Providers are tracked as **business metadata** in the `var_partnerships_projection` table, NOT as hierarchical ownership.
 
-**Rationale**: VAR contract expiration cannot trigger Zitadel organization restructuring or ltree path changes. Provider organizational structure must remain stable regardless of business relationships.
+**Rationale**: VAR contract expiration cannot trigger organizational restructuring or ltree path changes. Provider organizational structure must remain stable regardless of business relationships.
 
-### Platform-Wide Zitadel Organization Structure (Flat Model)
+### Platform-Wide Organization Structure (Flat Model)
+
+Organizations are stored in `organizations_projection` table with ltree paths:
 
 ```
-Zitadel Instance: analytics4change-zdswvg.us1.zitadel.cloud
+organizations_projection (PostgreSQL table)
 │
-├── Analytics4Change (Zitadel Org) - Internal A4C Organization
-│   ├── Super Admin (role) - Can manage all organizations
-│   ├── Provider Admin (role) - Can create/manage provider organizations
-│   ├── Support roles - Created by Super Admin for impersonation
-│   └── Internal A4C users
+├── analytics4change (type: platform_owner)
+│   └── path: 'analytics4change'::ltree
+│   └── Users assigned via user_roles_projection
+│       ├── Super Admin role
+│       ├── Provider Admin role
+│       └── Support roles
 │
-├── VAR Partner XYZ (Zitadel Org) - Value Added Reseller/Partner
-│   ├── Administrator (static role)
-│   ├── Partner-specific roles
-│   └── Access: Via cross_tenant_access_grants (NOT hierarchical ownership)
-│       └── Partnership metadata in var_partnerships_projection table
+├── var_partner_xyz (type: provider_partner, subtype: var)
+│   └── path: 'var_partner_xyz'::ltree
+│   └── Access to Providers via cross_tenant_access_grants
+│       └── Partnership metadata in var_partnerships_projection
 │
-├── Provider A (Zitadel Org) - Healthcare Provider Organization
-│   ├── Administrator (static role - top-level admin for entire provider)
-│   ├── Custom roles (defined by Administrator)
-│   ├── Sub-Provider: Group Home 1 (database record, not separate Zitadel org)
-│   ├── Sub-Provider: Group Home 2 (database record, not separate Zitadel org)
-│   └── Sub-Provider: Residential Facility (database record, not separate Zitadel org)
-│   └── Note: May be associated with VAR via var_partnerships_projection
+├── provider_a (type: provider)
+│   └── path: 'provider_a'::ltree
+│   └── Subdomain: provider-a.firstovertheline.com (via Temporal workflow)
+│   ├── Sub-Provider: group_home_1
+│   │   └── path: 'provider_a.group_home_1'::ltree
+│   ├── Sub-Provider: group_home_2
+│   │   └── path: 'provider_a.group_home_2'::ltree
+│   └── May be associated with VAR via var_partnerships_projection
 │
-├── Provider B (Zitadel Org) - Direct Customer (No VAR)
-│   ├── Administrator
-│   ├── Custom roles
-│   └── Sub-Providers (database records)
+├── provider_b (type: provider)
+│   └── path: 'provider_b'::ltree
+│   └── Direct customer (no VAR)
+│   └── Sub-Providers (nested ltree paths)
 │
-├── A4C-Demo (Zitadel Org) - Demo/Development Provider
-│   ├── Administrator (for testing)
-│   ├── Demo data for sales/development
-│   └── Safe impersonation testing environment
+├── a4c_demo (type: provider)
+│   └── path: 'a4c_demo'::ltree
+│   └── Demo/development organization
 │
-└── A4C-Families (Zitadel Org) - Shared Family Access
+└── a4c_families (type: provider_partner, subtype: family)
+    └── path: 'a4c_families'::ltree
     └── Family members accessing client data via grants
+```
+
+### Database Schema
+
+```sql
+-- Organizations (CQRS projection from domain_events)
+CREATE TABLE organizations_projection (
+  org_id UUID PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('platform_owner', 'provider', 'provider_partner')),
+  path LTREE NOT NULL UNIQUE,  -- Hierarchical path (e.g., 'provider_a.group_home_1')
+  parent_org_id UUID REFERENCES organizations_projection(org_id),
+  domain TEXT UNIQUE,  -- Subdomain (e.g., 'provider-a.firstovertheline.com')
+  is_active BOOLEAN NOT NULL DEFAULT FALSE,  -- Activated after bootstrap
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  activated_at TIMESTAMPTZ  -- When organization bootstrap completed
+);
+
+-- GiST index for ltree queries
+CREATE INDEX idx_organizations_path ON organizations_projection USING gist(path);
 ```
 
 ### Provider Partner Relationships (Event-Sourced Metadata)
 
-**NOT in Zitadel hierarchy** - tracked in PostgreSQL via bootstrap architecture:
+**NOT in organizational hierarchy** - tracked in PostgreSQL via bootstrap architecture:
 
 ```sql
 -- Provider partner relationships (type-specific projections) - IMPLEMENTED ✅
@@ -135,42 +166,38 @@ CREATE TABLE var_partnerships_projection (
 ```
 
 **Access Model (IMPLEMENTED ✅)**:
-- Provider partner organizations (VARs, courts, agencies, families) created via bootstrap architecture
-- Cross-tenant access grants via event-sourced `access_grant.*` events  
-- Grants reference relationship for authorization basis (VAR contracts, court orders, etc.)
+- Provider partner organizations created via **Temporal bootstrap workflow**
+- Cross-tenant access grants via event-sourced `access_grant.*` events
+- Grants reference relationship for authorization basis
 - Partnership expiration automatically revokes grants (event-driven)
-- Provider Zitadel org remains unchanged when provider partner relationships end
-- Bootstrap completion required before provider partner relationship creation
-- Architecture supports multiple provider partner types: VARs, courts, social services, families
+- Provider org remains unchanged when provider partner relationships end
 
 ## User Roles and Access Patterns
 
 ### Internal A4C Roles (within Analytics4Change org):
-- **Super Admin**: Complete system access, can impersonate any user, create support roles
-- **Provider Admin**: Create and manage provider organizations, set up initial administrators
+- **Super Admin**: Complete system access, can impersonate any user
+- **Provider Admin**: Create and manage provider organizations, trigger bootstrap workflows
 
 **Note**: These map to the 3-type organization system:
 - **platform_owner**: Analytics4Change org (Super Admin, Provider Admin roles)
-- **provider**: Healthcare provider organizations 
+- **provider**: Healthcare provider organizations
 - **provider_partner**: Provider partner organizations (VARs, courts, social services, families)
 
 ### Provider Organization Roles:
-- **Administrator**: Top-level role within each provider, manages all sub-providers and defines custom roles
-- **Custom Roles**: Defined by each provider's Administrator based on their needs
+- **Administrator** (`provider_admin`): Top-level role within each provider, manages all sub-providers
+- **Organization Member** (`organization_member`): Standard access within provider
+- **Custom Roles**: Defined by each provider's Administrator based on RBAC system
 
 ### Provider Partner Roles:
-- **Partner Administrator**: Manages provider partner organization (VAR admin, court admin, agency admin, family admin)
-- **Partner Consultant**: Access to Provider data based on grants (VAR consultant, case worker, guardian, family member)
+- **Partner Administrator**: Manages provider partner organization
+- **Partner Consultant**: Access to Provider data based on grants
 
 ### Key Access Rules:
-- Users can belong to multiple sub-providers within the same provider organization
-- Users CANNOT belong to multiple provider organizations (would require separate logins)
-- Cross-organization access via `cross_tenant_access_grants_projection` table (event-sourced)
-- Provider Partners access Provider data through grants (NOT hierarchical ownership):
-  - Grants created when relationship is active (VAR contracts, court orders, agency assignments, family consents)
-  - Grants reference relationship-specific projection for authorization basis
-  - Grants automatically revoked when relationship expires/terminates (event-driven)
-  - Provider org structure unchanged when provider partner relationships end
+- Users can belong to **one active organization at a time** (stored in `user_roles_projection.is_active`)
+- Users with multiple org memberships can switch orgs (triggers JWT refresh)
+- Multi-tenant isolation via RLS policies checking JWT `org_id` claim
+- Cross-organization access via `cross_tenant_access_grants_projection` (event-sourced)
+- JWT custom claims added via database hook during authentication
 
 ### Provider Partner Access Lifecycle:
 1. **Relationship Created**: Type-specific relationship event → relationship record in projection
@@ -181,21 +208,108 @@ CREATE TABLE var_partnerships_projection (
 2. **Grant Issued**: Admin creates cross-tenant grant for provider partner
    - Event: `access_grant.created`
    - Authorization type: `var_contract`, `court_order`, `agency_assignment`, `family_consent`
-   - Legal reference: relationship UUID
 3. **Partner Accesses Data**: RLS policies check grant validity + relationship status
 4. **Relationship Expires**: Background job or manual action → relationship expiration event
 5. **Automatic Revocation**: Event processor emits `access_grant.revoked` events
 6. **Access Denied**: RLS policies now exclude provider partner (grant revoked)
+
+## Authentication and Authorization
+
+### Supabase Auth Integration
+
+**Authentication Flow**:
+1. User navigates to organization subdomain (e.g., `provider-a.firstovertheline.com`)
+2. Frontend initiates authentication via Supabase Auth:
+   - Social login (Google, GitHub, etc.)
+   - Magic link (email OTP)
+   - Password-based
+   - Enterprise SSO (SAML 2.0)
+3. Supabase Auth generates JWT
+4. Database hook adds custom claims: `org_id`, `user_role`, `permissions`, `scope_path`
+5. JWT returned to frontend
+6. All API requests include JWT in Authorization header
+7. RLS policies enforce data isolation using JWT claims
+
+**Custom JWT Claims**:
+```json
+{
+  "sub": "user-uuid",
+  "email": "user@example.com",
+  "role": "authenticated",
+
+  // Custom claims added by database hook
+  "org_id": "provider-org-uuid",
+  "user_role": "provider_admin",
+  "permissions": ["medication.create", "client.view", "organization.manage"],
+  "scope_path": "provider_a"
+}
+```
+
+**RLS Policy Example**:
+```sql
+CREATE POLICY "Tenant isolation"
+ON clients FOR ALL
+TO authenticated
+USING (
+  org_id = (auth.jwt()->>'org_id')::uuid
+);
+```
+
+**See**: `.plans/supabase-auth-integration/` for detailed documentation.
+
+## Organization Bootstrap Workflow
+
+Organizations are created via **Temporal.io workflows** for durable, reliable execution.
+
+### OrganizationBootstrapWorkflow
+
+**Orchestrated Steps**:
+1. **Create Organization**: Emit `OrganizationCreated` event
+   - Creates record in `organizations_projection` (via event processor)
+   - Status: `is_active = false` (activated after full bootstrap)
+2. **Configure DNS Subdomain**: Call Cloudflare API
+   - Create CNAME record: `{subdomain}.firstovertheline.com` → `app.firstovertheline.com`
+   - Emit `DNSConfigured` event
+3. **Wait for DNS Propagation**: Durable sleep (5-30 minutes)
+   - Workflow survives worker crashes during wait
+4. **Verify DNS Resolution**: Retry until success or timeout
+   - Query DNS to confirm subdomain resolves
+5. **Generate User Invitations**: Emit `UserInvited` events
+   - Create secure invitation tokens
+   - Store in `user_invitations_projection`
+6. **Send Invitation Emails**: Email users with invitation links
+   - Emit `InvitationEmailSent` / `InvitationEmailFailed` events
+7. **Activate Organization**: Emit `OrganizationActivated` event
+   - Updates `is_active = true` in `organizations_projection`
+
+**Duration**: 10-40 minutes (depends on DNS propagation)
+
+**Error Handling**: Saga pattern with compensation
+- If DNS fails: Deactivate organization
+- If email fails: Continue with partial success, log failures
+- Automatic retries with exponential backoff
+
+**Trigger**:
+- Via API endpoint (authenticated, requires `organization.bootstrap` permission)
+- Via admin UI (Provider Admin role)
+
+**See**: `.plans/temporal-integration/organization-onboarding-workflow.md` for detailed implementation.
 
 ## Provider Information Requirements
 
 ### MVP Fields:
 ```typescript
 interface Provider {
-  // Basic Information
-  id: string;                    // Matches Zitadel org_id
+  // Organization Identity (from organizations_projection)
+  org_id: string;
   name: string;
-  type: string;                   // Data-driven from provider_types table
+  type: 'provider';
+  path: string;                   // ltree path
+  domain: string;                 // Subdomain (e.g., 'provider-a.firstovertheline.com')
+  is_active: boolean;
+
+  // Business Profile (from organization_business_profiles_projection)
+  provider_type: string;          // Data-driven from provider_types table
   status: 'pending' | 'active' | 'suspended' | 'inactive';
 
   // Primary Contact
@@ -233,65 +347,54 @@ interface Provider {
 - Initially single tier, but architecture supports multiple
 - No payment processor integration initially (just store billing info)
 
-### Future Considerations (Post-MVP):
-- Licensing information
-- Capacity metrics
-- Service authorizations
-- Compliance tracking
-- Insurance information
-- Staff ratios
-
 ## Technical Implementation Strategy
 
-### Database Architecture
+### Event-Driven Architecture (CQRS)
 
-#### Audit Trail:
-Using Supabase's built-in capabilities:
-- **pg_audit extension** for automatic change tracking
-- **Postgres triggers** to capture changes to audit_log table
-- **Supabase Realtime** for event streaming (can replace Kafka)
-- Every change tracked with: who, what, when, old values, new values
-
-#### Schema Design:
+**Event Store**:
 ```sql
--- CQRS Projection: Organizations (replaces providers table)
-CREATE TABLE organizations_projection (
-  id UUID PRIMARY KEY,
-  name TEXT NOT NULL,
-  path LTREE NOT NULL UNIQUE,
-  type TEXT NOT NULL CHECK (type IN ('platform_owner', 'provider', 'provider_partner')),
-  parent_path LTREE,
-  depth INTEGER NOT NULL,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  deleted_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL
-);
-
--- CQRS Projection: Business profiles for top-level organizations only
-CREATE TABLE organization_business_profiles_projection (
-  organization_id UUID PRIMARY KEY REFERENCES organizations_projection(id),
-  organization_type TEXT NOT NULL CHECK (organization_type IN ('provider', 'provider_partner')),
-  mailing_address JSONB,
-  physical_address JSONB,
-  provider_profile JSONB,    -- Only for type=provider
-  partner_profile JSONB,     -- Only for type=provider_partner
-  created_at TIMESTAMPTZ NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL
-);
-
--- Event-sourced VAR partnerships (unchanged)
-CREATE TABLE var_partnerships_projection (
-  id UUID PRIMARY KEY,
-  var_org_id UUID NOT NULL,
-  provider_org_id UUID NOT NULL,
-  -- ... rest unchanged
+CREATE TABLE domain_events (
+  event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_type TEXT NOT NULL,
+  aggregate_type TEXT NOT NULL,
+  aggregate_id TEXT NOT NULL,
+  event_data JSONB NOT NULL,
+  metadata JSONB DEFAULT '{}'::jsonb,  -- Includes workflow context
+  created_at TIMESTAMPTZ DEFAULT now(),
+  created_by UUID REFERENCES auth.users(id)
 );
 ```
 
-### Development Testing Strategy:
+**Event Types**:
+- `OrganizationCreated`
+- `OrganizationActivated`
+- `DNSConfigured`
+- `UserInvited`
+- `InvitationEmailSent`
+- `InvitationEmailFailed`
+- `access_grant.created`
+- `access_grant.revoked`
+
+**Event Processors** (PostgreSQL triggers):
+```sql
+CREATE TRIGGER trigger_process_organization_created
+  AFTER INSERT ON domain_events
+  FOR EACH ROW
+  EXECUTE FUNCTION process_organization_created();
+```
+
+### Audit Trail
+
+- **Domain Events**: All state changes recorded as immutable events
+- **Workflow Metadata**: Events include `workflow_id`, `workflow_run_id` for traceability
+- **Temporal History**: Complete workflow execution history in Temporal Web UI
+- **HIPAA Compliance**: 7-year event retention
+
+### Development Testing Strategy
+
 - **Email Testing**: Gmail plus addressing (admin+provider1@gmail.com)
 - **A4C-Demo Organization**: Safe testing environment
+- **Local Temporal**: Port-forward Temporal frontend for local testing
 - **Environment Flags**: `VITE_DEV_SHOW_ALL_ROUTES=true` for development visibility
 
 ## Navigation and Routes
@@ -320,7 +423,7 @@ All routes plus:
 ```
 /providers - Provider Management (MAIN DELIVERABLE)
   /providers/list
-  /providers/create
+  /providers/create - Triggers Temporal bootstrap workflow
   /providers/:id/view
   /providers/:id/edit
 
@@ -328,6 +431,7 @@ All routes plus:
   /system/users
   /system/roles
   /system/audit
+  /system/workflows - Temporal workflow monitoring
 ```
 
 #### A4C Partner:
@@ -337,45 +441,59 @@ All routes plus:
 ```
 
 ### Dynamic Navigation Features:
-1. **Role-based menu rendering**: Menu items appear/disappear based on user roles
-2. **Provider context switcher**: In both header and sidebar initially
+1. **Role-based menu rendering**: Menu items appear/disappear based on JWT claims
+2. **Provider context switcher**: Switch active organization (triggers JWT refresh)
 3. **Development mode**: All routes visible with lock icons for inaccessible ones
 4. **Production mode**: Only show accessible routes
 
 ### Client Route Context:
-- `/clients` is provider-scoped (users see only their provider's clients)
-- CRUD permissions based on roles within that provider
-- Mock data will be migrated to real Supabase data for A4C-Demo org
-
-### Medication Architecture (Future):
-Template/Instance pattern similar to OOP:
-- **Templates** (Classes): Reusable medication definitions at provider level
-- **Instances** (Objects): Client-specific medication assignments with customizations
+- `/clients` is provider-scoped (RLS enforces via JWT `org_id`)
+- CRUD permissions based on JWT `permissions` claim
+- Mock data will be migrated to real Supabase data for a4c_demo org
 
 ## Implementation Plan
 
-### Phase 1: Current Branch (feat/auth-integration)
+### Phase 1: Supabase Auth Migration
 
-#### Priority 1: Documentation
-- ✅ Create this architecture document at `/docs/plans/feat-auth-integration/tenants-as-organization-thoughts.md`
+#### Priority 1: Database Schema
+- ✅ Create `organizations_projection` table with ltree paths
+- ✅ Create `user_roles_projection` table
+- ✅ Create `user_permissions_projection` table
+- ✅ Create `user_invitations_projection` table
+- ✅ Create `domain_events` event store
+- ✅ Create event processor triggers
 
-#### Priority 2: A4C-Demo Organization
-- Create demo organization in Zitadel
-- Set up demo Administrator with email invitation
-- Implement Super Admin impersonation capability
+#### Priority 2: Custom JWT Claims
+- Create database hook function (`auth.custom_access_token_hook`)
+- Register hook with Supabase Auth
+- Test JWT contains custom claims
+- Update RLS policies to use JWT claims
 
-#### Priority 3: Provider Management UI (Main Deliverable)
+**See**: `.plans/supabase-auth-integration/custom-claims-setup.md`
+
+#### Priority 3: Temporal Workflow Implementation
+- ✅ Create `temporal/` project structure
+- Implement `OrganizationBootstrapWorkflow`
+- Implement activities (create org, DNS, invitations, emails)
+- Deploy worker to Kubernetes
+- Test workflow end-to-end
+
+**See**: `.plans/temporal-integration/organization-onboarding-workflow.md`
+
+### Phase 2: Provider Management UI
+
 Create glassmorphic UI matching existing design:
 - Provider list page with search/filter
-- Create provider form with admin invitation
+- Create provider form (triggers Temporal workflow)
 - View provider with sub-provider tree visualization
 - Edit provider details
+- View workflow status in UI
 
 New files:
 ```
 /src/pages/providers/
   ├── ProviderListPage.tsx
-  ├── ProviderCreatePage.tsx
+  ├── ProviderCreatePage.tsx - Triggers Temporal workflow
   ├── ProviderDetailPage.tsx
   └── ProviderManagementLayout.tsx
 
@@ -385,57 +503,40 @@ New files:
 
 /src/services/providers/
   ├── provider.service.ts
-  └── zitadel-provider.service.ts
+  └── temporal-client.service.ts - Triggers workflows
 
 /src/types/provider.types.ts
 ```
 
-#### Priority 4: Client Data Migration
+### Phase 3: Migration from Mock Data
+
 - Move mock data to Supabase
-- Scope to A4C-Demo organization
-- Implement proper RLS policies
+- Scope to a4c_demo organization
+- Implement RLS policies using JWT claims
+- Test multi-tenant isolation
 
-#### Priority 5: Dynamic Navigation
-- Update MainLayout with role-based rendering
-- Add provider/sub-provider context switchers
-- Implement development visibility mode
+### Phase 4: Enterprise SSO (3-6 Months)
 
-### Phase 2: Next Branch
-- Medication template system
-- Sub-provider management UI
-- A4C Partner dashboard
-- Advanced audit visualization
+- Configure Supabase SAML providers
+- Implement per-organization SSO configuration
+- Create SSO configuration workflow (Temporal)
+- Test with customer IdP sandbox
 
-## User Interaction Log
-
-### Initial Requirements (User):
-- Provider Management for tenant management
-- Providers are care providers for at-risk youth (group homes, detention centers, etc.)
-- Glassmorphic styling matching existing UI
-- Integration with Zitadel for organizations
-- Row-level security in Supabase
-
-### Key Decisions Made Through Discussion:
-1. **Providers = Zitadel Organizations** (after cost/complexity analysis)
-2. **Sub-providers as database records** (not separate Zitadel orgs)
-3. **Role hierarchy**: Super Admin → Provider Admin → Administrator → Custom roles
-4. **A4C Partners** as separate tenant type for VARs
-5. **Billing info storage only** (no payment processor initially)
-6. **Audit trail required** (using Supabase features)
-7. **Dynamic navigation** based on roles
-8. **A4C-Demo organization** for safe testing
-9. **Provider/sub-provider context switchers** in both header and sidebar
-10. **Development mode** showing all routes with visual indicators
-
-### Implementation Priorities Confirmed:
-1. Documentation (this file)
-2. Provider Management UI (main deliverable)
-3. A4C-Demo setup
-4. Client data migration from mocks
-5. Dynamic navigation
+**See**: `.plans/supabase-auth-integration/enterprise-sso-guide.md`
 
 ---
 
-*Document created: 2025-01-28*
-*Branch: feat/auth-integration*
-*Author: Agent + User collaboration*
+## Related Documentation
+
+- **Supabase Auth Integration**: `.plans/supabase-auth-integration/overview.md`
+- **Custom JWT Claims**: `.plans/supabase-auth-integration/custom-claims-setup.md`
+- **Enterprise SSO**: `.plans/supabase-auth-integration/enterprise-sso-guide.md`
+- **Temporal Integration**: `.plans/temporal-integration/overview.md`
+- **Organization Bootstrap Workflow**: `.plans/temporal-integration/organization-onboarding-workflow.md`
+- **RBAC Architecture**: `.plans/rbac-permissions/architecture.md`
+
+---
+
+**Document Version**: 2.0
+**Last Updated**: 2025-10-24
+**Major Changes**: Migrated from Zitadel to Supabase Auth + Temporal.io workflows

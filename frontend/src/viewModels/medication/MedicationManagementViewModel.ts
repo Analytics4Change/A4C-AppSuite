@@ -16,7 +16,7 @@ import { Logger } from '@/utils/logger';
 import { RXNormAdapter } from '@/services/adapters/RXNormAdapter';
 import { IOrganizationService } from '@/services/organization/IOrganizationService';
 import { eventEmitter } from '@/lib/events/event-emitter';
-import { zitadelService } from '@/services/auth/zitadel.service';
+import { getAuthProvider } from '@/services/auth/AuthProviderFactory';
 
 const log = Logger.getLogger('viewmodel');
 
@@ -541,7 +541,8 @@ export class MedicationManagementViewModel {
       const organizationId = await this.organizationService.getCurrentOrganizationId();
 
       // Get current user for metadata
-      const user = await zitadelService.getUser();
+      const authProvider = getAuthProvider();
+      const user = await authProvider.getUser();
       if (!user) {
         throw new Error('No authenticated user found');
       }

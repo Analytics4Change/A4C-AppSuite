@@ -225,15 +225,14 @@ export function validateRoleDefinition(role: RoleDefinition): string[] {
 }
 
 /**
- * Export role definition for Zitadel
+ * Export role definition for external systems
  */
-export function exportRoleForZitadel(role: RoleDefinition) {
+export function exportRoleDefinition(role: RoleDefinition) {
   return {
     key: role.key,
     displayName: role.displayName,
     group: role.scope === 'global' ? 'global' : `org_${role.key}`,
-    // Zitadel doesn't store permissions in roles directly
-    // Permissions are checked in the application
+    permissions: role.permissions,
   };
 }
 

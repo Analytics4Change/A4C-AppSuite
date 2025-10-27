@@ -117,7 +117,7 @@ export class EventEmitter {
         required: [],
         description: 'Medication discontinuation data'
       },
-      'user.synced_from_zitadel': {
+      'user.synced': {
         required: [],
         description: 'User sync data'
       },

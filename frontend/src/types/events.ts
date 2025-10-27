@@ -22,7 +22,6 @@ export type {
   MedicationSkippedEvent,
   MedicationRefusedEvent,
   MedicationDiscontinuedEvent,
-  UserSyncedFromZitadelEvent,
   UserOrganizationSwitchedEvent,
 } from './generated/events';
 

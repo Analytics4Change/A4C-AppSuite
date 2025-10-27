@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Logger } from '@/utils/logger';
-import { zitadelService, ZitadelUser } from './zitadel.service';
+import { Session } from '@/types/auth.types';
 
 const log = Logger.getLogger('api');
 
@@ -36,7 +36,7 @@ export interface Database {
 
 class SupabaseService {
   private client: SupabaseClient<Database>;
-  private currentUser: ZitadelUser | null = null;
+  private currentSession: Session | null = null;
 
   constructor() {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -48,12 +48,12 @@ class SupabaseService {
 
     this.client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
-        persistSession: false, // We'll use Zitadel for session management
-        autoRefreshToken: false, // Zitadel handles token refresh
+        persistSession: false, // Session managed by auth providers
+        autoRefreshToken: false, // Token refresh handled by auth providers
       },
       global: {
         headers: {
-          // We'll set the Authorization header dynamically based on Zitadel token
+          // Headers will be set dynamically based on auth session
         },
       },
     });
@@ -62,78 +62,69 @@ class SupabaseService {
   }
 
   /**
-   * Update the Supabase client with the current Zitadel access token
-   * This should be called whenever the user logs in or the token is refreshed
+   * Update the Supabase client with the current auth session
+   * Works with both mock and real authentication sessions
+   * This should be called whenever the user logs in or the session is refreshed
    */
-  async updateAuthToken(user: ZitadelUser | null): Promise<void> {
-    this.currentUser = user;
+  async updateAuthSession(session: Session | null): Promise<void> {
+    this.currentSession = session;
 
-    // Instead of recreating the client, just update the headers
-    // This prevents the "Multiple GoTrueClient instances" warning
-    if (user?.accessToken) {
-      // Update headers for authenticated requests
+    // Update headers for authenticated requests
+    // Works with sessions from both DevAuthProvider and SupabaseAuthProvider
+    if (session?.access_token) {
       (this.client as any).rest.headers = {
         ...((this.client as any).rest?.headers || {}),
-        Authorization: `Bearer ${user.accessToken}`,
-        'X-Organization-Id': user.organizationId,
+        Authorization: `Bearer ${session.access_token}`,
+        'X-Organization-Id': session.claims.org_id,
+        'X-User-Role': session.claims.user_role,
       };
-      
+
       // Also update the realtime headers if needed
       if ((this.client as any).realtime) {
         (this.client as any).realtime.headers = {
           ...((this.client as any).realtime?.headers || {}),
-          Authorization: `Bearer ${user.accessToken}`,
-          'X-Organization-Id': user.organizationId,
+          Authorization: `Bearer ${session.access_token}`,
+          'X-Organization-Id': session.claims.org_id,
         };
       }
-      
-      log.info('Supabase auth token updated');
+
+      log.info('Supabase auth session updated', {
+        user: session.user.email,
+        org_id: session.claims.org_id,
+        role: session.claims.user_role,
+      });
     } else {
       // Reset to anonymous access
       (this.client as any).rest.headers = {
         ...((this.client as any).rest?.headers || {}),
         apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       };
-      
+
       delete (this.client as any).rest.headers.Authorization;
       delete (this.client as any).rest.headers['X-Organization-Id'];
-      
+      delete (this.client as any).rest.headers['X-User-Role'];
+
       log.info('Supabase reset to anonymous access');
     }
   }
 
   /**
    * Get the Supabase client instance
-   * Ensures the token is current before returning
    */
-  async getClient(): Promise<SupabaseClient<Database>> {
-    // Check if we need to refresh the token
-    const currentZitadelUser = await zitadelService.getUser();
-
-    if (currentZitadelUser?.accessToken !== this.currentUser?.accessToken) {
-      await this.updateAuthToken(currentZitadelUser);
-    }
-
+  getClient(): SupabaseClient<Database> {
     return this.client;
   }
 
   /**
-   * Get the current authenticated user
+   * Get the current session
    */
-  async getCurrentUser(): Promise<ZitadelUser | null> {
-    // Ensure we have the latest user from Zitadel
-    const currentZitadelUser = await zitadelService.getUser();
-
-    if (currentZitadelUser?.accessToken !== this.currentUser?.accessToken) {
-      await this.updateAuthToken(currentZitadelUser);
-    }
-
-    return this.currentUser;
+  getCurrentSession(): Session | null {
+    return this.currentSession;
   }
 
   /**
    * Helper method for organization-scoped queries
-   * Automatically adds organization_id filter based on current user
+   * Automatically adds organization_id filter based on current session
    */
   async queryWithOrgScope<T>(
     tableName: keyof Database['public']['Tables'],
@@ -144,18 +135,18 @@ class SupabaseService {
       limit?: number;
     }
   ): Promise<{ data: T[] | null; error: any }> {
-    if (!this.currentUser?.organizationId) {
+    if (!this.currentSession?.claims.org_id) {
       return {
         data: null,
         error: new Error('No organization context available'),
       };
     }
 
-    const client = await this.getClient();
+    const client = this.getClient();
     let dbQuery = client.from(tableName).select(query?.select || '*');
 
     // Add organization filter
-    dbQuery = dbQuery.eq('organization_id', this.currentUser.organizationId);
+    dbQuery = dbQuery.eq('organization_id', this.currentSession.claims.org_id);
 
     // Add additional filters
     if (query?.filter) {
@@ -192,19 +183,19 @@ class SupabaseService {
     tableName: keyof Database['public']['Tables'],
     data: Omit<T, 'organization_id' | 'id' | 'created_at' | 'updated_at'>
   ): Promise<{ data: T | null; error: any }> {
-    if (!this.currentUser?.organizationId) {
+    if (!this.currentSession?.claims.org_id) {
       return {
         data: null,
         error: new Error('No organization context available'),
       };
     }
 
-    const client = await this.getClient();
+    const client = this.getClient();
     const result = await client
       .from(tableName)
       .insert({
         ...data,
-        organization_id: this.currentUser.organizationId,
+        organization_id: this.currentSession.claims.org_id,
       } as any)
       .select()
       .single();
@@ -224,19 +215,19 @@ class SupabaseService {
     id: string,
     updates: Partial<Omit<T, 'organization_id' | 'id' | 'created_at' | 'updated_at'>>
   ): Promise<{ data: T | null; error: any }> {
-    if (!this.currentUser?.organizationId) {
+    if (!this.currentSession?.claims.org_id) {
       return {
         data: null,
         error: new Error('No organization context available'),
       };
     }
 
-    const client = await this.getClient();
+    const client = this.getClient();
     const result = await (client as any)
       .from(tableName)
       .update(updates)
       .eq('id', id)
-      .eq('organization_id', this.currentUser.organizationId) // Ensure org scope
+      .eq('organization_id', this.currentSession.claims.org_id) // Ensure org scope
       .select()
       .single();
 
@@ -254,18 +245,18 @@ class SupabaseService {
     tableName: keyof Database['public']['Tables'],
     id: string
   ): Promise<{ error: any }> {
-    if (!this.currentUser?.organizationId) {
+    if (!this.currentSession?.claims.org_id) {
       return {
         error: new Error('No organization context available'),
       };
     }
 
-    const client = await this.getClient();
+    const client = this.getClient();
     const result = await client
       .from(tableName)
       .delete()
       .eq('id', id)
-      .eq('organization_id', this.currentUser.organizationId); // Ensure org scope
+      .eq('organization_id', this.currentSession.claims.org_id); // Ensure org scope
 
     if (result.error) {
       log.error(`Delete failed for ${tableName}`, result.error);
@@ -282,7 +273,7 @@ class SupabaseService {
     callback: (payload: any) => void,
     filter?: { column: string; value: string }
   ) {
-    if (!this.currentUser?.organizationId) {
+    if (!this.currentSession?.claims.org_id) {
       log.warn('Cannot subscribe without organization context');
       return null;
     }
@@ -297,7 +288,7 @@ class SupabaseService {
           table: tableName,
           filter: filter
             ? `${filter.column}=eq.${filter.value}`
-            : `organization_id=eq.${this.currentUser.organizationId}`,
+            : `organization_id=eq.${this.currentSession.claims.org_id}`,
         },
         callback
       )
