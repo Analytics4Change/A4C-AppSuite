@@ -82,166 +82,161 @@ After implementing the custom claims hook, Supabase JWTs will include:
 
 ## Database Hook Implementation
 
-### Step 1: Create Helper Function
-
-First, create a helper function to query user permissions:
+The JWT hook function is included in `infrastructure/supabase/DEPLOY_TO_SUPABASE_STUDIO.sql` (lines 516-619). The implementation:
 
 ```sql
--- File: infrastructure/supabase/sql/03-functions/authorization/get_user_claims.sql
+-- File: infrastructure/supabase/DEPLOY_TO_SUPABASE_STUDIO.sql (lines 516-619)
 
-CREATE OR REPLACE FUNCTION auth.get_user_claims(user_id uuid)
+CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, auth
+STABLE
 AS $$
 DECLARE
-  claims jsonb;
-  user_org_id uuid;
-  user_role text;
-  user_permissions text[];
-  org_scope_path ltree;
+  v_user_id uuid;
+  v_claims jsonb;
+  v_org_id uuid;
+  v_user_role text;
+  v_permissions text[];
+  v_scope_path text;
 BEGIN
-  -- Get user's active organization and role
-  SELECT
-    urp.org_id,
-    urp.role
-  INTO
-    user_org_id,
-    user_role
-  FROM user_roles_projection urp
-  WHERE urp.user_id = get_user_claims.user_id
-    AND urp.is_active = true
-  LIMIT 1;
+  v_user_id := (event->>'user_id')::uuid;
 
-  -- If no active organization, return empty claims
-  IF user_org_id IS NULL THEN
-    RETURN jsonb_build_object(
-      'org_id', null,
-      'user_role', null,
-      'permissions', '[]'::jsonb,
-      'scope_path', null
-    );
+  -- Query user's organization and role
+  SELECT
+    u.current_organization_id,
+    COALESCE(
+      (SELECT r.name
+       FROM user_roles_projection ur
+       JOIN roles_projection r ON r.id = ur.role_id
+       WHERE ur.user_id = u.id
+       ORDER BY CASE WHEN r.name = 'super_admin' THEN 1 ELSE 2 END
+       LIMIT 1
+      ),
+      'viewer'
+    ),
+    NULL
+  INTO v_org_id, v_user_role, v_scope_path
+  FROM users u
+  WHERE u.id = v_user_id;
+
+  -- Get permissions based on role
+  IF v_user_role = 'super_admin' THEN
+    SELECT array_agg(p.name)
+    INTO v_permissions
+    FROM permissions_projection p;
+  ELSE
+    SELECT array_agg(DISTINCT p.name)
+    INTO v_permissions
+    FROM user_roles_projection ur
+    JOIN role_permissions_projection rp ON rp.role_id = ur.role_id
+    JOIN permissions_projection p ON p.id = rp.permission_id
+    WHERE ur.user_id = v_user_id
+      AND (ur.org_id = v_org_id OR ur.org_id IS NULL);
   END IF;
 
-  -- Get organization scope path
-  SELECT op.path
-  INTO org_scope_path
-  FROM organizations_projection op
-  WHERE op.org_id = user_org_id;
+  v_permissions := COALESCE(v_permissions, ARRAY[]::text[]);
 
-  -- Get user's effective permissions (aggregated from all sources)
-  SELECT array_agg(DISTINCT upp.permission_name)
-  INTO user_permissions
-  FROM user_permissions_projection upp
-  WHERE upp.user_id = get_user_claims.user_id
-    AND upp.org_id = user_org_id
-    AND upp.is_active = true;
-
-  -- Build claims object
-  claims := jsonb_build_object(
-    'org_id', user_org_id,
-    'user_role', user_role,
-    'permissions', COALESCE(to_jsonb(user_permissions), '[]'::jsonb),
-    'scope_path', org_scope_path::text
+  -- Build custom claims
+  v_claims := jsonb_build_object(
+    'org_id', v_org_id,
+    'user_role', v_user_role,
+    'permissions', to_jsonb(v_permissions),
+    'scope_path', v_scope_path,
+    'claims_version', 1
   );
 
-  RETURN claims;
-END;
-$$;
-
--- Grant execute to authenticated users
-GRANT EXECUTE ON FUNCTION auth.get_user_claims(uuid) TO authenticated;
-
-COMMENT ON FUNCTION auth.get_user_claims IS
-  'Retrieves custom JWT claims for a user based on their active organization membership and permissions';
-```
-
-### Step 2: Create Custom Access Token Hook
-
-Create the main hook function that Supabase calls during JWT generation:
-
-```sql
--- File: infrastructure/supabase/sql/03-functions/authorization/custom_access_token_hook.sql
-
-CREATE OR REPLACE FUNCTION auth.custom_access_token_hook(event jsonb)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, auth
-AS $$
-DECLARE
-  claims jsonb;
-  user_id uuid;
-BEGIN
-  -- Extract user ID from event
-  user_id := (event->>'user_id')::uuid;
-
-  -- Validate user_id exists
-  IF user_id IS NULL THEN
-    RAISE EXCEPTION 'user_id is required in event payload';
-  END IF;
-
-  -- Get custom claims
-  claims := auth.get_user_claims(user_id);
-
-  -- Merge custom claims into event claims
-  event := jsonb_set(
+  -- Merge into event
+  RETURN jsonb_set(
     event,
     '{claims}',
-    COALESCE(event->'claims', '{}'::jsonb) || claims
+    (COALESCE(event->'claims', '{}'::jsonb) || v_claims)
   );
 
-  RETURN event;
 EXCEPTION
   WHEN OTHERS THEN
-    -- Log error but don't block authentication
-    -- In production, consider logging to a monitoring table
-    RAISE WARNING 'Failed to add custom claims for user %: %', user_id, SQLERRM;
-    RETURN event;
+    RAISE WARNING 'JWT hook error: % %', SQLERRM, SQLSTATE;
+    RETURN jsonb_set(
+      event,
+      '{claims}',
+      jsonb_build_object(
+        'org_id', NULL,
+        'user_role', 'viewer',
+        'permissions', '[]'::jsonb,
+        'scope_path', NULL,
+        'claims_error', SQLERRM
+      )
+    );
 END;
 $$;
 
-COMMENT ON FUNCTION auth.custom_access_token_hook IS
-  'Supabase Auth hook that adds custom claims (org_id, permissions, role, scope_path) to JWT during token generation';
+-- Required permission grants
+GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin;
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+GRANT SELECT ON TABLE users TO supabase_auth_admin;
+GRANT SELECT ON TABLE user_roles_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE roles_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE role_permissions_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE permissions_projection TO supabase_auth_admin;
 ```
 
-### Step 3: Deploy Functions
+### Deployment
 
-Deploy the SQL functions to your Supabase project:
+Deploy the function via SQL:
 
 ```bash
-# Option 1: Via Supabase CLI
-supabase db push
-
-# Option 2: Via Supabase Dashboard
-# Copy SQL content and run in SQL Editor
-
-# Option 3: Via migration (recommended)
-# Add to infrastructure/supabase/sql/03-functions/authorization/
+# Via Supabase MCP
+# Or via SQL Editor in Dashboard
+# Or via CLI: supabase db push
 ```
+
+Then register the hook via Dashboard (Authentication > Hooks > Custom Access Token).
 
 ---
 
 ## Hook Registration
 
-⚠️ **IMPORTANT DEPLOYMENT LIMITATION**: The JWT custom claims hook function CANNOT be created via SQL due to `auth` schema permission restrictions. You MUST use the Supabase Dashboard UI to create this function.
+⚠️ **SCHEMA LOCATION UPDATE (2025)**: As of April 2025, Supabase restricts creating NEW functions in `auth`, `storage`, and `realtime` schemas. The JWT custom claims hook must be created in the **`public` schema** with permission grants to `supabase_auth_admin`.
 
-### Why SQL Deployment Fails
+### Official Deployment Pattern (Public Schema)
 
-When attempting to create `auth.custom_access_token_hook` via SQL (e.g., `psql`, Supabase MCP, or SQL Editor), you will receive:
+The hook function should be created in the `public` schema via SQL deployment:
 
+```sql
+CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+...
+
+-- Required permission grants
+GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin;
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+GRANT SELECT ON TABLE users TO supabase_auth_admin;
+-- ... additional table grants
 ```
-ERROR: 42501: permission denied for schema auth
+
+**Why Public Schema**: Supabase platform restrictions prevent creating new functions in protected schemas (`auth`, `storage`, `realtime`), but you CAN edit existing functions in those schemas. Creating the hook in `public` schema with proper grants is the recommended approach.
+
+**After SQL Deployment**: The hook must still be registered via Dashboard (Authentication > Hooks) or CLI config to activate it for JWT generation.
+
+### Step 1: Deploy Function via SQL
+
+The function is already included in `infrastructure/supabase/DEPLOY_TO_SUPABASE_STUDIO.sql` (lines 516-619). Deploy it via:
+
+```bash
+# Via Supabase MCP
+# Or via SQL Editor in Dashboard
+# Or via CLI: supabase db push
 ```
 
-**Reason**: The `auth` schema is protected by Supabase. Even with `service_role` credentials, direct SQL CREATE FUNCTION statements on the `auth` schema are blocked. This is a platform security feature, not a bug.
+The deployment script creates:
+- Function: `public.custom_access_token_hook(event jsonb)`
+- Permission grants to `supabase_auth_admin`
+- Table access grants (SELECT on users, roles, permissions projections)
 
-**Solution**: Use the Dashboard UI (Authentication > Hooks) which has elevated permissions to create functions in the `auth` schema.
+### Step 2: Register Hook via Dashboard
 
-### Via Supabase Dashboard (UI) ✅ REQUIRED METHOD
-
-This is the **only supported method** for deploying the JWT hook function:
+After SQL deployment, register the hook to activate it:
 
 1. **Navigate to Hooks**
    - Supabase Dashboard → Authentication → Hooks
@@ -249,16 +244,14 @@ This is the **only supported method** for deploying the JWT hook function:
 2. **Enable "Custom Access Token Hook"**
    - Click "Enable Hook" or toggle "Custom Access Token Hook"
 
-3. **Paste Function Code**
-   - The Dashboard provides a code editor
-   - Copy the function code from `infrastructure/supabase/DEPLOY_TO_SUPABASE_STUDIO.sql` (lines 528-606)
-   - Paste into the editor (excluding the `CREATE OR REPLACE FUNCTION` wrapper - Dashboard handles this)
+3. **Configure Hook**
+   - **Schema**: `public` (not `auth`)
+   - **Function**: `custom_access_token_hook`
+   - The function already exists from SQL deployment
 
 4. **Save Configuration**
-   - Dashboard automatically:
-     - Creates the function in `auth` schema with `SECURITY DEFINER`
-     - Registers the hook in `auth.hooks` table
-     - Enables the hook for JWT generation
+   - Dashboard registers the hook in internal configuration
+   - Supabase Auth will now call this function during JWT generation
 
 ### Via Supabase CLI
 
@@ -280,26 +273,31 @@ supabase db push
 
 ### Deployment Script Reference
 
-The `infrastructure/supabase/DEPLOY_TO_SUPABASE_STUDIO.sql` script includes the JWT hook function as a **comment block** (lines 517-609) with clear instructions:
+The `infrastructure/supabase/DEPLOY_TO_SUPABASE_STUDIO.sql` script includes the JWT hook function (lines 516-619):
 
 ```sql
 -- ============================================================================
--- JWT CUSTOM CLAIMS HOOK (Must be enabled via Supabase Dashboard)
+-- JWT CUSTOM CLAIMS HOOK
 -- ============================================================================
--- NOTE: The custom_access_token_hook function CANNOT be created via SQL
--- due to auth schema permissions. You must create it via Dashboard:
---
--- 1. Go to: Authentication > Hooks > Custom Access Token Hook
--- 2. Click "Create a new hook" or "Enable"
--- 3. Paste the following function code in the editor:
+-- Creates hook in PUBLIC schema (not auth schema due to 2025 restrictions)
+-- Must be registered in Dashboard: Authentication > Hooks > Custom Access Token
+-- Or via config.toml: [auth.hook.custom_access_token] enabled = true
 -- ============================================================================
-/*
-CREATE OR REPLACE FUNCTION auth.custom_access_token_hook(event jsonb)
+
+CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+AS $$
 ...
-*/
+$$;
+
+-- Grant permissions to supabase_auth_admin (required for hook execution)
+GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin;
+-- ... additional grants
 ```
 
-This ensures the function code is version-controlled and documented, even though deployment requires manual Dashboard interaction.
+The function is deployed via SQL and then registered via Dashboard or CLI configuration.
 
 ---
 
@@ -308,19 +306,21 @@ This ensures the function code is version-controlled and documented, even though
 ### Test 1: Verify Hook Function Exists
 
 ```sql
--- Check function exists
+-- Check function exists in public schema
 SELECT
-  proname AS function_name,
-  prosecdef AS security_definer,
-  proargnames AS argument_names
-FROM pg_proc
-WHERE proname = 'custom_access_token_hook'
-  AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'auth');
+  n.nspname AS schema_name,
+  p.proname AS function_name,
+  p.prosecdef AS security_definer,
+  p.proargnames AS argument_names
+FROM pg_proc p
+JOIN pg_namespace n ON p.pronamespace = n.oid
+WHERE p.proname = 'custom_access_token_hook'
+  AND n.nspname = 'public';
 
 -- Expected result:
--- function_name           | security_definer | argument_names
--- ------------------------+------------------+----------------
--- custom_access_token_hook| t                | {event}
+-- schema_name | function_name           | security_definer | argument_names
+-- ------------+-------------------------+------------------+----------------
+-- public      | custom_access_token_hook| f                | {event}
 ```
 
 ### Test 2: Verify Hook Registration
@@ -376,15 +376,22 @@ VALUES (
 )
 ON CONFLICT (user_id, org_id) DO UPDATE SET is_active = true;
 
--- Test claims retrieval
-SELECT auth.get_user_claims('550e8400-e29b-41d4-a716-446655440000'::uuid);
+-- Test claims via hook function
+SELECT public.custom_access_token_hook(
+  jsonb_build_object(
+    'user_id', '550e8400-e29b-41d4-a716-446655440000',
+    'claims', '{}'::jsonb
+  )
+);
 
--- Expected result (jsonb):
+-- Expected result should contain merged claims:
 -- {
---   "org_id": "660e8400-e29b-41d4-a716-446655440000",
---   "user_role": "provider_admin",
---   "permissions": ["medication.create", "client.view", ...],
---   "scope_path": "test_org"
+--   "claims": {
+--     "org_id": "660e8400-e29b-41d4-a716-446655440000",
+--     "user_role": "provider_admin",
+--     "permissions": ["medication.create", "client.view", ...],
+--     "scope_path": "test_org"
+--   }
 -- }
 ```
 
@@ -596,7 +603,7 @@ SELECT * FROM auth.hooks WHERE hook_name = 'custom_access_token_hook';
 SELECT proname FROM pg_proc WHERE proname = 'custom_access_token_hook';
 
 -- Test function directly
-SELECT auth.custom_access_token_hook(
+SELECT public.custom_access_token_hook(
   jsonb_build_object(
     'user_id', 'your-user-uuid',
     'claims', '{}'::jsonb
@@ -624,7 +631,9 @@ WHERE query LIKE '%custom_access_token_hook%'
 ORDER BY last_exec_time DESC LIMIT 10;
 
 -- Test function with sample user
-SELECT auth.get_user_claims('sample-user-uuid'::uuid);
+SELECT public.custom_access_token_hook(
+  jsonb_build_object('user_id', 'sample-user-uuid', 'claims', '{}'::jsonb)
+);
 ```
 
 **Solutions**:
@@ -643,7 +652,9 @@ SELECT auth.get_user_claims('sample-user-uuid'::uuid);
 ```sql
 -- Check query execution time
 EXPLAIN ANALYZE
-SELECT auth.get_user_claims('sample-user-uuid'::uuid);
+SELECT public.custom_access_token_hook(
+  jsonb_build_object('user_id', 'sample-user-uuid', 'claims', '{}'::jsonb)
+);
 
 -- Check for missing indexes
 SELECT schemaname, tablename, indexname
@@ -653,7 +664,7 @@ WHERE tablename IN ('user_roles_projection', 'user_permissions_projection', 'org
 
 **Solutions**:
 1. Add recommended indexes (see Security Considerations section)
-2. Optimize queries in `get_user_claims` function
+2. Optimize queries in `custom_access_token_hook` function
 3. Consider materialized view for permissions (if many permissions per user)
 4. Cache claims in application session (don't re-fetch on every request)
 

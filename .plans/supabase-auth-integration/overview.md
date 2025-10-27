@@ -407,22 +407,28 @@ Since Supabase doesn't provide native organization management:
 The database hook that adds custom claims must be secure:
 
 ```sql
-CREATE FUNCTION auth.custom_access_token_hook(event jsonb)
+-- Created in PUBLIC schema (2025 Supabase restrictions prevent auth schema)
+CREATE FUNCTION public.custom_access_token_hook(event jsonb)
 RETURNS jsonb
-SECURITY DEFINER  -- ⚠️ Runs with elevated privileges
 LANGUAGE plpgsql
+STABLE
 AS $$
 BEGIN
-  -- CRITICAL: This function has elevated access
+  -- CRITICAL: This function queries projection tables
   -- Must validate all inputs and prevent injection
   -- Errors in this function compromise multi-tenant isolation
 
   -- Implementation in custom-claims-setup.md
 END;
 $$;
+
+-- Required permission grants
+GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin;
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+-- ... additional table grants
 ```
 
-⚠️ **Deployment Note**: This function CANNOT be created via SQL due to `auth` schema permissions. You must create it via Supabase Dashboard → Authentication → Hooks. See `custom-claims-setup.md` for detailed instructions.
+⚠️ **Deployment Note**: As of 2025, this function is created in `public` schema via SQL deployment (see `infrastructure/supabase/DEPLOY_TO_SUPABASE_STUDIO.sql`). After SQL deployment, register the hook via Supabase Dashboard → Authentication → Hooks → Custom Access Token. See `custom-claims-setup.md` for detailed instructions.
 
 ---
 

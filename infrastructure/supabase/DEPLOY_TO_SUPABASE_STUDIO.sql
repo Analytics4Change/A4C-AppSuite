@@ -514,22 +514,17 @@ $$;
 
 
 -- ============================================================================
--- JWT CUSTOM CLAIMS HOOK (Must be enabled via Supabase Dashboard)
+-- JWT CUSTOM CLAIMS HOOK
 -- ============================================================================
--- NOTE: The custom_access_token_hook function CANNOT be created via SQL
--- due to auth schema permissions. You must create it via Dashboard:
---
--- 1. Go to: Authentication > Hooks > Custom Access Token Hook
--- 2. Click "Create a new hook" or "Enable"
--- 3. Paste the following function code in the editor:
+-- Creates hook in PUBLIC schema (not auth schema due to 2025 restrictions)
+-- Must be registered in Dashboard: Authentication > Hooks > Custom Access Token
+-- Or via config.toml: [auth.hook.custom_access_token] enabled = true
 -- ============================================================================
-/*
 
-CREATE OR REPLACE FUNCTION auth.custom_access_token_hook(event jsonb)
+CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
-SECURITY DEFINER
 AS $$
 DECLARE
   v_user_id uuid;
@@ -605,7 +600,22 @@ EXCEPTION
 END;
 $$;
 
-*/
+COMMENT ON FUNCTION public.custom_access_token_hook IS 'Enriches JWT with custom claims (org_id, user_role, permissions, scope_path)';
+
+-- Grant permissions to supabase_auth_admin (required for hook execution)
+GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin;
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+
+-- Revoke from API roles (security: prevent direct calls)
+REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook FROM authenticated, anon, public;
+
+-- Grant read access to required tables
+GRANT SELECT ON TABLE users TO supabase_auth_admin;
+GRANT SELECT ON TABLE user_roles_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE roles_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE role_permissions_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE permissions_projection TO supabase_auth_admin;
+
 -- ============================================================================
 
 
@@ -829,7 +839,7 @@ COMMIT;
 -- 1. Enable JWT custom claims hook in Supabase Dashboard:
 --    Authentication > Hooks > Custom Access Token Hook
 --    - Enable: Yes
---    - Schema: auth
+--    - Schema: public
 --    - Function: custom_access_token_hook
 --
 -- 2. Bootstrap your first super_admin user:
