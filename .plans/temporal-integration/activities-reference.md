@@ -391,7 +391,14 @@ const token = createHmac('sha256', secret)
 
 ### `sendInvitationEmailsActivity`
 
-Sends invitation emails and emits success/failure events.
+Sends invitation emails via Resend email service and emits success/failure events.
+
+**Email Service**: Resend (https://resend.com) - Modern transactional email API
+- ✅ Excellent deliverability
+- ✅ Simple API (no SMTP configuration)
+- ✅ Free tier: 100 emails/day
+- ✅ Production: $20/month for 50,000 emails
+- ✅ Environment variable: `RESEND_API_KEY`
 
 **Signature**:
 ```typescript
