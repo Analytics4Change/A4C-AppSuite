@@ -14,7 +14,7 @@
  * - Session persistence
  *
  * Usage:
- *   Set VITE_AUTH_PROVIDER=supabase in .env to use this provider
+ *   Set VITE_APP_MODE=production in .env to use this provider
  *
  * See .plans/supabase-auth-integration/frontend-auth-architecture.md
  */

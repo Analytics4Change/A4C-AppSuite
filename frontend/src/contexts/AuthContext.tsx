@@ -5,7 +5,7 @@
  * Uses dependency injection with IAuthProvider interface to support
  * multiple authentication backends (mock, Supabase, etc.).
  *
- * The actual provider implementation is determined by VITE_AUTH_PROVIDER
+ * The actual provider implementation is determined by VITE_APP_MODE
  * environment variable and created by AuthProviderFactory.
  *
  * Usage:
@@ -17,6 +17,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { IAuthProvider } from '@/services/auth/IAuthProvider';
 import { getAuthProvider, logAuthConfig } from '@/services/auth/AuthProviderFactory';
+import { getDeploymentConfig } from '@/config/deployment.config';
 import {
   User,
   Session,
@@ -45,6 +46,7 @@ interface AuthContextType {
   /** Authentication operations */
   login: (credentials: LoginCredentials) => Promise<void>;
   loginWithOAuth: (provider: OAuthProvider, options?: OAuthOptions) => Promise<void>;
+  handleOAuthCallback: (callbackUrl: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
 
@@ -221,6 +223,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvid
   };
 
   /**
+   * Handle OAuth callback
+   * Called by AuthCallback page after OAuth redirect
+   */
+  const handleOAuthCallback = async (callbackUrl: string): Promise<void> => {
+    try {
+      setAuthState((prev) => ({ ...prev, loading: true, error: null }));
+
+      log.info('AuthProvider: Processing OAuth callback');
+      const session = await authProvider.handleOAuthCallback(callbackUrl);
+
+      setAuthState({
+        isAuthenticated: true,
+        user: session.user,
+        session,
+        loading: false,
+        error: null,
+      });
+
+      log.info('AuthProvider: OAuth callback processed successfully', {
+        user: session.user.email,
+        role: session.claims.user_role,
+      });
+    } catch (error) {
+      log.error('AuthProvider: OAuth callback processing failed', error);
+      setAuthState((prev) => ({
+        ...prev,
+        loading: false,
+        error: error as Error,
+      }));
+      throw error;
+    }
+  };
+
+  /**
    * Logout current user
    */
   const logout = async (): Promise<void> => {
@@ -329,12 +365,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvid
     error: authState.error,
     login,
     loginWithOAuth,
+    handleOAuthCallback,
     logout,
     refreshSession,
     hasPermission,
     hasRole,
     switchOrganization,
-    providerType: import.meta.env.VITE_AUTH_PROVIDER || (import.meta.env.PROD ? 'supabase' : 'mock'),
+    providerType: getDeploymentConfig().authProvider,
   };
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;

@@ -311,19 +311,19 @@ const MyComponent = () => {
 
 #### Environment Configuration
 
-Control authentication mode via environment variable:
+Control deployment mode via environment variable:
 
 ```bash
 # .env.development (mock mode)
-VITE_AUTH_PROVIDER=mock
+VITE_APP_MODE=mock
 
-# .env.development.integration (real auth for testing)
-VITE_AUTH_PROVIDER=supabase
+# .env.development.integration (production mode for testing)
+VITE_APP_MODE=production
 VITE_SUPABASE_URL=https://your-dev-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-dev-anon-key
 
-# .env.production (real auth)
-VITE_AUTH_PROVIDER=supabase
+# .env.production (production mode)
+VITE_APP_MODE=production
 VITE_SUPABASE_URL=https://your-prod-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-prod-anon-key
 ```

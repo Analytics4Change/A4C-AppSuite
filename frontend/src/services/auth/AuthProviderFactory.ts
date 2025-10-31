@@ -2,12 +2,12 @@
  * Authentication Provider Factory
  *
  * Factory function that creates the appropriate authentication provider
- * based on environment configuration. This is the single point of control
- * for switching between mock, integration, and production authentication modes.
+ * based on deployment mode configuration. This is the single point of control
+ * for switching between mock and production authentication modes.
  *
- * Configuration via VITE_AUTH_PROVIDER environment variable:
+ * Configuration via VITE_APP_MODE environment variable:
  * - "mock" - DevAuthProvider for fast local development
- * - "supabase" - SupabaseAuthProvider for integration testing and production
+ * - "production" - SupabaseAuthProvider for integration testing and production
  *
  * Usage:
  *   const authProvider = createAuthProvider();
@@ -20,6 +20,7 @@ import { IAuthProvider } from './IAuthProvider';
 import { DevAuthProvider } from './DevAuthProvider';
 import { SupabaseAuthProvider } from './SupabaseAuthProvider';
 import { getDevAuthConfig } from '@/config/dev-auth.config';
+import { getDeploymentConfig } from '@/config/deployment.config';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('api');
@@ -30,17 +31,11 @@ const log = Logger.getLogger('api');
 export type AuthProviderType = 'mock' | 'supabase';
 
 /**
- * Get the configured authentication provider type
+ * Get the configured authentication provider type based on deployment mode
  */
 export function getAuthProviderType(): AuthProviderType {
-  const provider = import.meta.env.VITE_AUTH_PROVIDER as AuthProviderType;
-
-  // Default to supabase in production, mock in development
-  if (!provider) {
-    return import.meta.env.PROD ? 'supabase' : 'mock';
-  }
-
-  return provider;
+  const { authProvider } = getDeploymentConfig();
+  return authProvider;
 }
 
 /**

@@ -13,7 +13,7 @@
  * - Environment variable overrides
  *
  * Usage:
- *   Set VITE_AUTH_PROVIDER=mock in .env to use this provider
+ *   Set VITE_APP_MODE=mock in .env to use this provider
  *
  * See .plans/supabase-auth-integration/frontend-auth-architecture.md
  */

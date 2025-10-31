@@ -1,6 +1,7 @@
 import { IOrganizationService } from './organization/IOrganizationService';
 import { MockOrganizationService } from './organization/MockOrganizationService';
 import { ProductionOrganizationService } from './organization/ProductionOrganizationService';
+import { getDeploymentConfig } from '@/config/deployment.config';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('main');
@@ -8,11 +9,12 @@ const log = Logger.getLogger('main');
 /**
  * Service Factory for Dependency Injection
  *
- * Provides centralized service instantiation based on environment configuration.
- * Enables easy switching between mock and production implementations.
+ * Provides centralized service instantiation based on deployment mode.
+ * Service implementations are determined by VITE_APP_MODE environment variable.
  *
- * Environment Variables:
- * - VITE_USE_MOCK_ORGANIZATION: Set to 'true' to use mock organization service
+ * Modes:
+ * - mock: All services use mock implementations (fast local dev)
+ * - production: All services use production implementations (integration/prod)
  */
 class ServiceFactory {
   private organizationService: IOrganizationService | null = null;
@@ -20,17 +22,17 @@ class ServiceFactory {
   /**
    * Get organization service instance
    *
-   * Returns mock or production implementation based on environment.
+   * Returns mock or production implementation based on deployment mode.
    */
   getOrganizationService(): IOrganizationService {
     if (!this.organizationService) {
-      const useMock = import.meta.env.VITE_USE_MOCK_ORGANIZATION === 'true';
+      const { useMockOrganization } = getDeploymentConfig();
 
-      if (useMock) {
-        log.info('Using MockOrganizationService (VITE_USE_MOCK_ORGANIZATION=true)');
+      if (useMockOrganization) {
+        log.info('Using MockOrganizationService (VITE_APP_MODE=mock)');
         this.organizationService = new MockOrganizationService();
       } else {
-        log.info('Using ProductionOrganizationService');
+        log.info('Using ProductionOrganizationService (VITE_APP_MODE=production)');
         this.organizationService = new ProductionOrganizationService();
       }
     }
