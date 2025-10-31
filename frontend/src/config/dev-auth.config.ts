@@ -11,6 +11,7 @@
  */
 
 import { Session, User, JWTClaims, UserRole, Permission } from '@/types/auth.types';
+import { getRolePermissions } from './roles.config';
 
 /**
  * Complete permission catalog for development testing
@@ -73,27 +74,11 @@ export const DEV_PERMISSIONS: Record<string, Permission[]> = {
 
 /**
  * Get all permissions from the catalog
+ * Note: This is kept for reference, but actual role permissions
+ * should be retrieved via getRolePermissions() from roles.config.ts
  */
 export function getAllPermissions(): Permission[] {
   return Object.values(DEV_PERMISSIONS).flat();
-}
-
-/**
- * Get provider_admin permissions (all except platform-level)
- */
-export function getProviderAdminPermissions(): Permission[] {
-  const allPermissions = getAllPermissions();
-  // Remove platform-level permissions
-  return allPermissions.filter(
-    (p) => p !== 'organization.create_root' && p !== 'organization.business_profile_create'
-  );
-}
-
-/**
- * Get super_admin permissions (all permissions)
- */
-export function getSuperAdminPermissions(): Permission[] {
-  return getAllPermissions();
 }
 
 /**
@@ -114,6 +99,9 @@ export interface DevUserProfile {
 /**
  * Default test user profile (provider_admin)
  *
+ * Uses getRolePermissions() from roles.config.ts to ensure dev mode
+ * uses the same canonical role definitions as production.
+ *
  * Environment variables can override these values:
  * - VITE_DEV_USER_ID
  * - VITE_DEV_USER_EMAIL
@@ -133,12 +121,14 @@ export const DEFAULT_DEV_USER: DevUserProfile = {
   scope_path: import.meta.env.VITE_DEV_SCOPE_PATH || 'org_dev_organization',
   permissions: import.meta.env.VITE_DEV_PERMISSIONS
     ? import.meta.env.VITE_DEV_PERMISSIONS.split(',')
-    : getProviderAdminPermissions(),
+    : getRolePermissions((import.meta.env.VITE_DEV_USER_ROLE as UserRole) || 'provider_admin'),
   picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=dev-user',
 };
 
 /**
- * Additional test user profiles for different scenarios
+ * Additional test user profiles for canonical roles
+ * Only includes system-defined roles from CANONICAL_ROLES
+ * Custom organization roles should be tested via real database queries
  */
 export const DEV_USER_PROFILES: Record<string, DevUserProfile> = {
   provider_admin: DEFAULT_DEV_USER,
@@ -151,44 +141,20 @@ export const DEV_USER_PROFILES: Record<string, DevUserProfile> = {
     org_id: '*', // Wildcard indicates all orgs
     org_name: 'Platform (All Organizations)',
     scope_path: '*', // Global scope
-    permissions: getSuperAdminPermissions(),
+    permissions: getRolePermissions('super_admin'),
     picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=super-admin',
   },
 
-  clinician: {
-    id: 'dev-clinician-880e8400-e29b-41d4-a716-446655440000',
-    email: 'clinician@example.com',
-    name: 'Dev Clinician',
-    role: 'clinician',
-    org_id: 'dev-org-660e8400-e29b-41d4-a716-446655440000',
-    org_name: 'Development Organization',
-    scope_path: 'org_dev_organization',
-    permissions: [
-      'medication.create',
-      'medication.view',
-      'medication.update',
-      'client.create',
-      'client.view',
-      'client.update',
-    ],
-    picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=clinician',
-  },
-
-  viewer: {
-    id: 'dev-viewer-990e8400-e29b-41d4-a716-446655440000',
-    email: 'viewer@example.com',
-    name: 'Dev Viewer (Read-Only)',
-    role: 'viewer',
-    org_id: 'dev-org-660e8400-e29b-41d4-a716-446655440000',
-    org_name: 'Development Organization',
-    scope_path: 'org_dev_organization',
-    permissions: [
-      'medication.view',
-      'client.view',
-      'organization.view',
-      'audit.view',
-    ],
-    picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=viewer',
+  partner_onboarder: {
+    id: 'dev-partner-onboarder-880e8400-e29b-41d4-a716-446655440000',
+    email: 'partner.onboarder@example.com',
+    name: 'Dev Partner Onboarder',
+    role: 'partner_onboarder',
+    org_id: '*', // Wildcard indicates all orgs
+    org_name: 'Platform (All Organizations)',
+    scope_path: '*', // Global scope
+    permissions: getRolePermissions('partner_onboarder'),
+    picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=partner-onboarder',
   },
 };
 

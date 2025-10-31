@@ -31,55 +31,85 @@ export const PERMISSIONS: Record<string, Permission> = {
   // Global Level Permissions (Platform-wide)
   // ============================================
 
-  // Provider Management
-  'provider.create': {
-    id: 'provider.create',
-    category: 'Provider Management',
-    resource: 'provider',
-    action: 'create',
-    displayName: 'Create Provider',
-    description: 'Create new provider organizations',
+  // Organization Management
+  'organization.create_root': {
+    id: 'organization.create_root',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'create_root',
+    displayName: 'Create Root Organization',
+    description: 'Create new root tenant organizations (bootstrap)',
     scope: 'global',
     riskLevel: 'high'
   },
-  'provider.read': {
-    id: 'provider.read',
-    category: 'Provider Management',
-    resource: 'provider',
-    action: 'read',
-    displayName: 'View Providers',
-    description: 'View provider information',
+  'organization.create_sub': {
+    id: 'organization.create_sub',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'create_sub',
+    displayName: 'Create Sub-Organization',
+    description: 'Create sub-organizations within hierarchy',
+    scope: 'organization',
+    riskLevel: 'medium'
+  },
+  'organization.view': {
+    id: 'organization.view',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'view',
+    displayName: 'View Organizations',
+    description: 'View organization information',
     scope: 'global',
     riskLevel: 'low'
   },
-  'provider.update': {
-    id: 'provider.update',
-    category: 'Provider Management',
-    resource: 'provider',
+  'organization.update': {
+    id: 'organization.update',
+    category: 'Organization Management',
+    resource: 'organization',
     action: 'update',
-    displayName: 'Update Provider',
-    description: 'Modify provider information',
-    scope: 'global',
+    displayName: 'Update Organization',
+    description: 'Modify organization information',
+    scope: 'organization',
     riskLevel: 'medium'
   },
-  'provider.delete': {
-    id: 'provider.delete',
-    category: 'Provider Management',
-    resource: 'provider',
+  'organization.deactivate': {
+    id: 'organization.deactivate',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'deactivate',
+    displayName: 'Deactivate Organization',
+    description: 'Deactivate organizations',
+    scope: 'global',
+    riskLevel: 'high'
+  },
+  'organization.delete': {
+    id: 'organization.delete',
+    category: 'Organization Management',
+    resource: 'organization',
     action: 'delete',
-    displayName: 'Delete Provider',
-    description: 'Remove provider organizations',
+    displayName: 'Delete Organization',
+    description: 'Permanently delete organizations',
     scope: 'global',
     riskLevel: 'critical'
   },
-  'provider.clone': {
-    id: 'provider.clone',
-    category: 'Provider Management',
-    resource: 'provider',
-    action: 'clone',
-    displayName: 'Clone Provider Setup',
-    description: 'Copy provider configuration to new provider',
-    scope: 'global',
+  'organization.business_profile_create': {
+    id: 'organization.business_profile_create',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'business_profile_create',
+    displayName: 'Create Business Profile',
+    description: 'Create business profiles for organizations',
+    scope: 'organization',
+    riskLevel: 'medium'
+  },
+  'organization.business_profile_update': {
+    id: 'organization.business_profile_update',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'business_profile_update',
+    displayName: 'Update Business Profile',
+    description: 'Modify business profiles',
+    scope: 'organization',
     riskLevel: 'medium'
   },
 

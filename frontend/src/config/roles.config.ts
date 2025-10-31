@@ -28,16 +28,21 @@ export const GLOBAL_ROLES: Record<string, RoleDefinition> = {
     description: 'Full platform control with ability to manage all providers and settings',
     scope: 'global',
     permissions: [
-      // All global permissions
-      'provider.create',
-      'provider.read',
-      'provider.update',
-      'provider.delete',
-      'provider.clone',
+      // Organization Management (Bootstrap capability)
+      'organization.create_root',
+      'organization.create_sub',
+      'organization.view',
+      'organization.update',
+      'organization.deactivate',
+      'organization.delete',
+      'organization.business_profile_create',
+      'organization.business_profile_update',
+      // Global client management
       'client.create',
       'client.read',
       'client.update',
       'client.delete',
+      // Global role management
       'global_roles.create',
       'cross_org.grant',
       'users.impersonate',
@@ -56,10 +61,11 @@ export const GLOBAL_ROLES: Record<string, RoleDefinition> = {
     description: 'Can create and manage new provider organizations',
     scope: 'global',
     permissions: [
-      'provider.create',
-      'provider.read',
-      'provider.update',
-      'provider.clone'
+      'organization.create_root',
+      'organization.view',
+      'organization.update',
+      'organization.business_profile_create',
+      'organization.business_profile_update'
     ],
     canCreateRoles: false,
     canGrantCrossOrg: false,
@@ -69,15 +75,20 @@ export const GLOBAL_ROLES: Record<string, RoleDefinition> = {
 };
 
 /**
- * Organization role template that is created for each new provider
- * This is the default administrator role for organizations
+ * Organization owner role that is created during bootstrap
+ * This is the owner of a root-level organization with full control
  */
-export const ORGANIZATION_ROLE_TEMPLATE: RoleDefinition = {
-  key: 'administrator',
-  displayName: 'Administrator',
-  description: 'Full control within the organization including role and user management',
+const PROVIDER_ADMIN_ROLE: RoleDefinition = {
+  key: 'provider_admin',
+  displayName: 'Provider Administrator',
+  description: 'Organization owner with full control, created during bootstrap process',
   scope: 'organization',
   permissions: [
+    // Organization management (sub-orgs only, not root creation)
+    'organization.create_sub',
+    'organization.view',
+    'organization.update',
+    'organization.business_profile_update',
     // All organization-level permissions
     'medication.create',
     'medication.read',
@@ -120,15 +131,18 @@ export const ORGANIZATION_ROLE_TEMPLATE: RoleDefinition = {
   canCreateRoles: true,  // Can create org-specific roles
   canGrantCrossOrg: false,
   canImpersonate: false,
-  isSystemRole: true  // Cannot be deleted from organizations
+  isSystemRole: true  // Canonical role, cannot be deleted
 };
 
 /**
- * All bootstrap roles (global + org template)
+ * All canonical role definitions
+ * These are system-defined roles that exist across all deployments
+ * - Global roles: Platform-level roles (super_admin, partner_onboarder)
+ * - Organization roles: Roles created during organization bootstrap (provider_admin)
  */
-export const BOOTSTRAP_ROLES = {
+export const CANONICAL_ROLES: Record<string, RoleDefinition> = {
   ...GLOBAL_ROLES,
-  administrator: ORGANIZATION_ROLE_TEMPLATE
+  provider_admin: PROVIDER_ADMIN_ROLE
 };
 
 /**
@@ -137,17 +151,17 @@ export const BOOTSTRAP_ROLES = {
  */
 export const ROLE_HIERARCHY = {
   global: ['super_admin', 'partner_onboarder'],
-  organization: ['administrator']  // Custom org roles will be added dynamically
+  organization: ['provider_admin']  // Custom org roles will be added dynamically
 };
 
 /**
  * Get all permissions for a role, including inherited permissions
  */
 export function getRolePermissions(roleKey: string): string[] {
-  const role = BOOTSTRAP_ROLES[roleKey];
+  const role = CANONICAL_ROLES[roleKey];
   if (!role) return [];
 
-  const permissions = new Set(role.permissions);
+  const permissions = new Set<string>(role.permissions);
 
   // Super admin gets all permissions when in org context
   if (roleKey === 'super_admin') {
@@ -174,7 +188,7 @@ export function roleHasPermission(roleKey: string, permissionId: string): boolea
  * Get roles that can be created by a given role
  */
 export function getCreatableRoles(roleKey: string): string[] {
-  const role = BOOTSTRAP_ROLES[roleKey];
+  const role = CANONICAL_ROLES[roleKey];
   if (!role || !role.canCreateRoles) return [];
 
   if (role.scope === 'global') {
@@ -253,7 +267,7 @@ export const ROLE_MENU_ACCESS: Record<string, string[]> = {
     '/providers',
     '/reports'
   ],
-  administrator: [
+  provider_admin: [
     '/clients',
     '/medications',
     '/reports',

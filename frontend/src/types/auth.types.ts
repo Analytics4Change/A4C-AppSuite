@@ -8,18 +8,35 @@
 
 /**
  * User roles supported by the system
- * Maps to RBAC roles defined in .plans/rbac-permissions/architecture.md
+ * Includes both canonical roles (from CANONICAL_ROLES) and custom organization roles
+ *
+ * Canonical roles (system-defined):
+ * - super_admin: Platform-wide access (all organizations)
+ * - partner_onboarder: Can create and manage new provider organizations
+ * - provider_admin: Organization owner with full control
+ *
+ * Custom organization roles (created by provider_admin):
+ * - partner_admin: Provider Partner admin (custom role)
+ * - facility_admin: Facility-scoped admin (future)
+ * - program_manager: Program-scoped manager (future)
+ * - clinician: Clinical user
+ * - nurse: Nursing staff
+ * - caregiver: Caregiver role
+ * - viewer: Read-only access
+ *
+ * See .plans/rbac-permissions/architecture.md for complete role definitions
  */
 export type UserRole =
-  | 'super_admin'           // Platform-wide access (all organizations)
-  | 'provider_admin'        // Organization-level admin
-  | 'partner_admin'         // Provider Partner admin
-  | 'facility_admin'        // Facility-scoped admin (future)
-  | 'program_manager'       // Program-scoped manager (future)
-  | 'clinician'             // Clinical user
-  | 'nurse'                 // Nursing staff
-  | 'caregiver'             // Caregiver role
-  | 'viewer';               // Read-only access
+  | 'super_admin'           // Canonical: Platform-wide access
+  | 'partner_onboarder'     // Canonical: Create/manage provider organizations
+  | 'provider_admin'        // Canonical: Organization owner
+  | 'partner_admin'         // Custom: Provider Partner admin
+  | 'facility_admin'        // Custom: Facility-scoped admin (future)
+  | 'program_manager'       // Custom: Program-scoped manager (future)
+  | 'clinician'             // Custom: Clinical user
+  | 'nurse'                 // Custom: Nursing staff
+  | 'caregiver'             // Custom: Caregiver role
+  | 'viewer';               // Custom: Read-only access
 
 /**
  * Permission strings following the applet.action pattern
