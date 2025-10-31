@@ -35,6 +35,19 @@ BEGIN
       WHEN 'organization' THEN
         PERFORM process_organization_event(NEW);
 
+      -- Organization child entities
+      WHEN 'program' THEN
+        PERFORM process_program_event(NEW);
+
+      WHEN 'contact' THEN
+        PERFORM process_contact_event(NEW);
+
+      WHEN 'address' THEN
+        PERFORM process_address_event(NEW);
+
+      WHEN 'phone' THEN
+        PERFORM process_phone_event(NEW);
+
       -- RBAC stream types
       WHEN 'permission' THEN
         PERFORM process_rbac_event(NEW);
