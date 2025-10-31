@@ -1,10 +1,13 @@
 # Organization Management Module - Implementation Plan
 
-**Status**: 🚧 In Progress
+**Status**: 🚧 In Progress (Phase 1-2 partially complete)
 **Started**: 2025-10-28
+**Last Updated**: 2025-10-30
 **Target Completion**: TBD
 **Priority**: High - Core business functionality
 **Pattern**: MVVM with Temporal workflow orchestration
+
+**Completion**: ~15% (Types created, Mock services implemented, Environment config unified)
 
 ---
 
@@ -2249,16 +2252,56 @@ Load Draft:
 
 ## Progress Tracking
 
+### Recent Updates (2025-10-30)
+
+#### Environment Variable Refactoring ✅
+**Problem**: Functional dependency between `VITE_AUTH_PROVIDER` and `VITE_USE_MOCK_ORGANIZATION` created invalid configurations.
+
+**Solution**: Unified into single `VITE_APP_MODE` variable with deployment configurations.
+
+**Files Modified**:
+- ✅ Created `frontend/src/config/deployment.config.ts` - Centralized deployment mode configuration
+- ✅ Updated `AuthProviderFactory.ts` - Uses deployment config
+- ✅ Updated `ServiceFactory.ts` - Uses deployment config for organization service selection
+- ✅ Updated `AuthContext.tsx` - Provider type from deployment config
+- ✅ Updated `package.json` - Scripts use VITE_APP_MODE
+- ✅ Updated `.env.example` - Comprehensive VITE_APP_MODE documentation
+- ✅ Cleaned `.env.local` - Removed deprecated Zitadel and bootstrap variables
+- ✅ Updated `CLAUDE.md` - Developer documentation
+- ✅ Updated provider comments - DevAuthProvider.ts, SupabaseAuthProvider.ts
+
+**Result**: Two clear deployment modes:
+- `mock`: All services mocked (auth + organization)
+- `production`: All services real (Supabase Auth + Temporal workflows)
+
+#### Mock Organization Data Improvements ✅
+**Problem**: MockWorkflowClient returned synthetic data instead of echoing user input.
+
+**Solution**: Updated mock implementation to echo actual form data.
+
+**Files Modified**:
+- ✅ Updated `frontend/src/types/organization.types.ts`
+  - Added optional fields: `organizationName`, `subdomain`, `adminUser`, `createdAt`
+- ✅ Updated `frontend/src/services/workflow/MockWorkflowClient.ts`
+  - Rewrote `generateMockResult()` to slugify org name and echo input
+  - Returns actual admin user details instead of synthetic data
+
+**Result**: Better development UX - mock data matches user input.
+
 ### Implementation Status
 
 #### Phase 1: Types & Data Models
-- [ ] Create organization.types.ts
+- [x] Create organization.types.ts (✅ 2025-10-30)
+- [x] Update OrganizationBootstrapResult with optional fields (✅ 2025-10-30)
 - [ ] Create organization.constants.ts
 - [ ] Export from index files
 
 #### Phase 2: Services
-- [ ] Create organization.service.ts
-- [ ] Create temporal-client.service.ts
+- [x] Create MockWorkflowClient.ts with realistic data echo (✅ 2025-10-30)
+- [x] Create deployment.config.ts - unified VITE_APP_MODE (✅ 2025-10-30)
+- [x] Create OrganizationService interface (IOrganizationService) (✅ 2025-10-29)
+- [x] Create MockOrganizationService (✅ 2025-10-29)
+- [ ] Create ProductionOrganizationService (production mode implementation)
 - [ ] Create organization-validation.ts
 
 #### Phase 3: ViewModel
@@ -2344,6 +2387,6 @@ Load Draft:
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-10-28
-**Status**: Planning Complete - Ready for Implementation
+**Document Version**: 1.1
+**Last Updated**: 2025-10-30
+**Status**: In Progress - Types and Services partially implemented
