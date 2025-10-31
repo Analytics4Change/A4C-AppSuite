@@ -44,11 +44,12 @@ class MedicationTemplateService {
         throw new Error('Source medication not found');
       }
 
-      // Get current user and organization
-      const user = await supabaseService.getCurrentUser();
-      if (!user || !user.organizationId) {
+      // Get current user and organization from session
+      const session = supabaseService.getCurrentSession();
+      if (!session || !session.claims.org_id) {
         throw new Error('User organization context required');
       }
+      const user = session.user;
 
       // Extract client initials if requested
       let clientInitials: string | undefined;
@@ -58,7 +59,7 @@ class MedicationTemplateService {
 
       // Create template object (stripping PII)
       const template: Omit<MedicationTemplate, 'id'> = {
-        organizationId: user.organizationId,
+        organizationId: session.claims.org_id,
         name: request.templateName,
 
         // Preserve medication info
@@ -122,8 +123,8 @@ class MedicationTemplateService {
    */
   async getTemplates(options?: TemplateFilterOptions): Promise<MedicationTemplate[]> {
     try {
-      const user = await supabaseService.getCurrentUser();
-      if (!user || !user.organizationId) {
+      const session = supabaseService.getCurrentSession();
+      if (!session || !session.claims.org_id) {
         throw new Error('User organization context required');
       }
 
@@ -131,7 +132,7 @@ class MedicationTemplateService {
       let query = (client as any)
         .from('medication_templates')
         .select('*')
-        .eq('organization_id', user.organizationId);
+        .eq('organization_id', session.claims.org_id);
 
       // Apply filters
       if (options?.searchTerm) {
@@ -345,8 +346,8 @@ class MedicationTemplateService {
    */
   async getTemplateStats(): Promise<TemplateStats> {
     try {
-      const user = await supabaseService.getCurrentUser();
-      if (!user || !user.organizationId) {
+      const session = supabaseService.getCurrentSession();
+      if (!session || !session.claims.org_id) {
         throw new Error('User organization context required');
       }
 
@@ -356,7 +357,7 @@ class MedicationTemplateService {
       const { data: templates, error } = await (client as any)
         .from('medication_templates')
         .select('*')
-        .eq('organization_id', user.organizationId);
+        .eq('organization_id', session.claims.org_id);
 
       if (error) {
         throw error;

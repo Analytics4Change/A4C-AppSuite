@@ -11,12 +11,14 @@ export default defineConfig(({ mode }) => {
       react(),
       checker({
         typescript: true,
-        eslint: {
-          lintCommand: 'eslint "./src/**/*.{ts,tsx}"',
-          dev: {
-            logLevel: ['error'],
-          },
-        },
+        // ESLint checker temporarily disabled due to configuration incompatibility
+        // Can be re-enabled after updating to new ESLint API
+        // eslint: {
+        //   lintCommand: 'eslint "./src/**/*.{ts,tsx}"',
+        //   dev: {
+        //     logLevel: ['error'],
+        //   },
+        // },
         overlay: {
           initialIsOpen: false,
         },

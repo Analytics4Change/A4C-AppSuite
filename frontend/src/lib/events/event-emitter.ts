@@ -154,7 +154,7 @@ export class EventEmitter {
     eventData: T,
     reason: string,
     additionalMetadata?: Partial<EventMetadata>
-  ): Promise<DomainEvent<T>> {
+  ): Promise<DomainEvent> {
     this.validateReason(reason);
     this.validateEventType(eventType);
     this.validateEventData(eventType, eventData);
@@ -166,12 +166,12 @@ export class EventEmitter {
 
     const version = await this.getNextVersion(streamId, streamType);
 
-    const event: Omit<DomainEvent<T>, 'id' | 'sequence_number' | 'created_at'> = {
+    const event: Omit<DomainEvent, 'id' | 'created_at'> = {
       stream_id: streamId,
       stream_type: streamType,
       stream_version: version,
       event_type: eventType,
-      event_data: eventData,
+      event_data: eventData as Record<string, any>,
       event_metadata: {
         user_id: user.data.user.id,
         organization_id: user.data.user.user_metadata?.organization_id || '',
@@ -204,7 +204,7 @@ export class EventEmitter {
       throw error;
     }
 
-    return data as DomainEvent<T>;
+    return data as DomainEvent;
   }
 
   async emitBatch<T = any>(
@@ -216,7 +216,7 @@ export class EventEmitter {
       reason: string;
       additionalMetadata?: Partial<EventMetadata>;
     }>
-  ): Promise<DomainEvent<T>[]> {
+  ): Promise<DomainEvent[]> {
     const user = await this.supabase.auth.getUser();
     if (!user.data.user) {
       throw new Error('User must be authenticated to emit events');
@@ -255,7 +255,7 @@ export class EventEmitter {
       throw error;
     }
 
-    return data as DomainEvent<T>[];
+    return data as DomainEvent[];
   }
 
   async getEventHistory(
@@ -364,7 +364,7 @@ export const eventEmitter = {
     eventData: T,
     reason: string,
     additionalMetadata?: Partial<EventMetadata>
-  ): Promise<DomainEvent<T>> {
+  ): Promise<DomainEvent> {
     const instance = await getOrCreateEventEmitter();
     return instance.emit(streamId, streamType, eventType, eventData, reason, additionalMetadata);
   },
@@ -378,7 +378,7 @@ export const eventEmitter = {
       reason: string;
       additionalMetadata?: Partial<EventMetadata>;
     }>
-  ): Promise<DomainEvent<T>[]> {
+  ): Promise<DomainEvent[]> {
     const instance = await getOrCreateEventEmitter();
     return instance.emitBatch(events);
   },

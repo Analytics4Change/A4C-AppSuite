@@ -9,7 +9,7 @@ import { ImpersonationSession } from '@/services/auth/impersonation.service';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function useImpersonationUI() {
-  const { user } = useAuth();
+  const { user, session: authSession } = useAuth();
   const [session, setSession] = useState<ImpersonationSession | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -49,7 +49,7 @@ export function useImpersonationUI() {
     };
   }, [refreshKey]);
 
-  const canImpersonate = user?.role === 'super_admin';
+  const canImpersonate = authSession?.claims.user_role === 'super_admin';
 
   const openImpersonationModal = () => {
     if (canImpersonate && !session) {

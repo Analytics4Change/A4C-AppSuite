@@ -588,7 +588,7 @@ export class MedicationManagementViewModel {
       const streamId = crypto.randomUUID();
       await eventEmitter.emit(
         streamId,
-        'medication_history',
+        'medication',
         'medication.prescribed',
         eventData,
         'New Medication Added', // Page-driven reason

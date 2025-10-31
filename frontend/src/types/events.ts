@@ -7,26 +7,15 @@
  * Generated types are synced from A4C-Infrastructure/supabase/contracts/types
  */
 
-// Re-export core types from generated schema
+// Re-export core types from event-types
 export type {
   DomainEvent,
   EventMetadata,
   StreamType,
-  AllDomainEvents,
-  ClientRegisteredEvent,
-  ClientAdmittedEvent,
-  ClientInformationUpdatedEvent,
-  ClientDischargedEvent,
-  MedicationPrescribedEvent,
-  MedicationAdministeredEvent,
-  MedicationSkippedEvent,
-  MedicationRefusedEvent,
-  MedicationDiscontinuedEvent,
-  UserOrganizationSwitchedEvent,
-} from './generated/events';
+} from './event-types';
 
 // Import types needed for extensions
-import type { EventMetadata, StreamType } from './generated/events';
+import type { EventMetadata, StreamType } from './event-types';
 
 // Application-specific type extensions
 

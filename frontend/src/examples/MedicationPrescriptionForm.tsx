@@ -96,7 +96,7 @@ export function MedicationPrescriptionForm({
 
     await emitEvent(
       prescriptionId,
-      'medication_history',
+      'medication',
       'medication.prescribed',
       {
         organization_id: organizationId,
@@ -420,7 +420,7 @@ export function MedicationPrescriptionForm({
       <div className="bg-white shadow rounded-lg p-6">
         <EventHistory
           entityId={clientId}
-          streamType="medication_history"
+          streamType="medication"
           title="Medication History"
           emptyMessage="No medications prescribed yet"
           realtime={true}
