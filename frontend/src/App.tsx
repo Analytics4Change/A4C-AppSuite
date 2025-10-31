@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { RequirePermission } from '@/components/auth/RequirePermission';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { AuthCallback } from '@/pages/auth/AuthCallback';
 import { MainLayout } from '@/components/layouts/MainLayout';
@@ -10,10 +11,11 @@ import { ClientDetailLayout } from '@/pages/clients/ClientDetailLayout';
 import { ClientOverviewPage } from '@/pages/clients/ClientOverviewPage';
 import { ClientMedicationsPage } from '@/pages/clients/ClientMedicationsPage';
 import { MedicationManagementPage } from '@/pages/medications/MedicationManagementPage';
-import { ProviderListPage } from '@/pages/providers/ProviderListPage';
-import { ProviderCreatePage } from '@/pages/providers/ProviderCreatePage';
-import { ProviderDetailPage } from '@/pages/providers/ProviderDetailPage';
-import { BootstrapPage } from '@/pages/admin/BootstrapPage';
+import { OrganizationListPage } from '@/pages/organizations/OrganizationListPage';
+import { OrganizationCreatePage } from '@/pages/organizations/OrganizationCreatePage';
+import { OrganizationBootstrapStatusPage } from '@/pages/organizations/OrganizationBootstrapStatusPage';
+import { OrganizationDashboard } from '@/pages/organizations/OrganizationDashboard';
+import { AcceptInvitationPage } from '@/pages/organizations/AcceptInvitationPage';
 import { DebugControlPanel } from '@/components/debug/DebugControlPanel';
 import { LogOverlay } from '@/components/debug/LogOverlay';
 import { DiagnosticsProvider } from '@/contexts/DiagnosticsContext';
@@ -57,6 +59,7 @@ function App() {
             {/* Public Routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/organizations/invitation" element={<AcceptInvitationPage />} />
 
             {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>
@@ -75,19 +78,21 @@ function App() {
                   <Route path="documents" element={<div>Client Documents - Coming Soon</div>} />
                 </Route>
 
-                {/* Provider Management routes */}
-                <Route path="/providers" element={<ProviderListPage />} />
-                <Route path="/providers/create" element={<ProviderCreatePage />} />
-                <Route path="/providers/:id/view" element={<ProviderDetailPage />} />
-                <Route path="/providers/:id/edit" element={<div>Provider Edit - Coming Soon</div>} />
+                {/* Organization Management routes */}
+                <Route path="/organizations" element={<OrganizationListPage />} />
+                <Route path="/organizations/create" element={
+                  <RequirePermission permission="organization.create_root" fallback="/clients">
+                    <OrganizationCreatePage />
+                  </RequirePermission>
+                } />
+                <Route path="/organizations/bootstrap/:workflowId" element={<OrganizationBootstrapStatusPage />} />
+                <Route path="/organizations/:orgId/dashboard" element={<OrganizationDashboard />} />
+                <Route path="/organizations/:orgId/edit" element={<div>Organization Edit - Coming Soon</div>} />
 
                 {/* Other main sections */}
                 <Route path="/medications" element={<MedicationsPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
-
-                {/* Admin section */}
-                <Route path="/admin/bootstrap" element={<BootstrapPage />} />
               </Route>
             </Route>
             

@@ -19,13 +19,13 @@ import { ImpersonationModal } from '@/components/auth/ImpersonationModal';
 import { useImpersonationUI } from '@/hooks/useImpersonationUI';
 
 export const MainLayout: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, session: authSession, hasPermission } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
   // Impersonation UI hook
   const {
-    session,
+    session: impersonationSession,
     isImpersonating,
     canImpersonate,
     isModalOpen,
@@ -40,49 +40,77 @@ export const MainLayout: React.FC = () => {
     navigate('/login');
   };
 
-  // Define all possible nav items with their required roles
+  // Define all possible nav items with their required roles and permissions
   const allNavItems = [
     { to: '/clients', icon: Users, label: 'Clients', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse', 'caregiver'] },
-    { to: '/providers', icon: Building, label: 'Providers', roles: ['super_admin', 'a4c_partner'] },
+    { to: '/organizations', icon: Building, label: 'Organizations', roles: ['super_admin', 'partner_onboarder'], permission: 'organization.create_root' },
     { to: '/medications', icon: Pill, label: 'Medications', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse'] },
     { to: '/reports', icon: FileText, label: 'Reports', roles: ['super_admin', 'provider_admin', 'administrator'] },
     { to: '/settings', icon: Settings, label: 'Settings', roles: ['super_admin', 'provider_admin', 'administrator'] },
   ];
 
-  // Filter nav items based on user role
-  const userRole = user?.role || 'caregiver'; // Default to most restrictive role
+  // Filter nav items based on user role and permissions
+  const userRole = authSession?.claims.user_role || 'caregiver'; // Default to most restrictive role
+  const [navItems, setNavItems] = React.useState<typeof allNavItems>([]);
 
   // Debug logging
   console.log('[MainLayout] Current user:', {
     email: user?.email,
-    role: user?.role,
+    role: authSession?.claims.user_role,
     userRole: userRole,
     userRoleLowercase: userRole.toLowerCase()
   });
 
-  const navItems = allNavItems.filter(item => {
-    const included = item.roles.includes(userRole.toLowerCase());
-    // Debug: Uncomment to log navigation filtering
-    // console.log(`[MainLayout] ${item.label}: roles=${item.roles.join(',')}, userRole=${userRole.toLowerCase()}, included=${included}`);
-    return included;
-  });
+  // Filter nav items by role AND permission (async)
+  React.useEffect(() => {
+    const filterItems = async () => {
+      const filtered = [];
+
+      for (const item of allNavItems) {
+        // Check role first
+        const roleMatch = item.roles.includes(userRole.toLowerCase());
+        if (!roleMatch) continue;
+
+        // If item requires permission, check it
+        if ('permission' in item && item.permission) {
+          const allowed = await hasPermission(item.permission);
+          if (allowed) {
+            filtered.push(item);
+          } else {
+            console.log(`[MainLayout] Hiding ${item.label}: missing permission ${item.permission}`);
+          }
+        } else {
+          // No permission required, just role
+          filtered.push(item);
+        }
+      }
+
+      setNavItems(filtered);
+    };
+
+    filterItems();
+  }, [authSession, userRole, hasPermission]);
 
   return (
     <>
       {/* Impersonation Banner - Always at the top */}
-      {isImpersonating && session && (
+      {isImpersonating && impersonationSession && (
         <ImpersonationBanner
-          session={session}
+          session={impersonationSession}
           onEndImpersonation={handleEndImpersonation}
         />
       )}
 
       {/* Impersonation Modal */}
-      {canImpersonate && user && (
+      {canImpersonate && user && authSession && (
         <ImpersonationModal
           isOpen={isModalOpen}
           onClose={closeImpersonationModal}
-          currentUser={user}
+          currentUser={{
+            id: user.id,
+            email: user.email,
+            role: authSession.claims.user_role
+          }}
           onImpersonationStart={handleImpersonationStart}
         />
       )}
@@ -173,12 +201,12 @@ export const MainLayout: React.FC = () => {
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-sm font-medium text-gray-800">
-                {isImpersonating && session ? session.context.impersonatedUserEmail : user?.name}
+                {isImpersonating && impersonationSession ? impersonationSession.context.impersonatedUserEmail : user?.name}
               </p>
               <p className="text-xs text-gray-600">
-                {isImpersonating && session ? session.context.impersonatedUserRole : user?.role}
+                {isImpersonating && impersonationSession ? impersonationSession.context.impersonatedUserRole : authSession?.claims.user_role}
               </p>
-              {isImpersonating && session && (
+              {isImpersonating && impersonationSession && (
                 <p className="text-xs text-yellow-600 font-medium mt-1">Impersonating</p>
               )}
             </div>
