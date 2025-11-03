@@ -1,208 +1,285 @@
 -- Organization Permissions Setup
 -- Initializes organization-related permissions via event sourcing
 -- This script emits permission.defined events for organization lifecycle management
+--
+-- IDEMPOTENT: Can be run multiple times safely
+-- Uses conditional DO blocks to check for existing permissions before insertion
 
--- Function to emit permission.defined events during platform initialization
-CREATE OR REPLACE FUNCTION initialize_organization_permissions()
-RETURNS VOID AS $$
-DECLARE
-  v_permission_id UUID;
-  v_current_time TIMESTAMPTZ := NOW();
+-- ========================================
+-- Organization Lifecycle Permissions
+-- ========================================
+
+-- organization.create_root
+DO $$
 BEGIN
-  
-  -- Define organization permissions via events (not direct inserts)
-  
-  -- 1. organization.create_root - Platform Owner only
-  v_permission_id := gen_random_uuid();
-  INSERT INTO domain_events (
-    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
-  ) VALUES (
-    v_permission_id,
-    'permission',
-    1,
-    'permission.defined',
-    jsonb_build_object(
-      'applet', 'organization',
-      'action', 'create_root',
-      'name', 'organization.create_root',
-      'description', 'Create top-level organizations (Platform Owner only)',
-      'scope_type', 'global',
-      'requires_mfa', true
-    ),
-    jsonb_build_object(
-      'user_id', '00000000-0000-0000-0000-000000000000',
-      'reason', 'Platform initialization: defining organization.create_root permission'
-    )
-  );
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'organization'
+      AND event_data->>'action' = 'create_root'
+  ) THEN
+    INSERT INTO domain_events (
+      stream_id, stream_type, stream_version, event_type, event_data, event_metadata
+    ) VALUES (
+      gen_random_uuid(),
+      'permission',
+      1,
+      'permission.defined',
+      jsonb_build_object(
+        'applet', 'organization',
+        'action', 'create_root',
+        'name', 'organization.create_root',
+        'description', 'Create top-level organizations (Platform Owner only)',
+        'scope_type', 'global',
+        'requires_mfa', true
+      ),
+      jsonb_build_object(
+        'user_id', '00000000-0000-0000-0000-000000000000',
+        'reason', 'Platform initialization: defining organization.create_root permission'
+      )
+    );
+  END IF;
+END $$;
 
-  -- 2. organization.create_sub - Provider Admin within their org
-  v_permission_id := gen_random_uuid();
-  INSERT INTO domain_events (
-    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
-  ) VALUES (
-    v_permission_id,
-    'permission',
-    1,
-    'permission.defined',
-    jsonb_build_object(
-      'applet', 'organization',
-      'action', 'create_sub',
-      'name', 'organization.create_sub',
-      'description', 'Create sub-organizations within hierarchy',
-      'scope_type', 'org',
-      'requires_mfa', false
-    ),
-    jsonb_build_object(
-      'user_id', '00000000-0000-0000-0000-000000000000',
-      'reason', 'Platform initialization: defining organization.create_sub permission'
-    )
-  );
+-- organization.create_sub
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'organization'
+      AND event_data->>'action' = 'create_sub'
+  ) THEN
+    INSERT INTO domain_events (
+      stream_id, stream_type, stream_version, event_type, event_data, event_metadata
+    ) VALUES (
+      gen_random_uuid(),
+      'permission',
+      1,
+      'permission.defined',
+      jsonb_build_object(
+        'applet', 'organization',
+        'action', 'create_sub',
+        'name', 'organization.create_sub',
+        'description', 'Create sub-organizations within hierarchy',
+        'scope_type', 'org',
+        'requires_mfa', false
+      ),
+      jsonb_build_object(
+        'user_id', '00000000-0000-0000-0000-000000000000',
+        'reason', 'Platform initialization: defining organization.create_sub permission'
+      )
+    );
+  END IF;
+END $$;
 
-  -- 3. organization.deactivate - Organization deactivation
-  v_permission_id := gen_random_uuid();
-  INSERT INTO domain_events (
-    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
-  ) VALUES (
-    v_permission_id,
-    'permission',
-    1,
-    'permission.defined',
-    jsonb_build_object(
-      'applet', 'organization',
-      'action', 'deactivate',
-      'name', 'organization.deactivate',
-      'description', 'Deactivate organizations (billing, compliance, operational)',
-      'scope_type', 'org',
-      'requires_mfa', true
-    ),
-    jsonb_build_object(
-      'user_id', '00000000-0000-0000-0000-000000000000',
-      'reason', 'Platform initialization: defining organization.deactivate permission'
-    )
-  );
+-- organization.deactivate
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'organization'
+      AND event_data->>'action' = 'deactivate'
+  ) THEN
+    INSERT INTO domain_events (
+      stream_id, stream_type, stream_version, event_type, event_data, event_metadata
+    ) VALUES (
+      gen_random_uuid(),
+      'permission',
+      1,
+      'permission.defined',
+      jsonb_build_object(
+        'applet', 'organization',
+        'action', 'deactivate',
+        'name', 'organization.deactivate',
+        'description', 'Deactivate organizations (billing, compliance, operational)',
+        'scope_type', 'org',
+        'requires_mfa', true
+      ),
+      jsonb_build_object(
+        'user_id', '00000000-0000-0000-0000-000000000000',
+        'reason', 'Platform initialization: defining organization.deactivate permission'
+      )
+    );
+  END IF;
+END $$;
 
-  -- 4. organization.delete - Organization deletion (dangerous operation)
-  v_permission_id := gen_random_uuid();
-  INSERT INTO domain_events (
-    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
-  ) VALUES (
-    v_permission_id,
-    'permission',
-    1,
-    'permission.defined',
-    jsonb_build_object(
-      'applet', 'organization',
-      'action', 'delete',
-      'name', 'organization.delete',
-      'description', 'Delete organizations with cascade handling',
-      'scope_type', 'global',
-      'requires_mfa', true
-    ),
-    jsonb_build_object(
-      'user_id', '00000000-0000-0000-0000-000000000000',
-      'reason', 'Platform initialization: defining organization.delete permission'
-    )
-  );
+-- organization.delete
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'organization'
+      AND event_data->>'action' = 'delete'
+  ) THEN
+    INSERT INTO domain_events (
+      stream_id, stream_type, stream_version, event_type, event_data, event_metadata
+    ) VALUES (
+      gen_random_uuid(),
+      'permission',
+      1,
+      'permission.defined',
+      jsonb_build_object(
+        'applet', 'organization',
+        'action', 'delete',
+        'name', 'organization.delete',
+        'description', 'Delete organizations with cascade handling',
+        'scope_type', 'global',
+        'requires_mfa', true
+      ),
+      jsonb_build_object(
+        'user_id', '00000000-0000-0000-0000-000000000000',
+        'reason', 'Platform initialization: defining organization.delete permission'
+      )
+    );
+  END IF;
+END $$;
 
-  -- 5. organization.business_profile_create - Business profile creation
-  v_permission_id := gen_random_uuid();
-  INSERT INTO domain_events (
-    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
-  ) VALUES (
-    v_permission_id,
-    'permission',
-    1,
-    'permission.defined',
-    jsonb_build_object(
-      'applet', 'organization',
-      'action', 'business_profile_create',
-      'name', 'organization.business_profile_create',
-      'description', 'Create business profiles (Platform Owner only)',
-      'scope_type', 'global',
-      'requires_mfa', true
-    ),
-    jsonb_build_object(
-      'user_id', '00000000-0000-0000-0000-000000000000',
-      'reason', 'Platform initialization: defining organization.business_profile_create permission'
-    )
-  );
+-- organization.business_profile_create
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'organization'
+      AND event_data->>'action' = 'business_profile_create'
+  ) THEN
+    INSERT INTO domain_events (
+      stream_id, stream_type, stream_version, event_type, event_data, event_metadata
+    ) VALUES (
+      gen_random_uuid(),
+      'permission',
+      1,
+      'permission.defined',
+      jsonb_build_object(
+        'applet', 'organization',
+        'action', 'business_profile_create',
+        'name', 'organization.business_profile_create',
+        'description', 'Create business profiles (Platform Owner only)',
+        'scope_type', 'global',
+        'requires_mfa', true
+      ),
+      jsonb_build_object(
+        'user_id', '00000000-0000-0000-0000-000000000000',
+        'reason', 'Platform initialization: defining organization.business_profile_create permission'
+      )
+    );
+  END IF;
+END $$;
 
-  -- 6. organization.business_profile_update - Business profile updates
-  v_permission_id := gen_random_uuid();
-  INSERT INTO domain_events (
-    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
-  ) VALUES (
-    v_permission_id,
-    'permission',
-    1,
-    'permission.defined',
-    jsonb_build_object(
-      'applet', 'organization',
-      'action', 'business_profile_update',
-      'name', 'organization.business_profile_update',
-      'description', 'Update business profiles',
-      'scope_type', 'org',
-      'requires_mfa', false
-    ),
-    jsonb_build_object(
-      'user_id', '00000000-0000-0000-0000-000000000000',
-      'reason', 'Platform initialization: defining organization.business_profile_update permission'
-    )
-  );
+-- organization.business_profile_update
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'organization'
+      AND event_data->>'action' = 'business_profile_update'
+  ) THEN
+    INSERT INTO domain_events (
+      stream_id, stream_type, stream_version, event_type, event_data, event_metadata
+    ) VALUES (
+      gen_random_uuid(),
+      'permission',
+      1,
+      'permission.defined',
+      jsonb_build_object(
+        'applet', 'organization',
+        'action', 'business_profile_update',
+        'name', 'organization.business_profile_update',
+        'description', 'Update business profiles',
+        'scope_type', 'org',
+        'requires_mfa', false
+      ),
+      jsonb_build_object(
+        'user_id', '00000000-0000-0000-0000-000000000000',
+        'reason', 'Platform initialization: defining organization.business_profile_update permission'
+      )
+    );
+  END IF;
+END $$;
 
-  -- 7. organization.view - View organization information
-  v_permission_id := gen_random_uuid();
-  INSERT INTO domain_events (
-    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
-  ) VALUES (
-    v_permission_id,
-    'permission',
-    1,
-    'permission.defined',
-    jsonb_build_object(
-      'applet', 'organization',
-      'action', 'view',
-      'name', 'organization.view',
-      'description', 'View organization information and hierarchy',
-      'scope_type', 'org',
-      'requires_mfa', false
-    ),
-    jsonb_build_object(
-      'user_id', '00000000-0000-0000-0000-000000000000',
-      'reason', 'Platform initialization: defining organization.view permission'
-    )
-  );
+-- organization.view
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'organization'
+      AND event_data->>'action' = 'view'
+  ) THEN
+    INSERT INTO domain_events (
+      stream_id, stream_type, stream_version, event_type, event_data, event_metadata
+    ) VALUES (
+      gen_random_uuid(),
+      'permission',
+      1,
+      'permission.defined',
+      jsonb_build_object(
+        'applet', 'organization',
+        'action', 'view',
+        'name', 'organization.view',
+        'description', 'View organization information and hierarchy',
+        'scope_type', 'org',
+        'requires_mfa', false
+      ),
+      jsonb_build_object(
+        'user_id', '00000000-0000-0000-0000-000000000000',
+        'reason', 'Platform initialization: defining organization.view permission'
+      )
+    );
+  END IF;
+END $$;
 
-  -- 8. organization.update - Update organization information
-  v_permission_id := gen_random_uuid();
-  INSERT INTO domain_events (
-    stream_id, stream_type, stream_version, event_type, event_data, event_metadata
-  ) VALUES (
-    v_permission_id,
-    'permission',
-    1,
-    'permission.defined',
-    jsonb_build_object(
-      'applet', 'organization',
-      'action', 'update',
-      'name', 'organization.update',
-      'description', 'Update organization information',
-      'scope_type', 'org',
-      'requires_mfa', false
-    ),
-    jsonb_build_object(
-      'user_id', '00000000-0000-0000-0000-000000000000',
-      'reason', 'Platform initialization: defining organization.update permission'
-    )
-  );
+-- organization.update
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'organization'
+      AND event_data->>'action' = 'update'
+  ) THEN
+    INSERT INTO domain_events (
+      stream_id, stream_type, stream_version, event_type, event_data, event_metadata
+    ) VALUES (
+      gen_random_uuid(),
+      'permission',
+      1,
+      'permission.defined',
+      jsonb_build_object(
+        'applet', 'organization',
+        'action', 'update',
+        'name', 'organization.update',
+        'description', 'Update organization information',
+        'scope_type', 'org',
+        'requires_mfa', false
+      ),
+      jsonb_build_object(
+        'user_id', '00000000-0000-0000-0000-000000000000',
+        'reason', 'Platform initialization: defining organization.update permission'
+      )
+    );
+  END IF;
+END $$;
 
-  RAISE NOTICE 'Organization permissions initialized via permission.defined events';
-END;
-$$ LANGUAGE plpgsql;
+-- ========================================
+-- Verification
+-- ========================================
 
--- Execute the initialization function
--- This can be run during platform setup/migration
-SELECT initialize_organization_permissions();
+DO $$
+DECLARE
+  org_permission_count INTEGER;
+BEGIN
+  -- Count organization permissions
+  SELECT COUNT(*) INTO org_permission_count
+  FROM domain_events
+  WHERE event_type = 'permission.defined'
+    AND event_data->>'applet' = 'organization';
 
--- Drop the initialization function after use (optional)
-DROP FUNCTION IF EXISTS initialize_organization_permissions();
+  RAISE NOTICE 'Total organization permissions defined: %', org_permission_count;
+  RAISE NOTICE 'Organization permissions from this file: 8';
+  RAISE NOTICE '✓ Organization permissions seeded successfully!';
+END $$;

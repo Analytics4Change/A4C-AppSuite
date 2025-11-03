@@ -4,6 +4,7 @@
 -- 2. Provider Admin: Bootstrap role (permissions granted per organization later)
 -- 3. Partner Admin: Bootstrap role (permissions granted per organization later)
 --
+-- IDEMPOTENT: Can be run multiple times safely
 -- All inserts go through the event-sourced architecture
 
 -- ========================================
@@ -11,26 +12,77 @@
 -- Super Admin manages tenant/provider onboarding
 -- ========================================
 
-INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
-  -- organization.create
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "organization", "action": "create", "description": "Create new tenant organizations", "scope_type": "global", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
+-- organization.create
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'organization'
+      AND event_data->>'action' = 'create'
+  ) THEN
+    INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "organization", "action": "create", "description": "Create new tenant organizations", "scope_type": "global", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb
+    );
+  END IF;
+END $$;
 
-  -- organization.suspend
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "organization", "action": "suspend", "description": "Suspend organization access (e.g., payment issues)", "scope_type": "global", "requires_mfa": true}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
+-- organization.suspend
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'organization'
+      AND event_data->>'action' = 'suspend'
+  ) THEN
+    INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "organization", "action": "suspend", "description": "Suspend organization access (e.g., payment issues)", "scope_type": "global", "requires_mfa": true}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb
+    );
+  END IF;
+END $$;
 
-  -- organization.activate
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "organization", "action": "activate", "description": "Activate or reactivate organization", "scope_type": "global", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb),
+-- organization.activate
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'organization'
+      AND event_data->>'action' = 'activate'
+  ) THEN
+    INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "organization", "action": "activate", "description": "Activate or reactivate organization", "scope_type": "global", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb
+    );
+  END IF;
+END $$;
 
-  -- organization.search
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "organization", "action": "search", "description": "Search across all organizations", "scope_type": "global", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb);
+-- organization.search
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'organization'
+      AND event_data->>'action' = 'search'
+  ) THEN
+    INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "organization", "action": "search", "description": "Search across all organizations", "scope_type": "global", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin tenant onboarding"}'::jsonb
+    );
+  END IF;
+END $$;
 
 
 -- ========================================
@@ -38,31 +90,95 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
 -- Super Admin manages roles within Analytics4Change organization
 -- ========================================
 
-INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
-  -- a4c_role.create
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "a4c_role", "action": "create", "description": "Create roles within A4C organization", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb),
+-- a4c_role.create
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'a4c_role'
+      AND event_data->>'action' = 'create'
+  ) THEN
+    INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "a4c_role", "action": "create", "description": "Create roles within A4C organization", "scope_type": "org", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb
+    );
+  END IF;
+END $$;
 
-  -- a4c_role.view
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "a4c_role", "action": "view", "description": "View A4C internal roles", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb),
+-- a4c_role.view
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'a4c_role'
+      AND event_data->>'action' = 'view'
+  ) THEN
+    INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "a4c_role", "action": "view", "description": "View A4C internal roles", "scope_type": "org", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb
+    );
+  END IF;
+END $$;
 
-  -- a4c_role.update
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "a4c_role", "action": "update", "description": "Modify A4C internal roles", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb),
+-- a4c_role.update
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'a4c_role'
+      AND event_data->>'action' = 'update'
+  ) THEN
+    INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "a4c_role", "action": "update", "description": "Modify A4C internal roles", "scope_type": "org", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb
+    );
+  END IF;
+END $$;
 
-  -- a4c_role.delete
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "a4c_role", "action": "delete", "description": "Delete A4C internal roles", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb),
+-- a4c_role.delete
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'a4c_role'
+      AND event_data->>'action' = 'delete'
+  ) THEN
+    INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "a4c_role", "action": "delete", "description": "Delete A4C internal roles", "scope_type": "org", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb
+    );
+  END IF;
+END $$;
 
-  -- a4c_role.assign
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "a4c_role", "action": "assign", "description": "Assign A4C roles to A4C staff users", "scope_type": "org", "requires_mfa": false}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb);
+-- a4c_role.assign
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'a4c_role'
+      AND event_data->>'action' = 'assign'
+  ) THEN
+    INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "a4c_role", "action": "assign", "description": "Assign A4C roles to A4C staff users", "scope_type": "org", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin role delegation within A4C"}'::jsonb
+    );
+  END IF;
+END $$;
 
 
 -- ========================================
@@ -70,21 +186,59 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
 -- Super Admin manages permissions and role grants
 -- ========================================
 
-INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
-  -- permission.grant
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "permission", "action": "grant", "description": "Grant permissions to roles", "scope_type": "global", "requires_mfa": true}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin RBAC management"}'::jsonb),
+-- permission.grant
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'permission'
+      AND event_data->>'action' = 'grant'
+  ) THEN
+    INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "permission", "action": "grant", "description": "Grant permissions to roles", "scope_type": "global", "requires_mfa": true}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin RBAC management"}'::jsonb
+    );
+  END IF;
+END $$;
 
-  -- permission.revoke
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "permission", "action": "revoke", "description": "Revoke permissions from roles", "scope_type": "global", "requires_mfa": true}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin RBAC management"}'::jsonb),
+-- permission.revoke
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'permission'
+      AND event_data->>'action' = 'revoke'
+  ) THEN
+    INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "permission", "action": "revoke", "description": "Revoke permissions from roles", "scope_type": "global", "requires_mfa": true}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin RBAC management"}'::jsonb
+    );
+  END IF;
+END $$;
 
-  -- role.grant
-  (gen_random_uuid(), 'permission', 1, 'permission.defined',
-   '{"applet": "role", "action": "grant", "description": "Assign roles to users", "scope_type": "global", "requires_mfa": true}'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin RBAC management"}'::jsonb);
+-- role.grant
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM domain_events
+    WHERE event_type = 'permission.defined'
+      AND event_data->>'applet' = 'role'
+      AND event_data->>'action' = 'grant'
+  ) THEN
+    INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "role", "action": "grant", "description": "Assign roles to users", "scope_type": "global", "requires_mfa": true}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Super Admin RBAC management"}'::jsonb
+    );
+  END IF;
+END $$;
 
 
 -- ========================================
@@ -92,6 +246,7 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
 -- ========================================
 
 -- A4C Platform Organization (owner of the application)
+-- Fixed UUID for idempotency
 INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'organization', 1, 'organization.registered',
    '{
@@ -106,18 +261,22 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
        "description": "Platform owner organization"
      }
    }'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating A4C platform organization"}'::jsonb);
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating A4C platform organization"}'::jsonb)
+ON CONFLICT (stream_id) DO NOTHING;
 
 -- Super Admin Role (global scope, NULL org_id for platform-wide access)
+-- Fixed UUID for idempotency
 INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
   ('11111111-1111-1111-1111-111111111111', 'role', 1, 'role.created',
    '{
      "name": "super_admin",
      "description": "Platform administrator who manages tenant onboarding and A4C internal roles"
    }'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating super_admin role for A4C platform staff"}'::jsonb);
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating super_admin role for A4C platform staff"}'::jsonb)
+ON CONFLICT (stream_id) DO NOTHING;
 
 -- Provider Admin Role Template (bootstrap only, actual roles created per organization)
+-- Fixed UUID for idempotency
 INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
   ('22222222-2222-2222-2222-222222222222', 'role', 1, 'role.created',
    '{
@@ -126,9 +285,11 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
      "zitadel_org_id": null,
      "org_hierarchy_scope": null
    }'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating provider_admin role template"}'::jsonb);
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating provider_admin role template"}'::jsonb)
+ON CONFLICT (stream_id) DO NOTHING;
 
 -- Partner Admin Role Template (bootstrap only, actual roles created per organization)
+-- Fixed UUID for idempotency
 INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
   ('33333333-3333-3333-3333-333333333333', 'role', 1, 'role.created',
    '{
@@ -137,7 +298,8 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
      "zitadel_org_id": null,
      "org_hierarchy_scope": null
    }'::jsonb,
-   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating partner_admin role template"}'::jsonb);
+   '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating partner_admin role template"}'::jsonb)
+ON CONFLICT (stream_id) DO NOTHING;
 
 
 -- ========================================
@@ -146,19 +308,30 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
 
 -- Grant all 16 permissions to super_admin role
 -- These will be processed by the event triggers into role_permissions_projection table
+-- IDEMPOTENT: Only grants permissions that haven't been granted yet
 
 DO $$
 DECLARE
   perm_record RECORD;
-  version_counter INT := 2;  -- Start at version 2 (version 1 was role.created)
+  version_counter INT;
 BEGIN
-  -- Wait for permissions to be processed into projection (in real deployment)
-  -- For seed script, we query permissions_projection after initial INSERT processing
+  -- Get current version for super_admin role stream
+  SELECT COALESCE(MAX(stream_version), 1) + 1 INTO version_counter
+  FROM domain_events
+  WHERE stream_id = '11111111-1111-1111-1111-111111111111';
 
+  -- Grant permissions that haven't been granted yet
   FOR perm_record IN
     SELECT id, applet, action
     FROM permissions_projection
     WHERE applet IN ('organization', 'a4c_role', 'permission', 'role')
+      -- Only select permissions not already granted
+      AND id NOT IN (
+        SELECT (event_data->>'permission_id')::UUID
+        FROM domain_events
+        WHERE stream_id = '11111111-1111-1111-1111-111111111111'
+          AND event_type = 'role.permission.granted'
+      )
   LOOP
     INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
     VALUES (
@@ -178,6 +351,8 @@ BEGIN
 
     version_counter := version_counter + 1;
   END LOOP;
+
+  RAISE NOTICE 'Granted % new permissions to super_admin role', version_counter - 2;
 END $$;
 
 

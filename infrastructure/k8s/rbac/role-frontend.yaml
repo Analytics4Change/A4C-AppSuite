@@ -1,0 +1,47 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: github-actions-frontend-role
+  namespace: default
+  labels:
+    app: github-actions
+    deployment: frontend
+    managed-by: manual
+  annotations:
+    description: "Permissions for deploying frontend application to default namespace"
+    security-principle: "least-privilege - only deployment operations"
+rules:
+# Secrets: Manage docker registry credentials (ghcr-secret)
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "patch", "get"]
+
+# Deployments: Deploy frontend, check rollout status
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "patch", "watch"]
+
+# ReplicaSets: Monitor deployment replicas during rollout
+- apiGroups: ["apps"]
+  resources: ["replicasets"]
+  verbs: ["get", "list", "watch"]
+
+# Pods: Check pod status and debug deployment issues
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+
+# Services: Verify service creation and configuration
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list"]
+
+# Ingresses: Check ingress configuration
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list"]
+
+# Events: Troubleshoot deployment issues
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list"]

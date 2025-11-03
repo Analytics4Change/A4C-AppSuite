@@ -1,0 +1,37 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: github-actions-temporal-role
+  namespace: temporal
+  labels:
+    app: github-actions
+    deployment: temporal-workers
+    managed-by: manual
+  annotations:
+    description: "Permissions for deploying Temporal workers to temporal namespace"
+    security-principle: "least-privilege - only deployment operations"
+rules:
+# Secrets: Manage docker registry credentials (ghcr-secret) in temporal namespace
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "patch", "get"]
+
+# Deployments: Deploy workers, check rollout status
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "patch", "watch"]
+
+# ReplicaSets: Monitor worker replica status during rollout
+- apiGroups: ["apps"]
+  resources: ["replicasets"]
+  verbs: ["get", "list", "watch"]
+
+# Pods: Check worker pod status and debug
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+
+# Events: Troubleshoot deployment issues
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list"]

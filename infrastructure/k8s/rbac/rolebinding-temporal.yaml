@@ -1,0 +1,19 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: github-actions-temporal-binding
+  namespace: temporal
+  labels:
+    app: github-actions
+    deployment: temporal-workers
+    managed-by: manual
+  annotations:
+    description: "Binds github-actions service account to temporal worker deployment role"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: github-actions-temporal-role
+subjects:
+- kind: ServiceAccount
+  name: github-actions
+  namespace: default

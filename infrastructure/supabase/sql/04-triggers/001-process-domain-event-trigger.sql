@@ -1,5 +1,9 @@
 -- Trigger to Process Domain Events
 -- Automatically projects events to 3NF tables when they are inserted
+
+-- Drop trigger if exists (idempotency)
+DROP TRIGGER IF EXISTS process_domain_event_trigger ON domain_events;
+
 CREATE TRIGGER process_domain_event_trigger
   BEFORE INSERT OR UPDATE ON domain_events
   FOR EACH ROW
