@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: workflow-worker
-  namespace: temporal
+  namespace: default
   labels:
     app: workflow-worker
     component: temporal-worker
@@ -80,9 +80,9 @@ spec:
       # Graceful termination period (at pod spec level)
       terminationGracePeriodSeconds: 30
 
-      # Image pull secrets (if using private registry)
-      # imagePullSecrets:
-      # - name: ghcr-credentials
+      # Image pull secrets (using ghcr-secret from default namespace)
+      imagePullSecrets:
+      - name: ghcr-secret
 
       # Restart policy
       restartPolicy: Always

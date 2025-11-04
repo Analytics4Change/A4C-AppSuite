@@ -1,0 +1,31 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workflow-worker-config
+  namespace: default
+  labels:
+    app: workflow-worker
+    component: temporal-worker
+data:
+  # Workflow mode (mock | development | production)
+  WORKFLOW_MODE: "production"
+
+  # Temporal connection
+  TEMPORAL_ADDRESS: "temporal-frontend.temporal.svc.cluster.local:7233"
+  TEMPORAL_NAMESPACE: "default"
+  TEMPORAL_TASK_QUEUE: "bootstrap"
+
+  # Supabase (non-sensitive)
+  SUPABASE_URL: "https://cuvxypuwvbchsngjzdqo.supabase.co"
+
+  # Development features (should be false in production)
+  TAG_DEV_ENTITIES: "false"
+  AUTO_CLEANUP: "false"
+
+  # Node.js environment
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+
+  # Health check
+  HEALTH_CHECK_PORT: "9090"

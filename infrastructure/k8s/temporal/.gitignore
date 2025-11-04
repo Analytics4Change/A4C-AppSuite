@@ -1,0 +1,4 @@
+# Kubernetes secrets with real credentials
+worker-secret.yaml
+*-secret.yaml
+!*-secret.yaml.example

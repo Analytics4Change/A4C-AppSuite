@@ -1,10 +1,12 @@
 # ==========================================
 # Stage 1: Builder
 # ==========================================
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 # Install build dependencies
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -28,14 +30,16 @@ RUN npm prune --production
 # ==========================================
 # Stage 2: Production
 # ==========================================
-FROM node:20-alpine
+FROM node:20-slim
 
 # Install curl for health checks
-RUN apk add --no-cache curl
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create app user (non-root)
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+RUN groupadd --gid 1001 nodejs && \
+    useradd --uid 1001 --gid nodejs --shell /bin/bash --create-home nodejs
 
 # Set working directory
 WORKDIR /app
