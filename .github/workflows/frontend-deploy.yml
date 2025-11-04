@@ -1,5 +1,10 @@
 name: Deploy Frontend
 
+# This workflow deploys the frontend React application to the k3s cluster via Cloudflare Tunnel.
+# Prerequisites:
+#   - KUBECONFIG secret must point to https://k8s.firstovertheline.com (public endpoint)
+#   - See infrastructure/KUBECONFIG_UPDATE_GUIDE.md for setup instructions
+
 on:
   push:
     branches: [ main ]
@@ -60,8 +65,8 @@ jobs:
       uses: docker/login-action@v3
       with:
         registry: ${{ env.REGISTRY }}
-        username: analytics4change-ghcr-bot
-        password: ${{ secrets.GHCR_PULL_TOKEN }}
+        username: ${{ github.actor }}
+        password: ${{ steps.app-token.outputs.token }}
 
     - name: Extract metadata
       id: meta
@@ -148,14 +153,16 @@ jobs:
           echo "🌐 NETWORK CONNECTIVITY ISSUE"
           echo "The kubeconfig format is valid, but the cluster is not reachable from GitHub Actions."
           echo ""
+          echo "📖 See infrastructure/KUBECONFIG_UPDATE_GUIDE.md for detailed setup instructions"
+          echo ""
           echo "Possible solutions:"
-          echo "1. Ensure your k3s cluster has a public IP or domain name"
-          echo "2. Use a VPN or tunnel service (like ngrok, Cloudflare Tunnel)"
-          echo "3. Set up a bastion host or jump server"
-          echo "4. Use a cloud-hosted Kubernetes cluster (EKS, GKE, AKS)"
+          echo "1. Update KUBECONFIG to use https://k8s.firstovertheline.com (Cloudflare Tunnel)"
+          echo "2. Ensure Cloudflare Tunnel is running on k3s host"
+          echo "3. Verify DNS resolution: nslookup k8s.firstovertheline.com"
+          echo "4. Test connectivity: curl -k https://k8s.firstovertheline.com/version"
           echo ""
           echo "Current cluster endpoint: $(grep 'server:' ~/.kube/config | head -1)"
-          echo "This appears to be a private network address not accessible from GitHub Actions."
+          echo "Expected endpoint: https://k8s.firstovertheline.com"
           exit 1
         fi
 
