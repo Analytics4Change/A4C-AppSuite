@@ -172,8 +172,8 @@ jobs:
       run: |
         kubectl create secret docker-registry ghcr-secret \
           --docker-server=ghcr.io \
-          --docker-username=analytics4change-ghcr-bot \
-          --docker-password=${{ secrets.GHCR_PULL_TOKEN }} \
+          --docker-username=${{ github.actor }} \
+          --docker-password=${{ secrets.GITHUB_TOKEN }} \
           --dry-run=client -o yaml | kubectl apply -f -
 
     - name: Deploy to k3s
