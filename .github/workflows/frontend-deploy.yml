@@ -15,7 +15,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: analytics4change/a4c-frontend
+  IMAGE_NAME: analytics4change/a4c-appsuite-frontend
 
 jobs:
   build:
@@ -183,7 +183,7 @@ jobs:
         echo "Using image tag: $IMAGE_TAG"
 
         # Update deployment YAML with new image tag
-        sed -i "s|image: ghcr.io/analytics4change/a4c-frontend:.*|image: $IMAGE_TAG|g" frontend/k8s/deployment.yaml
+        sed -i "s|image: ghcr.io/analytics4change/a4c-appsuite-frontend:.*|image: $IMAGE_TAG|g" frontend/k8s/deployment.yaml
 
         # Apply the updated deployment (preserves imagePullSecrets)
         kubectl apply -f frontend/k8s/deployment.yaml
