@@ -62,5 +62,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
 # Set environment
 ENV NODE_ENV=production
 
-# Start worker
-CMD ["node", "dist/worker/index.js"]
+# Start worker with TypeScript path resolution
+CMD ["node", "-r", "tsconfig-paths/register", "dist/worker/index.js"]
