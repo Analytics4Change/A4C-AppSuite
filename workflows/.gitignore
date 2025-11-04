@@ -1,7 +1,6 @@
 # Dependencies
 node_modules/
-package-lock.json
-yarn.lock
+# Note: package-lock.json and yarn.lock should be committed for reproducible builds
 
 # Build output
 dist/
