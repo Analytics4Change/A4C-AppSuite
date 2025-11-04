@@ -11,13 +11,13 @@ on:
       - main
     paths:
       - 'workflows/**'
-      - '.github/workflows/workflows-docker.yaml'
+      - '.github/workflows/workflows-deploy.yml'
     tags:
       - 'v*'
   pull_request:
     paths:
       - 'workflows/**'
-      - '.github/workflows/workflows-docker.yaml'
+      - '.github/workflows/workflows-deploy.yml'
   workflow_dispatch:
 
 env:
