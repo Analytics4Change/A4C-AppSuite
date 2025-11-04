@@ -1,0 +1,66 @@
+{
+  "name": "@a4c/workflows",
+  "version": "1.0.0",
+  "description": "Temporal.io workflows for A4C organization management",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "build:watch": "tsc --build --watch",
+    "dev": "nodemon --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/worker/index.ts",
+    "worker": "node dist/worker/index.js",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:config": "ts-node -r tsconfig-paths/register src/scripts/test-config.ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "cleanup:dev": "ts-node -r tsconfig-paths/register src/scripts/cleanup-dev.ts",
+    "query:dev": "ts-node -r tsconfig-paths/register src/scripts/query-dev.ts",
+    "validate": "ts-node -r tsconfig-paths/register src/scripts/validate-system.ts",
+    "trigger-workflow": "ts-node -r tsconfig-paths/register src/examples/trigger-workflow.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.3",
+    "@temporalio/activity": "^1.10.0",
+    "@temporalio/client": "^1.10.0",
+    "@temporalio/worker": "^1.10.0",
+    "@temporalio/workflow": "^1.10.0",
+    "nodemailer": "^6.9.13",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@temporalio/testing": "^1.13.1",
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.11.5",
+    "@types/nodemailer": "^6.4.14",
+    "@types/uuid": "^9.0.7",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "dotenv": "^16.4.1",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.3",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "temporal",
+    "workflow",
+    "organization",
+    "dns",
+    "email",
+    "event-sourcing",
+    "cqrs"
+  ],
+  "author": "Analytics4Change",
+  "license": "UNLICENSED"
+}
