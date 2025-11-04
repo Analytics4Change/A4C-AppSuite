@@ -1,24 +1,7 @@
 # Production Dockerfile for A4C-FrontEnd React Application
-# Multi-stage build: Node.js build -> nginx serve
+# Expects dist/ folder to be pre-built by GitHub Actions workflow
+# This avoids needing the infrastructure/ directory in Docker context
 
-# Stage 1: Build the React application
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-# Copy package files first for better Docker layer caching
-COPY package*.json ./
-
-# Install dependencies (use npm ci for production builds)
-RUN npm ci --omit=dev --ignore-scripts
-
-# Copy source code
-COPY . .
-
-# Build the React application for production
-RUN npm run build
-
-# Stage 2: Production nginx server
 FROM nginx:alpine AS production
 
 # Remove default nginx content
@@ -65,8 +48,8 @@ RUN echo 'server {' > /etc/nginx/conf.d/default.conf && \
     echo '    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;' >> /etc/nginx/conf.d/default.conf && \
     echo '}' >> /etc/nginx/conf.d/default.conf
 
-# Copy built React application from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy pre-built React application (built by GitHub Actions workflow)
+COPY dist /usr/share/nginx/html
 
 # Add healthcheck
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
