@@ -1,0 +1,88 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflow-worker
+  namespace: temporal
+  labels:
+    app: workflow-worker
+    component: temporal-worker
+    version: v1
+spec:
+  replicas: 1  # Reduced from 3 due to CPU capacity constraints (k3s VM has 2 cores)
+  selector:
+    matchLabels:
+      app: workflow-worker
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: workflow-worker
+        component: temporal-worker
+        version: v1
+    spec:
+      containers:
+      - name: worker
+        image: ghcr.io/analytics4change/a4c-workflows:latest
+        imagePullPolicy: Always
+
+        ports:
+        - name: health
+          containerPort: 9090
+          protocol: TCP
+
+        # Environment from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: workflow-worker-config
+        - secretRef:
+            name: workflow-worker-secrets
+
+        # Resource limits and requests
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+
+        # Liveness probe - restart if unhealthy
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: health
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        # Readiness probe - don't send traffic if not ready
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: health
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+
+        # Graceful shutdown
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]
+
+      # Graceful termination period (at pod spec level)
+      terminationGracePeriodSeconds: 30
+
+      # Image pull secrets (if using private registry)
+      # imagePullSecrets:
+      # - name: ghcr-credentials
+
+      # Restart policy
+      restartPolicy: Always
