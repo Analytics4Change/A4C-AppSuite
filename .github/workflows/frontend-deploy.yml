@@ -46,6 +46,38 @@ jobs:
       working-directory: ./frontend
       run: echo "Skipping tests - no unit tests configured"
 
+    - name: Create production environment file
+      working-directory: ./frontend
+      run: |
+        echo "Creating .env.production with Supabase credentials..."
+        cat > .env.production << EOF
+        # Deployment mode (production = real Supabase)
+        VITE_APP_MODE=production
+
+        # Supabase credentials (from GitHub Secrets)
+        VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+        VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+        # Medication search (using mock data)
+        VITE_USE_RXNORM_API=false
+
+        # Debug flags (enabled for development-like deployment)
+        VITE_DEBUG_LOGS=true
+        VITE_DEBUG_MOBX=false
+        VITE_DEBUG_PERFORMANCE=false
+        EOF
+        echo "✓ Environment file created with debug logging enabled"
+        echo "Verifying environment variables are set..."
+        if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ]; then
+          echo "❌ VITE_SUPABASE_URL secret is not set"
+          exit 1
+        fi
+        if [ -z "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
+          echo "❌ VITE_SUPABASE_ANON_KEY secret is not set"
+          exit 1
+        fi
+        echo "✓ All required secrets are present"
+
     - name: Build React application
       working-directory: ./frontend
       run: npm run build
