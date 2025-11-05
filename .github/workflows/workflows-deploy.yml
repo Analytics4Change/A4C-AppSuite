@@ -96,14 +96,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get GitHub App Token
-        id: app-token
-        uses: tibdex/github-app-token@v1
-        with:
-          app_id: ${{ secrets.APP_ID }}
-          private_key: ${{ secrets.APP_PRIVATE_KEY }}
-          installation_id: ${{ secrets.INSTALLATION_ID }}
-
       - name: Setup kubectl
         uses: azure/setup-kubectl@v3
         with:
@@ -155,16 +147,7 @@ jobs:
 
           echo "✓ kubectl configuration complete"
 
-      - name: Create image pull secret
-        run: |
-          kubectl create secret docker-registry ghcr-secret \
-            --docker-server=ghcr.io \
-            --docker-username=${{ github.actor }} \
-            --docker-password=${{ secrets.GITHUB_TOKEN }} \
-            --namespace=temporal \
-            --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: Deploy to k3s Temporal namespace
+      - name: Deploy to k3s default namespace
         run: |
           # Get the first image tag from the multi-line output
           IMAGE_TAG=$(echo "${{ needs.build-and-push.outputs.image-tags }}" | head -n1)
@@ -173,28 +156,28 @@ jobs:
           # Update the worker image
           kubectl set image deployment/workflow-worker \
             worker=$IMAGE_TAG \
-            -n temporal
+            -n default
 
           echo "✅ Image updated in deployment"
 
       - name: Wait for rollout
         run: |
           # Wait for rollout to complete
-          if kubectl rollout status deployment/workflow-worker -n temporal --timeout=300s; then
+          if kubectl rollout status deployment/workflow-worker -n default --timeout=300s; then
             echo "✅ Rollout completed successfully"
           else
             echo "⚠️ First rollout attempt timed out, checking actual deployment status..."
 
             # Check if deployment actually succeeded despite timeout
-            READY_REPLICAS=$(kubectl get deployment workflow-worker -n temporal -o jsonpath='{.status.readyReplicas}')
-            DESIRED_REPLICAS=$(kubectl get deployment workflow-worker -n temporal -o jsonpath='{.spec.replicas}')
+            READY_REPLICAS=$(kubectl get deployment workflow-worker -n default -o jsonpath='{.status.readyReplicas}')
+            DESIRED_REPLICAS=$(kubectl get deployment workflow-worker -n default -o jsonpath='{.spec.replicas}')
 
             if [ "$READY_REPLICAS" = "$DESIRED_REPLICAS" ] && [ "$READY_REPLICAS" != "" ]; then
               echo "✅ Deployment actually completed successfully ($READY_REPLICAS/$DESIRED_REPLICAS ready)"
             else
               echo "❌ Deployment failed - only $READY_REPLICAS/$DESIRED_REPLICAS replicas ready"
-              kubectl get pods -l app=workflow-worker -n temporal
-              kubectl describe deployment workflow-worker -n temporal
+              kubectl get pods -l app=workflow-worker -n default
+              kubectl describe deployment workflow-worker -n default
               exit 1
             fi
           fi
@@ -202,13 +185,13 @@ jobs:
       - name: Verify deployment
         run: |
           echo "📊 Deployment Status:"
-          kubectl get deployment workflow-worker -n temporal
+          kubectl get deployment workflow-worker -n default
           echo ""
           echo "📦 Pod Status:"
-          kubectl get pods -l app=workflow-worker -n temporal
+          kubectl get pods -l app=workflow-worker -n default
           echo ""
           echo "🔍 Recent Events:"
-          kubectl get events -n temporal --sort-by='.lastTimestamp' | tail -10
+          kubectl get events -n default --sort-by='.lastTimestamp' | tail -10
 
       - name: Report deployment status
         if: always()
