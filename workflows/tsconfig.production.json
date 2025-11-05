@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": "./dist",
+    "paths": {
+      "@shared/*": ["shared/*"],
+      "@workflows/*": ["workflows/*"],
+      "@activities/*": ["activities/*"]
+    }
+  }
+}
