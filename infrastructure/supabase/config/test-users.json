@@ -1,0 +1,19 @@
+{
+  "users": [
+    {
+      "email": "super-admin@test.a4c.local",
+      "role": "super_admin",
+      "name": "Super Admin Test User"
+    },
+    {
+      "email": "provider-admin@test.a4c.local",
+      "role": "provider_admin",
+      "name": "Provider Admin Test User"
+    },
+    {
+      "email": "clinician@test.a4c.local",
+      "role": "clinician",
+      "name": "Clinician Test User"
+    }
+  ]
+}
