@@ -115,19 +115,23 @@ jobs:
           PROJECT_REF=$(echo "${{ secrets.SUPABASE_URL }}" | sed 's|https://\([^.]*\).*|\1|')
           echo "PROJECT_REF=$PROJECT_REF" >> $GITHUB_ENV
 
-          # Construct database URL
-          DB_URL="postgresql://postgres:[password]@db.${PROJECT_REF}.supabase.co:5432/postgres"
-          echo "DB_HOST=db.${PROJECT_REF}.supabase.co" >> $GITHUB_ENV
+          # Use Session Pooler for GitHub Actions (IPv4 compatible)
+          DB_USER="postgres.${PROJECT_REF}"
+          DB_HOST="aws-1-us-west-1.pooler.supabase.com"
+          DB_PORT="5432"
+
+          echo "DB_USER=$DB_USER" >> $GITHUB_ENV
+          echo "DB_HOST=$DB_HOST" >> $GITHUB_ENV
+          echo "DB_PORT=$DB_PORT" >> $GITHUB_ENV
 
       - name: Test database connection
         env:
           PGPASSWORD: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           echo "Testing connection to Supabase database..."
+          echo "Using Session Pooler: $DB_HOST:$DB_PORT"
 
-          # Note: Direct database connection with service role key
-          # In production, use connection pooler or proper database password
-          if psql -h "$DB_HOST" -U postgres -d postgres -c "SELECT version();" 2>&1; then
+          if psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "SELECT version();" 2>&1; then
             echo "✅ Database connection successful"
           else
             echo "❌ Database connection failed"
@@ -140,7 +144,7 @@ jobs:
           PGPASSWORD: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           echo "Creating migration tracking table..."
-          psql -h "$DB_HOST" -U postgres -d postgres <<'EOF'
+          psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres <<'EOF'
           CREATE TABLE IF NOT EXISTS _migrations_applied (
             id SERIAL PRIMARY KEY,
             migration_name TEXT UNIQUE NOT NULL,
@@ -203,7 +207,7 @@ jobs:
               CHECKSUM=$(sha256sum "$file" | awk '{print $1}')
 
               # Check if migration already applied
-              APPLIED=$(psql -h "$DB_HOST" -U postgres -d postgres -tAc \
+              APPLIED=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc \
                 "SELECT COUNT(*) FROM _migrations_applied WHERE migration_name = '$MIGRATION_NAME' AND checksum = '$CHECKSUM';")
 
               if [ "$APPLIED" -gt 0 ]; then
@@ -213,7 +217,7 @@ jobs:
               fi
 
               # Check if migration was applied with different checksum
-              APPLIED_DIFFERENT=$(psql -h "$DB_HOST" -U postgres -d postgres -tAc \
+              APPLIED_DIFFERENT=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc \
                 "SELECT COUNT(*) FROM _migrations_applied WHERE migration_name = '$MIGRATION_NAME' AND checksum != '$CHECKSUM';")
 
               if [ "$APPLIED_DIFFERENT" -gt 0 ]; then
@@ -227,12 +231,12 @@ jobs:
               # Execute migration and measure time
               START_TIME=$(date +%s%3N)
 
-              if psql -h "$DB_HOST" -U postgres -d postgres -f "$file" > /tmp/migration-output.log 2>&1; then
+              if psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -f "$file" > /tmp/migration-output.log 2>&1; then
                 END_TIME=$(date +%s%3N)
                 EXECUTION_TIME=$((END_TIME - START_TIME))
 
                 # Record successful migration
-                psql -h "$DB_HOST" -U postgres -d postgres <<SQL
+                psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres <<SQL
                 INSERT INTO _migrations_applied (migration_name, migration_path, checksum, execution_time_ms, applied_by)
                 VALUES ('$MIGRATION_NAME', '$file', '$CHECKSUM', $EXECUTION_TIME, 'github-actions')
                 ON CONFLICT (migration_name)
@@ -283,7 +287,7 @@ jobs:
           echo "Seed files are located in: infrastructure/supabase/sql/99-seeds/"
           echo ""
           echo "To run seeds manually:"
-          echo "  psql -h $DB_HOST -U postgres -d postgres -f <seed-file.sql>"
+          echo "  psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres -f <seed-file.sql>"
           echo ""
           echo "Skipping automated seed execution for safety."
 
@@ -295,7 +299,7 @@ jobs:
 
           # Check migration tracking
           echo "📊 Migration History:"
-          psql -h "$DB_HOST" -U postgres -d postgres <<'EOF'
+          psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres <<'EOF'
           SELECT
             migration_name,
             applied_at,
@@ -306,12 +310,12 @@ jobs:
           EOF
 
           # Check table count
-          TABLE_COUNT=$(psql -h "$DB_HOST" -U postgres -d postgres -tAc \
+          TABLE_COUNT=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc \
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';")
           echo "📋 Total tables in public schema: $TABLE_COUNT"
 
           # Check function count
-          FUNCTION_COUNT=$(psql -h "$DB_HOST" -U postgres -d postgres -tAc \
+          FUNCTION_COUNT=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc \
             "SELECT COUNT(*) FROM pg_proc WHERE pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public');")
           echo "⚙️  Total functions in public schema: $FUNCTION_COUNT"
 
