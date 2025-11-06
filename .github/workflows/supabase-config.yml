@@ -83,10 +83,11 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           echo "📦 Deploying Edge Functions..."
-          cd infrastructure/supabase/supabase
 
-          # Deploy all functions
-          supabase functions deploy --project-ref $PROJECT_REF
+          # Deploy all functions using --workdir to specify project location
+          supabase functions deploy \
+            --project-ref $PROJECT_REF \
+            --workdir infrastructure/supabase
 
           echo "✅ Edge Functions deployed successfully!"
 
@@ -95,8 +96,9 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           echo "📋 Deployed Edge Functions:"
-          cd infrastructure/supabase/supabase
-          supabase functions list --project-ref $PROJECT_REF
+          supabase functions list \
+            --project-ref $PROJECT_REF \
+            --workdir infrastructure/supabase
 
       - name: Report deployment status
         if: always()
