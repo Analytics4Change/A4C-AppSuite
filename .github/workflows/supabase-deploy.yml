@@ -126,7 +126,7 @@ jobs:
 
       - name: Test database connection
         env:
-          PGPASSWORD: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           echo "Testing connection to Supabase database..."
           echo "Using Session Pooler: $DB_HOST:$DB_PORT"
@@ -135,13 +135,13 @@ jobs:
             echo "✅ Database connection successful"
           else
             echo "❌ Database connection failed"
-            echo "Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY secrets"
+            echo "Check SUPABASE_URL and SUPABASE_DB_PASSWORD secrets"
             exit 1
           fi
 
       - name: Create migration tracking table
         env:
-          PGPASSWORD: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           echo "Creating migration tracking table..."
           psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres <<'EOF'
@@ -166,7 +166,7 @@ jobs:
 
       - name: Run migrations
         env:
-          PGPASSWORD: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           echo "Running migrations..."
 
@@ -281,7 +281,7 @@ jobs:
       - name: Run seed data (manual approval required)
         if: github.event_name == 'workflow_dispatch'
         env:
-          PGPASSWORD: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           echo "⚠️  Seed data execution requires manual approval"
           echo "Seed files are located in: infrastructure/supabase/sql/99-seeds/"
@@ -293,7 +293,7 @@ jobs:
 
       - name: Verify database state
         env:
-          PGPASSWORD: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           echo "Verifying database state..."
 
