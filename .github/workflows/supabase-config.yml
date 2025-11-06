@@ -15,7 +15,7 @@ on:
       - main
     paths:
       - 'infrastructure/supabase/config/**'
-      - 'infrastructure/supabase/functions/**'
+      - 'infrastructure/supabase/supabase/functions/**'
       - 'infrastructure/supabase/scripts/**'
       - '.github/workflows/supabase-config.yml'
   workflow_dispatch:
