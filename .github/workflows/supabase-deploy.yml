@@ -260,7 +260,7 @@ jobs:
                 # Stop on first failure to prevent cascading errors
                 exit 1
               fi
-            done < <(find "$FULL_PATH" -name "*.sql" | sort)
+            done < <(find "$FULL_PATH" -name "*.sql" | sort) || true
           done
 
           echo ""
