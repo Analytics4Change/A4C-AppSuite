@@ -28,7 +28,8 @@ BEGIN
         safe_jsonb_extract_text(p_event.event_data, 'scope_type'),
         COALESCE((p_event.event_data->>'requires_mfa')::BOOLEAN, FALSE),
         p_event.created_at
-      );
+      )
+      ON CONFLICT (id) DO NOTHING;
 
     -- ========================================
     -- Role Events
@@ -39,27 +40,26 @@ BEGIN
         name,
         description,
         organization_id,
-        zitadel_org_id,
         org_hierarchy_scope,
         created_at
       ) VALUES (
         p_event.stream_id,
         safe_jsonb_extract_text(p_event.event_data, 'name'),
         safe_jsonb_extract_text(p_event.event_data, 'description'),
-        -- Resolve Zitadel org ID to internal UUID (NULL for super_admin)
+        -- organization_id comes directly from event_data (NULL for super_admin)
         CASE
-          WHEN safe_jsonb_extract_text(p_event.event_data, 'zitadel_org_id') IS NOT NULL
-          THEN get_internal_org_id(safe_jsonb_extract_text(p_event.event_data, 'zitadel_org_id'))
+          WHEN p_event.event_data->>'organization_id' IS NOT NULL
+          THEN (p_event.event_data->>'organization_id')::UUID
           ELSE NULL
         END,
-        safe_jsonb_extract_text(p_event.event_data, 'zitadel_org_id'),
         CASE
           WHEN p_event.event_data->>'org_hierarchy_scope' IS NOT NULL
           THEN (p_event.event_data->>'org_hierarchy_scope')::LTREE
           ELSE NULL
         END,
         p_event.created_at
-      );
+      )
+      ON CONFLICT (id) DO NOTHING;
 
     WHEN 'role.updated' THEN
       UPDATE roles_projection
@@ -171,7 +171,8 @@ BEGIN
         safe_jsonb_extract_text(p_event.event_data, 'authorization_type'),
         safe_jsonb_extract_text(p_event.event_data, 'legal_reference'),
         COALESCE(p_event.event_data->'metadata', '{}'::JSONB)
-      );
+      )
+      ON CONFLICT (id) DO NOTHING;
 
     WHEN 'access_grant.revoked' THEN
       UPDATE cross_tenant_access_grants_projection

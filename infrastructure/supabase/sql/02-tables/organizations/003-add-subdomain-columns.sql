@@ -10,12 +10,12 @@ ALTER TABLE organizations_projection
 
 -- Index for querying organizations by provisioning status
 -- Partial index excludes verified orgs (most common case) for efficiency
-CREATE INDEX idx_organizations_subdomain_status
+CREATE INDEX IF NOT EXISTS idx_organizations_subdomain_status
   ON organizations_projection(subdomain_status)
   WHERE subdomain_status != 'verified';
 
 -- Index for finding failed provisioning attempts that need attention
-CREATE INDEX idx_organizations_subdomain_failed
+CREATE INDEX IF NOT EXISTS idx_organizations_subdomain_failed
   ON organizations_projection(subdomain_status, updated_at)
   WHERE subdomain_status = 'failed';
 

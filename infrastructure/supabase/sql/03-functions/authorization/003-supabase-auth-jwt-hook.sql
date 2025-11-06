@@ -252,8 +252,22 @@ COMMENT ON FUNCTION public.get_user_claims_preview IS
 -- Grant Permissions
 -- ============================================================================
 
--- Grant execute on JWT hook to authenticated users
-GRANT EXECUTE ON FUNCTION auth.custom_access_token_hook TO authenticated;
+-- Grant execute on JWT hook to authenticated users (Supabase Cloud only)
+-- The auth.custom_access_token_hook function only exists in Supabase Cloud
+-- Local Supabase (self-hosted) does not include this auth hook infrastructure
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'auth' AND p.proname = 'custom_access_token_hook'
+  ) THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION auth.custom_access_token_hook TO authenticated';
+    RAISE NOTICE 'Granted execute permission on auth.custom_access_token_hook (Supabase Cloud detected)';
+  ELSE
+    RAISE NOTICE 'Skipping auth.custom_access_token_hook grant (not available in local Supabase)';
+  END IF;
+END $$;
 
 -- Grant execute on helper functions
 GRANT EXECUTE ON FUNCTION public.switch_organization TO authenticated;
