@@ -19,6 +19,7 @@ env:
 
 jobs:
   build:
+    name: Build and Push Frontend Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -115,6 +116,7 @@ jobs:
         cache-to: type=gha,mode=max
 
   deploy:
+    name: Deploy Frontend to Kubernetes
     needs: build
     runs-on: ubuntu-latest
     environment: production

@@ -1,4 +1,4 @@
-name: Deploy Workflows
+name: Deploy Temporal Workers
 
 # This workflow builds the Temporal worker Docker image and deploys it to the k3s cluster.
 # Prerequisites:
@@ -11,13 +11,13 @@ on:
       - main
     paths:
       - 'workflows/**'
-      - '.github/workflows/workflows-deploy.yml'
+      - '.github/workflows/temporal-deploy.yml'
     tags:
       - 'v*'
   pull_request:
     paths:
       - 'workflows/**'
-      - '.github/workflows/workflows-deploy.yml'
+      - '.github/workflows/temporal-deploy.yml'
   workflow_dispatch:
 
 env:
@@ -82,7 +82,7 @@ jobs:
         run: echo ${{ steps.build.outputs.digest }}
 
   deploy:
-    name: Deploy to Temporal Namespace
+    name: Deploy Workers to Kubernetes
     needs: build-and-push
     # Only deploy on push to main (not PRs or tags)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

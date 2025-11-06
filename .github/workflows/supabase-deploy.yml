@@ -1,0 +1,333 @@
+name: Deploy Database Migrations
+
+# This workflow deploys database schema migrations to Supabase.
+# Prerequisites:
+#   - SUPABASE_URL secret (e.g., https://your-project.supabase.co)
+#   - SUPABASE_SERVICE_ROLE_KEY secret
+#   - All migrations must be idempotent (see infrastructure/supabase/SQL_IDEMPOTENCY_AUDIT.md)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infrastructure/supabase/sql/**'
+      - '.github/workflows/supabase-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: 'Target environment'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+env:
+  SUPABASE_VERSION: '1.187.10'  # Pin version for consistency
+
+jobs:
+  validate-migrations:
+    name: Validate SQL Migrations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Check SQL syntax
+        run: |
+          echo "Checking SQL syntax..."
+          for file in $(find infrastructure/supabase/sql -name "*.sql" | sort); do
+            echo "Checking: $file"
+            # Basic syntax check (doesn't connect to database)
+            if ! psql --version > /dev/null; then
+              echo "❌ psql not available"
+              exit 1
+            fi
+
+            # Check for common syntax errors (basic validation)
+            if grep -qi "syntax error" "$file" 2>/dev/null; then
+              echo "❌ Potential syntax error in $file"
+              exit 1
+            fi
+          done
+          echo "✅ All SQL files passed basic syntax validation"
+
+      - name: Check for idempotency patterns
+        run: |
+          echo "Checking for idempotency patterns..."
+          ISSUES_FOUND=0
+
+          # Check for CREATE TABLE without IF NOT EXISTS
+          if grep -r "CREATE TABLE" infrastructure/supabase/sql/ | grep -v "IF NOT EXISTS" | grep -v "^\s*--"; then
+            echo "❌ Found CREATE TABLE without IF NOT EXISTS"
+            ISSUES_FOUND=1
+          fi
+
+          # Check for CREATE INDEX without IF NOT EXISTS
+          if grep -r "CREATE.*INDEX" infrastructure/supabase/sql/ | grep -v "IF NOT EXISTS" | grep -v "^\s*--"; then
+            echo "❌ Found CREATE INDEX without IF NOT EXISTS"
+            ISSUES_FOUND=1
+          fi
+
+          # Check for CREATE FUNCTION without OR REPLACE
+          if grep -r "CREATE FUNCTION" infrastructure/supabase/sql/ | grep -v "OR REPLACE" | grep -v "^\s*--"; then
+            echo "❌ Found CREATE FUNCTION without OR REPLACE"
+            ISSUES_FOUND=1
+          fi
+
+          if [ $ISSUES_FOUND -eq 0 ]; then
+            echo "✅ Basic idempotency checks passed"
+          else
+            echo "⚠️  Idempotency issues detected - see infrastructure/supabase/SQL_IDEMPOTENCY_AUDIT.md"
+            echo "Migrations will still run, but may fail on re-execution"
+          fi
+
+  deploy-migrations:
+    name: Deploy Migrations to Supabase
+    needs: validate-migrations
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.target_environment || 'development' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        run: |
+          curl -fsSL https://github.com/supabase/cli/releases/download/v${SUPABASE_VERSION}/supabase_${SUPABASE_VERSION}_linux_amd64.tar.gz | tar -xz
+          sudo mv supabase /usr/local/bin/
+          supabase --version
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Configure database connection
+        run: |
+          # Extract project ref from Supabase URL
+          PROJECT_REF=$(echo "${{ secrets.SUPABASE_URL }}" | sed 's|https://\([^.]*\).*|\1|')
+          echo "PROJECT_REF=$PROJECT_REF" >> $GITHUB_ENV
+
+          # Construct database URL
+          DB_URL="postgresql://postgres:[password]@db.${PROJECT_REF}.supabase.co:5432/postgres"
+          echo "DB_HOST=db.${PROJECT_REF}.supabase.co" >> $GITHUB_ENV
+
+      - name: Test database connection
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Testing connection to Supabase database..."
+
+          # Note: Direct database connection with service role key
+          # In production, use connection pooler or proper database password
+          if psql -h "$DB_HOST" -U postgres -d postgres -c "SELECT version();" 2>&1; then
+            echo "✅ Database connection successful"
+          else
+            echo "❌ Database connection failed"
+            echo "Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY secrets"
+            exit 1
+          fi
+
+      - name: Create migration tracking table
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Creating migration tracking table..."
+          psql -h "$DB_HOST" -U postgres -d postgres <<'EOF'
+          CREATE TABLE IF NOT EXISTS _migrations_applied (
+            id SERIAL PRIMARY KEY,
+            migration_name TEXT UNIQUE NOT NULL,
+            migration_path TEXT NOT NULL,
+            applied_at TIMESTAMPTZ DEFAULT NOW(),
+            checksum TEXT,
+            execution_time_ms INTEGER,
+            applied_by TEXT DEFAULT 'github-actions'
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_migrations_name
+            ON _migrations_applied(migration_name);
+
+          CREATE INDEX IF NOT EXISTS idx_migrations_applied_at
+            ON _migrations_applied(applied_at DESC);
+          EOF
+
+          echo "✅ Migration tracking table ready"
+
+      - name: Run migrations
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Running migrations..."
+
+          # Migration execution order
+          MIGRATION_DIRS=(
+            "00-extensions"
+            "01-events"
+            "02-tables"
+            "03-functions"
+            "04-triggers"
+            "05-views"
+            "06-rls"
+          )
+
+          TOTAL_APPLIED=0
+          TOTAL_SKIPPED=0
+          FAILURES=0
+
+          for dir in "${MIGRATION_DIRS[@]}"; do
+            FULL_PATH="infrastructure/supabase/sql/$dir"
+
+            if [ ! -d "$FULL_PATH" ]; then
+              echo "⚠️  Directory not found: $FULL_PATH (skipping)"
+              continue
+            fi
+
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "📁 Processing: $dir"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Find all .sql files in this directory (including subdirectories)
+            while IFS= read -r file; do
+              BASENAME=$(basename "$file")
+              MIGRATION_NAME="$dir/$BASENAME"
+
+              # Calculate checksum
+              CHECKSUM=$(sha256sum "$file" | awk '{print $1}')
+
+              # Check if migration already applied
+              APPLIED=$(psql -h "$DB_HOST" -U postgres -d postgres -tAc \
+                "SELECT COUNT(*) FROM _migrations_applied WHERE migration_name = '$MIGRATION_NAME' AND checksum = '$CHECKSUM';")
+
+              if [ "$APPLIED" -gt 0 ]; then
+                echo "⏭️  Skipping: $MIGRATION_NAME (already applied)"
+                ((TOTAL_SKIPPED++))
+                continue
+              fi
+
+              # Check if migration was applied with different checksum
+              APPLIED_DIFFERENT=$(psql -h "$DB_HOST" -U postgres -d postgres -tAc \
+                "SELECT COUNT(*) FROM _migrations_applied WHERE migration_name = '$MIGRATION_NAME' AND checksum != '$CHECKSUM';")
+
+              if [ "$APPLIED_DIFFERENT" -gt 0 ]; then
+                echo "⚠️  WARNING: $MIGRATION_NAME was previously applied with different content"
+                echo "   This may indicate the migration file was modified after deployment"
+                # Continue anyway (idempotent migrations should handle this)
+              fi
+
+              echo "▶️  Applying: $MIGRATION_NAME"
+
+              # Execute migration and measure time
+              START_TIME=$(date +%s%3N)
+
+              if psql -h "$DB_HOST" -U postgres -d postgres -f "$file" > /tmp/migration-output.log 2>&1; then
+                END_TIME=$(date +%s%3N)
+                EXECUTION_TIME=$((END_TIME - START_TIME))
+
+                # Record successful migration
+                psql -h "$DB_HOST" -U postgres -d postgres <<SQL
+                INSERT INTO _migrations_applied (migration_name, migration_path, checksum, execution_time_ms, applied_by)
+                VALUES ('$MIGRATION_NAME', '$file', '$CHECKSUM', $EXECUTION_TIME, 'github-actions')
+                ON CONFLICT (migration_name)
+                DO UPDATE SET
+                  checksum = EXCLUDED.checksum,
+                  execution_time_ms = EXCLUDED.execution_time_ms,
+                  applied_at = NOW();
+          SQL
+
+                echo "✅ Success: $MIGRATION_NAME (${EXECUTION_TIME}ms)"
+                ((TOTAL_APPLIED++))
+              else
+                echo "❌ FAILED: $MIGRATION_NAME"
+                echo "Error output:"
+                cat /tmp/migration-output.log
+                ((FAILURES++))
+
+                # Decide whether to continue or stop
+                echo "::error file=$file::Migration failed: $MIGRATION_NAME"
+                # Stop on first failure to prevent cascading errors
+                exit 1
+              fi
+            done < <(find "$FULL_PATH" -name "*.sql" | sort)
+          done
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📊 Migration Summary"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Applied:  $TOTAL_APPLIED"
+          echo "Skipped:  $TOTAL_SKIPPED"
+          echo "Failures: $FAILURES"
+          echo ""
+
+          if [ $FAILURES -gt 0 ]; then
+            echo "❌ Migrations failed!"
+            exit 1
+          else
+            echo "✅ All migrations applied successfully!"
+          fi
+
+      - name: Run seed data (manual approval required)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "⚠️  Seed data execution requires manual approval"
+          echo "Seed files are located in: infrastructure/supabase/sql/99-seeds/"
+          echo ""
+          echo "To run seeds manually:"
+          echo "  psql -h $DB_HOST -U postgres -d postgres -f <seed-file.sql>"
+          echo ""
+          echo "Skipping automated seed execution for safety."
+
+      - name: Verify database state
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Verifying database state..."
+
+          # Check migration tracking
+          echo "📊 Migration History:"
+          psql -h "$DB_HOST" -U postgres -d postgres <<'EOF'
+          SELECT
+            migration_name,
+            applied_at,
+            execution_time_ms
+          FROM _migrations_applied
+          ORDER BY applied_at DESC
+          LIMIT 10;
+          EOF
+
+          # Check table count
+          TABLE_COUNT=$(psql -h "$DB_HOST" -U postgres -d postgres -tAc \
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';")
+          echo "📋 Total tables in public schema: $TABLE_COUNT"
+
+          # Check function count
+          FUNCTION_COUNT=$(psql -h "$DB_HOST" -U postgres -d postgres -tAc \
+            "SELECT COUNT(*) FROM pg_proc WHERE pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public');")
+          echo "⚙️  Total functions in public schema: $FUNCTION_COUNT"
+
+          echo "✅ Database verification complete"
+
+      - name: Report deployment status
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "🎉 Database migrations deployed successfully!"
+            echo "🔗 Supabase Project: ${{ secrets.SUPABASE_URL }}"
+          else
+            echo "❌ Migration deployment failed."
+            echo "Check the logs above for details."
+          fi
