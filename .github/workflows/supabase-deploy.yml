@@ -115,10 +115,11 @@ jobs:
           PROJECT_REF=$(echo "${{ secrets.SUPABASE_URL }}" | sed 's|https://\([^.]*\).*|\1|')
           echo "PROJECT_REF=$PROJECT_REF" >> $GITHUB_ENV
 
-          # Use Session Pooler for GitHub Actions (IPv4 compatible)
+          # Use Transaction Mode Pooler for GitHub Actions (IPv4 compatible, port 6543)
+          # Transaction mode is recommended for CI/CD scenarios with transient connections
           DB_USER="postgres.${PROJECT_REF}"
           DB_HOST="aws-1-us-west-1.pooler.supabase.com"
-          DB_PORT="5432"
+          DB_PORT="6543"
 
           echo "DB_USER=$DB_USER" >> $GITHUB_ENV
           echo "DB_HOST=$DB_HOST" >> $GITHUB_ENV
