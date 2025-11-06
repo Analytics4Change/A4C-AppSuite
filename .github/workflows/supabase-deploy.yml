@@ -25,9 +25,6 @@ on:
           - staging
           - production
 
-env:
-  SUPABASE_VERSION: '1.187.10'  # Pin version for consistency
-
 jobs:
   validate-migrations:
     name: Validate SQL Migrations
@@ -102,11 +99,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Supabase CLI
-        run: |
-          curl -fsSL https://github.com/supabase/cli/releases/download/v${SUPABASE_VERSION}/supabase_${SUPABASE_VERSION}_linux_amd64.tar.gz | tar -xz
-          sudo mv supabase /usr/local/bin/
-          supabase --version
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
       - name: Install PostgreSQL client
         run: |
