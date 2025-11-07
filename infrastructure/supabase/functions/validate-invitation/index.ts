@@ -51,10 +51,10 @@ serve(async (req) => {
     }
 
     // Query invitation from database
-    // Note: This assumes you have an invitations table
+    // Table: invitations_projection (CQRS read model)
     // Schema: id, token, email, organization_id, expires_at, accepted_at, created_at
     const { data: invitation, error: invitationError } = await supabase
-      .from('invitations')
+      .from('invitations_projection')
       .select('*, organizations_projection!inner(name)')
       .eq('token', token)
       .single();

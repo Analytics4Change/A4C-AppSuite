@@ -254,7 +254,6 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
      "slug": "a4c",
      "org_type": "platform_owner",
      "parent_org_id": null,
-     "zitadel_org_id": "339658157368404786",
      "settings": {
        "is_active": true,
        "is_internal": true,
@@ -262,7 +261,7 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
      }
    }'::jsonb,
    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating A4C platform organization"}'::jsonb)
-ON CONFLICT (stream_id) DO NOTHING;
+ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
 
 -- Super Admin Role (global scope, NULL org_id for platform-wide access)
 -- Fixed UUID for idempotency
@@ -273,7 +272,7 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
      "description": "Platform administrator who manages tenant onboarding and A4C internal roles"
    }'::jsonb,
    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating super_admin role for A4C platform staff"}'::jsonb)
-ON CONFLICT (stream_id) DO NOTHING;
+ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
 
 -- Provider Admin Role Template (bootstrap only, actual roles created per organization)
 -- Fixed UUID for idempotency
@@ -282,11 +281,10 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
    '{
      "name": "provider_admin",
      "description": "Organization administrator who manages their own provider organization (permissions granted during org provisioning)",
-     "zitadel_org_id": null,
      "org_hierarchy_scope": null
    }'::jsonb,
    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating provider_admin role template"}'::jsonb)
-ON CONFLICT (stream_id) DO NOTHING;
+ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
 
 -- Partner Admin Role Template (bootstrap only, actual roles created per organization)
 -- Fixed UUID for idempotency
@@ -295,11 +293,10 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
    '{
      "name": "partner_admin",
      "description": "Provider partner administrator who manages cross-tenant access (permissions granted during org provisioning)",
-     "zitadel_org_id": null,
      "org_hierarchy_scope": null
    }'::jsonb,
    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Bootstrap: Creating partner_admin role template"}'::jsonb)
-ON CONFLICT (stream_id) DO NOTHING;
+ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
 
 
 -- ========================================

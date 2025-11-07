@@ -71,17 +71,18 @@ INSERT INTO event_types (event_type, stream_type, description, event_schema, pro
   ARRAY['medication_history']),
 
 -- User events
-('user.synced_from_zitadel', 'user', 'User synchronized from Zitadel',
-  '{"type": "object", "required": ["zitadel_user_id", "email", "roles"]}',
+('user.synced_from_auth', 'user', 'User synchronized from Supabase Auth',
+  '{"type": "object", "required": ["auth_user_id", "email"]}',
   ARRAY['users']),
 
 ('user.organization_switched', 'user', 'User switched organization context',
   '{"type": "object", "required": ["user_id", "from_organization_id", "to_organization_id"]}',
-  ARRAY['users', 'audit_log']);
+  ARRAY['users', 'audit_log'])
+ON CONFLICT (event_type) DO NOTHING;
 
 -- Index for lookups
-CREATE INDEX idx_event_types_stream ON event_types(stream_type);
-CREATE INDEX idx_event_types_active ON event_types(is_active) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_event_types_stream ON event_types(stream_type);
+CREATE INDEX IF NOT EXISTS idx_event_types_active ON event_types(is_active) WHERE is_active = true;
 
 -- Comment
 COMMENT ON TABLE event_types IS 'Catalog of all valid event types with schemas and processing rules';

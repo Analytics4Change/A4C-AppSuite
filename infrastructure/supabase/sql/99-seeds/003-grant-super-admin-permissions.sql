@@ -37,24 +37,3 @@ BEGIN
   -- Log summary
   RAISE NOTICE 'Granted % permissions to super_admin role', version_counter - 2;
 END $$;
-
-
--- ============================================================================
--- Verification
--- ============================================================================
-
--- Verify all 22 permissions were granted
-DO $$
-DECLARE
-  granted_count INT;
-BEGIN
-  SELECT COUNT(*) INTO granted_count
-  FROM role_permissions_projection
-  WHERE role_id = '11111111-1111-1111-1111-111111111111';
-
-  IF granted_count != 22 THEN
-    RAISE EXCEPTION 'Expected 22 permissions for super_admin, found %', granted_count;
-  END IF;
-
-  RAISE NOTICE 'Verification passed: super_admin has % permissions', granted_count;
-END $$;

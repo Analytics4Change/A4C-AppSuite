@@ -13,7 +13,6 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
      "slug": "a4c",
      "org_type": "platform_owner",
      "parent_org_id": null,
-     "zitadel_org_id": "339658157368404786",
      "settings": {
        "is_active": true,
        "is_internal": true,
@@ -23,7 +22,8 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
    '{
      "user_id": "00000000-0000-0000-0000-000000000000",
      "reason": "Bootstrap: Creating A4C platform organization"
-   }'::jsonb);
+   }'::jsonb)
+ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
 
 -- Create organization projection manually (no organization event processor yet in minimal bootstrap)
 INSERT INTO organizations_projection (
@@ -46,19 +46,6 @@ INSERT INTO organizations_projection (
   NOW()
 );
 
--- Create Zitadel organization mapping
-INSERT INTO zitadel_organization_mapping (
-  internal_org_id,
-  zitadel_org_id,
-  org_name,
-  created_at
-) VALUES (
-  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-  '339658157368404786',
-  'Analytics4Change',
-  NOW()
-);
-
 
 -- ============================================================================
 -- Core Role Templates
@@ -74,7 +61,8 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
    '{
      "user_id": "00000000-0000-0000-0000-000000000000",
      "reason": "Bootstrap: Creating super_admin role for A4C platform staff"
-   }'::jsonb);
+   }'::jsonb)
+ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
 
 -- Provider Admin Role Template (permissions granted per organization during provisioning)
 INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
@@ -86,7 +74,8 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
    '{
      "user_id": "00000000-0000-0000-0000-000000000000",
      "reason": "Bootstrap: Creating provider_admin role template"
-   }'::jsonb);
+   }'::jsonb)
+ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
 
 -- Partner Admin Role Template (permissions granted per organization during provisioning)
 INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
@@ -98,7 +87,8 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
    '{
      "user_id": "00000000-0000-0000-0000-000000000000",
      "reason": "Bootstrap: Creating partner_admin role template"
-   }'::jsonb);
+   }'::jsonb)
+ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
 
 
 -- ============================================================================

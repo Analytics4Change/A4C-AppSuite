@@ -6,12 +6,14 @@
 -- ============================================================================
 
 -- Super admins can view all organizations
+DROP POLICY IF EXISTS organizations_super_admin_all ON organizations_projection;
 CREATE POLICY organizations_super_admin_all
   ON organizations_projection
   FOR ALL
   USING (is_super_admin(get_current_user_id()));
 
 -- Provider/Partner admins can view their own organization
+DROP POLICY IF EXISTS organizations_org_admin_select ON organizations_projection;
 CREATE POLICY organizations_org_admin_select
   ON organizations_projection
   FOR SELECT
@@ -28,12 +30,14 @@ COMMENT ON POLICY organizations_org_admin_select ON organizations_projection IS
 -- ============================================================================
 
 -- Super admins can view all business profiles
+DROP POLICY IF EXISTS business_profiles_super_admin_all ON organization_business_profiles_projection;
 CREATE POLICY business_profiles_super_admin_all
   ON organization_business_profiles_projection
   FOR ALL
   USING (is_super_admin(get_current_user_id()));
 
 -- Provider/Partner admins can view their own organization's profile
+DROP POLICY IF EXISTS business_profiles_org_admin_select ON organization_business_profiles_projection;
 CREATE POLICY business_profiles_org_admin_select
   ON organization_business_profiles_projection
   FOR SELECT
@@ -50,12 +54,14 @@ COMMENT ON POLICY business_profiles_org_admin_select ON organization_business_pr
 -- ============================================================================
 
 -- Super admins can view all users
+DROP POLICY IF EXISTS users_super_admin_all ON users;
 CREATE POLICY users_super_admin_all
   ON users
   FOR ALL
   USING (is_super_admin(get_current_user_id()));
 
 -- Organization admins can view users in their organization
+DROP POLICY IF EXISTS users_org_admin_select ON users;
 CREATE POLICY users_org_admin_select
   ON users
   FOR SELECT
@@ -69,6 +75,7 @@ CREATE POLICY users_org_admin_select
   );
 
 -- Users can view their own profile
+DROP POLICY IF EXISTS users_own_profile_select ON users;
 CREATE POLICY users_own_profile_select
   ON users
   FOR SELECT
@@ -87,12 +94,14 @@ COMMENT ON POLICY users_own_profile_select ON users IS
 -- ============================================================================
 
 -- Super admins can view all permissions
+DROP POLICY IF EXISTS permissions_super_admin_all ON permissions_projection;
 CREATE POLICY permissions_super_admin_all
   ON permissions_projection
   FOR ALL
   USING (is_super_admin(get_current_user_id()));
 
 -- All authenticated users can view available permissions (read-only reference data)
+DROP POLICY IF EXISTS permissions_authenticated_select ON permissions_projection;
 CREATE POLICY permissions_authenticated_select
   ON permissions_projection
   FOR SELECT
@@ -109,12 +118,14 @@ COMMENT ON POLICY permissions_authenticated_select ON permissions_projection IS
 -- ============================================================================
 
 -- Super admins can view all roles
+DROP POLICY IF EXISTS roles_super_admin_all ON roles_projection;
 CREATE POLICY roles_super_admin_all
   ON roles_projection
   FOR ALL
   USING (is_super_admin(get_current_user_id()));
 
 -- Organization admins can view roles in their organization
+DROP POLICY IF EXISTS roles_org_admin_select ON roles_projection;
 CREATE POLICY roles_org_admin_select
   ON roles_projection
   FOR SELECT
@@ -124,6 +135,7 @@ CREATE POLICY roles_org_admin_select
   );
 
 -- All authenticated users can view global roles (templates like provider_admin, partner_admin)
+DROP POLICY IF EXISTS roles_global_select ON roles_projection;
 CREATE POLICY roles_global_select
   ON roles_projection
   FOR SELECT
@@ -145,12 +157,14 @@ COMMENT ON POLICY roles_global_select ON roles_projection IS
 -- ============================================================================
 
 -- Super admins can view all role permissions
+DROP POLICY IF EXISTS role_permissions_super_admin_all ON role_permissions_projection;
 CREATE POLICY role_permissions_super_admin_all
   ON role_permissions_projection
   FOR ALL
   USING (is_super_admin(get_current_user_id()));
 
 -- Organization admins can view permissions for roles in their organization
+DROP POLICY IF EXISTS role_permissions_org_admin_select ON role_permissions_projection;
 CREATE POLICY role_permissions_org_admin_select
   ON role_permissions_projection
   FOR SELECT
@@ -165,6 +179,7 @@ CREATE POLICY role_permissions_org_admin_select
   );
 
 -- All authenticated users can view permissions for global roles
+DROP POLICY IF EXISTS role_permissions_global_select ON role_permissions_projection;
 CREATE POLICY role_permissions_global_select
   ON role_permissions_projection
   FOR SELECT
@@ -191,12 +206,14 @@ COMMENT ON POLICY role_permissions_global_select ON role_permissions_projection 
 -- ============================================================================
 
 -- Super admins can view all user-role assignments
+DROP POLICY IF EXISTS user_roles_super_admin_all ON user_roles_projection;
 CREATE POLICY user_roles_super_admin_all
   ON user_roles_projection
   FOR ALL
   USING (is_super_admin(get_current_user_id()));
 
 -- Organization admins can view user-role assignments in their organization
+DROP POLICY IF EXISTS user_roles_org_admin_select ON user_roles_projection;
 CREATE POLICY user_roles_org_admin_select
   ON user_roles_projection
   FOR SELECT
@@ -206,6 +223,7 @@ CREATE POLICY user_roles_org_admin_select
   );
 
 -- Users can view their own role assignments
+DROP POLICY IF EXISTS user_roles_own_select ON user_roles_projection;
 CREATE POLICY user_roles_own_select
   ON user_roles_projection
   FOR SELECT
@@ -224,12 +242,14 @@ COMMENT ON POLICY user_roles_own_select ON user_roles_projection IS
 -- ============================================================================
 
 -- Super admins can view all user mappings
+DROP POLICY IF EXISTS zitadel_user_mapping_super_admin_all ON zitadel_user_mapping;
 CREATE POLICY zitadel_user_mapping_super_admin_all
   ON zitadel_user_mapping
   FOR ALL
   USING (is_super_admin(get_current_user_id()));
 
 -- Users can view their own Zitadel mapping
+DROP POLICY IF EXISTS zitadel_user_mapping_own_select ON zitadel_user_mapping;
 CREATE POLICY zitadel_user_mapping_own_select
   ON zitadel_user_mapping
   FOR SELECT
@@ -246,12 +266,14 @@ COMMENT ON POLICY zitadel_user_mapping_own_select ON zitadel_user_mapping IS
 -- ============================================================================
 
 -- Super admins can view all organization mappings
+DROP POLICY IF EXISTS zitadel_org_mapping_super_admin_all ON zitadel_organization_mapping;
 CREATE POLICY zitadel_org_mapping_super_admin_all
   ON zitadel_organization_mapping
   FOR ALL
   USING (is_super_admin(get_current_user_id()));
 
 -- Organization admins can view their own organization's Zitadel mapping
+DROP POLICY IF EXISTS zitadel_org_mapping_org_admin_select ON zitadel_organization_mapping;
 CREATE POLICY zitadel_org_mapping_org_admin_select
   ON zitadel_organization_mapping
   FOR SELECT
@@ -268,6 +290,7 @@ COMMENT ON POLICY zitadel_org_mapping_org_admin_select ON zitadel_organization_m
 -- ============================================================================
 
 -- Super admins can view all domain events (audit trail)
+DROP POLICY IF EXISTS domain_events_super_admin_all ON domain_events;
 CREATE POLICY domain_events_super_admin_all
   ON domain_events
   FOR ALL
@@ -286,12 +309,14 @@ COMMENT ON POLICY domain_events_super_admin_all ON domain_events IS
 -- ============================================================================
 
 -- Super admins can manage event type definitions
+DROP POLICY IF EXISTS event_types_super_admin_all ON event_types;
 CREATE POLICY event_types_super_admin_all
   ON event_types
   FOR ALL
   USING (is_super_admin(get_current_user_id()));
 
 -- All authenticated users can view event type definitions (reference data)
+DROP POLICY IF EXISTS event_types_authenticated_select ON event_types;
 CREATE POLICY event_types_authenticated_select
   ON event_types
   FOR SELECT

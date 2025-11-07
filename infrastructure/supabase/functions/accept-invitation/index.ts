@@ -64,9 +64,9 @@ serve(async (req) => {
       );
     }
 
-    // Query invitation
+    // Query invitation from invitations_projection (CQRS read model)
     const { data: invitation, error: invitationError } = await supabase
-      .from('invitations')
+      .from('invitations_projection')
       .select('*')
       .eq('token', requestData.token)
       .single();
@@ -149,9 +149,9 @@ serve(async (req) => {
       );
     }
 
-    // Mark invitation as accepted
+    // Mark invitation as accepted in invitations_projection
     const { error: updateError } = await supabase
-      .from('invitations')
+      .from('invitations_projection')
       .update({ accepted_at: new Date().toISOString() })
       .eq('id', invitation.id);
 

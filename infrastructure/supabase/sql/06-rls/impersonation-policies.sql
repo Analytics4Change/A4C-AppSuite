@@ -2,6 +2,7 @@
 -- These policies must run AFTER RBAC tables (roles_projection, user_roles_projection) are created
 
 -- Policy: Super admins can view all sessions
+DROP POLICY IF EXISTS impersonation_sessions_super_admin_select ON impersonation_sessions_projection;
 CREATE POLICY impersonation_sessions_super_admin_select
   ON impersonation_sessions_projection
   FOR SELECT
@@ -16,6 +17,7 @@ CREATE POLICY impersonation_sessions_super_admin_select
   );
 
 -- Policy: Provider admins can view sessions affecting their organization
+DROP POLICY IF EXISTS impersonation_sessions_provider_admin_select ON impersonation_sessions_projection;
 CREATE POLICY impersonation_sessions_provider_admin_select
   ON impersonation_sessions_projection
   FOR SELECT
@@ -31,6 +33,7 @@ CREATE POLICY impersonation_sessions_provider_admin_select
   );
 
 -- Policy: Users can view their own impersonation sessions (as either super admin or target)
+DROP POLICY IF EXISTS impersonation_sessions_own_sessions_select ON impersonation_sessions_projection;
 CREATE POLICY impersonation_sessions_own_sessions_select
   ON impersonation_sessions_projection
   FOR SELECT
