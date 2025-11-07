@@ -175,6 +175,7 @@ export interface SendInvitationEmailsParams {
   orgId: string;
   invitations: Invitation[];
   domain: string;
+  frontendUrl: string;
 }
 
 /**

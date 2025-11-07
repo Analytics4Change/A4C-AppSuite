@@ -34,15 +34,15 @@ import { emitEvent, buildTags } from '@shared/utils/emit-event';
  * Build invitation email HTML
  * @param invitation - Invitation details
  * @param orgName - Organization name
- * @param domain - Organization domain
+ * @param frontendUrl - Frontend URL for invitation acceptance
  * @returns HTML email content
  */
 function buildInvitationEmailHTML(
   invitation: Invitation,
   orgName: string,
-  domain: string
+  frontendUrl: string
 ): string {
-  const invitationUrl = `https://${domain}/accept-invitation?token=${invitation.token}`;
+  const invitationUrl = `${frontendUrl}/accept-invitation?token=${invitation.token}`;
   const expiresDate = invitation.expiresAt.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -103,15 +103,15 @@ function buildInvitationEmailHTML(
  * Build invitation email plain text
  * @param invitation - Invitation details
  * @param orgName - Organization name
- * @param domain - Organization domain
+ * @param frontendUrl - Frontend URL for invitation acceptance
  * @returns Plain text email content
  */
 function buildInvitationEmailText(
   invitation: Invitation,
   orgName: string,
-  domain: string
+  frontendUrl: string
 ): string {
-  const invitationUrl = `https://${domain}/accept-invitation?token=${invitation.token}`;
+  const invitationUrl = `${frontendUrl}/accept-invitation?token=${invitation.token}`;
   const expiresDate = invitation.expiresAt.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -169,8 +169,8 @@ export async function sendInvitationEmails(
     try {
       console.log(`[SendInvitationEmails] Sending email to: ${invitation.email}`);
 
-      const html = buildInvitationEmailHTML(invitation, orgName, params.domain);
-      const text = buildInvitationEmailText(invitation, orgName, params.domain);
+      const html = buildInvitationEmailHTML(invitation, orgName, params.frontendUrl);
+      const text = buildInvitationEmailText(invitation, orgName, params.frontendUrl);
 
       await emailProvider.sendEmail({
         from: `Analytics4Change <noreply@${params.domain}>`,

@@ -196,7 +196,8 @@ export async function organizationBootstrapWorkflow(
     const emailResult = await sendInvitationEmails({
       orgId: state.orgId!,
       invitations: state.invitations,
-      domain: state.domain!
+      domain: state.domain!,
+      frontendUrl: process.env.FRONTEND_URL || 'https://a4c.firstovertheline.com'
     });
 
     state.invitationsSent = true;
