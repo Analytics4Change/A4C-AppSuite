@@ -1,0 +1,207 @@
+{
+    "version": "1.0",
+    "description": "Skill activation triggers for A4C-AppSuite monorepo. Controls when skills automatically suggest based on file context and user prompts.",
+    "skills": {
+        "frontend-dev-guidelines": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "high",
+            "description": "React 19 + TypeScript best practices with Radix UI, Tailwind CSS, MobX, and WCAG 2.1 Level AA accessibility",
+            "promptTriggers": {
+                "keywords": [
+                    "component",
+                    "react component",
+                    "ui component",
+                    "interface",
+                    "page",
+                    "modal",
+                    "dialog",
+                    "form",
+                    "button",
+                    "input",
+                    "radix",
+                    "radix ui",
+                    "tailwind",
+                    "styling",
+                    "css",
+                    "mobx",
+                    "observable",
+                    "store",
+                    "state management",
+                    "accessibility",
+                    "wcag",
+                    "aria",
+                    "keyboard navigation",
+                    "screen reader",
+                    "frontend",
+                    "react",
+                    "vite"
+                ],
+                "intentPatterns": [
+                    "(create|add|make|build|implement).*?(component|UI|page|modal|dialog|form)",
+                    "(update|modify|edit|refactor).*?(component|UI|page)",
+                    "(style|design|layout).*?(component|UI)",
+                    "(test|accessibility|a11y).*?(component|UI)",
+                    "(how to|best practice).*?(component|react|radix|tailwind|mobx)"
+                ]
+            },
+            "fileTriggers": {
+                "pathPatterns": [
+                    "frontend/src/**/*.tsx",
+                    "frontend/src/**/*.ts"
+                ],
+                "pathExclusions": [
+                    "**/*.test.tsx",
+                    "**/*.test.ts",
+                    "**/*.spec.tsx",
+                    "**/*.spec.ts",
+                    "**/vite.config.ts",
+                    "**/tsconfig.json"
+                ],
+                "contentPatterns": [
+                    "from 'react'",
+                    "from \"react\"",
+                    "from '@radix-ui",
+                    "from \"@radix-ui",
+                    "makeAutoObservable",
+                    "observable",
+                    "tailwind",
+                    "className="
+                ]
+            }
+        },
+        "temporal-workflow-guidelines": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "high",
+            "description": "Temporal.io workflow orchestration with Workflow-First architecture, Saga compensation, and event-driven patterns",
+            "promptTriggers": {
+                "keywords": [
+                    "workflow",
+                    "activity",
+                    "temporal",
+                    "orchestration",
+                    "saga",
+                    "compensation",
+                    "determinism",
+                    "deterministic",
+                    "event",
+                    "domain event",
+                    "emit event",
+                    "side effect",
+                    "proxyActivities",
+                    "worker",
+                    "task queue"
+                ],
+                "intentPatterns": [
+                    "(create|add|implement|build).*?(workflow|activity)",
+                    "(update|modify|edit|refactor).*?(workflow|activity)",
+                    "(fix|debug|handle).*?(workflow|temporal|activity)",
+                    "(emit|create|handle).*?(event|domain event)",
+                    "(how to|best practice).*?(workflow|activity|temporal|saga)",
+                    "(test|debug).*?(workflow|activity)"
+                ]
+            },
+            "fileTriggers": {
+                "pathPatterns": [
+                    "temporal/src/**/*.ts"
+                ],
+                "pathExclusions": [
+                    "**/*.test.ts",
+                    "**/*.spec.ts"
+                ],
+                "contentPatterns": [
+                    "proxyActivities",
+                    "defineWorkflow",
+                    "startChild",
+                    "Temporal\\.",
+                    "@temporalio",
+                    "workflow\\.",
+                    "activity\\."
+                ]
+            }
+        },
+        "infrastructure-guidelines": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "high",
+            "description": "Infrastructure as Code with Terraform, Supabase (PostgreSQL + Auth + RLS), Kubernetes, and CQRS event-driven architecture",
+            "promptTriggers": {
+                "keywords": [
+                    "terraform",
+                    "kubernetes",
+                    "k8s",
+                    "supabase",
+                    "migration",
+                    "sql",
+                    "table",
+                    "rls",
+                    "row level security",
+                    "policy",
+                    "cqrs",
+                    "projection",
+                    "event store",
+                    "domain events",
+                    "trigger",
+                    "idempotent",
+                    "database",
+                    "schema",
+                    "deployment",
+                    "manifest"
+                ],
+                "intentPatterns": [
+                    "(create|add|write|implement).*?(migration|table|policy|trigger)",
+                    "(update|modify|alter).*?(schema|table|migration)",
+                    "(deploy|apply|plan).*?(terraform|kubernetes|k8s)",
+                    "(implement|update|create).*?(projection|cqrs|event.*?store)",
+                    "(how to|best practice).*?(terraform|supabase|kubernetes|migration|rls)"
+                ]
+            },
+            "fileTriggers": {
+                "pathPatterns": [
+                    "infrastructure/terraform/**/*.tf",
+                    "infrastructure/supabase/sql/**/*.sql",
+                    "infrastructure/supabase/migrations/**/*.sql",
+                    "infrastructure/k8s/**/*.yaml",
+                    "infrastructure/k8s/**/*.yml"
+                ],
+                "pathExclusions": [
+                    "**/.terraform/**",
+                    "**/terraform.tfstate",
+                    "**/terraform.tfstate.backup"
+                ],
+                "contentPatterns": [
+                    "CREATE TABLE",
+                    "CREATE POLICY",
+                    "CREATE TRIGGER",
+                    "ALTER TABLE",
+                    "resource \"",
+                    "provider \"",
+                    "rls_",
+                    "domain_events",
+                    "kind:",
+                    "apiVersion:"
+                ]
+            }
+        }
+    },
+    "notes": {
+        "enforcement_types": {
+            "suggest": "Skill suggestion appears but doesn't block execution",
+            "block": "Requires skill to be used before proceeding (guardrail)",
+            "warn": "Shows warning but allows proceeding"
+        },
+        "priority_levels": {
+            "critical": "Highest - Always trigger when matched",
+            "high": "Important - Trigger for most matches",
+            "medium": "Moderate - Trigger for clear matches",
+            "low": "Optional - Trigger only for explicit matches"
+        },
+        "customization": {
+            "a4c_appsuite": "This file is customized for the A4C-AppSuite monorepo structure",
+            "tech_stack": "Reflects actual tech choices: Radix UI (not MUI), Tailwind, MobX, Temporal, Supabase",
+            "file_paths": "Matches frontend/, temporal/, infrastructure/ monorepo structure",
+            "phase_2_note": "Skills referenced here don't exist yet - will be created in Phase 2"
+        }
+    }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "a4c-claude-hooks",
+  "version": "1.0.0",
+  "description": "Claude Code hooks for A4C-AppSuite monorepo",
+  "type": "module",
+  "dependencies": {
+    "tsx": "^4.7.0"
+  }
+}

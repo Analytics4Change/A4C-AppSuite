@@ -1,0 +1,2 @@
+frontend:build:cd /home/lars/dev/A4C-AppSuite/frontend && npm run build
+frontend:tsc:cd /home/lars/dev/A4C-AppSuite/frontend && npx tsc --noEmit

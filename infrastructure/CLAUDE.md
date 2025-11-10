@@ -4,51 +4,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is the Infrastructure as Code (IaC) repository for Analytics4Change (A4C) platform, managing:
-- **Supabase**: Authentication (replacing Zitadel), database, Edge Functions, RLS policies
+This is the infrastructure repository for Analytics4Change (A4C) platform, managing:
+- **Supabase**: Authentication, database, Edge Functions, RLS policies, SQL migrations
 - **Kubernetes**: Temporal.io cluster for workflow orchestration
-- **SQL Migrations**: Event-driven schema with CQRS projections
-- **Terraform**: Infrastructure automation (future: Supabase resources via IaC)
+- **SQL-First Approach**: Event-driven schema with CQRS projections
 
-**Migration Note**: Platform is migrating from Zitadel to Supabase Auth. Zitadel configurations are deprecated and archived in `.archived_plans/zitadel/`.
+**Migration Note**: Platform migrated from Zitadel to Supabase Auth (October 2025). Zitadel configurations are deprecated and archived in `.archived_plans/zitadel/`.
 
 ## Commands
 
-### Terraform Commands
+### Supabase SQL Migrations
 ```bash
-# Initialize Terraform (run in environment directory)
-terraform init
+# Run migrations locally (idempotent)
+cd infrastructure/supabase
+./local-tests/start-local.sh
+./local-tests/run-migrations.sh
+./local-tests/verify-idempotency.sh  # Test by running twice
+./local-tests/stop-local.sh
 
-# Validate configuration
-terraform validate
-
-# Format Terraform files
-terraform fmt -recursive
-
-# Plan changes (dry run)
-terraform plan
-
-# Apply changes
-terraform apply
-
-# Import existing resources
-terraform import <resource_type>.<resource_name> <resource_id>
-
-# Show current state
-terraform state list
-terraform state show <resource>
+# Deploy to production via psql
+export PROJECT_REF="your-project-ref"
+psql -h "db.${PROJECT_REF}.supabase.co" -U postgres -d postgres \
+  -f sql/02-tables/organizations/table.sql
 ```
 
-### Development Workflow
+### Kubernetes Commands
 ```bash
-# Check for configuration drift
-terraform plan -detailed-exitcode
+# Deploy Temporal workers
+kubectl apply -f k8s/temporal/worker-deployment.yaml
+kubectl rollout status deployment/workflow-worker -n temporal
 
-# Generate resource import commands
-terraform plan -generate-config-out=generated.tf
+# Port-forward to Temporal Web UI
+kubectl port-forward -n temporal svc/temporal-web 8080:8080
 
-# Refresh state from actual infrastructure
-terraform refresh
+# Check worker logs
+kubectl logs -n temporal -l app=workflow-worker --tail=100 -f
 ```
 
 ## Architecture
@@ -56,15 +46,6 @@ terraform refresh
 ### Directory Structure
 ```
 infrastructure/
-├── terraform/            # Infrastructure as Code (Terraform)
-│   ├── environments/     # Environment-specific root modules
-│   │   ├── dev/         # Dev environment configuration
-│   │   ├── staging/     # Staging environment configuration
-│   │   └── production/  # Production environment configuration
-│   ├── modules/         # Reusable Terraform modules
-│   │   ├── zitadel/    # ⚠️ DEPRECATED - Archived
-│   │   └── supabase/   # Supabase resources (future IaC)
-│   └── global/         # Shared configuration (providers, backend)
 ├── supabase/            # Supabase database schema and migrations
 │   ├── sql/            # SQL migrations (event-driven schema)
 │   │   ├── 01-extensions/       # PostgreSQL extensions (ltree, uuid)
@@ -73,10 +54,18 @@ infrastructure/
 │   │   ├── 04-triggers/        # Event processors
 │   │   ├── 05-policies/        # RLS policies
 │   │   └── 99-seeds/           # Seed data
+│   ├── contracts/      # AsyncAPI event schemas
+│   │   └── asyncapi.yaml       # Event contract definitions
+│   ├── local-tests/    # Local testing scripts
+│   │   ├── start-local.sh      # Start local Supabase
+│   │   ├── run-migrations.sh   # Run all migrations
+│   │   ├── verify-idempotency.sh  # Test idempotency
+│   │   └── stop-local.sh       # Stop local Supabase
 │   ├── DEPLOY_TO_SUPABASE_STUDIO.sql  # Deployment script
 │   └── SUPABASE-AUTH-SETUP.md          # Auth configuration guide
 └── k8s/                 # Kubernetes deployments
-    └── temporal/        # Temporal.io cluster and workers
+    ├── rbac/           # RBAC for GitHub Actions
+    └── temporal/       # Temporal.io cluster and workers
         ├── values.yaml          # Helm configuration
         ├── configmap-dev.yaml   # Dev environment config
         └── worker-deployment.yaml  # Temporal worker deployment
@@ -105,32 +94,10 @@ infrastructure/
 - **Ingress**: Nginx ingress controller
 - **Monitoring**: Prometheus + Grafana (planned)
 
-**~~Zitadel Instance~~ (DEPRECATED)**: `analytics4change-zdswvg.us1.zitadel.cloud`
-- ⚠️ **Migration in progress**: Replacing with Supabase Auth
-- Project ID: `339658577486583889`
+**~~Zitadel Instance~~ (DEPRECATED)**: Migrated to Supabase Auth (October 2025)
 - Documentation archived in `.archived_plans/zitadel/`
 
-### Migration Strategy
-
-This repository follows an **import-first approach**:
-1. Import existing manually-created resources into Terraform state
-2. Validate that `terraform plan` shows no changes
-3. Gradually add new resources via Terraform
-
-Critical: Always use `terraform import` for existing resources - never recreate them.
-
 ## Environment Variables
-
-### Terraform Providers
-```bash
-# Supabase
-export TF_VAR_supabase_access_token="<access_token>"
-export TF_VAR_supabase_project_ref="<project_ref>"
-
-# Zitadel (DEPRECATED - remove after migration)
-# export TF_VAR_zitadel_service_user_id="<service_user_id>"
-# export TF_VAR_zitadel_service_user_secret="<service_user_secret>"
-```
 
 ### Supabase Database
 ```bash
@@ -155,11 +122,11 @@ kubectl get secret temporal-worker-secrets -n temporal -o yaml
 
 ## Key Considerations
 
-1. **State Management**: Remote state will be configured in S3/Terraform Cloud with locking
-2. **Zero Downtime**: All changes must maintain service availability
-3. **Import First**: Always import existing resources rather than recreating them
-4. **Environment Isolation**: Each environment has separate state and variables
-5. **Service Accounts**: Use dedicated service accounts for Terraform operations
+1. **SQL Idempotency**: All migrations must be idempotent (IF NOT EXISTS, OR REPLACE, DROP IF EXISTS)
+2. **Zero Downtime**: All schema changes must maintain service availability
+3. **RLS First**: All tables must have Row-Level Security policies
+4. **Event-Driven**: All state changes emit domain events for CQRS projections
+5. **Local Testing**: Test migrations locally before deploying to production
 
 ## Deployment Runbook
 
