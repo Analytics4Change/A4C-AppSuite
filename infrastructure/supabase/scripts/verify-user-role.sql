@@ -5,6 +5,7 @@ DO $$
 DECLARE
   v_user_id UUID := '5a975b95-a14d-4ddd-bdb6-949033dab0b8';
   v_user_email TEXT := 'lars.tice@gmail.com';
+  v_rec RECORD;
 BEGIN
   RAISE NOTICE '===== USER VERIFICATION =====';
 
