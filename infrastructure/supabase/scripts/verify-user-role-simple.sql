@@ -26,8 +26,8 @@ SELECT '5. User role assignments' as section,
   ur.role_id,
   r.name as role_name,
   ur.org_id,
-  ur.is_active,
-  ur.granted_at
+  ur.scope_path,
+  ur.assigned_at
 FROM user_roles_projection ur
 LEFT JOIN roles_projection r ON r.id = ur.role_id
 WHERE ur.user_id = '5a975b95-a14d-4ddd-bdb6-949033dab0b8';

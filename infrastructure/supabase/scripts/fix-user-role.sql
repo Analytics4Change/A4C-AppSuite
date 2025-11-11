@@ -109,15 +109,13 @@ BEGIN
       role_id,
       org_id,
       scope_path,
-      is_active,
-      granted_at
+      assigned_at
     )
     SELECT
       v_auth_user_id,
       '11111111-1111-1111-1111-111111111111'::UUID,  -- super_admin role
       NULL,  -- Global scope
       NULL,  -- No scope path for global super admin
-      true,
       NOW()
     WHERE NOT EXISTS (
       SELECT 1
