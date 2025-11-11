@@ -50,14 +50,12 @@ BEGIN
       id,
       email,
       name,
-      zitadel_user_id,  -- Required by schema, use placeholder
       is_active,
       created_at
     ) VALUES (
       v_auth_user_id,
       v_user_email,
       'Lars Tice',
-      'oauth-' || v_auth_user_id::TEXT,  -- Placeholder for legacy field
       true,
       NOW()
     )
