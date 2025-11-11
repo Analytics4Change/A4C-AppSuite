@@ -206,6 +206,10 @@ jobs:
         # Apply the updated deployment (preserves imagePullSecrets)
         kubectl apply -f frontend/k8s/deployment.yaml
 
+        # Force rollout restart to ensure latest image is pulled
+        # This is necessary when using :main tag since Kubernetes may not pull updated images
+        kubectl rollout restart deployment/a4c-frontend
+
     - name: Wait for rollout
       run: |
         # First attempt with standard timeout
