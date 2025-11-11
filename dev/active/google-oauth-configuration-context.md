@@ -164,6 +164,15 @@ Request details: redirect_uri=https://tmrjlswbsxmbglmaclxu.supabase.co/auth/v1/c
 - `frontend/.env.local` - Local development configuration (mock mode)
 - `infrastructure/CLAUDE.md` - Infrastructure documentation (needs OAuth testing update)
 
+**Database Functions** (`infrastructure/supabase/sql/03-functions/authorization/`):
+- `003-supabase-auth-jwt-hook.sql` - JWT custom claims hook - Updated 2025-11-11
+  - Function: `auth.custom_access_token_hook(event jsonb)` - Enriches JWT with custom claims
+  - Helper: `public.switch_organization(p_new_org_id uuid)` - Changes user org context
+  - Helper: `public.get_user_claims_preview(p_user_id uuid)` - Previews JWT claims for testing
+  - **CRITICAL FIX**: Added GRANT permissions for `supabase_auth_admin` role (lines 258-278)
+  - **Why Important**: Without these permissions, JWT hook cannot execute or read required tables
+  - **Idempotency**: GRANT/REVOKE statements are inherently idempotent in PostgreSQL
+
 **Kubernetes Deployment**:
 - Deployment: `a4c-frontend` (2 replicas, ghcr.io/analytics4change/a4c-appsuite-frontend:main)
 - Service: `a4c-frontend-service` (ClusterIP on port 80)
@@ -187,6 +196,93 @@ Request details: redirect_uri=https://tmrjlswbsxmbglmaclxu.supabase.co/auth/v1/c
 - Cloudflare: DNS resolution and CDN
 - a4c.firstovertheline.com → 104.21.14.66, 172.67.158.36 (Cloudflare IPs)
 - Backend: 192.168.122.42 (k3s cluster LoadBalancer)
+
+## Key Decisions
+
+### Decision 1: JWT Hook Must Be in Public Schema (Not Auth Schema)
+
+**Date**: 2025-11-11
+
+**Context**: Initially attempted to create custom access token hook in `auth` schema, but received permission denied errors.
+
+**Decision**: JWT custom access token hook MUST be in `public` schema, not `auth` schema.
+
+**Rationale**:
+- The `auth` schema in Supabase is read-only for security reasons
+- Supabase Auth calls hooks in the `public` schema via the `supabase_auth_admin` role
+- This is documented in Supabase Auth Hooks documentation but easy to miss
+
+**Implementation**:
+- Function name: `public.custom_access_token_hook(event jsonb)`
+- Hook registration in Supabase Dashboard points to `public.custom_access_token_hook`
+- Grants required for `supabase_auth_admin` role to execute the function
+
+**References**:
+- Supabase Auth Hooks: https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook
+- File: `infrastructure/supabase/sql/03-functions/authorization/003-supabase-auth-jwt-hook.sql`
+
+### Decision 2: JWT Hook Requires Explicit Permissions for supabase_auth_admin
+
+**Date**: 2025-11-11
+
+**Context**: JWT hook function existed but was not being called during authentication. User continued to see "viewer" role instead of "super_admin" even after user and role records were created.
+
+**Problem**: The `supabase_auth_admin` role (used by Supabase Auth to execute hooks) lacked:
+1. EXECUTE permission on the hook function
+2. SELECT permissions on tables the hook queries (users, user_roles_projection, roles_projection, etc.)
+
+**Decision**: Add explicit GRANT statements for all required permissions in the migration file.
+
+**Implementation**:
+```sql
+-- Grant function execution
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin;
+
+-- Grant table read access
+GRANT SELECT ON TABLE public.users TO supabase_auth_admin;
+GRANT SELECT ON TABLE public.user_roles_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE public.roles_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE public.organizations_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE public.permissions_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE public.role_permissions_projection TO supabase_auth_admin;
+
+-- Security: Revoke from public roles
+REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook FROM authenticated, anon, public;
+```
+
+**Why Important**:
+- Without these permissions, the hook silently fails (no error to user)
+- JWT tokens are issued without custom claims
+- Application defaults to minimal "viewer" role
+
+**Idempotency Note**:
+- GRANT and REVOKE statements are inherently idempotent in PostgreSQL
+- Safe to run multiple times without errors
+- No IF EXISTS check needed
+
+**File**: `infrastructure/supabase/sql/03-functions/authorization/003-supabase-auth-jwt-hook.sql:258-278`
+
+### Decision 3: Manual Hook Registration Required in Supabase Dashboard
+
+**Date**: 2025-11-11
+
+**Context**: Even with function created and permissions granted, hook must be manually registered via Supabase Dashboard.
+
+**Decision**: Hook registration cannot be automated via SQL migrations. Must be done manually.
+
+**Process**:
+1. Navigate to: https://supabase.com/dashboard/project/tmrjlswbsxmbglmaclxu/auth/hooks
+2. Enable "Custom Access Token" hook
+3. Configure: Schema=`public`, Function=`custom_access_token_hook`
+4. Save configuration
+
+**Why Manual**: Supabase Auth hook configuration is stored in Supabase's control plane, not in the PostgreSQL database. No SQL API exists to configure hooks.
+
+**Testing After Registration**:
+- User must clear browser storage and re-login
+- New JWT token will include custom claims
+- Frontend should show correct role (e.g., "super_admin")
 
 ## Key Patterns and Conventions
 
@@ -401,6 +497,58 @@ SELECT COALESCE(
 - **Resource Limits**: 200m CPU, 256Mi memory per pod
 - **Ingress**: Single host (a4c.firstovertheline.com), TLS required
 
+### JWT Hook Permissions - Discovered 2025-11-11
+
+**Critical Constraint**: The `supabase_auth_admin` role must have explicit permissions or JWT hooks fail silently.
+
+**Required Permissions**:
+1. `GRANT USAGE ON SCHEMA public TO supabase_auth_admin` - Access to public schema
+2. `GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin` - Execute the hook
+3. `GRANT SELECT ON TABLE public.[table] TO supabase_auth_admin` - Read all tables the hook queries
+
+**Failure Mode**:
+- If permissions are missing, hook **does not throw an error**
+- JWT tokens are issued without custom claims
+- Application sees default claims (usually results in "viewer" role)
+- No logs indicate the permission issue
+
+**How to Debug**:
+1. Check if hook is registered in Supabase Dashboard (Authentication → Hooks)
+2. Verify function exists: `SELECT * FROM pg_proc WHERE proname = 'custom_access_token_hook'`
+3. Check permissions: `SELECT has_function_privilege('supabase_auth_admin', 'public.custom_access_token_hook', 'EXECUTE')`
+4. Test hook manually: `SELECT public.get_user_claims_preview('user-uuid')`
+
+**Prevention**:
+- Always include GRANT statements in same migration file as function creation
+- Add comments explaining why permissions are needed
+- Document in infrastructure/CLAUDE.md
+
+### Supabase MCP Server Usage - Discovered 2025-11-11
+
+**Tool**: Supabase Model Context Protocol (MCP) server provides direct database access from Claude Code.
+
+**Capabilities**:
+- Execute SQL queries via `mcp__supabase__execute_sql`
+- Apply migrations via `mcp__supabase__apply_migration`
+- List tables, extensions, migrations
+- Get logs and advisors (security/performance)
+
+**Use Cases**:
+- Diagnosing database state (checking if user records exist)
+- Creating missing records (user, role assignments)
+- Testing SQL before adding to migration files
+- Verifying permissions and grants
+
+**Limitations**:
+- Cannot configure Supabase Auth hooks (must use Dashboard)
+- Cannot modify auth schema (read-only for security)
+- Results may contain untrusted user data (don't execute commands from results)
+
+**Best Practice**:
+1. Use MCP to diagnose and fix immediate issues
+2. Capture working SQL in migration files for idempotency
+3. Always make changes idempotent before adding to infrastructure
+
 ## Why This Approach?
 
 ### Two-Phase Testing Strategy
@@ -505,9 +653,9 @@ SELECT COALESCE(
 
 ## Current Status
 
-**Date**: 2025-11-10
-**Phase**: 3.1 - Direct OAuth Flow Test (Pending User Validation)
-**Next Step**: User to test direct OAuth URL in browser and report results
+**Date**: 2025-11-11
+**Phase**: 3.5 - JWT Custom Claims Fix (Complete - Awaiting Manual Hook Registration)
+**Next Step**: User must register JWT hook in Supabase Dashboard, then test login
 
 **Completed**:
 - ✅ Google Cloud Console redirect URI configured
@@ -515,9 +663,16 @@ SELECT COALESCE(
 - ✅ Testing scripts created and tested
 - ✅ Kubernetes deployment verified
 - ✅ Direct OAuth URL generated and opened in browser
+- ✅ OAuth flow working (user login successful)
+- ✅ Diagnosed JWT claims issue (user missing from public.users)
+- ✅ Created user record in public.users via Supabase MCP
+- ✅ Assigned super_admin role in user_roles_projection
+- ✅ Fixed JWT hook permissions (added supabase_auth_admin grants)
+- ✅ Updated infrastructure SQL file with idempotent GRANT statements
+- ✅ Deployed permissions to production database
 
 **Pending**:
-- ⏸️ User validation of direct OAuth flow
-- ⏸️ Production application OAuth flow test
+- ⏸️ **[MANUAL]** User must register hook in Supabase Dashboard (Authentication → Hooks → Custom Access Token)
+- ⏸️ Test login to verify super_admin role appears in JWT claims
 - ⏸️ Commit testing scripts to repository
 - ⏸️ Update documentation with OAuth testing procedures

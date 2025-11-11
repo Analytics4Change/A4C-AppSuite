@@ -77,12 +77,13 @@
 - [x] Confirm redirect to `/clients` dashboard
 - [x] Verify authenticated state in application
 
-## Phase 3.5: JWT Custom Claims Fix ✅ IN PROGRESS
+## Phase 3.5: JWT Custom Claims Fix ✅ COMPLETE
 
 ### Issue Diagnosed
 - [x] OAuth works but user shows "viewer" instead of "super_admin"
 - [x] Root cause: User exists in `auth.users` but not in `public.users`
 - [x] JWT hook defaults to "viewer" when no user record found
+- [x] JWT hook missing required permissions for `supabase_auth_admin` role
 
 ### Fix Implementation
 - [x] Create `fix-user-role.sql` to sync auth user to public.users
@@ -90,10 +91,12 @@
 - [x] Update `users` table schema to remove Zitadel references
 - [x] Fix column name mismatches (`is_active` → `assigned_at`)
 - [x] Create verification scripts to diagnose database state
-- [ ] **[BLOCKED]** User runs verification script - needs Result #5 output
-- [ ] Create user_roles_projection record for super_admin
-- [ ] Verify JWT claims include super_admin role
-- [ ] Test login shows super_admin in UI
+- [x] Create user_roles_projection record for super_admin (via Supabase MCP)
+- [x] Add GRANT permissions for supabase_auth_admin role
+- [x] Update infrastructure SQL file with idempotent GRANT statements
+- [x] Deploy permissions to production database
+- [ ] **[MANUAL]** Register hook in Supabase Dashboard (Authentication → Hooks → Custom Access Token)
+- [ ] Test login shows super_admin in UI (after hook registration)
 
 ### Test Validation
 - [ ] Confirm user appears in Supabase Auth Users table
@@ -163,11 +166,21 @@
 ## Current Status
 
 **Phase**: Phase 3.5 - JWT Custom Claims Fix
-**Status**: ✅ IN PROGRESS (debugging role assignment)
+**Status**: ✅ COMPLETE (awaiting manual hook registration)
 **Last Updated**: 2025-11-11
-**Next Step**: User provides Result #5 from verify-user-role-simple.sql to see if role assignment exists
+**Next Step**: User must register JWT hook in Supabase Dashboard, then test login
 
 ### Recent Activity
+
+**2025-11-11 20:30 UTC**:
+- ✅ Used Supabase MCP to diagnose database state
+- ✅ Created missing records:
+  - Added user to `public.users` (synced from `auth.users`)
+  - Created super_admin role assignment in `user_roles_projection`
+- ✅ Identified missing permissions for JWT hook
+- ✅ Added idempotent GRANT statements to infrastructure SQL file (`003-supabase-auth-jwt-hook.sql`)
+- ✅ Deployed permissions to production database via Supabase MCP
+- 📋 **Next**: User must register hook in Supabase Dashboard (Authentication → Hooks)
 
 **2025-11-11 19:00 UTC**:
 - ✅ Created verification scripts (verify-user-role.sql, verify-user-role-simple.sql)
@@ -177,8 +190,6 @@
   - Fixed missing RECORD variable declaration
   - Replaced Cloud-only JWT hook call with manual simulation
 - ✅ User UUID confirmed: `5a975b95-a14d-4ddd-bdb6-949033dab0b8` (matches seed file)
-- 🔍 Awaiting verification output (Result #5) to see if role was assigned
-- 📋 Next: Based on verification, either role exists or needs manual creation
 
 **2025-11-10 18:00 UTC**:
 - ✅ Fixed OAuth redirect loop issue

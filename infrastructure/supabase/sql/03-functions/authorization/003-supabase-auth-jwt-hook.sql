@@ -249,26 +249,30 @@ COMMENT ON FUNCTION public.get_user_claims_preview IS
 
 
 -- ============================================================================
--- Grant Permissions
+-- Grant Permissions (Idempotent - GRANT statements can be run multiple times)
 -- ============================================================================
 
--- Grant execute on JWT hook to authenticated users (Supabase Cloud only)
--- The auth.custom_access_token_hook function only exists in Supabase Cloud
--- Local Supabase (self-hosted) does not include this auth hook infrastructure
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM pg_proc p
-    JOIN pg_namespace n ON p.pronamespace = n.oid
-    WHERE n.nspname = 'auth' AND p.proname = 'custom_access_token_hook'
-  ) THEN
-    EXECUTE 'GRANT EXECUTE ON FUNCTION auth.custom_access_token_hook TO authenticated';
-    RAISE NOTICE 'Granted execute permission on auth.custom_access_token_hook (Supabase Cloud detected)';
-  ELSE
-    RAISE NOTICE 'Skipping auth.custom_access_token_hook grant (not available in local Supabase)';
-  END IF;
-END $$;
+-- Grant permissions for Supabase Auth to call the JWT hook
+-- The supabase_auth_admin role is used by Supabase Auth to execute custom hooks
+-- Note: These GRANT statements are idempotent and safe to run multiple times
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin;
 
--- Grant execute on helper functions
+-- Grant read access to tables the JWT hook needs to query
+-- The hook must be able to read user roles, permissions, and organization data
+GRANT SELECT ON TABLE public.users TO supabase_auth_admin;
+GRANT SELECT ON TABLE public.user_roles_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE public.roles_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE public.organizations_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE public.permissions_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE public.role_permissions_projection TO supabase_auth_admin;
+
+-- Revoke execute from public roles for security
+-- Only supabase_auth_admin should call the JWT hook function
+-- Note: REVOKE is idempotent - safe to run even if privilege doesn't exist
+REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook FROM authenticated, anon, public;
+
+-- Grant execute on helper functions to authenticated users
+-- These are utility functions for user session management
 GRANT EXECUTE ON FUNCTION public.switch_organization TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_user_claims_preview TO authenticated;
