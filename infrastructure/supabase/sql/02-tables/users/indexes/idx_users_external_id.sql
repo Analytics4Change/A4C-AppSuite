@@ -1,2 +1,2 @@
--- Index on zitadel_user_id for fast lookups when syncing with Zitadel
-CREATE INDEX IF NOT EXISTS idx_users_zitadel_user_id ON users(zitadel_user_id);
+-- Note: users.id directly matches auth.users.id from Supabase Auth (no external ID needed)
+-- Index removed: zitadel_user_id column no longer exists after migration to Supabase Auth
