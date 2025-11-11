@@ -117,6 +117,9 @@ export const LoginPage: React.FC = () => {
                   {useMockAuth ? 'Mock Google Sign In' : 'Continue with Google'}
                 </Button>
 
+                {/* GitHub OAuth disabled - not configured in Supabase */}
+                {/* To enable: Configure GitHub OAuth in Supabase Dashboard */}
+                {/*
                 <Button
                   type="button"
                   variant="outline"
@@ -129,6 +132,7 @@ export const LoginPage: React.FC = () => {
                   </svg>
                   {useMockAuth ? 'Mock GitHub Sign In' : 'Continue with GitHub'}
                 </Button>
+                */}
               </div>
 
               {/* Divider */}

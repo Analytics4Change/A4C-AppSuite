@@ -218,12 +218,18 @@
 
 ### Blockers
 
-**Current Blocker**: None - awaiting user action
+**Current Blocker**: GitHub OAuth Not Configured (2025-11-11)
+- User clicked "Continue with GitHub" but GitHub OAuth is not enabled in Supabase
+- Only Google OAuth is currently configured
+- HTTP 400 error on `/auth/v1/authorize` endpoint with `provider=github`
+- **Resolution**: Either use Google OAuth (recommended) or configure GitHub OAuth in Supabase Dashboard
 
 **Resolved Blockers**:
 - ✅ Google Cloud Console redirect URI mismatch (resolved by adding correct URI)
 - ✅ Supabase OAuth configuration uncertainty (resolved via Management API verification)
 - ✅ Node.js script dependency issue (resolved by creating bash alternative)
+- ✅ Multiple GoTrueClient instances (resolved by singleton pattern)
+- ✅ JWT claims missing (resolved by adding permissions and creating user records)
 
 ### Notes
 

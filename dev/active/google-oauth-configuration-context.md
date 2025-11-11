@@ -655,7 +655,8 @@ SELECT COALESCE(
 
 **Date**: 2025-11-11
 **Phase**: 3.5 - JWT Custom Claims Fix (Complete - Awaiting Manual Hook Registration)
-**Next Step**: User must register JWT hook in Supabase Dashboard, then test login
+**Issue Discovered**: User attempting to use GitHub OAuth but only Google OAuth is configured
+**Next Step**: User must either (1) use Google OAuth or (2) configure GitHub OAuth in Supabase, then register JWT hook
 
 **Completed**:
 - ✅ Google Cloud Console redirect URI configured
@@ -671,8 +672,13 @@ SELECT COALESCE(
 - ✅ Updated infrastructure SQL file with idempotent GRANT statements
 - ✅ Deployed permissions to production database
 
+**OAuth Provider Status** (Updated 2025-11-11):
+- ✅ Google OAuth: Fully configured and working
+- ❌ GitHub OAuth: NOT configured (disabled in frontend LoginPage.tsx:120-135)
+- **Note**: User only wants Google OAuth, GitHub button removed from UI
+
 **Pending**:
 - ⏸️ **[MANUAL]** User must register hook in Supabase Dashboard (Authentication → Hooks → Custom Access Token)
-- ⏸️ Test login to verify super_admin role appears in JWT claims
+- ⏸️ Test login with Google OAuth to verify super_admin role appears in JWT claims
 - ⏸️ Commit testing scripts to repository
 - ⏸️ Update documentation with OAuth testing procedures
