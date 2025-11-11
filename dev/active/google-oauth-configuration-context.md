@@ -29,6 +29,15 @@
    - **Choice**: `https://tmrjlswbsxmbglmaclxu.supabase.co/auth/v1/callback` as OAuth redirect URI
    - **Rationale**: Supabase handles OAuth complexity (token exchange, session creation), then redirects to frontend's `/auth/callback` route
 
+6. **Singleton Supabase Client Pattern**: Use single Supabase client instance across entire application - Added 2025-11-10
+   - **Choice**: All authentication code uses singleton from `/lib/supabase.ts`
+   - **Rationale**: Multiple GoTrueClient instances cause OAuth callback race conditions and redirect loops
+   - **Implementation**: Removed separate client instantiation in `SupabaseAuthProvider` and `supabase.service`
+
+7. **Manual Header Injection Removed**: Let Supabase handle JWT automatically - Added 2025-11-10
+   - **Choice**: Removed manual `Authorization` header injection from `supabase.service.ts`
+   - **Rationale**: Manual header mutation on shared singleton causes concurrency issues; Supabase automatically includes JWT from browser storage
+
 ## Technical Context
 
 ### Architecture
@@ -121,6 +130,25 @@ Request details: redirect_uri=https://tmrjlswbsxmbglmaclxu.supabase.co/auth/v1/c
   - Tests OAuth flow programmatically
   - Provides detailed error messages
   - Note: Requires npm install @supabase/supabase-js to run
+
+- `fix-user-role.sql` - Syncs OAuth user from auth.users to public.users - Added 2025-11-11
+  - Queries auth.users for actual UUID
+  - Creates public.users record if missing
+  - Emits domain events (user.synced_from_auth, user.role.assigned)
+  - Creates user_roles_projection entry for super_admin
+
+- `fix-user-role.sh` - Bash wrapper for fix-user-role.sql - Added 2025-11-11
+  - Connects to Supabase PostgreSQL via psql
+  - Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
+
+- `verify-user-role.sql` - Diagnostic script with RAISE NOTICE output - Added 2025-11-11
+  - Uses RAISE NOTICE to show verification steps
+  - Output appears in Messages tab (not Results)
+
+- `verify-user-role-simple.sql` - Diagnostic script with query results - Added 2025-11-11
+  - Returns 7 result sets for easy viewing
+  - Shows auth.users check, public.users check, role assignments, domain events
+  - Includes manual JWT claims simulation (Cloud-only hook workaround)
 
 ### Existing Files Referenced
 
@@ -252,6 +280,84 @@ VITE_DEBUG_LOGS=true
 - Auth Users: https://supabase.com/dashboard/project/tmrjlswbsxmbglmaclxu/auth/users
 
 ## Important Constraints
+
+### Multiple GoTrueClient Instances - Added 2025-11-10
+
+**Constraint**: Only ONE Supabase client instance can exist in the application
+
+**Problem**: Creating multiple Supabase clients causes:
+- "Multiple GoTrueClient instances detected" console warning
+- OAuth callback race conditions (multiple clients competing to process callback)
+- Redirect loops to `/login#`
+- Session storage conflicts
+
+**Solution**: Use singleton pattern - all code imports from `/lib/supabase.ts`
+
+**Files that must NOT create their own client**:
+- `SupabaseAuthProvider.ts` - Use imported singleton
+- `supabase.service.ts` - Use imported singleton
+- Any future services - Import singleton, never call `createClient()`
+
+### Manual Header Injection Causes Concurrency Issues - Added 2025-11-10
+
+**Constraint**: Do NOT manually inject Authorization headers on Supabase client
+
+**Problem**: Mutating shared singleton's headers causes:
+- Race conditions when multiple requests happen simultaneously
+- Incorrect org_id context bleeding between requests
+- JWT tokens potentially sent with wrong organization context
+
+**Solution**: Let Supabase handle auth automatically
+- Supabase reads JWT from browser storage (localStorage/sessionStorage)
+- JWT automatically included in Authorization header
+- RLS policies read org_id from JWT claims directly
+
+**Anti-pattern to avoid**:
+```typescript
+// ❌ BAD - causes concurrency issues
+this.client.rest.headers = {
+  Authorization: `Bearer ${token}`,
+  'X-Organization-Id': org_id
+};
+```
+
+### Database Schema Mismatch: Repository vs Deployed - Added 2025-11-11
+
+**Constraint**: Repository schema files may not match deployed database
+
+**Problem**:
+- Deployed database migrated away from Zitadel (removed `zitadel_user_id` column)
+- Repository still references Zitadel columns and concepts
+- SQL scripts fail with "column does not exist" errors
+
+**Examples found**:
+- `users` table: `zitadel_user_id` column removed (deployed), still in repo schema
+- `user_roles_projection`: Column names differ (`is_active`/`granted_at` in scripts vs `assigned_at` in schema)
+
+**Solution**: Always verify column names against deployed schema before writing SQL
+- Check actual table structure via Supabase SQL Editor: `\d table_name`
+- Don't trust repository schema files for column-level details
+- Run `SELECT * FROM table LIMIT 0` to see actual columns
+
+### JWT Hook Only Available on Supabase Cloud - Added 2025-11-11
+
+**Constraint**: `auth.custom_access_token_hook()` function only exists on Supabase Cloud
+
+**Problem**: Verification scripts calling `get_user_claims_preview()` fail on local Supabase with:
+```
+ERROR: function auth.custom_access_token_hook(jsonb) does not exist
+```
+
+**Solution**: Skip JWT hook calls or simulate manually in verification scripts
+
+**Workaround pattern**:
+```sql
+-- Instead of calling hook, simulate its logic manually
+SELECT COALESCE(
+  (SELECT r.name FROM user_roles_projection ur ...),
+  'viewer'
+) as user_role
+```
 
 ### OAuth Redirect URI Exactness
 
