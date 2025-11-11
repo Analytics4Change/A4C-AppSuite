@@ -43,6 +43,31 @@ WHERE stream_id = '5a975b95-a14d-4ddd-bdb6-949033dab0b8'
   AND stream_type = 'user'
 ORDER BY stream_version;
 
--- 7. Test JWT claims preview
-SELECT '7. JWT claims preview' as section,
-  public.get_user_claims_preview('5a975b95-a14d-4ddd-bdb6-949033dab0b8') as claims;
+-- 7. Test JWT claims preview (skip if function doesn't exist - Supabase Cloud only)
+-- SELECT '7. JWT claims preview' as section,
+--   public.get_user_claims_preview('5a975b95-a14d-4ddd-bdb6-949033dab0b8') as claims;
+
+-- 7. Manual JWT claims simulation (what the hook SHOULD return)
+SELECT '7. JWT claims simulation' as section,
+  u.id as user_id,
+  u.email,
+  u.current_organization_id as org_id,
+  COALESCE(
+    (SELECT r.name
+     FROM user_roles_projection ur
+     JOIN roles_projection r ON r.id = ur.role_id
+     WHERE ur.user_id = u.id
+     ORDER BY CASE WHEN r.name = 'super_admin' THEN 1 ELSE 2 END
+     LIMIT 1
+    ),
+    'viewer'
+  ) as user_role,
+  (
+    SELECT array_agg(p.name)
+    FROM user_roles_projection ur
+    JOIN role_permissions_projection rp ON rp.role_id = ur.role_id
+    JOIN permissions_projection p ON p.id = rp.permission_id
+    WHERE ur.user_id = u.id
+  ) as permissions
+FROM users u
+WHERE u.id = '5a975b95-a14d-4ddd-bdb6-949033dab0b8';
