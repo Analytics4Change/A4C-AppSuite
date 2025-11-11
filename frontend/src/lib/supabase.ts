@@ -22,6 +22,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
  *
  * Configured with anonymous key for public operations.
  * Automatically handles JWT token injection for authenticated requests.
+ * OAuth configuration ensures proper session detection and persistence.
  *
  * @example
  * ```typescript
@@ -34,4 +35,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
  *   .limit(10);
  * ```
  */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true, // Critical for OAuth callback handling
+    flowType: 'pkce', // Use PKCE flow for enhanced security
+  },
+});

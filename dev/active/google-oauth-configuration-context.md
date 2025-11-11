@@ -1,0 +1,417 @@
+# Context: Google OAuth Configuration & Testing
+
+## Decision Record
+
+**Date**: 2025-11-10
+**Feature**: Google OAuth Authentication Configuration
+**Goal**: Enable Google SSO authentication for lars.tice@gmail.com through production Kubernetes-deployed frontend at https://a4c.firstovertheline.com
+
+### Key Decisions
+
+1. **Testing Approach**: Two-phase testing strategy
+   - **Phase 1**: Direct OAuth URL test to isolate OAuth configuration issues
+   - **Phase 2**: Full application flow test through production frontend
+   - **Rationale**: Separates OAuth configuration problems from application integration issues, making debugging faster and more targeted
+
+2. **Script-Based Testing Infrastructure**: Created bash and Node.js testing scripts
+   - **Choice**: Bash scripts for simplicity and portability, Node.js for advanced testing when @supabase/supabase-js is available
+   - **Rationale**: Bash scripts work everywhere without dependencies, provide immediate feedback, and can be version-controlled for repeatable testing
+
+3. **API-First Validation**: Use Supabase Management API to verify configuration before browser testing
+   - **Choice**: `verify-oauth-config.sh` checks configuration via API before attempting browser OAuth flow
+   - **Rationale**: API validation catches configuration errors faster than manual browser testing, provides programmatic verification for CI/CD
+
+4. **Production Environment Strategy**: Deploy frontend with baked-in environment variables via Docker build
+   - **Choice**: GitHub Actions builds Docker image with .env.production containing Supabase credentials
+   - **Rationale**: Avoids ConfigMaps/Secrets complexity, ensures environment variables are immutable per deployment, simplifies rollback
+
+5. **OAuth Redirect URI Pattern**: Use Supabase's standard OAuth callback endpoint
+   - **Choice**: `https://tmrjlswbsxmbglmaclxu.supabase.co/auth/v1/callback` as OAuth redirect URI
+   - **Rationale**: Supabase handles OAuth complexity (token exchange, session creation), then redirects to frontend's `/auth/callback` route
+
+## Technical Context
+
+### Architecture
+
+The authentication flow involves four main components:
+
+```
+[Frontend] ──────────────────> [Google OAuth]
+    ↑                                |
+    |                                ↓
+    └───── [Supabase Auth] <──── [OAuth Callback]
+```
+
+**Flow Breakdown**:
+1. **Frontend** (`https://a4c.firstovertheline.com`): React app with LoginPage.tsx
+2. **Google OAuth** (`accounts.google.com`): Google's OAuth 2.0 authorization server
+3. **Supabase Auth** (`tmrjlswbsxmbglmaclxu.supabase.co/auth/v1`): Manages OAuth provider integration
+4. **Frontend Callback** (`/auth/callback`): AuthCallback.tsx processes Supabase response and establishes session
+
+### Tech Stack
+
+**Frontend**:
+- React 19 with TypeScript
+- Vite build tool
+- Deployed as Nginx-served static files in Docker container
+- Running on Kubernetes (k3s) with 2 replicas
+
+**Authentication**:
+- Supabase Auth (OAuth provider management)
+- @supabase/supabase-js v2 (frontend SDK)
+- JWT with custom claims (org_id, permissions, user_role, scope_path)
+
+**Infrastructure**:
+- Kubernetes (k3s) cluster
+- Traefik ingress with Let's Encrypt TLS
+- Cloudflare CDN in front
+- GitHub Actions CI/CD pipeline
+
+**Testing Scripts**:
+- Bash 5.x (for verify-oauth-config.sh, test-oauth-url.sh)
+- Node.js 20 (for test-google-oauth.js)
+- curl (for API calls)
+- jq (for JSON parsing)
+
+### Dependencies
+
+**External Services**:
+- Google Cloud Console (OAuth 2.0 credentials configuration)
+- Supabase Cloud (project: tmrjlswbsxmbglmaclxu)
+- GitHub Actions (CI/CD secrets for SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+- Cloudflare (DNS and CDN)
+
+**Internal Dependencies**:
+- Frontend authentication system (AuthContext, IAuthProvider interface)
+- Supabase database hook for JWT custom claims
+- Kubernetes deployment configuration
+- GitHub Container Registry (ghcr.io) for Docker images
+
+### Problem Context
+
+**Original Issue**: Google OAuth failing with error:
+```
+"You can't sign in to this app because it doesn't comply with Google's OAuth 2.0 policy"
+Request details: redirect_uri=https://tmrjlswbsxmbglmaclxu.supabase.co/auth/v1/callback
+```
+
+**Root Cause**: Redirect URI not properly configured in Google Cloud Console OAuth credentials.
+
+**Resolution**: Added exact redirect URI to Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client ID → Authorized redirect URIs.
+
+## File Structure
+
+### New Files Created
+
+**Testing Scripts** (`infrastructure/supabase/scripts/`):
+- `verify-oauth-config.sh` - Validates OAuth configuration via Supabase Management API
+  - Checks if Google OAuth is enabled
+  - Verifies Client ID is configured
+  - Validates expected redirect URI
+  - Provides colored terminal output with troubleshooting steps
+
+- `test-oauth-url.sh` - Generates OAuth authorization URL for manual browser testing
+  - Creates OAuth URL with correct parameters
+  - Provides step-by-step testing instructions
+  - Includes troubleshooting guide for common errors
+  - Cross-platform (macOS, Linux)
+
+- `test-google-oauth.js` - Node.js-based OAuth testing (requires @supabase/supabase-js)
+  - Uses Supabase JavaScript SDK to generate OAuth URL
+  - Tests OAuth flow programmatically
+  - Provides detailed error messages
+  - Note: Requires npm install @supabase/supabase-js to run
+
+### Existing Files Referenced
+
+**Frontend Authentication** (`frontend/src/`):
+- `pages/auth/LoginPage.tsx` - Login UI with "Continue with Google" button (lines 104-118)
+- `pages/auth/AuthCallback.tsx` - OAuth callback handler that processes Supabase response
+- `contexts/AuthContext.tsx` - React context for authentication state
+- `services/auth/SupabaseAuthProvider.ts` - OAuth implementation using Supabase SDK
+- `services/auth/AuthProviderFactory.ts` - Provider selection (mock vs production)
+
+**Infrastructure Configuration**:
+- `.github/workflows/frontend-deploy.yml` - CI/CD pipeline that builds Docker image with env vars
+- `frontend/.env.local` - Local development configuration (mock mode)
+- `infrastructure/CLAUDE.md` - Infrastructure documentation (needs OAuth testing update)
+
+**Kubernetes Deployment**:
+- Deployment: `a4c-frontend` (2 replicas, ghcr.io/analytics4change/a4c-appsuite-frontend:main)
+- Service: `a4c-frontend-service` (ClusterIP on port 80)
+- Ingress: `a4c-frontend-ingress` (Traefik, TLS via cert-manager, host: a4c.firstovertheline.com)
+
+## Related Components
+
+**Authentication System**:
+- Frontend: Uses three-mode authentication (mock, integration, production)
+- Supabase Auth: Manages OAuth providers, issues JWT tokens
+- Database Hook: Adds custom claims to JWT (org_id, permissions, user_role, scope_path)
+- Row-Level Security: Uses JWT claims to enforce multi-tenant data isolation
+
+**Deployment Pipeline**:
+- GitHub Actions: Builds frontend with production env vars
+- Docker: Packages Nginx + static files
+- Kubernetes: Deploys with rolling update strategy
+- Traefik: Routes traffic with TLS termination
+
+**DNS & CDN**:
+- Cloudflare: DNS resolution and CDN
+- a4c.firstovertheline.com → 104.21.14.66, 172.67.158.36 (Cloudflare IPs)
+- Backend: 192.168.122.42 (k3s cluster LoadBalancer)
+
+## Key Patterns and Conventions
+
+### Testing Pattern: Isolate Before Integration
+
+**Principle**: Test OAuth configuration in isolation before testing full application flow.
+
+**Implementation**:
+1. **API Verification**: Use Management API to programmatically check configuration
+2. **Direct OAuth Test**: Test OAuth URL directly to isolate OAuth provider issues
+3. **Application Test**: Test through full application stack only after OAuth is verified
+
+**Benefit**: Faster debugging by eliminating variables. If direct OAuth works but application OAuth fails, problem is in application integration, not OAuth configuration.
+
+### Script Naming Convention
+
+- `verify-*.sh` - Validation scripts that check configuration state
+- `test-*.sh` - Testing scripts that generate test URLs or execute tests
+- `configure-*.sh` - Configuration scripts that modify settings
+
+### OAuth URL Generation
+
+**Pattern**: Always generate OAuth URLs with these parameters:
+```bash
+BASE_URL/auth/v1/authorize?provider=google
+```
+
+**Additional Parameters** (optional):
+- `access_type=offline` - Request refresh token
+- `prompt=consent` - Force consent screen
+- `redirect_to` - Frontend callback URL
+
+### Error Handling in Scripts
+
+**Convention**: Use colored terminal output with emoji indicators:
+- 🧪 Section headers
+- ✓ Success messages (green)
+- ✗ Error messages (red)
+- ⚠ Warning messages (yellow)
+- 📋 Information messages (blue)
+
+## Environment Variables
+
+### Frontend Production Build (.env.production)
+
+Created by GitHub Actions during Docker build:
+```bash
+VITE_APP_MODE=production
+VITE_SUPABASE_URL=https://tmrjlswbsxmbglmaclxu.supabase.co
+VITE_SUPABASE_ANON_KEY=[from GitHub secret]
+VITE_USE_RXNORM_API=false
+VITE_DEBUG_LOGS=true
+```
+
+### Testing Scripts
+
+**verify-oauth-config.sh**:
+- `SUPABASE_ACCESS_TOKEN` (required) - Management API token from Supabase Dashboard
+- `SUPABASE_PROJECT_REF` (default: tmrjlswbsxmbglmaclxu) - Project reference ID
+
+**test-google-oauth.js**:
+- `SUPABASE_URL` (default: https://tmrjlswbsxmbglmaclxu.supabase.co)
+- `SUPABASE_ANON_KEY` (default: hardcoded for testing)
+
+### GitHub Actions Secrets
+
+- `SUPABASE_URL` - Project URL for production builds
+- `VITE_SUPABASE_ANON_KEY` - Anonymous key for frontend auth
+- `KUBECONFIG` - Kubernetes cluster access for deployment
+
+## Reference Materials
+
+**Official Documentation**:
+- Supabase Auth Docs: https://supabase.com/docs/guides/auth
+- Google OAuth 2.0: https://developers.google.com/identity/protocols/oauth2
+- Supabase Management API: https://supabase.com/docs/reference/api
+
+**Internal Documentation**:
+- `infrastructure/supabase/SUPABASE-AUTH-SETUP.md` - Complete auth setup guide
+- `infrastructure/supabase/JWT-CLAIMS-SETUP.md` - Custom claims configuration
+- `frontend/CLAUDE.md` - Frontend authentication architecture (lines 235-367)
+- `.plans/supabase-auth-integration/frontend-auth-architecture.md` - Detailed auth design
+
+**Google Cloud Console**:
+- OAuth Credentials: https://console.cloud.google.com/apis/credentials
+- OAuth Consent Screen: https://console.cloud.google.com/apis/credentials/consent
+
+**Supabase Dashboard**:
+- Project Settings: https://supabase.com/dashboard/project/tmrjlswbsxmbglmaclxu
+- Auth Providers: https://supabase.com/dashboard/project/tmrjlswbsxmbglmaclxu/auth/providers
+- Auth Users: https://supabase.com/dashboard/project/tmrjlswbsxmbglmaclxu/auth/users
+
+## Important Constraints
+
+### OAuth Redirect URI Exactness
+
+**Constraint**: Google OAuth requires **exact** redirect URI match, including:
+- Protocol (https vs http)
+- Domain/subdomain
+- Path
+- Query parameters
+- Trailing slashes
+
+**Example**:
+- ✅ Configured: `https://tmrjlswbsxmbglmaclxu.supabase.co/auth/v1/callback`
+- ❌ Will fail: `http://tmrjlswbsxmbglmaclxu.supabase.co/auth/v1/callback` (http)
+- ❌ Will fail: `https://tmrjlswbsxmbglmaclxu.supabase.co/auth/v1/callback/` (trailing slash)
+
+### OAuth Consent Screen Modes
+
+**Testing Mode**: Limited to specific test users (up to 100)
+- Used during development
+- No Google verification required
+- Must add lars.tice@gmail.com as test user
+
+**Production Mode**: Available to all Google users
+- Requires Google verification (1-2 weeks)
+- OAuth consent screen must be approved
+- App icon, privacy policy, terms of service required
+
+**Current Status**: Using Testing mode with lars.tice@gmail.com as test user.
+
+### Supabase Project Limits
+
+- **Project URL**: Cannot be changed after project creation
+- **OAuth Providers**: Maximum 20 providers per project
+- **JWT Claims Size**: Custom claims should be <1KB for performance
+- **Session Duration**: Default 3600 seconds (1 hour), configurable up to 604800 seconds (7 days)
+
+### Kubernetes Deployment Constraints
+
+- **Environment Variables**: Baked into Docker image, not configurable at runtime
+- **Rolling Updates**: Zero-downtime deployments with maxUnavailable: 1, maxSurge: 1
+- **Resource Limits**: 200m CPU, 256Mi memory per pod
+- **Ingress**: Single host (a4c.firstovertheline.com), TLS required
+
+## Why This Approach?
+
+### Two-Phase Testing Strategy
+
+**Chosen Approach**: Test OAuth configuration directly, then test through application.
+
+**Alternative Considered**: Test only through application frontend.
+
+**Rationale**:
+- Direct OAuth testing isolates Google Cloud Console configuration issues
+- Application testing can fail for many reasons (frontend bugs, routing issues, session handling)
+- Two-phase approach provides clear diagnosis: "OAuth works but application doesn't" vs "OAuth itself is broken"
+- Saves debugging time by eliminating variables
+
+### Bash Scripts Over Node.js/Python
+
+**Chosen Approach**: Primary testing scripts in Bash with optional Node.js script.
+
+**Alternatives Considered**:
+- Pure Node.js (requires npm install)
+- Pure Python (requires dependencies)
+- Go binary (requires compilation)
+
+**Rationale**:
+- Bash available on all Unix systems without installation
+- curl and jq are standard tools on developer machines
+- Immediate execution without build/install step
+- Easy to read and modify inline
+- Version control friendly (plain text)
+
+### Supabase Management API for Validation
+
+**Chosen Approach**: Use Supabase Management API to verify OAuth configuration.
+
+**Alternative Considered**: Manual verification via Supabase Dashboard.
+
+**Rationale**:
+- Programmatic validation can be automated in CI/CD
+- API provides definitive source of truth
+- Faster than clicking through dashboard UI
+- Scriptable for monitoring and alerting
+- Provides exact configuration values (masked for security)
+
+### Production Deployment with Baked Environment Variables
+
+**Chosen Approach**: Build Docker image with .env.production file containing Supabase credentials.
+
+**Alternatives Considered**:
+- Kubernetes ConfigMaps
+- Kubernetes Secrets
+- External secrets management (Vault, AWS Secrets Manager)
+
+**Rationale**:
+- Simpler deployment: no ConfigMap/Secret management
+- Immutable configuration per deployment (safer)
+- Easier rollback: old image has old config
+- No runtime secret injection complexity
+- GitHub Actions secrets are already secure
+- Frontend anon key is safe to embed (RLS-protected)
+
+### Direct Supabase OAuth vs Custom Backend
+
+**Chosen Approach**: Use Supabase Auth to handle OAuth flow.
+
+**Alternative Considered**: Build custom OAuth backend with direct Google integration.
+
+**Rationale**:
+- Supabase handles OAuth complexity (token exchange, validation, session management)
+- Reduced security surface area (no storing/managing OAuth secrets in our code)
+- Built-in JWT custom claims support
+- Automatic refresh token rotation
+- No need to maintain OAuth library versions
+- Faster implementation (weeks vs months)
+
+## Troubleshooting Guide
+
+### Common Errors and Solutions
+
+**Error**: "OAuth 2.0 policy compliance"
+- **Cause**: Redirect URI not in Google Cloud Console
+- **Solution**: Add exact redirect URI to OAuth credentials
+
+**Error**: "redirect_uri_mismatch"
+- **Cause**: Redirect URI doesn't exactly match
+- **Solution**: Check for trailing slashes, http vs https, path differences
+
+**Error**: "unauthorized_client"
+- **Cause**: Client ID or Secret incorrect in Supabase
+- **Solution**: Regenerate credentials in Google Cloud Console, update in Supabase Dashboard
+
+**Error**: "access_denied"
+- **Cause**: User denied OAuth consent
+- **Solution**: User must grant permissions, or check OAuth consent screen configuration
+
+**Error**: Session not persisting in frontend
+- **Cause**: AuthCallback not processing Supabase response correctly
+- **Solution**: Check browser console for errors, verify AuthCallback.tsx logic
+
+**Error**: JWT claims missing (org_id, permissions, etc.)
+- **Cause**: Database hook not firing or configured incorrectly
+- **Solution**: Check Supabase SQL function for custom claims, verify trigger is active
+
+## Current Status
+
+**Date**: 2025-11-10
+**Phase**: 3.1 - Direct OAuth Flow Test (Pending User Validation)
+**Next Step**: User to test direct OAuth URL in browser and report results
+
+**Completed**:
+- ✅ Google Cloud Console redirect URI configured
+- ✅ Supabase OAuth configuration verified
+- ✅ Testing scripts created and tested
+- ✅ Kubernetes deployment verified
+- ✅ Direct OAuth URL generated and opened in browser
+
+**Pending**:
+- ⏸️ User validation of direct OAuth flow
+- ⏸️ Production application OAuth flow test
+- ⏸️ Commit testing scripts to repository
+- ⏸️ Update documentation with OAuth testing procedures

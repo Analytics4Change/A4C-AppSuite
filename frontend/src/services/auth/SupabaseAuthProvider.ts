@@ -20,6 +20,7 @@
  */
 
 import { createClient, SupabaseClient, AuthError, Session as SupabaseSession } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import { IAuthProvider } from './IAuthProvider';
 import {
   Session,
@@ -66,16 +67,13 @@ export class SupabaseAuthProvider implements IAuthProvider {
       );
     }
 
-    this.client = createClient(this.config.supabaseUrl, this.config.supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    });
+    // Use the singleton Supabase client to avoid multiple GoTrueClient instances
+    // This prevents "Multiple GoTrueClient instances detected" warnings and
+    // ensures OAuth callbacks are handled correctly by a single client instance
+    this.client = supabase;
 
     if (this.config.debug) {
-      log.info('SupabaseAuthProvider initialized', {
+      log.info('SupabaseAuthProvider initialized (using singleton client)', {
         url: this.config.supabaseUrl,
       });
     }

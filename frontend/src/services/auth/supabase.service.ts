@@ -1,4 +1,5 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import { Logger } from '@/utils/logger';
 import { Session } from '@/types/auth.types';
 
@@ -34,77 +35,59 @@ export interface Database {
   };
 }
 
+/**
+ * Supabase Data Service
+ *
+ * Provides typed database access and organization-scoped query helpers.
+ * Uses the singleton Supabase client for all operations to avoid multiple
+ * GoTrueClient instances and ensure consistent OAuth callback handling.
+ *
+ * Authentication is handled automatically by the singleton client:
+ * - Auth sessions are managed by SupabaseAuthProvider
+ * - JWT tokens are automatically included in all requests
+ * - RLS policies on the database use JWT claims for authorization
+ */
 class SupabaseService {
   private client: SupabaseClient<Database>;
   private currentSession: Session | null = null;
 
   constructor() {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    // Use the singleton Supabase client to avoid multiple GoTrueClient instances
+    // This prevents "Multiple GoTrueClient instances detected" warnings and
+    // ensures OAuth callbacks are handled correctly by a single client instance
+    this.client = supabase as SupabaseClient<Database>;
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase configuration missing. Check your environment variables.');
-    }
-
-    this.client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: false, // Session managed by auth providers
-        autoRefreshToken: false, // Token refresh handled by auth providers
-      },
-      global: {
-        headers: {
-          // Headers will be set dynamically based on auth session
-        },
-      },
-    });
-
-    log.info('Supabase client initialized');
+    log.info('SupabaseService initialized (using singleton client)');
   }
 
   /**
-   * Update the Supabase client with the current auth session
-   * Works with both mock and real authentication sessions
-   * This should be called whenever the user logs in or the session is refreshed
+   * Update the current session reference
+   *
+   * Note: Authentication is handled automatically by the singleton Supabase client.
+   * This method only stores the session reference for use in organization-scoped
+   * helper methods (queryWithOrgScope, insertWithOrgScope, etc.)
+   *
+   * The Supabase client automatically:
+   * - Includes Authorization headers with JWT tokens on all requests
+   * - Handles token refresh
+   * - Manages session persistence
+   * - Processes OAuth callbacks
+   *
+   * RLS policies on the database read org_id, user_role, and permissions
+   * directly from the JWT claims, so manual header injection is unnecessary
+   * and can cause concurrency issues.
    */
   async updateAuthSession(session: Session | null): Promise<void> {
     this.currentSession = session;
 
-    // Update headers for authenticated requests
-    // Works with sessions from both DevAuthProvider and SupabaseAuthProvider
-    if (session?.access_token) {
-      (this.client as any).rest.headers = {
-        ...((this.client as any).rest?.headers || {}),
-        Authorization: `Bearer ${session.access_token}`,
-        'X-Organization-Id': session.claims.org_id,
-        'X-User-Role': session.claims.user_role,
-      };
-
-      // Also update the realtime headers if needed
-      if ((this.client as any).realtime) {
-        (this.client as any).realtime.headers = {
-          ...((this.client as any).realtime?.headers || {}),
-          Authorization: `Bearer ${session.access_token}`,
-          'X-Organization-Id': session.claims.org_id,
-        };
-      }
-
-      log.info('Supabase auth session updated', {
+    if (session) {
+      log.info('Session reference updated', {
         user: session.user.email,
         org_id: session.claims.org_id,
         role: session.claims.user_role,
       });
     } else {
-      // Reset to anonymous access
-      (this.client as any).rest.headers = {
-        ...((this.client as any).rest?.headers || {}),
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      };
-
-      delete (this.client as any).rest.headers.Authorization;
-      delete (this.client as any).rest.headers['X-Organization-Id'];
-      delete (this.client as any).rest.headers['X-User-Role'];
-
-      log.info('Supabase reset to anonymous access');
+      log.info('Session reference cleared');
     }
   }
 
