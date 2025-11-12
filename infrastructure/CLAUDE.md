@@ -41,6 +41,40 @@ kubectl port-forward -n temporal svc/temporal-web 8080:8080
 kubectl logs -n temporal -l app=workflow-worker --tail=100 -f
 ```
 
+### OAuth Testing
+
+Test Google OAuth configuration and JWT custom claims:
+
+```bash
+# 1. Verify OAuth configuration via API
+cd infrastructure/supabase/scripts
+export SUPABASE_ACCESS_TOKEN="your-access-token"
+./verify-oauth-config.sh
+
+# 2. Generate OAuth URL for browser testing
+./test-oauth-url.sh
+# Copy URL and open in browser to test OAuth flow
+
+# 3. Test using Supabase JavaScript SDK (more realistic)
+npm install @supabase/supabase-js  # First time only
+node test-google-oauth.js
+
+# 4. Verify JWT custom claims (run in Supabase SQL Editor)
+# Copy contents of verify-jwt-hook-complete.sql and execute
+# Checks: hook exists, permissions granted, claims generation works
+```
+
+**Comprehensive OAuth Testing Guide**: See [`infrastructure/supabase/OAUTH-TESTING.md`](./supabase/OAUTH-TESTING.md) for:
+- Two-phase testing strategy (API verification → OAuth flow → Application integration)
+- Complete troubleshooting guide for common OAuth issues
+- JWT custom claims diagnostics
+- Production deployment verification checklist
+
+**Quick OAuth Troubleshooting**:
+- **"redirect_uri_mismatch"**: Check Google Cloud Console redirect URI matches Supabase callback URL exactly
+- **User shows "viewer" role**: Run `verify-jwt-hook-complete.sql` to diagnose JWT hook configuration
+- **JWT missing custom claims**: Verify hook registered in Dashboard (Authentication → Hooks)
+
 ## Architecture
 
 ### Directory Structure

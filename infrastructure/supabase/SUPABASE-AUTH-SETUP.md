@@ -541,6 +541,103 @@ async function switchOrganization(userId: string, newOrgId: string) {
 }
 ```
 
+### Test 4.4: OAuth Configuration Verification
+
+**Purpose**: Validate that OAuth providers are correctly configured and JWT custom claims are being populated.
+
+**See Also**: For comprehensive OAuth testing procedures, refer to [`OAUTH-TESTING.md`](./OAUTH-TESTING.md)
+
+#### Quick Verification Steps
+
+1. **Verify OAuth Provider Configuration**:
+   ```bash
+   cd infrastructure/supabase/scripts
+   export SUPABASE_ACCESS_TOKEN="your-access-token"
+   ./verify-oauth-config.sh
+
+   # Expected output:
+   # ✓ Google OAuth is ENABLED
+   # ✓ Client ID is configured
+   ```
+
+2. **Test OAuth URL Generation**:
+   ```bash
+   cd infrastructure/supabase/scripts
+   ./test-oauth-url.sh
+
+   # Copy the displayed URL and open in browser
+   # Complete Google OAuth flow
+   # Verify successful redirect
+   ```
+
+3. **Verify JWT Custom Claims**:
+   ```sql
+   -- Run comprehensive JWT hook diagnostics
+   -- Copy contents of verify-jwt-hook-complete.sql into Supabase SQL Editor
+
+   -- Check results for:
+   -- ✓ Hook exists in public schema
+   -- ✓ Permissions granted to supabase_auth_admin
+   -- ✓ User record exists
+   -- ✓ Role assignments exist
+   -- ✓ Simulated claims show correct data
+   ```
+
+4. **Frontend JWT Inspection**:
+   ```typescript
+   // After OAuth login, inspect JWT token
+   const { data: { session } } = await supabase.auth.getSession()
+
+   if (session) {
+     const payload = JSON.parse(atob(session.access_token.split('.')[1]))
+
+     console.log('JWT Custom Claims:', {
+       org_id: payload.org_id,              // Should not be null (unless super_admin)
+       user_role: payload.user_role,        // Should match user's role
+       permissions: payload.permissions,    // Should be array of permission names
+       scope_path: payload.scope_path,      // Should match org hierarchy path
+       claims_version: payload.claims_version // Should be 1
+     })
+
+     // Verify no error field
+     if (payload.claims_error) {
+       console.error('JWT Hook Error:', payload.claims_error)
+     }
+   }
+   ```
+
+#### Common OAuth Issues and Solutions
+
+**Issue**: OAuth returns "redirect_uri_mismatch"
+- **Solution**: Verify redirect URI in Google Cloud Console matches exactly:
+  `https://tmrjlswbsxmbglmaclxu.supabase.co/auth/v1/callback`
+
+**Issue**: JWT contains `claims_error` field
+- **Solution**: Run `verify-jwt-hook-complete.sql` to diagnose hook configuration issues
+- Check Supabase auth logs: Dashboard → Logs → Auth Logs
+
+**Issue**: User shows "viewer" role instead of assigned role
+- **Solution**:
+  1. Verify JWT hook is registered in Dashboard (Authentication → Hooks)
+  2. Check permissions: `SELECT has_function_privilege('supabase_auth_admin', 'public.custom_access_token_hook', 'EXECUTE')`
+  3. Verify user has role assignment in `user_roles_projection`
+
+**Issue**: JWT missing custom claims entirely
+- **Solution**:
+  1. Verify hook function exists: `SELECT * FROM pg_proc WHERE proname = 'custom_access_token_hook'`
+  2. Verify hook is in `public` schema (not `auth` schema)
+  3. Check hook is enabled in Supabase Dashboard
+
+#### Comprehensive Testing
+
+For complete OAuth testing procedures including:
+- Two-phase testing strategy
+- Troubleshooting common issues
+- JWT hook diagnostics
+- Production application integration testing
+
+**See**: [`OAUTH-TESTING.md`](./OAUTH-TESTING.md) for the full guide.
+
 ---
 
 ## Phase 5: Enterprise SSO (Future)
