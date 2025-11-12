@@ -125,10 +125,38 @@ The new `documentation/` directory sits at repository root alongside existing co
 
 **Total Created**: 40 directories, 7 README.md files
 
-**Validation Scripts (Phase 1.3 - ⏸️ Pending):**
-- Script to find and categorize all markdown files
-- Script to validate internal links
-- Script to check for broken references
+**Validation Scripts (Phase 1.3 - ✅ Complete 2025-01-12):**
+- `scripts/documentation/find-markdown-files.js` - ✅ Created (3,328 bytes)
+  - Recursively finds all markdown files in repository
+  - Excludes: node_modules, .git, dev, build artifacts
+  - Output modes: human-readable (grouped by directory), JSON, count-only
+  - Zero external dependencies (Node.js built-in modules only)
+- `scripts/documentation/categorize-files.js` - ✅ Created (6,504 bytes)
+  - Categorizes files as "stay" (44) or "move" (118)
+  - Provides suggested destination paths
+  - Flags .plans/ content for manual review
+  - Implements all stay/move rules from project requirements
+- `scripts/documentation/validate-links.js` - ✅ Created (6,501 bytes)
+  - Validates internal markdown links
+  - Checks if linked files exist
+  - Resolves relative paths correctly
+  - Reports broken links with line numbers
+- `scripts/documentation/README.md` - ✅ Created (10,256 bytes)
+  - Comprehensive usage documentation
+  - Integration with CI/CD guidance
+  - Development and troubleshooting sections
+  - Workflow examples
+
+**Implementation Tracking Documents (Phase 2 - ✅ Complete 2025-01-12):**
+- `dev/parked/subdomain-provisioning/` - ✅ Created
+  - `implementation-tracking.md` - Moved from SUBDOMAIN_PROVISIONING_IMPLEMENTATION.md
+  - `README.md` - Project context (status: Phase 0-2 complete, paused)
+- `dev/parked/organization-module/` - ✅ Created
+  - `implementation-tracking.md` - Moved from ORGANIZATION_MODULE_IMPLEMENTATION.md
+  - `README.md` - Project context (status: ✅ Complete 2025-10-30)
+- `dev/parked/frontend-integration-testing/` - ✅ Created
+  - `testing-guide.md` - Moved from FRONTEND_INTEGRATION_TESTING.md
+  - `README.md` - Testing guide context
 
 **Migration Artifacts (Future Phases - ⏸️ Pending):**
 - `documentation/MIGRATION_REPORT.md` - Summary of all moves and findings
@@ -264,6 +292,32 @@ From clarifying questions:
 - Frontend has validation workflow that needs updating
 - CI/CD workflows reference documentation paths (need updates)
 
+## Important Learnings & Gotchas
+
+### Phase 1 Learnings
+1. **File Count Updates**: After Phase 2 completion, markdown file count decreased from 162 → 160 (moved 3 tracking docs to dev/parked/, but they were excluded from original count). Actual count before Phase 2: 162. After Phase 2: 159 (3 moved from root). Current validation scripts show 160. - Discovered 2025-01-12
+
+2. **Script Testing Results**: All validation scripts work correctly with current repository structure:
+   - find-markdown-files.js: Reports 160 files
+   - categorize-files.js: Shows 44 stay, 116 move (updated after Phase 2)
+   - validate-links.js: Shows 9 broken links (all pre-existing in .claude/skills and documentation/ placeholders, not caused by migration)
+
+3. **Git History Preservation**: Using `git mv` successfully preserves file history. Git status correctly shows files as "R" (renamed) rather than deleted+added. - Confirmed 2025-01-12
+
+### Phase 2 Learnings
+1. **Context READMEs Are Valuable**: Creating README.md in each dev/parked/ subdirectory provides essential context:
+   - Why the project was parked
+   - Current status and completion state
+   - How to resume work
+   - Related documentation references
+   - This pattern should be followed for ALL parked projects
+
+2. **Implementation Tracking Documents**: Three types identified:
+   - **In-Progress** (subdomain-provisioning): Paused at stable checkpoint
+   - **Complete** (organization-module): Finished and in production
+   - **One-Time Guides** (frontend-integration-testing): Specific to completed implementation
+   - Each type needs different README context
+
 ## Important Constraints
 
 ### Must Not Break
@@ -350,8 +404,8 @@ This defeats the entire purpose of documentation consolidation.
 
 ## Current Status
 
-**Phase**: Phase 1 - Structure Creation & Planning
-**Status**: 🚧 IN PROGRESS (Phases 1.1 & 1.2 Complete)
+**Phase**: Phase 2 - Implementation Tracking Document Migration
+**Status**: ✅ COMPLETE
 **Last Updated**: 2025-01-12
 
 **Phase 0 - Discovery & Planning** ✅ COMPLETE:
@@ -398,7 +452,68 @@ This defeats the entire purpose of documentation consolidation.
 - ✅ Added "Contributing to Documentation" guidelines (placement, structure, cross-references, quality)
 - ✅ Added "Migration Information" section with phase status and old location mappings
 
+**Phase 1.3 - Create Validation Scripts** ✅ COMPLETE (2025-01-12):
+- ✅ Created `scripts/documentation/` directory at repository root
+- ✅ Created three automation scripts (all zero dependencies, Node.js built-in modules only):
+  - **find-markdown-files.js** - Recursively finds all markdown files
+    - Excludes: node_modules, .git, dev, build artifacts (.next, dist, build, coverage, .temporal)
+    - Found: 162 markdown files in current repository
+    - Output modes: human-readable (grouped by directory), JSON, count-only
+  - **categorize-files.js** - Categorizes files as "stay" or "move"
+    - Stay rules: CLAUDE.md, README.md, .claude/, dev/, infrastructure/supabase/contracts/
+    - Current breakdown: 44 files stay, 118 files move
+    - Provides suggested destination paths for files to move
+    - Flags .plans/ and .archived_plans/ for manual review (Phase 3.5)
+  - **validate-links.js** - Validates internal markdown links
+    - Finds all markdown links: [text](path)
+    - Checks if linked files exist
+    - Resolves relative paths correctly
+    - Current status: 503 total links, 256 internal links, 9 broken links (pre-existing)
+- ✅ All scripts executable and tested on full repository
+- ✅ Created comprehensive README.md (scripts/documentation/README.md)
+  - Script usage examples
+  - Output format documentation
+  - Integration with CI/CD guidance
+  - Development and troubleshooting sections
+  - Workflow examples
+
+**Phase 2.1 - Identify WIP Tracking Documents** ✅ COMPLETE (2025-01-12):
+- ✅ Identified 3 WIP tracking documents in repository root:
+  - **SUBDOMAIN_PROVISIONING_IMPLEMENTATION.md** - Status: Phase 0-2 Complete
+    - Temporal-first subdomain provisioning implementation
+    - Non-blocking bootstrap with background DNS verification
+    - Paused after completing infrastructure phases
+  - **ORGANIZATION_MODULE_IMPLEMENTATION.md** - Status: ✅ Complete (2025-10-30)
+    - Full-stack organization management with CQRS/Event Sourcing
+    - Complete implementation including frontend, backend, workflows, and testing
+    - Production-ready, all phases complete
+  - **FRONTEND_INTEGRATION_TESTING.md** - Status: Configuration Complete (2025-10-30)
+    - Integration testing guide for Organization Module
+    - Step-by-step testing procedures for Edge Functions and database
+    - Testing guide specific to Organization Module implementation
+- ✅ No other WIP tracking documents found in repository root
+
+**Phase 2.2 - Move to dev/parked/** ✅ COMPLETE (2025-01-12):
+- ✅ Created three subdirectories under dev/parked/:
+  - `dev/parked/subdomain-provisioning/` - For subdomain provisioning project
+  - `dev/parked/organization-module/` - For organization module project
+  - `dev/parked/frontend-integration-testing/` - For integration testing guide
+- ✅ Moved all tracking documents using `git mv` (preserves history):
+  - SUBDOMAIN_PROVISIONING_IMPLEMENTATION.md → dev/parked/subdomain-provisioning/implementation-tracking.md
+  - ORGANIZATION_MODULE_IMPLEMENTATION.md → dev/parked/organization-module/implementation-tracking.md
+  - FRONTEND_INTEGRATION_TESTING.md → dev/parked/frontend-integration-testing/testing-guide.md
+- ✅ Created comprehensive README.md in each subdirectory:
+  - Project overview and architecture summary
+  - Current status and completion state
+  - Explanation of why project was parked
+  - Related documentation references
+  - Instructions for resuming work (where applicable)
+  - Reference value for future developers
+
 **Next Steps**:
-1. Phase 1.3 - Create Validation Scripts (markdown file finder, file categorization, link validation)
-2. Phase 2 - Implementation Tracking Document Migration
-3. Phase 3 - Documentation Migration (119 files to move and reorganize)
+1. Phase 3 - Documentation Migration (118 files to move and reorganize)
+   - 3.1 - Move Root-Level Documentation
+   - 3.2 - Move Infrastructure Documentation
+   - 3.3 - Move Frontend Documentation
+   - 3.4 - Move Workflow Documentation
+   - 3.5 - Audit and Categorize Planning Documentation
