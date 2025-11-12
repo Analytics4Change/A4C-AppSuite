@@ -78,7 +78,7 @@
 - [x] Move FRONTEND_INTEGRATION_TESTING.md → testing-guide.md
 - [x] Create README.md in each subdirectory explaining project context
 
-## Phase 3: Documentation Migration ✅ 73% COMPLETE
+## Phase 3: Documentation Migration ✅ COMPLETE
 
 ### 3.1 Move Root-Level Documentation (2 files) ✅ COMPLETE
 - [x] Identify all root-level markdown files to move
@@ -116,59 +116,92 @@
 - [x] Move workflows/IMPLEMENTATION.md → documentation/workflows/guides/implementation.md
 - [x] Verify workflows/CLAUDE.md doesn't exist (no references to update)
 
-### 3.5 Audit and Categorize Planning Documentation
+### 3.5 Audit and Categorize Planning Documentation ✅ COMPLETE
 
-**Step 1: Audit .plans/ directories (1.5 hours)**
-- [ ] Audit `.plans/auth-integration` - Determine: aspirational, current, or deprecated
-- [ ] Audit `.plans/cloudflare-remote-access` - Determine status
-- [ ] Audit `.plans/consolidated` - Determine status
-- [ ] Audit `.plans/event-resilience` - Determine status
-- [ ] Audit `.plans/impersonation` - Determine status
-- [ ] Audit `.plans/in-progress` - Determine status
-- [ ] Audit `.plans/multi-tenancy` - Determine status
-- [ ] Audit `.plans/organization-management` - Determine status
-- [ ] Audit `.plans/provider-partners` - Determine status
-- [ ] Audit `.plans/rbac-permissions` - Determine status (likely CURRENT)
-- [ ] Audit `.plans/supabase-auth-integration` - Determine status (likely CURRENT)
-- [ ] Audit `.plans/temporal-integration` - Determine status (likely CURRENT)
-- [ ] Audit `.plans/zitadel-integration` - Mark as DEPRECATED (Zitadel no longer used)
-- [ ] Audit `.archived_plans/provider-management` - Determine status
-- [ ] Audit `.archived_plans/zitadel` - Mark as DEPRECATED
-- [ ] Document categorization results
+**Step 1: Audit .plans/ directories ✅ COMPLETE**
+- [x] Create comprehensive audit summary (dev/active/planning-docs-audit-summary.md)
+- [x] Audit all 15 planning directories
+- [x] Verify implementation status with user (cloudflare, provider-partners, temporal, event-resilience)
+- [x] Categorize as CURRENT (20 files), ASPIRATIONAL (10 files), or DEPRECATED (6 files)
+- [x] Special handling: Identify files requiring split/conversion
 
-**Step 2: Move According to Category (1.5 hours)**
-- [ ] Move CURRENT planning docs to appropriate locations
-  - [ ] Example: supabase-auth-integration → documentation/architecture/authentication/
-  - [ ] Example: rbac-permissions → documentation/architecture/authorization/
-  - [ ] Example: temporal-integration → documentation/architecture/workflows/
-- [ ] Move ASPIRATIONAL planning docs to documentation/architecture/ with status tags
-- [ ] Leave DEPRECATED planning docs in original locations
-- [ ] Update internal links in moved planning docs
+**Step 2: Move According to Category ✅ COMPLETE**
+- [x] Move 20 CURRENT files to appropriate locations with frontmatter
+  - [x] Supabase Auth (3 files) → documentation/architecture/authentication/
+  - [x] Temporal integration (4 files) → documentation/architecture/workflows/ and documentation/workflows/
+  - [x] RBAC permissions (2 files) → documentation/architecture/authorization/
+  - [x] Organization management (2 files) → documentation/architecture/data/
+  - [x] In-progress (3 files) → various locations
+  - [x] Auth integration (1 file) → documentation/architecture/data/
+  - [x] Cloudflare remote access (2 files) → documentation/infrastructure/guides/cloudflare/
+- [x] Move 10 ASPIRATIONAL files with status tags and inline warnings
+  - [x] Impersonation (5 files) → documentation/architecture/authentication/
+  - [x] Enterprise SSO (1 file) → documentation/architecture/authentication/
+  - [x] Organizational deletion UX (1 file) → documentation/architecture/authorization/
+  - [x] Provider partners (2 files) → documentation/architecture/data/
+  - [x] Event resilience (1 file) → documentation/frontend/architecture/
+- [x] Leave 6 DEPRECATED files for historical reference (.archived_plans/)
 
-**Step 3: Handle Original Directories (15 min)**
-- [ ] Create `.plans/README.md` explaining migration
-- [ ] Add note that active planning docs moved to documentation/architecture/
-- [ ] Verify deprecated content remains for historical reference
+**Step 3: Special Handling ✅ COMPLETE**
+- [x] Split consolidated/agent-observations.md:
+  - [x] Extract CQRS content → documentation/architecture/data/event-sourcing-overview.md
+  - [x] Update Zitadel → Supabase Auth references
+  - [x] Rename original → agent-observations-zitadel-deprecated.md
+  - [x] Add deprecation warning to deprecated file
+- [x] Convert multi-tenancy HTML to Markdown:
+  - [x] Install pandoc (user installed during session)
+  - [x] Convert HTML → Markdown (930 lines)
+  - [x] Update all Zitadel → Supabase Auth references
+  - [x] Clean up HTML artifacts
+  - [x] Add frontmatter → documentation/architecture/data/multi-tenancy-architecture.md
+
+**Step 4: Add Frontmatter to All Migrated Files ✅ COMPLETE**
+- [x] Create frontmatter script (/tmp/add-frontmatter.sh)
+- [x] Add YAML frontmatter to 20 CURRENT files (status: current)
+- [x] Add YAML frontmatter to 10 ASPIRATIONAL files (status: aspirational)
+- [x] Add inline warning markers to all ASPIRATIONAL files
+
+**Step 5: Create Migration Documentation ✅ COMPLETE**
+- [x] Create `.plans/README.md` explaining migration (comprehensive with all details)
+- [x] Document new locations for all migrated files
+- [x] Explain special cases (split + conversion)
+- [x] List deprecated content preserved for historical reference
+- [x] Note implementation status clarifications
 
 ## Phase 4: Technical Reference Validation ⏸️ PENDING
 
-### 4.1 Validate API Contracts & Schemas
-- [ ] Identify documented function signatures
-- [ ] Compare against actual code implementations
-- [ ] Verify REST endpoint documentation
-- [ ] Check GraphQL schemas against implementation
-- [ ] Validate AsyncAPI event schemas (in infrastructure/supabase/contracts/)
-- [ ] Document drift findings in spreadsheet
-- [ ] Create summary of API drift
+### 4.1 Validate API Contracts & Schemas ✅ COMPLETE
+- [x] Identify documented function signatures
+- [x] Compare against actual code implementations
+- [x] Verify REST endpoint documentation (N/A - no REST endpoints documented)
+- [x] Check GraphQL schemas against implementation (N/A - no GraphQL)
+- [x] Validate AsyncAPI event schemas (deferred to Phase 4.4)
+- [x] Document drift findings in report
+- [x] Create summary of API drift (dev/active/phase-4-1-api-validation-report.md)
 
-### 4.2 Validate Database Schemas
-- [ ] Compare table documentation to actual SQL
-- [ ] Verify RLS policy documentation
-- [ ] Check trigger documentation against implementation
-- [ ] Validate function definitions
-- [ ] Compare migration documentation to actual migrations
-- [ ] Document drift findings
-- [ ] Create summary of database drift
+**Findings**:
+- IClientApi: ✅ Perfect match - All 6 methods documented correctly
+- IMedicationApi: ✅ Perfect match - All 9 methods documented correctly
+- SearchableDropdownProps: ⚠️ SIGNIFICANT DRIFT - 73% undocumented (22/30 properties missing)
+- HybridCacheService: ⚠️ MODERATE DRIFT - Generic docs vs specialized implementation
+- AsyncAPI contracts: ✅ Exist but validation deferred to Phase 4.4 (requires code analysis)
+
+### 4.2 Validate Database Schemas ✅ COMPLETE
+- [x] Compare table documentation to actual SQL
+- [x] Verify RLS policy documentation
+- [x] Check trigger documentation against implementation
+- [x] Validate function definitions
+- [x] Compare migration documentation to actual migrations
+- [x] Document drift findings
+- [x] Create summary of database drift (dev/active/phase-4-2-database-validation-report.md)
+
+**Critical Finding**: ⚠️ ZERO dedicated database schema documentation exists
+- **Tables**: 12 implemented, 0 documented (clients, medications, organizations, etc.)
+- **RLS Policies**: Multiple implemented, 0 documented
+- **Triggers**: 3 implemented, 0 documented
+- **Functions**: 13 implemented, 0 documented
+- **Impact**: HIGH - Major developer onboarding and maintenance barrier
+- **Recommendation**: Create comprehensive database schema reference (est. 40 hours)
 
 ### 4.3 Validate Configuration References
 - [ ] Check environment variable documentation against actual .env files
@@ -334,9 +367,10 @@
 
 ## Current Status
 
-**Phase**: Phase 3 - Documentation Migration
-**Status**: ✅ 73% COMPLETE (85/116 files migrated)
+**Phase**: Phase 4 - Technical Reference Validation
+**Status**: ✅ 50% COMPLETE (Phase 4.1-4.2 done, 4.3-4.4 pending)
 **Last Updated**: 2025-01-12
+
 **Completed Phases**:
 - Phase 1.1 - Create Directory Structure (40 directories, 7 README files) ✅
 - Phase 1.2 - Create Master Index Template (343-line README) ✅
@@ -346,19 +380,34 @@
 - Phase 3.2 - Move Infrastructure Documentation (22 files) ✅
 - Phase 3.3 - Move Frontend Documentation (58 files) ✅
 - Phase 3.4 - Move Workflow Documentation (1 file) ✅
+- Phase 3.5 - Audit and Categorize Planning Documentation (30 files + 2 special handling) ✅
+- Phase 4.1 - Validate API Contracts & Schemas ✅
+- Phase 4.2 - Validate Database Schemas ✅
 
-**Recent Progress (3 commits)**:
-- Commit f2ebc2f9: Phase 3.1-3.2 (24 files, updated infrastructure/CLAUDE.md)
-- Commit b8c13894: Phase 3.3 (58 frontend files, updated frontend/CLAUDE.md)
-- Commit cbbf65ed: Phase 3.4 (1 workflow file)
+**Recent Progress (2025-01-12)**:
+- **Phase 4.1 complete**: API contracts validation
+  - IClientApi, IMedicationApi: ✅ Perfect matches
+  - SearchableDropdownProps: ⚠️ 73% undocumented (critical gap)
+  - HybridCacheService: ⚠️ Docs describe generic, code is specialized
+  - Created 29KB validation report: dev/active/phase-4-1-api-validation-report.md
 
-**Current File Counts**:
-- Total files in repo: 159 markdown files
-- Files migrated: 85 (73%)
-- Files remaining: 31 (stay in place) + 33 (planning docs need audit)
-- Broken links: 54 (expected, deferred to Phase 6.1)
+- **Phase 4.2 complete**: Database schema validation
+  - Found ZERO dedicated schema documentation for 12 tables
+  - Database implementation is technically sound (RLS, triggers, functions working)
+  - Identified critical documentation gap (40+ hours to fix)
+  - Created 28KB validation report: dev/active/phase-4-2-database-validation-report.md
 
-**Next Step**: Phase 3.5 - Audit and Categorize Planning Documentation (33 files in .plans/ and .archived_plans/)
+**Validation Reports Created**:
+- dev/active/phase-4-1-api-validation-report.md (29KB)
+- dev/active/phase-4-2-database-validation-report.md (28KB)
+
+**Key Findings**:
+- ✅ **Strengths**: Core API interfaces perfectly documented
+- ⚠️ **Critical Gap**: Database schemas completely undocumented (HIGH impact)
+- ⚠️ **High Priority**: SearchableDropdownProps 73% undocumented
+- ⚠️ **Medium Priority**: HybridCacheService architectural mismatch
+
+**Next Step**: Phase 4.3 - Validate Configuration References (env vars, configs, secrets)
 
 **How to Resume After /clear**:
 ```bash
@@ -366,8 +415,11 @@
 cat dev/active/documentation-grooming-context.md
 cat dev/active/documentation-grooming-tasks.md
 
-# Then continue: "Read dev/active/documentation-grooming-*.md and continue with Phase 3.5"
-# Phase 3.5 requires manual audit of 33 planning docs to categorize as current/aspirational/deprecated
+# Read validation reports
+cat dev/active/phase-4-1-api-validation-report.md
+cat dev/active/phase-4-2-database-validation-report.md
+
+# Then continue: "Read dev/active/documentation-grooming-*.md and continue with Phase 4.3"
 ```
 
 ## Execution Notes

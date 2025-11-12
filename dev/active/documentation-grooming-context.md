@@ -30,6 +30,17 @@
 
 6. **Update CI/CD Workflows**: Frontend validation workflow and scripts must be updated to reference new documentation paths. This is an acceptable trade-off for consistency.
 
+7. **Planning Documentation Special Handling** (Added 2025-01-12):
+   - **Split large consolidated docs**: When a single planning doc mixes current architecture (CQRS) with deprecated content (Zitadel), split into separate files. Extract current content to new location, rename original with deprecation suffix.
+   - **Convert HTML planning docs**: Use pandoc to convert HTML documentation to Markdown. Update all deprecated technology references (Zitadel → Supabase Auth) during conversion.
+   - **Verify implementation status with user**: Don't rely solely on status markers in planning docs. Ask user to confirm actual deployment status, especially for infrastructure features.
+
+8. **Implementation Status Reality Check** (Added 2025-01-12):
+   - **Cloudflare remote access**: Planning doc unclear, but user confirmed SSH via cloudflared proxy is operational → CURRENT
+   - **Provider partners**: Planning doc showed "✅ Integrated" but user corrected → ASPIRATIONAL (database schema exists, needs frontend/data work)
+   - **Temporal workflows**: Planning doc said "Design Complete - Not Implemented" but 303-line implementation exists in workflows/ → CURRENT at 80%
+   - **Event resilience**: HTTP-level resilience exists (CircuitBreaker, ResilientHttpClient) but domain event offline queue does not → ASPIRATIONAL
+
 ## Technical Context
 
 ### Architecture
@@ -98,6 +109,18 @@ The new `documentation/` directory sits at repository root alongside existing co
   - `documentation/frontend/testing/` - ✅ Created
   - `documentation/frontend/performance/` - ✅ Created
 - `documentation/workflows/README.md` - ✅ Workflow documentation index
+
+**Phase 3.5 New Files (✅ Created 2025-01-12):**
+- `documentation/architecture/data/event-sourcing-overview.md` - ✅ Extracted CQRS/Event Sourcing content from agent-observations.md
+- `documentation/architecture/data/multi-tenancy-architecture.md` - ✅ Converted from multi-tenancy-organization.html (930 lines)
+- `.plans/README.md` - ✅ Migration explanation document
+- `dev/active/planning-docs-audit-summary.md` - ✅ Comprehensive audit of all planning documentation (24KB)
+- `.plans/consolidated/agent-observations-zitadel-deprecated.md` - ✅ Renamed from agent-observations.md with deprecation warning
+- `/tmp/add-frontmatter.sh` - ✅ Utility script for adding YAML frontmatter to migrated files
+
+**Phase 4.1-4.2 Validation Reports (✅ Created 2025-01-12):**
+- `dev/active/phase-4-1-api-validation-report.md` - ✅ API contracts & schemas validation (comprehensive 29KB report)
+- `dev/active/phase-4-2-database-validation-report.md` - ✅ Database schema validation (comprehensive 28KB report)
   - `documentation/workflows/getting-started/` - ✅ Created
   - `documentation/workflows/architecture/` - ✅ Created
   - `documentation/workflows/guides/` - ✅ Created
@@ -337,6 +360,78 @@ From clarifying questions:
 
 ## Important Constraints
 
+### Phase 3.5 Learnings (Added 2025-01-12)
+
+**Planning Doc Status Markers Are Often Outdated**:
+- Planning documents frequently have status markers that don't reflect actual implementation
+- Always verify with user or check actual code before categorizing as CURRENT vs ASPIRATIONAL
+- Example: temporal-workflow-design.md said "Design Complete - Not Implemented" but 303-line implementation existed
+
+**Pandoc Availability Cannot Be Assumed**:
+- User had to install pandoc during session for HTML conversion
+- Have fallback plan for HTML → Markdown conversion if pandoc unavailable
+- Discovered during multi-tenancy-organization.html conversion
+
+**Zitadel → Supabase Auth Migration is Complete**:
+- All references to Zitadel in documentation need updating to Supabase Auth
+- Migration completed October 2025
+- Preserved deprecated Zitadel docs in .archived_plans/ for historical reference
+- sed find/replace patterns: `s/Zitadel Cloud/Supabase Auth/g`, `s/Zitadel organizations/Database organization records/g`, etc.
+
+**Infrastructure Feature Status Requires User Verification**:
+- Infrastructure features (cloudflare, networking) may be operational without explicit documentation updates
+- User knows actual deployment state better than planning docs
+- Ask user to confirm operational status before categorizing
+
+**CQRS/Event-Sourcing Content is Transversal**:
+- Event-sourcing architecture spans all planning docs (not specific to one feature)
+- Should be extracted to standalone doc when found mixed with deprecated content
+- Lives in `documentation/architecture/data/` as foundational cross-cutting concern
+
+### Phase 4.1-4.2 Learnings (Added 2025-01-12)
+
+**Frontend API Documentation is Generally Accurate**:
+- Core interfaces (IClientApi, IMedicationApi) match implementation exactly
+- Type-level validation shows strong documentation discipline
+- Problem areas: UI components and specialized services
+
+**UI Component Documentation Has Significant Drift**:
+- SearchableDropdownProps: 73% undocumented (22/30 properties missing)
+- Documentation describes basic 8-property interface, implementation has 30 properties
+- Root cause: Component evolved rapidly, docs didn't keep pace
+- Pattern: Documentation written early, not updated during feature expansion
+
+**Specialized vs Generic Implementation Mismatch**:
+- HybridCacheService documented as generic `key/value` cache
+- Actual implementation specialized for medication search (`query: string, medications: Medication[]`)
+- Root cause: Initial architecture envisioned reusable cache, implementation optimized for specific use case
+- Documentation describes aspirational generic design, not current specialized reality
+
+**Critical Database Schema Documentation Gap**:
+- **ZERO dedicated database schema documentation** despite 12 production tables
+- High-level architecture docs exist (CQRS, multi-tenancy concepts)
+- No table schemas, no RLS policy docs, no function reference
+- Developers must read SQL files directly - major onboarding barrier
+- Impact: High - blocks database development and maintenance
+
+**AsyncAPI Contracts Exist But Aren't Validated**:
+- Event contracts defined in `infrastructure/supabase/contracts/asyncapi/`
+- Documents domain events (ClientRegistered, MedicationPrescribed, etc.)
+- Deferred validation to Phase 4.4 (requires code analysis to verify emission)
+
+**Database Implementation is Technically Sound**:
+- Proper use of PostgreSQL features (RLS, triggers, functions)
+- Idempotent migrations with `IF NOT EXISTS`
+- Event-driven CQRS architecture implemented correctly
+- Problem is purely documentation, not implementation
+
+**Documentation Excellence Gap Between Frontend and Database**:
+- Frontend: 50+ component docs, automated validation, template-driven
+- Database: 0 schema docs, no validation tooling, no templates
+- Same codebase, vastly different documentation cultures
+
+## Important Constraints
+
 ### Must Not Break
 - GitHub README.md display at directory roots
 - Claude Code infrastructure in .claude/
@@ -421,8 +516,8 @@ This defeats the entire purpose of documentation consolidation.
 
 ## Current Status
 
-**Phase**: Phase 3 - Documentation Migration
-**Status**: ✅ 73% COMPLETE (85/116 files migrated)
+**Phase**: Phase 4 - Technical Reference Validation
+**Status**: ✅ 50% COMPLETE (Phase 4.1-4.2 done, 4.3-4.4 pending)
 **Last Updated**: 2025-01-12
 
 **Completed Phases**:
@@ -433,37 +528,38 @@ This defeats the entire purpose of documentation consolidation.
 - ✅ Phase 3.2 - Move Infrastructure Documentation (22 files)
 - ✅ Phase 3.3 - Move Frontend Documentation (58 files)
 - ✅ Phase 3.4 - Move Workflow Documentation (1 file)
+- ✅ Phase 3.5 - Audit and Categorize Planning Documentation (30 files + 2 special handling)
+- ✅ Phase 4.1 - Validate API Contracts & Schemas
+- ✅ Phase 4.2 - Validate Database Schemas
 
-**Recent Commits (2025-01-12)**:
-1. **f2ebc2f9** - Phase 3.1-3.2: Moved 24 files (root + infrastructure)
-   - Moved 2 root docs to documentation/infrastructure/operations/
-   - Moved 22 infrastructure docs to documentation/infrastructure/guides/
-   - Updated 6 references in infrastructure/CLAUDE.md
-   - Fixed broken link in FAQ.md
-
-2. **b8c13894** - Phase 3.3: Moved 58 frontend files
-   - Moved all frontend/docs/ subdirectories to documentation/frontend/
-   - Replaced placeholder README with comprehensive 496-line version
-   - Updated 2 references in frontend/CLAUDE.md
-   - Cleaned up empty subdirectories
-
-3. **cbbf65ed** - Phase 3.4: Moved 1 workflow file
-   - Moved workflows/IMPLEMENTATION.md to documentation/workflows/guides/
+**Recent Progress (2025-01-12)**:
+- **Phase 4.1 complete**: Validated frontend API contracts (IClientApi, IMedicationApi, HybridCacheService, SearchableDropdownProps)
+  - Found 2 perfect matches, 2 with significant drift
+  - Created comprehensive 29KB validation report
+  - Identified critical documentation gap: SearchableDropdownProps 73% undocumented
+- **Phase 4.2 complete**: Validated database schemas against documentation
+  - Found ZERO dedicated schema documentation for 12 production tables
+  - Database implementation is technically sound (RLS, triggers, functions all working)
+  - Created comprehensive 28KB validation report
+  - Identified critical need: 40+ hours to document database schemas
 
 **Migration Statistics**:
 - **Total markdown files**: 159
-- **Files migrated**: 85 (73% complete)
+- **Files migrated**: 115 (99% complete)
 - **Files staying in place**: 31 (CLAUDE.md, README.md, .claude/*, dev/*, contracts/)
-- **Files pending audit**: 33 (planning docs in .plans/ and .archived_plans/)
-- **Broken links**: 54 (expected after migration, will fix in Phase 6.1)
+- **Deprecated files preserved**: 6 (historical reference in .archived_plans/)
+- **Validation reports created**: 2 (Phase 4.1 and 4.2)
+
+**Key Findings from Phase 4.1-4.2**:
+- **Critical Gap**: Database schemas completely undocumented (HIGH impact)
+- **High Priority**: SearchableDropdownProps missing 22/30 properties in docs
+- **Medium Priority**: HybridCacheService docs describe generic design, implementation is specialized
+- **Strengths**: Core API interfaces (IClientApi, IMedicationApi) perfectly documented
 
 **Next Steps**:
-1. **Phase 3.5** - Audit and Categorize Planning Documentation (33 files)
-   - Requires manual review of .plans/ and .archived_plans/ directories
-   - Categorize as current/aspirational/deprecated
-   - Move current/aspirational with status tags
-   - Leave deprecated for historical reference
-2. **Phase 4** - Technical Reference Validation
-3. **Phase 5** - Annotation & Status Marking
-4. **Phase 6** - Cross-Referencing & Master Index
-5. **Phase 7** - Validation, Cleanup, and CI/CD Updates
+1. **Phase 4.3** - Validate Configuration References (env vars, configs, secrets)
+2. **Phase 4.4** - Validate Architecture Descriptions (structure, topology, workflows)
+3. **Phase 4 Final Report** - Consolidate all validation findings
+4. **Phase 5** - Annotation & Status Marking (deferred pending validation completion)
+5. **Phase 6** - Cross-Referencing & Master Index
+6. **Phase 7** - Validation, Cleanup, and CI/CD Updates
