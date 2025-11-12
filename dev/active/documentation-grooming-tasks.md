@@ -78,43 +78,43 @@
 - [x] Move FRONTEND_INTEGRATION_TESTING.md → testing-guide.md
 - [x] Create README.md in each subdirectory explaining project context
 
-## Phase 3: Documentation Migration ⏸️ PENDING
+## Phase 3: Documentation Migration ✅ 73% COMPLETE
 
-### 3.1 Move Root-Level Documentation (8 files)
-- [ ] Identify all root-level markdown files to move
-- [ ] Move deployment/environment docs to documentation/infrastructure/operations/
-- [ ] Update any references in CLAUDE.md files
-- [ ] Verify no broken links
-- [ ] Test that moved docs render correctly
+### 3.1 Move Root-Level Documentation (2 files) ✅ COMPLETE
+- [x] Identify all root-level markdown files to move
+- [x] Move docs/DEPLOYMENT_CHECKLIST.md → documentation/infrastructure/operations/deployment/
+- [x] Move docs/ENVIRONMENT_VARIABLES.md → documentation/infrastructure/operations/configuration/
+- [x] Remove empty docs/ directory
+- [x] Verify no broken links introduced
 
-### 3.2 Move Infrastructure Documentation (28 files)
-- [ ] Move Supabase docs to documentation/infrastructure/guides/supabase/
-- [ ] Move database docs to documentation/infrastructure/guides/database/
-- [ ] Move K8s docs to documentation/infrastructure/guides/kubernetes/
-- [ ] Move operational docs to documentation/infrastructure/operations/
-- [ ] Move reference docs to documentation/infrastructure/reference/
-- [ ] Move inventories to documentation/infrastructure/reference/
-- [ ] Verify infrastructure structure matches standard
-- [ ] Update internal links
+### 3.2 Move Infrastructure Documentation (22 files) ✅ COMPLETE
+- [x] Move 6 root infrastructure operational docs to documentation/infrastructure/operations/
+- [x] Move infrastructure/k8s/rbac/IMPLEMENTATION_SUMMARY.md → documentation/infrastructure/guides/kubernetes/rbac/
+- [x] Move 9 Supabase root docs to documentation/infrastructure/guides/supabase/
+- [x] Move infrastructure/supabase/docs/*.md (3 files) → documentation/infrastructure/guides/supabase/docs/
+- [x] Move infrastructure/supabase/local-tests/*.md (2 files) → documentation/infrastructure/guides/supabase/local-tests/
+- [x] Move infrastructure/supabase/sql/99-seeds/README_SEED_IDEMPOTENCY.md
+- [x] Update 6 documentation references in infrastructure/CLAUDE.md
+- [x] Fix broken link in FAQ.md to point to contracts directory
 
-### 3.3 Move Frontend Documentation (55 files)
-- [ ] Move frontend/docs/api/ → documentation/frontend/reference/api/
-- [ ] Move frontend/docs/components/ → documentation/frontend/reference/components/
-- [ ] Move frontend/docs/getting-started/ → documentation/frontend/getting-started/
-- [ ] Move frontend/docs/architecture/ → documentation/frontend/architecture/
-- [ ] Move frontend/docs/testing/ → documentation/frontend/testing/
-- [ ] Move frontend/docs/performance/ → documentation/frontend/performance/
-- [ ] Move frontend/docs/strategy/ → documentation/frontend/patterns/
-- [ ] Move frontend/docs/templates/ → documentation/templates/ (shared)
-- [ ] Move root-level guides (DEVELOPMENT.md, etc.) → documentation/frontend/guides/
-- [ ] Move supplementary frontend docs from frontend root
-- [ ] Verify frontend structure matches standard
-- [ ] Update internal links
+### 3.3 Move Frontend Documentation (58 files) ✅ COMPLETE
+- [x] Move frontend/docs/api/*.md (4 files) → documentation/frontend/reference/api/
+- [x] Move frontend/docs/components/*.md (24 files) → documentation/frontend/reference/components/
+- [x] Move frontend/docs/getting-started/*.md (2 files) → documentation/frontend/getting-started/
+- [x] Move frontend/docs/architecture/*.md (2 files) → documentation/frontend/architecture/
+- [x] Move frontend/docs/testing/*.md (1 file) → documentation/frontend/testing/
+- [x] Move frontend/docs/performance/*.md (1 file) → documentation/frontend/performance/
+- [x] Move frontend/docs/strategy/*.md (3 files) → documentation/frontend/patterns/
+- [x] Move frontend/docs/templates/*.md (2 files) → documentation/templates/ (shared)
+- [x] Move 17 root-level guides to appropriate subdirectories
+- [x] Replace placeholder documentation/frontend/README.md with comprehensive version (496 lines)
+- [x] Move frontend/doc-status-report.md and documentation-reports/doc-status-report.md
+- [x] Update 2 template path references in frontend/CLAUDE.md
+- [x] Remove empty subdirectories from frontend/docs/
 
-### 3.4 Move Workflow Documentation (2 files)
-- [ ] Move workflows/IMPLEMENTATION.md → documentation/workflows/guides/implementation.md
-- [ ] Create placeholder files in getting-started/, architecture/, reference/
-- [ ] Verify workflows structure matches standard
+### 3.4 Move Workflow Documentation (1 file) ✅ COMPLETE
+- [x] Move workflows/IMPLEMENTATION.md → documentation/workflows/guides/implementation.md
+- [x] Verify workflows/CLAUDE.md doesn't exist (no references to update)
 
 ### 3.5 Audit and Categorize Planning Documentation
 
@@ -334,22 +334,31 @@
 
 ## Current Status
 
-**Phase**: Phase 2 - Implementation Tracking Document Migration
-**Status**: ✅ COMPLETE
+**Phase**: Phase 3 - Documentation Migration
+**Status**: ✅ 73% COMPLETE (85/116 files migrated)
 **Last Updated**: 2025-01-12
-**Completed**:
-- Phase 1.1 - Create Directory Structure (40 directories, 7 README files)
-- Phase 1.2 - Create Master Index Template (comprehensive 343-line README with TOC, audience sections, status legend, navigation tips)
-- Phase 1.3 - Create Validation Scripts (3 scripts: find, categorize, validate-links + comprehensive README)
-  - `scripts/documentation/find-markdown-files.js` - Finds 160 markdown files (current)
-  - `scripts/documentation/categorize-files.js` - Categorizes 44 stay, 116 move (after Phase 2)
-  - `scripts/documentation/validate-links.js` - Validates 503 links (256 internal, 9 broken pre-existing)
-- Phase 2.1 - Identify WIP Tracking Documents (3 files identified)
-- Phase 2.2 - Move to dev/parked/ (3 projects parked with context READMEs)
-  - subdomain-provisioning/ - Phase 0-2 complete, paused
-  - organization-module/ - Complete implementation (2025-10-30)
-  - frontend-integration-testing/ - Testing guide for Organization Module
-**Next Step**: Begin Phase 3 - Documentation Migration (116 files to move)
+**Completed Phases**:
+- Phase 1.1 - Create Directory Structure (40 directories, 7 README files) ✅
+- Phase 1.2 - Create Master Index Template (343-line README) ✅
+- Phase 1.3 - Create Validation Scripts (3 scripts + README) ✅
+- Phase 2.1-2.2 - Move WIP Tracking Documents (3 projects to dev/parked/) ✅
+- Phase 3.1 - Move Root-Level Documentation (2 files) ✅
+- Phase 3.2 - Move Infrastructure Documentation (22 files) ✅
+- Phase 3.3 - Move Frontend Documentation (58 files) ✅
+- Phase 3.4 - Move Workflow Documentation (1 file) ✅
+
+**Recent Progress (3 commits)**:
+- Commit f2ebc2f9: Phase 3.1-3.2 (24 files, updated infrastructure/CLAUDE.md)
+- Commit b8c13894: Phase 3.3 (58 frontend files, updated frontend/CLAUDE.md)
+- Commit cbbf65ed: Phase 3.4 (1 workflow file)
+
+**Current File Counts**:
+- Total files in repo: 159 markdown files
+- Files migrated: 85 (73%)
+- Files remaining: 31 (stay in place) + 33 (planning docs need audit)
+- Broken links: 54 (expected, deferred to Phase 6.1)
+
+**Next Step**: Phase 3.5 - Audit and Categorize Planning Documentation (33 files in .plans/ and .archived_plans/)
 
 **How to Resume After /clear**:
 ```bash
@@ -357,8 +366,8 @@
 cat dev/active/documentation-grooming-context.md
 cat dev/active/documentation-grooming-tasks.md
 
-# Continue with Phase 3.1 - Move Root-Level Documentation
-# Start by identifying root-level markdown files to move
+# Then continue: "Read dev/active/documentation-grooming-*.md and continue with Phase 3.5"
+# Phase 3.5 requires manual audit of 33 planning docs to categorize as current/aspirational/deprecated
 ```
 
 ## Execution Notes

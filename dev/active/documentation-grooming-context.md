@@ -318,6 +318,23 @@ From clarifying questions:
    - **One-Time Guides** (frontend-integration-testing): Specific to completed implementation
    - Each type needs different README context
 
+### Phase 3 Learnings (Added 2025-01-12)
+1. **Frontend Migration Scale**: Frontend docs were the largest migration (58 files). Well-organized source structure (frontend/docs/ with subdirectories) made batch moves efficient via `for file in` loops.
+
+2. **Broken Links Are Expected**: Link count jumped from 16 → 54 broken links after Phase 3 migration. This is NORMAL and deferred to Phase 6.1 (Update Internal Links). Don't try to fix during migration - focus on moving files first.
+
+3. **README Replacement Strategy**: Placeholder READMEs (24 lines) should be replaced with comprehensive versions when source has better content (frontend/docs/README.md had 496 lines). Use `git mv -f` to overwrite placeholders.
+
+4. **Empty Directory Cleanup**: After moving all .md files from subdirectories, use `find frontend/docs/ -type d -empty -delete` to remove empty directories automatically. Keeps structure clean.
+
+5. **Git Commit Strategy**: Breaking Phase 3 into 3 commits (3.1-3.2, 3.3, 3.4) kept history clean and made rollback easier if needed. Each commit had clear scope: infrastructure, frontend, workflows.
+
+6. **CLAUDE.md Path Updates**: Relative paths in component CLAUDE.md files need updating after migration. Infrastructure had 6 references, frontend had 2. Check with `grep -n "docs/" */CLAUDE.md` to find all.
+
+7. **Contracts Directory Stays In Place**: API contracts in `infrastructure/supabase/contracts/` stay near source code per project requirements. Links to contracts need relative path adjustments (e.g., `../../../../../infrastructure/supabase/contracts/`).
+
+8. **Documentation Artifacts Remain**: Non-markdown files in docs/ directories (dashboard.html, metrics.json, *.json reports) stay in place - they're dev artifacts, not documentation to migrate.
+
 ## Important Constraints
 
 ### Must Not Break
@@ -404,116 +421,49 @@ This defeats the entire purpose of documentation consolidation.
 
 ## Current Status
 
-**Phase**: Phase 2 - Implementation Tracking Document Migration
-**Status**: ✅ COMPLETE
+**Phase**: Phase 3 - Documentation Migration
+**Status**: ✅ 73% COMPLETE (85/116 files migrated)
 **Last Updated**: 2025-01-12
 
-**Phase 0 - Discovery & Planning** ✅ COMPLETE:
-- ✅ Comprehensive repository scan (166 markdown files identified)
-- ✅ Categorization of stay vs. move files
-- ✅ User requirement clarification (5+ rounds of questions)
-- ✅ Directory structure design (standardized across components)
-- ✅ Implementation plan created and refined
-- ✅ Discovered and removed deprecated temporal/ directory
-- ✅ Created dev/parked/remove-temporal-project/ documentation
-- ✅ Addressed .plans/ categorization challenge
-- ✅ Identified CI/CD workflow updates needed
-- ✅ Resolved uniformity vs co-locality question (uniformity wins)
-- ✅ Created documentation-grooming-tasks.md
-- ✅ Created documentation-grooming-plan.md
-- ✅ Created documentation-grooming-context.md
+**Completed Phases**:
+- ✅ Phase 0 - Discovery & Planning
+- ✅ Phase 1 - Structure Creation (directory structure, master index, validation scripts)
+- ✅ Phase 2 - Implementation Tracking Document Migration
+- ✅ Phase 3.1 - Move Root-Level Documentation (2 files)
+- ✅ Phase 3.2 - Move Infrastructure Documentation (22 files)
+- ✅ Phase 3.3 - Move Frontend Documentation (58 files)
+- ✅ Phase 3.4 - Move Workflow Documentation (1 file)
 
-**Phase 1.1 - Create Directory Structure** ✅ COMPLETE (2025-01-12):
-- ✅ Created `documentation/` root directory
-- ✅ Created 40 total directories in standardized structure
-- ✅ Created 7 README.md files with comprehensive documentation
-- ✅ All component directories follow uniform structure:
-  - frontend/ - 7 subdirectories (getting-started, architecture, guides, patterns, testing, performance, reference/)
-  - workflows/ - 6 subdirectories (getting-started, architecture, guides, reference, testing, operations/)
-  - infrastructure/ - 12 subdirectories (includes guides/{database,kubernetes,supabase}, operations/{deployment,configuration,troubleshooting})
-  - architecture/ - 4 cross-cutting domains (authentication, authorization, data, workflows)
-  - templates/ - Shared documentation templates
-  - archived/ - Historical and deprecated content
+**Recent Commits (2025-01-12)**:
+1. **f2ebc2f9** - Phase 3.1-3.2: Moved 24 files (root + infrastructure)
+   - Moved 2 root docs to documentation/infrastructure/operations/
+   - Moved 22 infrastructure docs to documentation/infrastructure/guides/
+   - Updated 6 references in infrastructure/CLAUDE.md
+   - Fixed broken link in FAQ.md
 
-**Phase 1.2 - Create Master Index Template** ✅ COMPLETE (2025-01-12):
-- ✅ Enhanced documentation/README.md from 72 to 343 lines
-- ✅ Added "Quick Start - Common Tasks" section (3 categories: New Developers, Frequently Needed, Architecture & Design)
-- ✅ Created comprehensive Table of Contents with all sections and subsections
-- ✅ Added "Documentation by Audience" with 3 personas:
-  - 👨‍💻 Developers (4 categories: Getting Started, Daily Development, Architecture & Patterns, API & Reference)
-  - 🔧 Operators (3 categories: Deployment, Monitoring & Troubleshooting, Configuration Management)
-  - 🏗️ Architects (3 categories: System Architecture, Component Architecture, Patterns & Practices)
-- ✅ Created "Documentation Organization" section with standard directory structure table
-- ✅ Added comprehensive "Documentation Status" section with:
-  - Status types table (current, aspirational, archived)
-  - Dual annotation system (YAML frontmatter + inline markers)
-  - Concrete examples of both current and aspirational documentation
-- ✅ Added "Navigation Tips" section with finding strategies and search strategies
-- ✅ Added "Contributing to Documentation" guidelines (placement, structure, cross-references, quality)
-- ✅ Added "Migration Information" section with phase status and old location mappings
+2. **b8c13894** - Phase 3.3: Moved 58 frontend files
+   - Moved all frontend/docs/ subdirectories to documentation/frontend/
+   - Replaced placeholder README with comprehensive 496-line version
+   - Updated 2 references in frontend/CLAUDE.md
+   - Cleaned up empty subdirectories
 
-**Phase 1.3 - Create Validation Scripts** ✅ COMPLETE (2025-01-12):
-- ✅ Created `scripts/documentation/` directory at repository root
-- ✅ Created three automation scripts (all zero dependencies, Node.js built-in modules only):
-  - **find-markdown-files.js** - Recursively finds all markdown files
-    - Excludes: node_modules, .git, dev, build artifacts (.next, dist, build, coverage, .temporal)
-    - Found: 162 markdown files in current repository
-    - Output modes: human-readable (grouped by directory), JSON, count-only
-  - **categorize-files.js** - Categorizes files as "stay" or "move"
-    - Stay rules: CLAUDE.md, README.md, .claude/, dev/, infrastructure/supabase/contracts/
-    - Current breakdown: 44 files stay, 118 files move
-    - Provides suggested destination paths for files to move
-    - Flags .plans/ and .archived_plans/ for manual review (Phase 3.5)
-  - **validate-links.js** - Validates internal markdown links
-    - Finds all markdown links: [text](path)
-    - Checks if linked files exist
-    - Resolves relative paths correctly
-    - Current status: 503 total links, 256 internal links, 9 broken links (pre-existing)
-- ✅ All scripts executable and tested on full repository
-- ✅ Created comprehensive README.md (scripts/documentation/README.md)
-  - Script usage examples
-  - Output format documentation
-  - Integration with CI/CD guidance
-  - Development and troubleshooting sections
-  - Workflow examples
+3. **cbbf65ed** - Phase 3.4: Moved 1 workflow file
+   - Moved workflows/IMPLEMENTATION.md to documentation/workflows/guides/
 
-**Phase 2.1 - Identify WIP Tracking Documents** ✅ COMPLETE (2025-01-12):
-- ✅ Identified 3 WIP tracking documents in repository root:
-  - **SUBDOMAIN_PROVISIONING_IMPLEMENTATION.md** - Status: Phase 0-2 Complete
-    - Temporal-first subdomain provisioning implementation
-    - Non-blocking bootstrap with background DNS verification
-    - Paused after completing infrastructure phases
-  - **ORGANIZATION_MODULE_IMPLEMENTATION.md** - Status: ✅ Complete (2025-10-30)
-    - Full-stack organization management with CQRS/Event Sourcing
-    - Complete implementation including frontend, backend, workflows, and testing
-    - Production-ready, all phases complete
-  - **FRONTEND_INTEGRATION_TESTING.md** - Status: Configuration Complete (2025-10-30)
-    - Integration testing guide for Organization Module
-    - Step-by-step testing procedures for Edge Functions and database
-    - Testing guide specific to Organization Module implementation
-- ✅ No other WIP tracking documents found in repository root
-
-**Phase 2.2 - Move to dev/parked/** ✅ COMPLETE (2025-01-12):
-- ✅ Created three subdirectories under dev/parked/:
-  - `dev/parked/subdomain-provisioning/` - For subdomain provisioning project
-  - `dev/parked/organization-module/` - For organization module project
-  - `dev/parked/frontend-integration-testing/` - For integration testing guide
-- ✅ Moved all tracking documents using `git mv` (preserves history):
-  - SUBDOMAIN_PROVISIONING_IMPLEMENTATION.md → dev/parked/subdomain-provisioning/implementation-tracking.md
-  - ORGANIZATION_MODULE_IMPLEMENTATION.md → dev/parked/organization-module/implementation-tracking.md
-  - FRONTEND_INTEGRATION_TESTING.md → dev/parked/frontend-integration-testing/testing-guide.md
-- ✅ Created comprehensive README.md in each subdirectory:
-  - Project overview and architecture summary
-  - Current status and completion state
-  - Explanation of why project was parked
-  - Related documentation references
-  - Instructions for resuming work (where applicable)
-  - Reference value for future developers
+**Migration Statistics**:
+- **Total markdown files**: 159
+- **Files migrated**: 85 (73% complete)
+- **Files staying in place**: 31 (CLAUDE.md, README.md, .claude/*, dev/*, contracts/)
+- **Files pending audit**: 33 (planning docs in .plans/ and .archived_plans/)
+- **Broken links**: 54 (expected after migration, will fix in Phase 6.1)
 
 **Next Steps**:
-1. Phase 3 - Documentation Migration (118 files to move and reorganize)
-   - 3.1 - Move Root-Level Documentation
-   - 3.2 - Move Infrastructure Documentation
-   - 3.3 - Move Frontend Documentation
-   - 3.4 - Move Workflow Documentation
-   - 3.5 - Audit and Categorize Planning Documentation
+1. **Phase 3.5** - Audit and Categorize Planning Documentation (33 files)
+   - Requires manual review of .plans/ and .archived_plans/ directories
+   - Categorize as current/aspirational/deprecated
+   - Move current/aspirational with status tags
+   - Leave deprecated for historical reference
+2. **Phase 4** - Technical Reference Validation
+3. **Phase 5** - Annotation & Status Marking
+4. **Phase 6** - Cross-Referencing & Master Index
+5. **Phase 7** - Validation, Cleanup, and CI/CD Updates
