@@ -970,8 +970,8 @@ All code must meet the following standards before being considered complete:
 
 #### Documentation Standards
 
-- **Templates**: Use standardized templates located at `/docs/templates/`
-  - `/docs/templates/component-template.md` for React components
+- **Templates**: Use standardized templates located at `../documentation/templates/`
+  - `../documentation/templates/component-template.md` for React components
   - Additional templates for ViewModels and types as needed
 - **Exact Interface Matching**: Documentation must exactly match TypeScript interfaces
   - Every prop, property, and method must be documented
