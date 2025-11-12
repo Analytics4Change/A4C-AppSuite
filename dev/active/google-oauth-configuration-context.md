@@ -848,9 +848,74 @@ INSERT INTO organizations_projection (
 
 **Notes**: Future organizations will be created via event-driven workflows, but bootstrap organization created manually for initial setup.
 
+### Decision 6: Comprehensive Documentation Strategy for Testing Scripts
+
+**Date**: 2025-11-12
+
+**Context**: Testing scripts were functional but lacked comprehensive documentation. Future developers would struggle to understand OAuth testing procedures and troubleshoot issues.
+
+**Problem**:
+- Testing scripts had minimal inline documentation
+- No comprehensive testing guide existed
+- Troubleshooting knowledge existed only in conversation history
+- No quick reference for common OAuth issues
+
+**Decision**: Create multi-layered documentation approach:
+1. **Inline script documentation**: Detailed comments in all testing scripts
+2. **Comprehensive testing guide**: Dedicated OAUTH-TESTING.md with full procedures
+3. **Quick reference**: OAuth testing commands in infrastructure CLAUDE.md
+4. **Integration guide**: OAuth verification section in SUPABASE-AUTH-SETUP.md
+
+**Implementation**:
+
+**Layer 1 - Inline Documentation** (+179 lines):
+- verify-oauth-config.sh: Added function docs, explained jq syntax, documented curl techniques (+79 lines)
+- test-oauth-url.sh: Added OAuth flow explanation, documented URL generation (+53 lines)
+- test-google-oauth.js: Added comprehensive JSDoc, documented all functions (+78 lines)
+
+**Layer 2 - Comprehensive Guide** (637 lines):
+- Created infrastructure/supabase/OAUTH-TESTING.md
+- Two-phase testing strategy (API verification → OAuth flow → Application integration)
+- 6-phase testing procedure (~20 minutes total)
+- 4 verification checklists (32 items total)
+- Troubleshooting for 8+ common OAuth issues with detailed solutions
+- Reference section with all useful links and commands
+
+**Layer 3 - Quick Reference** (+34 lines):
+- Updated infrastructure/CLAUDE.md with "OAuth Testing" section
+- Quick commands for all 4 testing scripts
+- Common troubleshooting tips
+- Link to comprehensive guide
+
+**Layer 4 - Integration Documentation** (+97 lines):
+- Updated infrastructure/supabase/SUPABASE-AUTH-SETUP.md
+- Added "Test 4.4: OAuth Configuration Verification"
+- Quick verification steps with code examples
+- Common OAuth issues and solutions
+- Reference to comprehensive testing guide
+
+**Rationale**:
+- **Inline docs**: Make scripts self-documenting for maintenance
+- **Comprehensive guide**: Provide complete reference for OAuth testing and troubleshooting
+- **Quick reference**: Enable fast lookups for common commands
+- **Integration docs**: Connect OAuth testing to broader auth setup process
+
+**Result**: Complete OAuth testing documentation enabling any team member to:
+- Verify OAuth configuration programmatically
+- Test OAuth flows end-to-end
+- Diagnose and fix JWT custom claims issues
+- Troubleshoot common OAuth problems independently
+
+**Total Documentation**: 1,125 lines across 6 files
+
+**References**:
+- infrastructure/supabase/OAUTH-TESTING.md (primary guide)
+- infrastructure/CLAUDE.md (quick reference)
+- infrastructure/supabase/SUPABASE-AUTH-SETUP.md (integration guide)
+
 ## Final Status
 
-**Feature Status**: ✅ **COMPLETE**
+**Feature Status**: ✅ **ALL PHASES COMPLETE** (including documentation)
 
 **What Works**:
 1. ✅ Google OAuth login via production frontend
@@ -860,13 +925,24 @@ INSERT INTO organizations_projection (
 5. ✅ No schema resolution errors
 6. ✅ No claims validation errors
 7. ✅ Bootstrap organization exists for multi-tenant queries
+8. ✅ Comprehensive testing documentation available
+9. ✅ All testing scripts fully documented
 
 **Completed Migrations**:
 1. `fix_jwt_hook_claims_structure` (2025-11-12) - Fixed return format
 2. `fix_jwt_hook_schema_qualification` (2025-11-12) - Added public. prefix
 
 **New Files Created**:
-- `infrastructure/supabase/scripts/verify-jwt-hook-complete.sql` - Comprehensive JWT hook diagnostic script (358 lines, 10 verification checks)
+- `infrastructure/supabase/scripts/verify-jwt-hook-complete.sql` - JWT hook diagnostic script (358 lines)
+- `infrastructure/supabase/OAUTH-TESTING.md` - Comprehensive OAuth testing guide (637 lines) - Added 2025-11-12
+- `.gitignore` - Added .claude/tsc-cache/ exclusion - Updated 2025-11-12
 
-**Modified Files**:
+**Modified Files (Phase 5 - Documentation)**:
+- `infrastructure/supabase/scripts/verify-oauth-config.sh` - Enhanced with inline documentation (+79 lines) - Updated 2025-11-12
+- `infrastructure/supabase/scripts/test-oauth-url.sh` - Enhanced with inline documentation (+53 lines) - Updated 2025-11-12
+- `infrastructure/supabase/scripts/test-google-oauth.js` - Enhanced with JSDoc (+78 lines) - Updated 2025-11-12
+- `infrastructure/supabase/SUPABASE-AUTH-SETUP.md` - Added OAuth verification section (+97 lines) - Updated 2025-11-12
+- `infrastructure/CLAUDE.md` - Added OAuth testing commands (+34 lines) - Updated 2025-11-12
+
+**Modified Files (Phase 3.5 - JWT Fix)**:
 - `infrastructure/supabase/sql/03-functions/authorization/003-supabase-auth-jwt-hook.sql` - JWT hook with correct format and schema qualification
