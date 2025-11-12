@@ -64,7 +64,7 @@ node test-google-oauth.js
 # Checks: hook exists, permissions granted, claims generation works
 ```
 
-**Comprehensive OAuth Testing Guide**: See [`infrastructure/supabase/OAUTH-TESTING.md`](./supabase/OAUTH-TESTING.md) for:
+**Comprehensive OAuth Testing Guide**: See [`documentation/infrastructure/guides/supabase/OAUTH-TESTING.md`](../documentation/infrastructure/guides/supabase/OAUTH-TESTING.md) for:
 - Two-phase testing strategy (API verification → OAuth flow → Application integration)
 - Complete troubleshooting guide for common OAuth issues
 - JWT custom claims diagnostics
@@ -95,8 +95,7 @@ infrastructure/
 │   │   ├── run-migrations.sh   # Run all migrations
 │   │   ├── verify-idempotency.sh  # Test idempotency
 │   │   └── stop-local.sh       # Stop local Supabase
-│   ├── DEPLOY_TO_SUPABASE_STUDIO.sql  # Deployment script
-│   └── SUPABASE-AUTH-SETUP.md          # Auth configuration guide
+│   └── DEPLOY_TO_SUPABASE_STUDIO.sql  # Deployment script
 └── k8s/                 # Kubernetes deployments
     ├── rbac/           # RBAC for GitHub Actions
     └── temporal/       # Temporal.io cluster and workers
@@ -187,7 +186,7 @@ Before automated deployments can work:
 2. **KUBECONFIG Secret Updated**
    - GitHub secret `KUBECONFIG` must point to `https://k8s.firstovertheline.com`
    - Uses service account token (not cluster-admin client certificate)
-   - See `infrastructure/KUBECONFIG_UPDATE_GUIDE.md` for step-by-step instructions
+   - See `../documentation/infrastructure/operations/KUBECONFIG_UPDATE_GUIDE.md` for step-by-step instructions
    - Test connectivity: `./infrastructure/test-k8s-connectivity.sh`
 
 3. **Cloudflare Tunnel Running**
@@ -195,7 +194,7 @@ Before automated deployments can work:
    - Verify endpoint: `curl -k https://k8s.firstovertheline.com/version`
 
 4. **SQL Migrations Idempotent**
-   - See `infrastructure/supabase/SQL_IDEMPOTENCY_AUDIT.md`
+   - See `../documentation/infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md`
    - Fix triggers: Add `DROP TRIGGER IF EXISTS` before `CREATE TRIGGER`
    - Fix seed data: Add `ON CONFLICT DO NOTHING` to INSERT statements
 
@@ -354,7 +353,7 @@ SQL
 1. Check KUBECONFIG secret points to `k8s.firstovertheline.com`
 2. Verify Cloudflare Tunnel: `ssh <k3s-host> 'sudo systemctl status cloudflared'`
 3. Test connectivity: `./infrastructure/test-k8s-connectivity.sh`
-4. See `infrastructure/KUBECONFIG_UPDATE_GUIDE.md`
+4. See `../documentation/infrastructure/operations/KUBECONFIG_UPDATE_GUIDE.md`
 
 **Issue:** Docker image push failed
 
@@ -400,7 +399,7 @@ SQL
 **Issue:** Migration not idempotent
 
 **Solution:**
-1. Review `infrastructure/supabase/SQL_IDEMPOTENCY_AUDIT.md`
+1. Review `../documentation/infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md`
 2. Add `IF NOT EXISTS`, `OR REPLACE`, `DROP ... IF EXISTS`
 3. Test by running migration twice locally
 
@@ -535,8 +534,8 @@ kubectl get deployment workflow-worker -n temporal
 
 ### References
 
-- KUBECONFIG Setup: `infrastructure/KUBECONFIG_UPDATE_GUIDE.md`
-- SQL Idempotency Audit: `infrastructure/supabase/SQL_IDEMPOTENCY_AUDIT.md`
+- KUBECONFIG Setup: `../documentation/infrastructure/operations/KUBECONFIG_UPDATE_GUIDE.md`
+- SQL Idempotency Audit: `../documentation/infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md`
 - Connectivity Testing: `infrastructure/test-k8s-connectivity.sh`
 - Frontend Workflow: `.github/workflows/frontend-deploy.yml`
 - Worker Workflow: `.github/workflows/workflows-docker.yaml`

@@ -521,7 +521,7 @@ INSERT INTO domain_events (...) VALUES (
 
 1. Check the [main documentation](./EVENT-DRIVEN-ARCHITECTURE.md)
 2. Review [example code](./QUICKSTART.md)
-3. Browse the [AsyncAPI contracts](../contracts/asyncapi/)
+3. Browse the [AsyncAPI contracts](../../../../../infrastructure/supabase/contracts/asyncapi/)
 4. Search existing events: `SELECT DISTINCT event_type FROM domain_events`
 5. Ask the team - we're here to help!
 
