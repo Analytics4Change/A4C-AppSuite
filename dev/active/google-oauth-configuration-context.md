@@ -38,6 +38,18 @@
    - **Choice**: Removed manual `Authorization` header injection from `supabase.service.ts`
    - **Rationale**: Manual header mutation on shared singleton causes concurrency issues; Supabase automatically includes JWT from browser storage
 
+8. **GitHub OAuth Disabled in Production**: Only Google OAuth supported - Added 2025-11-11
+   - **Choice**: Commented out GitHub OAuth button in `LoginPage.tsx` (lines 120-135)
+   - **Rationale**: GitHub OAuth not configured in Supabase, causing HTTP 400 errors; user only needs Google OAuth
+   - **Implementation**: GitHub button removed from production UI to prevent confusion
+   - **Deployment**: Committed in `a5f9a32e`, deployed via GitHub Actions to Kubernetes
+
+9. **Cloudflare CDN Caching Strategy**: CDN caching requires manual purge after deployments - Discovered 2025-11-11
+   - **Problem**: Cloudflare CDN caches JavaScript bundles, preventing immediate deployment visibility
+   - **Root Cause**: Vite generates content-hashed filenames (`index-ByeozVEU.js`) that don't change if content is similar
+   - **Workaround**: Manual cache purge via Cloudflare Dashboard or API required after deployments
+   - **Long-term Solution**: Configure Vite to include commit SHA in bundle names or set proper cache headers
+
 ## Technical Context
 
 ### Architecture
@@ -523,6 +535,45 @@ SELECT COALESCE(
 - Add comments explaining why permissions are needed
 - Document in infrastructure/CLAUDE.md
 
+### Cloudflare CDN Caching Prevents Immediate Deployment Visibility - Discovered 2025-11-11
+
+**Constraint**: Cloudflare CDN aggressively caches static assets, including JavaScript bundles, even after Kubernetes deployment completes.
+
+**Problem**:
+- Kubernetes deployment succeeds and pods serve new code
+- Cloudflare edge cache still serves old `index-ByeozVEU.js` bundle
+- Users (even in private/incognito windows) see old code
+- Cache persists for 2-4 hours by default
+
+**Evidence**:
+```bash
+# Pods serve new bundle WITHOUT "Continue with GitHub" text
+kubectl exec deployment/a4c-frontend -- grep -o 'Continue with GitHub' /usr/share/nginx/html/assets/*.js
+# Result: NOT FOUND
+
+# Cloudflare serves old bundle WITH the text
+curl -s "https://a4c.firstovertheline.com/assets/index-ByeozVEU.js" | grep -o "Continue with GitHub"
+# Result: Continue with GitHub
+```
+
+**Root Cause**: Vite content-based hashing keeps same filename if changes are small enough not to alter hash.
+
+**Solutions**:
+1. **Manual Purge (Immediate)**:
+   - Cloudflare Dashboard → Caching → Purge Everything
+   - OR Cloudflare API with token that has "Cache Purge" permission
+
+2. **Automatic Purge (CI/CD)**:
+   - Add cache purge step to GitHub Actions workflow after deployment
+   - Requires CLOUDFLARE_API_TOKEN and CLOUDFLARE_ZONE_ID secrets
+
+3. **Prevent Issue (Long-term)**:
+   - Configure Vite to include commit SHA in bundle names
+   - Set appropriate Cache-Control headers in Nginx
+   - Configure Cloudflare to respect origin cache headers
+
+**Workaround for Now**: User must manually purge Cloudflare cache after each frontend deployment.
+
 ### Supabase MCP Server Usage - Discovered 2025-11-11
 
 **Tool**: Supabase Model Context Protocol (MCP) server provides direct database access from Claude Code.
@@ -653,10 +704,10 @@ SELECT COALESCE(
 
 ## Current Status
 
-**Date**: 2025-11-11
-**Phase**: 3.5 - JWT Custom Claims Fix (Complete - Awaiting Manual Hook Registration)
-**Issue Discovered**: User attempting to use GitHub OAuth but only Google OAuth is configured
-**Next Step**: User must either (1) use Google OAuth or (2) configure GitHub OAuth in Supabase, then register JWT hook
+**Date**: 2025-11-11 23:15 UTC
+**Phase**: 4 - GitHub OAuth Removal ✅ COMPLETE
+**Next Phase**: Phase 5 - Documentation & Cleanup
+**Next Step**: Commit testing scripts and update infrastructure documentation
 
 **Completed**:
 - ✅ Google Cloud Console redirect URI configured
@@ -671,14 +722,151 @@ SELECT COALESCE(
 - ✅ Fixed JWT hook permissions (added supabase_auth_admin grants)
 - ✅ Updated infrastructure SQL file with idempotent GRANT statements
 - ✅ Deployed permissions to production database
+- ✅ Disabled GitHub OAuth button in LoginPage.tsx
+- ✅ Committed and pushed changes via GitHub Actions
+- ✅ Verified Kubernetes deployment with new code
+- ✅ Discovered Cloudflare CDN caching issue
+- ✅ Added Cloudflare API credentials to ~/.bashrc.local
+- ✅ User manually purged Cloudflare cache via dashboard
+- ✅ Verified GitHub button no longer renders in production
 
 **OAuth Provider Status** (Updated 2025-11-11):
 - ✅ Google OAuth: Fully configured and working
 - ❌ GitHub OAuth: NOT configured (disabled in frontend LoginPage.tsx:120-135)
 - **Note**: User only wants Google OAuth, GitHub button removed from UI
 
+**Deployment Changes** (2025-11-11):
+- ✅ Removed GitHub OAuth button from LoginPage.tsx
+- ✅ Committed and deployed fix via GitHub Actions (commit: a5f9a32e)
+- ✅ Kubernetes rollout completed (2/2 pods updated)
+- ⏸️ Cloudflare CDN cache still serving old bundle (requires purge)
+
+**Cloudflare Configuration** (2025-11-11):
+- ✅ Added `CLOUDFLARE_API_TOKEN` to ~/.bashrc.local
+- ✅ Retrieved Zone ID: `538e5229b00f5660508a1c7fcd097f97`
+- ✅ Added `CLOUDFLARE_ZONE_ID` to ~/.bashrc.local
+- ⏸️ API token lacks "Cache Purge" permission (authentication error)
+- **Next**: User needs to create new API token with Cache Purge permission OR manually purge via dashboard
+
 **Pending**:
-- ⏸️ **[MANUAL]** User must register hook in Supabase Dashboard (Authentication → Hooks → Custom Access Token)
-- ⏸️ Test login with Google OAuth to verify super_admin role appears in JWT claims
+- ✅ **[MANUAL]** Purge Cloudflare cache (User manually purged via dashboard)
+- ✅ **[MANUAL]** Register JWT hook in Supabase Dashboard (Completed)
+- ✅ Test login with Google OAuth to verify super_admin role appears in JWT claims (WORKING!)
 - ⏸️ Commit testing scripts to repository
 - ⏸️ Update documentation with OAuth testing procedures
+
+### Decision 3: JWT Hook Return Format Must Use jsonb_build_object
+
+**Date**: 2025-11-12
+
+**Context**: OAuth login worked but JWT contained `claims_error: "output claims do not conform to expected schema"`. All standard JWT fields (aud, exp, iat, sub, etc.) were reported as missing.
+
+**Problem**: The JWT hook was using `jsonb_set(event, '{claims}', merged_claims)` which doesn't match Supabase Auth's expected return format.
+
+**Root Cause**: Supabase Auth expects hooks to return `{ "claims": { ...all claims... } }` but `jsonb_set` was modifying the event object incorrectly.
+
+**Decision**: Change JWT hook to return `jsonb_build_object('claims', merged_claims)` format.
+
+**Implementation** (lines 115-125 in `003-supabase-auth-jwt-hook.sql`):
+```sql
+-- OLD (WRONG):
+RETURN jsonb_set(event, '{claims}', (COALESCE(event->'claims', '{}'::jsonb) || v_claims));
+
+-- NEW (CORRECT):
+v_claims := COALESCE(event->'claims', '{}'::jsonb) || jsonb_build_object(...);
+RETURN jsonb_build_object('claims', v_claims);
+```
+
+**Result**: All standard JWT fields now preserved while adding custom claims (org_id, user_role, permissions, scope_path).
+
+**References**:
+- Supabase Auth Hooks Documentation: https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook
+- Migration: `fix_jwt_hook_claims_structure` (2025-11-12)
+
+### Decision 4: JWT Hook Must Use Schema-Qualified Table References
+
+**Date**: 2025-11-12
+
+**Context**: JWT hook was running but failing with error `"column u.current_organization_id does not exist"` even though the column exists in the `users` table.
+
+**Problem**: The `supabase_auth_admin` role doesn't have `public` in its default schema search path. Unqualified table references like `FROM users` fail.
+
+**Root Cause**: PostgreSQL search_path for `supabase_auth_admin` doesn't include `public` schema by default for security reasons.
+
+**Decision**: Add `public.` prefix to ALL table references in JWT hook and helper functions.
+
+**Implementation**: Updated 8+ table references in `003-supabase-auth-jwt-hook.sql`:
+```sql
+-- OLD (WRONG):
+FROM users u
+FROM user_roles_projection ur
+FROM roles_projection r
+
+-- NEW (CORRECT):
+FROM public.users u
+FROM public.user_roles_projection ur
+FROM public.roles_projection r
+```
+
+**Files Modified**:
+- `infrastructure/supabase/sql/03-functions/authorization/003-supabase-auth-jwt-hook.sql`
+
+**Result**: JWT hook can now find all tables and execute without schema resolution errors.
+
+**References**:
+- Migration: `fix_jwt_hook_schema_qualification` (2025-11-12)
+- PostgreSQL search_path documentation
+
+### Decision 5: Bootstrap Platform Organization Required
+
+**Date**: 2025-11-12
+
+**Context**: Multi-tenant architecture requires all users to have organization context, but `organizations_projection` table was empty.
+
+**Problem**: Queries referencing organization context failed, JWT hook couldn't populate org_id claim.
+
+**Decision**: Create bootstrap platform organization for initial system setup.
+
+**Implementation**:
+```sql
+INSERT INTO organizations_projection (
+  id, name, display_name, slug, type, path, parent_path, timezone, is_active
+) VALUES (
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid,
+  'Analytics4Change', 'Analytics4Change', 'a4c', 'platform_owner',
+  'a4c'::ltree, NULL, 'America/New_York', true
+);
+```
+
+**Organization Details**:
+- **ID**: `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa` (fixed UUID for bootstrap)
+- **Type**: `platform_owner` (highest level in organization hierarchy)
+- **Path**: `a4c` (ltree root node)
+- **Depth**: 1 (auto-calculated from path)
+
+**Result**: Organization context now available for JWT claims and RLS policies.
+
+**Notes**: Future organizations will be created via event-driven workflows, but bootstrap organization created manually for initial setup.
+
+## Final Status
+
+**Feature Status**: ✅ **COMPLETE**
+
+**What Works**:
+1. ✅ Google OAuth login via production frontend
+2. ✅ User authenticated with correct JWT claims
+3. ✅ User role shows "super_admin" in UI
+4. ✅ JWT includes org_id, user_role, permissions, scope_path
+5. ✅ No schema resolution errors
+6. ✅ No claims validation errors
+7. ✅ Bootstrap organization exists for multi-tenant queries
+
+**Completed Migrations**:
+1. `fix_jwt_hook_claims_structure` (2025-11-12) - Fixed return format
+2. `fix_jwt_hook_schema_qualification` (2025-11-12) - Added public. prefix
+
+**New Files Created**:
+- `infrastructure/supabase/scripts/verify-jwt-hook-complete.sql` - Comprehensive JWT hook diagnostic script (358 lines, 10 verification checks)
+
+**Modified Files**:
+- `infrastructure/supabase/sql/03-functions/authorization/003-supabase-auth-jwt-hook.sql` - JWT hook with correct format and schema qualification

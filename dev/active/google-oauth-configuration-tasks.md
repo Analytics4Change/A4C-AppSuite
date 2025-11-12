@@ -95,17 +95,64 @@
 - [x] Add GRANT permissions for supabase_auth_admin role
 - [x] Update infrastructure SQL file with idempotent GRANT statements
 - [x] Deploy permissions to production database
-- [ ] **[MANUAL]** Register hook in Supabase Dashboard (Authentication → Hooks → Custom Access Token)
-- [ ] Test login shows super_admin in UI (after hook registration)
+- [x] **[MANUAL]** Register hook in Supabase Dashboard (Authentication → Hooks → Custom Access Token)
+- [x] Created bootstrap organization (Analytics4Change)
+- [x] Fixed JWT hook return format (jsonb_build_object instead of jsonb_set)
+- [x] Fixed schema qualification issue (added public. prefix to all tables)
+- [x] Test login shows super_admin in UI ✅
+
+### Root Cause Analysis (2025-11-12)
+**Issue 1**: JWT hook returned incomplete claims structure
+- **Error**: `output claims do not conform to expected schema (aud, exp, iat, sub, etc. required)`
+- **Root Cause**: Hook used `jsonb_set(event, '{claims}', ...)` which doesn't match Supabase format
+- **Fix**: Changed to `jsonb_build_object('claims', merged_claims)` format
+- **Result**: Standard JWT fields now preserved while adding custom claims
+
+**Issue 2**: JWT hook failed with "column u.current_organization_id does not exist"
+- **Error**: `claims_error: "column u.current_organization_id does not exist"`
+- **Root Cause**: Unqualified table references (e.g., `FROM users`) not found by `supabase_auth_admin` role
+- **Fix**: Added `public.` schema prefix to all 8 table references
+- **Result**: Hook can now find all tables and execute successfully
+
+**Issue 3**: Missing bootstrap organization
+- **Error**: User has NULL org_id (acceptable for super_admin but projections query failed)
+- **Root Cause**: organizations_projection table was empty
+- **Fix**: Created platform_owner organization "Analytics4Change" with UUID aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+- **Result**: Organization context now available for queries
 
 ### Test Validation
-- [ ] Confirm user appears in Supabase Auth Users table
+- [x] Confirm user appears in Supabase Auth Users table
+- [x] JWT hook executes without errors (verified in auth logs)
+- [x] User role shows "super_admin" in UI (bottom left corner)
+- [x] Session includes all required JWT claims (org_id, permissions, user_role)
 - [ ] Verify session persists across page refreshes
 - [ ] Check JWT token expiration and refresh behavior
 - [ ] Test logout functionality
 - [ ] Verify session cleanup on logout
 
-## Phase 4: Documentation & Cleanup ⏸️ PENDING
+## Phase 4: GitHub OAuth Removal ✅ COMPLETE
+
+### Frontend Changes
+- [x] Identify root cause: GitHub OAuth not configured in Supabase
+- [x] User confirmed only Google OAuth needed
+- [x] Comment out GitHub OAuth button in LoginPage.tsx (lines 120-135)
+- [x] Add documentation comments explaining removal
+- [x] Commit changes: `a5f9a32e fix(frontend): disable GitHub OAuth button in production`
+- [x] Push to remote repository
+- [x] Monitor GitHub Actions workflow execution
+- [x] Verify Kubernetes deployment rollout (2/2 pods updated)
+- [x] Verify new code deployed in pods (no "Continue with GitHub" text)
+
+### Cloudflare CDN Cache Issue
+- [x] Discover Cloudflare CDN serving stale JavaScript bundle
+- [x] Verify pods have new code but CDN serves old code
+- [x] Add Cloudflare API token to ~/.bashrc.local
+- [x] Retrieve Cloudflare Zone ID via API
+- [x] Add Zone ID to ~/.bashrc.local
+- [x] Purge Cloudflare cache (user manually purged via dashboard)
+- [x] Verify updated frontend is visible (GitHub button no longer renders)
+
+## Phase 5: Documentation & Cleanup ⏸️ PENDING
 
 ### Commit Testing Scripts
 - [ ] Review testing scripts for quality
@@ -165,12 +212,60 @@
 
 ## Current Status
 
-**Phase**: Phase 3.5 - JWT Custom Claims Fix
-**Status**: ✅ COMPLETE (awaiting manual hook registration)
-**Last Updated**: 2025-11-11
-**Next Step**: User must register JWT hook in Supabase Dashboard, then test login
+**Phase**: Phase 3.5 - JWT Custom Claims Fix ✅ COMPLETE
+**Status**: **FEATURE COMPLETE** - OAuth fully working with correct roles
+**Last Updated**: 2025-11-12 18:30 UTC
+**Next Step**: Phase 5 - Documentation & Cleanup (optional - commit testing scripts)
+
+**Resolved Blockers**:
+1. ✅ **Cloudflare Cache Purge**: User manually purged cache via dashboard
+   - Verified: GitHub button no longer renders in production
+   - Note: String literals still in bundle (dead code from comments) but button doesn't render
+2. ✅ **JWT Hook Return Format**: Fixed to use `jsonb_build_object('claims', ...)`
+   - Standard JWT fields now preserved correctly
+3. ✅ **JWT Hook Schema Qualification**: Added `public.` prefix to all tables
+   - `supabase_auth_admin` can now find all tables
+4. ✅ **Bootstrap Organization Created**: Analytics4Change platform organization
+   - Provides organization context for queries
+
+**After /clear**: Read `dev/active/google-oauth-configuration-*.md` files and:
+1. Optional: Proceed to Phase 5: Documentation & Cleanup
+2. Optional: Commit testing scripts to repository
+3. Optional: Update infrastructure documentation with OAuth testing procedures
+4. **Main feature is COMPLETE** - Google OAuth working with super_admin role
 
 ### Recent Activity
+
+**2025-11-12 18:30 UTC - JWT Hook Fixed, Feature Complete**:
+- ✅ **Issue 1**: Fixed JWT hook return format
+  - Changed from `jsonb_set(event, '{claims}', ...)` to `jsonb_build_object('claims', v_claims)`
+  - Standard JWT fields (aud, exp, iat, sub, etc.) now preserved
+- ✅ **Issue 2**: Fixed schema qualification bug
+  - Added `public.` prefix to all 8 table references in JWT hook
+  - Fixed error: "column u.current_organization_id does not exist"
+  - `supabase_auth_admin` can now find all tables
+- ✅ **Issue 3**: Created bootstrap organization
+  - Created Analytics4Change platform_owner organization
+  - UUID: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+- ✅ User tested and confirmed: **super_admin role now shows correctly in UI**
+- 🎉 **FEATURE COMPLETE**: Google OAuth fully working with correct JWT claims
+
+**2025-11-11 23:15 UTC**:
+- ✅ User manually purged Cloudflare cache via dashboard
+- ✅ Verified GitHub button no longer renders in production HTML
+- ✅ Confirmed only "Continue with Google" button visible
+- ✅ Phase 4 complete: GitHub OAuth successfully removed
+- 📋 **Next**: Phase 5 - Documentation & Cleanup (commit testing scripts)
+
+**2025-11-11 23:00 UTC**:
+- ✅ Diagnosed OAuth callback failure: user clicking GitHub OAuth but only Google configured
+- ✅ Disabled GitHub OAuth button in LoginPage.tsx (commented out lines 120-135)
+- ✅ Committed and deployed fix via GitHub Actions (commit: a5f9a32e)
+- ✅ Verified Kubernetes deployment successful (2/2 pods running with new image)
+- ✅ Discovered Cloudflare CDN caching issue preventing deployment visibility
+- ✅ Verified pods serve new code but CDN serves old cached bundle
+- ✅ Added Cloudflare credentials to ~/.bashrc.local (API token and Zone ID)
+- ⏸️ Blocked on Cloudflare cache purge (API token lacks permission)
 
 **2025-11-11 20:30 UTC**:
 - ✅ Used Supabase MCP to diagnose database state
@@ -218,11 +313,7 @@
 
 ### Blockers
 
-**Current Blocker**: GitHub OAuth Not Configured (2025-11-11)
-- User clicked "Continue with GitHub" but GitHub OAuth is not enabled in Supabase
-- Only Google OAuth is currently configured
-- HTTP 400 error on `/auth/v1/authorize` endpoint with `provider=github`
-- **Resolution**: Either use Google OAuth (recommended) or configure GitHub OAuth in Supabase Dashboard
+**No Current Blockers** - Phase 4 Complete
 
 **Resolved Blockers**:
 - ✅ Google Cloud Console redirect URI mismatch (resolved by adding correct URI)
@@ -230,6 +321,7 @@
 - ✅ Node.js script dependency issue (resolved by creating bash alternative)
 - ✅ Multiple GoTrueClient instances (resolved by singleton pattern)
 - ✅ JWT claims missing (resolved by adding permissions and creating user records)
+- ✅ Cloudflare CDN cache purge (resolved by user manual purge via dashboard)
 
 ### Notes
 

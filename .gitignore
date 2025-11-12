@@ -29,6 +29,9 @@ Temporary Items
 *.swo
 *~
 
+# Claude Code
+.claude/tsc-cache/
+
 # Environment variables
 .env
 .env.local

@@ -1231,3 +1231,38 @@ WCAG 2.1 Level AA: COMPLIANT
 - Add missing validation rules
 
 **Recommendation**: Option C (real-world validation) to ensure agent criteria match actual development needs before automation
+
+---
+
+## Investigation: Hook Behavior and Skill Loading (2025-11-11)
+
+**User Concern**: Suspected that skill activation hooks might be loading skills multiple times into context window, wasting tokens.
+
+**Investigation Performed**:
+- Analyzed all hook implementations (skill-activation-prompt.ts, skill-activation-file.ts, post-tool-use-tracker.sh)
+- Examined settings.local.json configuration
+- Reviewed skill-rules.json trigger patterns
+- Checked phase-2-testing-results.md for evidence
+
+**Key Finding**: Hooks only output text suggestions via console.log() - they cannot and do not invoke the Skill tool or load content into context.
+
+**Important Clarification**:
+- Hooks suggest skills by outputting text (e.g., "💡 SKILL SUGGESTION: frontend-dev-guidelines")
+- Claude (the LLM) manually decides whether to invoke the Skill tool
+- Skills load ONLY when Claude explicitly calls the Skill tool
+- No automatic skill loading mechanism exists in hook implementation
+- No duplicate loading is possible from hook behavior
+
+**Files Investigated**:
+- `.claude/settings.local.json` - Hook registration
+- `.claude/hooks/skill-activation-prompt.ts` - Prompt-based suggestions
+- `.claude/hooks/skill-activation-file.ts` - File-based suggestions
+- `.claude/hooks/post-tool-use-tracker.sh` - Edit tracking
+- `.claude/skills/skill-rules.json` - Trigger patterns
+- `dev/active/phase-2-testing-results.md` - Testing evidence
+
+**User Theory**: DISPROVEN - No duplicate loading mechanism exists in hook implementation
+
+**Actual Behavior**: Hooks suggest, Claude decides, skills load only on explicit Skill tool invocation
+
+**Related Context**: PostToolUse output remains invisible in UI (documented in Phase 2.4 testing), so file-based suggestions don't reach the user anyway. Only prompt-based suggestions (UserPromptSubmit) display visible output in `<system-reminder>` sections.

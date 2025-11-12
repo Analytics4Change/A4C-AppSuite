@@ -9,8 +9,10 @@
 -- ============================================================================
 -- JWT Custom Claims Hook (Primary Entry Point)
 -- ============================================================================
+-- IMPORTANT: Hook MUST be in public schema for Supabase Auth to call it
+-- See: https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook
 
-CREATE OR REPLACE FUNCTION auth.custom_access_token_hook(event jsonb)
+CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
@@ -33,8 +35,8 @@ BEGIN
     u.current_organization_id,
     COALESCE(
       (SELECT r.name
-       FROM user_roles_projection ur
-       JOIN roles_projection r ON r.id = ur.role_id
+       FROM public.user_roles_projection ur
+       JOIN public.roles_projection r ON r.id = ur.role_id
        WHERE ur.user_id = u.id
        ORDER BY
          CASE
@@ -49,8 +51,8 @@ BEGIN
     ) as role,
     COALESCE(
       (SELECT ur.scope_path::text
-       FROM user_roles_projection ur
-       JOIN roles_projection r ON r.id = ur.role_id
+       FROM public.user_roles_projection ur
+       JOIN public.roles_projection r ON r.id = ur.role_id
        WHERE ur.user_id = u.id
        ORDER BY
          CASE
@@ -64,7 +66,7 @@ BEGIN
       NULL
     ) as scope
   INTO v_org_id, v_user_role, v_scope_path
-  FROM users u
+  FROM public.users u
   WHERE u.id = v_user_id;
 
   -- If no organization context, check for super_admin role
@@ -73,15 +75,15 @@ BEGIN
       CASE
         WHEN EXISTS (
           SELECT 1
-          FROM user_roles_projection ur
-          JOIN roles_projection r ON r.id = ur.role_id
+          FROM public.user_roles_projection ur
+          JOIN public.roles_projection r ON r.id = ur.role_id
           WHERE ur.user_id = v_user_id
             AND r.name = 'super_admin'
             AND ur.org_id IS NULL
         ) THEN NULL  -- Super admin has NULL org_id (global scope)
         ELSE (
           SELECT o.id
-          FROM organizations_projection o
+          FROM public.organizations_projection o
           WHERE o.type = 'platform_owner'
           LIMIT 1
         )
@@ -94,14 +96,14 @@ BEGIN
   IF v_user_role = 'super_admin' THEN
     SELECT array_agg(p.name)
     INTO v_permissions
-    FROM permissions_projection p;
+    FROM public.permissions_projection p;
   ELSE
     -- Get permissions via role grants
     SELECT array_agg(DISTINCT p.name)
     INTO v_permissions
-    FROM user_roles_projection ur
-    JOIN role_permissions_projection rp ON rp.role_id = ur.role_id
-    JOIN permissions_projection p ON p.id = rp.permission_id
+    FROM public.user_roles_projection ur
+    JOIN public.role_permissions_projection rp ON rp.role_id = ur.role_id
+    JOIN public.permissions_projection p ON p.id = rp.permission_id
     WHERE ur.user_id = v_user_id
       AND (ur.org_id = v_org_id OR ur.org_id IS NULL);
   END IF;
@@ -109,8 +111,10 @@ BEGIN
   -- Default to empty array if no permissions
   v_permissions := COALESCE(v_permissions, ARRAY[]::text[]);
 
-  -- Build custom claims object
-  v_claims := jsonb_build_object(
+  -- Build custom claims by merging with existing claims
+  -- CRITICAL: Preserve all standard JWT fields (aud, exp, iat, sub, email, phone, role, aal, session_id, is_anonymous)
+  -- and add our custom claims (org_id, user_role, permissions, scope_path, claims_version)
+  v_claims := COALESCE(event->'claims', '{}'::jsonb) || jsonb_build_object(
     'org_id', v_org_id,
     'user_role', v_user_role,
     'permissions', to_jsonb(v_permissions),
@@ -118,12 +122,9 @@ BEGIN
     'claims_version', 1
   );
 
-  -- Merge custom claims with existing event claims
-  RETURN jsonb_set(
-    event,
-    '{claims}',
-    (COALESCE(event->'claims', '{}'::jsonb) || v_claims)
-  );
+  -- Return the updated claims object
+  -- Supabase Auth expects: { "claims": { ... all standard JWT fields + custom fields ... } }
+  RETURN jsonb_build_object('claims', v_claims);
 
 EXCEPTION
   WHEN OTHERS THEN
@@ -133,11 +134,10 @@ EXCEPTION
       SQLERRM,
       SQLSTATE;
 
-    -- Return minimal claims on error
-    RETURN jsonb_set(
-      event,
-      '{claims}',
-      jsonb_build_object(
+    -- Return minimal claims on error, preserving standard JWT fields
+    RETURN jsonb_build_object(
+      'claims',
+      COALESCE(event->'claims', '{}'::jsonb) || jsonb_build_object(
         'org_id', NULL,
         'user_role', 'viewer',
         'permissions', '[]'::jsonb,
@@ -148,7 +148,7 @@ EXCEPTION
 END;
 $$;
 
-COMMENT ON FUNCTION auth.custom_access_token_hook IS
+COMMENT ON FUNCTION public.custom_access_token_hook IS
   'Enriches Supabase Auth JWTs with custom claims: org_id, user_role, permissions, scope_path. Called automatically on token generation.';
 
 
@@ -178,7 +178,7 @@ BEGIN
   -- Check if user has access to the requested organization
   SELECT EXISTS (
     SELECT 1
-    FROM user_roles_projection ur
+    FROM public.user_roles_projection ur
     WHERE ur.user_id = v_user_id
       AND (ur.org_id = p_new_org_id OR ur.org_id IS NULL)  -- NULL for super_admin
   ) INTO v_has_access;
@@ -188,7 +188,7 @@ BEGIN
   END IF;
 
   -- Update user's current organization
-  UPDATE users
+  UPDATE public.users
   SET current_organization_id = p_new_org_id,
       updated_at = NOW()
   WHERE id = v_user_id;
