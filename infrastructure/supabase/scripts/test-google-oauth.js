@@ -2,25 +2,50 @@
 /**
  * Google OAuth Configuration Test Script
  *
- * This script tests the Google OAuth configuration by:
- * 1. Generating an OAuth URL using Supabase JavaScript client
- * 2. Verifying the redirect URI is correct
- * 3. Providing the URL for manual browser testing
+ * This script tests the Google OAuth configuration using the Supabase JavaScript SDK.
+ * It's more realistic than the bash script because it uses the actual SDK that your
+ * frontend application would use.
+ *
+ * What it does:
+ * 1. Initializes a Supabase client with your project credentials
+ * 2. Calls signInWithOAuth({ provider: 'google' }) to generate OAuth URL
+ * 3. Verifies the auth endpoint is accessible
+ * 4. Checks if Google provider is enabled via public settings endpoint
+ * 5. Provides the URL for manual browser testing
  *
  * Usage:
  *   node test-google-oauth.js
  *
- * Environment Variables Required:
- *   SUPABASE_URL - Your Supabase project URL
- *   SUPABASE_ANON_KEY - Your Supabase anonymous key
+ * Environment Variables (Optional):
+ *   SUPABASE_URL - Your Supabase project URL (default: tmrjlswbsxmbglmaclxu)
+ *   SUPABASE_ANON_KEY - Your Supabase anonymous key (default: provided)
+ *
+ * Exit Codes:
+ *   0 - Success: OAuth URL generated and provider appears configured
+ *   1 - Failure: OAuth generation failed or provider not enabled
+ *
+ * Example:
+ *   export SUPABASE_URL="https://yourproject.supabase.co"
+ *   export SUPABASE_ANON_KEY="your-anon-key"
+ *   node test-google-oauth.js
+ *
+ * @requires @supabase/supabase-js
  */
 
 import { createClient } from '@supabase/supabase-js';
 
+// ============================================================================
 // Configuration
+// ============================================================================
+// Supabase project URL and anonymous key
+// The anon key is safe to expose (RLS policies protect your data)
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://tmrjlswbsxmbglmaclxu.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcmpsc3dic3htYmdsbWFjbHh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5MzgzNzQsImV4cCI6MjA3NDUxNDM3NH0.o_cS3L7X6h1UKnNgPEeV9PLSB-bTtExzTK1amXXjxOY';
 
+/**
+ * ANSI color codes for terminal output formatting
+ * @const {Object}
+ */
 const COLORS = {
   reset: '\x1b[0m',
   bright: '\x1b[1m',
@@ -31,10 +56,19 @@ const COLORS = {
   cyan: '\x1b[36m',
 };
 
+/**
+ * Log a colored message to the console
+ * @param {string} color - ANSI color code
+ * @param {string} message - Message to display
+ */
 function log(color, message) {
   console.log(`${color}${message}${COLORS.reset}`);
 }
 
+/**
+ * Log a section header with decorative border
+ * @param {string} title - Section title
+ */
 function logSection(title) {
   console.log('');
   log(COLORS.bright + COLORS.cyan, '━'.repeat(60));
@@ -42,6 +76,19 @@ function logSection(title) {
   log(COLORS.bright + COLORS.cyan, '━'.repeat(60));
 }
 
+/**
+ * Main test function for Google OAuth configuration
+ *
+ * This function performs the following steps:
+ * 1. Initializes Supabase client with project credentials
+ * 2. Generates OAuth URL using signInWithOAuth()
+ * 3. Verifies auth endpoint accessibility
+ * 4. Checks if Google provider is enabled
+ * 5. Displays results and testing instructions
+ *
+ * @async
+ * @throws {Error} If Supabase client initialization fails or OAuth URL generation fails
+ */
 async function testGoogleOAuth() {
   try {
     logSection('🧪 Google OAuth Configuration Test');
@@ -59,13 +106,19 @@ async function testGoogleOAuth() {
     const redirectUrl = `${SUPABASE_URL}/auth/v1/callback`;
     log(COLORS.reset, `   Expected redirect: ${redirectUrl}`);
 
+    // Call signInWithOAuth to generate the authorization URL
+    // This is the same method your frontend application would use
+    // Options:
+    //   - redirectTo: Where to send user after OAuth completes
+    //   - access_type: 'offline' requests a refresh token
+    //   - prompt: 'consent' forces consent screen (useful for testing)
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
         queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
+          access_type: 'offline',  // Request refresh token for long-lived sessions
+          prompt: 'consent',       // Force consent screen to appear every time
         },
       },
     });
@@ -109,15 +162,19 @@ async function testGoogleOAuth() {
       log(COLORS.reset, '   (or use "start" on Windows, "xdg-open" on Linux)');
     }
 
-    // Step 4: Verify endpoint accessibility
+    // Step 3: Verify endpoint accessibility
     log(COLORS.blue, '\n📋 Step 3: Verify Auth Endpoint');
 
+    // Check the public /auth/v1/settings endpoint to verify configuration
+    // This endpoint is publicly accessible and shows enabled auth providers
+    // It's a quick way to confirm Google OAuth is enabled without needing API tokens
     try {
       const response = await fetch(`${SUPABASE_URL}/auth/v1/settings`);
       if (response.ok) {
         const settings = await response.json();
         log(COLORS.green, '   ✓ Auth endpoint is accessible');
 
+        // Check if Google is listed in external_providers array
         if (settings.external_providers) {
           const googleEnabled = settings.external_providers.some(
             p => p.provider === 'google' && p.enabled
@@ -131,6 +188,7 @@ async function testGoogleOAuth() {
         }
       }
     } catch (fetchError) {
+      // Endpoint check failure is not critical - OAuth might still work
       log(COLORS.yellow, '   ⚠ Could not verify auth endpoint (may not affect OAuth)');
     }
 

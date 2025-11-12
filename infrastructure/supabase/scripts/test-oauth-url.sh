@@ -2,13 +2,31 @@
 #
 # Google OAuth URL Generation Test
 #
-# This script generates a Google OAuth URL that you can test in your browser
+# This script generates a Google OAuth authorization URL for manual browser testing.
+# It's the simplest way to test OAuth configuration without writing any code.
+#
+# What it does:
+#   1. Constructs the OAuth authorization URL using Supabase's standard format
+#   2. Displays the URL with clear testing instructions
+#   3. Provides platform-specific commands to open the URL in your browser
+#   4. Lists expected results and common troubleshooting steps
 #
 # Usage:
 #   ./test-oauth-url.sh
 #
+# Optional Environment Variables:
+#   SUPABASE_PROJECT_REF - Your Supabase project reference (default: tmrjlswbsxmbglmaclxu)
+#
+# Exit Codes:
+#   0 - Always succeeds (this is a display-only script)
+#
+# Example:
+#   export SUPABASE_PROJECT_REF="yourproject"
+#   ./test-oauth-url.sh
+#   # Copy the URL and paste into your browser
+#
 
-set -euo pipefail
+set -euo pipefail  # Exit on error, undefined variables, and pipe failures
 
 # Colors
 RED='\033[0;31m'
@@ -19,12 +37,16 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# ============================================================================
 # Configuration
-PROJECT_REF="${SUPABASE_PROJECT_REF:-tmrjlswbsxmbglmaclxu}"
-SUPABASE_URL="https://${PROJECT_REF}.supabase.co"
-REDIRECT_URI="${SUPABASE_URL}/auth/v1/callback"
+# ============================================================================
+PROJECT_REF="${SUPABASE_PROJECT_REF:-tmrjlswbsxmbglmaclxu}"  # Project reference from env or default
+SUPABASE_URL="https://${PROJECT_REF}.supabase.co"           # Supabase project URL
+REDIRECT_URI="${SUPABASE_URL}/auth/v1/callback"             # OAuth callback endpoint
 
-# Helper functions
+# ============================================================================
+# Helper Functions for Formatted Output
+# ============================================================================
 log_section() {
     echo ""
     echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -54,8 +76,21 @@ main() {
 
     log_section "📌 Google OAuth Authorization URL"
 
-    # Generate the OAuth URL manually
-    # This is what Supabase's signInWithOAuth would generate
+    # ========================================================================
+    # Generate OAuth Authorization URL
+    # ========================================================================
+    # This URL initiates the OAuth 2.0 flow with Google as the provider.
+    # Supabase's auth endpoint handles the redirect to Google's consent screen.
+    #
+    # URL Format: https://{project}.supabase.co/auth/v1/authorize?provider=google
+    #
+    # What happens when you open this URL:
+    #   1. Supabase redirects to Google's OAuth consent screen
+    #   2. User selects Google account and grants permissions
+    #   3. Google redirects back to Supabase callback URL with auth code
+    #   4. Supabase exchanges auth code for tokens and creates user session
+    #
+    # This is equivalent to calling supabase.auth.signInWithOAuth({ provider: 'google' })
     OAUTH_URL="${SUPABASE_URL}/auth/v1/authorize?provider=google"
 
     echo ""
