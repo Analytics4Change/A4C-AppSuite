@@ -34,13 +34,13 @@ interface ValidationConfig {
 
 // Configuration
 const CONFIG: ValidationConfig = {
-  docsRoot: join(process.cwd(), 'docs'),
+  docsRoot: join(process.cwd(), '..', 'documentation', 'frontend'),
   srcRoot: join(process.cwd(), 'src'),
   requiredDocs: [
     'CLAUDE.md',
     'README.md',
-    'docs/architecture/overview.md',
-    'docs/getting-started/installation.md'
+    '../documentation/frontend/architecture/overview.md',
+    '../documentation/frontend/getting-started/local-development.md'
   ],
   patterns: {
     component: /^# Component: (.+)$/m,

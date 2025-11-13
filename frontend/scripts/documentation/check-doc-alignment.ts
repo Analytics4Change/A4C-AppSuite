@@ -195,26 +195,26 @@ interface FileChange {
  */
 const CONFIG = {
   srcRoot: join(process.cwd(), 'src'),
-  docsRoot: join(process.cwd(), 'docs'),
+  docsRoot: join(process.cwd(), '..', 'documentation', 'frontend'),
   alignmentRules: [
     {
       name: 'API Endpoints',
       sourcePattern: 'src/services/api/**/*.ts',
-      docPattern: 'docs/api/**/*.md',
+      docPattern: '../documentation/frontend/reference/api/**/*.md',
       extractor: extractApiEndpoints,
       validator: validateApiEndpoints
     },
     {
       name: 'ViewModels',
       sourcePattern: 'src/viewModels/**/*.ts',
-      docPattern: 'docs/architecture/viewmodels.md',
+      docPattern: '../documentation/frontend/architecture/viewmodels.md',
       extractor: extractViewModelStructure,
       validator: validateViewModelDocs
     },
     {
       name: 'Types and Interfaces',
       sourcePattern: 'src/types/**/*.ts',
-      docPattern: 'docs/api/types.md',
+      docPattern: '../documentation/frontend/reference/api/types.md',
       extractor: extractTypeDefinitions,
       validator: validateTypeDocs
     }
