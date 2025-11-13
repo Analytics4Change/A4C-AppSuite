@@ -66,15 +66,41 @@ The A4C-FrontEnd application follows a modern React architecture with the follow
 
 ```
 src/
-├── components/     # UI layer
-├── views/         # Feature layer
-├── viewModels/    # State management layer
-├── services/      # Data access layer
-├── types/         # Type definitions
-├── hooks/         # Custom React hooks
-├── utils/         # Utility functions
-└── config/        # Application configuration
+├── components/     # UI layer - Reusable UI components
+├── pages/          # Routing layer - Route-level components (auth, clients, medications, orgs)
+├── views/          # Presentation layer - Feature-specific view components
+├── viewModels/     # State management layer - MobX stores
+├── services/       # Data access layer - API clients and business logic
+├── types/          # Type definitions - TypeScript interfaces and models
+├── hooks/          # Custom React hooks - Reusable stateful logic
+├── utils/          # Utility functions - Pure helper functions
+├── contexts/       # React contexts - Cross-component state providers
+├── constants/      # Application constants - Static configuration values
+├── lib/            # Shared libraries - Event bus, utilities
+├── mocks/          # Mock data - Development and testing fixtures
+├── data/           # Static data - Static application data files
+├── config/         # Application configuration - Environment-based config
+├── styles/         # Global styles - CSS and theme configuration
+├── test/           # Test utilities - Shared testing helpers and setup
+└── examples/       # Example components - Reference implementations and demos
 ```
+
+### Directory Purposes
+
+**Routing vs Presentation Architecture:**
+- **pages/**: Route-level components that define what renders at each URL path. These are thin wrappers that connect routes to views.
+  - Example: `pages/clients/ClientListPage.tsx` renders at `/clients`
+- **views/**: Presentation components that contain the actual UI logic and interact with ViewModels.
+  - Example: `views/client/ClientList.tsx` is the actual component with business logic
+
+**State Management:**
+- **viewModels/**: MobX observable stores that manage application state
+- **contexts/**: React Context providers for cross-component state (auth, theme, etc.)
+
+**Shared Libraries:**
+- **lib/**: Shared functionality like event bus, custom utilities
+- **hooks/**: Reusable React hooks for stateful logic
+- **utils/**: Pure utility functions with no side effects
 
 ## Data Flow
 

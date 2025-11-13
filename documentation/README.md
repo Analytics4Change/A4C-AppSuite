@@ -288,9 +288,13 @@ When adding or updating documentation:
 
 ### Structure
 1. **Add YAML frontmatter** with status and last_updated date
-2. **Follow naming conventions**: lowercase-kebab-case.md
-3. **Use descriptive filenames**: `jwt-custom-claims.md` not `claims.md`
-4. **Include inline markers** for aspirational content
+2. **Ensure frontmatter matches heading status**:
+   - Frontmatter `status: current` → Heading `**Status**: ✅ Fully Implemented` or `**Status**: Operational`
+   - Frontmatter `status: aspirational` → Heading `**Status**: 📅 Planned` or `**Status**: Design Specification`
+   - Frontmatter `status: archived` → Heading `**Status**: ⚠️ Deprecated` or `**Status**: Historical`
+3. **Follow naming conventions**: lowercase-kebab-case.md
+4. **Use descriptive filenames**: `jwt-custom-claims.md` not `claims.md`
+5. **Include inline markers** for aspirational content (e.g., `> [!NOTE] This feature is not yet implemented`)
 
 ### Cross-References
 1. **Add "See Also" sections** linking to related documentation

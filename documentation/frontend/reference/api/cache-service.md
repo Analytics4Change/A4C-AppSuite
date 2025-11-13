@@ -1,82 +1,111 @@
-# Cache Service API
+# Medication Search Cache Service
 
 ## Overview
 
-The Cache Service API provides a sophisticated caching system for the A4C-FrontEnd application. It implements a hybrid approach combining in-memory caching for speed and IndexedDB for persistence, with intelligent fallback mechanisms and performance monitoring.
+The HybridCacheService provides a specialized caching system for medication search results in the A4C-FrontEnd application. It implements a hybrid approach combining in-memory caching for speed and IndexedDB for persistence, optimized specifically for the medication search use case.
+
+**Note**: This is a specialized implementation for medication search, not a generic cache service. The service is optimized for caching `Medication[]` search results keyed by search query strings.
 
 ## Architecture
 
 ### Hybrid Cache Strategy
 
-The cache service uses a two-tier architecture:
+The cache service uses a two-tier architecture optimized for medication search:
 
-1. **Memory Cache (L1)**: Fast, volatile storage for frequently accessed data
-2. **IndexedDB Cache (L2)**: Persistent storage for larger datasets and offline capability
+1. **Memory Cache (L1)**: Fast, volatile storage for frequently searched medications
+2. **IndexedDB Cache (L2)**: Persistent storage for larger result sets and offline capability
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Application   │───▶│  Memory Cache   │───▶│ IndexedDB Cache │
-│                 │    │   (L1 - Fast)   │    │ (L2 - Persistent)│
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-        ▲                        │                        │
-        │                        ▼                        ▼
-        └──────────────── Network Request ─────────────────┘
+┌──────────────────────┐    ┌─────────────────┐    ┌──────────────────────┐
+│ Medication Search UI │───▶│  Memory Cache   │───▶│  IndexedDB Cache     │
+│                      │    │ (Fast lookups)  │    │ (Persistent storage) │
+└──────────────────────┘    └─────────────────┘    └──────────────────────┘
+        ▲                            │                        │
+        │                            ▼                        ▼
+        └────────────────── RxNorm API Request ───────────────┘
 ```
 
 ## Core Services
 
 ### HybridCacheService
 
-The main cache orchestrator that coordinates between memory and persistent storage.
+The medication search cache coordinator that manages memory and IndexedDB storage layers.
 
 ```typescript
 class HybridCacheService {
-  constructor(config?: CacheConfig);
-  
-  // Core operations
-  async get(key: string): Promise<CacheResult | null>;
-  async set(key: string, value: any, ttl?: number): Promise<void>;
-  async delete(key: string): Promise<void>;
+  constructor(); // No configuration - uses sensible defaults
+
+  // Core operations (medication-search-specific)
+  async get(query: string): Promise<SearchResult | null>;
+  async set(query: string, medications: Medication[], customTTL?: number): Promise<void>;
+  async has(query: string): Promise<boolean>;
+  async delete(query: string): Promise<void>;
   async clear(): Promise<void>;
-  
-  // Cache management
-  getStats(): CacheStats;
-  async cleanup(): Promise<void>;
-  
-  // Health monitoring
-  isHealthy(): boolean;
-  getMetrics(): CacheMetrics;
+
+  // Performance and optimization
+  async warmUp(commonMedications: Medication[]): Promise<void>;
+
+  // Statistics and monitoring
+  async getStats(): Promise<{
+    memory: CacheStats;
+    indexedDB: CacheStats | null;
+    combined: {
+      totalEntries: number;
+      totalSize: number;
+      isIndexedDBAvailable: boolean;
+    };
+  }>;
+}
+
+// Return types
+interface SearchResult {
+  medications: Medication[];
+  timestamp: number;
+  query: string;
+}
+
+interface CacheStats {
+  entries: number;
+  size: number; // bytes
+  hits: number;
+  misses: number;
+  hitRate: number; // percentage
 }
 ```
 
 ### Usage Examples
 
-#### Basic Caching Operations
+#### Basic Medication Search Caching
 
 ```typescript
 import { HybridCacheService } from '@/services/cache/HybridCacheService';
 
-// Initialize cache service
-const cacheService = new HybridCacheService({
-  memory: {
-    maxEntries: 1000,
-    ttl: 300000 // 5 minutes
-  },
-  indexedDB: {
-    dbName: 'AppCache',
-    version: 1,
-    maxSize: 50 * 1024 * 1024 // 50MB
-  }
-});
+// Initialize cache service (uses sensible defaults)
+const cacheService = new HybridCacheService();
 
 // Cache medication search results
-await cacheService.set('search:lisinopril', medications, 3600); // 1 hour TTL
+const medications = await medicationApi.search('lisinopril');
+await cacheService.set('lisinopril', medications); // Uses default TTL (30 minutes)
+
+// Or with custom TTL
+await cacheService.set('lisinopril', medications, 3600); // 1 hour
+
+// Check if query is cached
+const isCached = await cacheService.has('lisinopril');
+if (isCached) {
+  console.log('Query is in cache');
+}
 
 // Retrieve from cache
-const cached = await cacheService.get('search:lisinopril');
+const cached = await cacheService.get('lisinopril');
 if (cached) {
-  console.log('Cache hit:', cached.data);
-  console.log('Cache age:', Date.now() - cached.timestamp);
+  console.log('Cache hit:', cached.medications);
+  console.log('Query:', cached.query);
+  console.log('Age:', Date.now() - cached.timestamp, 'ms');
+} else {
+  // Cache miss - fetch from API
+  const results = await medicationApi.search('lisinopril');
+  await cacheService.set('lisinopril', results);
 }
 
 // Delete specific entry

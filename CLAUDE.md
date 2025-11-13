@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is the A4C (Analytics4Change) AppSuite monorepo, containing:
 
 - **Frontend**: React/TypeScript medication management application (`frontend/`)
-- **Temporal**: Workflow orchestration for long-running business processes (`temporal/`)
+- **Workflows**: Temporal.io workflow orchestration for long-running business processes (`workflows/`)
 - **Infrastructure**: Terraform-based infrastructure as code (`infrastructure/`)
 
 ## Monorepo Structure
@@ -16,15 +16,20 @@ This is the A4C (Analytics4Change) AppSuite monorepo, containing:
 A4C-AppSuite/
 ├── frontend/          # React application for medication management
 │   ├── src/          # Application source code
-│   ├── docs/         # Frontend documentation
 │   └── CLAUDE.md     # Detailed frontend guidance
-├── temporal/          # Temporal.io workflows and activities
+├── workflows/         # Temporal.io workflows and activities
 │   ├── src/          # Workflows, activities, workers
 │   │   ├── workflows/    # Durable workflow definitions
 │   │   ├── activities/   # Side effects (API calls, events)
-│   │   └── workers/      # Worker startup
+│   │   ├── worker/       # Worker startup
+│   │   └── shared/       # Shared config and utilities
 │   ├── Dockerfile    # Worker container image
-│   └── CLAUDE.md     # Detailed temporal development guidance
+│   └── CLAUDE.md     # Detailed workflow guidance
+├── documentation/     # Consolidated documentation (115+ files)
+│   ├── architecture/ # Cross-cutting concerns (auth, CQRS, multi-tenancy)
+│   ├── frontend/     # Frontend guides and reference
+│   ├── workflows/    # Workflow guides and reference
+│   └── infrastructure/ # Infrastructure guides and reference
 └── infrastructure/    # Terraform IaC and deployment configs
     ├── terraform/    # Terraform configurations
     ├── supabase/     # Supabase-specific resources (SQL, migrations)
@@ -45,10 +50,10 @@ npm run test       # Run tests
 npm run lint       # Lint code
 ```
 
-### Temporal Workflows
+### Workflow Development
 
 ```bash
-cd temporal
+cd workflows
 npm install
 npm run dev        # Start worker in development mode
 npm run build      # Build for production
@@ -77,9 +82,11 @@ For detailed guidance on each component, refer to their respective CLAUDE.md fil
 
 - **Frontend**: See `frontend/CLAUDE.md` for comprehensive React/TypeScript development guidelines, accessibility standards, state management patterns, and component architecture.
 
-- **Temporal**: See `temporal/CLAUDE.md` for Temporal.io workflow development, activity patterns, event-driven architecture, error handling, and testing strategies.
+- **Workflows**: See `workflows/CLAUDE.md` for Temporal.io workflow development, activity patterns, event-driven architecture, error handling, and testing strategies.
 
 - **Infrastructure**: See `infrastructure/CLAUDE.md` for Terraform workflows, provider configuration, environment management, and deployment procedures.
+
+- **Documentation**: See `documentation/README.md` for consolidated architecture, guides, and reference documentation across all components.
 
 ## Common Development Workflows
 
@@ -90,9 +97,9 @@ When making changes that affect multiple components:
 1. **Infrastructure first**: Database schema, API contracts, event definitions
    - Update Supabase SQL schema (`infrastructure/supabase/sql/`)
    - Deploy migrations to development environment
-2. **Temporal workflows**: Orchestration logic and event emission
-   - Create/update workflows (`temporal/src/workflows/`)
-   - Create/update activities with event emission (`temporal/src/activities/`)
+2. **Workflow orchestration**: Temporal workflow logic and event emission
+   - Create/update workflows (`workflows/src/workflows/`)
+   - Create/update activities with event emission (`workflows/src/activities/`)
    - Test workflows locally against dev Temporal cluster
 3. **Frontend integration**: UI to consume new features
    - Update React components to trigger workflows
@@ -162,14 +169,14 @@ The frontend supports three authentication modes for different development needs
 - **Testing**: Easy mocking via injected auth provider
 
 **See**:
-- `.plans/supabase-auth-integration/frontend-auth-architecture.md` (Complete implementation)
+- `documentation/architecture/authentication/frontend-auth-architecture.md` (Complete implementation)
 - `frontend/CLAUDE.md` (Developer guidance)
-- `.plans/supabase-auth-integration/overview.md` (Architecture overview)
+- `documentation/architecture/authentication/supabase-auth-overview.md` (Architecture overview)
 
 ### Data Flow
 1. Frontend React app (`frontend/`)
 2. Supabase Auth for authentication (`infrastructure/supabase/`)
-3. Temporal workflows for orchestration (`temporal/`)
+3. Temporal workflows for orchestration (`workflows/`)
 4. PostgreSQL with RLS and CQRS projections (`infrastructure/supabase/sql/`)
 
 ### Event-Driven Architecture
@@ -186,7 +193,7 @@ The frontend supports three authentication modes for different development needs
 - **Pattern**: Workflow-First with Saga compensation for rollback
 
 ### Infrastructure as Code
-- Terraform manages Supabase resources (future: remove Zitadel after migration)
+- Terraform manages Supabase resources (Zitadel migration complete - October 2025)
 - Kubernetes deployments for Temporal server and workers
 - Event-driven data model with CQRS projections
 - Environment-specific configurations (dev/staging/production)
@@ -208,7 +215,7 @@ The frontend supports three authentication modes for different development needs
 
 **Infrastructure:**
 - Terraform (IaC)
-- Supabase Auth (authentication - replacing Zitadel)
+- Supabase Auth (primary authentication provider)
 - Supabase (PostgreSQL database, Edge Functions, RLS)
 - Kubernetes (k3s cluster for Temporal and workers)
 
@@ -220,11 +227,11 @@ VITE_RXNORM_API_URL=https://rxnav.nlm.nih.gov/REST
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 
-# Note: Zitadel being replaced by Supabase Auth
+# Note: Zitadel migration complete (October 2025) - now using Supabase Auth
 # VITE_ZITADEL_AUTHORITY=https://analytics4change-zdswvg.us1.zitadel.cloud (deprecated)
 ```
 
-### Temporal (`temporal/.env` for local development)
+### Workflows (`workflows/.env` for local development)
 ```bash
 export TEMPORAL_ADDRESS=localhost:7233  # or cluster address
 export TEMPORAL_NAMESPACE=default
@@ -242,7 +249,7 @@ export SMTP_PASS=your-smtp-password
 export TF_VAR_supabase_access_token="..."
 export TF_VAR_supabase_project_ref="..."
 
-# Note: Zitadel variables deprecated after migration to Supabase Auth
+# Note: Zitadel migration complete (October 2025)
 # export TF_VAR_zitadel_service_user_id="..." (deprecated)
 # export TF_VAR_zitadel_service_user_secret="..." (deprecated)
 ```
@@ -254,7 +261,7 @@ export TF_VAR_supabase_project_ref="..."
 - E2E tests: Playwright
 - Accessibility: Manual keyboard navigation + screen reader testing
 
-### Temporal Testing
+### Workflow Testing
 - Activity unit tests: Jest
 - Workflow replay tests: Temporal testing framework
 - Integration tests: Test against dev Temporal cluster

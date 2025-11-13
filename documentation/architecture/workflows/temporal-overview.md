@@ -127,7 +127,7 @@ export async function OrganizationBootstrapWorkflow(
 **Cluster**: Kubernetes (k3s)
 **Namespace**: `temporal`
 **Deployed**: 2025-10-17 (6+ days uptime)
-**Configuration**: Helm chart (see `infrastructure/k8s/temporal/`)
+**Configuration**: Kubernetes manifests (see `infrastructure/k8s/temporal/`)
 
 ### Connection Information
 
@@ -461,7 +461,7 @@ async function emitDomainEvent(event: DomainEvent) {
 
 1. **Install Dependencies**
    ```bash
-   cd temporal/
+   cd workflows/
    npm install
    ```
 
@@ -798,12 +798,12 @@ If workflow changes cause issues:
 
 ## Related Documentation
 
-- **Organization Onboarding Workflow**: `organization-onboarding-workflow.md`
-- **Activities Reference**: `activities-reference.md`
-- **Error Handling and Compensation**: `error-handling-and-compensation.md`
-- **Temporal Worker Development**: `temporal/CLAUDE.md`
-- **Kubernetes Deployment**: `infrastructure/k8s/temporal/README.md`
-- **Supabase Auth Integration**: `.plans/supabase-auth-integration/overview.md`
+- **Organization Onboarding Workflow**: `documentation/architecture/workflows/organization-onboarding-workflow.md`
+- **Workflow Implementation**: `workflows/src/workflows/organization-bootstrap/`
+- **Temporal Worker Development**: `workflows/CLAUDE.md`
+- **Kubernetes Deployment**: `infrastructure/k8s/temporal/`
+- **Supabase Auth Integration**: `documentation/architecture/authentication/supabase-auth-overview.md`
+- **Event-Driven Architecture**: `documentation/architecture/data/event-sourcing-overview.md`
 
 ---
 

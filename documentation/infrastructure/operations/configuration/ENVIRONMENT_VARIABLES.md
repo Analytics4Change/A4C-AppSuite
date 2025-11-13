@@ -663,6 +663,42 @@ TEMPORAL_ADDRESS=temporal-frontend.temporal.svc.cluster.local:7233
 
 **Performance Impact**: Lower levels (debug) increase logging overhead
 
+#### `FRONTEND_URL`
+
+**Purpose**: Frontend application URL for invitation email links
+**Example**: `https://a4c.firstovertheline.com`
+**Required**: Yes (for GenerateInvitationsActivity)
+
+**Behavior Influence**: Invitation emails include clickable links to this URL for new users to complete registration
+
+**Files**:
+- `workflows/src/activities/organization-bootstrap/generate-invitations.ts` - Email template generation
+
+**Example**:
+```bash
+# Development
+FRONTEND_URL=http://localhost:5173
+
+# Production
+FRONTEND_URL=https://app.analytics4change.com
+```
+
+#### `HEALTH_CHECK_PORT`
+
+**Purpose**: HTTP port for Kubernetes health and readiness probes
+**Default**: `9090`
+**Required**: No (optional, defaults to 9090)
+
+**Behavior Influence**: Kubernetes liveness/readiness probes check endpoints at this port
+
+**Endpoints**:
+- `GET /health` - Liveness probe (is worker process running?)
+- `GET /ready` - Readiness probe (is worker connected to Temporal?)
+
+**Files**:
+- `workflows/src/worker/health-server.ts` - Health check server implementation
+- `infrastructure/k8s/temporal/worker-deployment.yaml` - Kubernetes probe configuration
+
 ---
 
 ## Infrastructure Configuration

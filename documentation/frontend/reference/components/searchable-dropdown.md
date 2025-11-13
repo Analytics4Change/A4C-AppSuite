@@ -8,23 +8,94 @@ The SearchableDropdown component provides a searchable selection interface for l
 
 ```typescript
 interface SearchableDropdownProps<T> {
+  // Current state
   value: string;
+  selectedItem?: T;
   searchResults: T[];
+  isLoading: boolean;
+  showDropdown: boolean;
+
+  // Search configuration
   onSearch: (query: string) => void;
-  onSelect: (item: T) => void;
-  renderItem: (item: T) => React.ReactNode;
-  placeholder?: string;
-  loading?: boolean;
-  error?: string;
+  onSelect: (item: T, method: SelectionMethod) => void;
+  onClear: () => void;
   minSearchLength?: number;
-  maxResults?: number;
   debounceMs?: number;
+
+  // Display configuration
+  placeholder?: string;
+  error?: string;
+
+  // Rendering functions
+  renderItem: (item: T, index: number, isHighlighted: boolean) => React.ReactNode;
+  renderSelectedItem?: (item: T) => React.ReactNode;
+  getItemKey: (item: T, index: number) => string | number;
+  getItemText?: (item: T) => string; // For auto-select matching
+
+  // Styling
   className?: string;
-  disabled?: boolean;
-  'aria-label'?: string;
-  'aria-describedby'?: string;
+  dropdownClassName?: string;
+  inputClassName?: string;
+
+  // Callbacks
+  onFieldComplete?: () => void;
+  onDropdownOpen?: (elementId: string) => void;
+
+  // IDs and labels
+  inputId?: string;
+  dropdownId?: string;
+  label?: string;
+  required?: boolean;
+  tabIndex?: number;
+  autoFocus?: boolean;
 }
+
+// Selection method indicates how item was selected
+type SelectionMethod = 'click' | 'enter' | 'tab';
 ```
+
+### Prop Details
+
+**State Props (required):**
+- `value`: Current search input value
+- `searchResults`: Array of search results to display
+- `isLoading`: Whether search is in progress
+- `showDropdown`: Whether dropdown is visible
+
+**State Props (optional):**
+- `selectedItem`: Currently selected item (for displaying selected state)
+
+**Callbacks (required):**
+- `onSearch`: Called when user types (after debounce)
+- `onSelect`: Called when item selected, includes selection method
+- `onClear`: Called when selection is cleared
+- `renderItem`: Render function for each result item (receives item, index, isHighlighted)
+- `getItemKey`: Generate unique key for each item
+
+**Callbacks (optional):**
+- `renderSelectedItem`: Custom rendering for selected item display
+- `getItemText`: Extract text from item for auto-select matching
+- `onFieldComplete`: Called when user completes interaction (e.g., Tab key)
+- `onDropdownOpen`: Called when dropdown opens with element ID
+
+**Configuration:**
+- `minSearchLength`: Minimum characters before search (default: 1)
+- `debounceMs`: Debounce delay in milliseconds (default: 300)
+- `placeholder`: Input placeholder text
+- `error`: Error message to display
+
+**Styling:**
+- `className`: CSS class for container
+- `dropdownClassName`: CSS class for dropdown
+- `inputClassName`: CSS class for input field
+
+**Accessibility:**
+- `inputId`: ID for the input element
+- `dropdownId`: ID for the dropdown element
+- `label`: Visible label text
+- `required`: Whether field is required
+- `tabIndex`: Custom tab index
+- `autoFocus`: Auto-focus input on mount
 
 ## Usage Examples
 

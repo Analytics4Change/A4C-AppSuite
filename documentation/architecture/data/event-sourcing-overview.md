@@ -12,8 +12,8 @@ migration_note: "Extracted CQRS/Event Sourcing content from consolidated plannin
 **CRITICAL**: The A4C platform uses an **Event-First Architecture with CQRS (Command Query Responsibility Segregation)** where all state changes flow through an immutable event log before being projected to normalized tables for efficient querying.
 
 **Primary Documentation**:
-- `infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - Full CQRS architecture specification
-- `frontend/docs/EVENT-DRIVEN-GUIDE.md` - Frontend implementation patterns
+- `documentation/infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - Full CQRS architecture specification
+- `documentation/frontend/guides/EVENT-DRIVEN-GUIDE.md` - Frontend implementation patterns
 
 **Core Principles**:
 - **Events are the single source of truth**: The `domain_events` table is append-only and immutable
