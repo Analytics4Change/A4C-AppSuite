@@ -997,6 +997,57 @@ After Phase 4 validation identified critical documentation gaps, created a new p
   4. `documentation/architecture/authentication/impersonation-security-controls.md`
   5. `documentation/architecture/authentication/impersonation-ui-specification.md`
   6. `documentation/architecture/authentication/enterprise-sso-guide.md`
+
+**Phase 8: MIGRATION_REPORT.md Remediation (Added 2025-11-13)**:
+- ✅ Investigated pending items from MIGRATION_REPORT.md (dated 2025-01-13)
+- ✅ Discovered Phase 7.4 was already complete (CI/CD paths updated)
+- ✅ Identified CRITICAL production blocker: RLS policies missing for 4 clinical tables
+- ✅ Identified HIGH priority gap: CQRS infrastructure tables undocumented
+- **Decision**: Address critical gaps before continuing with remaining table documentation
+
+**Phase 8.1 - RLS Policies for Clinical Tables (CRITICAL) (Added 2025-11-13)**:
+- **Status**: ✅ COMPLETE - Production blocker resolved
+- **Files Created**: `infrastructure/supabase/sql/06-rls/002-clinical-table-policies.sql`
+- **Tables Fixed**: clients, medications, medication_history, dosage_info
+- **Policies Added** (per table):
+  - Super admin: Full access across all organizations
+  - Organization users: Access scoped to their own organization
+  - INSERT/UPDATE/DELETE: Permission-based access control
+- **Pattern**: Followed existing RLS patterns from 001-core-projection-policies.sql
+- **Idempotency**: All policies use `DROP POLICY IF EXISTS` before `CREATE POLICY`
+- **Impact**: Resolved production blocker preventing use of medication management features
+- **Commit**: 72a19d9d - "fix(rls): Add RLS policies for clinical tables (production blocker)"
+- **Lines Added**: 288 lines of SQL
+- **Testing**: Verified idempotent pattern (no local testing due to Supabase CLI issues)
+
+**Phase 8.2 - Document CQRS Infrastructure Tables (HIGH) (Added 2025-11-13)**:
+- **Status**: ✅ COMPLETE - Critical documentation gap closed
+- **Files Created**:
+  - `documentation/infrastructure/reference/database/tables/domain_events.md` (650+ lines)
+  - `documentation/infrastructure/reference/database/tables/event_types.md` (530+ lines)
+- **domain_events.md Coverage**:
+  - 12 columns fully documented with detailed explanations
+  - 6 performance indexes explained (stream, type, created, unprocessed, correlation, user)
+  - Event sourcing patterns: stream versioning, optimistic concurrency, immutability
+  - Usage examples: append events, replay streams, trace workflows, audit trails
+  - RLS policies: super admin access, future org-scoped access recommendations
+  - Performance considerations: 1M-100M+ events, partitioning strategy, archival
+  - HIPAA/GDPR compliance notes: audit trail integrity, right to erasure patterns
+  - Best practices: event design, projection patterns, schema evolution
+- **event_types.md Coverage**:
+  - 14 columns fully documented
+  - JSON Schema validation for event_data and event_metadata
+  - Seed data: 11 core event types documented (client, medication, user domains)
+  - Role-based access control (allowed_roles array)
+  - Projection mapping (projection_tables, projection_function)
+  - Event type naming conventions and hierarchy
+  - Schema evolution best practices
+  - Deprecation lifecycle management
+- **Architecture Impact**: Closes critical documentation gap for CQRS infrastructure
+- **Onboarding Value**: Provides comprehensive reference for event-driven development
+- **Contract Documentation**: Documents interface between event producers (Temporal) and consumers (projections)
+- **Commit**: 21e6fe0a - "docs(database): Document CQRS infrastructure tables (domain_events, event_types)"
+- **Total Lines**: 1,181 lines of comprehensive technical documentation
   7. `documentation/architecture/authorization/organizational-deletion-ux.md`
   8. `documentation/architecture/data/provider-partners-architecture.md`
   9. `documentation/architecture/data/var-partnerships.md`

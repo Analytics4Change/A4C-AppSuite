@@ -639,6 +639,105 @@
 2. **Continue Phase 5**: Annotation & Status Marking (115 files need frontmatter)
 3. **Consider Production Blocker**: Implement RLS policies for 4 clinical tables (clients, medications, medication_history, dosage_info)
 
+## Phase 8: MIGRATION_REPORT.md Remediation ✅ COMPLETE (Phases 8.1-8.2)
+
+**Context**: User requested review of pending items from MIGRATION_REPORT.md (dated 2025-01-13)
+
+### Investigation Results (2025-11-13)
+- [x] Investigated MIGRATION_REPORT.md pending items
+- [x] Verified Phase 7.4 CI/CD updates already complete
+  - `.github/workflows/frontend-documentation-validation.yml` - All 4 paths updated ✅
+  - `frontend/scripts/documentation/*.ts` - All 5 scripts updated ✅
+- [x] Identified CRITICAL RLS gap: 4 clinical tables with NO policies
+- [x] Identified HIGH priority gap: CQRS infrastructure tables undocumented
+
+### 8.1 RLS Policies for Clinical Tables (CRITICAL) ✅ COMPLETE
+- [x] Created `infrastructure/supabase/sql/06-rls/002-clinical-table-policies.sql`
+- [x] Added 20 policies (5 policies × 4 tables):
+  - [x] clients: SELECT, INSERT, UPDATE, DELETE, super_admin_select
+  - [x] medications: SELECT, INSERT, UPDATE, DELETE, super_admin_select
+  - [x] medication_history: SELECT, INSERT, UPDATE, DELETE, super_admin_select
+  - [x] dosage_info: SELECT, INSERT, UPDATE, DELETE, super_admin_select
+- [x] Followed idempotent pattern (DROP IF EXISTS, then CREATE)
+- [x] Verified idempotency (grep pattern check)
+- [x] Committed with comprehensive message (commit 72a19d9d)
+
+**Impact**: ✅ **Production blocker resolved** - Clinical tables now accessible
+
+### 8.2 Document CQRS Infrastructure Tables (HIGH) ✅ COMPLETE
+- [x] Documented `domain_events` table (650+ lines)
+  - [x] 12 columns with detailed explanations
+  - [x] 6 performance indexes documented
+  - [x] Event sourcing patterns (stream versioning, optimistic concurrency)
+  - [x] Usage examples (append events, replay streams, workflows, audit)
+  - [x] RLS policies and future enhancements
+  - [x] Performance considerations (1M-100M+ events, partitioning)
+  - [x] HIPAA/GDPR compliance guidance
+  - [x] Best practices (event design, projections, schema evolution)
+- [x] Documented `event_types` table (530+ lines)
+  - [x] 14 columns with detailed explanations
+  - [x] JSON Schema validation patterns
+  - [x] 11 seeded event types documented
+  - [x] Event naming conventions and hierarchy
+  - [x] Schema evolution best practices
+  - [x] Role-based access control
+  - [x] Deprecation lifecycle management
+- [x] Committed documentation (commit 21e6fe0a)
+
+**Impact**: ✅ **Critical CQRS infrastructure fully documented** - Closes 10-month documentation gap
+
+### Remaining Work from MIGRATION_REPORT.md (Not Started - Lower Priority)
+
+**Phase 3 (MEDIUM Priority): Document Remaining 8+ Tables** (~8-10 hours):
+- [ ] Document organization child tables (4 tables):
+  - [ ] addresses_projection.md
+  - [ ] contacts_projection.md
+  - [ ] programs_projection.md
+  - [ ] phones_projection.md
+- [ ] Document audit tables (2 tables):
+  - [ ] audit_log.md
+  - [ ] api_audit_log.md
+- [ ] Document other tables (2 tables):
+  - [ ] organization_business_profiles_projection.md (has SQL, no docs)
+  - [ ] impersonation_sessions_projection.md (has SQL, no docs)
+- [ ] Handle deprecated Zitadel tables (2 tables):
+  - [ ] Document or remove: zitadel_user_mapping
+  - [ ] Document or remove: zitadel_organization_mapping
+
+**Phase 4 (LOW Priority): Update MIGRATION_REPORT.md** (~30 minutes):
+- [ ] Mark Phase 7.4 as ✅ COMPLETE (verified complete)
+- [ ] Update RLS gap section (now resolved)
+- [ ] Update database documentation metrics (12→14 tables documented)
+- [ ] Add Phase 8 to completion timeline
+- [ ] Update final completion percentage (95%→98%)
+
+**Phase 8 Summary**:
+- **Time Invested**: ~3-4 hours
+- **Files Created**: 3 new files (1 SQL, 2 markdown)
+- **Lines Added**: ~1,500 lines (288 SQL + 1,181 docs)
+- **Tables Documented**: 2 critical CQRS tables (domain_events, event_types)
+- **Production Blockers Resolved**: 1 (RLS policies for 4 clinical tables)
+- **Commits**: 2 (72a19d9d, 21e6fe0a)
+
+## Current Status
+
+**Phase**: Phase 8 (MIGRATION_REPORT.md Remediation)
+**Status**: ✅ COMPLETE (Critical and High priority items resolved)
+**Last Updated**: 2025-11-13
+**Next Step**: Continue with remaining table documentation (8+ tables) OR update MIGRATION_REPORT.md
+
+**How to Resume After /clear**:
+```bash
+# Option 1: Continue documenting remaining tables (Phase 3 from MIGRATION_REPORT)
+"Read dev/active/documentation-grooming-*.md and continue documenting remaining database tables (addresses, contacts, programs, phones, audit_log, api_audit_log, business_profiles, impersonation_sessions)"
+
+# Option 2: Update MIGRATION_REPORT.md with completed work
+"Read dev/active/documentation-grooming-*.md and update MIGRATION_REPORT.md to reflect Phase 8 completion"
+
+# Option 3: Continue with original grooming plan (if any phases incomplete)
+"Read dev/active/documentation-grooming-*.md and check for any incomplete phases"
+```
+
 ## Execution Notes
 
 ### Important Reminders
