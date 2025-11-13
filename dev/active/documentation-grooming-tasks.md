@@ -367,9 +367,9 @@
 
 ## Current Status
 
-**Phase**: Addressing Phase 4 Gaps - Database Schema Documentation (Phase 1 of Gap Remediation)
-**Status**: ✅ 5% COMPLETE (Started Phase 1.1-1.2 of gap remediation plan)
-**Last Updated**: 2025-01-12
+**Phase**: Gap Remediation - Database Schema Documentation COMPLETE
+**Status**: ✅ 100% COMPLETE (12/12 core tables documented - 9,660 lines)
+**Last Updated**: 2025-01-13
 
 **Completed Phases (Documentation Grooming)**:
 - Phase 1.1 - Create Directory Structure (40 directories, 7 README files) ✅
@@ -383,14 +383,16 @@
 - Phase 3.5 - Audit and Categorize Planning Documentation (30 files + 2 special handling) ✅
 - Phase 4.1 - Validate API Contracts & Schemas ✅
 - Phase 4.2 - Validate Database Schemas ✅
+- Gap Remediation Phase 1.1 - Create Table Documentation Template ✅
+- Gap Remediation Phase 1.2 - Document All Core Tables (12 tables, 9,660 lines) ✅
 
-**Gap Remediation Progress (NEW - Started 2025-01-12, Updated 2025-01-13)**:
+**Gap Remediation Summary (Started 2025-01-12, COMPLETED 2025-01-13)**:
 - **Phase 1.1 COMPLETE**: Created comprehensive table documentation template
   - Location: `documentation/infrastructure/reference/database/table-template.md`
   - 415 lines with sections: Schema, Relationships, Indexes, RLS Policies, Usage Examples, Troubleshooting
   - Based on frontend's component-template.md pattern
 
-- **Phase 1.2 IN PROGRESS** (6/12 core tables documented - 50%):
+- **Phase 1.2 COMPLETE** (12/12 core tables documented - 100%):
   - ✅ **organizations_projection** (760 lines)
     - Complete schema with ltree hierarchy documentation
     - All 8 indexes documented with purposes
@@ -423,7 +425,30 @@
     - 23 columns for dose tracking
     - Vitals monitoring (JSONB schemas)
     - Adverse reaction reporting
-  - ⏸️ **Remaining**: permissions_projection, roles_projection, user_roles_projection, role_permissions_projection, invitations_projection, cross_tenant_access_grants_projection (6 tables)
+  - ✅ **permissions_projection** (728 lines) - Added 2025-01-13
+    - RBAC permission definitions with scope types
+    - 4 indexes including partial index for MFA permissions
+    - 2 RLS policies (super_admin all, authenticated read-only)
+  - ✅ **roles_projection** (814 lines) - Added 2025-01-13
+    - Dual-pattern: global templates vs org-scoped roles
+    - Check constraint enforces global/org-scoped pattern
+    - 5 indexes including GIST for ltree
+  - ✅ **role_permissions_projection** (731 lines) - Added 2025-01-13
+    - Role-permission junction table
+    - Composite PK prevents duplicates
+    - 2 indexes for bidirectional lookups
+  - ✅ **user_roles_projection** (831 lines) - Added 2025-01-13
+    - User role assignments with org scoping
+    - PostgreSQL 15+ NULLS NOT DISTINCT constraint
+    - 6 indexes including composite for JWT generation
+  - ✅ **invitations_projection** (817 lines) - Added 2025-01-13
+    - User invitation workflow (Temporal → Edge Functions)
+    - 256-bit secure tokens, 7 indexes
+    - ⚠️ RLS enabled with commented-out policy
+  - ✅ **cross_tenant_access_grants_projection** (721 lines) - Added 2025-01-13
+    - Cross-org access control (VAR contracts)
+    - 11 indexes for authorization checks
+    - ⚠️ CRITICAL: RLS enabled but NO policies defined
 
 **Validation Reports Created**:
 - dev/active/phase-4-1-api-validation-report.md (29KB)
@@ -431,26 +456,33 @@
 
 **Key Findings from Validation**:
 - ✅ **Strengths**: Core API interfaces perfectly documented
-- ⚠️ **CRITICAL Gap**: Database schemas completely undocumented (HIGH impact) - NOW BEING ADDRESSED
+- ✅ **Database schemas**: COMPLETE - All 12 core tables now fully documented (9,660 lines)
 - ⚠️ **High Priority**: SearchableDropdownProps 73% undocumented - PENDING
 - ⚠️ **Medium Priority**: HybridCacheService architectural mismatch - PENDING
+- ⚠️ **RLS Gaps Identified**: cross_tenant_access_grants (no policies), invitations (commented policy)
 
-**Current Focus**: Database schema documentation (Phase 1 of gap remediation plan)
-**Progress**: 50% complete (6/12 tables documented, 5,373 lines)
-**Next Step**: Continue Phase 1.2 - Document remaining 6 tables (RBAC projections + system tables) to complete Option C goal
+**Current Focus**: ✅ Database schema documentation COMPLETE - Moving to remaining Phase 4 validations
+**Progress**: 100% complete (12/12 tables documented, 9,660 lines)
+**Next Step**: Proceed with Phase 4.3 (Validate Configuration References) or address remaining gaps (SearchableDropdownProps, HybridCacheService)
 
 **How to Resume After /clear**:
 ```bash
-# Read dev-docs to restore context
-cat dev/active/documentation-grooming-context.md
-cat dev/active/documentation-grooming-tasks.md
+# Option 1: Continue with remaining validation phases
+"Read dev/active/documentation-grooming-*.md and continue with Phase 4.3 (Validate Configuration References)"
 
-# Read validation reports
-cat dev/active/phase-4-1-api-validation-report.md
-cat dev/active/phase-4-2-database-validation-report.md
+# Option 2: Address remaining API documentation gaps
+"Read dev/active/phase-4-1-api-validation-report.md and document SearchableDropdownProps missing properties"
 
-# Then continue: "Read dev/active/documentation-grooming-*.md and continue with Phase 4.3"
+# Option 3: Continue with original grooming phases (5, 6, 7)
+"Read dev/active/documentation-grooming-*.md and continue with Phase 5 (Annotation & Status Marking)"
 ```
+
+**Recommended Next Steps**:
+1. **Phase 4.3**: Validate Configuration References (env vars, .env files, config docs)
+2. **Phase 4.4**: Validate Architecture Descriptions (topology, structure, workflows)
+3. **Phase 4 Final Report**: Consolidate all validation findings into single report
+4. **Address API Gaps**: Document SearchableDropdownProps (22/30 missing properties)
+5. **Address API Gaps**: Align HybridCacheService docs with specialized implementation
 
 ## Execution Notes
 

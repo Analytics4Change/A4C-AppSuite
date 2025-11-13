@@ -567,7 +567,7 @@ This defeats the entire purpose of documentation consolidation.
 ## Current Status
 
 **Phase**: Addressing Phase 4 Gaps - Database Schema Documentation (Gap Remediation)
-**Status**: ✅ 50% COMPLETE (6 of 12 core tables documented - 5,373 lines)
+**Status**: ✅ 100% COMPLETE (12 of 12 core tables documented - 9,660 lines)
 **Last Updated**: 2025-01-13
 
 **Completed Phases (Documentation Grooming)**:
@@ -591,7 +591,7 @@ After Phase 4 validation identified critical documentation gaps, created a new p
   - 415 lines covering: Schema, Relationships, Indexes, RLS Policies, Constraints, Triggers, Usage Examples, Audit Trail, JSONB schemas, Troubleshooting
   - Modeled after successful frontend `component-template.md` pattern
 
-- **Phase 1.2 IN PROGRESS** - Core Tables Documentation (6/12 = 50% COMPLETE)
+- **Phase 1.2 COMPLETE** - Core Tables Documentation (12/12 = 100% COMPLETE)
 
   **✅ Infrastructure & Auth Tables (2 tables - 1,502 lines):**
   - ✅ **organizations_projection.md** (760 lines)
@@ -652,15 +652,61 @@ After Phase 4 validation identified critical documentation gaps, created a new p
     - Adverse reaction reporting with safety alerts
     - Double-check verification workflow (administered_by + verified_by)
 
-  **⏸️ RBAC Projection Tables (4 tables) - PENDING:**
-  - ⏸️ **permissions_projection** - CQRS projection, reference data
-  - ⏸️ **roles_projection** - CQRS projection with org hierarchy
-  - ⏸️ **role_permissions_projection** - Junction table
-  - ⏸️ **user_roles_projection** - User-role assignments with org scoping
+  **✅ RBAC Projection Tables (4 tables - 2,804 lines) - COMPLETE:**
+  - ✅ **permissions_projection.md** (728 lines) - Added 2025-01-13
+    - CQRS projection for atomic authorization units
+    - 4 indexes including partial index for MFA-required permissions
+    - 2 RLS policies (super_admin all access, authenticated read-only)
+    - Generated `name` column (applet.action format) for JWT claims
+    - Scope types: global, org, facility, program, client
+    - Complete event sourcing with permission.defined events
 
-  **⏸️ System Tables (2 tables) - PENDING:**
-  - ⏸️ **invitations_projection** - User invitation workflow
-  - ⏸️ **cross_tenant_access_grants_projection** - Multi-org access grants
+  - ✅ **roles_projection.md** (814 lines) - Added 2025-01-13
+    - Dual-pattern design: global templates vs org-scoped roles
+    - Check constraint enforces global (super_admin) vs org-scoped pattern
+    - ltree org_hierarchy_scope for hierarchical permission inheritance
+    - 5 indexes including GIST for ltree operations
+    - 3 RLS policies (super_admin, org_admin, global template visibility)
+    - Role lifecycle: created, updated, soft deleted
+
+  - ✅ **role_permissions_projection.md** (731 lines) - Added 2025-01-13
+    - Many-to-many junction table (roles ↔ permissions)
+    - Composite PRIMARY KEY (role_id, permission_id) prevents duplicates
+    - 2 indexes for bidirectional lookups
+    - 3 RLS policies (super_admin, org_admin, global roles)
+    - Idempotent event processing (ON CONFLICT DO NOTHING)
+    - Events: role.permission.granted, role.permission.revoked
+
+  - ✅ **user_roles_projection.md** (831 lines) - Added 2025-01-13
+    - User role assignments with org-level scoping
+    - Hybrid: global super_admin (org_id = NULL) + org-scoped assignments
+    - PostgreSQL 15+ UNIQUE NULLS NOT DISTINCT constraint
+    - Check constraint: (org_id IS NULL AND scope_path IS NULL) OR both NOT NULL
+    - 6 indexes including composite idx_user_roles_auth_lookup for JWT generation
+    - 3 RLS policies (super_admin, org_admin, self-access)
+    - ltree scope_path for hierarchical permission checks
+
+  **✅ System Tables (2 tables - 1,538 lines) - COMPLETE:**
+  - ✅ **invitations_projection.md** (817 lines) - Added 2025-01-13
+    - User invitation workflow tracking (Temporal → Edge Functions)
+    - 256-bit cryptographically secure tokens (URL-safe base64)
+    - Status state machine: pending → accepted/expired/deleted
+    - 7 indexes including GIN for tags array (dev cleanup)
+    - ⚠️ RLS enabled with COMMENTED-OUT policy (Edge Functions use service role)
+    - Foreign key to organizations_projection with CASCADE delete
+    - Event: UserInvited (from GenerateInvitationsActivity)
+    - Includes development tags for test data cleanup
+
+  - ✅ **cross_tenant_access_grants_projection.md** (721 lines) - Added 2025-01-13
+    - Cross-organization data access (provider_partner → provider)
+    - Legal authorization types: var_contract, court_order, parental_consent, etc.
+    - Scope hierarchy: full_org, facility, program, client_specific
+    - Status state machine: active → revoked/expired/suspended → reactivated
+    - 11 indexes including composite for active grant lookups
+    - ⚠️ **CRITICAL**: RLS enabled but NO policies defined (table blocked)
+    - JSONB permissions and terms fields for granular access control
+    - Complete audit trail: granted_by, revoked_by, suspended_by, reactivated_by
+    - Events: access_grant.created, revoked, expired, suspended, reactivated
 
 **Validation Reports Created**:
 - dev/active/phase-4-1-api-validation-report.md (29KB)
@@ -672,19 +718,21 @@ After Phase 4 validation identified critical documentation gaps, created a new p
 - **Files staying in place**: 31 (CLAUDE.md, README.md, .claude/*, dev/*, contracts/)
 - **Deprecated files preserved**: 6 (historical reference in .archived_plans/)
 - **Validation reports created**: 2 (Phase 4.1 and 4.2)
-- **NEW - Table docs created**: 7 (template + 6 tables = 5,788 lines total)
+- **Table docs created**: 13 (template + 12 tables = 10,075 lines total)
 
 **Key Findings from Phase 4.1-4.2**:
-- **Critical Gap**: Database schemas completely undocumented (HIGH impact) - ✅ BEING ADDRESSED
+- **Critical Gap**: Database schemas completely undocumented (HIGH impact) - ✅ **RESOLVED** (100% complete)
 - **High Priority**: SearchableDropdownProps missing 22/30 properties in docs - PENDING
 - **Medium Priority**: HybridCacheService docs describe generic design, implementation is specialized - PENDING
 - **Strengths**: Core API interfaces (IClientApi, IMedicationApi) perfectly documented
 
-**Decision Point - Next Steps**:
-User presented with 3 options for continuing gap remediation:
-- **Option A**: Continue with 2-3 more critical tables (clients, medications) then checkpoint
-- **Option B**: Pause now, team uses template + 2 examples to parallelize remaining work
-- **Option C**: Continue documenting all tables in this session (6-8 more hours estimated)
+**Gap Remediation Decision**:
+- **Selected**: Option C - Document all remaining tables in this session
+- **Outcome**: ✅ SUCCESS - All 12 core tables documented (9,660 lines)
+- **Critical RLS Gaps Identified**:
+  - cross_tenant_access_grants_projection: RLS enabled, NO policies (blocks all access)
+  - invitations_projection: RLS enabled, commented-out policy (Edge Functions bypass via service role)
+- **Session Duration**: ~4 hours (faster than estimated 6-8 hours due to template efficiency)
 
 **Original Phase 4+ Still Pending**:
 1. **Phase 4.3** - Validate Configuration References (env vars, configs, secrets)
