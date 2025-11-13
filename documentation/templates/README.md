@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Documentation Templates
 
 This directory contains shared templates for creating consistent documentation across the A4C-AppSuite monorepo.

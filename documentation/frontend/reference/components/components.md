@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Component Documentation
 
 This file documents the component architecture and usage patterns for the A4C-FrontEnd application.

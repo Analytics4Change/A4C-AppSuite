@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Organization Module Deployment Instructions
 
 ## Step 1: Deploy Database Migrations ✅

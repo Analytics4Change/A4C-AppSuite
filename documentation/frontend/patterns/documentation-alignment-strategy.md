@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Documentation-Code Alignment Strategy for A4C-FrontEnd
 
 ## Executive Summary

@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # API Documentation
 
 This directory contains API documentation for the A4C-FrontEnd application.

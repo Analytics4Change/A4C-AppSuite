@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Installation Guide
 
 This guide will help you set up the A4C-FrontEnd development environment.

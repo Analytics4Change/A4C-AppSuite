@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Medication Autocomplete: TypeScript React Implementation
 
 This implementation provides a medication autocomplete system using the RXNorm displaynames API endpoint: `https://rxnav.nlm.nih.gov/REST/displaynames.json`

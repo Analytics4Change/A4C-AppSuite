@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Event-Driven Architecture Quick Start Guide
 
 This guide will get you up and running with the A4C event-driven architecture in 15 minutes.

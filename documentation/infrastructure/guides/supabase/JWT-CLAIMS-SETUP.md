@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # JWT Custom Claims Setup Guide
 
 **Purpose**: Configure Supabase Auth to enrich JWT tokens with custom claims for RBAC and multi-tenant isolation.

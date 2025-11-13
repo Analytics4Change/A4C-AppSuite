@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # A4C-FrontEnd Documentation
 
 A React-based medication management application for healthcare client management.

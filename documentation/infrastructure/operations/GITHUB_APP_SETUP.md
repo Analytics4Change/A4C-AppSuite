@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # GitHub App Setup for GHCR Access
 
 This guide walks through creating a GitHub App for the frontend deployment workflow.

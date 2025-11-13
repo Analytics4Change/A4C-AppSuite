@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Architecture Overview
 
 This document provides a high-level overview of the A4C-FrontEnd architecture.

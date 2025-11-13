@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Environment Variables Reference
 
 **Last Updated**: 2025-11-04

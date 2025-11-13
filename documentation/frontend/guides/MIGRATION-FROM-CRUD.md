@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Migration Guide: CRUD to Event-Driven Architecture
 
 This guide helps you migrate existing CRUD operations to the event-driven architecture.

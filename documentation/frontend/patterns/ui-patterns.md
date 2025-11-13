@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # UI Patterns and Architecture
 
 ## Table of Contents

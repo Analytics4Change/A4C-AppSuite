@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Workflows Documentation
 
 Documentation for the A4C-AppSuite Temporal.io workflow orchestration system.

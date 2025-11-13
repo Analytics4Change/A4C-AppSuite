@@ -4,6 +4,9 @@ last_updated: 2025-01-12
 ---
 
 # Provider Partner Architecture
+> [!WARNING]
+> **This feature is not yet implemented.** This document describes planned functionality that has not been built. Implementation timeline and approach are subject to change based on business priorities.
+
 
 **Status**: ✅ Integrated with Supabase Auth + Temporal.io
 **Version**: 2.1 (Updated for Supabase Auth integration)

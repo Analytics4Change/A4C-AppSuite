@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Event-Driven Frontend Implementation Guide
 
 This guide explains how to implement the event-driven architecture in the A4C Frontend application.

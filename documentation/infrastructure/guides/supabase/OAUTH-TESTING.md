@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # OAuth Testing Guide
 
 This guide provides comprehensive testing procedures for Google OAuth authentication in the A4C-AppSuite platform.

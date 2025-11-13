@@ -4,6 +4,9 @@ last_updated: 2025-01-12
 ---
 
 # Supabase Auth - Enterprise SSO (SAML 2.0) Guide
+> [!WARNING]
+> **This feature is not yet implemented.** This document describes planned functionality that has not been built. Implementation timeline and approach are subject to change based on business priorities.
+
 
 **Status**: 📅 Planned for implementation (3-6 months)
 **Priority**: High - Required for enterprise healthcare customers

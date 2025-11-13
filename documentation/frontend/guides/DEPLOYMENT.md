@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Deployment Guide
 
 Comprehensive guide for deploying the A4C-FrontEnd application with automated CI/CD pipeline.

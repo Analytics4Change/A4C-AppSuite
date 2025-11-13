@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Local Supabase Testing Guide
 
 This guide helps you test SQL migrations and Edge Functions locally before enabling GitHub Actions automation.

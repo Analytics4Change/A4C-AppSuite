@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # GitHub KUBECONFIG Secret Update Instructions
 
 ## Step 1: Copy the Base64 Kubeconfig

@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # SQL Migration Idempotency Audit Report
 
 **Date:** 2025-11-03

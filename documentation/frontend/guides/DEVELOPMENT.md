@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Development Guide
 
 Comprehensive guide for developing the A4C-FrontEnd application across multiple environments and platforms.

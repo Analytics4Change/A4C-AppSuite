@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Infrastructure Inventory
 
 This document captures the current state of manually configured infrastructure that needs to be imported into Terraform.

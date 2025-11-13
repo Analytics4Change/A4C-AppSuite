@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Architecture Documentation
 
 Cross-cutting architectural documentation that spans multiple components of the A4C-AppSuite.

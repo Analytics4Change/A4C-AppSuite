@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Testing Guide
 
 Comprehensive testing strategy and patterns for the A4C-FrontEnd application with Playwright E2E testing and accessibility validation.

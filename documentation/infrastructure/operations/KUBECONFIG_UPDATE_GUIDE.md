@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # KUBECONFIG Update Guide for GitHub Actions Deployment
 
 ## Overview

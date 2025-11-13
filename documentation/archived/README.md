@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Archived Documentation
 
 This directory contains historical and deprecated documentation that is no longer current but preserved for reference.

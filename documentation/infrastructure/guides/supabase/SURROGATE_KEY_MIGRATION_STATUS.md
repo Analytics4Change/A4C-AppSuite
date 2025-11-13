@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Surrogate Key Migration Status
 
 **Date Started**: 2025-10-20

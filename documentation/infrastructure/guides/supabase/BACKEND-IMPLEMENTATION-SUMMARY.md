@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Backend JWT Custom Claims Implementation Summary
 
 **Date**: 2025-10-27

@@ -1,3 +1,8 @@
+---
+status: current
+last_updated: 2025-01-13
+---
+
 # Documentation Validation Guide
 
 This guide helps developers run documentation validation locally and understand how to fix common issues.
