@@ -645,12 +645,25 @@ Before marking workflow development complete:
 
 ## Additional Resources
 
-- **Temporal Documentation**: Use Context7 MCP for `/temporalio/sdk-typescript`
-- **Architecture Overview**: `documentation/architecture/workflows/temporal-overview.md`
-- **Workflow Implementation**: `documentation/workflows/architecture/organization-bootstrap-workflow-design.md`
-- **Event-Driven Guide**: `documentation/infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md`
-- **AsyncAPI Contracts**: `infrastructure/supabase/contracts/asyncapi.yaml`
-- **Configuration Reference**: `documentation/infrastructure/operations/configuration/ENVIRONMENT_VARIABLES.md`
+### Architecture & Design
+- **Temporal Architecture Overview**: `documentation/architecture/workflows/temporal-overview.md` - Complete workflow orchestration guide
+- **Organization Onboarding Workflow**: `documentation/architecture/workflows/organization-onboarding-workflow.md` - Workflow design
+- **Workflow Implementation Guide**: `documentation/workflows/architecture/organization-bootstrap-workflow-design.md` - Detailed spec
+- **Error Handling & Compensation**: `documentation/workflows/guides/error-handling-and-compensation.md` - Saga pattern
+- **Activities Reference**: `documentation/workflows/reference/activities-reference.md` - Complete activity catalog
+
+### Event-Driven Architecture
+- **Event-Driven Guide**: `documentation/infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - Backend event sourcing spec
+- **Event Sourcing Overview**: `documentation/architecture/data/event-sourcing-overview.md` - CQRS architecture
+- **AsyncAPI Contracts**: `infrastructure/supabase/contracts/asyncapi.yaml` - Event schemas
+
+### Infrastructure & Deployment
+- **Infrastructure CLAUDE.md**: `../infrastructure/CLAUDE.md` - Deployment runbook (see Temporal Workers section)
+- **KUBECONFIG Update Guide**: `documentation/infrastructure/operations/KUBECONFIG_UPDATE_GUIDE.md` - K8s cluster access
+- **Environment Variables**: `documentation/infrastructure/operations/configuration/ENVIRONMENT_VARIABLES.md` - Complete config reference
+
+### External Documentation
+- **Temporal TypeScript SDK**: Use Context7 MCP for `/temporalio/sdk-typescript`
 
 ## Quick Reference
 

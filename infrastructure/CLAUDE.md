@@ -534,9 +534,36 @@ kubectl get deployment workflow-worker -n temporal
 
 ### References
 
-- KUBECONFIG Setup: `../documentation/infrastructure/operations/KUBECONFIG_UPDATE_GUIDE.md`
-- SQL Idempotency Audit: `../documentation/infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md`
-- Connectivity Testing: `infrastructure/test-k8s-connectivity.sh`
-- Frontend Workflow: `.github/workflows/frontend-deploy.yml`
-- Worker Workflow: `.github/workflows/workflows-docker.yaml`
-- Migration Workflow: `.github/workflows/supabase-migrations.yml`
+#### Architecture & Design
+- **[Multi-Tenancy Architecture](../documentation/architecture/data/multi-tenancy-architecture.md)** - Organization isolation with RLS policies
+- **[Event Sourcing Overview](../documentation/architecture/data/event-sourcing-overview.md)** - CQRS and domain events architecture
+- **[RBAC Architecture](../documentation/architecture/authorization/rbac-architecture.md)** - Role-based access control implementation
+- **[Temporal Workflows Overview](../documentation/architecture/workflows/temporal-overview.md)** - Workflow orchestration architecture
+
+#### Supabase Implementation Guides
+- **[Deployment Instructions](../documentation/infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md)** - Production deployment procedures
+- **[SQL Idempotency Audit](../documentation/infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md)** - Migration idempotency patterns and fixes
+- **[JWT Custom Claims Setup](../documentation/infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md)** - Database hooks for JWT claims
+- **[OAuth Testing Guide](../documentation/infrastructure/guides/supabase/OAUTH-TESTING.md)** - Comprehensive OAuth testing and troubleshooting
+- **[Supabase Auth Setup](../documentation/infrastructure/guides/supabase/SUPABASE-AUTH-SETUP.md)** - Complete authentication configuration
+- **[Event-Driven Architecture](../documentation/infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)** - Backend event sourcing specification
+
+#### Database Table Reference
+- **[organizations](../documentation/infrastructure/reference/database/tables/organizations.md)** - Multi-tenant organization hierarchy
+- **[user_roles](../documentation/infrastructure/reference/database/tables/user_roles.md)** - Role assignments with scope isolation
+- **[permissions](../documentation/infrastructure/reference/database/tables/permissions.md)** - Permission definitions
+- **[domain_events](../documentation/infrastructure/reference/database/tables/domain_events.md)** - Event store for CQRS
+- **[Complete Table List](../documentation/infrastructure/reference/database/tables/)** - All 12 core table schemas
+
+#### Operations & Deployment
+- **[KUBECONFIG Update Guide](../documentation/infrastructure/operations/KUBECONFIG_UPDATE_GUIDE.md)** - GitHub Actions k8s access configuration
+- **[RBAC Setup](../documentation/infrastructure/operations/k8s-rbac-setup.md)** - Kubernetes service account permissions
+
+#### CI/CD Workflows
+- **Frontend Deployment**: `.github/workflows/frontend-deploy.yml`
+- **Temporal Workers**: `.github/workflows/workflows-docker.yaml`
+- **Database Migrations**: `.github/workflows/supabase-migrations.yml`
+
+#### Testing & Scripts
+- **Connectivity Testing**: `infrastructure/test-k8s-connectivity.sh`
+- **Local Supabase**: `infrastructure/supabase/local-tests/` (start, migrate, verify, stop)

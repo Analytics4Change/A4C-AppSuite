@@ -88,6 +88,26 @@ For detailed guidance on each component, refer to their respective CLAUDE.md fil
 
 - **Documentation**: See `documentation/README.md` for consolidated architecture, guides, and reference documentation across all components.
 
+## Key Documentation Resources
+
+### Architecture Documentation
+- **[Authentication Architecture](documentation/architecture/authentication/frontend-auth-architecture.md)** - Three-mode auth system, JWT custom claims
+- **[RBAC Architecture](documentation/architecture/authorization/rbac-architecture.md)** - Role-based access control
+- **[Multi-Tenancy](documentation/architecture/data/multi-tenancy-architecture.md)** - Organization isolation with RLS
+- **[Event Sourcing](documentation/architecture/data/event-sourcing-overview.md)** - CQRS and domain events
+- **[Temporal Workflows](documentation/architecture/workflows/temporal-overview.md)** - Workflow orchestration
+
+### Implementation Guides
+- **[Frontend Event-Driven Guide](documentation/frontend/guides/EVENT-DRIVEN-GUIDE.md)** - CQRS patterns in React
+- **[JWT Custom Claims Setup](documentation/infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md)** - Database hooks
+- **[OAuth Testing Guide](documentation/infrastructure/guides/supabase/OAUTH-TESTING.md)** - Test Google OAuth
+- **[SQL Idempotency](documentation/infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md)** - Migration patterns
+- **[Deployment Instructions](documentation/infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md)** - Production deployment
+
+### Database Reference
+- **[Database Tables](documentation/infrastructure/reference/database/tables/)** - Complete schema documentation (12 core tables)
+- **[Event-Driven Architecture](documentation/infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)** - Backend event sourcing spec
+
 ## Common Development Workflows
 
 ### Making Cross-Component Changes

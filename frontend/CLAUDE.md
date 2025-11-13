@@ -361,7 +361,7 @@ test('user can login with any credentials', async ({ page }) => {
 });
 ```
 
-**For complete authentication architecture**: See `.plans/supabase-auth-integration/frontend-auth-architecture.md`
+**For complete authentication architecture**: See `../documentation/architecture/authentication/frontend-auth-architecture.md`
 
 ### State Management with MobX
 
