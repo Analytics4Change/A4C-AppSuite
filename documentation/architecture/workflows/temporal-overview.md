@@ -798,12 +798,27 @@ If workflow changes cause issues:
 
 ## Related Documentation
 
-- **Organization Onboarding Workflow**: `documentation/architecture/workflows/organization-onboarding-workflow.md`
-- **Workflow Implementation**: `workflows/src/workflows/organization-bootstrap/`
-- **Temporal Worker Development**: `workflows/CLAUDE.md`
-- **Kubernetes Deployment**: `infrastructure/k8s/temporal/`
-- **Supabase Auth Integration**: `documentation/architecture/authentication/supabase-auth-overview.md`
-- **Event-Driven Architecture**: `documentation/architecture/data/event-sourcing-overview.md`
+### Workflow Architecture & Implementation
+- **[Organization Onboarding Workflow](./organization-onboarding-workflow.md)** - Complete org setup workflow design
+- **[Organization Bootstrap Workflow Design](../../workflows/architecture/organization-bootstrap-workflow-design.md)** - Detailed workflow specification
+- **[Activities Reference](../../workflows/reference/activities-reference.md)** - Complete activity catalog
+- **[Error Handling and Compensation](../../workflows/guides/error-handling-and-compensation.md)** - Saga pattern implementation
+- **[Workflow Implementation Guide](../../workflows/guides/implementation.md)** - How to build workflows
+
+### Infrastructure & Deployment
+- **[Workflows CLAUDE.md](../../../workflows/CLAUDE.md)** - Temporal worker development guide
+- **[Infrastructure CLAUDE.md](../../../infrastructure/CLAUDE.md)** - Deployment runbook (see Temporal Workers section)
+- **[Kubernetes Temporal Deployment](../../../infrastructure/k8s/temporal/)** - K8s manifests and Helm values
+
+### Authentication & Data
+- **[Supabase Auth Overview](../authentication/supabase-auth-overview.md)** - Authentication integration
+- **[Frontend Auth Architecture](../authentication/frontend-auth-architecture.md)** - JWT custom claims for workflows
+- **[Event Sourcing Overview](../data/event-sourcing-overview.md)** - Event-driven architecture with CQRS
+- **[Multi-Tenancy Architecture](../data/multi-tenancy-architecture.md)** - Organization isolation patterns
+
+### Operations & Monitoring
+- **[Supabase Deployment Instructions](../../infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md)** - Database migration deployment
+- **[KUBECONFIG Update Guide](../../infrastructure/operations/KUBECONFIG_UPDATE_GUIDE.md)** - K8s cluster access
 
 ---
 

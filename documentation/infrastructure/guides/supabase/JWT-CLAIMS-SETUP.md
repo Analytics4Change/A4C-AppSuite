@@ -405,10 +405,29 @@ If issues arise, disable the hook:
 
 ## Related Documentation
 
-- **Frontend Auth Architecture**: `/frontend/docs/auth-provider-architecture.md`
-- **RBAC Implementation**: `/.plans/rbac-permissions/implementation-guide.md`
-- **Supabase Auth Hooks**: https://supabase.com/docs/guides/auth/auth-hooks
-- **Row Level Security**: `infrastructure/supabase/sql/06-rls/`
+### Authentication & Authorization
+- **[Frontend Auth Architecture](../../../architecture/authentication/frontend-auth-architecture.md)** - Three-mode auth system with JWT claims
+- **[Supabase Auth Overview](../../../architecture/authentication/supabase-auth-overview.md)** - OAuth2 PKCE and session management
+- **[Custom Claims Setup](../../../architecture/authentication/custom-claims-setup.md)** - JWT claims architecture
+- **[RBAC Architecture](../../../architecture/authorization/rbac-architecture.md)** - Role-based access control using JWT claims
+- **[RBAC Implementation Guide](../../../architecture/authorization/rbac-implementation-guide.md)** - Step-by-step RBAC setup
+
+### Multi-Tenancy & Database
+- **[Multi-Tenancy Architecture](../../../architecture/data/multi-tenancy-architecture.md)** - Organization isolation with JWT org_id claim
+- **[organizations_projection Table](../../reference/database/tables/organizations_projection.md)** - Organization schema with ltree paths
+- **[users Table](../../reference/database/tables/users.md)** - User authentication and org association
+- **[permissions_projection Table](../../reference/database/tables/permissions_projection.md)** - Permission definitions
+- **[roles_projection Table](../../reference/database/tables/roles_projection.md)** - Role templates
+
+### Infrastructure & Testing
+- **[OAuth Testing Guide](./OAUTH-TESTING.md)** - Test Google OAuth and JWT claims
+- **[Supabase Auth Setup](./SUPABASE-AUTH-SETUP.md)** - Complete auth configuration
+- **[SQL Idempotency Audit](./SQL_IDEMPOTENCY_AUDIT.md)** - Idempotent migration patterns
+- **[Deployment Instructions](./DEPLOYMENT_INSTRUCTIONS.md)** - Production deployment guide
+
+### External References
+- **[Supabase Auth Hooks](https://supabase.com/docs/guides/auth/auth-hooks)** - Official documentation
+- **[PostgreSQL Row Level Security](https://www.postgresql.org/docs/current/ddl-rowsecurity.html)** - RLS documentation
 
 ---
 

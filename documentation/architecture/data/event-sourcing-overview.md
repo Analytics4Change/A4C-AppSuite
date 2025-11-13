@@ -169,21 +169,35 @@ CREATE TRIGGER trigger_process_domain_events
 ## Related Documentation
 
 ### CQRS/Event Sourcing Implementation
-- `infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - Complete event sourcing specification
-- `frontend/docs/EVENT-DRIVEN-GUIDE.md` - Frontend event implementation patterns
+- **[Event-Driven Architecture Guide](../../infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)** - Complete event sourcing specification
+- **[Frontend Event-Driven Guide](../../frontend/guides/EVENT-DRIVEN-GUIDE.md)** - Frontend CQRS implementation patterns
+- **[domain_events Table](../../infrastructure/reference/database/tables/domain_events.md)** - Event store schema documentation
+- **[event_subscriptions Table](../../infrastructure/reference/database/tables/event_subscriptions.md)** - Event subscriber configuration
+
+### Database & Projections
+- **[Database Tables Reference](../../infrastructure/reference/database/tables/)** - All CQRS projection tables
+  - [organizations_projection.md](../../infrastructure/reference/database/tables/organizations_projection.md) - Organization read model
+  - [users.md](../../infrastructure/reference/database/tables/users.md) - User read model
+  - [permissions_projection.md](../../infrastructure/reference/database/tables/permissions_projection.md) - Permissions read model
+  - [roles_projection.md](../../infrastructure/reference/database/tables/roles_projection.md) - Roles read model
+  - [audit_log_projection.md](../../infrastructure/reference/database/tables/audit_log_projection.md) - Audit trail projection
+- **[SQL Idempotency Audit](../../infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md)** - Idempotent trigger patterns
 
 ### Authentication & Authorization
-- `documentation/architecture/authentication/supabase-auth-overview.md` - Supabase Auth integration
-- `documentation/architecture/authentication/custom-claims-setup.md` - JWT custom claims configuration
-- `documentation/architecture/authorization/rbac-architecture.md` - Event-sourced RBAC
+- **[Supabase Auth Overview](../authentication/supabase-auth-overview.md)** - Supabase Auth integration
+- **[Frontend Auth Architecture](../authentication/frontend-auth-architecture.md)** - Three-mode auth system
+- **[JWT Custom Claims Setup](../authentication/custom-claims-setup.md)** - JWT custom claims configuration
+- **[RBAC Architecture](../authorization/rbac-architecture.md)** - Event-sourced RBAC system
 
-### Multi-Tenancy
-- `documentation/architecture/data/multi-tenancy-architecture.md` - Multi-tenant data isolation
-- `documentation/architecture/data/tenants-as-organizations.md` - Organization structure
+### Multi-Tenancy & Data
+- **[Multi-Tenancy Architecture](./multi-tenancy-architecture.md)** - Multi-tenant data isolation with RLS
+- **[Organization Management Architecture](./organization-management-architecture.md)** - Hierarchical organization structure
+- **[Tenants as Organizations](./tenants-as-organizations.md)** - Organization design philosophy
 
 ### Workflow Orchestration
-- `documentation/architecture/workflows/temporal-overview.md` - Temporal workflow integration
-- `documentation/workflows/guides/error-handling-and-compensation.md` - Saga pattern for compensation
+- **[Temporal Overview](../workflows/temporal-overview.md)** - Workflow orchestration architecture
+- **[Organization Onboarding Workflow](../workflows/organization-onboarding-workflow.md)** - Event-driven org setup
+- **[Error Handling and Compensation](../../workflows/guides/error-handling-and-compensation.md)** - Saga pattern for rollback
 
 ---
 

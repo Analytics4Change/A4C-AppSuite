@@ -895,7 +895,7 @@ as "Coming Soon - Enterprise Feature"
 ### 14.2 Reference Links
 
 - **Zitadel Documentation:** <a href="https://zitadel.com/docs"
-  target="_blank">https://zitadel.com/docs
+  target="_blank">https://zitadel.com/docs (DEPRECATED - migrated to Supabase Auth October 2025)
 - **Supabase Documentation:** <a href="https://supabase.com/docs"
   target="_blank">https://supabase.com/docs
 - **PostgreSQL ltree:**
@@ -903,6 +903,37 @@ as "Coming Soon - Enterprise Feature"
   target="_blank">https://www.postgresql.org/docs/current/ltree.html
 - **Cloudflare API:** <a href="https://developers.cloudflare.com/api/"
   target="_blank">https://developers.cloudflare.com/api/
+
+---
+
+## Related Documentation
+
+### Authentication & Authorization
+- **[Frontend Auth Architecture](../authentication/frontend-auth-architecture.md)** - Three-mode authentication system with JWT claims
+- **[RBAC Architecture](../authorization/rbac-architecture.md)** - Role-based access control implementation
+- **[JWT Custom Claims Setup](../../infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md)** - Database hooks for org_id and scope_path claims
+
+### Data & Organization Management
+- **[Organization Management Architecture](./organization-management-architecture.md)** - Hierarchical organization structure with ltree
+- **[Organization Management Implementation](./organization-management-implementation.md)** - Technical implementation details
+- **[Tenants as Organizations](./tenants-as-organizations.md)** - Multi-tenancy design philosophy
+- **[Event Sourcing Overview](./event-sourcing-overview.md)** - CQRS and domain events for audit trail
+
+### Database Implementation
+- **[organizations_projection Table](../../infrastructure/reference/database/tables/organizations_projection.md)** - Complete org table schema (760 lines)
+- **[users Table](../../infrastructure/reference/database/tables/users.md)** - User authentication and org association (742 lines)
+- **[RLS Policy Design](../../infrastructure/guides/supabase/RLS-POLICY-DESIGN.md)** - Row-level security patterns (if exists)
+- **[SQL Idempotency Audit](../../infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md)** - Migration best practices
+
+### Workflows & Operations
+- **[Organization Onboarding Workflow](../workflows/organization-onboarding-workflow.md)** - Temporal workflow for org setup
+- **[Temporal Overview](../workflows/temporal-overview.md)** - Workflow orchestration architecture
+
+### Infrastructure & Deployment
+- **[Supabase Auth Setup](../../infrastructure/guides/supabase/SUPABASE-AUTH-SETUP.md)** - OAuth and social login configuration
+- **[Deployment Instructions](../../infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md)** - Production deployment guide
+
+---
 
 ### 14.3 Document Status
 

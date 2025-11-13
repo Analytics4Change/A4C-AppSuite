@@ -804,6 +804,35 @@ await emitEvent(...);
 - Always calculate next version dynamically
 - Use the getNextVersion helper function
 
+---
+
+## Related Documentation
+
+### Event Sourcing & CQRS Architecture
+- **[Event Sourcing Overview](../../architecture/data/event-sourcing-overview.md)** - CQRS and domain events architecture
+- **[Event-Driven Architecture Guide](../../infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)** - Complete backend event sourcing specification
+- **[domain_events Table](../../infrastructure/reference/database/tables/domain_events.md)** - Event store schema documentation
+- **[event_subscriptions Table](../../infrastructure/reference/database/tables/event_subscriptions.md)** - Event subscriber configuration
+
+### Frontend Architecture
+- **[Frontend Architecture Overview](../architecture/overview.md)** - High-level application architecture
+- **[ViewModels Architecture](../architecture/viewmodels.md)** - MobX state management with events
+- **[Event Resilience Plan](../architecture/event-resilience-plan.md)** - Event-driven reliability patterns
+- **[Frontend Auth Architecture](../../architecture/authentication/frontend-auth-architecture.md)** - JWT claims in event metadata
+
+### Database & Projections
+- **[Multi-Tenancy Architecture](../../architecture/data/multi-tenancy-architecture.md)** - Organization isolation with RLS
+- **[Database Tables Reference](../../infrastructure/reference/database/tables/)** - All CQRS projection tables
+  - [organizations_projection.md](../../infrastructure/reference/database/tables/organizations_projection.md) - Organization read model
+  - [users.md](../../infrastructure/reference/database/tables/users.md)** - User read model
+  - [audit_log_projection.md](../../infrastructure/reference/database/tables/audit_log_projection.md) - Audit trail
+
+### Implementation & Testing
+- **[Design Patterns Migration Guide](./DESIGN_PATTERNS_MIGRATION_GUIDE.md)** - Component architecture patterns
+- **[Testing Strategies](../testing/TESTING.md)** - Unit and E2E testing with events
+
+---
+
 ## Resources
 
 - [Infrastructure Documentation](https://github.com/Analytics4Change/A4C-Infrastructure/tree/main/supabase/docs)

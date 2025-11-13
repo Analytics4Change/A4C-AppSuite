@@ -1073,6 +1073,38 @@ To complete Temporal integration (~10% of total project):
 
 ---
 
+## Related Documentation
+
+### Implementation & Database
+- **[Organization Management Implementation](./organization-management-implementation.md)** - Technical implementation details
+- **[organizations_projection Table](../../infrastructure/reference/database/tables/organizations_projection.md)** - Complete database schema (760 lines)
+- **[organization_business_profiles_projection Table](../../infrastructure/reference/database/tables/organization_business_profiles_projection.md)** - Business profile schema
+- **[organization_domains_projection Table](../../infrastructure/reference/database/tables/organization_domains_projection.md)** - Custom domains schema
+- **[provider_partnerships_projection Table](../../infrastructure/reference/database/tables/provider_partnerships_projection.md)** - Partnership schema
+
+### Multi-Tenancy & Data Architecture
+- **[Multi-Tenancy Architecture](./multi-tenancy-architecture.md)** - Organization-based tenant isolation with RLS
+- **[Tenants as Organizations](./tenants-as-organizations.md)** - Multi-tenancy design philosophy
+- **[Event Sourcing Overview](./event-sourcing-overview.md)** - CQRS and domain events
+- **[Provider Partners Architecture](./provider-partners-architecture.md)** - Partner ecosystem design
+
+### Authentication & Authorization
+- **[RBAC Architecture](../authorization/rbac-architecture.md)** - Role-based access control at org level
+- **[Frontend Auth Architecture](../authentication/frontend-auth-architecture.md)** - JWT custom claims with org_id
+- **[JWT Custom Claims Setup](../../infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md)** - Database hooks for org context
+
+### Workflows & Operations
+- **[Organization Onboarding Workflow](../workflows/organization-onboarding-workflow.md)** - Workflow design for org setup
+- **[Organization Bootstrap Workflow Design](../../workflows/architecture/organization-bootstrap-workflow-design.md)** - Detailed workflow spec
+- **[Temporal Overview](../workflows/temporal-overview.md)** - Workflow orchestration architecture
+
+### Infrastructure & Deployment
+- **[Supabase Auth Setup](../../infrastructure/guides/supabase/SUPABASE-AUTH-SETUP.md)** - OAuth configuration
+- **[Deployment Instructions](../../infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md)** - Production deployment
+- **[SQL Idempotency Audit](../../infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md)** - Migration best practices
+
+---
+
 **Document Version**: 1.0
 **Last Updated**: 2025-10-31
 **Author**: Claude Code
