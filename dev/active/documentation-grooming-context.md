@@ -121,6 +121,11 @@ The new `documentation/` directory sits at repository root alongside existing co
 **Phase 4.1-4.2 Validation Reports (✅ Created 2025-01-12):**
 - `dev/active/phase-4-1-api-validation-report.md` - ✅ API contracts & schemas validation (comprehensive 29KB report)
 - `dev/active/phase-4-2-database-validation-report.md` - ✅ Database schema validation (comprehensive 28KB report)
+
+**Gap Remediation Documentation (✅ Started 2025-01-12):**
+- `documentation/infrastructure/reference/database/table-template.md` - ✅ Comprehensive table doc template (415 lines)
+- `documentation/infrastructure/reference/database/tables/organizations_projection.md` - ✅ Hierarchical organization structure (760 lines)
+- `documentation/infrastructure/reference/database/tables/users.md` - ✅ User authentication & multi-tenant access (742 lines)
   - `documentation/workflows/getting-started/` - ✅ Created
   - `documentation/workflows/architecture/` - ✅ Created
   - `documentation/workflows/guides/` - ✅ Created
@@ -388,6 +393,51 @@ From clarifying questions:
 - Should be extracted to standalone doc when found mixed with deprecated content
 - Lives in `documentation/architecture/data/` as foundational cross-cutting concern
 
+### Gap Remediation Learnings (Added 2025-01-12, Updated 2025-01-13)
+
+**Comprehensive Table Documentation Pattern Works**:
+- Template-driven approach (415 lines) ensures consistency
+- Each table doc takes ~30-45 minutes for comprehensive coverage
+- 700-1,000 lines per table provides complete developer reference (range: 742-1,057 lines)
+- Pattern: Schema → Relationships → Indexes → RLS → Usage Examples → Troubleshooting
+- Two detailed examples (infrastructure + auth tables) sufficient for team to parallelize
+- Critical sections: RLS policies with testing examples, JSONB schema documentation, common query patterns
+
+**Database Documentation Excellence Gap**:
+- Frontend has 50+ component docs with automated validation
+- Database had ZERO schema docs for 12 production tables
+- Same codebase, vastly different documentation cultures
+- Applying frontend's template pattern to database closes the gap
+- Comprehensive docs prevent "read SQL files directly" barrier for new developers
+
+**ltree and Array Columns Need Extra Care**:
+- PostgreSQL-specific types (ltree, uuid[]) require detailed explanation
+- Hierarchical queries need examples: ancestors, descendants, children
+- GIN indexes for arrays need query pattern documentation
+- JSONB schemas should include TypeScript-style interface definitions
+
+**Clinical Tables Documentation is Critical** (Added 2025-01-13):
+- **All clinical tables have CRITICAL RLS GAP**: RLS enabled but NO policies defined
+  - clients, medications, medication_history, dosage_info all blocked by default
+  - Each doc includes recommended policies ready for implementation
+  - This is a production blocker - tables cannot be used without RLS policies
+- **PHI/RESTRICTED data sensitivity**: Clinical tables contain Protected Health Information
+  - Clients, medication_history, dosage_info all HIPAA-regulated
+  - Documentation includes compliance sections (HIPAA, GDPR, DEA for controlled substances)
+- **Complex JSONB schemas require TypeScript-style documentation**:
+  - vitals_before/vitals_after in dosage_info (BP, HR, temp, O2 sat)
+  - address/emergency_contact in clients (structured location/contact data)
+  - active_ingredients in medications (multi-ingredient drug composition)
+- **Clinical workflow states well-documented**:
+  - Medication status: active → completed/discontinued/on_hold
+  - Dose status: scheduled → administered/refused/skipped/missed/late/early
+  - Client status: active ↔ inactive → archived
+- **Regulatory tracking is embedded**:
+  - Controlled substance schedule tracking (DEA Schedule II-V)
+  - Prescriber NPI and license number tracking
+  - Refill authorization and usage tracking
+  - High-alert medication and black box warning flags
+
 ### Phase 4.1-4.2 Learnings (Added 2025-01-12)
 
 **Frontend API Documentation is Generally Accurate**:
@@ -516,11 +566,11 @@ This defeats the entire purpose of documentation consolidation.
 
 ## Current Status
 
-**Phase**: Phase 4 - Technical Reference Validation
-**Status**: ✅ 50% COMPLETE (Phase 4.1-4.2 done, 4.3-4.4 pending)
-**Last Updated**: 2025-01-12
+**Phase**: Addressing Phase 4 Gaps - Database Schema Documentation (Gap Remediation)
+**Status**: ✅ 50% COMPLETE (6 of 12 core tables documented - 5,373 lines)
+**Last Updated**: 2025-01-13
 
-**Completed Phases**:
+**Completed Phases (Documentation Grooming)**:
 - ✅ Phase 0 - Discovery & Planning
 - ✅ Phase 1 - Structure Creation (directory structure, master index, validation scripts)
 - ✅ Phase 2 - Implementation Tracking Document Migration
@@ -532,16 +582,89 @@ This defeats the entire purpose of documentation consolidation.
 - ✅ Phase 4.1 - Validate API Contracts & Schemas
 - ✅ Phase 4.2 - Validate Database Schemas
 
-**Recent Progress (2025-01-12)**:
-- **Phase 4.1 complete**: Validated frontend API contracts (IClientApi, IMedicationApi, HybridCacheService, SearchableDropdownProps)
-  - Found 2 perfect matches, 2 with significant drift
-  - Created comprehensive 29KB validation report
-  - Identified critical documentation gap: SearchableDropdownProps 73% undocumented
-- **Phase 4.2 complete**: Validated database schemas against documentation
-  - Found ZERO dedicated schema documentation for 12 production tables
-  - Database implementation is technically sound (RLS, triggers, functions all working)
-  - Created comprehensive 28KB validation report
-  - Identified critical need: 40+ hours to document database schemas
+**Gap Remediation Progress (NEW - Started 2025-01-12, Updated 2025-01-13)**:
+
+After Phase 4 validation identified critical documentation gaps, created a new plan to address them. Started with highest priority: database schema documentation. **User selected Option C: Document all remaining tables in this session.**
+
+- **Phase 1.1 COMPLETE** - Table Documentation Template Created
+  - Created comprehensive template at `documentation/infrastructure/reference/database/table-template.md`
+  - 415 lines covering: Schema, Relationships, Indexes, RLS Policies, Constraints, Triggers, Usage Examples, Audit Trail, JSONB schemas, Troubleshooting
+  - Modeled after successful frontend `component-template.md` pattern
+
+- **Phase 1.2 IN PROGRESS** - Core Tables Documentation (6/12 = 50% COMPLETE)
+
+  **✅ Infrastructure & Auth Tables (2 tables - 1,502 lines):**
+  - ✅ **organizations_projection.md** (760 lines)
+    - Full schema with all 15 columns documented
+    - ltree hierarchical path system explained with examples
+    - 8 indexes (GIST, BTREE, partial indexes) with purposes
+    - 2 RLS policies (super_admin, org_admin) with testing examples
+    - Hierarchical queries: find ancestors, descendants, direct children
+    - Soft delete and deactivation patterns
+    - Check constraints for hierarchy integrity
+
+  - ✅ **users.md** (742 lines)
+    - Shadow table for Supabase Auth integration
+    - 10 columns including arrays (accessible_organizations)
+    - 4 indexes including GIN index for array containment
+    - 3 RLS policies (super_admin, org_admin, self-access) - three-tier model
+    - Multi-organization access management examples
+    - GDPR compliance examples (right to access, erasure, portability)
+    - JSONB metadata schema with preferences, onboarding tracking
+
+  **✅ Clinical Operations Tables (4 tables - 3,871 lines) - Added 2025-01-13:**
+  - ✅ **clients.md** (953 lines)
+    - Patient/client records with full medical information (PHI/RESTRICTED)
+    - 20 columns including JSONB (address, emergency_contact) and arrays (allergies, medical_conditions)
+    - 4 indexes for name search, DOB, status, organization
+    - ⚠️ **CRITICAL GAP**: RLS enabled but NO policies defined
+    - HIPAA/GDPR compliance considerations documented
+    - JSONB schemas for address and emergency contact
+    - Comprehensive usage examples and common queries
+
+  - ✅ **medications.md** (1,057 lines)
+    - Medication catalog with RxNorm integration (INTERNAL/reference data)
+    - 26 columns including regulatory flags (is_controlled, is_psychotropic, is_high_alert)
+    - RxNorm CUI and NDC code integration for national standards
+    - 7 indexes including name, generic_name, rxnorm_cui, is_controlled
+    - ⚠️ **CRITICAL GAP**: RLS enabled but NO policies defined
+    - JSONB active_ingredients schema for multi-ingredient drugs
+    - Controlled substance schedule tracking (DEA Schedule II-V)
+    - Black box warnings and high-alert medication flags
+
+  - ✅ **medication_history.md** (1,006 lines)
+    - Prescription tracking with comprehensive clinical data (PHI/RESTRICTED)
+    - 32 columns covering prescription, dosage, refills, compliance, side effects
+    - 6 indexes for client lookups, medication usage, status, PRN filtering
+    - ⚠️ **CRITICAL GAP**: RLS enabled but NO policies defined
+    - Prescriber information (NPI, license tracking)
+    - Refill tracking and inventory management
+    - Compliance percentage and missed dose tracking
+    - Side effect reporting and effectiveness ratings
+
+  - ✅ **dosage_info.md** (855 lines)
+    - Medication administration records (MAR) tracking (PHI/RESTRICTED)
+    - 23 columns for scheduled vs actual administration, vitals, adverse reactions
+    - 6 indexes for MAR queries, scheduling, staff tracking
+    - ⚠️ **CRITICAL GAP**: RLS enabled but NO policies defined
+    - Dose status workflow (scheduled → administered/refused/skipped/missed)
+    - JSONB vitals_before/vitals_after schemas for monitoring
+    - Adverse reaction reporting with safety alerts
+    - Double-check verification workflow (administered_by + verified_by)
+
+  **⏸️ RBAC Projection Tables (4 tables) - PENDING:**
+  - ⏸️ **permissions_projection** - CQRS projection, reference data
+  - ⏸️ **roles_projection** - CQRS projection with org hierarchy
+  - ⏸️ **role_permissions_projection** - Junction table
+  - ⏸️ **user_roles_projection** - User-role assignments with org scoping
+
+  **⏸️ System Tables (2 tables) - PENDING:**
+  - ⏸️ **invitations_projection** - User invitation workflow
+  - ⏸️ **cross_tenant_access_grants_projection** - Multi-org access grants
+
+**Validation Reports Created**:
+- dev/active/phase-4-1-api-validation-report.md (29KB)
+- dev/active/phase-4-2-database-validation-report.md (28KB)
 
 **Migration Statistics**:
 - **Total markdown files**: 159
@@ -549,14 +672,21 @@ This defeats the entire purpose of documentation consolidation.
 - **Files staying in place**: 31 (CLAUDE.md, README.md, .claude/*, dev/*, contracts/)
 - **Deprecated files preserved**: 6 (historical reference in .archived_plans/)
 - **Validation reports created**: 2 (Phase 4.1 and 4.2)
+- **NEW - Table docs created**: 7 (template + 6 tables = 5,788 lines total)
 
 **Key Findings from Phase 4.1-4.2**:
-- **Critical Gap**: Database schemas completely undocumented (HIGH impact)
-- **High Priority**: SearchableDropdownProps missing 22/30 properties in docs
-- **Medium Priority**: HybridCacheService docs describe generic design, implementation is specialized
+- **Critical Gap**: Database schemas completely undocumented (HIGH impact) - ✅ BEING ADDRESSED
+- **High Priority**: SearchableDropdownProps missing 22/30 properties in docs - PENDING
+- **Medium Priority**: HybridCacheService docs describe generic design, implementation is specialized - PENDING
 - **Strengths**: Core API interfaces (IClientApi, IMedicationApi) perfectly documented
 
-**Next Steps**:
+**Decision Point - Next Steps**:
+User presented with 3 options for continuing gap remediation:
+- **Option A**: Continue with 2-3 more critical tables (clients, medications) then checkpoint
+- **Option B**: Pause now, team uses template + 2 examples to parallelize remaining work
+- **Option C**: Continue documenting all tables in this session (6-8 more hours estimated)
+
+**Original Phase 4+ Still Pending**:
 1. **Phase 4.3** - Validate Configuration References (env vars, configs, secrets)
 2. **Phase 4.4** - Validate Architecture Descriptions (structure, topology, workflows)
 3. **Phase 4 Final Report** - Consolidate all validation findings
