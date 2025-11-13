@@ -645,9 +645,9 @@ This defeats the entire purpose of documentation consolidation.
 
 ## Current Status
 
-**Phase**: Phase 4 Complete - All Technical Validation + Remediation Finished
-**Status**: ✅ PHASE 4 COMPLETE - All validation reports created + All CRITICAL/HIGH issues fixed (9/9 resolved)
-**Last Updated**: 2025-01-13 (Validation completed, remediation completed same session)
+**Phase**: Phase 5 Complete - Annotation & Status Marking Finished
+**Status**: ✅ PHASE 5 COMPLETE - All frontmatter added, aspirational markers in place, status legend updated
+**Last Updated**: 2025-01-13 (Phase 5 completed same session as Phase 4)
 
 **Completed Phases (Documentation Grooming)**:
 - ✅ Phase 0 - Discovery & Planning
@@ -662,6 +662,9 @@ This defeats the entire purpose of documentation consolidation.
 - ✅ Phase 4.2 - Validate Database Schemas
 - ✅ Phase 4.3 - Validate Configuration References
 - ✅ Phase 4.4 - Validate Architecture Descriptions
+- ✅ Phase 5.1 - Add YAML Frontmatter (103 files)
+- ✅ Phase 5.2 - Add Inline Aspirational Markers (10 files)
+- ✅ Phase 5.3 - Update Status Legend
 
 **Gap Remediation Progress (NEW - Started 2025-01-12, Updated 2025-01-13)**:
 
@@ -941,3 +944,100 @@ After Phase 4 validation identified critical documentation gaps, created a new p
 
 **Infrastructure Documentation**:
 - `documentation/infrastructure/operations/configuration/ENVIRONMENT_VARIABLES.md` - Added FRONTEND_URL and HEALTH_CHECK_PORT
+
+**Phase 5 Annotation & Status Marking Completed (Added 2025-01-13)**:
+- ✅ Completed all three sub-phases in single session
+- ✅ Added frontmatter to 103 documentation files
+- ✅ Added inline aspirational markers to 10 files
+- ✅ Updated master index with complete migration status
+
+**Phase 5.1 - YAML Frontmatter (Added 2025-01-13)**:
+- Created batch processing script `/tmp/add-frontmatter-batch.sh`
+- Added frontmatter to all files lacking it:
+  - Frontend: 60 files
+  - Infrastructure: 30 files
+  - Workflows: 2 files
+  - Architecture/Templates: 11 files
+- Frontmatter format:
+  ```yaml
+  ---
+  status: current
+  last_updated: 2025-01-13
+  ---
+  ```
+- Note: 28 files already had frontmatter from Phase 3.5 (planning docs)
+
+**Phase 5.2 - Inline Aspirational Markers (Added 2025-01-13)**:
+- Created script `/tmp/add-aspirational-markers.sh` to add visible warnings
+- Added markers to 10 aspirational documents:
+  1. `documentation/architecture/authentication/impersonation-architecture.md`
+  2. `documentation/architecture/authentication/impersonation-event-schema.md`
+  3. `documentation/architecture/authentication/impersonation-implementation-guide.md`
+  4. `documentation/architecture/authentication/impersonation-security-controls.md`
+  5. `documentation/architecture/authentication/impersonation-ui-specification.md`
+  6. `documentation/architecture/authentication/enterprise-sso-guide.md`
+  7. `documentation/architecture/authorization/organizational-deletion-ux.md`
+  8. `documentation/architecture/data/provider-partners-architecture.md`
+  9. `documentation/architecture/data/var-partnerships.md`
+  10. `documentation/frontend/architecture/event-resilience-plan.md`
+- Marker format:
+  ```markdown
+  > [!WARNING]
+  > **This feature is not yet implemented.** This document describes planned functionality
+  > that has not been built. Implementation timeline and approach are subject to change
+  > based on business priorities.
+  ```
+
+**Phase 5.3 - Status Legend Update (Added 2025-01-13)**:
+- Updated `documentation/README.md` migration status section
+- Documented Phases 0-5 as complete with details
+- Status legend already comprehensive from Phase 1.2
+- Location: documentation/README.md lines 326-344
+
+**Phase 5 Files Modified**:
+- 113 files total modified
+- 103 files: frontmatter added
+- 10 files: aspirational markers added
+- 1 file: README migration status updated
+
+**Phase 5 Git Commits**:
+- `fd9cefe9` - Phase 5 main work (113 files, 562 insertions)
+- `ebc1cd93` - tasks.md update (marked Phase 5 complete)
+
+## Next Steps (After Phase 5 Completion)
+
+**Immediate Next Action**: Proceed to Phase 6 - Cross-Referencing & Master Index
+
+### Phase 6 Overview
+1. **Update Internal Links** (6.1)
+   - Fix broken links after file moves (~54 known broken links)
+   - Update relative paths to work from new locations
+   - Run link validation script to verify all links work
+   
+2. **Add Cross-References** (6.2)
+   - Add "See also" sections to related documents
+   - Link architecture docs to implementation guides
+   - Connect operational procedures to configuration references
+   
+3. **Populate Master Index** (6.3)
+   - Fill in all sections of documentation/README.md
+   - Add links to all major documents
+   - Create quick access sections for common tasks
+   - Organize by audience (developer, operator, architect)
+   
+4. **Update Component CLAUDE.md Files** (6.4)
+   - Update references in CLAUDE.md files to point to new documentation/ locations
+   - Add pointers from component directories to relevant docs
+
+**How to Resume After /clear**:
+```bash
+# Read dev-docs to restore context
+"Read dev/active/documentation-grooming-*.md and continue with Phase 6 (Cross-Referencing & Master Index)"
+```
+
+**Key Context to Remember**:
+- All 115 migrated files now have frontmatter metadata
+- 10 aspirational docs have visible warning markers
+- Phase 4 validation identified ~54 broken links (deferred to Phase 6.1)
+- Link validation script available: `scripts/documentation/validate-links.js`
+- Status legend in documentation/README.md is comprehensive
