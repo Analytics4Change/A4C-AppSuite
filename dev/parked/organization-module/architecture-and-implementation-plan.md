@@ -1,9 +1,22 @@
 ---
-status: current
-last_updated: 2025-01-12
+status: archived
+last_updated: 2025-01-13
+original_location: documentation/architecture/data/organization-management-implementation.md
+moved_to: dev/parked/organization-module/architecture-and-implementation-plan.md
 ---
 
 # Organization Management Module - Implementation Plan
+
+> [!NOTE]
+> **This is historical documentation** - Archived 2025-01-13
+>
+> This document tracked the implementation of the Organization Management module from October 2025. The project is now complete (~90%).
+>
+> **For current architecture documentation**, see:
+> - [Organization Management Architecture](../../documentation/architecture/data/organization-management-architecture.md) - Current system architecture
+> - [Organization Bootstrap Workflow](../../documentation/workflows/architecture/organization-bootstrap-workflow-design.md) - Workflow design specification
+>
+> This file is preserved in `dev/parked/` for historical reference showing the implementation journey.
 
 **Status**: 🎉 Nearly Complete (Phases 1-8 Complete, Phase 9 Pending)
 **Started**: 2025-10-28

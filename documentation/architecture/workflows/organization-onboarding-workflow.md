@@ -9,6 +9,8 @@ last_updated: 2025-01-12
 **Priority**: Critical - Core business process
 **Pattern**: Workflow-First with Event-Driven Activities
 
+> **Related Documentation**: This document provides a concise implementation guide for developers. For comprehensive design rationale, architecture decisions, complexity analysis, and risk assessment, see [OrganizationBootstrapWorkflow Design Specification](../../workflows/architecture/organization-bootstrap-workflow-design.md).
+
 ---
 
 ## Table of Contents

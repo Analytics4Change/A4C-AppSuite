@@ -105,19 +105,12 @@ Terraform IaC, Kubernetes deployments, Supabase resources
   - [Kubernetes](./infrastructure/guides/kubernetes/) - K8s deployments and configuration
 - **[Reference](./infrastructure/reference/)** - Quick lookup for schemas and configs
   - **[Database Reference](./infrastructure/reference/database/)**
-    - **[Table Documentation](./infrastructure/reference/database/tables/)** - Complete schema documentation
-      - [organizations_projection.md](./infrastructure/reference/database/tables/organizations_projection.md) - Hierarchical org structure (760 lines)
-      - [users.md](./infrastructure/reference/database/tables/users.md) - User authentication (742 lines)
-      - [permissions_projection.md](./infrastructure/reference/database/tables/permissions_projection.md) - Permission definitions
-      - [roles_projection.md](./infrastructure/reference/database/tables/roles_projection.md) - Role templates
-      - [user_roles_projection.md](./infrastructure/reference/database/tables/user_roles_projection.md) - User role assignments
-      - [role_permissions_projection.md](./infrastructure/reference/database/tables/role_permissions_projection.md) - Role-permission junction
-      - [organization_business_profiles_projection.md](./infrastructure/reference/database/tables/organization_business_profiles_projection.md) - Business profiles
-      - [organization_domains_projection.md](./infrastructure/reference/database/tables/organization_domains_projection.md) - Custom domains
-      - [provider_partnerships_projection.md](./infrastructure/reference/database/tables/provider_partnerships_projection.md) - Provider partnerships
-      - [domain_events.md](./infrastructure/reference/database/tables/domain_events.md) - Event sourcing store
-      - [event_subscriptions.md](./infrastructure/reference/database/tables/event_subscriptions.md) - Event subscribers
-      - [audit_log_projection.md](./infrastructure/reference/database/tables/audit_log_projection.md) - Audit trail
+    - **[Table Documentation](./infrastructure/reference/database/tables/)** - Schema documentation (12 core tables documented)
+      - **Infrastructure & Auth**: [organizations_projection](./infrastructure/reference/database/tables/organizations_projection.md) (760 lines) • [users](./infrastructure/reference/database/tables/users.md) (742 lines)
+      - **Clinical Operations**: [clients](./infrastructure/reference/database/tables/clients.md) (953 lines) • [medications](./infrastructure/reference/database/tables/medications.md) (1,057 lines) • [medication_history](./infrastructure/reference/database/tables/medication_history.md) (1,006 lines) • [dosage_info](./infrastructure/reference/database/tables/dosage_info.md) (855 lines)
+      - **RBAC**: [permissions_projection](./infrastructure/reference/database/tables/permissions_projection.md) (728 lines) • [roles_projection](./infrastructure/reference/database/tables/roles_projection.md) (814 lines) • [user_roles_projection](./infrastructure/reference/database/tables/user_roles_projection.md) (831 lines) • [role_permissions_projection](./infrastructure/reference/database/tables/role_permissions_projection.md) (731 lines)
+      - **System**: [invitations_projection](./infrastructure/reference/database/tables/invitations_projection.md) (817 lines) • [cross_tenant_access_grants_projection](./infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) (721 lines)
+      - **Not Yet Documented** (7 additional tables): organization_business_profiles_projection, organization_domains_projection, provider_partnerships_projection, domain_events, event_subscriptions, audit_log_projection, audit_log
   - [Kubernetes Reference](./infrastructure/reference/kubernetes/) - K8s resource reference
 - **[Testing](./infrastructure/testing/)** - Infrastructure testing strategies
 - **[Operations](./infrastructure/operations/)** - Deployment and operational procedures

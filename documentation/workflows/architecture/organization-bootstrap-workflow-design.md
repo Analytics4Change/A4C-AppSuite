@@ -11,6 +11,8 @@ last_updated: 2025-01-13
 **Complexity Score**: 2.6/5 (Moderate - Justified)
 **Priority**: Critical - Core business functionality
 
+> **Related Documentation**: This document provides comprehensive design specification and architecture rationale. For a more concise implementation guide focused on Temporal.io deployment, see [Organization Onboarding Workflow](../../../architecture/workflows/organization-onboarding-workflow.md).
+
 ---
 
 ## Table of Contents

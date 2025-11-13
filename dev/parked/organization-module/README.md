@@ -28,7 +28,8 @@ Complete implementation of the Organization Management Module, replacing the pre
 
 ## Files
 
-- **implementation-tracking.md** - Complete implementation documentation with architecture, phases, file structure, and deployment notes
+- **implementation-tracking.md** - Complete implementation documentation with architecture, phases, file structure, and deployment notes (created 2025-01-12)
+- **architecture-and-implementation-plan.md** - Detailed architecture and phased implementation plan (archived 2025-01-13, originally at `documentation/architecture/data/`)
 
 ## Project Status
 
@@ -46,9 +47,12 @@ This implementation tracking document was moved from the repository root to `dev
 ## Related Documentation
 
 For current organization module documentation, see:
-- Frontend: `frontend/src/services/organization/` (code)
-- Architecture: `documentation/architecture/` (when migrated)
-- API Reference: `documentation/frontend/reference/api/` (when migrated)
+- **Architecture**: [Organization Management Architecture](../../documentation/architecture/data/organization-management-architecture.md)
+- **Workflow Design**: [Organization Bootstrap Workflow](../../documentation/workflows/architecture/organization-bootstrap-workflow-design.md)
+- **Workflow Implementation**: [Organization Onboarding Workflow](../../documentation/architecture/workflows/organization-onboarding-workflow.md)
+- **Database Schema**: [organizations_projection](../../documentation/infrastructure/reference/database/tables/organizations_projection.md)
+- **Frontend Code**: `frontend/src/services/organization/`
+- **API Reference**: `documentation/frontend/reference/api/`
 
 ## Reference Value
 

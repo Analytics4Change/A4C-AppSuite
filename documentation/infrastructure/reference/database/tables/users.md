@@ -725,8 +725,8 @@ SELECT * FROM users WHERE email = 'user@example.com';
 
 - [Schema Overview](../schema-overview.md) - Complete database schema and ER diagrams
 - [RLS Policies](../rls-policies.md) - Comprehensive RLS policy reference
-- [Migration Guide](../../guides/database/migration-guide.md) - How to create migrations
-- [Supabase Auth Setup](../../guides/supabase/JWT-CLAIMS-SETUP.md) - JWT custom claims configuration
+- [Migration Guide](../../../guides/database/migration-guide.md) - How to create migrations
+- [Supabase Auth Setup](../../../guides/supabase/JWT-CLAIMS-SETUP.md) - JWT custom claims configuration
 
 ## See Also
 

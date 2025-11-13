@@ -549,10 +549,10 @@ kubectl get deployment workflow-worker -n temporal
 - **[Event-Driven Architecture](../documentation/infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)** - Backend event sourcing specification
 
 #### Database Table Reference
-- **[organizations](../documentation/infrastructure/reference/database/tables/organizations.md)** - Multi-tenant organization hierarchy
-- **[user_roles](../documentation/infrastructure/reference/database/tables/user_roles.md)** - Role assignments with scope isolation
-- **[permissions](../documentation/infrastructure/reference/database/tables/permissions.md)** - Permission definitions
-- **[domain_events](../documentation/infrastructure/reference/database/tables/domain_events.md)** - Event store for CQRS
+- **[organizations_projection](../documentation/infrastructure/reference/database/tables/organizations_projection.md)** - Multi-tenant organization hierarchy
+- **[user_roles_projection](../documentation/infrastructure/reference/database/tables/user_roles_projection.md)** - Role assignments with scope isolation
+- **[permissions_projection](../documentation/infrastructure/reference/database/tables/permissions_projection.md)** - Permission definitions
+- **[domain_events](../documentation/infrastructure/reference/database/tables/domain_events.md)** - Event store for CQRS (not yet documented)
 - **[Complete Table List](../documentation/infrastructure/reference/database/tables/)** - All 12 core table schemas
 
 #### Operations & Deployment
