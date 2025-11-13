@@ -211,10 +211,17 @@ class DocumentValidator {
 
   private async checkRequiredFiles(): Promise<void> {
     logger.debug('Checking required documentation files');
-    
+
+    // Monorepo root for files in ../documentation
+    const monorepoRoot = join(process.cwd(), '..');
+
     for (const requiredFile of CONFIG.requiredDocs) {
       try {
-        const filePath = sanitizePath(requiredFile);
+        // Use monorepo root for documentation files, frontend root for others
+        const allowedBase = requiredFile.startsWith('../documentation')
+          ? monorepoRoot
+          : process.cwd();
+        const filePath = sanitizePath(requiredFile, allowedBase);
         await fs.access(filePath);
         this.result.addInfo(`Required file exists: ${requiredFile}`);
       } catch (error) {
@@ -422,7 +429,12 @@ class DocumentValidator {
   }
 
   private async validateFileLinks(filePath: string): Promise<{ total: number; broken: number }> {
-    const safePath = sanitizePath(filePath);
+    // Use monorepo root if file is in documentation directory
+    const monorepoRoot = join(process.cwd(), '..');
+    const allowedBase = filePath.includes('../documentation') || filePath.startsWith('documentation/')
+      ? monorepoRoot
+      : process.cwd();
+    const safePath = sanitizePath(filePath, allowedBase);
     const content = await fs.readFile(safePath, 'utf-8');
     const lines = content.split('\n');
     
@@ -466,14 +478,23 @@ class DocumentValidator {
   private resolveRelativePath(fromFile: string, linkPath: string): string {
     // Remove any anchor fragments
     const cleanPath = linkPath.split('#')[0];
-    
+
+    // Monorepo root for resolving documentation links
+    const monorepoRoot = join(process.cwd(), '..');
+
     if (cleanPath.startsWith('/')) {
       // Absolute path from project root
-      return sanitizePath(join(process.cwd(), cleanPath.substring(1)));
+      return sanitizePath(join(process.cwd(), cleanPath.substring(1)), monorepoRoot);
     } else {
       // Relative path from current file
       const fromDir = join(process.cwd(), fromFile, '..');
-      return sanitizePath(join(fromDir, cleanPath));
+      const resolved = join(fromDir, cleanPath);
+
+      // Use monorepo root if link path goes to documentation directory
+      const allowedBase = cleanPath.includes('../documentation') || cleanPath.startsWith('documentation/')
+        ? monorepoRoot
+        : process.cwd();
+      return sanitizePath(resolved, allowedBase);
     }
   }
 }
