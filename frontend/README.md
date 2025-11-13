@@ -200,9 +200,9 @@ Press `Ctrl+Shift+D` to access the debug control panel:
 
 ## Documentation
 
-- **[Technical Documentation](./docs/README.md)** - Comprehensive technical details
-- **[Testing Strategies](./docs/TESTING.md)** - Testing patterns and methodologies
-- **[UI Patterns](./docs/ui-patterns.md)** - Component architecture guidelines
+- **[Technical Documentation](../documentation/frontend/README.md)** - Comprehensive technical details
+- **[Testing Strategies](../documentation/frontend/testing/TESTING.md)** - Testing patterns and methodologies
+- **[UI Patterns](../documentation/frontend/patterns/ui-patterns.md)** - Component architecture guidelines
 - **[CLAUDE.md](./CLAUDE.md)** - AI assistant project instructions
 
 ## Contributing

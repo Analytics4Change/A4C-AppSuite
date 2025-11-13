@@ -326,7 +326,7 @@ kubectl auth can-i --list --as=system:serviceaccount:default:github-actions -n t
 - [Service Account Tokens](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/)
 - [GitHub Actions Secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
 - [Infrastructure CLAUDE.md](../../CLAUDE.md)
-- [KUBECONFIG Update Guide](../../KUBECONFIG_UPDATE_GUIDE.md)
+- [KUBECONFIG Update Guide](../../../documentation/infrastructure/operations/KUBECONFIG_UPDATE_GUIDE.md)
 
 ---
 

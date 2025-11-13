@@ -272,25 +272,25 @@ npx knip
 ## Documentation
 
 ### Core Documentation
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - CI/CD pipeline and deployment guide
-- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Development setup and cross-platform guidelines
-- **[TESTING.md](./TESTING.md)** - Comprehensive testing strategies with Playwright
-- **[API.md](./API.md)** - Component and service API reference
-- **[UI Patterns](./ui-patterns.md)** - Modal architecture and component patterns
+- **[DEPLOYMENT.md](./guides/DEPLOYMENT.md)** - CI/CD pipeline and deployment guide
+- **[DEVELOPMENT.md](./guides/DEVELOPMENT.md)** - Development setup and cross-platform guidelines
+- **[TESTING.md](./testing/TESTING.md)** - Comprehensive testing strategies with Playwright
+- **[API.md](./reference/api/API.md)** - Component and service API reference
+- **[UI Patterns](./patterns/ui-patterns.md)** - Modal architecture and component patterns
 
 ### Implementation Docs
-- **[DESIGN_PATTERNS_MIGRATION_GUIDE.md](./DESIGN_PATTERNS_MIGRATION_GUIDE.md)** - Design patterns and migration strategies
-- **[FocusTrappedCheckboxGroup_plan.md](./FocusTrappedCheckboxGroup_plan.md)** - Focus management implementation
-- **[GHCR_TOKEN_ROTATION.md](./GHCR_TOKEN_ROTATION.md)** - Token management procedures
-- **[medication-search-implementation.md](./medication-search-implementation.md)** - Search functionality details
-- **[rxnorm-medication-autocomplete.md](./rxnorm-medication-autocomplete.md)** - RxNorm integration
+- **[DESIGN_PATTERNS_MIGRATION_GUIDE.md](./guides/DESIGN_PATTERNS_MIGRATION_GUIDE.md)** - Design patterns and migration strategies
+- **[FocusTrappedCheckboxGroup_plan.md](./patterns/FocusTrappedCheckboxGroup_plan.md)** - Focus management implementation
+- **[GHCR_TOKEN_ROTATION.md](./guides/GHCR_TOKEN_ROTATION.md)** - Token management procedures
+- **[medication-search-implementation.md](./guides/medication-search-implementation.md)** - Search functionality details
+- **[rxnorm-medication-autocomplete.md](./guides/rxnorm-medication-autocomplete.md)** - RxNorm integration
 
 ### Additional Resources
-- **[CLAUDE.md](../CLAUDE.md)** - Project instructions and development guidelines
-- **[Package.json](../package.json)** - Dependencies and script definitions
-- **[TypeScript Config](../tsconfig.json)** - TypeScript configuration settings
-- **[Vite Config](../vite.config.ts)** - Build tool configuration
-- **[Tailwind Config](../tailwind.config.js)** - Styling framework configuration
+- **[CLAUDE.md](../../frontend/CLAUDE.md)** - Project instructions and development guidelines
+- **[Package.json](../../frontend/package.json)** - Dependencies and script definitions
+- **[TypeScript Config](../../frontend/tsconfig.json)** - TypeScript configuration settings
+- **[Vite Config](../../frontend/vite.config.ts)** - Build tool configuration
+- **[Tailwind Config](../../frontend/tailwind.config.js)** - Styling framework configuration
 
 ## Development Guidelines
 

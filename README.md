@@ -84,8 +84,8 @@ psql -h db.<project-ref>.supabase.co -U postgres -d postgres \
 ### Deployment Documentation
 
 - **Full Runbook**: [infrastructure/CLAUDE.md#deployment-runbook](infrastructure/CLAUDE.md#deployment-runbook)
-- **KUBECONFIG Setup**: [infrastructure/KUBECONFIG_UPDATE_GUIDE.md](infrastructure/KUBECONFIG_UPDATE_GUIDE.md)
-- **SQL Idempotency**: [infrastructure/supabase/SQL_IDEMPOTENCY_AUDIT.md](infrastructure/supabase/SQL_IDEMPOTENCY_AUDIT.md)
+- **KUBECONFIG Setup**: [documentation/infrastructure/operations/KUBECONFIG_UPDATE_GUIDE.md](documentation/infrastructure/operations/KUBECONFIG_UPDATE_GUIDE.md)
+- **SQL Idempotency**: [documentation/infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md](documentation/infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md)
 - **Connectivity Test**: [infrastructure/test-k8s-connectivity.sh](infrastructure/test-k8s-connectivity.sh)
 
 ## Git-Crypt
