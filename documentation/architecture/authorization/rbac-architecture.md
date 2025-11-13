@@ -1245,29 +1245,38 @@ const AdminPanel = () => {
 };
 ```
 
-**See**: `.plans/supabase-auth-integration/frontend-auth-architecture.md` for complete frontend implementation
+**See**: [../authentication/frontend-auth-architecture.md](../authentication/frontend-auth-architecture.md) for complete frontend implementation
 
 ---
 
 ### E. Related Documentation
 
 #### Authentication & Authorization
-- **Frontend Auth**: `.plans/supabase-auth-integration/frontend-auth-architecture.md` ✅
-- **Supabase Auth Overview**: `.plans/supabase-auth-integration/overview.md`
-- **Custom JWT Claims**: `.plans/supabase-auth-integration/custom-claims-setup.md`
-- **Multi-tenancy**: `.plans/auth-integration/tenants-as-organization-thoughts.md`
+- **Frontend Auth Architecture**: [../authentication/frontend-auth-architecture.md](../authentication/frontend-auth-architecture.md) - Three-mode auth system ✅
+- **Custom JWT Claims**: [../authentication/custom-claims-setup.md](../authentication/custom-claims-setup.md) - JWT claims configuration
+- **RBAC Implementation Guide**: [./rbac-implementation-guide.md](./rbac-implementation-guide.md) - Detailed implementation steps
+- **Impersonation Architecture**: [../authentication/impersonation-architecture.md](../authentication/impersonation-architecture.md) - Super admin impersonation (aspirational)
 
-#### Event Sourcing
-- **Event-Driven Architecture**: `/infrastructure/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md`
-- **Frontend Event Guide**: `/frontend/docs/EVENT-DRIVEN-GUIDE.md`
+#### Multi-Tenancy & Data
+- **Multi-Tenancy Architecture**: [../data/multi-tenancy-architecture.md](../data/multi-tenancy-architecture.md) - Organization-based isolation
+- **Organization Management**: [../data/organization-management-architecture.md](../data/organization-management-architecture.md) - Hierarchical organization structure
+- **Event Sourcing**: [../data/event-sourcing-overview.md](../data/event-sourcing-overview.md) - CQRS and domain events
 
-#### Workflows
-- **Organization Bootstrap**: `.plans/temporal-integration/organization-onboarding-workflow.md`
-- **User Invitations**: `.plans/temporal-integration/activities-reference.md`
+#### Infrastructure & Database
+- **RBAC Tables**: [../../infrastructure/reference/database/tables/](../../infrastructure/reference/database/tables/) - Database schema
+  - [permissions_projection.md](../../infrastructure/reference/database/tables/permissions_projection.md) - Permission definitions
+  - [roles_projection.md](../../infrastructure/reference/database/tables/roles_projection.md) - Role templates and assignments
+  - [role_permissions_projection.md](../../infrastructure/reference/database/tables/role_permissions_projection.md) - Role-permission junction
+  - [user_roles_projection.md](../../infrastructure/reference/database/tables/user_roles_projection.md) - User role assignments
+- **Supabase RLS**: [../../infrastructure/guides/supabase/RLS-POLICY-DESIGN.md](../../infrastructure/guides/supabase/RLS-POLICY-DESIGN.md) - Row-level security patterns
 
-#### Administration
-- **Super Admin Impersonation**: `.plans/impersonation/architecture.md`
-- **Implementation Guide**: `.plans/rbac-permissions/implementation-guide.md`
+#### Workflows & Operations
+- **Organization Bootstrap**: [../workflows/organization-bootstrap-workflow-design.md](../workflows/organization-bootstrap-workflow-design.md) - Temporal workflow for org setup ✅
+- **Temporal Overview**: [../workflows/temporal-overview.md](../workflows/temporal-overview.md) - Workflow orchestration architecture
+- **Activities Reference**: [../../workflows/reference/activities-reference.md](../../workflows/reference/activities-reference.md) - Workflow activity catalog
+
+#### Frontend Implementation
+- **Frontend Event-Driven Guide**: [../../frontend/guides/EVENT-DRIVEN-GUIDE.md](../../frontend/guides/EVENT-DRIVEN-GUIDE.md) - Event-driven patterns in React
 
 ---
 

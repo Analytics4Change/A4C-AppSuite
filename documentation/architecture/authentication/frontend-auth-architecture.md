@@ -892,11 +892,23 @@ const user = await authProvider.getUser();
 
 ## Related Documentation
 
-- **Overview**: `.plans/supabase-auth-integration/overview.md`
-- **Custom Claims**: `.plans/supabase-auth-integration/custom-claims-setup.md`
-- **Enterprise SSO**: `.plans/supabase-auth-integration/enterprise-sso-guide.md`
-- **RBAC Architecture**: `.plans/rbac-permissions/architecture.md`
-- **Organization Management**: `.plans/temporal-integration/organization-onboarding-workflow.md`
+### Authentication & Authorization
+- **Custom Claims Setup**: [../authentication/custom-claims-setup.md](./custom-claims-setup.md) - JWT custom claims configuration
+- **Enterprise SSO Guide**: [../authentication/enterprise-sso-guide.md](./enterprise-sso-guide.md) - SAML 2.0 integration (aspirational)
+- **RBAC Architecture**: [../authorization/rbac-architecture.md](../authorization/rbac-architecture.md) - Role-based access control
+- **RBAC Implementation**: [../authorization/rbac-implementation-guide.md](../authorization/rbac-implementation-guide.md) - Permission system details
+
+### Multi-Tenancy & Data
+- **Multi-Tenancy Architecture**: [../data/multi-tenancy-architecture.md](../data/multi-tenancy-architecture.md) - Organization isolation with RLS
+- **Event Sourcing Overview**: [../data/event-sourcing-overview.md](../data/event-sourcing-overview.md) - CQRS and domain events
+
+### Infrastructure & Configuration
+- **Supabase Auth Setup**: [../../infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md](../../infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) - Database hooks
+- **Environment Variables**: [../../infrastructure/operations/configuration/ENVIRONMENT_VARIABLES.md](../../infrastructure/operations/configuration/ENVIRONMENT_VARIABLES.md) - Configuration reference
+
+### Frontend Implementation
+- **Frontend CLAUDE.md**: [../../../frontend/CLAUDE.md](../../../frontend/CLAUDE.md) - Development guidelines
+- **Frontend Getting Started**: [../../frontend/getting-started/overview.md](../../frontend/getting-started/overview.md) - Setup and onboarding
 
 ---
 
