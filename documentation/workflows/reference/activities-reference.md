@@ -464,7 +464,7 @@ interface SendInvitationEmailsResult {
 ```
 
 **External Service**:
-- **Email Provider**: SMTP (nodemailer) or transactional email API (SendGrid, Postmark)
+- **Email Provider**: Resend API (recommended, requires `RESEND_API_KEY`) or SMTP (nodemailer, requires `SMTP_HOST`/`SMTP_USER`/`SMTP_PASS`)
 
 **Error Handling**:
 - **Per-email failure**: Activity continues, logs failure, returns partial success

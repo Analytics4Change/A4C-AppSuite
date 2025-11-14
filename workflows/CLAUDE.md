@@ -12,7 +12,7 @@ A4C Workflows implements durable, fault-tolerant business process orchestration 
 - **Runtime**: Node.js 20+ with TypeScript
 - **Database**: Supabase PostgreSQL (event store + projections)
 - **DNS Provider**: Cloudflare API
-- **Email Providers**: Resend API, SMTP
+- **Email Providers**: Resend API (primary), SMTP (fallback) - See [Resend Email Provider Guide](../documentation/workflows/guides/resend-email-provider.md)
 - **Testing**: Jest, Temporal test framework
 - **Deployment**: Docker + Kubernetes
 

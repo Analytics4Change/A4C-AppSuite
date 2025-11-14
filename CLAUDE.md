@@ -259,10 +259,13 @@ export TEMPORAL_TASK_QUEUE=bootstrap
 export SUPABASE_URL=https://your-project.supabase.co
 export SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 export CLOUDFLARE_API_TOKEN=your-cloudflare-token
-export SMTP_HOST=smtp.example.com
-export SMTP_USER=your-smtp-user
-export SMTP_PASS=your-smtp-password
+export RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # Email provider (recommended)
+# export SMTP_HOST=smtp.example.com  # Email provider (alternative)
+# export SMTP_USER=your-smtp-user
+# export SMTP_PASS=your-smtp-password
 ```
+
+**See**: [Resend Email Provider Guide](documentation/workflows/guides/resend-email-provider.md) for complete email configuration
 
 ### Infrastructure
 ```bash

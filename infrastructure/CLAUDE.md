@@ -143,15 +143,200 @@ export SUPABASE_ANON_KEY="your-anon-key"
 ### Temporal Workers (Kubernetes Secrets)
 ```bash
 # View secrets
-kubectl get secret temporal-worker-secrets -n temporal -o yaml
+kubectl get secret workflow-worker-secrets -n temporal -o yaml
 
-# Required secrets:
-# - TEMPORAL_ADDRESS=temporal-frontend.temporal.svc.cluster.local:7233
-# - SUPABASE_URL=https://your-project.supabase.co
-# - SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-# - CLOUDFLARE_API_TOKEN=your-cloudflare-token
-# - SMTP_HOST, SMTP_USER, SMTP_PASS (email delivery)
+# Required secrets (stored in workflow-worker-secrets):
+# - TEMPORAL_ADDRESS=temporal-frontend.temporal.svc.cluster.local:7233 (from ConfigMap)
+# - SUPABASE_URL=https://your-project.supabase.co (from ConfigMap)
+# - SUPABASE_SERVICE_ROLE_KEY=your-service-role-key (Secret)
+# - CLOUDFLARE_API_TOKEN=your-cloudflare-token (Secret)
+# - RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx (Secret - primary email provider)
+# - SMTP_HOST, SMTP_USER, SMTP_PASS (Secret - optional, SMTP fallback)
 ```
+
+## Email Provider Configuration (Resend)
+
+### Overview
+
+A4C-AppSuite uses **Resend** (https://resend.com) as the primary email provider for transactional emails (organization invitations, password resets, notifications). SMTP (nodemailer) is available as a fallback.
+
+**For comprehensive Resend documentation**, see:
+- **[Resend Email Provider Guide](../documentation/workflows/guides/resend-email-provider.md)** - Complete implementation, monitoring, and troubleshooting
+- **[Resend Key Rotation](../documentation/infrastructure/operations/resend-key-rotation.md)** - Security procedures for rotating API keys
+
+**Implementation**:
+- Provider: `workflows/src/shared/providers/email/resend-provider.ts`
+- Factory: `workflows/src/shared/providers/email/factory.ts`
+- Activity: `workflows/src/activities/organization-bootstrap/send-invitation-emails.ts`
+
+**Mode Selection** (via `WORKFLOW_MODE` environment variable):
+- `production` → **ResendEmailProvider** (requires `RESEND_API_KEY`)
+- `development` → LoggingEmailProvider (console only, no API calls)
+- `mock` → MockEmailProvider (in-memory, testing)
+
+**Override**: Set `EMAIL_PROVIDER=resend` to force Resend regardless of mode.
+
+### Configuring RESEND_API_KEY
+
+#### 1. Get API Key from Resend
+
+1. Sign up / log in to https://resend.com
+2. Navigate to **API Keys** → **Create API Key**
+3. Name: "A4C Production" (or environment-specific name)
+4. Permissions: **Send emails**
+5. Copy the key (starts with `re_`)
+
+**Important**: API key shown once only - save it securely!
+
+#### 2. Update Kubernetes Secret
+
+**File**: `infrastructure/k8s/temporal/worker-secret.yaml` (NOT committed to git)
+
+```bash
+# Create secret file from template
+cp infrastructure/k8s/temporal/worker-secret.yaml.example \
+   infrastructure/k8s/temporal/worker-secret.yaml
+
+# Encode the API key
+echo -n "re_your_actual_resend_api_key" | base64
+# Example output: cmVfeW91cl9hY3R1YWxfcmVzZW5kX2FwaV9rZXk=
+
+# Edit worker-secret.yaml and replace RESEND_API_KEY value
+# Use the base64-encoded value from above
+```
+
+**Apply to cluster**:
+```bash
+kubectl apply -f infrastructure/k8s/temporal/worker-secret.yaml
+```
+
+#### 3. Restart Temporal Workers
+
+Workers must be restarted to load the new secret:
+
+```bash
+kubectl rollout restart deployment/workflow-worker -n temporal
+kubectl rollout status deployment/workflow-worker -n temporal
+```
+
+#### 4. Verify Configuration
+
+Check worker logs for successful startup:
+
+```bash
+kubectl logs -n temporal -l app=workflow-worker --tail=50 | grep -i "email\|resend"
+```
+
+Expected log: `✓ Email provider configured: ResendEmailProvider`
+
+### RESEND_API_KEY Rotation
+
+**When to rotate**:
+- API key compromised
+- Quarterly security rotation
+- Team member with key access leaves
+
+**Rotation process**:
+
+1. **Create new API key in Resend**:
+   - Log in to https://resend.com/api-keys
+   - Create new API key: "A4C Production (2025-01-14)"
+   - Copy the new key (starts with `re_`)
+
+2. **Update Kubernetes secret**:
+   ```bash
+   # Encode new key
+   NEW_KEY=$(echo -n "re_new_api_key_here" | base64)
+
+   # Update secret
+   kubectl patch secret workflow-worker-secrets -n temporal \
+     -p "{\"data\":{\"RESEND_API_KEY\":\"$NEW_KEY\"}}"
+   ```
+
+3. **Restart workers** (zero-downtime rolling update):
+   ```bash
+   kubectl rollout restart deployment/workflow-worker -n temporal
+   kubectl rollout status deployment/workflow-worker -n temporal --timeout=300s
+   ```
+
+4. **Verify new key works**:
+   ```bash
+   # Check worker logs
+   kubectl logs -n temporal -l app=workflow-worker --tail=20
+
+   # Trigger test workflow (organization creation)
+   # Verify invitation emails sent successfully
+   ```
+
+5. **Delete old API key from Resend**:
+   - Log in to https://resend.com/api-keys
+   - Find old key "A4C Production"
+   - Click **Delete**
+
+**Rollback** (if new key doesn't work):
+```bash
+# Revert to old key
+OLD_KEY=$(echo -n "re_old_api_key_here" | base64)
+kubectl patch secret workflow-worker-secrets -n temporal \
+  -p "{\"data\":{\"RESEND_API_KEY\":\"$OLD_KEY\"}}"
+kubectl rollout restart deployment/workflow-worker -n temporal
+```
+
+### Alternative: SMTP Fallback
+
+If Resend is unavailable or SMTP preferred:
+
+1. **Remove RESEND_API_KEY** from secret (or leave it)
+2. **Add SMTP credentials**:
+   ```bash
+   kubectl patch secret workflow-worker-secrets -n temporal -p '{
+     "data": {
+       "SMTP_HOST": "'$(echo -n "smtp.example.com" | base64)'",
+       "SMTP_PORT": "'$(echo -n "587" | base64)'",
+       "SMTP_USER": "'$(echo -n "your-smtp-user" | base64)'",
+       "SMTP_PASS": "'$(echo -n "your-smtp-password" | base64)'"
+     }
+   }'
+   ```
+
+3. **Restart workers**:
+   ```bash
+   kubectl rollout restart deployment/workflow-worker -n temporal
+   ```
+
+Factory will automatically use SMTP if `SMTP_HOST` is set and `RESEND_API_KEY` is not.
+
+### Monitoring Email Delivery
+
+**Resend Dashboard**:
+- Log in to https://resend.com
+- Navigate to **Logs** → View all sent emails
+- Check delivery status, open rates, bounce rates
+- Monitor API quota usage
+
+**Temporal Workflow Logs**:
+```bash
+# View email activity logs
+kubectl logs -n temporal -l app=workflow-worker | grep "sendInvitationEmails"
+```
+
+**Common Issues**:
+
+1. **`RESEND_API_KEY` not set**:
+   - Error: `Email provider requires RESEND_API_KEY environment variable`
+   - Fix: Add key to `workflow-worker-secrets` and restart workers
+
+2. **Invalid API key**:
+   - Error: `401 Unauthorized` from Resend API
+   - Fix: Verify key is correct, check it hasn't been deleted in Resend dashboard
+
+3. **Rate limit exceeded**:
+   - Error: `429 Too Many Requests`
+   - Fix: Upgrade Resend plan or implement exponential backoff
+
+4. **Domain not verified**:
+   - Error: `403 Forbidden - Domain not verified`
+   - Fix: Verify sending domain in Resend dashboard
 
 ## Key Considerations
 
@@ -160,6 +345,7 @@ kubectl get secret temporal-worker-secrets -n temporal -o yaml
 3. **RLS First**: All tables must have Row-Level Security policies
 4. **Event-Driven**: All state changes emit domain events for CQRS projections
 5. **Local Testing**: Test migrations locally before deploying to production
+6. **Email Provider**: Resend (primary), SMTP (fallback) - workers require `RESEND_API_KEY` in Kubernetes secrets
 
 ## Deployment Runbook
 

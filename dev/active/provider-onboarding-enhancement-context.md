@@ -48,6 +48,13 @@
    - **Why**: Production requirement. Lars must be able to login to manage the system. Breaking platform owner org is unacceptable.
    - **Alternative Rejected**: Require data migration for existing orgs (risky, could break production)
 
+9. **Email Provider: Resend (Not SMTP)** - Added 2025-01-14
+   - **Decision**: Use Resend as primary email provider for transactional emails in Temporal workflows. Fully implemented with factory pattern. SMTP (nodemailer) available as fallback.
+   - **Why**: Investigation revealed Resend already implemented in `workflows/src/shared/providers/email/resend-provider.ts`. Dev-docs incorrectly assumed SMTP. Resend provides better deliverability, simpler API (native fetch), and superior monitoring dashboard compared to raw SMTP.
+   - **Alternative Rejected**: Switching to SMTP (unnecessary, Resend already working, would lose monitoring/analytics)
+   - **Configuration**: Requires `RESEND_API_KEY` environment variable in Kubernetes secret `workflow-worker-secrets` (temporal namespace). Workers must restart to pick up key changes.
+   - **Documentation**: Comprehensive guides created at `documentation/workflows/guides/resend-email-provider.md` (implementation, monitoring, troubleshooting) and `documentation/infrastructure/operations/resend-key-rotation.md` (security procedures).
+
 ---
 
 ## Technical Context
@@ -142,6 +149,12 @@ The enhancement maintains this architecture while adding:
 **Infrastructure** (AsyncAPI Contracts):
 - `infrastructure/supabase/contracts/asyncapi/domains/organization.yaml` - Update `organization.created` event schema, remove program fields, add new fields
 
+**Developer Guidance** (Updated 2025-01-14 for Resend documentation):
+- `CLAUDE.md` (root) - Added link to Resend email provider guide after workflow environment variables (line 268)
+- `workflows/CLAUDE.md` - Updated Technology Stack to reference Resend guide (line 15)
+- `infrastructure/CLAUDE.md` - Added cross-references to Resend guides at top of Email Provider section (lines 163-165)
+- `documentation/workflows/reference/activities-reference.md` - Updated email provider description to mention Resend (line 467)
+
 ### New Files Created
 
 **Database** (Junction Tables):
@@ -168,13 +181,22 @@ The enhancement maintains this architecture while adding:
 - `infrastructure/supabase/contracts/asyncapi/domains/address.yaml` - Address event schemas
 - `infrastructure/supabase/contracts/asyncapi/domains/phone.yaml` - Phone event schemas
 
-**Documentation**:
+**Documentation** (Database):
 - `documentation/infrastructure/reference/database/tables/contacts_projection.md` - Contact table reference
 - `documentation/infrastructure/reference/database/tables/addresses_projection.md` - Address table reference
 - `documentation/infrastructure/reference/database/tables/phones_projection.md` - Phone table reference
 - `documentation/infrastructure/reference/database/tables/organization_contacts.md` - Junction table reference
 - `documentation/infrastructure/reference/database/tables/organization_addresses.md` - Junction table reference
 - `documentation/infrastructure/reference/database/tables/organization_phones.md` - Junction table reference
+
+**Documentation** (Contact Management - Aspirational):
+- `documentation/architecture/features/contact-management-vision.md` - User stories, use cases, business value (15,000 words) - Added 2025-01-14
+- `documentation/infrastructure/architecture/contact-management-architecture.md` - Data model, RLS policies, event-driven architecture (10,000 words) - Added 2025-01-14
+- `documentation/infrastructure/guides/contact-management-implementation-guide.md` - 5 implementation phases, 14-19 week estimate (9,000 words) - Added 2025-01-14
+
+**Documentation** (Resend Email Provider):
+- `documentation/workflows/guides/resend-email-provider.md` - Complete Resend implementation guide: configuration, domain verification, monitoring, troubleshooting (8,000 words) - Added 2025-01-14
+- `documentation/infrastructure/operations/resend-key-rotation.md` - API key rotation procedure with zero downtime, emergency procedures (7,500 words) - Added 2025-01-14
 
 ---
 
@@ -531,6 +553,8 @@ During the planning phase, we investigated the codebase and discovered:
 - [x] **Migration of Deprecated Business Profile Addresses**: RESOLVED - Defer to later. `organization_business_profiles_projection` has no data. Safe to ignore for this project.
 - [x] **Sub-Organization Creation**: RESOLVED - Out of scope for this project. This project creates top-level orgs only. Sub-org creation is a provider_admin function (impersonation required). "Provider Admin Info" section establishes first user assigned provider_admin role for the new org. Sub-org functionality not yet implemented (may be documented as aspirational in @documentation/).
 - [x] **Contact Phone/Address Links**: RESOLVED - **INCLUDE IN THIS PROJECT**. Contacts have personal phones and addresses linked to them. Event processors for `contact.phone.linked` and `contact.address.linked` will be created now.
+- [x] **Contact Management Module Timeline**: RESOLVED - Timeline **indeterminate** (aspirational feature, not on current roadmap). Complete documentation created at `documentation/architecture/features/contact-management-vision.md`, `documentation/infrastructure/architecture/contact-management-architecture.md`, and `documentation/infrastructure/guides/contact-management-implementation-guide.md`. Infrastructure foundation (junction tables, type enums, event processors) being built by provider onboarding enhancement to avoid future data model surgery and enable fast implementation when business need arises. When prioritized: estimated 14-19 weeks for UI/UX implementation (backend foundation already exists).
+- [x] **Email Provider**: RESOLVED - Using **Resend** as primary email provider (not SMTP/SendGrid/Mailgun). Fully implemented in `workflows/src/shared/providers/email/resend-provider.ts` with factory pattern. Requires `RESEND_API_KEY` environment variable for Temporal workers (configured in `infrastructure/k8s/temporal/worker-secret.yaml`). SMTP (nodemailer) available as fallback if `RESEND_API_KEY` not set but `SMTP_HOST` configured. Production mode (`WORKFLOW_MODE=production`) uses Resend by default. **See**: [Resend Email Provider Guide](../../documentation/workflows/guides/resend-email-provider.md) and [Resend Key Rotation](../../documentation/infrastructure/operations/resend-key-rotation.md) for complete documentation.
 
 ### 🔥 CRITICAL DATA MODEL CLARIFICATION
 
@@ -561,12 +585,9 @@ During the planning phase, we investigated the codebase and discovered:
 
 ### 🔄 Still Open
 
-- [ ] **Contact Management Module Timeline**: When will contact management module be implemented? Many-to-many infrastructure built here is for that future module.
 - [ ] **TypeScript Type Generation**: Should we auto-generate TypeScript types from AsyncAPI schemas? (Current: manual typing)
-- [ ] **Contact Phone/Address Links**: When will contact-phone and contact-address junction tables be used? (Future contact management module)
 - [ ] **GraphQL API Layer**: Should organization queries be exposed via GraphQL? (Current: direct SQL queries)
 - [ ] **Workflow Status Polling**: How does frontend poll for workflow status? (Current: OrganizationBootstrapStatusPage, needs investigation)
-- [ ] **Email Provider**: Is SMTP the only email delivery method, or support SendGrid/Mailgun? (Current: SMTP via Nodemailer)
 
 ---
 
