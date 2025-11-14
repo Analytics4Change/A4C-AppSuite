@@ -198,6 +198,9 @@ The enhancement maintains this architecture while adding:
 - `documentation/workflows/guides/resend-email-provider.md` - Complete Resend implementation guide: configuration, domain verification, monitoring, troubleshooting (8,000 words) - Added 2025-01-14
 - `documentation/infrastructure/operations/resend-key-rotation.md` - API key rotation procedure with zero downtime, emergency procedures (7,500 words) - Added 2025-01-14
 
+**Documentation** (Architecture Decisions):
+- `documentation/infrastructure/architecture/asyncapi-type-generation-decision.md` - Decision to reject AsyncAPI-to-TypeScript auto-generation: anonymous schema problem, type quality loss, build complexity analysis (3,800 words) - Added 2025-01-14
+
 ---
 
 ## Related Components
