@@ -210,11 +210,15 @@ contracts/
 
 ### Type Generation
 
-```bash
-# Generate TypeScript types from contracts
-./scripts/generate-contracts.sh
+> **Note**: We maintain **hand-crafted TypeScript types** rather than auto-generating from AsyncAPI schemas. See [AsyncAPI Type Generation Decision](../../../architecture/asyncapi-type-generation-decision.md) for complete rationale (anonymous schema problem, type quality, build complexity).
 
-# Output includes:
+**Manual Type Maintenance**:
+
+```bash
+# Types located at:
+# infrastructure/supabase/contracts/types/events.ts
+
+# Includes:
 # - Discriminated union types for events
 # - Type guards for event detection
 # - Factory functions with validation

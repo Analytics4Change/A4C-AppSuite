@@ -555,6 +555,7 @@ During the planning phase, we investigated the codebase and discovered:
 - [x] **Contact Phone/Address Links**: RESOLVED - **INCLUDE IN THIS PROJECT**. Contacts have personal phones and addresses linked to them. Event processors for `contact.phone.linked` and `contact.address.linked` will be created now.
 - [x] **Contact Management Module Timeline**: RESOLVED - Timeline **indeterminate** (aspirational feature, not on current roadmap). Complete documentation created at `documentation/architecture/features/contact-management-vision.md`, `documentation/infrastructure/architecture/contact-management-architecture.md`, and `documentation/infrastructure/guides/contact-management-implementation-guide.md`. Infrastructure foundation (junction tables, type enums, event processors) being built by provider onboarding enhancement to avoid future data model surgery and enable fast implementation when business need arises. When prioritized: estimated 14-19 weeks for UI/UX implementation (backend foundation already exists).
 - [x] **Email Provider**: RESOLVED - Using **Resend** as primary email provider (not SMTP/SendGrid/Mailgun). Fully implemented in `workflows/src/shared/providers/email/resend-provider.ts` with factory pattern. Requires `RESEND_API_KEY` environment variable for Temporal workers (configured in `infrastructure/k8s/temporal/worker-secret.yaml`). SMTP (nodemailer) available as fallback if `RESEND_API_KEY` not set but `SMTP_HOST` configured. Production mode (`WORKFLOW_MODE=production`) uses Resend by default. **See**: [Resend Email Provider Guide](../../documentation/workflows/guides/resend-email-provider.md) and [Resend Key Rotation](../../documentation/infrastructure/operations/resend-key-rotation.md) for complete documentation.
+- [x] **TypeScript Type Generation**: RESOLVED - **Continue with manual hand-crafted types** (reject auto-generation). AsyncAPI code generation tools (Modelina) produce anonymous schemas (`AnonymousSchema_1`, `AnonymousSchema_2`) instead of semantic names, lose type quality (no discriminated unions/type guards), add build complexity (monorepo orchestration), and slow developer workflow (15-20 min vs 5-10 min per event). Our current 591-line hand-crafted type file provides superior quality. We already tried and rejected this approach previously (documented in contracts README). **Decision documented**: [AsyncAPI Type Generation Decision](../../documentation/infrastructure/architecture/asyncapi-type-generation-decision.md). Alternative recommendation: Add validation tests to catch drift instead of code generation. Decision made 2025-01-14.
 
 ### 🔥 CRITICAL DATA MODEL CLARIFICATION
 
@@ -585,7 +586,6 @@ During the planning phase, we investigated the codebase and discovered:
 
 ### 🔄 Still Open
 
-- [ ] **TypeScript Type Generation**: Should we auto-generate TypeScript types from AsyncAPI schemas? (Current: manual typing)
 - [ ] **GraphQL API Layer**: Should organization queries be exposed via GraphQL? (Current: direct SQL queries)
 - [ ] **Workflow Status Polling**: How does frontend poll for workflow status? (Current: OrganizationBootstrapStatusPage, needs investigation)
 

@@ -69,6 +69,8 @@ We initially attempted to use AsyncAPI code generation templates, but:
 
 **Solution**: Manually maintain TypeScript types based on AsyncAPI specs. The AsyncAPI YAML remains the source of truth, and types are kept in sync during development.
 
+> **📖 For complete rationale**: See [AsyncAPI Type Generation Decision](../../../documentation/infrastructure/architecture/asyncapi-type-generation-decision.md) for comprehensive analysis of why we rejected auto-generation in favor of hand-crafted types.
+
 ### Using Types in Frontend
 
 The Frontend repository will sync these types at build time:
