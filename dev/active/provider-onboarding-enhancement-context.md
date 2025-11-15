@@ -2,14 +2,120 @@
 
 ## Decision Record
 
-**Date**: 2025-01-14
+**Date**: 2025-01-14 (Initial planning + Critical clarification session)
 **Feature**: Provider Onboarding Enhancement
 **Goal**: Enhance organization creation workflow to support comprehensive contact/address/phone collection, dynamic UI based on org type, partner relationship tracking, and conditional subdomain provisioning while maintaining CQRS event-driven architecture.
 
-### Key Decisions
+### 🔥 CRITICAL UPDATES (2025-01-14 Afternoon Session)
+
+After resolving 37 open questions with user, the following major decisions were finalized:
+
+**1. NEW Projection Tables (Not Migrations)**
+   - **Decision**: CREATE brand new `contacts_projection`, `addresses_projection`, `phones_projection` tables. DROP old tables without `_projection` suffix.
+   - **Why**: Old tables are empty (no data to migrate). Clean slate approach. All new tables include `deleted_at` (soft deletes) and `organization_id` (RLS enforcement).
+   - **Impact**: Simplifies Phase 1 migrations significantly (no ALTER TABLE complexity)
+
+**2. General Information Contact is OPTIONAL**
+   - **Decision**: General Info section allows optional contact, requires address/phone
+   - **Why**: Main office scenarios have phone/address without specific contact person (unknown receptionist, general mailing address)
+   - **Validation**: At least one contact must exist across ALL sections (enforced at ViewModel + Workflow layers, no database triggers)
+
+**3. "Use General Information" Creates Junction Links (NOT Data Duplication)**
+   - **Decision**: When checked, create junction links to EXISTING General Info records (shared entities)
+   - **Why**: Avoid data duplication. When General Info edited after linking, system auto-unlinks and creates new record.
+   - **Impact**: Changes workflow activity logic - must track which sections are linked vs. independent
+
+**4. Soft Deletes with Cascade**
+   - **Decision**: All entities use `deleted_at` timestamp. When org soft-deleted, cascade soft-delete to all linked contacts/addresses/phones.
+   - **Why**: Preserves audit trail, enables "undo", cleaner than hard deletes
+   - **Impact**: Event processors must handle `organization.deleted` → emit `contact.deleted`, `address.deleted`, `phone.deleted` events
+
+**5. Junction Tables: No PK, No Metadata**
+   - **Decision**: Junction tables have UNIQUE constraint only (no primary key). No created_at or created_by columns.
+   - **Why**: domain_events table IS the audit trail. Minimal design for performance. CQRS alignment.
+   - **Impact**: Simplifies junction table creation, reduces storage
+
+**6. RLS Policy for Junction Tables: Both Entities AND Condition**
+   - **Decision**: Both organization_id AND linked entity's organization_id must match JWT org_id
+   - **Why**: Strictest multi-tenant isolation. Prevents any cross-org junction visibility.
+   - **Impact**: RLS policies must join to both sides of junction relationship
+
+**7. Workflow Idempotency: Fail if Org Exists**
+   - **Decision**: If org exists during retry, FAIL with non-retryable error (don't attempt repair)
+   - **Why**: Simpler error handling. Forces explicit compensation rather than ambiguous state.
+   - **Impact**: Workflow compensation saga must be robust
+
+**8. Referring Partner Dropdown: Only Activated VAR Partners**
+   - **Decision**: Filter dropdown to `status='activated' AND partner_type='var'`
+   - **Why**: Ensures provider can only be referred by operational partners
+   - **Impact**: Frontend API call must filter by both status and partner_type
+
+**9. Section Visibility Toggle: Preserve Hidden Data**
+   - **Decision**: When org type changes and hides Billing section, preserve Billing data in form state
+   - **Why**: Prevents accidental data loss from experimenting with dropdowns
+   - **Impact**: Form state management must handle hidden sections
+
+**10. "Use General Information" Unchecking: Keep Links, Allow Independent Editing**
+   - **Decision**: When unchecked, links remain active but section can edit independently
+   - **Why**: Most flexible approach - user can diverge from General Info without explicit unlinking
+   - **Impact**: UI must handle "linked but editable" state
+
+### 🔥 IMPLEMENTATION SESSION (2025-01-14 Evening)
+
+After resolving the 10 critical architectural decisions in the afternoon, implementation of Phase 1 schema changes was completed:
+
+**Phase 1.1-1.3 Implementation Complete ✅**
+
+**Files Created** (6 new migration files):
+1. `infrastructure/supabase/sql/02-tables/organizations/008-create-enums.sql` - 4 enum types (partner_type, contact_type, address_type, phone_type)
+2. `infrastructure/supabase/sql/02-tables/organizations/009-add-partner-columns.sql` - Added partner_type + referring_partner_id to organizations_projection
+3. `infrastructure/supabase/sql/02-tables/organizations/010-contacts_projection_v2.sql` - NEW table (DROP old, CREATE new with type/label/deleted_at)
+4. `infrastructure/supabase/sql/02-tables/organizations/011-addresses_projection_v2.sql` - NEW table (DROP old, CREATE new with type/label/deleted_at)
+5. `infrastructure/supabase/sql/02-tables/organizations/012-phones_projection_v2.sql` - NEW table (DROP old, CREATE new with type/label/deleted_at)
+6. `infrastructure/supabase/sql/02-tables/organizations/013-junction-tables.sql` - 6 junction tables (org-level + contact groups)
+
+**Key Implementation Decisions**:
+- **Single enum file**: All 4 enums in one file (008-create-enums.sql) for cleaner migration structure
+- **Single junction file**: All 6 junction tables in one file (013-junction-tables.sql) for atomic deployment
+- **DROP old tables**: Empty tables without `_projection` suffix dropped, no data migration needed
+- **v2 naming**: New tables use v2 suffix in file names to indicate breaking change from old structure
+- **Minimal junction design**: UNIQUE constraints only, no PK, no metadata columns (domain_events IS audit trail)
+- **Soft delete support**: All projection tables have `deleted_at TIMESTAMPTZ` column
+- **Deferred RLS**: RLS policies deferred to Phase 2 to focus on schema correctness first
+
+**Infrastructure Bug Fixed** 🛠️:
+- **Issue**: Platform owner seed data used `path='a4c'::LTREE` (nlevel=1), violated CHECK constraint requiring nlevel=2
+- **Root Cause**: All root organizations must use `root.*` prefix per documented architecture
+- **Fix**: Changed to `path='root.a4c'::LTREE` in `infrastructure/supabase/sql/99-seeds/002-bootstrap-org-roles.sql:43`
+- **Impact**: Seed INSERT now succeeds, platform owner org created correctly, all validation functions work
+- **Documentation**: Complete bug analysis at `dev/active/infrastructure-bug-ltree-path-analysis.md`
+
+**Testing Results**:
+- ✅ Migrations tested successfully (98 successful, 8 pre-existing failures unrelated to Phase 1)
+- ✅ Idempotency verified (ran migrations twice with no errors)
+- ✅ Platform owner org created with correct path: `root.a4c` (nlevel=2)
+- ✅ All new schema changes applied correctly:
+  - 4 enums created
+  - 2 new columns on organizations_projection
+  - 3 new projection tables created (contacts/addresses/phones v2)
+  - 6 junction tables created
+
+**Phase 1 Status**:
+- ✅ Phase 1.1 COMPLETE: Partner type infrastructure
+- ✅ Phase 1.2 COMPLETE: Junction tables
+- ✅ Phase 1.3 COMPLETE: Projection table updates
+- ⏸️ Phase 1.4 PENDING: Remove program infrastructure
+- ⏸️ Phase 1.5 PENDING: Update subdomain conditional logic
+- ⏸️ Phase 1.6 PENDING: Update AsyncAPI event contracts
+
+**Next Steps**:
+- Option 1: Continue with Phase 1.4-1.6 (schema completion)
+- Option 2: Move to Phase 2 (event processors and triggers for new tables)
+
+### Key Decisions (Original Planning Session)
 
 1. **Data Model: Separate Projection Tables with Many-to-Many Relationships**
-   - **Decision**: Use existing `contacts_projection`, `addresses_projection`, `phones_projection` tables (already created) with junction tables for many-to-many relationships
+   - **Decision**: Use separate projection tables with junction tables for many-to-many relationships
    - **Why**: CQRS pattern requires projections derived from events. Many-to-many supports future contact management module where contacts can be associated with multiple orgs/phones/addresses
    - **Alternative Rejected**: Storing contacts/addresses/phones as JSONB fields on organizations_projection (not queryable, doesn't support many-to-many)
 
@@ -28,22 +134,17 @@
    - **Why**: User confirmed program management is out of scope for organization creation. Will be handled separately if needed. MVP had program inline but it's not actually needed.
    - **Alternative Rejected**: Keep program fields but make them optional (tech debt, confusing to maintain dead code)
 
-5. **"Use General Information" Behavior: Dynamic Sync with Junction Links**
-   - **Decision**: UI shows dynamic sync (copy values when checked, update when general info changes). Backend creates junction table links via CQRS events.
-   - **Why**: UI provides convenient autofill. Backend uses junction links (not data duplication) to support future many-to-many queries. Clean separation of concerns.
-   - **Alternative Rejected**: Backend data duplication (duplicate address records, violates normalization, causes sync issues)
-
-6. **Event Creation Timing: Immediate (with Organization Creation)**
+5. **Event Creation Timing: Immediate (with Organization Creation)**
    - **Decision**: Emit contact/address/phone events in the first workflow activity (`createOrganization`) before DNS provisioning
    - **Why**: Event sourcing best practice is to record all entity creation atomically. Simplifies rollback (delete entire org including contacts). Provides complete audit trail from moment of creation.
    - **Alternative Rejected**: Create contacts/addresses/phones on organization activation (complicates rollback, loses audit trail if org creation fails midway)
 
-7. **Label + Type Fields: Both Required on All Entities**
+6. **Label + Type Fields: Both Required on All Entities**
    - **Decision**: All contacts/addresses/phones have both `label` (free-form text) and `type` (constrained enum)
    - **Why**: `type` provides structure for business logic (e.g., "billing contact" vs "technical contact"). `label` provides user-friendly identification for future contact management UI. Both serve different purposes.
    - **Alternative Rejected**: Label-only or type-only (loses either structure or flexibility)
 
-8. **Backward Compatibility: Preserve Platform Owner Org**
+7. **Backward Compatibility: Preserve Platform Owner Org**
    - **Decision**: All migrations must preserve platform owner org (A4C, lars.tice@gmail.com). All new fields nullable with defaults. Test login before and after migration.
    - **Why**: Production requirement. Lars must be able to login to manage the system. Breaking platform owner org is unacceptable.
    - **Alternative Rejected**: Require data migration for existing orgs (risky, could break production)
@@ -560,37 +661,118 @@ During the planning phase, we investigated the codebase and discovered:
 - [x] **Email Provider**: RESOLVED - Using **Resend** as primary email provider (not SMTP/SendGrid/Mailgun). Fully implemented in `workflows/src/shared/providers/email/resend-provider.ts` with factory pattern. Requires `RESEND_API_KEY` environment variable for Temporal workers (configured in `infrastructure/k8s/temporal/worker-secret.yaml`). SMTP (nodemailer) available as fallback if `RESEND_API_KEY` not set but `SMTP_HOST` configured. Production mode (`WORKFLOW_MODE=production`) uses Resend by default. **See**: [Resend Email Provider Guide](../../documentation/workflows/guides/resend-email-provider.md) and [Resend Key Rotation](../../documentation/infrastructure/operations/resend-key-rotation.md) for complete documentation.
 - [x] **TypeScript Type Generation**: RESOLVED - **Continue with manual hand-crafted types** (reject auto-generation). AsyncAPI code generation tools (Modelina) produce anonymous schemas (`AnonymousSchema_1`, `AnonymousSchema_2`) instead of semantic names, lose type quality (no discriminated unions/type guards), add build complexity (monorepo orchestration), and slow developer workflow (15-20 min vs 5-10 min per event). Our current 591-line hand-crafted type file provides superior quality. We already tried and rejected this approach previously (documented in contracts README). **Decision documented**: [AsyncAPI Type Generation Decision](../../documentation/infrastructure/architecture/asyncapi-type-generation-decision.md). Alternative recommendation: Add validation tests to catch drift instead of code generation. Decision made 2025-01-14.
 
-### 🔥 CRITICAL DATA MODEL CLARIFICATION
+### 🔥 CRITICAL DATA MODEL CLARIFICATION (Updated 2025-01-14)
 
 **General Information Section** (Headquarters):
-- Phone and Address are associated to the **organization only** (not to a contact)
-- Contact is a person associated to the organization
-- These are **3 separate entities**: org→address, org→phone, org→contact (no contact-address or contact-phone links)
+- **Contact is OPTIONAL** - Main office phone/mailing address may not have specific contact person
+- Phone and Address are **REQUIRED** and associated to the **organization only**
+- If contact provided, creates 3 separate entities: org→contact, org→address, org→phone (no contact-address or contact-phone links)
+- If contact omitted, creates 2 entities: org→address, org→phone
+- **Rationale**: Business may have main office with unknown receptionist (phone) and general mailing address with no specific contact
 
 **Billing Information Section** (Contact Group):
+- **Contact is REQUIRED** (must have billing contact person)
 - Phone, Address, and Contact are **all linked together** in a fully connected graph AND to the organization
-- Junction tables needed:
+- Junction tables needed (6 links total per Billing section):
   - `organization_contacts` (org→contact)
   - `organization_addresses` (org→address)
   - `organization_phones` (org→phone)
   - `contact_addresses` (**contact→address**)
   - `contact_phones` (**contact→phone**)
-  - `phone_addresses` (**phone→address**) ← **NEW TABLE REQUIRED**
+  - `phone_addresses` (**phone→address**) ← Enables direct phone-address queries without contact intermediary
 - Think of this as a "contact group" where all three entities (contact, address, phone) are fully interconnected
 
 **Provider Admin Information Section** (Contact Group):
+- **Contact is REQUIRED** (must have provider admin contact person)
 - Same as Billing: Phone, Address, and Contact all linked together in a fully connected graph AND to the organization
-- Same junction tables as Billing section
+- Same 6 junction links as Billing section
 
-**"Use General Information" Checkbox Behavior**:
-- **Copy address data**: Create a NEW address record with same data as General Info, then link contact to the new address
-- **Copy phone data**: Create a NEW phone record with same data as General Info, then link contact to the new phone
-- **NOT a reference**: This is data duplication, not a junction link to the existing General Info records
+**"Use General Information" Checkbox Behavior** (CORRECTED):
+- **Creates junction links to EXISTING records** (NOT data duplication)
+- When checked: Billing/Provider Admin sections link to same address/phone records as General Info
+- When General Info edited after linking: System auto-unlinks, creates NEW record with changed data, updates General Info to point to new record
+- When unchecked: Links remain active but Billing/Provider Admin can edit independently (links only removed if section cleared)
+- **Rationale**: Avoid data duplication while preserving ability to make sections independent when needed
 
-### 🔄 Still Open
+**Validation: At Least One Contact Required**:
+- Enforced at ViewModel layer (frontend) AND Workflow activity layer (backend)
+- General Info contact optional + Billing section may be hidden (partners) = Need explicit validation
+- Validation: "Organization must have at least one contact across all sections"
+- **No database trigger validation** - validation at application layer only
 
-- [ ] **GraphQL API Layer**: Should organization queries be exposed via GraphQL? (Current: direct SQL queries)
-- [ ] **Workflow Status Polling**: How does frontend poll for workflow status? (Current: OrganizationBootstrapStatusPage, needs investigation)
+### 🔥 NEW PROJECTION TABLES (Not Migrations)
+
+**CRITICAL**: This project creates **brand new** projection tables, does NOT migrate existing tables.
+
+**Tables to CREATE**:
+- `contacts_projection` - NEW table with `deleted_at`, `organization_id`, `type` enum
+- `addresses_projection` - NEW table with `deleted_at`, `organization_id`, `type` enum
+- `phones_projection` - NEW table with `deleted_at`, `organization_id`, `type` enum
+
+**Tables to DROP**:
+- Old `contacts` table (without `_projection` suffix) - **NO DATA** to migrate (empty table)
+- Old `addresses` table (without `_projection` suffix) - **NO DATA** to migrate (empty table)
+- Old `phones` table (without `_projection` suffix) - **NO DATA** to migrate (empty table)
+
+**New Table Structure**:
+- All include `deleted_at TIMESTAMP` for soft deletes
+- All include `organization_id UUID` foreign key for direct org-scoped queries + RLS enforcement
+- All include `type` enum column (contact_type, address_type, phone_type)
+- All include `label TEXT` for user-friendly names
+
+**Junction Table Structure**:
+- **No primary key** - just UNIQUE constraint on (entity1_id, entity2_id)
+- **No metadata columns** - No created_at, created_by, etc. (domain_events table IS the audit trail)
+- Minimal design for performance and CQRS alignment
+
+### 🔥 SOFT DELETE & CASCADE BEHAVIOR
+
+**Soft Delete Implementation**:
+- All entities use `deleted_at TIMESTAMP` column
+- Queries filter `WHERE deleted_at IS NULL` to exclude deleted records
+- Soft delete preserves audit trail, enables "undo" functionality
+
+**Cascade Soft Delete**:
+- When organization soft-deleted (`deleted_at` set), all linked contacts/addresses/phones also soft-deleted
+- Event processors handle cascade: `organization.deleted` event triggers `contact.deleted`, `address.deleted`, `phone.deleted` events
+- Junction links automatically filtered out when either entity is soft-deleted (RLS handles this)
+
+**RLS Policy for Junction Tables**:
+- Policy: **Both entities must belong to user's org** (AND condition)
+- Example: `organization_id = jwt.org_id AND contact.organization_id = jwt.org_id`
+- Strictest isolation - prevents any cross-org junction visibility
+- Supports future multi-org contacts by removing/modifying constraint later
+
+### 🔥 WORKFLOW & UI DECISIONS
+
+**Workflow Idempotency**:
+- If org exists during retry: **FAIL with non-retryable error**
+- No attempt to "repair" partial creation
+- Forces explicit compensation rather than ambiguous state
+- Simpler error handling, clearer failure modes
+
+**Referring Partner Dropdown**:
+- Show only **ACTIVATED VAR partners** (status='activated' AND partner_type='var')
+- Excludes pending, failed, or deactivated partners
+- Excludes stakeholder partners (family, court, other)
+- Excludes platform owner org
+
+**Section Visibility Toggle**:
+- When user changes org type from Provider to Partner (hides Billing section):
+  - **Preserve Billing data** (keep in form state, don't discard)
+  - If user switches back to Provider, Billing data reappears
+  - Only discard Billing data on final form submission if org type is Partner
+- **Rationale**: Prevents accidental data loss from experimenting with org type dropdown
+
+**"Use General Information" Unchecking**:
+- When checkbox unchecked: **Keep links, allow independent editing**
+- Links remain until user explicitly clears the Billing/Provider Admin section
+- Most flexible approach - user can edit independently without breaking links
+
+### 🔄 Still Open (Deferred)
+
+- [ ] **GraphQL API Layer**: Should organization queries be exposed via GraphQL? (Current: direct SQL queries) - Defer to future
+- [ ] **Workflow Status Polling**: How does frontend poll for workflow status? (Current: OrganizationBootstrapStatusPage, needs investigation) - Not blocking implementation
 
 ---
 

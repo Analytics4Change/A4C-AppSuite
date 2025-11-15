@@ -40,7 +40,7 @@ INSERT INTO organizations_projection (
   'Analytics4Change',
   'a4c',
   'platform_owner',
-  'a4c'::LTREE,
+  'root.a4c'::LTREE,
   NULL,
   true,
   NOW()
