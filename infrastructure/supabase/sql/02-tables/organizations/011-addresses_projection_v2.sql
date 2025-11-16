@@ -7,9 +7,10 @@
 DROP TABLE IF EXISTS addresses_projection CASCADE;
 
 -- Create new addresses_projection with all required fields
+-- Note: No ON DELETE CASCADE - event-driven deletion required (emit address.deleted events via workflow)
 CREATE TABLE addresses_projection (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL REFERENCES organizations_projection(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL REFERENCES organizations_projection(id),
 
   -- Address Classification
   label TEXT NOT NULL,             -- User-defined label (e.g., 'Main Office', 'Billing Department')

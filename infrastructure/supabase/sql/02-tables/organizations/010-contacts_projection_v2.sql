@@ -7,9 +7,10 @@
 DROP TABLE IF EXISTS contacts_projection CASCADE;
 
 -- Create new contacts_projection with all required fields
+-- Note: No ON DELETE CASCADE - event-driven deletion required (emit contact.deleted events via workflow)
 CREATE TABLE contacts_projection (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL REFERENCES organizations_projection(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL REFERENCES organizations_projection(id),
 
   -- Contact Classification
   label TEXT NOT NULL,           -- User-defined label (e.g., 'John - Main Contact', 'Billing Department')

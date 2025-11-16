@@ -7,8 +7,9 @@ ALTER TABLE organizations_projection
 ADD COLUMN IF NOT EXISTS partner_type partner_type;
 
 -- Add referring_partner_id column (nullable, tracks which VAR partner referred this provider)
+-- Note: No ON DELETE action - event-driven deletion required (emit organization.updated events to clear references)
 ALTER TABLE organizations_projection
-ADD COLUMN IF NOT EXISTS referring_partner_id UUID REFERENCES organizations_projection(id) ON DELETE SET NULL;
+ADD COLUMN IF NOT EXISTS referring_partner_id UUID REFERENCES organizations_projection(id);
 
 -- Add CHECK constraint: partner_type required for provider_partner orgs
 -- Note: Using DO block for idempotency since ALTER TABLE ADD CONSTRAINT doesn't support IF NOT EXISTS

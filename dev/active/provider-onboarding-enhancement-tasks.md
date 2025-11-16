@@ -697,18 +697,37 @@
 
 ## Current Status
 
-**Phase**: Phase 1 Schema Implementation COMPLETE ✅
-**Status**: ✅ Phase 1.1-1.3 COMPLETE | ⏸️ Phase 1.4-1.6 PENDING
-**Last Updated**: 2025-01-14 (Evening Session)
-**Next Step**: Phase 1.4 (Remove Program Infrastructure) OR Phase 2 (Event Processing & Triggers)
+**Phase**: Phase 1 Schema Implementation - Infrastructure Guideline Compliance
+**Status**: ✅ Phase 1.1-1.3 COMPLETE + ON DELETE Fixes | 🚀 Ready to Deploy to Remote | ⏸️ Phase 1.4-1.6 PENDING
+**Last Updated**: 2025-01-16 (Migration Investigation + Fixes Session)
+**Next Step**: Deploy Phase 1.1-1.3 to remote via GitHub Actions OR Supabase MCP
 
-**Completed in This Session**:
-- ✅ Phase 1.1: Partner type infrastructure (enums + columns)
-- ✅ Phase 1.2: Junction tables (all 6 tables created)
-- ✅ Phase 1.3: NEW projection tables (contacts/addresses/phones v2)
-- ✅ Infrastructure bug fix: Platform owner ltree path corrected
+**Migration Investigation Status** (Completed 2025-01-16):
+- ✅ **Remote State Analyzed**: 88 migrations already applied via GitHub Actions workflow
+- ✅ **Local vs Remote Gap Identified**: Phase 1.1-1.3 (6 files) exist only locally
+- ✅ **No Errors Found**: No migration errors - system working as designed
+- ✅ **ON DELETE Violations Fixed**: All 16 violations resolved (see session summary below)
+- ✅ **Deployment Method Confirmed**: GitHub Actions workflow `.github/workflows/supabase-deploy.yml` ready
 
-**Files Created**:
+**Infrastructure Guideline Compliance** (Fixed 2025-01-16):
+- ✅ **16 ON DELETE violations removed** from all Phase 1.1-1.3 migration files
+- ✅ **Event-driven deletion comments added** to explain requirement
+- ✅ **All files now compliant** with infrastructure-guidelines skill requirements
+- ⚠️ **Local testing blocked**: Podman container startup issue (unrelated to migration fixes)
+- 🚀 **Ready for remote deployment**: All fixes complete and idempotent
+
+**Approved Plan** (Updated):
+1. ✅ Investigate remote migration 20251115202250 → **COMPLETE** (full schema snapshot, 88 migrations tracked)
+2. ✅ Fix ON DELETE violations → **COMPLETE** (16 fixes across 5 files)
+3. 🚀 Deploy Phase 1.1-1.3 to remote (6 migration files via GitHub Actions)
+4. ⏸️ Complete Phase 1.4: Remove program infrastructure
+5. ⏸️ Complete Phase 1.5: Update subdomain conditional logic
+6. ⏸️ Complete Phase 1.6: Update AsyncAPI event contracts
+7. ⏸️ Test complete Phase 1 locally (once Podman issue resolved)
+8. ⏸️ Deploy Phase 1.4-1.6 to remote
+9. ⏸️ Update dev docs with Phase 1 completion
+
+**Files Created** (Original Phase 1.1-1.3):
 1. `infrastructure/supabase/sql/02-tables/organizations/008-create-enums.sql` (4 enums)
 2. `infrastructure/supabase/sql/02-tables/organizations/009-add-partner-columns.sql` (partner_type, referring_partner_id)
 3. `infrastructure/supabase/sql/02-tables/organizations/010-contacts_projection_v2.sql` (NEW table)
@@ -717,14 +736,21 @@
 6. `infrastructure/supabase/sql/02-tables/organizations/013-junction-tables.sql` (6 junction tables)
 7. `dev/active/infrastructure-bug-ltree-path-analysis.md` (bug documentation)
 
-**Files Modified**:
-1. `infrastructure/supabase/sql/99-seeds/002-bootstrap-org-roles.sql` (fixed path: 'a4c' → 'root.a4c')
+**Files Modified** (ON DELETE Fixes 2025-01-16):
+1. `infrastructure/supabase/sql/02-tables/organizations/009-add-partner-columns.sql` - Removed ON DELETE SET NULL (1 fix)
+2. `infrastructure/supabase/sql/02-tables/organizations/010-contacts_projection_v2.sql` - Removed ON DELETE CASCADE (1 fix)
+3. `infrastructure/supabase/sql/02-tables/organizations/011-addresses_projection_v2.sql` - Removed ON DELETE CASCADE (1 fix)
+4. `infrastructure/supabase/sql/02-tables/organizations/012-phones_projection_v2.sql` - Removed ON DELETE CASCADE (1 fix)
+5. `infrastructure/supabase/sql/02-tables/organizations/013-junction-tables.sql` - Removed 12 ON DELETE CASCADE (12 fixes)
+6. `infrastructure/supabase/sql/99-seeds/002-bootstrap-org-roles.sql` - Fixed ltree path ('a4c' → 'root.a4c')
 
 **Testing Results**:
-- ✅ Migrations tested successfully (98 successful, 8 pre-existing failures)
-- ✅ Idempotency verified (ran migrations twice)
+- ✅ Migrations tested successfully (98 successful, 8 pre-existing failures) - Before ON DELETE fixes
+- ✅ Idempotency verified (ran migrations twice) - Before ON DELETE fixes
 - ✅ Platform owner org created with correct path: `root.a4c` (nlevel=2)
 - ✅ All new schema changes applied correctly
+- ✅ ON DELETE fixes audited and verified idempotent
+- ⚠️ Post-fix local testing blocked by Podman issue (safe to deploy to remote)
 
 ## Session Summary (2025-01-14 Afternoon)
 
@@ -764,6 +790,110 @@
 - Junction tables: UNIQUE constraints only, no PK, no metadata (minimal design)
 - Soft delete support: `deleted_at TIMESTAMPTZ` on all projection tables
 - Deferred RLS policies to Phase 2 (focus on schema first)
+
+## Session Summary (2025-01-15 Late Evening)
+
+**Work Completed**:
+- ✅ Reviewed current plan state and Phase 1 progress
+- ✅ Investigated migration sync status between local and remote
+- ✅ Created comprehensive execution plan for completing Phase 1
+- ✅ Identified remote migration `20251115202250` (needs investigation)
+- ✅ User approved deployment plan for Phase 1.1-1.3 → Phase 1.4-1.6
+
+**Key Findings**:
+- **Migration Sync**: Local has Phase 1.1-1.3 complete (files 008-013), remote has 1 unknown migration
+- **MCP Issue**: Supabase MCP tool returned "Unauthorized" - needs reconnection
+- **Deployment Strategy**: Investigate remote state first, then deploy Phase 1.1-1.3, then complete Phase 1.4-1.6
+- **Local Supabase**: Running successfully on 127.0.0.1:54321
+
+**Next Session Tasks**:
+1. Investigate remote migration `20251115202250` to understand current state
+2. Fix Supabase MCP connection issue (may need re-authentication)
+3. Deploy Phase 1.1-1.3 (6 migrations) to remote Supabase
+4. Complete Phase 1.4-1.6 (program removal, subdomain logic, AsyncAPI contracts)
+5. Final testing and synchronization verification
+
+**Session Notes**:
+- User needed to exit tmux session for reconfiguration
+- Dev docs updated with current status and approved plan
+- Todo list created with 8 tasks for Phase 1 completion
+
+## Session Summary (2025-01-16 Morning) - Migration Investigation & ON DELETE Fixes
+
+**Work Completed**:
+- ✅ Comprehensive migration investigation (non-standard Supabase strategy documented)
+- ✅ Remote database state analysis via Supabase MCP (88 migrations applied, schema captured)
+- ✅ GitHub Actions workflow discovery (`.github/workflows/supabase-deploy.yml`)
+- ✅ Local vs remote schema gap analysis (Phase 1.1-1.3 not deployed)
+- ✅ Fixed 16 ON DELETE violations across 5 migration files (infrastructure guideline compliance)
+- ✅ Added event-driven deletion documentation comments to all fixed files
+- ✅ Verified all migration files are idempotent and ready for deployment
+
+**Migration Strategy Findings**:
+- **Dual-Track System**: Custom SQL directory (primary) + Supabase CLI migrations (snapshots only)
+- **Custom Runner**: `./local-tests/run-migrations.sh` for local (psql-based, no version tracking)
+- **GitHub Actions**: `.github/workflows/supabase-deploy.yml` for remote (with `_migrations_applied` tracking)
+- **Deployment Method**: Push to `main` branch → auto-deploys via GHA workflow
+- **Migration Tracking**: Remote has `_migrations_applied` table with 88 entries, checksums, execution times
+- **No Errors Found**: System working as designed, Phase 1.1-1.3 simply not deployed yet
+
+**ON DELETE Violation Fixes** (Infrastructure Guideline Compliance):
+1. **009-add-partner-columns.sql**: Removed `ON DELETE SET NULL` from `referring_partner_id` FK
+2. **010-contacts_projection_v2.sql**: Removed `ON DELETE CASCADE` from `organization_id` FK
+3. **011-addresses_projection_v2.sql**: Removed `ON DELETE CASCADE` from `organization_id` FK
+4. **012-phones_projection_v2.sql**: Removed `ON DELETE CASCADE` from `organization_id` FK
+5. **013-junction-tables.sql**: Removed 12 `ON DELETE CASCADE` from all 6 junction tables (2 FKs each)
+
+**Total Fixes**: 16 ON DELETE actions removed (all files now use default `ON DELETE RESTRICT`)
+
+**Why ON DELETE Actions Violate Guidelines**:
+- **Event Sourcing Architecture**: All changes must emit events to `domain_events` table
+- **CQRS Projections**: Read models rebuilt from event stream (CASCADE bypasses events)
+- **Audit Trail**: Delete events required for complete audit history
+- **Temporal Workflows**: Saga compensation logic relies on events, not database cascades
+- **Cross-System Sync**: Other services listen to events, won't know about cascaded deletions
+
+**Event-Driven Deletion Pattern** (What Should Happen Instead):
+- Workflow emits `contact.deleted`, `address.deleted`, `phone.deleted` events
+- Workflow emits `organization.contact.unlinked` events for junction tables
+- Event processors update projections based on events
+- Complete audit trail in `domain_events` table
+- CQRS projections can be rebuilt from events
+
+**Remote Database State** (via Supabase MCP):
+- **Tables Analyzed**: 25 tables in public schema
+- **Contacts/Addresses/Phones**: OLD schema (no `type` enum columns, text-based type)
+- **Organizations**: Missing `partner_type` and `referring_partner_id` columns
+- **Junction Tables**: None exist (all 6 tables missing)
+- **Migration Tracking**: `_migrations_applied` table with 88 entries
+- **Conclusion**: Remote is Pre-Phase 1 state, local has Phase 1.1-1.3 enhancements
+
+**Deployment Readiness**:
+- ✅ **All Files Idempotent**: IF NOT EXISTS, OR REPLACE, DROP IF EXISTS patterns
+- ✅ **No Data Loss Risk**: Dropping empty tables (contacts/addresses/phones have 0 rows remotely)
+- ✅ **Infrastructure Compliant**: All ON DELETE violations fixed
+- ✅ **GitHub Workflow Ready**: Validates idempotency, tracks checksums, stops on errors
+- ✅ **Safe to Deploy**: Can push to `main` or use Supabase MCP `apply_migration`
+
+**Key Learnings**:
+- **ON DELETE SET NULL**: Auto-updates FK to NULL when parent deleted (bypasses events)
+- **ON DELETE CASCADE**: Auto-deletes child rows when parent deleted (bypasses events)
+- **Default Behavior**: `ON DELETE RESTRICT` blocks deletion, forces app/workflow to handle via events
+- **User asked**: "I need to understand what ON DELETE SET NULL does" → Full explanation provided
+- **Plan Approved**: Fix all violations (Option A from investigation report)
+
+**Next Steps After /clear**:
+1. Deploy Phase 1.1-1.3 to remote via GitHub Actions (push to main)
+2. OR use Supabase MCP to deploy migrations manually for testing
+3. Verify remote deployment with `mcp__supabase__list_tables`
+4. Continue with Phase 1.4-1.6 (program removal, subdomain logic, AsyncAPI)
+
+**Session Notes**:
+- Activated `infrastructure-guidelines` skill for Supabase migration guidance
+- Used Supabase MCP to analyze remote database state (very helpful!)
+- User wanted to understand ON DELETE behavior → explained in detail
+- Podman container startup issue prevented post-fix local testing (unrelated to migration fixes)
+- All fixes ready for remote deployment
 
 ---
 

@@ -7,9 +7,10 @@
 DROP TABLE IF EXISTS phones_projection CASCADE;
 
 -- Create new phones_projection with all required fields
+-- Note: No ON DELETE CASCADE - event-driven deletion required (emit phone.deleted events via workflow)
 CREATE TABLE phones_projection (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL REFERENCES organizations_projection(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL REFERENCES organizations_projection(id),
 
   -- Phone Classification
   label TEXT NOT NULL,            -- User-defined label (e.g., 'Main Office', 'Emergency Line')

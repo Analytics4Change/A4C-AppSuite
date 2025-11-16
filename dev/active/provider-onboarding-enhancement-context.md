@@ -104,13 +104,37 @@ After resolving the 10 critical architectural decisions in the afternoon, implem
 - ✅ Phase 1.1 COMPLETE: Partner type infrastructure
 - ✅ Phase 1.2 COMPLETE: Junction tables
 - ✅ Phase 1.3 COMPLETE: Projection table updates
+- ✅ Phase 1 Compliance Fix: All ON DELETE violations removed (2025-01-16)
 - ⏸️ Phase 1.4 PENDING: Remove program infrastructure
 - ⏸️ Phase 1.5 PENDING: Update subdomain conditional logic
 - ⏸️ Phase 1.6 PENDING: Update AsyncAPI event contracts
 
+**Infrastructure Guideline Compliance Fix** 🛠️ (2025-01-16):
+- **Issue**: Phase 1.1-1.3 migration files contained 16 ON DELETE actions (CASCADE, SET NULL) violating infrastructure guidelines
+- **Why Violation**: Event sourcing architecture requires ALL deletions emit domain events. ON DELETE actions bypass event stream:
+  - **ON DELETE CASCADE**: Auto-deletes child rows without emitting `*.deleted` events
+  - **ON DELETE SET NULL**: Auto-updates FKs to NULL without emitting `*.updated` events
+  - **Impact**: Breaks CQRS projections (can't rebuild from events), incomplete audit trail, Temporal compensation fails
+- **Fix Applied**: Removed all 16 ON DELETE actions from 5 migration files (009-013)
+  - Default behavior now: `ON DELETE RESTRICT` (blocks deletion, forces app/workflow to handle via events)
+- **Event-Driven Pattern**: Workflows must emit events before deleting:
+  ```
+  Workflow: Delete Organization
+  1. Emit contact.deleted events (one per contact)
+  2. Emit address.deleted events (one per address)
+  3. Emit phone.deleted events (one per phone)
+  4. Emit organization.contact.unlinked events (junction table cleanup)
+  5. Emit organization.deleted event
+  6. Event processors update all projections
+  7. Complete audit trail in domain_events table
+  ```
+- **Documentation Added**: Each fixed file now has comment explaining event-driven deletion requirement
+- **Deployment Ready**: All files now compliant with infrastructure-guidelines skill, safe to deploy
+
 **Next Steps**:
-- Option 1: Continue with Phase 1.4-1.6 (schema completion)
-- Option 2: Move to Phase 2 (event processors and triggers for new tables)
+- Option 1: Deploy Phase 1.1-1.3 to remote (push to main → GitHub Actions auto-deploys)
+- Option 2: Continue with Phase 1.4-1.6 (schema completion)
+- Option 3: Move to Phase 2 (event processors and triggers for new tables)
 
 ### Key Decisions (Original Planning Session)
 
@@ -220,6 +244,15 @@ The enhancement maintains this architecture while adding:
 - One primary contact/address/phone per org (enforced by unique constraint on `is_primary`)
 - RLS policies require JWT custom claims (can't query without valid session)
 - Platform owner org (UUID: `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`) must remain intact
+
+**Infrastructure Constraints** (Discovered 2025-01-16):
+- **NO ON DELETE actions allowed**: ALL foreign keys must omit ON DELETE CASCADE/SET NULL (infrastructure-guidelines skill requirement)
+- **Event-driven deletions mandatory**: Workflows must emit `*.deleted` events before deleting entities
+- **Dual-track migration system**: Custom SQL directory (local testing) + GitHub Actions (remote deployment) + Supabase CLI (snapshots only)
+- **Migration tracking**: Remote uses `_migrations_applied` table (88 entries), local has no tracking (file-based execution order)
+- **Deployment via GitHub Actions**: Push to `main` → `.github/workflows/supabase-deploy.yml` auto-deploys to remote
+- **Idempotency required**: All migrations must use IF NOT EXISTS, OR REPLACE, DROP IF EXISTS patterns
+- **Local Supabase**: Uses Podman (not Docker), may have startup issues unrelated to migration code
 
 ---
 

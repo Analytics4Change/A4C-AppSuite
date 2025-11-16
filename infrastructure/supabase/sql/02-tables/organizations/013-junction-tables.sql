@@ -2,6 +2,7 @@
 -- Provider Onboarding Enhancement - Phase 1
 -- Minimal design: UNIQUE constraints only, no PK, no metadata
 -- Rationale: domain_events table IS the audit trail (CQRS pattern)
+-- Note: No ON DELETE CASCADE - event-driven deletion required (emit *.unlinked events via workflow)
 
 -- ==============================================================================
 -- Organization Junction Tables (org-level relationships)
@@ -11,8 +12,8 @@
 -- Links organizations to contact persons
 DROP TABLE IF EXISTS organization_contacts CASCADE;
 CREATE TABLE organization_contacts (
-  organization_id UUID NOT NULL REFERENCES organizations_projection(id) ON DELETE CASCADE,
-  contact_id UUID NOT NULL REFERENCES contacts_projection(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL REFERENCES organizations_projection(id),
+  contact_id UUID NOT NULL REFERENCES contacts_projection(id),
 
   UNIQUE (organization_id, contact_id)
 );
@@ -29,8 +30,8 @@ COMMENT ON TABLE organization_contacts IS 'Many-to-many junction: organizations 
 -- Links organizations to addresses
 DROP TABLE IF EXISTS organization_addresses CASCADE;
 CREATE TABLE organization_addresses (
-  organization_id UUID NOT NULL REFERENCES organizations_projection(id) ON DELETE CASCADE,
-  address_id UUID NOT NULL REFERENCES addresses_projection(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL REFERENCES organizations_projection(id),
+  address_id UUID NOT NULL REFERENCES addresses_projection(id),
 
   UNIQUE (organization_id, address_id)
 );
@@ -47,8 +48,8 @@ COMMENT ON TABLE organization_addresses IS 'Many-to-many junction: organizations
 -- Links organizations to phone numbers
 DROP TABLE IF EXISTS organization_phones CASCADE;
 CREATE TABLE organization_phones (
-  organization_id UUID NOT NULL REFERENCES organizations_projection(id) ON DELETE CASCADE,
-  phone_id UUID NOT NULL REFERENCES phones_projection(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL REFERENCES organizations_projection(id),
+  phone_id UUID NOT NULL REFERENCES phones_projection(id),
 
   UNIQUE (organization_id, phone_id)
 );
@@ -71,8 +72,8 @@ COMMENT ON TABLE organization_phones IS 'Many-to-many junction: organizations �
 -- Links contacts to their addresses (e.g., billing contact to billing address)
 DROP TABLE IF EXISTS contact_addresses CASCADE;
 CREATE TABLE contact_addresses (
-  contact_id UUID NOT NULL REFERENCES contacts_projection(id) ON DELETE CASCADE,
-  address_id UUID NOT NULL REFERENCES addresses_projection(id) ON DELETE CASCADE,
+  contact_id UUID NOT NULL REFERENCES contacts_projection(id),
+  address_id UUID NOT NULL REFERENCES addresses_projection(id),
 
   UNIQUE (contact_id, address_id)
 );
@@ -89,8 +90,8 @@ COMMENT ON TABLE contact_addresses IS 'Many-to-many junction: contacts ↔ addre
 -- Links contacts to their phone numbers (e.g., billing contact to billing phone)
 DROP TABLE IF EXISTS contact_phones CASCADE;
 CREATE TABLE contact_phones (
-  contact_id UUID NOT NULL REFERENCES contacts_projection(id) ON DELETE CASCADE,
-  phone_id UUID NOT NULL REFERENCES phones_projection(id) ON DELETE CASCADE,
+  contact_id UUID NOT NULL REFERENCES contacts_projection(id),
+  phone_id UUID NOT NULL REFERENCES phones_projection(id),
 
   UNIQUE (contact_id, phone_id)
 );
@@ -109,8 +110,8 @@ COMMENT ON TABLE contact_phones IS 'Many-to-many junction: contacts ↔ phones (
 -- Use case: Main office phone/address without specific contact person
 DROP TABLE IF EXISTS phone_addresses CASCADE;
 CREATE TABLE phone_addresses (
-  phone_id UUID NOT NULL REFERENCES phones_projection(id) ON DELETE CASCADE,
-  address_id UUID NOT NULL REFERENCES addresses_projection(id) ON DELETE CASCADE,
+  phone_id UUID NOT NULL REFERENCES phones_projection(id),
+  address_id UUID NOT NULL REFERENCES addresses_projection(id),
 
   UNIQUE (phone_id, address_id)
 );
