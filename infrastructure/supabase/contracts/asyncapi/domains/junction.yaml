@@ -1,0 +1,638 @@
+components:
+  messages:
+    # Organization-Contact Junction Events
+    OrganizationContactLinked:
+      name: organization.contact.linked
+      title: Organization-Contact Linked
+      summary: A contact has been linked to an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationContactLinkedEvent'
+
+    OrganizationContactUnlinked:
+      name: organization.contact.unlinked
+      title: Organization-Contact Unlinked
+      summary: A contact has been unlinked from an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationContactUnlinkedEvent'
+
+    # Organization-Address Junction Events
+    OrganizationAddressLinked:
+      name: organization.address.linked
+      title: Organization-Address Linked
+      summary: An address has been linked to an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationAddressLinkedEvent'
+
+    OrganizationAddressUnlinked:
+      name: organization.address.unlinked
+      title: Organization-Address Unlinked
+      summary: An address has been unlinked from an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationAddressUnlinkedEvent'
+
+    # Organization-Phone Junction Events
+    OrganizationPhoneLinked:
+      name: organization.phone.linked
+      title: Organization-Phone Linked
+      summary: A phone number has been linked to an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationPhoneLinkedEvent'
+
+    OrganizationPhoneUnlinked:
+      name: organization.phone.unlinked
+      title: Organization-Phone Unlinked
+      summary: A phone number has been unlinked from an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationPhoneUnlinkedEvent'
+
+    # Contact-Phone Junction Events
+    ContactPhoneLinked:
+      name: contact.phone.linked
+      title: Contact-Phone Linked
+      summary: A phone number has been linked to a contact
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ContactPhoneLinkedEvent'
+
+    ContactPhoneUnlinked:
+      name: contact.phone.unlinked
+      title: Contact-Phone Unlinked
+      summary: A phone number has been unlinked from a contact
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ContactPhoneUnlinkedEvent'
+
+    # Contact-Address Junction Events
+    ContactAddressLinked:
+      name: contact.address.linked
+      title: Contact-Address Linked
+      summary: An address has been linked to a contact
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ContactAddressLinkedEvent'
+
+    ContactAddressUnlinked:
+      name: contact.address.unlinked
+      title: Contact-Address Unlinked
+      summary: An address has been unlinked from a contact
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ContactAddressUnlinkedEvent'
+
+    # Phone-Address Junction Events
+    PhoneAddressLinked:
+      name: phone.address.linked
+      title: Phone-Address Linked
+      summary: An address has been linked to a phone number (e.g., location of phone)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PhoneAddressLinkedEvent'
+
+    PhoneAddressUnlinked:
+      name: phone.address.unlinked
+      title: Phone-Address Unlinked
+      summary: An address has been unlinked from a phone number
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PhoneAddressUnlinkedEvent'
+
+  schemas:
+    # ============================================================================
+    # Organization-Contact Junction Events
+    # ============================================================================
+
+    OrganizationContactLinkedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Junction UUID (organization_id)
+        stream_type:
+          type: string
+          enum: [junction]
+        event_type:
+          type: string
+          enum: [organization.contact.linked]
+        event_data:
+          $ref: '#/components/schemas/OrganizationContactLinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationContactLinkData:
+      type: object
+      required:
+        - organization_id
+        - contact_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        contact_id:
+          type: string
+          format: uuid
+          description: Contact UUID being linked
+        reason:
+          type: string
+          description: Optional reason for linking
+          examples:
+            - "Primary contact assignment"
+            - "Multi-organization contact relationship"
+
+    OrganizationContactUnlinkedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Junction UUID (organization_id)
+        stream_type:
+          type: string
+          enum: [junction]
+        event_type:
+          type: string
+          enum: [organization.contact.unlinked]
+        event_data:
+          $ref: '#/components/schemas/OrganizationContactUnlinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationContactUnlinkData:
+      type: object
+      required:
+        - organization_id
+        - contact_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        contact_id:
+          type: string
+          format: uuid
+          description: Contact UUID being unlinked
+        reason:
+          type: string
+          description: Optional reason for unlinking
+          examples:
+            - "Contact no longer associated with organization"
+            - "Organization cascade deletion"
+
+    # ============================================================================
+    # Organization-Address Junction Events
+    # ============================================================================
+
+    OrganizationAddressLinkedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Junction UUID (organization_id)
+        stream_type:
+          type: string
+          enum: [junction]
+        event_type:
+          type: string
+          enum: [organization.address.linked]
+        event_data:
+          $ref: '#/components/schemas/OrganizationAddressLinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationAddressLinkData:
+      type: object
+      required:
+        - organization_id
+        - address_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        address_id:
+          type: string
+          format: uuid
+          description: Address UUID being linked
+        reason:
+          type: string
+          description: Optional reason for linking
+
+    OrganizationAddressUnlinkedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Junction UUID (organization_id)
+        stream_type:
+          type: string
+          enum: [junction]
+        event_type:
+          type: string
+          enum: [organization.address.unlinked]
+        event_data:
+          $ref: '#/components/schemas/OrganizationAddressUnlinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationAddressUnlinkData:
+      type: object
+      required:
+        - organization_id
+        - address_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        address_id:
+          type: string
+          format: uuid
+          description: Address UUID being unlinked
+        reason:
+          type: string
+          description: Optional reason for unlinking
+
+    # ============================================================================
+    # Organization-Phone Junction Events
+    # ============================================================================
+
+    OrganizationPhoneLinkedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Junction UUID (organization_id)
+        stream_type:
+          type: string
+          enum: [junction]
+        event_type:
+          type: string
+          enum: [organization.phone.linked]
+        event_data:
+          $ref: '#/components/schemas/OrganizationPhoneLinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationPhoneLinkData:
+      type: object
+      required:
+        - organization_id
+        - phone_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        phone_id:
+          type: string
+          format: uuid
+          description: Phone UUID being linked
+        reason:
+          type: string
+          description: Optional reason for linking
+
+    OrganizationPhoneUnlinkedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Junction UUID (organization_id)
+        stream_type:
+          type: string
+          enum: [junction]
+        event_type:
+          type: string
+          enum: [organization.phone.unlinked]
+        event_data:
+          $ref: '#/components/schemas/OrganizationPhoneUnlinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationPhoneUnlinkData:
+      type: object
+      required:
+        - organization_id
+        - phone_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        phone_id:
+          type: string
+          format: uuid
+          description: Phone UUID being unlinked
+        reason:
+          type: string
+          description: Optional reason for unlinking
+
+    # ============================================================================
+    # Contact-Phone Junction Events
+    # ============================================================================
+
+    ContactPhoneLinkedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Junction UUID (contact_id)
+        stream_type:
+          type: string
+          enum: [junction]
+        event_type:
+          type: string
+          enum: [contact.phone.linked]
+        event_data:
+          $ref: '#/components/schemas/ContactPhoneLinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ContactPhoneLinkData:
+      type: object
+      required:
+        - contact_id
+        - phone_id
+      properties:
+        contact_id:
+          type: string
+          format: uuid
+          description: Contact UUID
+        phone_id:
+          type: string
+          format: uuid
+          description: Phone UUID being linked
+        reason:
+          type: string
+          description: Optional reason for linking
+
+    ContactPhoneUnlinkedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Junction UUID (contact_id)
+        stream_type:
+          type: string
+          enum: [junction]
+        event_type:
+          type: string
+          enum: [contact.phone.unlinked]
+        event_data:
+          $ref: '#/components/schemas/ContactPhoneUnlinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ContactPhoneUnlinkData:
+      type: object
+      required:
+        - contact_id
+        - phone_id
+      properties:
+        contact_id:
+          type: string
+          format: uuid
+          description: Contact UUID
+        phone_id:
+          type: string
+          format: uuid
+          description: Phone UUID being unlinked
+        reason:
+          type: string
+          description: Optional reason for unlinking
+
+    # ============================================================================
+    # Contact-Address Junction Events
+    # ============================================================================
+
+    ContactAddressLinkedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Junction UUID (contact_id)
+        stream_type:
+          type: string
+          enum: [junction]
+        event_type:
+          type: string
+          enum: [contact.address.linked]
+        event_data:
+          $ref: '#/components/schemas/ContactAddressLinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ContactAddressLinkData:
+      type: object
+      required:
+        - contact_id
+        - address_id
+      properties:
+        contact_id:
+          type: string
+          format: uuid
+          description: Contact UUID
+        address_id:
+          type: string
+          format: uuid
+          description: Address UUID being linked
+        reason:
+          type: string
+          description: Optional reason for linking
+
+    ContactAddressUnlinkedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Junction UUID (contact_id)
+        stream_type:
+          type: string
+          enum: [junction]
+        event_type:
+          type: string
+          enum: [contact.address.unlinked]
+        event_data:
+          $ref: '#/components/schemas/ContactAddressUnlinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ContactAddressUnlinkData:
+      type: object
+      required:
+        - contact_id
+        - address_id
+      properties:
+        contact_id:
+          type: string
+          format: uuid
+          description: Contact UUID
+        address_id:
+          type: string
+          format: uuid
+          description: Address UUID being unlinked
+        reason:
+          type: string
+          description: Optional reason for unlinking
+
+    # ============================================================================
+    # Phone-Address Junction Events
+    # ============================================================================
+
+    PhoneAddressLinkedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Junction UUID (phone_id)
+        stream_type:
+          type: string
+          enum: [junction]
+        event_type:
+          type: string
+          enum: [phone.address.linked]
+        event_data:
+          $ref: '#/components/schemas/PhoneAddressLinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    PhoneAddressLinkData:
+      type: object
+      required:
+        - phone_id
+        - address_id
+      properties:
+        phone_id:
+          type: string
+          format: uuid
+          description: Phone UUID
+        address_id:
+          type: string
+          format: uuid
+          description: Address UUID being linked (e.g., location of phone)
+        reason:
+          type: string
+          description: Optional reason for linking
+
+    PhoneAddressUnlinkedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Junction UUID (phone_id)
+        stream_type:
+          type: string
+          enum: [junction]
+        event_type:
+          type: string
+          enum: [phone.address.unlinked]
+        event_data:
+          $ref: '#/components/schemas/PhoneAddressUnlinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    PhoneAddressUnlinkData:
+      type: object
+      required:
+        - phone_id
+        - address_id
+      properties:
+        phone_id:
+          type: string
+          format: uuid
+          description: Phone UUID
+        address_id:
+          type: string
+          format: uuid
+          description: Address UUID being unlinked
+        reason:
+          type: string
+          description: Optional reason for unlinking

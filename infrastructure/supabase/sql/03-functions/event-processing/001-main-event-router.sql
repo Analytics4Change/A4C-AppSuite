@@ -40,9 +40,6 @@ BEGIN
           PERFORM process_organization_event(NEW);
 
         -- Organization child entities
-        WHEN 'program' THEN
-          PERFORM process_program_event(NEW);
-
         WHEN 'contact' THEN
           PERFORM process_contact_event(NEW);
 

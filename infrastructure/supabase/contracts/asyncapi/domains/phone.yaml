@@ -1,0 +1,223 @@
+components:
+  messages:
+    PhoneCreated:
+      name: phone.created
+      title: Phone Created
+      summary: A new phone number has been created for an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PhoneCreatedEvent'
+
+    PhoneUpdated:
+      name: phone.updated
+      title: Phone Updated
+      summary: Phone number information has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PhoneUpdatedEvent'
+
+    PhoneDeleted:
+      name: phone.deleted
+      title: Phone Deleted
+      summary: Phone number has been logically deleted (soft delete)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PhoneDeletedEvent'
+
+  schemas:
+    PhoneCreatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Phone UUID
+        stream_type:
+          type: string
+          enum: [phone]
+        event_type:
+          type: string
+          enum: [phone.created]
+        event_data:
+          $ref: '#/components/schemas/PhoneCreationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    PhoneCreationData:
+      type: object
+      required:
+        - organization_id
+        - label
+        - type
+        - number
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: Owning organization UUID
+        label:
+          type: string
+          maxLength: 200
+          description: User-defined phone label for identification
+          examples:
+            - "Main Office"
+            - "Emergency Hotline"
+            - "After Hours - On Call"
+            - "Billing Department"
+        type:
+          type: string
+          enum: [mobile, office, fax, emergency]
+          description: |
+            Structured phone type:
+            - mobile: Mobile/cell phone number
+            - office: Office landline number
+            - fax: Fax number
+            - emergency: Emergency contact number
+        number:
+          type: string
+          maxLength: 20
+          description: Phone number (formatted or raw)
+          examples:
+            - "+1-555-123-4567"
+            - "5551234567"
+            - "+1 (555) 123-4567"
+            - "555-123-4567"
+        extension:
+          type: string
+          maxLength: 10
+          description: Optional phone extension
+          examples:
+            - "x1234"
+            - "1234"
+            - "ext. 5678"
+        country_code:
+          type: string
+          maxLength: 5
+          default: "+1"
+          description: Country calling code
+          examples:
+            - "+1"   # US/Canada
+            - "+44"  # UK
+            - "+33"  # France
+            - "+49"  # Germany
+        is_primary:
+          type: boolean
+          default: false
+          description: Whether this is the primary phone for the organization (only one per org)
+        is_active:
+          type: boolean
+          default: true
+          description: Phone active status
+        metadata:
+          type: object
+          description: Additional flexible data storage
+
+    PhoneUpdatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Phone UUID
+        stream_type:
+          type: string
+          enum: [phone]
+        event_type:
+          type: string
+          enum: [phone.updated]
+        event_data:
+          $ref: '#/components/schemas/PhoneUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    PhoneUpdateData:
+      type: object
+      description: Partial update data (only fields being updated)
+      properties:
+        label:
+          type: string
+          maxLength: 200
+          description: Updated phone label
+        type:
+          type: string
+          enum: [mobile, office, fax, emergency]
+          description: Updated phone type
+        number:
+          type: string
+          maxLength: 20
+          description: Updated phone number
+        extension:
+          type: string
+          maxLength: 10
+          description: Updated phone extension
+        country_code:
+          type: string
+          maxLength: 5
+          description: Updated country calling code
+        is_primary:
+          type: boolean
+          description: Updated primary phone flag
+        is_active:
+          type: boolean
+          description: Updated active status
+        metadata:
+          type: object
+          description: Updated metadata (merges with existing)
+
+    PhoneDeletedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Phone UUID being deleted
+        stream_type:
+          type: string
+          enum: [phone]
+        event_type:
+          type: string
+          enum: [phone.deleted]
+        event_data:
+          $ref: '#/components/schemas/PhoneDeletionData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    PhoneDeletionData:
+      type: object
+      required:
+        - phone_id
+        - organization_id
+      properties:
+        phone_id:
+          type: string
+          format: uuid
+          description: UUID of phone being deleted
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization owning this phone
+        reason:
+          type: string
+          description: Optional deletion reason
+          examples:
+            - "Phone number no longer in use"
+            - "Duplicate phone removed"
+            - "Organization cascade deletion"

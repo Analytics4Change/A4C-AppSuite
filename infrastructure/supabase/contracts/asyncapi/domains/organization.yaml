@@ -65,14 +65,6 @@ components:
       payload:
         $ref: '#/components/schemas/OrganizationBootstrapInitiatedEvent'
 
-    OrganizationZitadelCreated:
-      name: organization.zitadel.created
-      title: Organization Zitadel Created
-      summary: Zitadel organization and initial admin user successfully created
-      contentType: application/json
-      payload:
-        $ref: '#/components/schemas/OrganizationZitadelCreatedEvent'
-
     OrganizationBootstrapCompleted:
       name: organization.bootstrap.completed
       title: Organization Bootstrap Completed
@@ -149,9 +141,6 @@ components:
           examples:
             - "acme-healthcare"
             - "north-campus"
-        zitadel_org_id:
-          type: string
-          description: Zitadel organization ID (NULL for sub-organizations)
         type:
           type: string
           enum: [platform_owner, provider, provider_partner]
@@ -160,6 +149,19 @@ components:
             - platform_owner: A4C internal organization (impersonation capability)
             - provider: Healthcare organizations serving clients (data owners)
             - provider_partner: External stakeholders (VARs, families, courts - access via grants)
+        partner_type:
+          type: string
+          enum: [var, family, court, other]
+          description: |
+            Partner organization subtype (required when type=provider_partner):
+            - var: Value-Added Reseller (requires subdomain, gets portal access)
+            - family: Family access partner (no subdomain, limited dashboard views)
+            - court: Court system partner (no subdomain, limited dashboard views)
+            - other: Other stakeholder partner (no subdomain, limited dashboard views)
+        referring_partner_id:
+          type: string
+          format: uuid
+          description: UUID of the partner organization that referred this provider (NULL if not referred)
         path:
           type: string
           description: ltree hierarchical path
@@ -271,11 +273,8 @@ components:
         email:
           type: string
           format: email
-        
-        # Program Information (Provider-specific)
-        program_name:
-          type: string
-          maxLength: 200
+
+        # Service Information (Provider-specific)
         service_types:
           type: array
           items:
@@ -319,8 +318,13 @@ components:
         # Partner-specific metadata
         partner_type:
           type: string
-          enum: [var, family_access, court_system, social_services]
-          description: Type of provider partner relationship
+          enum: [var, family, court, other]
+          description: |
+            Type of provider partner relationship:
+            - var: Value-Added Reseller (gets portal access)
+            - family: Family access partner (limited dashboard views)
+            - court: Court system partner (limited dashboard views)
+            - other: Other stakeholder partner (limited dashboard views)
 
     OrganizationDeactivatedEvent:
       type: object
@@ -542,65 +546,6 @@ components:
               type: string
               default: "America/New_York"
 
-    OrganizationZitadelCreatedEvent:
-      type: object
-      required:
-        - stream_id
-        - stream_type
-        - event_type
-        - event_data
-        - event_metadata
-      properties:
-        stream_id:
-          type: string
-          format: uuid
-        stream_type:
-          type: string
-          enum: [organization]
-        event_type:
-          type: string
-          enum: [organization.zitadel.created]
-        event_data:
-          $ref: '#/components/schemas/OrganizationZitadelCreationData'
-        event_metadata:
-          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
-
-    OrganizationZitadelCreationData:
-      type: object
-      required:
-        - bootstrap_id
-        - zitadel_org_id
-        - zitadel_user_id
-        - admin_email
-        - organization_name
-        - organization_type
-      properties:
-        bootstrap_id:
-          type: string
-          format: uuid
-          description: Links back to the bootstrap initiation
-        zitadel_org_id:
-          type: string
-          description: Zitadel organization ID returned from API
-        zitadel_user_id:
-          type: string
-          description: Zitadel user ID for the admin user
-        admin_email:
-          type: string
-          format: email
-        organization_name:
-          type: string
-        organization_type:
-          type: string
-          enum: [provider, provider_partner]
-        slug:
-          type: string
-          description: Final organization slug
-        invitation_sent:
-          type: boolean
-          description: Whether Zitadel invitation email was sent
-          default: true
-
     OrganizationBootstrapCompletedEvent:
       type: object
       required:
@@ -645,8 +590,6 @@ components:
         permissions_granted:
           type: integer
           description: Number of permissions granted to the admin role
-        zitadel_org_id:
-          type: string
         ltree_path:
           type: string
           description: Organization ltree path in hierarchy
@@ -688,14 +631,11 @@ components:
           format: uuid
         failure_stage:
           type: string
-          enum: [zitadel_org_creation, zitadel_user_creation, organization_creation, role_assignment, permission_grants]
+          enum: [organization_creation, dns_provisioning, admin_user_creation, role_assignment, permission_grants, invitation_email]
           description: Stage where bootstrap process failed
         error_message:
           type: string
           description: Error details for troubleshooting
-        zitadel_org_id:
-          type: string
-          description: Zitadel org ID if creation succeeded before failure
         partial_cleanup_required:
           type: boolean
           description: Whether partial resources need cleanup
@@ -742,8 +682,9 @@ components:
             type: string
           description: List of cleanup actions performed
           examples:
-            - "deleted_zitadel_organization"
+            - "removed_dns_records"
             - "removed_partial_database_records"
+            - "deleted_pending_invitations"
         original_failure_stage:
           type: string
           description: Original stage where bootstrap failed

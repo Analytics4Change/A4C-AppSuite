@@ -1,0 +1,236 @@
+components:
+  messages:
+    ContactCreated:
+      name: contact.created
+      title: Contact Created
+      summary: A new contact has been created for an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ContactCreatedEvent'
+
+    ContactUpdated:
+      name: contact.updated
+      title: Contact Updated
+      summary: Contact information has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ContactUpdatedEvent'
+
+    ContactDeleted:
+      name: contact.deleted
+      title: Contact Deleted
+      summary: Contact has been logically deleted (soft delete)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ContactDeletedEvent'
+
+  schemas:
+    ContactCreatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Contact UUID
+        stream_type:
+          type: string
+          enum: [contact]
+        event_type:
+          type: string
+          enum: [contact.created]
+        event_data:
+          $ref: '#/components/schemas/ContactCreationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ContactCreationData:
+      type: object
+      required:
+        - organization_id
+        - label
+        - type
+        - first_name
+        - last_name
+        - email
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: Owning organization UUID
+        label:
+          type: string
+          maxLength: 200
+          description: User-defined contact label for identification
+          examples:
+            - "John Smith - Billing Contact"
+            - "Emergency Contact - Jane Doe"
+            - "Technical Lead - Bob Johnson"
+        type:
+          type: string
+          enum: [a4c_admin, billing, technical, emergency, stakeholder]
+          description: |
+            Structured contact type:
+            - a4c_admin: A4C platform administrator contact
+            - billing: Billing and invoicing contact
+            - technical: Technical support contact
+            - emergency: Emergency contact person
+            - stakeholder: General stakeholder contact
+        first_name:
+          type: string
+          maxLength: 100
+          description: Contact first name
+        last_name:
+          type: string
+          maxLength: 100
+          description: Contact last name
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Contact email address
+        phone:
+          type: string
+          maxLength: 20
+          description: Optional phone number (deprecated - use phones_projection table for structured phone data)
+        title:
+          type: string
+          maxLength: 100
+          description: Job title (e.g., 'Chief Financial Officer')
+        department:
+          type: string
+          maxLength: 100
+          description: Department (e.g., 'Finance', 'IT')
+        is_primary:
+          type: boolean
+          default: false
+          description: Whether this is the primary contact for the organization (only one per org)
+        is_active:
+          type: boolean
+          default: true
+          description: Contact active status
+        metadata:
+          type: object
+          description: Additional flexible data storage
+
+    ContactUpdatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Contact UUID
+        stream_type:
+          type: string
+          enum: [contact]
+        event_type:
+          type: string
+          enum: [contact.updated]
+        event_data:
+          $ref: '#/components/schemas/ContactUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ContactUpdateData:
+      type: object
+      description: Partial update data (only fields being updated)
+      properties:
+        label:
+          type: string
+          maxLength: 200
+          description: Updated contact label
+        type:
+          type: string
+          enum: [a4c_admin, billing, technical, emergency, stakeholder]
+          description: Updated contact type
+        first_name:
+          type: string
+          maxLength: 100
+          description: Updated first name
+        last_name:
+          type: string
+          maxLength: 100
+          description: Updated last name
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Updated email address
+        phone:
+          type: string
+          maxLength: 20
+          description: Updated phone number (deprecated - use phones_projection)
+        title:
+          type: string
+          maxLength: 100
+          description: Updated job title
+        department:
+          type: string
+          maxLength: 100
+          description: Updated department
+        is_primary:
+          type: boolean
+          description: Updated primary contact flag
+        is_active:
+          type: boolean
+          description: Updated active status
+        metadata:
+          type: object
+          description: Updated metadata (merges with existing)
+
+    ContactDeletedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Contact UUID being deleted
+        stream_type:
+          type: string
+          enum: [contact]
+        event_type:
+          type: string
+          enum: [contact.deleted]
+        event_data:
+          $ref: '#/components/schemas/ContactDeletionData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ContactDeletionData:
+      type: object
+      required:
+        - contact_id
+        - organization_id
+      properties:
+        contact_id:
+          type: string
+          format: uuid
+          description: UUID of contact being deleted
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization owning this contact
+        reason:
+          type: string
+          description: Optional deletion reason
+          examples:
+            - "Contact no longer with organization"
+            - "Duplicate contact removed"
+            - "Organization cascade deletion"

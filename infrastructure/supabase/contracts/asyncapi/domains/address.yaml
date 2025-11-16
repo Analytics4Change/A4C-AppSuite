@@ -1,0 +1,258 @@
+components:
+  messages:
+    AddressCreated:
+      name: address.created
+      title: Address Created
+      summary: A new address has been created for an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AddressCreatedEvent'
+
+    AddressUpdated:
+      name: address.updated
+      title: Address Updated
+      summary: Address information has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AddressUpdatedEvent'
+
+    AddressDeleted:
+      name: address.deleted
+      title: Address Deleted
+      summary: Address has been logically deleted (soft delete)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AddressDeletedEvent'
+
+  schemas:
+    AddressCreatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Address UUID
+        stream_type:
+          type: string
+          enum: [address]
+        event_type:
+          type: string
+          enum: [address.created]
+        event_data:
+          $ref: '#/components/schemas/AddressCreationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    AddressCreationData:
+      type: object
+      required:
+        - organization_id
+        - label
+        - type
+        - street1
+        - city
+        - state
+        - zip_code
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: Owning organization UUID
+        label:
+          type: string
+          maxLength: 200
+          description: User-defined address label for identification
+          examples:
+            - "Main Office"
+            - "Billing Department"
+            - "Satellite Location - North Campus"
+        type:
+          type: string
+          enum: [physical, mailing, billing]
+          description: |
+            Structured address type:
+            - physical: Business location (where services are delivered)
+            - mailing: Mailing address (for correspondence)
+            - billing: Billing address (for invoices and payments)
+        street1:
+          type: string
+          maxLength: 255
+          description: Address line 1 (street number and name)
+          examples:
+            - "123 Main Street"
+            - "456 Healthcare Plaza, Suite 200"
+        street2:
+          type: string
+          maxLength: 255
+          description: Optional address line 2 (apartment, suite, unit)
+          examples:
+            - "Suite 200"
+            - "Building B"
+            - "Unit 5"
+        city:
+          type: string
+          maxLength: 100
+          description: City or locality
+          examples:
+            - "San Francisco"
+            - "New York"
+            - "Toronto"
+        state:
+          type: string
+          maxLength: 50
+          description: State, province, or region code
+          examples:
+            - "CA"
+            - "NY"
+            - "ON"
+            - "BC"
+        zip_code:
+          type: string
+          maxLength: 20
+          description: Postal code or ZIP code
+          examples:
+            - "94102"
+            - "10001"
+            - "M5H 2N2"
+        country:
+          type: string
+          maxLength: 3
+          default: "US"
+          description: ISO country code (ISO 3166-1 alpha-2)
+          examples:
+            - "US"
+            - "CA"
+            - "GB"
+        is_primary:
+          type: boolean
+          default: false
+          description: Whether this is the primary address for the organization (only one per org)
+        is_active:
+          type: boolean
+          default: true
+          description: Address active status
+        metadata:
+          type: object
+          description: Additional flexible data storage
+
+    AddressUpdatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Address UUID
+        stream_type:
+          type: string
+          enum: [address]
+        event_type:
+          type: string
+          enum: [address.updated]
+        event_data:
+          $ref: '#/components/schemas/AddressUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    AddressUpdateData:
+      type: object
+      description: Partial update data (only fields being updated)
+      properties:
+        label:
+          type: string
+          maxLength: 200
+          description: Updated address label
+        type:
+          type: string
+          enum: [physical, mailing, billing]
+          description: Updated address type
+        street1:
+          type: string
+          maxLength: 255
+          description: Updated address line 1
+        street2:
+          type: string
+          maxLength: 255
+          description: Updated address line 2
+        city:
+          type: string
+          maxLength: 100
+          description: Updated city
+        state:
+          type: string
+          maxLength: 50
+          description: Updated state/province
+        zip_code:
+          type: string
+          maxLength: 20
+          description: Updated postal code
+        country:
+          type: string
+          maxLength: 3
+          description: Updated country code
+        is_primary:
+          type: boolean
+          description: Updated primary address flag
+        is_active:
+          type: boolean
+          description: Updated active status
+        metadata:
+          type: object
+          description: Updated metadata (merges with existing)
+
+    AddressDeletedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Address UUID being deleted
+        stream_type:
+          type: string
+          enum: [address]
+        event_type:
+          type: string
+          enum: [address.deleted]
+        event_data:
+          $ref: '#/components/schemas/AddressDeletionData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    AddressDeletionData:
+      type: object
+      required:
+        - address_id
+        - organization_id
+      properties:
+        address_id:
+          type: string
+          format: uuid
+          description: UUID of address being deleted
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization owning this address
+        reason:
+          type: string
+          description: Optional deletion reason
+          examples:
+            - "Address no longer in use"
+            - "Duplicate address removed"
+            - "Organization cascade deletion"
