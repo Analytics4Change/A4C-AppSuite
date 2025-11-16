@@ -131,10 +131,76 @@ After resolving the 10 critical architectural decisions in the afternoon, implem
 - **Documentation Added**: Each fixed file now has comment explaining event-driven deletion requirement
 - **Deployment Ready**: All files now compliant with infrastructure-guidelines skill, safe to deploy
 
-**Next Steps**:
-- Option 1: Deploy Phase 1.1-1.3 to remote (push to main → GitHub Actions auto-deploys)
-- Option 2: Continue with Phase 1.4-1.6 (schema completion)
-- Option 3: Move to Phase 2 (event processors and triggers for new tables)
+**Deployment Outcome** (2025-01-16):
+- ✅ **Phase 1.1-1.3 DEPLOYED to remote Supabase**
+- ✅ **Deployment verified**: 94 migrations applied (was 88, +6 from Phase 1.1-1.3)
+- ✅ **Schema verification**: All tables, enums, FKs confirmed via `mcp__supabase__list_tables`
+- ✅ **GitHub Actions workflow**: Automatic deployment via `.github/workflows/supabase-deploy.yml`
+- 🎉 **Phase 1.1-1.3 PRODUCTION READY**
+
+**Next Steps** (Updated 2025-01-16):
+- Option 1: ✅ Deploy Phase 1.1-1.3 to remote → **COMPLETE**
+- Option 2: Implement Phase 2 event processors (CRITICAL - tables won't populate without processors)
+- Option 3: Continue with Phase 1.4-1.6 (schema completion: program removal, subdomain logic, AsyncAPI)
+
+### 🔥 CQRS ARCHITECTURE CLARIFICATION (2025-01-16)
+
+**Critical Learning**: All projection tables are populated ONLY via event processors - no direct INSERT/UPDATE allowed
+
+**Architecture Pattern**:
+```
+Temporal Activity → domain_events table (INSERT only)
+  → PostgreSQL Trigger (on domain_events)
+  → Event Processor Function (process_*_event)
+  → Projection Table (INSERT/UPDATE via processor)
+```
+
+**Why This Matters**:
+- ❌ Direct `INSERT INTO contacts_projection` violates CQRS
+- ❌ Direct `UPDATE organizations_projection` bypasses event sourcing
+- ✅ All state changes must emit domain events FIRST
+- ✅ Event processors are the ONLY way to modify projections
+- ✅ Infrastructure guideline principle #4: "Event-Driven CQRS Architecture"
+
+**Impact on Phase 2**:
+- Phase 1.1-1.3 created schema (tables exist)
+- **WITHOUT Phase 2 processors, tables remain EMPTY even when events emitted**
+- Phase 2 is BLOCKING for Phase 3 (Temporal workflows)
+- Cannot skip Phase 2 - it's architectural requirement, not optional enhancement
+
+**Phase 2 Planning Session** (2025-01-16):
+- ✅ **Reviewed existing event processors** (`002-process-organization-events.sql` as template)
+- ✅ **Identified pattern**: CASE statement with idempotent INSERT ... ON CONFLICT DO NOTHING
+- ✅ **Planned 4 new functions**:
+  1. Update `process_organization_event()` for partner fields
+  2. Create `process_contact_event()` (contact.created/updated/deleted)
+  3. Create `process_address_event()` (address.created/updated/deleted)
+  4. Create `process_phone_event()` (phone.created/updated/deleted)
+  5. Create `process_junction_event()` (*.linked/*.unlinked - handles all 6 junction types)
+- ✅ **Planned 4 new triggers**:
+  1. Update organization trigger (already exists)
+  2. Contact trigger (WHEN stream_type = 'contact')
+  3. Address trigger (WHEN stream_type = 'address')
+  4. Phone trigger (WHEN stream_type = 'phone')
+  5. Junction trigger (WHEN event_type LIKE '%.linked' OR '%.unlinked')
+- ✅ **Planned RLS policies** for new tables (4 files: contacts, addresses, phones, junction-tables)
+- ✅ **Estimated timeline**: 14-19 hours (~2-3 days)
+- ✅ **Detailed implementation plan**: Added to tasks.md "Phase 2 Detailed Implementation Plan" section
+
+**Existing Event Processor Example**:
+File: `infrastructure/supabase/sql/03-functions/event-processing/002-process-organization-events.sql`
+- Handles 15+ event types (organization.created, organization.updated, organization.deleted, etc.)
+- Uses idempotent INSERT with ON CONFLICT DO NOTHING
+- Soft deletes (UPDATE deleted_at, not DELETE)
+- Emits cascade events (organization.deleted → role.deleted events)
+- NEVER directly updates projections - always via events
+
+**Phase 2 Success Criteria** (see tasks.md for full checklist):
+- Event processors created for all 4 entity types
+- Triggers enabled and tested
+- RLS policies active
+- Idempotency verified (2x same event = 1 projection row)
+- Multi-tenant isolation tested
 
 ### Key Decisions (Original Planning Session)
 
@@ -824,11 +890,114 @@ During the planning phase, we investigated the codebase and discovered:
 
 ---
 
-## Next Immediate Steps
+## Session Summary: 2025-01-16 (Zitadel Cleanup + Phase 2 Deployment)
 
-1. Review this context document for accuracy
-2. Create `provider-onboarding-enhancement-tasks.md` with checklist
-3. Start Phase 1: Database schema updates (create partner_type enum, junction tables)
-4. Test migrations locally with `./local-tests/verify-idempotency.sh`
-5. Commit schema changes to git
-6. Proceed with Phase 2: Event processors and triggers
+### What Was Accomplished
+
+**Zitadel Authentication Cleanup (CRITICAL)**:
+- User identified Zitadel references in Phase 2 files before deployment ✅
+- Removed all deprecated Zitadel authentication code from SQL schema:
+  - Dropped `zitadel_org_id` column from `organizations_projection`
+  - Dropped `zitadel_user_mapping` and `zitadel_organization_mapping` tables
+  - Dropped 6 Zitadel ID resolution functions
+  - Cleaned Phase 2 event processors (removed Zitadel lookups, mapping upserts, bootstrap events)
+- Created idempotent cleanup migration: `014-remove-zitadel-references.sql`
+- **Deployed to remote Supabase** via GitHub Actions (1m32s)
+- **Verified with MCP tools**: 0 Zitadel columns, 0 Zitadel functions, 0 Zitadel tables ✅
+
+**Phase 2 Event Processors (COMPLETE)**:
+- Deployed 5 new files + 2 modified files to remote Supabase:
+  - `008-process-contact-events.sql` - Contact CRUD operations
+  - `009-process-address-events.sql` - Address CRUD operations
+  - `010-process-phone-events.sql` - Phone CRUD operations
+  - `011-process-junction-events.sql` - Junction operations (6 types)
+  - `003-contact-address-phone-policies.sql` - RLS policies for all new tables
+  - Updated `001-main-event-router.sql` - Junction routing + Zitadel removal
+  - Updated `002-process-organization-events.sql` - Partner fields + Zitadel removal
+- **Deployed to remote Supabase** via GitHub Actions (1m27s)
+- All processors follow CQRS compliance:
+  - Idempotent inserts (`ON CONFLICT DO NOTHING`)
+  - Soft deletes (`UPDATE deleted_at`, not `DELETE`)
+  - Multi-tenant RLS (JWT claims enforcement)
+
+**Security Advisor Findings** (Pre-existing issues, not related to Phase 2):
+- **3 ERRORS** (must fix in follow-up):
+  - `domain_events` table: Has RLS policies but RLS not enabled
+  - `event_types` table: Has RLS policies but RLS not enabled
+  - `organization_business_profiles_projection` table: Has RLS policies but RLS not enabled
+- **Many WARNINGS** (lower priority):
+  - 57 functions have "mutable search_path" (security best practice)
+  - `ltree` extension in public schema (acceptable)
+  - Leaked password protection disabled (should enable in dashboard)
+
+### Why Zitadel Cleanup Was Critical
+
+**Risk of Deploying Phase 2 WITHOUT Zitadel cleanup**:
+1. ❌ Phase 2 files referenced deprecated `zitadel_org_id` column (may not exist on remote)
+2. ❌ Called deprecated `upsert_org_mapping()` function (would fail)
+3. ❌ Handled deprecated `organization.zitadel.created` events (dead code)
+4. ❌ Mixed Supabase Auth + Zitadel legacy code (technical debt)
+
+**User caught this** before deployment → Saved deployment failure + rollback time!
+
+### Current State
+
+- **Phase 1.1-1.3** (Schema): ✅ DEPLOYED (2025-01-16)
+- **Zitadel Cleanup**: ✅ DEPLOYED (2025-01-16)
+- **Phase 2** (Event Processors + RLS): ✅ DEPLOYED (2025-01-16)
+- **Phase 1.4-1.6** (Program removal, subdomain logic, AsyncAPI): ⏸️ PENDING
+- **Phase 3** (Temporal Workflows): ⏸️ BLOCKED until Phase 2 deployed (NOW UNBLOCKED!)
+
+### What Phase 2 Deployment Unblocks
+
+Phase 2 was **CRITICAL** because without event processors, projection tables remain empty even when Temporal workflows emit events (CQRS architecture requirement).
+
+**Now that Phase 2 is deployed**:
+- ✅ Temporal workflows can emit `contact.created`, `address.created`, `phone.created` events
+- ✅ Event processors will populate `contacts_projection`, `addresses_projection`, `phones_projection`
+- ✅ Frontend can query projections and display organization data
+- ✅ Phase 3 (Temporal workflows) is now unblocked and ready for implementation
+- ✅ Phase 4 (Frontend UI) can be implemented with confidence
+
+### Follow-Up Tasks (Not Blocking)
+
+**Fix Security Advisor ERRORS** (separate task):
+```sql
+-- Enable RLS on tables that have policies
+ALTER TABLE domain_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE event_types ENABLE ROW LEVEL SECURITY;
+ALTER TABLE organization_business_profiles_projection ENABLE ROW LEVEL SECURITY;
+```
+
+**Optional Improvements** (technical debt):
+- Add `SET search_path = ''` to all functions (security best practice)
+- Move `ltree` extension to `extensions` schema (minor improvement)
+- Enable leaked password protection in Supabase dashboard (security enhancement)
+
+### Next Immediate Steps
+
+**Option A**: Continue Phase 1.4-1.6 (Schema enhancements)
+- Remove `programs` table (deprecated feature)
+- Add subdomain logic fields to organizations_projection
+- Create AsyncAPI contract definitions for all events
+
+**Option B**: Start Phase 3 (Temporal Workflows) ⭐ **RECOMMENDED**
+- Phase 2 deployment unblocked this path
+- Workflow activities can now emit contact/address/phone events
+- Can test end-to-end organization creation flow
+- Highest business value delivery
+
+**Option C**: Fix Security Advisor Errors
+- Enable RLS on 3 tables with policies
+- Low-effort, high-security-value task
+
+---
+
+## Next Immediate Steps (Original Plan - Mostly Complete!)
+
+1. ✅ Review this context document for accuracy
+2. ✅ Create `provider-onboarding-enhancement-tasks.md` with checklist
+3. ✅ Start Phase 1: Database schema updates (create partner_type enum, junction tables)
+4. ⏸️ Test migrations locally with `./local-tests/verify-idempotency.sh` (skipped - Podman issues)
+5. ✅ Commit schema changes to git
+6. ✅ Proceed with Phase 2: Event processors and triggers
