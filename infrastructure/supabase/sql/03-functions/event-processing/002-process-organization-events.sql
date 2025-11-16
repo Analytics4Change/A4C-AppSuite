@@ -31,14 +31,14 @@ BEGIN
       
       -- Insert into organizations projection
       INSERT INTO organizations_projection (
-        id, name, display_name, slug, zitadel_org_id, type, path, parent_path, depth,
-        tax_number, phone_number, timezone, metadata, created_at
+        id, name, display_name, slug, type, path, parent_path, depth,
+        tax_number, phone_number, timezone, metadata, created_at,
+        partner_type, referring_partner_id
       ) VALUES (
         p_event.stream_id,
         safe_jsonb_extract_text(p_event.event_data, 'name'),
         safe_jsonb_extract_text(p_event.event_data, 'display_name'),
         safe_jsonb_extract_text(p_event.event_data, 'slug'),
-        safe_jsonb_extract_text(p_event.event_data, 'zitadel_org_id'),
         safe_jsonb_extract_text(p_event.event_data, 'type'),
         (p_event.event_data->>'path')::LTREE,
         CASE
@@ -51,17 +51,14 @@ BEGIN
         safe_jsonb_extract_text(p_event.event_data, 'phone_number'),
         COALESCE(safe_jsonb_extract_text(p_event.event_data, 'timezone'), 'America/New_York'),
         COALESCE(p_event.event_data->'metadata', '{}'::jsonb),
-        p_event.created_at
+        p_event.created_at,
+        CASE
+          WHEN p_event.event_data ? 'partner_type'
+          THEN (safe_jsonb_extract_text(p_event.event_data, 'partner_type'))::partner_type
+          ELSE NULL
+        END,
+        safe_jsonb_extract_uuid(p_event.event_data, 'referring_partner_id')
       );
-
-      -- Populate Zitadel organization mapping (if zitadel_org_id exists)
-      IF safe_jsonb_extract_text(p_event.event_data, 'zitadel_org_id') IS NOT NULL THEN
-        PERFORM upsert_org_mapping(
-          p_event.stream_id,
-          safe_jsonb_extract_text(p_event.event_data, 'zitadel_org_id'),
-          safe_jsonb_extract_text(p_event.event_data, 'name')
-        );
-      END IF;
 
     -- Handle subdomain DNS record creation
     WHEN 'organization.subdomain.dns_created' THEN
@@ -281,15 +278,8 @@ BEGIN
     WHEN 'organization.bootstrap.initiated' THEN
       -- Bootstrap initiation: Log and prepare for next stages
       -- Note: This event triggers the bootstrap orchestrator externally
-      RAISE NOTICE 'Bootstrap initiated for org %, bootstrap_id: %', 
-        p_event.stream_id, 
-        p_event.event_data->>'bootstrap_id';
-
-    WHEN 'organization.zitadel.created' THEN
-      -- Zitadel org/user creation successful: Continue with organization creation
-      -- Note: This triggers organization.created event emission externally
-      RAISE NOTICE 'Zitadel org created: % for bootstrap %', 
-        p_event.event_data->>'zitadel_org_id',
+      RAISE NOTICE 'Bootstrap initiated for org %, bootstrap_id: %',
+        p_event.stream_id,
         p_event.event_data->>'bootstrap_id';
 
     WHEN 'organization.bootstrap.completed' THEN

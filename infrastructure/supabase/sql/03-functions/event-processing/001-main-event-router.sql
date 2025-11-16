@@ -15,56 +15,61 @@ BEGIN
   END IF;
 
   BEGIN
-    -- Route based on stream type
-    CASE NEW.stream_type
-      WHEN 'client' THEN
-        PERFORM process_client_event(NEW);
+    -- Check for junction events first (based on event_type pattern)
+    IF NEW.event_type LIKE '%.linked' OR NEW.event_type LIKE '%.unlinked' THEN
+      PERFORM process_junction_event(NEW);
+    ELSE
+      -- Route based on stream type
+      CASE NEW.stream_type
+        WHEN 'client' THEN
+          PERFORM process_client_event(NEW);
 
-      WHEN 'medication' THEN
-        PERFORM process_medication_event(NEW);
+        WHEN 'medication' THEN
+          PERFORM process_medication_event(NEW);
 
-      WHEN 'medication_history' THEN
-        PERFORM process_medication_history_event(NEW);
+        WHEN 'medication_history' THEN
+          PERFORM process_medication_history_event(NEW);
 
-      WHEN 'dosage' THEN
-        PERFORM process_dosage_event(NEW);
+        WHEN 'dosage' THEN
+          PERFORM process_dosage_event(NEW);
 
-      WHEN 'user' THEN
-        PERFORM process_user_event(NEW);
+        WHEN 'user' THEN
+          PERFORM process_user_event(NEW);
 
-      WHEN 'organization' THEN
-        PERFORM process_organization_event(NEW);
+        WHEN 'organization' THEN
+          PERFORM process_organization_event(NEW);
 
-      -- Organization child entities
-      WHEN 'program' THEN
-        PERFORM process_program_event(NEW);
+        -- Organization child entities
+        WHEN 'program' THEN
+          PERFORM process_program_event(NEW);
 
-      WHEN 'contact' THEN
-        PERFORM process_contact_event(NEW);
+        WHEN 'contact' THEN
+          PERFORM process_contact_event(NEW);
 
-      WHEN 'address' THEN
-        PERFORM process_address_event(NEW);
+        WHEN 'address' THEN
+          PERFORM process_address_event(NEW);
 
-      WHEN 'phone' THEN
-        PERFORM process_phone_event(NEW);
+        WHEN 'phone' THEN
+          PERFORM process_phone_event(NEW);
 
-      -- RBAC stream types
-      WHEN 'permission' THEN
-        PERFORM process_rbac_event(NEW);
+        -- RBAC stream types
+        WHEN 'permission' THEN
+          PERFORM process_rbac_event(NEW);
 
-      WHEN 'role' THEN
-        PERFORM process_rbac_event(NEW);
+        WHEN 'role' THEN
+          PERFORM process_rbac_event(NEW);
 
-      WHEN 'access_grant' THEN
-        PERFORM process_access_grant_event(NEW);
+        WHEN 'access_grant' THEN
+          PERFORM process_access_grant_event(NEW);
 
-      -- Impersonation stream type
-      WHEN 'impersonation' THEN
-        PERFORM process_impersonation_event(NEW);
+        -- Impersonation stream type
+        WHEN 'impersonation' THEN
+          PERFORM process_impersonation_event(NEW);
 
-      ELSE
-        RAISE WARNING 'Unknown stream type: %', NEW.stream_type;
-    END CASE;
+        ELSE
+          RAISE WARNING 'Unknown stream type: %', NEW.stream_type;
+      END CASE;
+    END IF;
 
     -- Mark as successfully processed
     NEW.processed_at = clock_timestamp();
@@ -175,17 +180,7 @@ CREATE OR REPLACE FUNCTION safe_jsonb_extract_boolean(
 $$ LANGUAGE SQL IMMUTABLE;
 
 -- Organization ID Resolution Functions
--- Supports both internal UUIDs and external Zitadel organization IDs
--- Also supports mock organization IDs during development
-
-CREATE OR REPLACE FUNCTION get_organization_uuid_from_external_id(
-  p_external_id TEXT
-) RETURNS UUID AS $$
-  SELECT id
-  FROM organizations_projection
-  WHERE zitadel_org_id = p_external_id
-  LIMIT 1;
-$$ LANGUAGE SQL STABLE;
+-- Extracts and validates organization UUIDs from event data
 
 CREATE OR REPLACE FUNCTION safe_jsonb_extract_organization_id(
   p_data JSONB,
@@ -202,13 +197,13 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  -- Try to cast as UUID first (handles internal UUID format)
+  -- Cast as UUID (all organization IDs are now UUIDs with Supabase Auth)
   BEGIN
     v_uuid := v_value::UUID;
     RETURN v_uuid;
   EXCEPTION WHEN invalid_text_representation THEN
-    -- If cast fails, it's an external_id (Zitadel or mock), look it up
-    RETURN get_organization_uuid_from_external_id(v_value);
+    RAISE WARNING 'Invalid UUID format for organization_id: %', v_value;
+    RETURN NULL;
   END;
 END;
 $$ LANGUAGE plpgsql STABLE;
@@ -216,5 +211,4 @@ $$ LANGUAGE plpgsql STABLE;
 COMMENT ON FUNCTION process_domain_event IS 'Main router that processes domain events and projects them to 3NF tables';
 COMMENT ON FUNCTION get_entity_version IS 'Gets the current version number for an entity stream';
 COMMENT ON FUNCTION validate_event_sequence IS 'Ensures events are processed in order';
-COMMENT ON FUNCTION get_organization_uuid_from_external_id IS 'Resolve Zitadel/mock organization external_id to internal UUID';
-COMMENT ON FUNCTION safe_jsonb_extract_organization_id IS 'Extract organization_id from event data, supporting UUID, Zitadel ID, and mock ID formats';
+COMMENT ON FUNCTION safe_jsonb_extract_organization_id IS 'Extract organization_id from event data as UUID (Supabase Auth migration completed Oct 2025)';
