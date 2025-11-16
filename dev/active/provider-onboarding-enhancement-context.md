@@ -347,7 +347,10 @@ The enhancement maintains this architecture while adding:
 - `infrastructure/supabase/sql/03-functions/event-processing/002-process-organization-events.sql` - Update to handle new fields, remove program logic
 
 **Infrastructure** (AsyncAPI Contracts):
-- `infrastructure/supabase/contracts/asyncapi/domains/organization.yaml` - Update `organization.created` event schema, remove program fields, add new fields
+- `infrastructure/supabase/contracts/asyncapi/domains/organization.yaml` - Update `organization.created` event schema, remove program fields, add new fields, remove Zitadel references
+
+**Infrastructure** (Main Event Router):
+- `infrastructure/supabase/sql/03-functions/event-processing/001-main-event-router.sql` - Removed program stream type case, updated to route junction events (2025-11-16)
 
 **Developer Guidance** (Updated 2025-01-14 for Resend documentation):
 - `CLAUDE.md` (root) - Added link to Resend email provider guide after workflow environment variables (line 268)
@@ -376,10 +379,15 @@ The enhancement maintains this architecture while adding:
 - `infrastructure/supabase/sql/03-functions/event-processing/005-process-phone-events.sql` - Handle `phone.created` events
 - `infrastructure/supabase/sql/03-functions/event-processing/006-process-junction-events.sql` - Handle junction link events
 
+**Database** (SQL Migrations - Phase 1.4-1.6):
+- `infrastructure/supabase/sql/02-tables/organizations/015-remove-program-infrastructure.sql` - Drop programs_projection table and process_program_event() function (2025-11-16)
+- `infrastructure/supabase/sql/02-tables/organizations/016-subdomain-conditional-logic.sql` - Make subdomain_status nullable, add is_subdomain_required() function, add CHECK constraint (2025-11-16)
+
 **AsyncAPI Contracts**:
-- `infrastructure/supabase/contracts/asyncapi/domains/contact.yaml` - Contact event schemas
-- `infrastructure/supabase/contracts/asyncapi/domains/address.yaml` - Address event schemas
-- `infrastructure/supabase/contracts/asyncapi/domains/phone.yaml` - Phone event schemas
+- `infrastructure/supabase/contracts/asyncapi/domains/contact.yaml` - Contact event schemas (created, updated, deleted) - Added 2025-11-16
+- `infrastructure/supabase/contracts/asyncapi/domains/address.yaml` - Address event schemas (created, updated, deleted) - Added 2025-11-16
+- `infrastructure/supabase/contracts/asyncapi/domains/phone.yaml` - Phone event schemas (created, updated, deleted) - Added 2025-11-16
+- `infrastructure/supabase/contracts/asyncapi/domains/junction.yaml` - Junction event schemas for all 6 junction types (12 events: linked/unlinked) - Added 2025-11-16
 
 **Documentation** (Database):
 - `documentation/infrastructure/reference/database/tables/contacts_projection.md` - Contact table reference
@@ -974,22 +982,109 @@ ALTER TABLE organization_business_profiles_projection ENABLE ROW LEVEL SECURITY;
 - Move `ltree` extension to `extensions` schema (minor improvement)
 - Enable leaked password protection in Supabase dashboard (security enhancement)
 
+---
+
+## Session Summary: Phase 1.4-1.6 Complete (2025-11-16 Evening)
+
+### What Was Accomplished
+
+Completed all remaining Phase 1 schema enhancements and deployed to remote Supabase.
+
+**Phase 1.4: Program Infrastructure Removal** ✅
+- Verified `programs_projection` table was empty (0 records) - greenfield removal
+- Created migration `015-remove-program-infrastructure.sql`:
+  - Dropped `programs_projection` table (CASCADE)
+  - Dropped `process_program_event()` function
+  - Deleted `program.*` event types from `event_types` table
+- Updated `001-main-event-router.sql` to remove `WHEN 'program'` case
+- Rationale: Programs feature deprecated, replaced with contact/address/phone model
+
+**Phase 1.5: Conditional Subdomain Logic** ✅
+- Created migration `016-subdomain-conditional-logic.sql`:
+  - Made `subdomain_status` nullable (NULL = subdomain not required)
+  - Created `is_subdomain_required(p_type, p_partner_type)` validation function
+  - Added CHECK constraint `chk_subdomain_conditional` to enforce logic
+  - Updated existing organizations: set `subdomain_status = NULL` where not required
+- Subdomain provisioning rules:
+  - **Providers**: subdomain REQUIRED (tenant isolation + portal access)
+  - **VAR partners**: subdomain REQUIRED (portal access)
+  - **Stakeholder partners** (family/court/other): subdomain NOT required (limited dashboard views)
+  - **Platform owner** (A4C): subdomain NOT required (uses main domain)
+
+**Phase 1.6: AsyncAPI Event Contracts** ✅
+- Updated `organization.yaml`:
+  - Added `partner_type` field (enum: var, family, court, other)
+  - Added `referring_partner_id` field (UUID, tracks partner referrals)
+  - Removed `zitadel_org_id` field (Zitadel cleanup complete)
+  - Removed `program_name` from `ProviderBusinessProfile`
+  - Removed `OrganizationZitadelCreated` event and all related schemas
+  - Updated `failure_stage` enum (removed Zitadel stages, added DNS/email stages)
+- Created 4 NEW AsyncAPI contracts:
+  - `contact.yaml` - 3 events (created, updated, deleted)
+  - `address.yaml` - 3 events (created, updated, deleted)
+  - `phone.yaml` - 3 events (created, updated, deleted)
+  - `junction.yaml` - 12 events (6 junction types x 2 operations):
+    - organization.contact.linked/unlinked
+    - organization.address.linked/unlinked
+    - organization.phone.linked/unlinked
+    - contact.phone.linked/unlinked
+    - contact.address.linked/unlinked
+    - phone.address.linked/unlinked
+
+**Deployment**:
+- Commit: `2653ccb1` - feat(provider-onboarding): Implement Phase 1.4-1.6 schema enhancements
+- GitHub Actions workflow: ✅ SUCCESSFUL
+  - SQL validation (22s)
+  - Idempotency checks passed
+  - Migrations applied to remote Supabase (39s)
+  - Database state verified
+- Files deployed:
+  - 2 new SQL migrations (015, 016)
+  - 1 modified SQL file (001-main-event-router.sql)
+  - 1 modified AsyncAPI contract (organization.yaml)
+  - 4 new AsyncAPI contracts (contact.yaml, address.yaml, phone.yaml, junction.yaml)
+
+### Current State
+
+- **Phase 1.1-1.3** (Schema): ✅ DEPLOYED (2025-01-16)
+- **Zitadel Cleanup**: ✅ DEPLOYED (2025-01-16)
+- **Phase 2** (Event Processors + RLS): ✅ DEPLOYED (2025-01-16)
+- **Phase 1.4-1.6** (Program removal, subdomain logic, AsyncAPI): ✅ DEPLOYED (2025-11-16)
+- **Phase 3** (Temporal Workflows): ⏸️ PENDING (ready to start)
+- **Phase 4** (Frontend UI): ⏸️ PENDING (blocked on Phase 3)
+
+### What This Enables
+
+**All Phase 1 schema work is now complete**:
+- ✅ Clean removal of deprecated programs infrastructure
+- ✅ Flexible subdomain provisioning based on organization type
+- ✅ Complete AsyncAPI event contracts for all entity types (organization, contact, address, phone, junction)
+- ✅ Foundation ready for Phase 3 (Temporal workflows can emit all required events)
+
+**Phase 3 is now fully unblocked**:
+- Event processors deployed and operational
+- AsyncAPI contracts define all event schemas
+- Subdomain logic ready for workflow integration
+- Partner relationship tracking ready
+
 ### Next Immediate Steps
 
-**Option A**: Continue Phase 1.4-1.6 (Schema enhancements)
-- Remove `programs` table (deprecated feature)
-- Add subdomain logic fields to organizations_projection
-- Create AsyncAPI contract definitions for all events
-
-**Option B**: Start Phase 3 (Temporal Workflows) ⭐ **RECOMMENDED**
-- Phase 2 deployment unblocked this path
-- Workflow activities can now emit contact/address/phone events
-- Can test end-to-end organization creation flow
+**Option A**: Start Phase 3 (Temporal Workflows) ⭐ **RECOMMENDED**
+- All infrastructure complete and deployed
+- Workflow activities can emit contact/address/phone events
+- Can implement conditional subdomain provisioning logic
+- End-to-end organization creation flow ready to test
 - Highest business value delivery
 
-**Option C**: Fix Security Advisor Errors
+**Option B**: Fix Security Advisor Errors (Quick win)
 - Enable RLS on 3 tables with policies
 - Low-effort, high-security-value task
+- Not blocking any other work
+
+**Option C**: Start Phase 4 (Frontend UI)
+- Can build organization creation wizard
+- Blocked on Phase 3 for end-to-end testing
+- Parallel development possible but risky
 
 ---
 

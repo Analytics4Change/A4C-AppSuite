@@ -138,41 +138,69 @@
 - [x] Test migrations locally
 - [x] Verify idempotency
 
-### 1.4 Remove Program Infrastructure
-- [ ] Identify program-related columns in `organizations_projection` (if any)
-- [ ] Identify program projection tables (if any)
-- [ ] Export existing program data to JSON file in `dev/archived/program-data.json`
-- [ ] Create migration to drop program columns (idempotent with DROP COLUMN IF EXISTS)
-- [ ] Update event processors to skip program events
-- [ ] Remove program event types from `event_types` table (if needed)
-- [ ] Document removal in migration file comments
-- [ ] Test migrations locally
-- [ ] Verify idempotency
+### 1.4 Remove Program Infrastructure ✅ COMPLETE (2025-11-16)
+- [x] Identify program-related columns in `organizations_projection` (none found)
+- [x] Identify program projection tables (`programs_projection` table found - empty, deprecated)
+- [x] Export existing program data to JSON file (skipped - 0 records in table)
+- [x] Create migration `015-remove-program-infrastructure.sql` to drop program infrastructure
+- [x] Drop `programs_projection` table (CASCADE to drop all dependencies)
+- [x] Drop `process_program_event()` function
+- [x] Update event processors to skip program events (removed `WHEN 'program'` case from 001-main-event-router.sql)
+- [x] Remove program event types from `event_types` table (DELETE WHERE event_type LIKE 'program.%')
+- [x] Document removal in migration file comments
+- [x] Deployed to remote Supabase via GitHub Actions (commit 2653ccb1)
 
-### 1.5 Update Subdomain Conditional Logic
-- [ ] Make `subdomain` column nullable on `organizations_projection` (ALTER TABLE ALTER COLUMN)
-- [ ] Create subdomain validation function `is_subdomain_required(org_type, partner_type)`
-- [ ] Add database CHECK constraint for subdomain conditional logic
-- [ ] Update platform owner org (A4C) to have NULL subdomain if currently has value
-- [ ] Add migration comments explaining subdomain rules
-- [ ] Test migrations locally
-- [ ] Verify idempotency
-- [ ] Test constraint validation (insert invalid data, should fail)
+**Implementation Details**:
+- Migration: `infrastructure/supabase/sql/02-tables/organizations/015-remove-program-infrastructure.sql`
+- Modified: `infrastructure/supabase/sql/03-functions/event-processing/001-main-event-router.sql` (removed program case)
+- Programs feature replaced with flexible contact/address/phone model
+- Clean greenfield removal (no data migration needed)
 
-### 1.6 Update AsyncAPI Event Contracts
-- [ ] Update `infrastructure/supabase/contracts/asyncapi/domains/organization.yaml` - add `referring_partner_id`, `partner_type`, remove program fields
-- [ ] Create `infrastructure/supabase/contracts/asyncapi/domains/contact.yaml` - define `contact.created` event
-- [ ] Create `infrastructure/supabase/contracts/asyncapi/domains/address.yaml` - define `address.created` event
-- [ ] Create `infrastructure/supabase/contracts/asyncapi/domains/phone.yaml` - define `phone.created` event
-- [ ] Add `organization.contact.linked` event schema to organization.yaml
-- [ ] Add `organization.address.linked` event schema to organization.yaml
-- [ ] Add `organization.phone.linked` event schema to organization.yaml
-- [ ] Add `contact.phone.linked` event schema to contact.yaml
-- [ ] Add `contact.address.linked` event schema to contact.yaml
-- [ ] Add `phone.address.linked` event schema to phone.yaml ← **NEW: for fully connected contact groups**
-- [ ] Version updated schemas (organization.created v1 → v2)
-- [ ] Update AsyncAPI README with new event types
-- [ ] Validate AsyncAPI YAML syntax
+### 1.5 Update Subdomain Conditional Logic ✅ COMPLETE (2025-11-16)
+- [x] Make `subdomain_status` column nullable on `organizations_projection` (ALTER COLUMN DROP NOT NULL, SET DEFAULT NULL)
+- [x] Create subdomain validation function `is_subdomain_required(p_type TEXT, p_partner_type partner_type)`
+- [x] Add database CHECK constraint `chk_subdomain_conditional` for subdomain conditional logic
+- [x] Update existing organizations: set `subdomain_status = NULL` where not required (stakeholder partners, platform owner)
+- [x] Add migration comments explaining subdomain rules (providers + VAR partners require subdomain, others don't)
+- [x] Deployed to remote Supabase via GitHub Actions (commit 2653ccb1)
+
+**Implementation Details**:
+- Migration: `infrastructure/supabase/sql/02-tables/organizations/016-subdomain-conditional-logic.sql`
+- Function `is_subdomain_required()` returns TRUE for providers and VAR partners, FALSE for stakeholder partners and platform owner
+- CHECK constraint enforces: if subdomain required, `subdomain_status IS NOT NULL`; if not required, `subdomain_status IS NULL`
+- Subdomain logic:
+  - Providers: subdomain REQUIRED (tenant isolation + portal access)
+  - VAR partners: subdomain REQUIRED (portal access)
+  - Stakeholder partners (family/court/other): subdomain NOT required (limited dashboard views)
+  - Platform owner (A4C): subdomain NOT required (uses main domain)
+
+### 1.6 Update AsyncAPI Event Contracts ✅ COMPLETE (2025-11-16)
+- [x] Update `infrastructure/supabase/contracts/asyncapi/domains/organization.yaml` - add `referring_partner_id`, `partner_type`, remove Zitadel fields
+- [x] Create `infrastructure/supabase/contracts/asyncapi/domains/contact.yaml` - define `contact.created/updated/deleted` events
+- [x] Create `infrastructure/supabase/contracts/asyncapi/domains/address.yaml` - define `address.created/updated/deleted` events
+- [x] Create `infrastructure/supabase/contracts/asyncapi/domains/phone.yaml` - define `phone.created/updated/deleted` events
+- [x] Create `infrastructure/supabase/contracts/asyncapi/domains/junction.yaml` - all 12 junction events (6 types x 2 operations)
+- [x] Add all junction link/unlink event schemas (organization-contact, organization-address, organization-phone, contact-phone, contact-address, phone-address)
+- [x] Deployed to remote Supabase via GitHub Actions (commit 2653ccb1)
+
+**Implementation Details**:
+- **organization.yaml** changes:
+  - Added `partner_type` field (var, family, court, other)
+  - Added `referring_partner_id` field (UUID, optional)
+  - Removed `zitadel_org_id` field (Zitadel migration complete)
+  - Removed `program_name` from ProviderBusinessProfile
+  - Removed OrganizationZitadelCreated event and schemas
+  - Updated bootstrap failure_stage enum (removed Zitadel stages, added DNS/email stages)
+- **contact.yaml** (NEW): 3 events (created, updated, deleted)
+- **address.yaml** (NEW): 3 events (created, updated, deleted)
+- **phone.yaml** (NEW): 3 events (created, updated, deleted)
+- **junction.yaml** (NEW): 12 events (6 junction types x 2 operations each)
+  - organization.contact.linked/unlinked
+  - organization.address.linked/unlinked
+  - organization.phone.linked/unlinked
+  - contact.phone.linked/unlinked
+  - contact.address.linked/unlinked
+  - phone.address.linked/unlinked
 
 ---
 
