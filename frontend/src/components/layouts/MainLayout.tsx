@@ -43,7 +43,7 @@ export const MainLayout: React.FC = () => {
   // Define all possible nav items with their required roles and permissions
   const allNavItems = [
     { to: '/clients', icon: Users, label: 'Clients', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse', 'caregiver'] },
-    { to: '/organizations', icon: Building, label: 'Organizations', roles: ['super_admin', 'partner_onboarder'], permission: 'organization.create_root' },
+    { to: '/organizations', icon: Building, label: 'Organizations', roles: ['super_admin', 'partner_onboarder'], permission: 'organization.create' },
     { to: '/medications', icon: Pill, label: 'Medications', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse'] },
     { to: '/reports', icon: FileText, label: 'Reports', roles: ['super_admin', 'provider_admin', 'administrator'] },
     { to: '/settings', icon: Settings, label: 'Settings', roles: ['super_admin', 'provider_admin', 'administrator'] },

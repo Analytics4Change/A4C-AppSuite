@@ -29,7 +29,7 @@ export const GLOBAL_ROLES: Record<string, RoleDefinition> = {
     scope: 'global',
     permissions: [
       // Organization Management (Bootstrap capability)
-      'organization.create_root',
+      'organization.create',
       'organization.create_sub',
       'organization.view',
       'organization.update',
@@ -61,7 +61,7 @@ export const GLOBAL_ROLES: Record<string, RoleDefinition> = {
     description: 'Can create and manage new provider organizations',
     scope: 'global',
     permissions: [
-      'organization.create_root',
+      'organization.create',
       'organization.view',
       'organization.update',
       'organization.business_profile_create',

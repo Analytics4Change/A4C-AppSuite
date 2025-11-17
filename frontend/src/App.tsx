@@ -81,7 +81,7 @@ function App() {
                 {/* Organization Management routes */}
                 <Route path="/organizations" element={<OrganizationListPage />} />
                 <Route path="/organizations/create" element={
-                  <RequirePermission permission="organization.create_root" fallback="/clients">
+                  <RequirePermission permission="organization.create" fallback="/clients">
                     <OrganizationCreatePage />
                   </RequirePermission>
                 } />

@@ -32,13 +32,13 @@ export const PERMISSIONS: Record<string, Permission> = {
   // ============================================
 
   // Organization Management
-  'organization.create_root': {
-    id: 'organization.create_root',
+  'organization.create': {
+    id: 'organization.create',
     category: 'Organization Management',
     resource: 'organization',
-    action: 'create_root',
-    displayName: 'Create Root Organization',
-    description: 'Create new root tenant organizations (bootstrap)',
+    action: 'create',
+    displayName: 'Create Organization',
+    description: 'Create new tenant organizations (bootstrap)',
     scope: 'global',
     riskLevel: 'high'
   },

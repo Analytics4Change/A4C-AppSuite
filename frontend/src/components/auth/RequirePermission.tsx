@@ -16,7 +16,7 @@ interface RequirePermissionProps {
  * Usage:
  * ```tsx
  * <Route path="/organizations/create" element={
- *   <RequirePermission permission="organization.create_root" fallback="/clients">
+ *   <RequirePermission permission="organization.create" fallback="/clients">
  *     <OrganizationCreatePage />
  *   </RequirePermission>
  * } />

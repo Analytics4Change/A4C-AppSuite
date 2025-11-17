@@ -29,7 +29,7 @@ export const DEV_PERMISSIONS: Record<string, Permission[]> = {
 
   // Organization Management Applet
   organization: [
-    'organization.create_root',
+    'organization.create',
     'organization.create_sub',
     'organization.view',
     'organization.update',
