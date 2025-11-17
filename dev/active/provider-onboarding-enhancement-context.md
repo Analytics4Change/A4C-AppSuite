@@ -1418,10 +1418,12 @@ Completed all remaining Phase 1 schema enhancements and deployed to remote Supab
 - ✅ **TypeScript Compilation**: Zero errors
 - ✅ **All Tests Passing**: Frontend and database migrations validated
 
-**Part B Dependencies**:
-- Waiting for user to upload wireframes for organization form redesign
-- ReferringPartnerDropdown will consume Part A API
-- No further backend work needed for Part B
+**Part B Status**:
+- ✅ **Started**: 2025-11-17
+- ✅ **Phase 1 Complete**: Components + Types created
+- ⏸️ **Phase 2 Pending**: ViewModel update
+- ✅ **Wireframes Received**: 3 wireframes analyzed (General Info, Billing, Provider Admin sections)
+- ✅ **Key Clarification**: General Information has NO contact field (organization-level only)
 
 #### Testing Notes
 
@@ -1444,11 +1446,79 @@ Completed all remaining Phase 1 schema enhancements and deployed to remote Supab
 
 ---
 
-## Next Immediate Steps (Original Plan - Mostly Complete!)
+### Part B: Frontend UI Redesign (Started 2025-11-17)
 
-1. ✅ Review this context document for accuracy
-2. ✅ Create `provider-onboarding-enhancement-tasks.md` with checklist
-3. ✅ Start Phase 1: Database schema updates (create partner_type enum, junction tables)
-4. ⏸️ Test migrations locally with `./local-tests/verify-idempotency.sh` (skipped - Podman issues)
-5. ✅ Commit schema changes to git
-6. ✅ Proceed with Phase 2: Event processors and triggers
+#### Key Architectural Decision (2025-11-17)
+
+**General Information Section = Organization-Level Only (NO Contact)**
+
+After wireframe analysis and user clarification, the General Information section contains:
+- Organization fields (Name, Type, Subdomain, Time Zone, Referring Partner)
+- **Address** (organization headquarters - required)
+- **Phone** (main office phone - required)
+- **NO Contact field** (rationale: headquarters scenario with indeterminate receptionist)
+
+This differs from the original plan which had optional contact. The final design removes contact entirely from General Information, simplifying the data model:
+- General Info: 2 entities (org→address, org→phone)
+- Billing Info: 3 entities (contact + address + phone, 6 junction links if fully connected)
+- Provider Admin: 3 entities (contact + address + phone, 6 junction links if fully connected)
+
+#### New Files Created (2025-11-17)
+
+**Components** (`frontend/src/components/organizations/`):
+- `ContactInput.tsx` - Contact input with label, type dropdown (Billing/Technical/Emergency/A4C Admin), name, email, title, department
+- `AddressInput.tsx` - Address input with label, type dropdown (Physical/Mailing/Billing), street, city, state, zip
+- `PhoneInputEnhanced.tsx` - Phone input with label, type dropdown (Mobile/Office/Fax/Emergency), number with auto-formatting, extension
+- `ReferringPartnerDropdown.tsx` - VAR partner selection using Part A API, fetches activated VAR partners
+
+**Type Definitions Updated**:
+- `frontend/src/types/organization.types.ts` - Added ContactFormData, AddressFormData, PhoneFormData, ContactInfo, AddressInfo, PhoneInfo, updated OrganizationFormData for 3-section structure, updated OrganizationBootstrapParams to match Phase 3 backend
+
+**Infrastructure**:
+- Installed `@radix-ui/react-select` package (30 new packages)
+- All components follow Radix UI + Tailwind + CVA patterns (frontend-dev-guidelines skill)
+- Full keyboard navigation and WCAG 2.1 Level AA compliance
+
+#### "Use General Information" Behavior Clarified (2025-11-17)
+
+After user questions, the checkbox behavior is:
+1. **Scope**: Applies to Address and Phone only (NOT Contact - each section has independent contact)
+2. **Data Strategy**: Creates junction links to EXISTING General Info records (shared entities, NOT duplication)
+3. **Auto-Sync**: When General Info edited, linked sections see changes immediately (same database records)
+4. **Section Visibility**: Billing section hidden for partners, data preserved in ViewModel when hidden
+
+#### Existing Files Modified (2025-11-17)
+
+- `frontend/src/types/organization.types.ts` - Complete restructure for 3-section form (General/Billing/Provider Admin)
+- `dev/active/provider-onboarding-enhancement-tasks.md` - Marked Phase 1 tasks complete
+- `dev/active/provider-onboarding-enhancement-context.md` - Added Part B context (this file)
+
+#### Important Constraints Discovered (2025-11-17)
+
+1. **TypeScript Compilation**: Components compile successfully, but OrganizationFormViewModel and OrganizationCreatePage need updates before full compilation succeeds
+2. **ViewModel Complexity**: OrganizationFormViewModel is 355 lines and requires significant restructuring for 3-section state
+3. **Data Preservation**: When org type changes (Provider ↔ Partner), Billing section data must be preserved in ViewModel even when hidden
+
+---
+
+## Next Immediate Steps (Updated 2025-11-17)
+
+**After `/clear`, continue with Part B Phase 2:**
+
+1. **Read dev/active context**: `Read @dev/active/ and continue from Part B Phase 1 completion`
+2. **Update OrganizationFormViewModel** (Task 4.2):
+   - Replace formData structure with 3-section state (General/Billing/Provider Admin)
+   - Add checkbox observables for "Use General Information"
+   - Implement MobX reactions for auto-sync behavior
+   - Update `transformToWorkflowParams()` method to build arrays
+   - File: `frontend/src/viewModels/organization/OrganizationFormViewModel.ts` (355 lines)
+3. **Rebuild OrganizationCreatePage** (Tasks 4.3-4.10):
+   - Remove program section
+   - Implement 3-section layout with new components
+   - Add dynamic section visibility (Billing conditional)
+   - Wire up "Use General Information" checkboxes
+4. **Update validation and utilities**:
+   - Fix `organization-validation.ts` for new structure
+   - Fix `MockWorkflowClient.ts` for new params
+5. **Test compilation**: `npm run build` (should have zero errors)
+6. **Commit Part B Phase 2**: Frontend ViewModel + Page updates
