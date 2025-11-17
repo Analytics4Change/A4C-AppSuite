@@ -151,29 +151,34 @@ export interface AcceptInvitationResult {
 
 /**
  * Organization projection data (read from database)
+ * Updated for Phase 1.4-1.6 schema enhancements
  */
 export interface Organization {
-  org_id: string;
+  id: string; // Primary key (changed from org_id for consistency)
   name: string;
   display_name: string;
-  type: 'provider' | 'partner';
+  type: 'platform_owner' | 'provider' | 'provider_partner'; // Updated enum
   domain: string;
   subdomain: string;
   time_zone: string;
   is_active: boolean;
   parent_org_id?: string;
   path: string; // Ltree path for hierarchy
+  partner_type?: 'var' | 'family' | 'court' | 'other'; // NEW: Partner classification
+  referring_partner_id?: string; // NEW: VAR partner who referred this organization
   created_at: Date;
   updated_at: Date;
 }
 
 /**
- * Organization filter options for list view
+ * Organization filter options for query API
+ * Used by OrganizationQueryService for filtering organizations
  */
 export interface OrganizationFilterOptions {
-  type?: 'provider' | 'partner' | 'all';
+  type?: 'platform_owner' | 'provider' | 'provider_partner' | 'all'; // Updated enum
   status?: 'active' | 'inactive' | 'all';
-  searchTerm?: string;
+  partnerType?: 'var' | 'family' | 'court' | 'other'; // NEW: Filter by partner type
+  searchTerm?: string; // Search by name or subdomain
 }
 
 /**
