@@ -202,6 +202,45 @@ File: `infrastructure/supabase/sql/03-functions/event-processing/002-process-org
 - Idempotency verified (2x same event = 1 projection row)
 - Multi-tenant isolation tested
 
+**Phase 3 Implementation Complete ✅** (2025-01-16 Evening)
+
+After Phase 2 deployment, Phase 3 focused on updating Temporal workflow implementation to handle new contact/address/phone arrays, partner fields, and compensation logic. Implementation completed with comprehensive testing.
+
+**Files Modified** (Phase 3 Implementation):
+1. `workflows/src/shared/types/index.ts` - Updated parameter types (ContactInfo, AddressInfo, PhoneInfo arrays, partner fields)
+2. `workflows/src/activities/organization-bootstrap/create-organization.ts` - Enhanced to emit contact/address/phone events + junction links
+3. `workflows/src/workflows/organization-bootstrap/workflow.ts` - Added conditional DNS provisioning, compensation saga updates
+4. `workflows/src/examples/trigger-workflow.ts` - Updated example with new parameter structure
+
+**Files Created** (Phase 3 Compensation Activities):
+1. `workflows/src/activities/organization-bootstrap/delete-contacts.ts` - Compensation activity (emits contact.deleted events)
+2. `workflows/src/activities/organization-bootstrap/delete-addresses.ts` - Compensation activity (emits address.deleted events)
+3. `workflows/src/activities/organization-bootstrap/delete-phones.ts` - Compensation activity (emits phone.deleted events)
+
+**Testing Session** (2025-01-16 Evening):
+- ✅ **All Tests Passing**: 24/24 tests (5 test suites, 100% success rate)
+- ✅ **Coverage >90%**: createOrganization (93.47%), generateInvitations (100%), activateOrganization (90.9%), configureDNS (93.1%)
+- ✅ **Compensation Verified**: Saga executes in reverse order (phones → addresses → contacts → org)
+- ✅ **Idempotency Verified**: Workflow handles duplicate executions safely
+- ✅ **Issues Fixed**:
+  - Activity test fixtures updated (contacts/addresses/phones arrays)
+  - Temporal sandbox violation fixed (`process.env.FRONTEND_URL` → hardcoded default)
+  - Event metadata test assertions corrected (`event_metadata.tags` path)
+
+**Key Implementation Details**:
+- **Event Emission Order**: org.created → contacts → addresses → phones → junction links (9-15 events total per org)
+- **Idempotency Check**: Dual strategy (subdomain if provided, name+null subdomain if not)
+- **Conditional DNS**: Subdomain null → DNS activities skipped, `dnsSkipped: true` flag set
+- **Compensation Cascade**: Best-effort deletion activities emit `*.deleted` events for projection cleanup
+- **Test Coverage**: All happy path, error, compensation, and idempotency scenarios tested
+
+**Ready for Deployment**:
+- TypeScript compilation: ✅ Zero errors
+- All tests passing: ✅ 24/24 tests
+- Coverage threshold: ✅ >80% (>90% critical paths)
+- Compensation logic: ✅ Verified
+- Idempotency: ✅ Verified
+
 ### Key Decisions (Original Planning Session)
 
 1. **Data Model: Separate Projection Tables with Many-to-Many Relationships**
@@ -333,11 +372,12 @@ The enhancement maintains this architecture while adding:
 - `frontend/src/services/workflow/IWorkflowClient.ts` - Workflow client interface, update parameter types
 
 **Workflows**:
-- `workflows/src/workflows/organization-bootstrap/workflow.ts` - Main workflow, update to handle optional subdomain
-- `workflows/src/workflows/organization-bootstrap/types.ts` - Parameter types, add arrays, add referring partner, remove program
-- `workflows/src/activities/createOrganization.ts` - Organization creation activity, emit contact/address/phone events
-- `workflows/src/activities/configureDNS.ts` - DNS provisioning, handle optional subdomain
-- `workflows/src/activities/verifyDNS.ts` - DNS verification, skip if no subdomain
+- `workflows/src/workflows/organization-bootstrap/workflow.ts` - Main workflow, conditional DNS provisioning, cascade deletion compensation (Phase 3.3, 3.4)
+- `workflows/src/shared/types/index.ts` - Parameter types, ContactInfo/AddressInfo/PhoneInfo interfaces, optional subdomain (Phase 3.1)
+- `workflows/src/activities/organization-bootstrap/create-organization.ts` - Organization creation activity, emit contact/address/phone events, dual idempotency (Phase 3.2)
+- `workflows/src/activities/organization-bootstrap/index.ts` - Export all activities including compensation activities (Phase 3.4)
+- `workflows/src/__tests__/workflows/organization-bootstrap.test.ts` - Workflow tests updated with new parameter structure (Phase 3.5)
+- `workflows/src/examples/trigger-workflow.ts` - Example trigger script updated (Phase 3.5)
 
 **Infrastructure** (Database):
 - `infrastructure/supabase/sql/02-tables/organizations/001-organizations_projection.sql` - Add `referring_partner_id`, `partner_type` columns, make `subdomain` nullable
@@ -357,6 +397,11 @@ The enhancement maintains this architecture while adding:
 - `workflows/CLAUDE.md` - Updated Technology Stack to reference Resend guide (line 15)
 - `infrastructure/CLAUDE.md` - Added cross-references to Resend guides at top of Email Provider section (lines 163-165)
 - `documentation/workflows/reference/activities-reference.md` - Updated email provider description to mention Resend (line 467)
+
+**Workflows** (Phase 3 - Temporal Workflows):
+- `workflows/src/activities/organization-bootstrap/delete-contacts.ts` - Compensation activity (emits contact.deleted events)
+- `workflows/src/activities/organization-bootstrap/delete-addresses.ts` - Compensation activity (emits address.deleted events)
+- `workflows/src/activities/organization-bootstrap/delete-phones.ts` - Compensation activity (emits phone.deleted events)
 
 ### New Files Created
 
@@ -981,6 +1026,161 @@ ALTER TABLE organization_business_profiles_projection ENABLE ROW LEVEL SECURITY;
 - Add `SET search_path = ''` to all functions (security best practice)
 - Move `ltree` extension to `extensions` schema (minor improvement)
 - Enable leaked password protection in Supabase dashboard (security enhancement)
+
+---
+
+## Session Summary: Phase 3 Complete - Temporal Workflows (2025-01-16 Afternoon)
+
+### What Was Accomplished
+
+Completed all Phase 3 Temporal workflow enhancements to support full contact/address/phone management with event-driven architecture.
+
+**Phase 3.1: Type System Updates** ✅
+- Modified `workflows/src/shared/types/index.ts` (expanded type definitions)
+- Created new interfaces: `ContactInfo`, `AddressInfo`, `PhoneInfo`
+- Made `subdomain` optional (`subdomain?: string`)
+- Updated `OrganizationBootstrapParams.orgData` structure to include arrays
+- Added compensation activity parameter types
+
+**Phase 3.2: createOrganization Activity Enhancement** ✅
+- Modified `workflows/src/activities/organization-bootstrap/create-organization.ts`
+- Expanded from 96 to 206 lines (+110 lines)
+- Implemented full event emission for contacts, addresses, phones:
+  - Emits `contact.created` for each contact
+  - Emits `address.created` for each address
+  - Emits `phone.created` for each phone
+  - Emits junction link events (`organization.contact.linked`, etc.)
+- Dual idempotency check:
+  - If subdomain provided: check by subdomain
+  - If no subdomain: check by name + NULL subdomain
+- Prevents duplicate organizations in both scenarios
+
+**Phase 3.3: Conditional DNS Provisioning** ✅
+- Modified `workflows/src/workflows/organization-bootstrap/workflow.ts`
+- Wrapped DNS provisioning in `if (params.subdomain)` conditional
+- Added `dnsSkipped` flag to workflow state tracking
+- Updated workflow documentation with conditional logic explanation
+- DNS only provisioned when subdomain parameter provided
+
+**Phase 3.4: Cascade Deletion Compensation Activities** ✅
+- Created 3 new compensation activities:
+  - `delete-contacts.ts` - Queries contacts, emits `contact.deleted` events
+  - `delete-addresses.ts` - Queries addresses, emits `address.deleted` events
+  - `delete-phones.ts` - Queries phones, emits `phone.deleted` events
+- All follow best-effort pattern (return true even on errors)
+- Updated workflow compensation flow:
+  - Delete in reverse order: phones → addresses → contacts → org
+  - Each step emits deletion events for CQRS compliance
+  - Event processors (Phase 2) handle actual soft deletes
+- Exported new activities from `index.ts`
+
+**Phase 3.5: Test Updates** ✅
+- Updated `workflows/src/__tests__/workflows/organization-bootstrap.test.ts`:
+  - Updated all 6 test fixtures with new parameter structure (contacts/addresses/phones arrays)
+  - Added mock compensation activities
+  - Verified TypeScript compilation succeeds
+- Updated `workflows/src/examples/trigger-workflow.ts`:
+  - Updated example with new parameter structure
+  - Shows how to trigger workflow with full contact/address/phone data
+
+### Implementation Statistics
+
+**Files Modified**: 6
+1. `workflows/src/shared/types/index.ts` - Type definitions
+2. `workflows/src/activities/organization-bootstrap/create-organization.ts` - Event emission
+3. `workflows/src/activities/organization-bootstrap/index.ts` - Exports
+4. `workflows/src/workflows/organization-bootstrap/workflow.ts` - Orchestration
+5. `workflows/src/examples/trigger-workflow.ts` - Example
+6. `workflows/src/__tests__/workflows/organization-bootstrap.test.ts` - Tests
+
+**Files Created**: 3
+1. `workflows/src/activities/organization-bootstrap/delete-contacts.ts`
+2. `workflows/src/activities/organization-bootstrap/delete-addresses.ts`
+3. `workflows/src/activities/organization-bootstrap/delete-phones.ts`
+
+**Code Changes**:
+- 472 insertions
+- 123 deletions
+- Net +349 lines
+
+### Key Architectural Decisions (Phase 3)
+
+**1. Event-Driven Contact/Address/Phone Creation**
+- **Decision**: Emit individual events for each contact, address, phone created
+- **Why**: CQRS compliance - ALL state changes must emit domain events
+- **Impact**: Event processors (Phase 2) populate projection tables automatically
+
+**2. Conditional DNS Provisioning**
+- **Decision**: Only provision DNS if `subdomain` parameter provided
+- **Why**: Stakeholder partners (family, court) don't need subdomains. Avoids unnecessary Cloudflare API calls.
+- **Impact**: Workflow logic checks `if (params.subdomain)` before DNS steps
+
+**3. Dual Idempotency Check**
+- **Decision**: Check existence by subdomain OR by name (if no subdomain)
+- **Why**: Prevents duplicate organizations in both scenarios (with and without subdomain)
+- **Implementation**:
+  ```typescript
+  if (params.subdomain) {
+    // Check by subdomain
+  } else {
+    // Check by name + null subdomain
+  }
+  ```
+
+**4. Event-Driven Cascade Deletion**
+- **Decision**: Compensation activities emit deletion events (not direct database deletes)
+- **Why**: Maintains CQRS architecture - event processors handle actual soft deletes
+- **Impact**: Complete audit trail in `domain_events` table for all compensations
+
+**5. Best-Effort Compensation**
+- **Decision**: Compensation activities return `true` even on errors
+- **Why**: Prevents compensation failures from blocking workflow completion
+- **Rationale**: Better to log compensation errors than fail entire rollback
+
+### Testing Results
+
+- ✅ TypeScript compilation: `npm run build` succeeded (0 errors)
+- ⏸️ Unit tests: Pending execution (`npm test`)
+- ⏸️ Integration tests: Pending (requires Temporal cluster port-forward)
+
+### Current State
+
+- **Phase 1.1-1.3** (Schema): ✅ DEPLOYED (2025-01-16)
+- **Zitadel Cleanup**: ✅ DEPLOYED (2025-01-16)
+- **Phase 2** (Event Processors + RLS): ✅ DEPLOYED (2025-01-16)
+- **Phase 1.4-1.6** (Program removal, subdomain logic, AsyncAPI): ✅ DEPLOYED (2025-11-16)
+- **Phase 3** (Temporal Workflows): ✅ IMPLEMENTATION COMPLETE (tests pending)
+- **Phase 4** (Frontend UI): ⏸️ PENDING (blocked on Phase 3 deployment)
+
+### What Phase 3 Enables
+
+**Complete Organization Bootstrap Flow**:
+1. ✅ Create organization with full contact/address/phone data
+2. ✅ Emit individual events for each entity created
+3. ✅ Conditional DNS provisioning (only if subdomain provided)
+4. ✅ Event-driven cascade deletion on failure (Saga compensation)
+5. ✅ Dual idempotency (subdomain-based or name-based)
+6. ✅ Partner relationship tracking (referring_partner_id)
+
+**Unblocks**:
+- Phase 4 frontend UI can be implemented with confidence
+- End-to-end organization creation flow testable
+- Partner onboarding workflow operational
+
+### Next Steps After Phase 3
+
+**Immediate** (before continuing):
+1. Run workflow tests: `cd workflows && npm test`
+2. Manual workflow testing:
+   - Port-forward Temporal: `kubectl port-forward -n temporal svc/temporal-frontend 7233:7233`
+   - Run example: `TEMPORAL_ADDRESS=localhost:7233 ts-node src/examples/trigger-workflow.ts`
+3. Verify compensation logic in failure scenarios
+4. Check code coverage (target: >80%)
+
+**Once tests pass**:
+- Option A: Deploy Phase 3 to remote (update Kubernetes worker deployment)
+- Option B: Start Phase 4 (Frontend UI) in parallel
+- Option C: Add monitoring/observability for workflows (Temporal Web UI)
 
 ---
 

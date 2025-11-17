@@ -38,7 +38,10 @@ const mockActivities = {
   // Compensation activities
   removeDNS: async () => true,
   deactivateOrganization: async () => true,
-  revokeInvitations: async () => true
+  revokeInvitations: async () => true,
+  deleteContacts: async () => true,
+  deleteAddresses: async () => true,
+  deletePhones: async () => true
 };
 
 describe('OrganizationBootstrapWorkflow', () => {
@@ -77,7 +80,34 @@ describe('OrganizationBootstrapWorkflow', () => {
         orgData: {
           name: 'Test Organization',
           type: 'provider',
-          contactEmail: 'admin@test-org.com'
+          contacts: [
+            {
+              firstName: 'John',
+              lastName: 'Doe',
+              email: 'admin@test-org.com',
+              title: 'CEO',
+              department: 'Executive',
+              type: 'billing',
+              label: 'Primary Contact'
+            }
+          ],
+          addresses: [
+            {
+              street1: '123 Main St',
+              city: 'Boston',
+              state: 'MA',
+              zipCode: '02101',
+              type: 'physical',
+              label: 'Main Office'
+            }
+          ],
+          phones: [
+            {
+              number: '555-1234',
+              type: 'office',
+              label: 'Main Line'
+            }
+          ]
         },
         users: [
           {
@@ -130,7 +160,32 @@ describe('OrganizationBootstrapWorkflow', () => {
         orgData: {
           name: 'Idempotent Test Org',
           type: 'provider',
-          contactEmail: 'admin@idempotent.com'
+          contacts: [
+            {
+              firstName: 'Admin',
+              lastName: 'User',
+              email: 'admin@idempotent.com',
+              type: 'billing',
+              label: 'Primary Contact'
+            }
+          ],
+          addresses: [
+            {
+              street1: '456 Test Ave',
+              city: 'Cambridge',
+              state: 'MA',
+              zipCode: '02139',
+              type: 'physical',
+              label: 'HQ'
+            }
+          ],
+          phones: [
+            {
+              number: '555-5678',
+              type: 'office',
+              label: 'Main'
+            }
+          ]
         },
         users: [
           {
@@ -207,7 +262,9 @@ describe('OrganizationBootstrapWorkflow', () => {
         orgData: {
           name: 'Email Fail Test',
           type: 'provider',
-          contactEmail: 'admin@test.com'
+          contacts: [{ firstName: 'Admin', lastName: 'User', email: 'admin@test.com', type: 'billing', label: 'Contact' }],
+          addresses: [{ street1: '789 Test St', city: 'Boston', state: 'MA', zipCode: '02101', type: 'physical', label: 'Office' }],
+          phones: [{ number: '555-9999', type: 'office', label: 'Main' }]
         },
         users: [
           {
@@ -218,7 +275,7 @@ describe('OrganizationBootstrapWorkflow', () => {
           },
           {
             email: 'invalid@example.com',
-            firstName: 'Invalid',
+            lastName: 'Invalid',
             lastName: 'User',
             role: 'user'
           }
@@ -268,7 +325,9 @@ describe('OrganizationBootstrapWorkflow', () => {
         orgData: {
           name: 'DNS Fail Test',
           type: 'provider',
-          contactEmail: 'admin@test.com'
+          contacts: [{ firstName: 'Admin', lastName: 'User', email: 'admin@test.com', type: 'billing', label: 'Contact' }],
+          addresses: [{ street1: '999 DNS Rd', city: 'Boston', state: 'MA', zipCode: '02101', type: 'physical', label: 'Office' }],
+          phones: [{ number: '555-0001', type: 'office', label: 'Main' }]
         },
         users: [
           {
@@ -327,7 +386,9 @@ describe('OrganizationBootstrapWorkflow', () => {
         orgData: {
           name: 'Invite Fail Test',
           type: 'provider',
-          contactEmail: 'admin@test.com'
+          contacts: [{ firstName: 'Admin', lastName: 'User', email: 'admin@test.com', type: 'billing', label: 'Contact' }],
+          addresses: [{ street1: '888 Invite Ave', city: 'Boston', state: 'MA', zipCode: '02101', type: 'physical', label: 'Office' }],
+          phones: [{ number: '555-0002', type: 'office', label: 'Main' }]
         },
         users: [
           {
@@ -377,7 +438,9 @@ describe('OrganizationBootstrapWorkflow', () => {
         orgData: {
           name: 'Tagged Test Org',
           type: 'provider',
-          contactEmail: 'admin@tagged.com'
+          contacts: [{ firstName: 'Admin', lastName: 'User', email: 'admin@tagged.com', type: 'billing', label: 'Contact' }],
+          addresses: [{ street1: '777 Tagged Blvd', city: 'Boston', state: 'MA', zipCode: '02101', type: 'physical', label: 'Office' }],
+          phones: [{ number: '555-0003', type: 'office', label: 'Main' }]
         },
         users: [
           {

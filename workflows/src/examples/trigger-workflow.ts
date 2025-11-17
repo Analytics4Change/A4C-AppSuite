@@ -28,7 +28,34 @@ async function main() {
     orgData: {
       name: 'Acme Corporation',
       type: 'provider',
-      contactEmail: 'admin@acme.com'
+      contacts: [
+        {
+          firstName: 'John',
+          lastName: 'Doe',
+          email: 'admin@acme.com',
+          title: 'CEO',
+          type: 'billing',
+          label: 'Primary Contact'
+        }
+      ],
+      addresses: [
+        {
+          street1: '100 Main Street',
+          street2: 'Suite 500',
+          city: 'San Francisco',
+          state: 'CA',
+          zipCode: '94105',
+          type: 'physical',
+          label: 'Headquarters'
+        }
+      ],
+      phones: [
+        {
+          number: '555-0100',
+          type: 'office',
+          label: 'Main Office'
+        }
+      ]
     },
     users: [
       {

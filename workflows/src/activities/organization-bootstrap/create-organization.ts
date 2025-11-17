@@ -26,16 +26,34 @@ import { emitEvent, buildTags } from '@shared/utils/emit-event';
 export async function createOrganization(
   params: CreateOrganizationParams
 ): Promise<string> {
-  console.log(`[CreateOrganization] Starting for subdomain: ${params.subdomain}`);
+  const displayName = params.subdomain || params.name;
+  console.log(`[CreateOrganization] Starting for: ${displayName}`);
 
   const supabase = getSupabaseClient();
 
   // Check if organization already exists (idempotency)
-  const { data: existing, error: checkError } = await supabase
-    .from('organizations_projection')
-    .select('id')
-    .eq('subdomain', params.subdomain)
-    .maybeSingle();
+  // For orgs with subdomains, check subdomain. For orgs without, check name.
+  let existing;
+  let checkError;
+
+  if (params.subdomain) {
+    const result = await supabase
+      .from('organizations_projection')
+      .select('id')
+      .eq('subdomain', params.subdomain)
+      .maybeSingle();
+    existing = result.data;
+    checkError = result.error;
+  } else {
+    const result = await supabase
+      .from('organizations_projection')
+      .select('id')
+      .eq('name', params.name)
+      .is('subdomain', null)
+      .maybeSingle();
+    existing = result.data;
+    checkError = result.error;
+  }
 
   if (checkError) {
     throw new Error(`Failed to check existing organization: ${checkError.message}`);
@@ -52,44 +70,140 @@ export async function createOrganization(
   // Build tags for development entity tracking
   const tags = buildTags();
 
-  // Create organization record
-  const { error: insertError } = await supabase
-    .from('organizations_projection')
-    .insert({
-      id: orgId,
-      name: params.name,
-      type: params.type,
-      parent_org_id: params.parentOrgId,
-      contact_email: params.contactEmail,
-      subdomain: params.subdomain,
-      status: 'provisioning',
-      tags
-    });
-
-  if (insertError) {
-    throw new Error(`Failed to create organization: ${insertError.message}`);
-  }
-
-  console.log(`[CreateOrganization] Created organization: ${orgId}`);
-
-  // Emit OrganizationCreated event
+  // Emit OrganizationCreated event FIRST (event-driven architecture)
   await emitEvent({
-    event_type: 'OrganizationCreated',
-    aggregate_type: 'Organization',
+    event_type: 'organization.created',
+    aggregate_type: 'organization',
     aggregate_id: orgId,
     event_data: {
-      org_id: orgId,
+      organization_id: orgId,
       name: params.name,
       type: params.type,
       parent_org_id: params.parentOrgId,
-      contact_email: params.contactEmail,
-      subdomain: params.subdomain,
+      subdomain: params.subdomain || null,
+      partner_type: params.partnerType || null,
+      referring_partner_id: params.referringPartnerId || null,
       status: 'provisioning'
     },
     tags
   });
 
-  console.log(`[CreateOrganization] Emitted OrganizationCreated event for ${orgId}`);
+  console.log(`[CreateOrganization] Emitted organization.created event for ${orgId}`);
+
+  // Create contacts and emit events
+  const contactIds: string[] = [];
+  for (const contact of params.contacts) {
+    const contactId = uuidv4();
+    contactIds.push(contactId);
+
+    await emitEvent({
+      event_type: 'contact.created',
+      aggregate_type: 'contact',
+      aggregate_id: contactId,
+      event_data: {
+        contact_id: contactId,
+        organization_id: orgId,
+        first_name: contact.firstName,
+        last_name: contact.lastName,
+        email: contact.email,
+        title: contact.title || null,
+        department: contact.department || null,
+        type: contact.type,
+        label: contact.label
+      },
+      tags
+    });
+
+    // Emit organization.contact.linked junction event
+    await emitEvent({
+      event_type: 'organization.contact.linked',
+      aggregate_type: 'organization',
+      aggregate_id: orgId,
+      event_data: {
+        organization_id: orgId,
+        contact_id: contactId
+      },
+      tags
+    });
+  }
+
+  console.log(`[CreateOrganization] Created ${contactIds.length} contacts for ${orgId}`);
+
+  // Create addresses and emit events
+  const addressIds: string[] = [];
+  for (const address of params.addresses) {
+    const addressId = uuidv4();
+    addressIds.push(addressId);
+
+    await emitEvent({
+      event_type: 'address.created',
+      aggregate_type: 'address',
+      aggregate_id: addressId,
+      event_data: {
+        address_id: addressId,
+        organization_id: orgId,
+        street1: address.street1,
+        street2: address.street2 || null,
+        city: address.city,
+        state: address.state,
+        zip_code: address.zipCode,
+        type: address.type,
+        label: address.label
+      },
+      tags
+    });
+
+    // Emit organization.address.linked junction event
+    await emitEvent({
+      event_type: 'organization.address.linked',
+      aggregate_type: 'organization',
+      aggregate_id: orgId,
+      event_data: {
+        organization_id: orgId,
+        address_id: addressId
+      },
+      tags
+    });
+  }
+
+  console.log(`[CreateOrganization] Created ${addressIds.length} addresses for ${orgId}`);
+
+  // Create phones and emit events
+  const phoneIds: string[] = [];
+  for (const phone of params.phones) {
+    const phoneId = uuidv4();
+    phoneIds.push(phoneId);
+
+    await emitEvent({
+      event_type: 'phone.created',
+      aggregate_type: 'phone',
+      aggregate_id: phoneId,
+      event_data: {
+        phone_id: phoneId,
+        organization_id: orgId,
+        number: phone.number,
+        extension: phone.extension || null,
+        type: phone.type,
+        label: phone.label
+      },
+      tags
+    });
+
+    // Emit organization.phone.linked junction event
+    await emitEvent({
+      event_type: 'organization.phone.linked',
+      aggregate_type: 'organization',
+      aggregate_id: orgId,
+      event_data: {
+        organization_id: orgId,
+        phone_id: phoneId
+      },
+      tags
+    });
+  }
+
+  console.log(`[CreateOrganization] Created ${phoneIds.length} phones for ${orgId}`);
+  console.log(`[CreateOrganization] Successfully created organization ${orgId} with all related entities`);
 
   return orgId;
 }

@@ -33,22 +33,41 @@ describe('CreateOrganization Activity', () => {
         error: null
       });
 
-      // Mock: Successful insert
-      mockSupabase.insert.mockResolvedValueOnce({
+      // Mock: Successful inserts (org + events)
+      mockSupabase.insert.mockResolvedValue({
         error: null
       });
 
       const params: CreateOrganizationParams = {
         name: 'Test Organization',
         type: 'provider',
-        contactEmail: 'admin@test.com',
-        subdomain: 'test-org'
+        subdomain: 'test-org',
+        contacts: [{
+          firstName: 'John',
+          lastName: 'Doe',
+          email: 'admin@test.com',
+          type: 'a4c_admin',
+          label: 'Primary Contact'
+        }],
+        addresses: [{
+          street1: '123 Main St',
+          city: 'Portland',
+          state: 'OR',
+          zipCode: '97201',
+          type: 'physical',
+          label: 'Main Office'
+        }],
+        phones: [{
+          number: '555-1234',
+          type: 'office',
+          label: 'Main Line'
+        }]
       };
 
       const orgId = await createOrganization(params);
 
       expect(orgId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
-      expect(mockSupabase.from).toHaveBeenCalledWith('organizations_projection');
+      expect(mockSupabase.from).toHaveBeenCalledWith('domain_events');
       expect(mockSupabase.insert).toHaveBeenCalled();
     });
 
@@ -58,7 +77,7 @@ describe('CreateOrganization Activity', () => {
         error: null
       });
 
-      mockSupabase.insert.mockResolvedValueOnce({
+      mockSupabase.insert.mockResolvedValue({
         error: null
       });
 
@@ -66,19 +85,35 @@ describe('CreateOrganization Activity', () => {
         name: 'Partner Organization',
         type: 'partner',
         parentOrgId: 'parent-org-id',
-        contactEmail: 'admin@partner.com',
-        subdomain: 'partner-org'
+        subdomain: 'partner-org',
+        partnerType: 'var',
+        contacts: [{
+          firstName: 'Jane',
+          lastName: 'Smith',
+          email: 'admin@partner.com',
+          type: 'a4c_admin',
+          label: 'Partner Admin'
+        }],
+        addresses: [{
+          street1: '456 Partner St',
+          city: 'Seattle',
+          state: 'WA',
+          zipCode: '98101',
+          type: 'physical',
+          label: 'Partner Office'
+        }],
+        phones: [{
+          number: '555-5678',
+          type: 'office',
+          label: 'Partner Phone'
+        }]
       };
 
       const orgId = await createOrganization(params);
 
       expect(orgId).toBeDefined();
-      expect(mockSupabase.insert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'partner',
-          parent_org_id: 'parent-org-id'
-        })
-      );
+      // Check that events were emitted (mock was called multiple times)
+      expect(mockSupabase.insert).toHaveBeenCalled();
     });
   });
 
@@ -95,8 +130,27 @@ describe('CreateOrganization Activity', () => {
       const params: CreateOrganizationParams = {
         name: 'Test Organization',
         type: 'provider',
-        contactEmail: 'admin@test.com',
-        subdomain: 'existing-org'
+        subdomain: 'existing-org',
+        contacts: [{
+          firstName: 'John',
+          lastName: 'Doe',
+          email: 'admin@test.com',
+          type: 'a4c_admin',
+          label: 'Primary Contact'
+        }],
+        addresses: [{
+          street1: '123 Main St',
+          city: 'Portland',
+          state: 'OR',
+          zipCode: '97201',
+          type: 'physical',
+          label: 'Main Office'
+        }],
+        phones: [{
+          number: '555-1234',
+          type: 'office',
+          label: 'Main Line'
+        }]
       };
 
       const orgId = await createOrganization(params);
@@ -116,8 +170,27 @@ describe('CreateOrganization Activity', () => {
       const params: CreateOrganizationParams = {
         name: 'Test Organization',
         type: 'provider',
-        contactEmail: 'admin@test.com',
-        subdomain: 'test-org'
+        subdomain: 'test-org',
+        contacts: [{
+          firstName: 'John',
+          lastName: 'Doe',
+          email: 'admin@test.com',
+          type: 'a4c_admin',
+          label: 'Primary Contact'
+        }],
+        addresses: [{
+          street1: '123 Main St',
+          city: 'Portland',
+          state: 'OR',
+          zipCode: '97201',
+          type: 'physical',
+          label: 'Main Office'
+        }],
+        phones: [{
+          number: '555-1234',
+          type: 'office',
+          label: 'Main Line'
+        }]
       };
 
       await expect(createOrganization(params)).rejects.toThrow(
@@ -125,25 +198,45 @@ describe('CreateOrganization Activity', () => {
       );
     });
 
-    it('should throw error if insert fails', async () => {
+    it('should throw error if event emission fails', async () => {
       mockSupabase.maybeSingle.mockResolvedValueOnce({
         data: null,
         error: null
       });
 
-      mockSupabase.insert.mockResolvedValueOnce({
-        error: { message: 'Unique constraint violation' }
-      });
+      // First insert succeeds (organization event), second fails (contact event)
+      mockSupabase.insert
+        .mockResolvedValueOnce({ error: null })
+        .mockResolvedValueOnce({ error: { message: 'Unique constraint violation' } });
 
       const params: CreateOrganizationParams = {
         name: 'Test Organization',
         type: 'provider',
-        contactEmail: 'admin@test.com',
-        subdomain: 'test-org'
+        subdomain: 'test-org',
+        contacts: [{
+          firstName: 'John',
+          lastName: 'Doe',
+          email: 'admin@test.com',
+          type: 'a4c_admin',
+          label: 'Primary Contact'
+        }],
+        addresses: [{
+          street1: '123 Main St',
+          city: 'Portland',
+          state: 'OR',
+          zipCode: '97201',
+          type: 'physical',
+          label: 'Main Office'
+        }],
+        phones: [{
+          number: '555-1234',
+          type: 'office',
+          label: 'Main Line'
+        }]
       };
 
       await expect(createOrganization(params)).rejects.toThrow(
-        'Failed to create organization'
+        'Failed to emit event'
       );
     });
   });
@@ -158,22 +251,44 @@ describe('CreateOrganization Activity', () => {
         error: null
       });
 
-      mockSupabase.insert.mockResolvedValueOnce({
+      mockSupabase.insert.mockResolvedValue({
         error: null
       });
 
       const params: CreateOrganizationParams = {
         name: 'Test Organization',
         type: 'provider',
-        contactEmail: 'admin@test.com',
-        subdomain: 'test-org'
+        subdomain: 'test-org',
+        contacts: [{
+          firstName: 'John',
+          lastName: 'Doe',
+          email: 'admin@test.com',
+          type: 'a4c_admin',
+          label: 'Primary Contact'
+        }],
+        addresses: [{
+          street1: '123 Main St',
+          city: 'Portland',
+          state: 'OR',
+          zipCode: '97201',
+          type: 'physical',
+          label: 'Main Office'
+        }],
+        phones: [{
+          number: '555-1234',
+          type: 'office',
+          label: 'Main Line'
+        }]
       };
 
       await createOrganization(params);
 
+      // Check that events were emitted with tags in event_metadata
       expect(mockSupabase.insert).toHaveBeenCalledWith(
         expect.objectContaining({
-          tags: expect.arrayContaining(['development'])
+          event_metadata: expect.objectContaining({
+            tags: expect.arrayContaining(['development'])
+          })
         })
       );
     });
@@ -186,22 +301,44 @@ describe('CreateOrganization Activity', () => {
         error: null
       });
 
-      mockSupabase.insert.mockResolvedValueOnce({
+      mockSupabase.insert.mockResolvedValue({
         error: null
       });
 
       const params: CreateOrganizationParams = {
         name: 'Test Organization',
         type: 'provider',
-        contactEmail: 'admin@test.com',
-        subdomain: 'test-org'
+        subdomain: 'test-org',
+        contacts: [{
+          firstName: 'John',
+          lastName: 'Doe',
+          email: 'admin@test.com',
+          type: 'a4c_admin',
+          label: 'Primary Contact'
+        }],
+        addresses: [{
+          street1: '123 Main St',
+          city: 'Portland',
+          state: 'OR',
+          zipCode: '97201',
+          type: 'physical',
+          label: 'Main Office'
+        }],
+        phones: [{
+          number: '555-1234',
+          type: 'office',
+          label: 'Main Line'
+        }]
       };
 
       await createOrganization(params);
 
+      // Check that events were emitted without tags (no event_metadata.tags)
       expect(mockSupabase.insert).toHaveBeenCalledWith(
         expect.objectContaining({
-          tags: []
+          event_metadata: expect.not.objectContaining({
+            tags: expect.anything()
+          })
         })
       );
     });

@@ -22,18 +22,68 @@ export interface DnsRetryConfig {
 }
 
 /**
+ * Contact information for organization
+ */
+export interface ContactInfo {
+  firstName: string;
+  lastName: string;
+  email: string;
+  title?: string;
+  department?: string;
+  type: 'a4c_admin' | 'billing' | 'technical' | 'emergency' | 'stakeholder';
+  label: string;
+}
+
+/**
+ * Address information for organization
+ */
+export interface AddressInfo {
+  street1: string;
+  street2?: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  type: 'physical' | 'mailing' | 'billing';
+  label: string;
+}
+
+/**
+ * Phone information for organization
+ */
+export interface PhoneInfo {
+  number: string;
+  extension?: string;
+  type: 'mobile' | 'office' | 'fax' | 'emergency';
+  label: string;
+}
+
+/**
  * Input parameters for OrganizationBootstrapWorkflow
  */
 export interface OrganizationBootstrapParams {
-  /** Subdomain for the organization (e.g., 'acme' for acme.firstovertheline.com) */
-  subdomain: string;
+  /** Subdomain for the organization (optional - required for providers and VAR partners only) */
+  subdomain?: string;
 
   /** Organization details */
   orgData: {
     name: string;
     type: 'provider' | 'partner';
     parentOrgId?: string;  // Required for partners, optional for providers
-    contactEmail: string;
+
+    /** Contact information (at least one contact required across all sections) */
+    contacts: ContactInfo[];
+
+    /** Address information (required) */
+    addresses: AddressInfo[];
+
+    /** Phone information (required) */
+    phones: PhoneInfo[];
+
+    /** Partner type (required when type='partner') */
+    partnerType?: 'var' | 'family' | 'court' | 'other';
+
+    /** Referring partner organization ID (optional) */
+    referringPartnerId?: string;
   };
 
   /** Users to invite */
@@ -93,6 +143,9 @@ export interface WorkflowState {
   /** Whether DNS was configured */
   dnsConfigured: boolean;
 
+  /** Whether DNS was skipped (no subdomain required) */
+  dnsSkipped: boolean;
+
   /** Whether invitations were sent */
   invitationsSent: boolean;
 
@@ -114,8 +167,12 @@ export interface CreateOrganizationParams {
   name: string;
   type: 'provider' | 'partner';
   parentOrgId?: string;
-  contactEmail: string;
-  subdomain: string;
+  subdomain?: string;
+  contacts: ContactInfo[];
+  addresses: AddressInfo[];
+  phones: PhoneInfo[];
+  partnerType?: 'var' | 'family' | 'court' | 'other';
+  referringPartnerId?: string;
 }
 
 /**
@@ -218,6 +275,27 @@ export interface DeactivateOrganizationParams {
  * RevokeInvitationsActivity parameters (compensation)
  */
 export interface RevokeInvitationsParams {
+  orgId: string;
+}
+
+/**
+ * DeleteContactsActivity parameters (compensation)
+ */
+export interface DeleteContactsParams {
+  orgId: string;
+}
+
+/**
+ * DeleteAddressesActivity parameters (compensation)
+ */
+export interface DeleteAddressesParams {
+  orgId: string;
+}
+
+/**
+ * DeletePhonesActivity parameters (compensation)
+ */
+export interface DeletePhonesParams {
   orgId: string;
 }
 
