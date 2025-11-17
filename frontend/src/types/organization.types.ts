@@ -1,52 +1,81 @@
 /**
  * Organization Management Type Definitions
  *
- * MVP Scope:
- * - 1 A4C Admin contact
- * - 1 Billing address
- * - 1 Billing phone
- * - 1 Program
+ * Enhanced Scope (Part B):
+ * - General Information: Organization-level address + phone (NO contact)
+ * - Billing Information: Contact + Address + Phone (conditional for providers)
+ * - Provider Admin Information: Contact + Address + Phone (always visible)
+ * - Referring Partner relationship tracking
+ * - Partner type classification
  */
 
 /**
+ * Contact form data with label and type classification
+ */
+export interface ContactFormData {
+  label: string;
+  type: 'billing' | 'technical' | 'emergency' | 'a4c_admin';
+  firstName: string;
+  lastName: string;
+  email: string;
+  title?: string;
+  department?: string;
+}
+
+/**
+ * Address form data with label and type classification
+ */
+export interface AddressFormData {
+  label: string;
+  type: 'physical' | 'mailing' | 'billing';
+  street1: string;
+  street2?: string;
+  city: string;
+  state: string;
+  zipCode: string;
+}
+
+/**
+ * Phone form data with label and type classification
+ */
+export interface PhoneFormData {
+  label: string;
+  type: 'mobile' | 'office' | 'fax' | 'emergency';
+  number: string; // Formatted: (xxx) xxx-xxxx
+  extension?: string;
+}
+
+/**
  * Organization form data (ViewModel state + draft storage)
+ * Enhanced for Part B with 3-section structure
  */
 export interface OrganizationFormData {
-  // General Information
-  type: 'provider' | 'partner';
+  // General Information (Organization-level)
+  type: 'provider' | 'provider_partner';
   name: string;
   displayName: string;
   subdomain: string;
   timeZone: string;
+  referringPartnerId?: string; // VAR partner who referred this org
+  partnerType?: 'var' | 'family' | 'court' | 'other'; // Required if type is 'provider_partner'
 
-  // Contact Information (MVP: Single A4C Admin)
-  adminContact: {
-    label: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
+  // General Information (Headquarters - NO contact)
+  generalAddress: AddressFormData;
+  generalPhone: PhoneFormData;
 
-  // Billing Information (MVP: Single address + phone)
-  billingAddress: {
-    label: string;
-    street1: string;
-    street2: string;
-    city: string;
-    state: string;
-    zipCode: string;
-  };
+  // Billing Information (Conditional for providers)
+  billingContact: ContactFormData;
+  billingAddress: AddressFormData;
+  billingPhone: PhoneFormData;
+  useBillingGeneralAddress: boolean; // "Use General Information" checkbox
+  useBillingGeneralPhone: boolean; // "Use General Information" checkbox
 
-  billingPhone: {
-    label: string;
-    number: string; // Formatted: (xxx) xxx-xxxx
-  };
-
-  // Program Information (MVP: Single program)
-  program: {
-    name: string;
-    type: string;
-  };
+  // Provider Admin Information (Always visible)
+  providerAdminContact: ContactFormData;
+  providerAdminAddress: AddressFormData;
+  providerAdminPhone: PhoneFormData;
+  useProviderAdminGeneralAddress: boolean; // "Use General Information" checkbox
+  useProviderAdminGeneralPhone: boolean; // "Use General Information" checkbox
 
   // Metadata
   status: 'draft' | 'pending' | 'running' | 'completed' | 'failed';
@@ -56,23 +85,58 @@ export interface OrganizationFormData {
 }
 
 /**
+ * Contact info for workflow (matches Phase 3 backend)
+ */
+export interface ContactInfo {
+  firstName: string;
+  lastName: string;
+  email: string;
+  title?: string;
+  department?: string;
+  type: string; // contact_type enum value
+  label: string;
+}
+
+/**
+ * Address info for workflow (matches Phase 3 backend)
+ */
+export interface AddressInfo {
+  street1: string;
+  street2?: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  type: string; // address_type enum value
+  label: string;
+}
+
+/**
+ * Phone info for workflow (matches Phase 3 backend)
+ */
+export interface PhoneInfo {
+  number: string;
+  extension?: string;
+  type: string; // phone_type enum value
+  label: string;
+}
+
+/**
  * Parameters for starting organization bootstrap workflow
- * Maps to Temporal workflow interface
+ * Maps to Temporal workflow interface (Phase 3 enhanced)
  */
 export interface OrganizationBootstrapParams {
   orgData: {
     name: string;
-    type: 'provider' | 'partner';
-    parentOrgId?: string; // For partner organizations
-    contactEmail: string;
+    displayName: string;
+    type: 'provider' | 'provider_partner';
+    timeZone: string;
+    referringPartnerId?: string;
+    partnerType?: 'var' | 'family' | 'court' | 'other';
   };
-  subdomain: string;
-  users: Array<{
-    email: string;
-    firstName: string;
-    lastName: string;
-    role: 'provider_admin' | 'organization_member';
-  }>;
+  subdomain?: string; // Optional for stakeholder partners
+  contacts: ContactInfo[]; // Array of contacts (Billing + Provider Admin)
+  addresses: AddressInfo[]; // Array of addresses (General + Billing + Provider Admin)
+  phones: PhoneInfo[]; // Array of phones (General + Billing + Provider Admin)
   dnsPropagationTimeout?: number; // Optional, defaults to 30 minutes in workflow
 }
 

@@ -1,0 +1,192 @@
+import { forwardRef, useCallback, type ComponentPropsWithoutRef } from "react";
+import * as Select from "@radix-ui/react-select";
+import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { PhoneFormData } from "@/types/organization.types";
+import { formatPhone } from "@/utils/organization-validation";
+
+/**
+ * PhoneInputEnhanced - Phone information input component with label and type classification
+ *
+ * Features:
+ * - Label field (user-defined phone identifier)
+ * - Type dropdown (Mobile, Office, Fax, Emergency)
+ * - Phone number with auto-formatting (XXX) XXX-XXXX
+ * - Extension field (optional)
+ * - Full keyboard navigation support
+ * - WCAG 2.1 Level AA compliant
+ *
+ * @example
+ * ```tsx
+ * <PhoneInputEnhanced
+ *   value={generalPhone}
+ *   onChange={(phone) => viewModel.setGeneralPhone(phone)}
+ *   disabled={false}
+ * />
+ * ```
+ */
+
+interface PhoneInputEnhancedProps extends Omit<ComponentPropsWithoutRef<"div">, "onChange"> {
+  value: PhoneFormData;
+  onChange: (phone: PhoneFormData) => void;
+  disabled?: boolean;
+}
+
+const PHONE_TYPES = [
+  { value: "mobile", label: "Mobile" },
+  { value: "office", label: "Office" },
+  { value: "fax", label: "Fax" },
+  { value: "emergency", label: "Emergency" },
+] as const;
+
+export const PhoneInputEnhanced = forwardRef<HTMLDivElement, PhoneInputEnhancedProps>(
+  ({ value, onChange, disabled = false, className, ...props }, ref) => {
+    const handleChange = (field: keyof PhoneFormData, newValue: string) => {
+      onChange({ ...value, [field]: newValue });
+    };
+
+    const handlePhoneChange = useCallback(
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        const formatted = formatPhone(e.target.value);
+        onChange({ ...value, number: formatted });
+      },
+      [onChange, value]
+    );
+
+    const handlePhoneBlur = useCallback(() => {
+      const formatted = formatPhone(value.number);
+      if (formatted !== value.number) {
+        onChange({ ...value, number: formatted });
+      }
+    }, [value, onChange]);
+
+    return (
+      <div ref={ref} className={cn("space-y-4", className)} {...props}>
+        {/* Label */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">
+            Phone Label <span className="text-destructive">*</span>
+          </label>
+          <input
+            type="text"
+            value={value.label}
+            onChange={(e) => handleChange("label", e.target.value)}
+            disabled={disabled}
+            placeholder="e.g., Main Office"
+            className={cn(
+              "w-full px-3 py-2 rounded-md border border-input bg-background",
+              "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
+              "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
+              "transition-colors"
+            )}
+            aria-label="Phone label"
+            aria-required="true"
+          />
+        </div>
+
+        {/* Type Dropdown */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">
+            Phone Type <span className="text-destructive">*</span>
+          </label>
+          <Select.Root
+            value={value.type}
+            onValueChange={(newType: string) => handleChange("type", newType)}
+            disabled={disabled}
+          >
+            <Select.Trigger
+              className={cn(
+                "w-full px-3 py-2 rounded-md border border-input bg-background",
+                "flex items-center justify-between",
+                "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
+                "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
+                "transition-colors"
+              )}
+              aria-label="Phone type"
+              aria-required="true"
+            >
+              <Select.Value placeholder="Select type..." />
+              <Select.Icon>
+                <ChevronDown className="h-4 w-4 opacity-50" />
+              </Select.Icon>
+            </Select.Trigger>
+            <Select.Portal>
+              <Select.Content
+                className={cn(
+                  "overflow-hidden bg-popover rounded-md border border-border shadow-md",
+                  "z-50"
+                )}
+              >
+                <Select.Viewport className="p-1">
+                  {PHONE_TYPES.map((type) => (
+                    <Select.Item
+                      key={type.value}
+                      value={type.value}
+                      className={cn(
+                        "relative flex items-center px-8 py-2 rounded-sm",
+                        "cursor-pointer select-none outline-none",
+                        "hover:bg-accent hover:text-accent-foreground",
+                        "focus:bg-accent focus:text-accent-foreground",
+                        "data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
+                      )}
+                    >
+                      <Select.ItemText>{type.label}</Select.ItemText>
+                    </Select.Item>
+                  ))}
+                </Select.Viewport>
+              </Select.Content>
+            </Select.Portal>
+          </Select.Root>
+        </div>
+
+        {/* Phone Number */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">
+            Phone Number <span className="text-destructive">*</span>
+          </label>
+          <input
+            type="tel"
+            value={value.number}
+            onChange={handlePhoneChange}
+            onBlur={handlePhoneBlur}
+            disabled={disabled}
+            placeholder="(555) 123-4567"
+            maxLength={14} // (XXX) XXX-XXXX = 14 characters
+            className={cn(
+              "w-full px-3 py-2 rounded-md border border-input bg-background",
+              "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
+              "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
+              "transition-colors"
+            )}
+            aria-label="Phone number"
+            aria-required="true"
+          />
+        </div>
+
+        {/* Extension (Optional) */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">
+            Extension
+          </label>
+          <input
+            type="text"
+            value={value.extension || ""}
+            onChange={(e) => handleChange("extension", e.target.value)}
+            disabled={disabled}
+            placeholder="e.g., 1234"
+            maxLength={10}
+            className={cn(
+              "w-full px-3 py-2 rounded-md border border-input bg-background",
+              "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
+              "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
+              "transition-colors"
+            )}
+            aria-label="Phone extension (optional)"
+          />
+        </div>
+      </div>
+    );
+  }
+);
+
+PhoneInputEnhanced.displayName = "PhoneInputEnhanced";
