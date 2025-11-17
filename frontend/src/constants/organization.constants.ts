@@ -24,21 +24,50 @@ export const US_TIME_ZONES = [
  */
 export const ORGANIZATION_TYPES = [
   { value: 'provider', label: 'Provider Organization' },
-  { value: 'partner', label: 'Partner Organization' }
+  { value: 'provider_partner', label: 'Provider Partner' }
 ] as const;
 
 /**
- * Program Types
- * Treatment program categories for substance use disorder services
+ * Partner Types
+ * Classification for provider_partner organizations
  */
-export const PROGRAM_TYPES = [
-  { value: 'residential', label: 'Residential Treatment' },
-  { value: 'outpatient', label: 'Outpatient Treatment' },
-  { value: 'day_treatment', label: 'Day Treatment' },
-  { value: 'iop', label: 'Intensive Outpatient (IOP)' },
-  { value: 'php', label: 'Partial Hospitalization (PHP)' },
-  { value: 'sober_living', label: 'Sober Living' },
-  { value: 'mat', label: 'Medication-Assisted Treatment (MAT)' }
+export const PARTNER_TYPES = [
+  { value: 'var', label: 'Value-Added Reseller (VAR)' },
+  { value: 'family', label: 'Family Service Organization' },
+  { value: 'court', label: 'Court System Partner' },
+  { value: 'other', label: 'Other Partner Type' }
+] as const;
+
+/**
+ * Contact Types
+ * Classification for contact records
+ */
+export const CONTACT_TYPES = [
+  { value: 'billing', label: 'Billing' },
+  { value: 'technical', label: 'Technical' },
+  { value: 'emergency', label: 'Emergency' },
+  { value: 'a4c_admin', label: 'A4C Admin' }
+] as const;
+
+/**
+ * Address Types
+ * Classification for address records
+ */
+export const ADDRESS_TYPES = [
+  { value: 'physical', label: 'Physical' },
+  { value: 'mailing', label: 'Mailing' },
+  { value: 'billing', label: 'Billing' }
+] as const;
+
+/**
+ * Phone Types
+ * Classification for phone records
+ */
+export const PHONE_TYPES = [
+  { value: 'mobile', label: 'Mobile' },
+  { value: 'office', label: 'Office' },
+  { value: 'fax', label: 'Fax' },
+  { value: 'emergency', label: 'Emergency' }
 ] as const;
 
 /**
@@ -145,21 +174,48 @@ export const WORKFLOW_STATUS_LABELS = {
 
 /**
  * Default form values for new organization creation
+ * Enhanced for Part B with 3-section structure
  */
 export const DEFAULT_ORGANIZATION_FORM = {
+  // General Information (Organization-level)
   type: 'provider' as const,
   name: '',
   displayName: '',
   subdomain: '',
   timeZone: 'America/New_York',
-  adminContact: {
-    label: CONTACT_LABELS.A4C_ADMIN,
+  referringPartnerId: undefined,
+  partnerType: undefined,
+
+  // General Information (Headquarters - NO contact)
+  generalAddress: {
+    label: 'Headquarters Address',
+    type: 'physical' as const,
+    street1: '',
+    street2: '',
+    city: '',
+    state: '',
+    zipCode: ''
+  },
+  generalPhone: {
+    label: 'Main Office Phone',
+    type: 'office' as const,
+    number: '',
+    extension: ''
+  },
+
+  // Billing Information (Conditional for providers)
+  billingContact: {
+    label: 'Billing Contact',
+    type: 'billing' as const,
     firstName: '',
     lastName: '',
-    email: ''
+    email: '',
+    title: '',
+    department: ''
   },
   billingAddress: {
-    label: ADDRESS_LABELS.BILLING,
+    label: 'Billing Address',
+    type: 'billing' as const,
     street1: '',
     street2: '',
     city: '',
@@ -167,12 +223,42 @@ export const DEFAULT_ORGANIZATION_FORM = {
     zipCode: ''
   },
   billingPhone: {
-    label: PHONE_LABELS.BILLING,
-    number: ''
+    label: 'Billing Phone',
+    type: 'office' as const,
+    number: '',
+    extension: ''
   },
-  program: {
-    name: '',
-    type: ''
+  useBillingGeneralAddress: false,
+  useBillingGeneralPhone: false,
+
+  // Provider Admin Information (Always visible)
+  providerAdminContact: {
+    label: 'Provider Admin Contact',
+    type: 'a4c_admin' as const,
+    firstName: '',
+    lastName: '',
+    email: '',
+    title: '',
+    department: ''
   },
+  providerAdminAddress: {
+    label: 'Provider Admin Address',
+    type: 'physical' as const,
+    street1: '',
+    street2: '',
+    city: '',
+    state: '',
+    zipCode: ''
+  },
+  providerAdminPhone: {
+    label: 'Provider Admin Phone',
+    type: 'mobile' as const,
+    number: '',
+    extension: ''
+  },
+  useProviderAdminGeneralAddress: false,
+  useProviderAdminGeneralPhone: false,
+
+  // Metadata
   status: 'draft' as const
 };

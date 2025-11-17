@@ -224,6 +224,8 @@ export class MockWorkflowClient implements IWorkflowClient {
    *
    * Returns realistic-looking data based on user input instead of synthetic values.
    * This provides better development UX by showing data that matches what was entered.
+   *
+   * Enhanced for Part B: Uses new contacts array structure.
    */
   private generateMockResult(
     params: OrganizationBootstrapParams
@@ -235,26 +237,27 @@ export class MockWorkflowClient implements IWorkflowClient {
       .replace(/^-+|-+$/g, '');
     const orgId = `org-${orgSlug}-${Date.now()}`;
 
-    // Build domain from actual subdomain (keep hardcoded .a4c.app for now)
-    // TODO: Once custom domains are supported, use custom domain if provided
-    const domain = `${params.subdomain}.a4c.app`;
+    // Build domain from actual subdomain (if provided)
+    const domain = params.subdomain ? `${params.subdomain}.a4c.app` : 'a4c.app';
+    const dnsConfigured = Boolean(params.subdomain);
 
-    // Return actual admin user data (first user is always admin in bootstrap)
-    const adminUser = params.users[0];
+    // Provider admin is always the last contact in the array
+    // (Providers: billing + providerAdmin, Partners: providerAdmin only)
+    const providerAdminContact = params.contacts[params.contacts.length - 1];
 
     return {
       orgId,
       organizationName: params.orgData.name,
       subdomain: params.subdomain,
       domain,
-      dnsConfigured: true,
+      dnsConfigured,
       adminUser: {
-        email: adminUser.email,
-        firstName: adminUser.firstName,
-        lastName: adminUser.lastName,
-        role: adminUser.role
+        email: providerAdminContact.email,
+        firstName: providerAdminContact.firstName,
+        lastName: providerAdminContact.lastName,
+        role: 'provider_admin'
       },
-      invitationsSent: params.users.length,
+      invitationsSent: params.contacts.length, // One invitation per contact
       createdAt: new Date().toISOString()
     };
   }

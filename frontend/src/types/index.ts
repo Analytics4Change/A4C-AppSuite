@@ -17,5 +17,12 @@ export type {
   AcceptInvitationResult,
   Organization,
   OrganizationFilterOptions,
-  OrganizationStatistics
+  OrganizationStatistics,
+  // Part B Enhanced Types
+  ContactFormData,
+  AddressFormData,
+  PhoneFormData,
+  ContactInfo,
+  AddressInfo,
+  PhoneInfo
 } from './organization.types';

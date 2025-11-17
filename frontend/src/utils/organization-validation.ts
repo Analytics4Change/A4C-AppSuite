@@ -192,6 +192,7 @@ export function formatSubdomain(value: string): string {
 
 /**
  * Validate organization form data
+ * Enhanced for Part B with 3-section structure
  *
  * @param data - Organization form data
  * @returns Validation result with errors
@@ -201,45 +202,143 @@ export function validateOrganizationForm(
 ): ValidationResult {
   const errors: ValidationError[] = [];
 
-  // Organization Information
+  // Determine if subdomain is required and if billing section should be validated
+  const isProvider = data.type === 'provider';
+  const isSubdomainRequired =
+    data.type === 'provider' || (data.type === 'provider_partner' && data.partnerType === 'var');
+
+  // General Information (Organization-level)
   addError(errors, 'name', ValidationRules.required(data.name, 'Organization name'));
   addError(errors, 'displayName', ValidationRules.required(data.displayName, 'Display name'));
-  addError(errors, 'subdomain', ValidationRules.subdomain(data.subdomain));
   addError(errors, 'timeZone', ValidationRules.required(data.timeZone, 'Time zone'));
 
-  // Admin Contact
-  addError(
-    errors,
-    'adminContact.firstName',
-    ValidationRules.required(data.adminContact.firstName, 'First name')
-  );
-  addError(
-    errors,
-    'adminContact.lastName',
-    ValidationRules.required(data.adminContact.lastName, 'Last name')
-  );
-  addError(errors, 'adminContact.email', ValidationRules.email(data.adminContact.email));
+  // Subdomain (conditionally required)
+  if (isSubdomainRequired) {
+    addError(errors, 'subdomain', ValidationRules.subdomain(data.subdomain));
+  }
 
-  // Billing Address
+  // Partner type (required if provider_partner)
+  if (data.type === 'provider_partner' && !data.partnerType) {
+    addError(errors, 'partnerType', 'Partner type is required');
+  }
+
+  // General Information (Headquarters - NO contact, just address and phone)
   addError(
     errors,
-    'billingAddress.street1',
-    ValidationRules.required(data.billingAddress.street1, 'Street address')
+    'generalAddress.street1',
+    ValidationRules.required(data.generalAddress.street1, 'Headquarters street address')
   );
-  addError(errors, 'billingAddress.city', ValidationRules.required(data.billingAddress.city, 'City'));
   addError(
     errors,
-    'billingAddress.state',
-    ValidationRules.required(data.billingAddress.state, 'State')
+    'generalAddress.city',
+    ValidationRules.required(data.generalAddress.city, 'Headquarters city')
   );
-  addError(errors, 'billingAddress.zipCode', ValidationRules.zipCode(data.billingAddress.zipCode));
+  addError(
+    errors,
+    'generalAddress.state',
+    ValidationRules.required(data.generalAddress.state, 'Headquarters state')
+  );
+  addError(
+    errors,
+    'generalAddress.zipCode',
+    ValidationRules.zipCode(data.generalAddress.zipCode)
+  );
+  addError(errors, 'generalPhone.number', ValidationRules.phone(data.generalPhone.number));
 
-  // Billing Phone
-  addError(errors, 'billingPhone.number', ValidationRules.phone(data.billingPhone.number));
+  // Billing Information (Only for providers)
+  if (isProvider) {
+    // Billing Contact
+    addError(
+      errors,
+      'billingContact.firstName',
+      ValidationRules.required(data.billingContact.firstName, 'Billing contact first name')
+    );
+    addError(
+      errors,
+      'billingContact.lastName',
+      ValidationRules.required(data.billingContact.lastName, 'Billing contact last name')
+    );
+    addError(errors, 'billingContact.email', ValidationRules.email(data.billingContact.email));
 
-  // Program
-  addError(errors, 'program.name', ValidationRules.required(data.program.name, 'Program name'));
-  addError(errors, 'program.type', ValidationRules.required(data.program.type, 'Program type'));
+    // Billing Address (if not using general)
+    if (!data.useBillingGeneralAddress) {
+      addError(
+        errors,
+        'billingAddress.street1',
+        ValidationRules.required(data.billingAddress.street1, 'Billing street address')
+      );
+      addError(
+        errors,
+        'billingAddress.city',
+        ValidationRules.required(data.billingAddress.city, 'Billing city')
+      );
+      addError(
+        errors,
+        'billingAddress.state',
+        ValidationRules.required(data.billingAddress.state, 'Billing state')
+      );
+      addError(
+        errors,
+        'billingAddress.zipCode',
+        ValidationRules.zipCode(data.billingAddress.zipCode)
+      );
+    }
+
+    // Billing Phone (if not using general)
+    if (!data.useBillingGeneralPhone) {
+      addError(errors, 'billingPhone.number', ValidationRules.phone(data.billingPhone.number));
+    }
+  }
+
+  // Provider Admin Information (Always required)
+  addError(
+    errors,
+    'providerAdminContact.firstName',
+    ValidationRules.required(data.providerAdminContact.firstName, 'Provider admin first name')
+  );
+  addError(
+    errors,
+    'providerAdminContact.lastName',
+    ValidationRules.required(data.providerAdminContact.lastName, 'Provider admin last name')
+  );
+  addError(
+    errors,
+    'providerAdminContact.email',
+    ValidationRules.email(data.providerAdminContact.email)
+  );
+
+  // Provider Admin Address (if not using general)
+  if (!data.useProviderAdminGeneralAddress) {
+    addError(
+      errors,
+      'providerAdminAddress.street1',
+      ValidationRules.required(data.providerAdminAddress.street1, 'Provider admin street address')
+    );
+    addError(
+      errors,
+      'providerAdminAddress.city',
+      ValidationRules.required(data.providerAdminAddress.city, 'Provider admin city')
+    );
+    addError(
+      errors,
+      'providerAdminAddress.state',
+      ValidationRules.required(data.providerAdminAddress.state, 'Provider admin state')
+    );
+    addError(
+      errors,
+      'providerAdminAddress.zipCode',
+      ValidationRules.zipCode(data.providerAdminAddress.zipCode)
+    );
+  }
+
+  // Provider Admin Phone (if not using general)
+  if (!data.useProviderAdminGeneralPhone) {
+    addError(
+      errors,
+      'providerAdminPhone.number',
+      ValidationRules.phone(data.providerAdminPhone.number)
+    );
+  }
 
   return {
     isValid: errors.length === 0,
