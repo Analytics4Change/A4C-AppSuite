@@ -279,9 +279,9 @@ export const OrganizationListPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {organizations.map((org) => (
               <Card
-                key={org.org_id}
+                key={org.id}
                 className="transition-all duration-300 cursor-pointer"
-                onClick={() => navigate(`/organizations/${org.org_id}/dashboard`)}
+                onClick={() => navigate(`/organizations/${org.id}/dashboard`)}
                 style={{
                   background: 'rgba(255, 255, 255, 0.7)',
                   backdropFilter: 'blur(20px)',
@@ -321,7 +321,7 @@ export const OrganizationListPage: React.FC = () => {
                       className="flex-1"
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/organizations/${org.org_id}/dashboard`);
+                        navigate(`/organizations/${org.id}/dashboard`);
                       }}
                     >
                       <Eye size={14} className="mr-1" />
@@ -333,7 +333,7 @@ export const OrganizationListPage: React.FC = () => {
                       className="flex-1"
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/organizations/${org.org_id}/edit`);
+                        navigate(`/organizations/${org.id}/edit`);
                       }}
                     >
                       <Edit size={14} className="mr-1" />
