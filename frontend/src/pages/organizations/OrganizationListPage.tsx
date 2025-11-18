@@ -39,6 +39,7 @@ const log = Logger.getLogger('component');
  * Displays organizations and drafts with filtering and search.
  */
 export const OrganizationListPage: React.FC = () => {
+  console.log('[OrganizationListPage] 🚀 COMPONENT RENDERING');
   const navigate = useNavigate();
   const organizationService = new OrganizationService();
 
@@ -48,6 +49,7 @@ export const OrganizationListPage: React.FC = () => {
   const [organizations] = useState<Organization[]>([]); // TODO: Fetch from API
 
   useEffect(() => {
+    console.log('[OrganizationListPage] ✅ COMPONENT MOUNTED');
     log.debug('OrganizationListPage mounting');
     loadDrafts();
   }, []);
