@@ -112,9 +112,6 @@ export const OrganizationCreatePage: React.FC = observer(() => {
             <h1 className="text-4xl font-bold text-gray-900 mb-2">
               Create New Organization
             </h1>
-            <p className="text-gray-600">
-              Complete all sections to onboard a new {isProvider ? 'provider' : 'partner'} organization
-            </p>
           </div>
 
           {/* Section 1: General Information */}
@@ -182,21 +179,19 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                   >
                     <div className="space-y-3">
                       {/* Organization Type */}
-                      <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-gray-900 text-left text-sm">
-                          Organization Type<span className="text-red-600">*</span>:
-                        </Label>
-                        <SelectDropdown
-                          id="org-type"
-                          label="Organization Type"
-                          value={formData.type}
-                          options={ORGANIZATION_TYPES.map((t) => ({
-                            value: t.value,
-                            label: t.label
-                          }))}
-                          onChange={(value) => viewModel.updateField('type', value as 'provider' | 'provider_partner')}
-                        />
-                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Organization Type
+                      </h3>
+                      <SelectDropdown
+                        id="org-type"
+                        label="Organization Type"
+                        value={formData.type}
+                        options={ORGANIZATION_TYPES.map((t) => ({
+                          value: t.value,
+                          label: t.label
+                        }))}
+                        onChange={(value) => viewModel.updateField('type', value as 'provider' | 'provider_partner')}
+                      />
 
                       {/* Partner Type (conditional) */}
                       {isPartner && (
@@ -231,7 +226,6 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                           <Input
                             value={formData.name}
                             onChange={(e) => viewModel.updateField('name', e.target.value)}
-                            placeholder="e.g., Sunshine Recovery Center"
                             className="bg-white/70 border-white/30 text-gray-900 placeholder:text-gray-500"
                             style={{
                               backdropFilter: 'blur(10px)',
@@ -255,7 +249,6 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                           <Input
                             value={formData.displayName}
                             onChange={(e) => viewModel.updateField('displayName', e.target.value)}
-                            placeholder="e.g., Sunshine Recovery"
                             className="bg-white/70 border-white/30 text-gray-900 placeholder:text-gray-500"
                             style={{
                               backdropFilter: 'blur(10px)',

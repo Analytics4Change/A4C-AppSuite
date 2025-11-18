@@ -84,7 +84,7 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
                   aria-label="Address type"
                   aria-required="true"
                 >
-                  <Select.Value placeholder="Select type..." />
+                  <Select.Value />
                   <Select.Icon>
                     <ChevronDown className="h-4 w-4 opacity-50" />
                   </Select.Icon>

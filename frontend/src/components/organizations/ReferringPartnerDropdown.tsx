@@ -96,7 +96,7 @@ export const ReferringPartnerDropdown = observer(
               aria-label="Referring partner"
               aria-describedby="referring-partner-description"
             >
-              <Select.Value placeholder={loading ? "Loading partners..." : "Select referring partner..."} />
+              <Select.Value />
               <Select.Icon>
                 <ChevronDown className="h-4 w-4 opacity-50" />
               </Select.Icon>

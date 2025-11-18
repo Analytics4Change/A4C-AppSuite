@@ -101,7 +101,7 @@ export const PhoneInputEnhanced = forwardRef<HTMLDivElement, PhoneInputEnhancedP
                   aria-label="Phone type"
                   aria-required="true"
                 >
-                  <Select.Value placeholder="Select type..." />
+                  <Select.Value />
                   <Select.Icon>
                     <ChevronDown className="h-4 w-4 opacity-50" />
                   </Select.Icon>
