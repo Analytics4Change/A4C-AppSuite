@@ -178,20 +178,27 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                     }}
                   >
                     <div className="space-y-3">
-                      {/* Organization Type */}
+                      {/* Organization Info */}
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                        Organization Type
+                        Organization Info
                       </h3>
-                      <SelectDropdown
-                        id="org-type"
-                        label="Organization Type"
-                        value={formData.type}
-                        options={ORGANIZATION_TYPES.map((t) => ({
-                          value: t.value,
-                          label: t.label
-                        }))}
-                        onChange={(value) => viewModel.updateField('type', value as 'provider' | 'provider_partner')}
-                      />
+
+                      {/* Organization Type */}
+                      <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+                        <Label className="text-gray-900 text-left text-sm">
+                          Organization Type<span className="text-red-600">*</span>:
+                        </Label>
+                        <SelectDropdown
+                          id="org-type"
+                          label="Organization Type"
+                          value={formData.type}
+                          options={ORGANIZATION_TYPES.map((t) => ({
+                            value: t.value,
+                            label: t.label
+                          }))}
+                          onChange={(value) => viewModel.updateField('type', value as 'provider' | 'provider_partner')}
+                        />
+                      </div>
 
                       {/* Partner Type (conditional) */}
                       {isPartner && (
