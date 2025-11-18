@@ -61,128 +61,132 @@ export const PhoneInputEnhanced = forwardRef<HTMLDivElement, PhoneInputEnhancedP
     }, [value, onChange]);
 
     return (
-      <div ref={ref} className={cn("space-y-3", className)} {...props}>
-        {/* Phone Label */}
-        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-          <label className="text-foreground text-right text-sm pt-2">
-            Phone Label<span className="text-destructive">*</span>:
-          </label>
-          <input
-            type="text"
-            value={value.label}
-            onChange={(e) => handleChange("label", e.target.value)}
-            disabled={disabled}
-            placeholder="e.g., Main Office"
-            className={cn(
-              "w-full px-3 py-2 rounded-md border border-input bg-background",
-              "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-              "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-              "transition-colors"
-            )}
-            aria-label="Phone label"
-            aria-required="true"
-          />
-        </div>
-
-        {/* Phone Type Dropdown */}
-        <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-          <label className="text-foreground text-right text-sm">
-            Phone Type<span className="text-destructive">*</span>:
-          </label>
-          <Select.Root
-            value={value.type}
-            onValueChange={(newType: string) => handleChange("type", newType)}
-            disabled={disabled}
-          >
-            <Select.Trigger
-              className={cn(
-                "w-full px-3 py-2 rounded-md border border-input bg-background",
-                "flex items-center justify-between",
-                "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                "transition-colors"
-              )}
-              aria-label="Phone type"
-              aria-required="true"
-            >
-              <Select.Value placeholder="Select type..." />
-              <Select.Icon>
-                <ChevronDown className="h-4 w-4 opacity-50" />
-              </Select.Icon>
-            </Select.Trigger>
-            <Select.Portal>
-              <Select.Content
+      <div ref={ref} className={cn(className)} {...props}>
+        <div className="bg-white p-6 rounded-lg border border-gray-200">
+          <div className="space-y-3">
+            {/* Phone Label */}
+            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+              <label className="text-foreground text-left text-sm pt-2">
+                Phone Label<span className="text-destructive">*</span>:
+              </label>
+              <input
+                type="text"
+                value={value.label}
+                onChange={(e) => handleChange("label", e.target.value)}
+                disabled={disabled}
+                placeholder="e.g., Main Office"
                 className={cn(
-                  "overflow-hidden bg-popover rounded-md border border-border shadow-md",
-                  "z-50"
+                  "w-full px-3 py-2 rounded-md border border-input bg-background",
+                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
+                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
+                  "transition-colors"
                 )}
+                aria-label="Phone label"
+                aria-required="true"
+              />
+            </div>
+
+            {/* Phone Type Dropdown */}
+            <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+              <label className="text-foreground text-left text-sm">
+                Phone Type<span className="text-destructive">*</span>:
+              </label>
+              <Select.Root
+                value={value.type}
+                onValueChange={(newType: string) => handleChange("type", newType)}
+                disabled={disabled}
               >
-                <Select.Viewport className="p-1">
-                  {PHONE_TYPES.map((type) => (
-                    <Select.Item
-                      key={type.value}
-                      value={type.value}
-                      className={cn(
-                        "relative flex items-center px-8 py-2 rounded-sm",
-                        "cursor-pointer select-none outline-none",
-                        "hover:bg-accent hover:text-accent-foreground",
-                        "focus:bg-accent focus:text-accent-foreground",
-                        "data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
-                      )}
-                    >
-                      <Select.ItemText>{type.label}</Select.ItemText>
-                    </Select.Item>
-                  ))}
-                </Select.Viewport>
-              </Select.Content>
-            </Select.Portal>
-          </Select.Root>
-        </div>
+                <Select.Trigger
+                  className={cn(
+                    "w-full px-3 py-2 rounded-md border border-input bg-background",
+                    "flex items-center justify-between",
+                    "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
+                    "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
+                    "transition-colors"
+                  )}
+                  aria-label="Phone type"
+                  aria-required="true"
+                >
+                  <Select.Value placeholder="Select type..." />
+                  <Select.Icon>
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  </Select.Icon>
+                </Select.Trigger>
+                <Select.Portal>
+                  <Select.Content
+                    className={cn(
+                      "overflow-hidden bg-popover rounded-md border border-border shadow-md",
+                      "z-50"
+                    )}
+                  >
+                    <Select.Viewport className="p-1">
+                      {PHONE_TYPES.map((type) => (
+                        <Select.Item
+                          key={type.value}
+                          value={type.value}
+                          className={cn(
+                            "relative flex items-center px-8 py-2 rounded-sm",
+                            "cursor-pointer select-none outline-none",
+                            "hover:bg-accent hover:text-accent-foreground",
+                            "focus:bg-accent focus:text-accent-foreground",
+                            "data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
+                          )}
+                        >
+                          <Select.ItemText>{type.label}</Select.ItemText>
+                        </Select.Item>
+                      ))}
+                    </Select.Viewport>
+                  </Select.Content>
+                </Select.Portal>
+              </Select.Root>
+            </div>
 
-        {/* Phone Number */}
-        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-          <label className="text-foreground text-right text-sm pt-2">
-            Phone Number<span className="text-destructive">*</span>:
-          </label>
-          <input
-            type="tel"
-            value={value.number}
-            onChange={handlePhoneChange}
-            onBlur={handlePhoneBlur}
-            disabled={disabled}
-            placeholder="(555) 123-4567"
-            maxLength={14} // (XXX) XXX-XXXX = 14 characters
-            className={cn(
-              "w-full px-3 py-2 rounded-md border border-input bg-background",
-              "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-              "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-              "transition-colors"
-            )}
-            aria-label="Phone number"
-            aria-required="true"
-          />
-        </div>
+            {/* Phone Number */}
+            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+              <label className="text-foreground text-left text-sm pt-2">
+                Phone Number<span className="text-destructive">*</span>:
+              </label>
+              <input
+                type="tel"
+                value={value.number}
+                onChange={handlePhoneChange}
+                onBlur={handlePhoneBlur}
+                disabled={disabled}
+                placeholder="(555) 123-4567"
+                maxLength={14} // (XXX) XXX-XXXX = 14 characters
+                className={cn(
+                  "w-full px-3 py-2 rounded-md border border-input bg-background",
+                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
+                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
+                  "transition-colors"
+                )}
+                aria-label="Phone number"
+                aria-required="true"
+              />
+            </div>
 
-        {/* Extension (Optional) */}
-        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-          <label className="text-foreground text-right text-sm pt-2">
-            Extension:
-          </label>
-          <input
-            type="text"
-            value={value.extension || ""}
-            onChange={(e) => handleChange("extension", e.target.value)}
-            disabled={disabled}
-            placeholder="e.g., 1234"
-            maxLength={10}
-            className={cn(
-              "w-full px-3 py-2 rounded-md border border-input bg-background",
-              "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-              "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-              "transition-colors"
-            )}
-            aria-label="Phone extension (optional)"
-          />
+            {/* Extension (Optional) */}
+            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+              <label className="text-foreground text-left text-sm pt-2">
+                Extension:
+              </label>
+              <input
+                type="text"
+                value={value.extension || ""}
+                onChange={(e) => handleChange("extension", e.target.value)}
+                disabled={disabled}
+                placeholder="e.g., 1234"
+                maxLength={10}
+                className={cn(
+                  "w-full px-3 py-2 rounded-md border border-input bg-background",
+                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
+                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
+                  "transition-colors"
+                )}
+                aria-label="Phone extension (optional)"
+              />
+            </div>
+          </div>
         </div>
       </div>
     );

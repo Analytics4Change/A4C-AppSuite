@@ -183,7 +183,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                     <div className="space-y-3">
                       {/* Organization Type */}
                       <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-gray-900 text-right text-sm">
+                        <Label className="text-gray-900 text-left text-sm">
                           Organization Type<span className="text-red-600">*</span>:
                         </Label>
                         <SelectDropdown
@@ -201,7 +201,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                       {/* Partner Type (conditional) */}
                       {isPartner && (
                         <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                          <Label className="text-gray-900 text-right text-sm">
+                          <Label className="text-gray-900 text-left text-sm">
                             Partner Type<span className="text-red-600">*</span>:
                           </Label>
                           <SelectDropdown
@@ -224,7 +224,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
 
                       {/* Organization Name */}
                       <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-                        <Label className="text-gray-900 text-right text-sm pt-2">
+                        <Label className="text-gray-900 text-left text-sm pt-2">
                           Organization Name<span className="text-red-600">*</span>:
                         </Label>
                         <div>
@@ -248,7 +248,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
 
                       {/* Display Name */}
                       <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-                        <Label className="text-gray-900 text-right text-sm pt-2">
+                        <Label className="text-gray-900 text-left text-sm pt-2">
                           Display Name<span className="text-red-600">*</span>:
                         </Label>
                         <div>
@@ -273,7 +273,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                       {/* Subdomain (conditional) */}
                       {viewModel.isSubdomainRequired && (
                         <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-                          <Label className="text-gray-900 text-right text-sm pt-2">
+                          <Label className="text-gray-900 text-left text-sm pt-2">
                             Subdomain<span className="text-red-600">*</span>:
                           </Label>
                           <SubdomainInput
@@ -289,7 +289,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
 
                       {/* Time Zone */}
                       <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-gray-900 text-right text-sm">
+                        <Label className="text-gray-900 text-left text-sm">
                           Time Zone<span className="text-red-600">*</span>:
                         </Label>
                         <SelectDropdown
@@ -307,7 +307,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                       {/* Referring Partner (conditional - only for providers) */}
                       {isProvider && (
                         <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                          <Label className="text-gray-900 text-right text-sm">
+                          <Label className="text-gray-900 text-left text-sm">
                             Referring Partner:
                           </Label>
                           <ReferringPartnerDropdown
