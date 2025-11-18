@@ -154,160 +154,227 @@ export const OrganizationCreatePage: React.FC = observer(() => {
               </div>
             </CardHeader>
             {!generalCollapsed && (
-              <CardContent className="p-6 space-y-6">
-                {/* Organization Type */}
-                <div>
-                  <Label className="text-gray-900 mb-2">
-                    Organization Type <span className="text-red-600">*</span>
-                  </Label>
-                  <SelectDropdown
-                    id="org-type"
-                    label="Organization Type"
-                    value={formData.type}
-                    options={ORGANIZATION_TYPES.map((t) => ({
-                      value: t.value,
-                      label: t.label
-                    }))}
-                    onChange={(value) => viewModel.updateField('type', value as 'provider' | 'provider_partner')}
-                  />
-                </div>
+              <CardContent className="p-6">
+                {/* Three-card layout: Organization | Address | Phone */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Card 1: Organization Details */}
+                  <div
+                    className="p-4 rounded-lg transition-all duration-200"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.7)',
+                      backdropFilter: 'blur(20px)',
+                      WebkitBackdropFilter: 'blur(20px)',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.boxShadow = `
+                        0 0 0 1px rgba(255, 255, 255, 0.25) inset,
+                        0 0 20px rgba(59, 130, 246, 0.15) inset,
+                        0 12px 24px rgba(0, 0, 0, 0.08)
+                      `.trim();
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <div className="space-y-4">
+                      {/* Organization Type */}
+                      <div>
+                        <Label className="text-gray-900 mb-2">
+                          Organization Type <span className="text-red-600">*</span>
+                        </Label>
+                        <SelectDropdown
+                          id="org-type"
+                          label="Organization Type"
+                          value={formData.type}
+                          options={ORGANIZATION_TYPES.map((t) => ({
+                            value: t.value,
+                            label: t.label
+                          }))}
+                          onChange={(value) => viewModel.updateField('type', value as 'provider' | 'provider_partner')}
+                        />
+                      </div>
 
-                {/* Partner Type (conditional) */}
-                {isPartner && (
-                  <div>
-                    <Label className="text-gray-900 mb-2">
-                      Partner Type <span className="text-red-600">*</span>
-                    </Label>
-                    <SelectDropdown
-                      id="partner-type"
-                      label="Partner Type"
-                      value={formData.partnerType || ''}
-                      options={PARTNER_TYPES.map((t) => ({
-                        value: t.value,
-                        label: t.label
-                      }))}
-                      onChange={(value) =>
-                        viewModel.updateField(
-                          'partnerType',
-                          value as 'var' | 'family' | 'court' | 'other'
-                        )
-                      }
-                    />
-                  </div>
-                )}
+                      {/* Partner Type (conditional) */}
+                      {isPartner && (
+                        <div>
+                          <Label className="text-gray-900 mb-2">
+                            Partner Type <span className="text-red-600">*</span>
+                          </Label>
+                          <SelectDropdown
+                            id="partner-type"
+                            label="Partner Type"
+                            value={formData.partnerType || ''}
+                            options={PARTNER_TYPES.map((t) => ({
+                              value: t.value,
+                              label: t.label
+                            }))}
+                            onChange={(value) =>
+                              viewModel.updateField(
+                                'partnerType',
+                                value as 'var' | 'family' | 'court' | 'other'
+                              )
+                            }
+                          />
+                        </div>
+                      )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Organization Name */}
-                  <div>
-                    <Label className="text-gray-900 mb-2">
-                      Organization Name <span className="text-red-600">*</span>
-                    </Label>
-                    <Input
-                      value={formData.name}
-                      onChange={(e) => viewModel.updateField('name', e.target.value)}
-                      placeholder="e.g., Sunshine Recovery Center"
-                      className="bg-white/70 border-white/30 text-gray-900 placeholder:text-gray-500"
-                      style={{
-                        backdropFilter: 'blur(10px)',
-                        WebkitBackdropFilter: 'blur(10px)'
-                      }}
-                    />
-                    {viewModel.getFieldError('name') && (
-                      <p className="text-red-600 text-sm mt-1">
-                        {viewModel.getFieldError('name')}
-                      </p>
-                    )}
-                  </div>
+                      {/* Organization Name */}
+                      <div>
+                        <Label className="text-gray-900 mb-2">
+                          Organization Name <span className="text-red-600">*</span>
+                        </Label>
+                        <Input
+                          value={formData.name}
+                          onChange={(e) => viewModel.updateField('name', e.target.value)}
+                          placeholder="e.g., Sunshine Recovery Center"
+                          className="bg-white/70 border-white/30 text-gray-900 placeholder:text-gray-500"
+                          style={{
+                            backdropFilter: 'blur(10px)',
+                            WebkitBackdropFilter: 'blur(10px)'
+                          }}
+                        />
+                        {viewModel.getFieldError('name') && (
+                          <p className="text-red-600 text-sm mt-1">
+                            {viewModel.getFieldError('name')}
+                          </p>
+                        )}
+                      </div>
 
-                  {/* Display Name */}
-                  <div>
-                    <Label className="text-gray-900 mb-2">
-                      Display Name <span className="text-red-600">*</span>
-                    </Label>
-                    <Input
-                      value={formData.displayName}
-                      onChange={(e) => viewModel.updateField('displayName', e.target.value)}
-                      placeholder="e.g., Sunshine Recovery"
-                      className="bg-white/70 border-white/30 text-gray-900 placeholder:text-gray-500"
-                      style={{
-                        backdropFilter: 'blur(10px)',
-                        WebkitBackdropFilter: 'blur(10px)'
-                      }}
-                    />
-                    {viewModel.getFieldError('displayName') && (
-                      <p className="text-red-600 text-sm mt-1">
-                        {viewModel.getFieldError('displayName')}
-                      </p>
-                    )}
-                  </div>
-                </div>
+                      {/* Display Name */}
+                      <div>
+                        <Label className="text-gray-900 mb-2">
+                          Display Name <span className="text-red-600">*</span>
+                        </Label>
+                        <Input
+                          value={formData.displayName}
+                          onChange={(e) => viewModel.updateField('displayName', e.target.value)}
+                          placeholder="e.g., Sunshine Recovery"
+                          className="bg-white/70 border-white/30 text-gray-900 placeholder:text-gray-500"
+                          style={{
+                            backdropFilter: 'blur(10px)',
+                            WebkitBackdropFilter: 'blur(10px)'
+                          }}
+                        />
+                        {viewModel.getFieldError('displayName') && (
+                          <p className="text-red-600 text-sm mt-1">
+                            {viewModel.getFieldError('displayName')}
+                          </p>
+                        )}
+                      </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Subdomain (conditional) */}
-                  {viewModel.isSubdomainRequired && (
-                    <div>
-                      <SubdomainInput
-                        id="subdomain"
-                        label="Subdomain"
-                        value={formData.subdomain}
-                        onChange={(value) => viewModel.updateSubdomain(value)}
-                        error={viewModel.getFieldError('subdomain')}
-                        required
-                      />
+                      {/* Subdomain (conditional) */}
+                      {viewModel.isSubdomainRequired && (
+                        <div>
+                          <SubdomainInput
+                            id="subdomain"
+                            label="Subdomain"
+                            value={formData.subdomain}
+                            onChange={(value) => viewModel.updateSubdomain(value)}
+                            error={viewModel.getFieldError('subdomain')}
+                            required
+                          />
+                        </div>
+                      )}
+
+                      {/* Time Zone */}
+                      <div>
+                        <Label className="text-gray-900 mb-2">
+                          Time Zone <span className="text-red-600">*</span>
+                        </Label>
+                        <SelectDropdown
+                          id="time-zone"
+                          label="Time Zone"
+                          value={formData.timeZone}
+                          options={US_TIME_ZONES.map((tz) => ({
+                            value: tz.value,
+                            label: tz.label
+                          }))}
+                          onChange={(value) => viewModel.updateField('timeZone', value)}
+                        />
+                      </div>
+
+                      {/* Referring Partner (conditional - only for providers) */}
+                      {isProvider && (
+                        <div>
+                          <Label className="text-gray-900 mb-2">
+                            Referring Partner (Optional)
+                          </Label>
+                          <ReferringPartnerDropdown
+                            value={formData.referringPartnerId}
+                            onChange={(value) => viewModel.updateField('referringPartnerId', value)}
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
 
-                  {/* Time Zone */}
-                  <div>
-                    <Label className="text-gray-900 mb-2">
-                      Time Zone <span className="text-red-600">*</span>
-                    </Label>
-                    <SelectDropdown
-                      id="time-zone"
-                      label="Time Zone"
-                      value={formData.timeZone}
-                      options={US_TIME_ZONES.map((tz) => ({
-                        value: tz.value,
-                        label: tz.label
-                      }))}
-                      onChange={(value) => viewModel.updateField('timeZone', value)}
+                  {/* Card 2: Headquarters Address */}
+                  <div
+                    className="p-4 rounded-lg transition-all duration-200"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.7)',
+                      backdropFilter: 'blur(20px)',
+                      WebkitBackdropFilter: 'blur(20px)',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.boxShadow = `
+                        0 0 0 1px rgba(255, 255, 255, 0.25) inset,
+                        0 0 20px rgba(59, 130, 246, 0.15) inset,
+                        0 12px 24px rgba(0, 0, 0, 0.08)
+                      `.trim();
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Headquarters Address
+                    </h3>
+                    <AddressInput
+                      value={formData.generalAddress}
+                      onChange={(address) => viewModel.updateField('generalAddress', address)}
                     />
                   </div>
-                </div>
 
-                {/* Referring Partner (conditional - only for providers) */}
-                {isProvider && (
-                  <div>
-                    <Label className="text-gray-900 mb-2">
-                      Referring Partner (Optional)
-                    </Label>
-                    <ReferringPartnerDropdown
-                      value={formData.referringPartnerId}
-                      onChange={(value) => viewModel.updateField('referringPartnerId', value)}
+                  {/* Card 3: Main Office Phone */}
+                  <div
+                    className="p-4 rounded-lg transition-all duration-200"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.7)',
+                      backdropFilter: 'blur(20px)',
+                      WebkitBackdropFilter: 'blur(20px)',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.boxShadow = `
+                        0 0 0 1px rgba(255, 255, 255, 0.25) inset,
+                        0 0 20px rgba(59, 130, 246, 0.15) inset,
+                        0 12px 24px rgba(0, 0, 0, 0.08)
+                      `.trim();
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Main Office Phone
+                    </h3>
+                    <PhoneInputEnhanced
+                      value={formData.generalPhone}
+                      onChange={(phone) => viewModel.updateField('generalPhone', phone)}
                     />
                   </div>
-                )}
-
-                {/* Headquarters Address */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Headquarters Address
-                  </h3>
-                  <AddressInput
-                    value={formData.generalAddress}
-                    onChange={(address) => viewModel.updateField('generalAddress', address)}
-                  />
-                </div>
-
-                {/* Headquarters Phone */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Main Office Phone
-                  </h3>
-                  <PhoneInputEnhanced
-                    value={formData.generalPhone}
-                    onChange={(phone) => viewModel.updateField('generalPhone', phone)}
-                  />
                 </div>
               </CardContent>
             )}
