@@ -180,11 +180,11 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                       e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {/* Organization Type */}
-                      <div>
-                        <Label className="text-gray-900 mb-2">
-                          Organization Type <span className="text-red-600">*</span>
+                      <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+                        <Label className="text-gray-900 text-right text-sm">
+                          Organization Type<span className="text-red-600">*</span>:
                         </Label>
                         <SelectDropdown
                           id="org-type"
@@ -200,9 +200,9 @@ export const OrganizationCreatePage: React.FC = observer(() => {
 
                       {/* Partner Type (conditional) */}
                       {isPartner && (
-                        <div>
-                          <Label className="text-gray-900 mb-2">
-                            Partner Type <span className="text-red-600">*</span>
+                        <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+                          <Label className="text-gray-900 text-right text-sm">
+                            Partner Type<span className="text-red-600">*</span>:
                           </Label>
                           <SelectDropdown
                             id="partner-type"
@@ -223,52 +223,59 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                       )}
 
                       {/* Organization Name */}
-                      <div>
-                        <Label className="text-gray-900 mb-2">
-                          Organization Name <span className="text-red-600">*</span>
+                      <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+                        <Label className="text-gray-900 text-right text-sm pt-2">
+                          Organization Name<span className="text-red-600">*</span>:
                         </Label>
-                        <Input
-                          value={formData.name}
-                          onChange={(e) => viewModel.updateField('name', e.target.value)}
-                          placeholder="e.g., Sunshine Recovery Center"
-                          className="bg-white/70 border-white/30 text-gray-900 placeholder:text-gray-500"
-                          style={{
-                            backdropFilter: 'blur(10px)',
-                            WebkitBackdropFilter: 'blur(10px)'
-                          }}
-                        />
-                        {viewModel.getFieldError('name') && (
-                          <p className="text-red-600 text-sm mt-1">
-                            {viewModel.getFieldError('name')}
-                          </p>
-                        )}
+                        <div>
+                          <Input
+                            value={formData.name}
+                            onChange={(e) => viewModel.updateField('name', e.target.value)}
+                            placeholder="e.g., Sunshine Recovery Center"
+                            className="bg-white/70 border-white/30 text-gray-900 placeholder:text-gray-500"
+                            style={{
+                              backdropFilter: 'blur(10px)',
+                              WebkitBackdropFilter: 'blur(10px)'
+                            }}
+                          />
+                          {viewModel.getFieldError('name') && (
+                            <p className="text-red-600 text-sm mt-1">
+                              {viewModel.getFieldError('name')}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
                       {/* Display Name */}
-                      <div>
-                        <Label className="text-gray-900 mb-2">
-                          Display Name <span className="text-red-600">*</span>
+                      <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+                        <Label className="text-gray-900 text-right text-sm pt-2">
+                          Display Name<span className="text-red-600">*</span>:
                         </Label>
-                        <Input
-                          value={formData.displayName}
-                          onChange={(e) => viewModel.updateField('displayName', e.target.value)}
-                          placeholder="e.g., Sunshine Recovery"
-                          className="bg-white/70 border-white/30 text-gray-900 placeholder:text-gray-500"
-                          style={{
-                            backdropFilter: 'blur(10px)',
-                            WebkitBackdropFilter: 'blur(10px)'
-                          }}
-                        />
-                        {viewModel.getFieldError('displayName') && (
-                          <p className="text-red-600 text-sm mt-1">
-                            {viewModel.getFieldError('displayName')}
-                          </p>
-                        )}
+                        <div>
+                          <Input
+                            value={formData.displayName}
+                            onChange={(e) => viewModel.updateField('displayName', e.target.value)}
+                            placeholder="e.g., Sunshine Recovery"
+                            className="bg-white/70 border-white/30 text-gray-900 placeholder:text-gray-500"
+                            style={{
+                              backdropFilter: 'blur(10px)',
+                              WebkitBackdropFilter: 'blur(10px)'
+                            }}
+                          />
+                          {viewModel.getFieldError('displayName') && (
+                            <p className="text-red-600 text-sm mt-1">
+                              {viewModel.getFieldError('displayName')}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
                       {/* Subdomain (conditional) */}
                       {viewModel.isSubdomainRequired && (
-                        <div>
+                        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+                          <Label className="text-gray-900 text-right text-sm pt-2">
+                            Subdomain<span className="text-red-600">*</span>:
+                          </Label>
                           <SubdomainInput
                             id="subdomain"
                             label="Subdomain"
@@ -281,9 +288,9 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                       )}
 
                       {/* Time Zone */}
-                      <div>
-                        <Label className="text-gray-900 mb-2">
-                          Time Zone <span className="text-red-600">*</span>
+                      <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+                        <Label className="text-gray-900 text-right text-sm">
+                          Time Zone<span className="text-red-600">*</span>:
                         </Label>
                         <SelectDropdown
                           id="time-zone"
@@ -299,9 +306,9 @@ export const OrganizationCreatePage: React.FC = observer(() => {
 
                       {/* Referring Partner (conditional - only for providers) */}
                       {isProvider && (
-                        <div>
-                          <Label className="text-gray-900 mb-2">
-                            Referring Partner (Optional)
+                        <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+                          <Label className="text-gray-900 text-right text-sm">
+                            Referring Partner:
                           </Label>
                           <ReferringPartnerDropdown
                             value={formData.referringPartnerId}

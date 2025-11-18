@@ -45,11 +45,11 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
     };
 
     return (
-      <div ref={ref} className={cn("space-y-4", className)} {...props}>
-        {/* Label */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Contact Label <span className="text-destructive">*</span>
+      <div ref={ref} className={cn("space-y-3", className)} {...props}>
+        {/* Contact Label */}
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            Contact Label<span className="text-destructive">*</span>:
           </label>
           <input
             type="text"
@@ -68,10 +68,10 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
           />
         </div>
 
-        {/* Type Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Contact Type <span className="text-destructive">*</span>
+        {/* Contact Type Dropdown */}
+        <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+          <label className="text-foreground text-right text-sm">
+            Contact Type<span className="text-destructive">*</span>:
           </label>
           <Select.Root
             value={value.type}
@@ -124,9 +124,9 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
         </div>
 
         {/* First Name */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            First Name <span className="text-destructive">*</span>
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            First Name<span className="text-destructive">*</span>:
           </label>
           <input
             type="text"
@@ -146,9 +146,9 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
         </div>
 
         {/* Last Name */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Last Name <span className="text-destructive">*</span>
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            Last Name<span className="text-destructive">*</span>:
           </label>
           <input
             type="text"
@@ -168,9 +168,9 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
         </div>
 
         {/* Email */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Email Address <span className="text-destructive">*</span>
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            Email Address<span className="text-destructive">*</span>:
           </label>
           <input
             type="email"
@@ -190,9 +190,9 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
         </div>
 
         {/* Title (Optional) */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Title
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            Title:
           </label>
           <input
             type="text"
@@ -211,9 +211,9 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
         </div>
 
         {/* Department (Optional) */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Department
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            Department:
           </label>
           <input
             type="text"

@@ -61,11 +61,11 @@ export const PhoneInputEnhanced = forwardRef<HTMLDivElement, PhoneInputEnhancedP
     }, [value, onChange]);
 
     return (
-      <div ref={ref} className={cn("space-y-4", className)} {...props}>
-        {/* Label */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Phone Label <span className="text-destructive">*</span>
+      <div ref={ref} className={cn("space-y-3", className)} {...props}>
+        {/* Phone Label */}
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            Phone Label<span className="text-destructive">*</span>:
           </label>
           <input
             type="text"
@@ -84,10 +84,10 @@ export const PhoneInputEnhanced = forwardRef<HTMLDivElement, PhoneInputEnhancedP
           />
         </div>
 
-        {/* Type Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Phone Type <span className="text-destructive">*</span>
+        {/* Phone Type Dropdown */}
+        <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+          <label className="text-foreground text-right text-sm">
+            Phone Type<span className="text-destructive">*</span>:
           </label>
           <Select.Root
             value={value.type}
@@ -140,9 +140,9 @@ export const PhoneInputEnhanced = forwardRef<HTMLDivElement, PhoneInputEnhancedP
         </div>
 
         {/* Phone Number */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Phone Number <span className="text-destructive">*</span>
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            Phone Number<span className="text-destructive">*</span>:
           </label>
           <input
             type="tel"
@@ -164,9 +164,9 @@ export const PhoneInputEnhanced = forwardRef<HTMLDivElement, PhoneInputEnhancedP
         </div>
 
         {/* Extension (Optional) */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Extension
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            Extension:
           </label>
           <input
             type="text"

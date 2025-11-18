@@ -44,11 +44,11 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
     };
 
     return (
-      <div ref={ref} className={cn("space-y-4", className)} {...props}>
-        {/* Label */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Address Label <span className="text-destructive">*</span>
+      <div ref={ref} className={cn("space-y-3", className)} {...props}>
+        {/* Address Label */}
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            Address Label<span className="text-destructive">*</span>:
           </label>
           <input
             type="text"
@@ -67,10 +67,10 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
           />
         </div>
 
-        {/* Type Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Address Type <span className="text-destructive">*</span>
+        {/* Address Type Dropdown */}
+        <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+          <label className="text-foreground text-right text-sm">
+            Address Type<span className="text-destructive">*</span>:
           </label>
           <Select.Root
             value={value.type}
@@ -123,9 +123,9 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
         </div>
 
         {/* Street Address Line 1 */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Street Address Line 1 <span className="text-destructive">*</span>
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            Street Line 1<span className="text-destructive">*</span>:
           </label>
           <input
             type="text"
@@ -145,9 +145,9 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
         </div>
 
         {/* Street Address Line 2 (Optional) */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Street Address Line 2
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            Street Line 2:
           </label>
           <input
             type="text"
@@ -166,9 +166,9 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
         </div>
 
         {/* City */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            City <span className="text-destructive">*</span>
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            City<span className="text-destructive">*</span>:
           </label>
           <input
             type="text"
@@ -188,9 +188,9 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
         </div>
 
         {/* State */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            State <span className="text-destructive">*</span>
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            State<span className="text-destructive">*</span>:
           </label>
           <input
             type="text"
@@ -211,9 +211,9 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
         </div>
 
         {/* Zip Code */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Zip Code <span className="text-destructive">*</span>
+        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+          <label className="text-foreground text-right text-sm pt-2">
+            Zip Code<span className="text-destructive">*</span>:
           </label>
           <input
             type="text"
