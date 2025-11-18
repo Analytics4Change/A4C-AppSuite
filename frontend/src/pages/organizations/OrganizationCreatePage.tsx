@@ -186,9 +186,9 @@ export const OrganizationCreatePage: React.FC = observer(() => {
 
                       {/* Organization Type */}
                       <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-gray-900 text-left text-sm">
-                          Organization Type<span className="text-red-600">*</span>:
-                        </Label>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Organization Type<span className="text-red-500">*</span>
+                        </label>
                         <Select.Root
                           value={formData.type}
                           onValueChange={(value) => viewModel.updateField('type', value as 'provider' | 'provider_partner')}
@@ -224,9 +224,9 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                       {/* Partner Type (conditional) */}
                       {isPartner && (
                         <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                          <Label className="text-gray-900 text-left text-sm">
-                            Partner Type<span className="text-red-600">*</span>:
-                          </Label>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Partner Type<span className="text-red-500">*</span>
+                          </label>
                           <Select.Root
                             value={formData.partnerType || ''}
                             onValueChange={(value) =>
@@ -267,9 +267,9 @@ export const OrganizationCreatePage: React.FC = observer(() => {
 
                       {/* Organization Name */}
                       <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-                        <Label className="text-gray-900 text-left text-sm pt-2">
-                          Organization Name<span className="text-red-600">*</span>:
-                        </Label>
+                        <label className="block text-sm font-medium text-gray-700 pt-2">
+                          Organization Name<span className="text-red-500">*</span>
+                        </label>
                         <div>
                           <input
                             type="text"
@@ -290,9 +290,9 @@ export const OrganizationCreatePage: React.FC = observer(() => {
 
                       {/* Display Name */}
                       <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-                        <Label className="text-gray-900 text-left text-sm pt-2">
-                          Display Name<span className="text-red-600">*</span>:
-                        </Label>
+                        <label className="block text-sm font-medium text-gray-700 pt-2">
+                          Display Name<span className="text-red-500">*</span>
+                        </label>
                         <div>
                           <input
                             type="text"
@@ -313,26 +313,21 @@ export const OrganizationCreatePage: React.FC = observer(() => {
 
                       {/* Subdomain (conditional) */}
                       {viewModel.isSubdomainRequired && (
-                        <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-                          <Label className="text-gray-900 text-left text-sm pt-2">
-                            Subdomain<span className="text-red-600">*</span>:
-                          </Label>
-                          <SubdomainInput
-                            id="subdomain"
-                            label="Subdomain"
-                            value={formData.subdomain}
-                            onChange={(value) => viewModel.updateSubdomain(value)}
-                            error={viewModel.getFieldError('subdomain')}
-                            required
-                          />
-                        </div>
+                        <SubdomainInput
+                          id="subdomain"
+                          label="Subdomain"
+                          value={formData.subdomain}
+                          onChange={(value) => viewModel.updateSubdomain(value)}
+                          error={viewModel.getFieldError('subdomain')}
+                          required
+                        />
                       )}
 
                       {/* Time Zone */}
                       <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-gray-900 text-left text-sm">
-                          Time Zone<span className="text-red-600">*</span>:
-                        </Label>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Time Zone<span className="text-red-500">*</span>
+                        </label>
                         <Select.Root
                           value={formData.timeZone}
                           onValueChange={(value) => viewModel.updateField('timeZone', value)}
@@ -367,15 +362,10 @@ export const OrganizationCreatePage: React.FC = observer(() => {
 
                       {/* Referring Partner (conditional - only for providers) */}
                       {isProvider && (
-                        <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                          <Label className="text-gray-900 text-left text-sm">
-                            Referring Partner:
-                          </Label>
-                          <ReferringPartnerDropdown
-                            value={formData.referringPartnerId}
-                            onChange={(value) => viewModel.updateField('referringPartnerId', value)}
-                          />
-                        </div>
+                        <ReferringPartnerDropdown
+                          value={formData.referringPartnerId}
+                          onChange={(value) => viewModel.updateField('referringPartnerId', value)}
+                        />
                       )}
                     </div>
                   </div>

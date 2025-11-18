@@ -76,31 +76,26 @@ export const ReferringPartnerDropdown = observer(
       };
 
       return (
-        <div ref={ref} className={cn("space-y-2", className)} {...props}>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
+        <div ref={ref} className={cn("grid grid-cols-[160px_1fr] items-start gap-4", className)} {...props}>
+          <label className="block text-sm font-medium text-gray-700 pt-2">
             Referring Partner
           </label>
-          <Select.Root
-            value={value || "none"}
-            onValueChange={handleValueChange}
-            disabled={disabled || loading}
-          >
-            <Select.Trigger
-              className={cn(
-                "w-full px-3 py-2 rounded-md border border-input bg-background",
-                "flex items-center justify-between",
-                "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                "transition-colors"
-              )}
-              aria-label="Referring partner"
-              aria-describedby="referring-partner-description"
+          <div className="space-y-2">
+            <Select.Root
+              value={value || "none"}
+              onValueChange={handleValueChange}
+              disabled={disabled || loading}
             >
-              <Select.Value />
-              <Select.Icon>
-                <ChevronDown className="h-4 w-4 opacity-50" />
-              </Select.Icon>
-            </Select.Trigger>
+              <Select.Trigger
+                className="w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
+                aria-label="Referring partner"
+                aria-describedby="referring-partner-description"
+              >
+                <Select.Value />
+                <Select.Icon>
+                  <ChevronDown className="h-4 w-4 opacity-50" />
+                </Select.Icon>
+              </Select.Trigger>
             <Select.Portal>
               <Select.Content
                 className={cn(
@@ -157,9 +152,10 @@ export const ReferringPartnerDropdown = observer(
               </Select.Content>
             </Select.Portal>
           </Select.Root>
-          <p id="referring-partner-description" className="text-sm text-muted-foreground">
-            Select the VAR partner who referred this organization (optional)
-          </p>
+            <p id="referring-partner-description" className="text-sm text-gray-500">
+              Select the VAR partner who referred this organization (optional)
+            </p>
+          </div>
         </div>
       );
     }
