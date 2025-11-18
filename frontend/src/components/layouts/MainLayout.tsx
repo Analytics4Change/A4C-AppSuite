@@ -64,26 +64,50 @@ export const MainLayout: React.FC = () => {
   // Filter nav items by role AND permission (async)
   React.useEffect(() => {
     const filterItems = async () => {
+      console.log('[MainLayout] Filtering nav items:', {
+        userRole,
+        userPermissions: authSession?.claims.permissions,
+        allNavItemsCount: allNavItems.length
+      });
+
       const filtered = [];
 
       for (const item of allNavItems) {
         // Check role first
         const roleMatch = item.roles.includes(userRole.toLowerCase());
+        console.log(`[MainLayout] ${item.label}: role check`, {
+          userRole: userRole.toLowerCase(),
+          requiredRoles: item.roles,
+          roleMatch
+        });
+
         if (!roleMatch) continue;
 
         // If item requires permission, check it
         if ('permission' in item && item.permission) {
           const allowed = await hasPermission(item.permission);
+          console.log(`[MainLayout] ${item.label}: permission check`, {
+            requiredPermission: item.permission,
+            userPermissions: authSession?.claims.permissions,
+            allowed
+          });
+
           if (allowed) {
             filtered.push(item);
           } else {
-            console.log(`[MainLayout] Hiding ${item.label}: missing permission ${item.permission}`);
+            console.warn(`[MainLayout] ❌ Hiding ${item.label}: missing permission ${item.permission}`);
           }
         } else {
           // No permission required, just role
+          console.log(`[MainLayout] ✅ Showing ${item.label}: role match, no permission required`);
           filtered.push(item);
         }
       }
+
+      console.log('[MainLayout] Final nav items:', {
+        count: filtered.length,
+        items: filtered.map(i => i.label)
+      });
 
       setNavItems(filtered);
     };

@@ -33,14 +33,30 @@ export const RequirePermission: React.FC<RequirePermissionProps> = ({
 
   useEffect(() => {
     const checkPermission = async () => {
+      // Enhanced debug logging
+      console.log('[RequirePermission] Checking permission:', {
+        required: permission,
+        user: session?.user.email,
+        role: session?.claims.user_role,
+        userPermissions: session?.claims.permissions,
+        orgId: session?.claims.org_id
+      });
+
       const result = await hasPermission(permission);
 
       if (!result) {
-        console.warn(`[RequirePermission] Access denied: missing ${permission}`, {
+        console.warn(`[RequirePermission] ❌ Access DENIED: missing ${permission}`, {
           user: session?.user.email,
-          permissions: session?.claims.permissions
+          role: session?.claims.user_role,
+          userPermissions: session?.claims.permissions,
+          required: permission
         });
         navigate(fallback, { replace: true });
+      } else {
+        console.log(`[RequirePermission] ✅ Access GRANTED for ${permission}`, {
+          user: session?.user.email,
+          role: session?.claims.user_role
+        });
       }
 
       setAllowed(result);
