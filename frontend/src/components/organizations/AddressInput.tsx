@@ -45,25 +45,19 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
 
     return (
       <div ref={ref} className={cn(className)} {...props}>
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
+        <div className="bg-white shadow rounded-lg p-6">
           <div className="space-y-3">
             {/* Address Label */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                Address Label<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                Address Label<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.label}
                 onChange={(e) => handleChange("label", e.target.value)}
                 disabled={disabled}
-                placeholder="e.g., Headquarters"
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Address label"
                 aria-required="true"
               />
@@ -71,8 +65,8 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
 
             {/* Address Type Dropdown */}
             <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-              <label className="text-foreground text-left text-sm">
-                Address Type<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                Address Type<span className="text-red-500">*</span>
               </label>
               <Select.Root
                 value={value.type}
@@ -126,21 +120,15 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
 
             {/* Street Address Line 1 */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                Street Line 1<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                Street Line 1<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.street1}
                 onChange={(e) => handleChange("street1", e.target.value)}
                 disabled={disabled}
-                placeholder="123 Main Street"
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Street address line 1"
                 aria-required="true"
               />
@@ -148,42 +136,30 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
 
             {/* Street Address Line 2 (Optional) */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                Street Line 2:
+              <label className="block text-sm font-medium text-gray-700">
+                Street Line 2
               </label>
               <input
                 type="text"
                 value={value.street2 || ""}
                 onChange={(e) => handleChange("street2", e.target.value)}
                 disabled={disabled}
-                placeholder="Suite 100"
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Street address line 2 (optional)"
               />
             </div>
 
             {/* City */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                City<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                City<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.city}
                 onChange={(e) => handleChange("city", e.target.value)}
                 disabled={disabled}
-                placeholder="City"
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="City"
                 aria-required="true"
               />
@@ -191,22 +167,16 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
 
             {/* State */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                State<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                State<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.state}
                 onChange={(e) => handleChange("state", e.target.value)}
                 disabled={disabled}
-                placeholder="State"
                 maxLength={2}
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="State (2-letter abbreviation)"
                 aria-required="true"
               />
@@ -214,22 +184,16 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
 
             {/* Zip Code */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                Zip Code<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                Zip Code<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.zipCode}
                 onChange={(e) => handleChange("zipCode", e.target.value)}
                 disabled={disabled}
-                placeholder="12345"
                 maxLength={10}
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Zip code"
                 aria-required="true"
               />

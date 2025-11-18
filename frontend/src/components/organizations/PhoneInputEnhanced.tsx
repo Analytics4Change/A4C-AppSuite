@@ -62,25 +62,19 @@ export const PhoneInputEnhanced = forwardRef<HTMLDivElement, PhoneInputEnhancedP
 
     return (
       <div ref={ref} className={cn(className)} {...props}>
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
+        <div className="bg-white shadow rounded-lg p-6">
           <div className="space-y-3">
             {/* Phone Label */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                Phone Label<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                Phone Label<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.label}
                 onChange={(e) => handleChange("label", e.target.value)}
                 disabled={disabled}
-                placeholder="e.g., Main Office"
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Phone label"
                 aria-required="true"
               />
@@ -88,8 +82,8 @@ export const PhoneInputEnhanced = forwardRef<HTMLDivElement, PhoneInputEnhancedP
 
             {/* Phone Type Dropdown */}
             <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-              <label className="text-foreground text-left text-sm">
-                Phone Type<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                Phone Type<span className="text-red-500">*</span>
               </label>
               <Select.Root
                 value={value.type}
@@ -143,8 +137,8 @@ export const PhoneInputEnhanced = forwardRef<HTMLDivElement, PhoneInputEnhancedP
 
             {/* Phone Number */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                Phone Number<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                Phone Number<span className="text-red-500">*</span>
               </label>
               <input
                 type="tel"
@@ -152,14 +146,8 @@ export const PhoneInputEnhanced = forwardRef<HTMLDivElement, PhoneInputEnhancedP
                 onChange={handlePhoneChange}
                 onBlur={handlePhoneBlur}
                 disabled={disabled}
-                placeholder="(555) 123-4567"
-                maxLength={14} // (XXX) XXX-XXXX = 14 characters
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                maxLength={14}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Phone number"
                 aria-required="true"
               />
@@ -167,22 +155,16 @@ export const PhoneInputEnhanced = forwardRef<HTMLDivElement, PhoneInputEnhancedP
 
             {/* Extension (Optional) */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                Extension:
+              <label className="block text-sm font-medium text-gray-700">
+                Extension
               </label>
               <input
                 type="text"
                 value={value.extension || ""}
                 onChange={(e) => handleChange("extension", e.target.value)}
                 disabled={disabled}
-                placeholder="e.g., 1234"
                 maxLength={10}
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Phone extension (optional)"
               />
             </div>

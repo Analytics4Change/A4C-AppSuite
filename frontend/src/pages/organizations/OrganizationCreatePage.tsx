@@ -105,7 +105,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 p-8">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-[130rem] mx-auto">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Page Header */}
           <div className="text-center mb-8">

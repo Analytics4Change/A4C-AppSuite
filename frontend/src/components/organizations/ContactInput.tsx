@@ -46,25 +46,19 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
 
     return (
       <div ref={ref} className={cn(className)} {...props}>
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
+        <div className="bg-white shadow rounded-lg p-6">
           <div className="space-y-3">
             {/* Contact Label */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                Contact Label<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                Contact Label<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.label}
                 onChange={(e) => handleChange("label", e.target.value)}
                 disabled={disabled}
-                placeholder="e.g., Primary Billing Contact"
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Contact label"
                 aria-required="true"
               />
@@ -72,8 +66,8 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
 
             {/* Contact Type Dropdown */}
             <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-              <label className="text-foreground text-left text-sm">
-                Contact Type<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                Contact Type<span className="text-red-500">*</span>
               </label>
               <Select.Root
                 value={value.type}
@@ -127,21 +121,15 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
 
             {/* First Name */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                First Name<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                First Name<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.firstName}
                 onChange={(e) => handleChange("firstName", e.target.value)}
                 disabled={disabled}
-                placeholder="First name"
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="First name"
                 aria-required="true"
               />
@@ -149,21 +137,15 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
 
             {/* Last Name */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                Last Name<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                Last Name<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.lastName}
                 onChange={(e) => handleChange("lastName", e.target.value)}
                 disabled={disabled}
-                placeholder="Last name"
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Last name"
                 aria-required="true"
               />
@@ -171,21 +153,15 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
 
             {/* Email */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                Email Address<span className="text-destructive">*</span>:
+              <label className="block text-sm font-medium text-gray-700">
+                Email Address<span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
                 value={value.email}
                 onChange={(e) => handleChange("email", e.target.value)}
                 disabled={disabled}
-                placeholder="email@example.com"
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Email address"
                 aria-required="true"
               />
@@ -193,42 +169,30 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
 
             {/* Title (Optional) */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                Title:
+              <label className="block text-sm font-medium text-gray-700">
+                Title
               </label>
               <input
                 type="text"
                 value={value.title || ""}
                 onChange={(e) => handleChange("title", e.target.value)}
                 disabled={disabled}
-                placeholder="e.g., Billing Manager"
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Job title (optional)"
               />
             </div>
 
             {/* Department (Optional) */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="text-foreground text-left text-sm pt-2">
-                Department:
+              <label className="block text-sm font-medium text-gray-700">
+                Department
               </label>
               <input
                 type="text"
                 value={value.department || ""}
                 onChange={(e) => handleChange("department", e.target.value)}
                 disabled={disabled}
-                placeholder="e.g., Finance"
-                className={cn(
-                  "w-full px-3 py-2 rounded-md border border-input bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                  "transition-colors"
-                )}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Department (optional)"
               />
             </div>
