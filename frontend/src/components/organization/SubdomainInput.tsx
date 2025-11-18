@@ -30,7 +30,6 @@
  */
 
 import React, { useCallback } from 'react';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatSubdomain } from '@/utils/organization-validation';
 
@@ -85,7 +84,7 @@ export const SubdomainInput: React.FC<SubdomainInputProps> = ({
       </Label>
 
       <div className="flex items-center gap-2">
-        <Input
+        <input
           id={id}
           type="text"
           value={value}
@@ -104,7 +103,7 @@ export const SubdomainInput: React.FC<SubdomainInputProps> = ({
                 ? `${id}-preview`
                 : undefined
           }
-          className={`${error ? 'border-red-500' : ''} font-mono`}
+          className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm font-mono ${error ? 'border-red-500' : ''}`}
         />
         <span className="text-gray-500">.a4c.app</span>
       </div>

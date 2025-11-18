@@ -39,6 +39,7 @@ import {
   PARTNER_TYPES
 } from '@/constants';
 import { Save, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import * as Select from '@radix-ui/react-select';
 import { Logger } from '@/utils/logger';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -188,16 +189,36 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                         <Label className="text-gray-900 text-left text-sm">
                           Organization Type<span className="text-red-600">*</span>:
                         </Label>
-                        <SelectDropdown
-                          id="org-type"
-                          label="Organization Type"
+                        <Select.Root
                           value={formData.type}
-                          options={ORGANIZATION_TYPES.map((t) => ({
-                            value: t.value,
-                            label: t.label
-                          }))}
-                          onChange={(value) => viewModel.updateField('type', value as 'provider' | 'provider_partner')}
-                        />
+                          onValueChange={(value) => viewModel.updateField('type', value as 'provider' | 'provider_partner')}
+                        >
+                          <Select.Trigger
+                            className="w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
+                            aria-label="Organization Type"
+                            aria-required="true"
+                          >
+                            <Select.Value />
+                            <Select.Icon>
+                              <ChevronDown className="h-4 w-4" />
+                            </Select.Icon>
+                          </Select.Trigger>
+                          <Select.Portal>
+                            <Select.Content className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50">
+                              <Select.Viewport className="p-1">
+                                {ORGANIZATION_TYPES.map((type) => (
+                                  <Select.Item
+                                    key={type.value}
+                                    value={type.value}
+                                    className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
+                                  >
+                                    <Select.ItemText>{type.label}</Select.ItemText>
+                                  </Select.Item>
+                                ))}
+                              </Select.Viewport>
+                            </Select.Content>
+                          </Select.Portal>
+                        </Select.Root>
                       </div>
 
                       {/* Partner Type (conditional) */}
@@ -206,21 +227,41 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                           <Label className="text-gray-900 text-left text-sm">
                             Partner Type<span className="text-red-600">*</span>:
                           </Label>
-                          <SelectDropdown
-                            id="partner-type"
-                            label="Partner Type"
+                          <Select.Root
                             value={formData.partnerType || ''}
-                            options={PARTNER_TYPES.map((t) => ({
-                              value: t.value,
-                              label: t.label
-                            }))}
-                            onChange={(value) =>
+                            onValueChange={(value) =>
                               viewModel.updateField(
                                 'partnerType',
                                 value as 'var' | 'family' | 'court' | 'other'
                               )
                             }
-                          />
+                          >
+                            <Select.Trigger
+                              className="w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
+                              aria-label="Partner Type"
+                              aria-required="true"
+                            >
+                              <Select.Value />
+                              <Select.Icon>
+                                <ChevronDown className="h-4 w-4" />
+                              </Select.Icon>
+                            </Select.Trigger>
+                            <Select.Portal>
+                              <Select.Content className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50">
+                                <Select.Viewport className="p-1">
+                                  {PARTNER_TYPES.map((type) => (
+                                    <Select.Item
+                                      key={type.value}
+                                      value={type.value}
+                                      className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
+                                    >
+                                      <Select.ItemText>{type.label}</Select.ItemText>
+                                    </Select.Item>
+                                  ))}
+                                </Select.Viewport>
+                              </Select.Content>
+                            </Select.Portal>
+                          </Select.Root>
                         </div>
                       )}
 
@@ -230,14 +271,14 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                           Organization Name<span className="text-red-600">*</span>:
                         </Label>
                         <div>
-                          <Input
+                          <input
+                            type="text"
                             value={formData.name}
                             onChange={(e) => viewModel.updateField('name', e.target.value)}
-                            className="bg-white/70 border-white/30 text-gray-900 placeholder:text-gray-500"
-                            style={{
-                              backdropFilter: 'blur(10px)',
-                              WebkitBackdropFilter: 'blur(10px)'
-                            }}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                            aria-label="Organization Name"
+                            aria-required="true"
+                            aria-invalid={!!viewModel.getFieldError('name')}
                           />
                           {viewModel.getFieldError('name') && (
                             <p className="text-red-600 text-sm mt-1">
@@ -253,14 +294,14 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                           Display Name<span className="text-red-600">*</span>:
                         </Label>
                         <div>
-                          <Input
+                          <input
+                            type="text"
                             value={formData.displayName}
                             onChange={(e) => viewModel.updateField('displayName', e.target.value)}
-                            className="bg-white/70 border-white/30 text-gray-900 placeholder:text-gray-500"
-                            style={{
-                              backdropFilter: 'blur(10px)',
-                              WebkitBackdropFilter: 'blur(10px)'
-                            }}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                            aria-label="Display Name"
+                            aria-required="true"
+                            aria-invalid={!!viewModel.getFieldError('displayName')}
                           />
                           {viewModel.getFieldError('displayName') && (
                             <p className="text-red-600 text-sm mt-1">
@@ -292,16 +333,36 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                         <Label className="text-gray-900 text-left text-sm">
                           Time Zone<span className="text-red-600">*</span>:
                         </Label>
-                        <SelectDropdown
-                          id="time-zone"
-                          label="Time Zone"
+                        <Select.Root
                           value={formData.timeZone}
-                          options={US_TIME_ZONES.map((tz) => ({
-                            value: tz.value,
-                            label: tz.label
-                          }))}
-                          onChange={(value) => viewModel.updateField('timeZone', value)}
-                        />
+                          onValueChange={(value) => viewModel.updateField('timeZone', value)}
+                        >
+                          <Select.Trigger
+                            className="w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
+                            aria-label="Time Zone"
+                            aria-required="true"
+                          >
+                            <Select.Value />
+                            <Select.Icon>
+                              <ChevronDown className="h-4 w-4" />
+                            </Select.Icon>
+                          </Select.Trigger>
+                          <Select.Portal>
+                            <Select.Content className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50 max-h-[300px]">
+                              <Select.Viewport className="p-1">
+                                {US_TIME_ZONES.map((tz) => (
+                                  <Select.Item
+                                    key={tz.value}
+                                    value={tz.value}
+                                    className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
+                                  >
+                                    <Select.ItemText>{tz.label}</Select.ItemText>
+                                  </Select.Item>
+                                ))}
+                              </Select.Viewport>
+                            </Select.Content>
+                          </Select.Portal>
+                        </Select.Root>
                       </div>
 
                       {/* Referring Partner (conditional - only for providers) */}
