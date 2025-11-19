@@ -52,18 +52,18 @@ BEGIN
         (p_event.event_data->'super_admin'->>'user_id')::UUID,
         p_event.event_data->'super_admin'->>'email',
         p_event.event_data->'super_admin'->>'name',
-        -- Convert super_admin org_id: NULL for platform super_admin, resolve Zitadel ID to UUID for org-scoped admin
+        -- Super admin org_id: NULL for platform super_admin, UUID for org-scoped admin
         CASE
           WHEN p_event.event_data->'super_admin'->>'org_id' IS NULL THEN NULL
           WHEN p_event.event_data->'super_admin'->>'org_id' = '*' THEN NULL
-          ELSE get_internal_org_id(p_event.event_data->'super_admin'->>'org_id')
+          ELSE (p_event.event_data->'super_admin'->>'org_id')::UUID
         END,
         -- Target
         (p_event.event_data->'target'->>'user_id')::UUID,
         p_event.event_data->'target'->>'email',
         p_event.event_data->'target'->>'name',
-        -- Convert target org_id: Zitadel ID to internal UUID
-        get_internal_org_id(p_event.event_data->'target'->>'org_id'),
+        -- Target org_id (UUID format from Supabase Auth)
+        (p_event.event_data->'target'->>'org_id')::UUID,
         p_event.event_data->'target'->>'org_name',
         p_event.event_data->'target'->>'org_type',
         -- Justification
@@ -148,7 +148,8 @@ EXCEPTION
       p_event.id;
     RAISE;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION process_impersonation_event IS 'Projects impersonation domain events (impersonation.started, impersonation.renewed, impersonation.ended) to impersonation_sessions_projection table';
 
@@ -184,7 +185,8 @@ BEGIN
     AND (isp.super_admin_user_id = p_user_id OR isp.target_user_id = p_user_id)
   ORDER BY isp.started_at DESC;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION get_user_active_impersonation_sessions IS 'Returns all active impersonation sessions for a user (as super admin or target)';
 
@@ -226,7 +228,8 @@ BEGIN
     AND isp.started_at BETWEEN p_start_date AND p_end_date
   ORDER BY isp.started_at DESC;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION get_org_impersonation_audit IS 'Returns impersonation audit trail for an organization within a date range (default: last 30 days)';
 
@@ -244,7 +247,8 @@ BEGIN
       AND expires_at > NOW()
   );
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION is_impersonation_session_active IS 'Checks if an impersonation session is currently active and not expired';
 
@@ -272,6 +276,7 @@ BEGIN
   FROM impersonation_sessions_projection isp
   WHERE isp.session_id = p_session_id;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION get_impersonation_session_details IS 'Returns impersonation session details for Redis cache synchronization';

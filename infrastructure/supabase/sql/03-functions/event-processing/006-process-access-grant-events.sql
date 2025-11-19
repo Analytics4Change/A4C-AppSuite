@@ -123,7 +123,8 @@ BEGIN
   END CASE;
 
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- Helper function to validate cross-tenant access requirements
 CREATE OR REPLACE FUNCTION validate_cross_tenant_access(
@@ -164,10 +165,11 @@ BEGIN
       RETURN false;
     END IF;
   END IF;
-  
+
   RETURN true;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
 
 -- Function to get active grants for consultant organization
 CREATE OR REPLACE FUNCTION get_active_grants_for_consultant(
@@ -200,7 +202,8 @@ BEGIN
     AND op.deleted_at IS NULL
   ORDER BY op.name, ctag.granted_at DESC;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
 
 -- Function to check if specific access is granted
 CREATE OR REPLACE FUNCTION has_cross_tenant_access(
@@ -221,7 +224,8 @@ BEGIN
       AND (scope = p_scope OR scope = 'full_org') -- full_org grants access to everything
   );
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
 
 -- Comments for documentation
 COMMENT ON FUNCTION process_access_grant_event IS 

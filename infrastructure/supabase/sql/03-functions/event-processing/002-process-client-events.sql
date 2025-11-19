@@ -170,6 +170,7 @@ BEGIN
     p_event.event_metadata
   );
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION process_client_event IS 'Projects client events to the clients table and audit log';

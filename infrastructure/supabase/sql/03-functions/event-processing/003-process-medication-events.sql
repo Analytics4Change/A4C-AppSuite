@@ -118,7 +118,8 @@ BEGIN
       RAISE WARNING 'Unknown medication event type: %', p_event.event_type;
   END CASE;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- Process Medication History Events
 CREATE OR REPLACE FUNCTION process_medication_history_event(
@@ -293,7 +294,8 @@ BEGIN
     p_event.event_metadata
   );
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- Process Dosage Events
 CREATE OR REPLACE FUNCTION process_dosage_event(
@@ -384,7 +386,8 @@ BEGIN
       RAISE WARNING 'Unknown dosage event type: %', p_event.event_type;
   END CASE;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION process_medication_event IS 'Projects medication catalog events to the medications table';
 COMMENT ON FUNCTION process_medication_history_event IS 'Projects prescription events to the medication_history table';

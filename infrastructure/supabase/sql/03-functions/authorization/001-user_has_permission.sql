@@ -39,7 +39,8 @@ BEGIN
       )
   );
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION user_has_permission IS 'Checks if user has specified permission within given org/scope context';
 
@@ -78,7 +79,8 @@ BEGIN
     )
   ORDER BY p.applet, p.action;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION user_permissions IS 'Returns all permissions for a user within a specific organization';
 
@@ -97,7 +99,8 @@ BEGIN
       AND ur.org_id IS NULL
   );
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION is_super_admin IS 'Checks if user has super_admin role with global scope';
 
@@ -117,7 +120,8 @@ BEGIN
       AND ur.org_id = p_org_id
   );
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION is_provider_admin IS 'Checks if user has provider_admin role for specific organization';
 
@@ -141,6 +145,7 @@ BEGIN
   WHERE ur.user_id = p_user_id
   ORDER BY ur.org_id, r.name;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION user_organizations IS 'Returns all organizations where user has assigned roles';

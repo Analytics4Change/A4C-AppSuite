@@ -78,7 +78,8 @@ BEGIN
       RAISE WARNING 'Unknown program event type: %', p_event.event_type;
   END CASE;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- Contact Event Processor
 CREATE OR REPLACE FUNCTION process_contact_event(
@@ -157,7 +158,8 @@ BEGIN
       RAISE WARNING 'Unknown contact event type: %', p_event.event_type;
   END CASE;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- Address Event Processor
 CREATE OR REPLACE FUNCTION process_address_event(
@@ -236,7 +238,8 @@ BEGIN
       RAISE WARNING 'Unknown address event type: %', p_event.event_type;
   END CASE;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- Phone Event Processor
 CREATE OR REPLACE FUNCTION process_phone_event(
@@ -311,7 +314,8 @@ BEGIN
       RAISE WARNING 'Unknown phone event type: %', p_event.event_type;
   END CASE;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- Comments for documentation
 COMMENT ON FUNCTION process_program_event IS

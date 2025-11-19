@@ -102,7 +102,8 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- Helper function to get current state version for an entity
 CREATE OR REPLACE FUNCTION get_entity_version(
@@ -114,7 +115,8 @@ CREATE OR REPLACE FUNCTION get_entity_version(
   WHERE stream_id = p_stream_id
     AND stream_type = p_stream_type
     AND processed_at IS NOT NULL;
-$$ LANGUAGE SQL STABLE;
+$$ LANGUAGE SQL STABLE
+SET search_path = public, extensions, pg_temp;
 
 -- Helper function to validate event sequence
 CREATE OR REPLACE FUNCTION validate_event_sequence(
@@ -133,7 +135,8 @@ BEGIN
 
   RETURN true;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- Function to safely extract and cast JSONB fields
 CREATE OR REPLACE FUNCTION safe_jsonb_extract_text(
@@ -142,7 +145,8 @@ CREATE OR REPLACE FUNCTION safe_jsonb_extract_text(
   p_default TEXT DEFAULT NULL
 ) RETURNS TEXT AS $$
   SELECT COALESCE(p_data->>p_key, p_default);
-$$ LANGUAGE SQL IMMUTABLE;
+$$ LANGUAGE SQL IMMUTABLE
+SET search_path = public, extensions, pg_temp;
 
 CREATE OR REPLACE FUNCTION safe_jsonb_extract_uuid(
   p_data JSONB,
@@ -150,7 +154,8 @@ CREATE OR REPLACE FUNCTION safe_jsonb_extract_uuid(
   p_default UUID DEFAULT NULL
 ) RETURNS UUID AS $$
   SELECT COALESCE((p_data->>p_key)::UUID, p_default);
-$$ LANGUAGE SQL IMMUTABLE;
+$$ LANGUAGE SQL IMMUTABLE
+SET search_path = public, extensions, pg_temp;
 
 CREATE OR REPLACE FUNCTION safe_jsonb_extract_timestamp(
   p_data JSONB,
@@ -158,7 +163,8 @@ CREATE OR REPLACE FUNCTION safe_jsonb_extract_timestamp(
   p_default TIMESTAMPTZ DEFAULT NULL
 ) RETURNS TIMESTAMPTZ AS $$
   SELECT COALESCE((p_data->>p_key)::TIMESTAMPTZ, p_default);
-$$ LANGUAGE SQL IMMUTABLE;
+$$ LANGUAGE SQL IMMUTABLE
+SET search_path = public, extensions, pg_temp;
 
 CREATE OR REPLACE FUNCTION safe_jsonb_extract_date(
   p_data JSONB,
@@ -166,7 +172,8 @@ CREATE OR REPLACE FUNCTION safe_jsonb_extract_date(
   p_default DATE DEFAULT NULL
 ) RETURNS DATE AS $$
   SELECT COALESCE((p_data->>p_key)::DATE, p_default);
-$$ LANGUAGE SQL IMMUTABLE;
+$$ LANGUAGE SQL IMMUTABLE
+SET search_path = public, extensions, pg_temp;
 
 CREATE OR REPLACE FUNCTION safe_jsonb_extract_boolean(
   p_data JSONB,
@@ -174,7 +181,8 @@ CREATE OR REPLACE FUNCTION safe_jsonb_extract_boolean(
   p_default BOOLEAN DEFAULT FALSE
 ) RETURNS BOOLEAN AS $$
   SELECT COALESCE((p_data->>p_key)::BOOLEAN, p_default);
-$$ LANGUAGE SQL IMMUTABLE;
+$$ LANGUAGE SQL IMMUTABLE
+SET search_path = public, extensions, pg_temp;
 
 -- Organization ID Resolution Functions
 -- Extracts and validates organization UUIDs from event data
@@ -203,7 +211,8 @@ BEGIN
     RETURN NULL;
   END;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION process_domain_event IS 'Main router that processes domain events and projects them to 3NF tables';
 COMMENT ON FUNCTION get_entity_version IS 'Gets the current version number for an entity stream';

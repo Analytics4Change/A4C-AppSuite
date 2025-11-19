@@ -17,7 +17,8 @@ EXCEPTION
   WHEN OTHERS THEN
     RETURN 'analytics4change.com';
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION get_base_domain() IS
   'Returns environment-specific base domain. Dev: firstovertheline.com, Prod: analytics4change.com. Reads from app.base_domain setting or defaults to analytics4change.com';
@@ -32,7 +33,8 @@ BEGIN
 
   RETURN p_slug || '.' || get_base_domain();
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION get_full_subdomain(TEXT) IS
   'Computes full subdomain from slug and environment base domain. Example: get_full_subdomain(''acme'') returns ''acme.firstovertheline.com'' in dev environment';
@@ -53,7 +55,8 @@ BEGIN
 
   RETURN get_full_subdomain(v_slug);
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION get_organization_subdomain(UUID) IS
   'Gets full subdomain for organization by ID. Returns NULL if organization not found. Example: get_organization_subdomain(''...'') might return ''acme.analytics4change.com''';

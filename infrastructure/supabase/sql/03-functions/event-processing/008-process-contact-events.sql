@@ -69,7 +69,8 @@ BEGIN
   END CASE;
 
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION process_contact_event IS
   'Main contact event processor - handles creation, updates, and soft deletion with CQRS projections';

@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS roles_projection (
   is_active BOOLEAN DEFAULT true
 );
 
--- Remove zitadel_org_id column if it exists (migration from Zitadel to Supabase Auth)
+-- Remove deprecated zitadel_org_id column if it exists
 ALTER TABLE roles_projection DROP COLUMN IF EXISTS zitadel_org_id;
 
 -- Update constraint to handle role templates (super_admin, provider_admin, partner_admin)

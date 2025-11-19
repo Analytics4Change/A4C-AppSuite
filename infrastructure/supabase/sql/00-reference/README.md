@@ -10,30 +10,7 @@ This directory contains code that was written but never deployed to production. 
 
 ## Archived Files
 
-### `zitadel-bootstrap-reference.sql`
-
-**Original purpose**: PostgreSQL-based organization bootstrap orchestration with Zitadel integration.
-
-**Why archived**:
-- Never deployed to production (greenfield project)
-- Replaced by Temporal workflow orchestration for better:
-  - Retry handling (built-in Temporal retry policies)
-  - Observability (Temporal UI)
-  - Real API integration (not SQL simulations)
-  - Scalability (workers scale independently)
-  - Maintainability (TypeScript vs SQL for complex logic)
-
-**Useful patterns to extract**:
-- Circuit breaker pattern for external API calls
-- Retry logic with exponential backoff
-- Event emission strategy (CQRS)
-- Error handling and recovery
-
-**Architecture decision**: Use Temporal workflows for orchestration, PostgreSQL for event store and CQRS projections only.
-
-**Date archived**: 2025-10-17
-**Archived by**: Claude Code during Temporal-first implementation
-**Related commit**: Initial Temporal infrastructure setup
+*No archived files currently. Previous Zitadel-related reference files were deleted as part of the complete migration to Supabase Auth (November 2025).*
 
 ## Usage
 

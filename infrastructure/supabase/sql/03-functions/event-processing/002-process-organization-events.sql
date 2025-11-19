@@ -344,7 +344,8 @@ BEGIN
   END CASE;
 
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- Helper function to validate organization path hierarchy
 CREATE OR REPLACE FUNCTION validate_organization_hierarchy(
@@ -371,10 +372,11 @@ BEGIN
     -- Check that path is properly nested under parent
     RETURN p_path <@ p_parent_path;
   END IF;
-  
+
   RETURN false;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
 
 -- Function to get organization hierarchy for queries
 CREATE OR REPLACE FUNCTION get_organization_descendants(
@@ -395,7 +397,8 @@ BEGIN
     AND o.deleted_at IS NULL
   ORDER BY o.path;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
 
 -- Function to get organization ancestors
 CREATE OR REPLACE FUNCTION get_organization_ancestors(
@@ -416,7 +419,8 @@ BEGIN
     AND o.deleted_at IS NULL
   ORDER BY o.depth;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
 
 -- Comments for documentation
 COMMENT ON FUNCTION process_organization_event IS 

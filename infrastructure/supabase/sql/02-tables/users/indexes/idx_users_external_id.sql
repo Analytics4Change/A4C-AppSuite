@@ -1,2 +1,0 @@
--- Note: users.id directly matches auth.users.id from Supabase Auth (no external ID needed)
--- Index removed: zitadel_user_id column no longer exists after migration to Supabase Auth

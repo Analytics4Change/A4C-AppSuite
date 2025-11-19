@@ -53,7 +53,8 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- Create trigger for bootstrap workflow automation
 DROP TRIGGER IF EXISTS bootstrap_workflow_trigger ON domain_events;
@@ -115,7 +116,8 @@ BEGIN
 
   RETURN v_new_bootstrap_id;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- Function to get bootstrap status
 CREATE OR REPLACE FUNCTION get_bootstrap_status(
@@ -141,9 +143,8 @@ BEGIN
     FROM domain_events de
     WHERE de.event_data->>'bootstrap_id' = p_bootstrap_id::TEXT
       AND de.stream_type = 'organization'
-      AND de.event_type LIKE 'organization.bootstrap.%'
-         OR de.event_type LIKE 'organization.zitadel.%'
-         OR de.event_type LIKE 'organization.created'
+      AND (de.event_type LIKE 'organization.bootstrap.%'
+         OR de.event_type = 'organization.created')
   )
   SELECT
     p_bootstrap_id,
@@ -152,15 +153,13 @@ BEGIN
       WHEN be.event_type = 'organization.bootstrap.completed' THEN 'completed'
       WHEN be.event_type = 'organization.bootstrap.failed' THEN 'failed'
       WHEN be.event_type = 'organization.bootstrap.cancelled' THEN 'cancelled'
-      WHEN be.event_type = 'organization.zitadel.created' THEN 'processing'
       WHEN be.event_type = 'organization.bootstrap.initiated' THEN 'initiated'
       WHEN be.event_type = 'organization.bootstrap.temporal_initiated' THEN 'initiated'
       ELSE 'unknown'
     END,
     CASE
-      WHEN be.event_type = 'organization.bootstrap.initiated' THEN 'zitadel_creation'
+      WHEN be.event_type = 'organization.bootstrap.initiated' THEN 'temporal_workflow_started'
       WHEN be.event_type = 'organization.bootstrap.temporal_initiated' THEN 'temporal_workflow_started'
-      WHEN be.event_type = 'organization.zitadel.created' THEN 'organization_creation'
       WHEN be.event_type = 'organization.created' THEN 'role_assignment'
       WHEN be.event_type = 'organization.bootstrap.completed' THEN 'completed'
       WHEN be.event_type = 'organization.bootstrap.failed' THEN be.event_data->>'failure_stage'
@@ -175,7 +174,8 @@ BEGIN
   FROM bootstrap_events be
   WHERE be.rn = 1; -- Most recent event
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
 
 -- Function to list all bootstrap processes (for admin dashboard)
 CREATE OR REPLACE FUNCTION list_bootstrap_processes(
@@ -239,7 +239,8 @@ BEGIN
   ORDER BY bi.initiated_at DESC
   LIMIT p_limit OFFSET p_offset;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
 
 -- Function to clean up old failed bootstrap attempts
 CREATE OR REPLACE FUNCTION cleanup_old_bootstrap_failures(
@@ -262,7 +263,8 @@ BEGIN
 
   RETURN v_cleanup_count;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- Comments for documentation
 COMMENT ON FUNCTION handle_bootstrap_workflow IS

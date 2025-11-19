@@ -47,7 +47,8 @@ BEGIN
   -- Return NEW to continue trigger chain
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 -- ========================================
 -- Register Trigger

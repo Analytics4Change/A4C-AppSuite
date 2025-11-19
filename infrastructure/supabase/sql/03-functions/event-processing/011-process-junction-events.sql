@@ -106,7 +106,8 @@ BEGIN
   END CASE;
 
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION process_junction_event IS
   'Main junction event processor - handles link/unlink for all 6 junction table types (org-contact, org-address, org-phone, contact-phone, contact-address, phone-address)';

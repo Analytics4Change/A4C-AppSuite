@@ -69,7 +69,8 @@ BEGIN
   END CASE;
 
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION process_address_event IS
   'Main address event processor - handles creation, updates, and soft deletion with CQRS projections';

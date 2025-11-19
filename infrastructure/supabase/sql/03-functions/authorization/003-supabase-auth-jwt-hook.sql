@@ -146,7 +146,8 @@ EXCEPTION
       )
     );
 END;
-$$;
+$$
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION public.custom_access_token_hook IS
   'Enriches Supabase Auth JWTs with custom claims: org_id, user_role, permissions, scope_path. Called automatically on token generation.';
@@ -204,7 +205,8 @@ EXCEPTION
   WHEN OTHERS THEN
     RAISE EXCEPTION 'Failed to switch organization: %', SQLERRM;
 END;
-$$;
+$$
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION public.switch_organization IS
   'Updates user current organization context. Client must refresh JWT to get new claims.';
@@ -242,7 +244,8 @@ BEGIN
 
   RETURN v_result;
 END;
-$$;
+$$
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION public.get_user_claims_preview IS
   'Preview what JWT custom claims would be for a user (debugging/testing only)';
