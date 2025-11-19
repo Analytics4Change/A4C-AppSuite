@@ -10,10 +10,11 @@ BEGIN
   CASE p_event.event_type
 
     -- Handle contact creation
+    -- Note: phone is a separate entity (phones_projection) linked via contact_phones junction table
     WHEN 'contact.created' THEN
       INSERT INTO contacts_projection (
         id, organization_id, type, label,
-        first_name, last_name, email, phone, title, department,
+        first_name, last_name, email, title, department,
         metadata, created_at
       ) VALUES (
         p_event.stream_id,
@@ -27,7 +28,6 @@ BEGIN
         safe_jsonb_extract_text(p_event.event_data, 'first_name'),
         safe_jsonb_extract_text(p_event.event_data, 'last_name'),
         safe_jsonb_extract_text(p_event.event_data, 'email'),
-        safe_jsonb_extract_text(p_event.event_data, 'phone'),
         safe_jsonb_extract_text(p_event.event_data, 'title'),
         safe_jsonb_extract_text(p_event.event_data, 'department'),
         COALESCE(p_event.event_data->'metadata', '{}'::jsonb),
@@ -36,6 +36,7 @@ BEGIN
       ON CONFLICT (id) DO NOTHING;  -- Idempotent
 
     -- Handle contact updates
+    -- Note: phone is a separate entity (phones_projection) linked via contact_phones junction table
     WHEN 'contact.updated' THEN
       UPDATE contacts_projection
       SET
@@ -48,7 +49,6 @@ BEGIN
         first_name = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'first_name'), first_name),
         last_name = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'last_name'), last_name),
         email = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'email'), email),
-        phone = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'phone'), phone),
         title = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'title'), title),
         department = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'department'), department),
         metadata = COALESCE(p_event.event_data->'metadata', metadata),

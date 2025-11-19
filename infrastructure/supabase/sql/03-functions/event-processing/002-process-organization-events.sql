@@ -30,8 +30,9 @@ BEGIN
       END IF;
       
       -- Insert into organizations projection
+      -- Note: depth column is auto-generated from path via PostgreSQL generated column
       INSERT INTO organizations_projection (
-        id, name, display_name, slug, type, path, parent_path, depth,
+        id, name, display_name, slug, type, path, parent_path,
         tax_number, phone_number, timezone, metadata, created_at,
         partner_type, referring_partner_id
       ) VALUES (
@@ -46,7 +47,6 @@ BEGIN
           THEN (p_event.event_data->>'parent_path')::LTREE
           ELSE NULL
         END,
-        nlevel((p_event.event_data->>'path')::LTREE),
         safe_jsonb_extract_text(p_event.event_data, 'tax_number'),
         safe_jsonb_extract_text(p_event.event_data, 'phone_number'),
         COALESCE(safe_jsonb_extract_text(p_event.event_data, 'timezone'), 'America/New_York'),
