@@ -34,7 +34,7 @@ BEGIN
       INSERT INTO organizations_projection (
         id, name, display_name, slug, type, path, parent_path,
         tax_number, phone_number, timezone, metadata, created_at,
-        partner_type, referring_partner_id
+        partner_type, referring_partner_id, subdomain_status
       ) VALUES (
         p_event.stream_id,
         safe_jsonb_extract_text(p_event.event_data, 'name'),
@@ -57,7 +57,22 @@ BEGIN
           THEN (safe_jsonb_extract_text(p_event.event_data, 'partner_type'))::partner_type
           ELSE NULL
         END,
-        safe_jsonb_extract_uuid(p_event.event_data, 'referring_partner_id')
+        safe_jsonb_extract_uuid(p_event.event_data, 'referring_partner_id'),
+        -- subdomain_status: set from event data if present, otherwise based on type/partner_type
+        CASE
+          WHEN p_event.event_data ? 'subdomain_status'
+          THEN (safe_jsonb_extract_text(p_event.event_data, 'subdomain_status'))::subdomain_status_enum
+          WHEN is_subdomain_required(
+            safe_jsonb_extract_text(p_event.event_data, 'type'),
+            CASE
+              WHEN p_event.event_data ? 'partner_type'
+              THEN (safe_jsonb_extract_text(p_event.event_data, 'partner_type'))::partner_type
+              ELSE NULL
+            END
+          )
+          THEN 'pending'::subdomain_status_enum
+          ELSE NULL
+        END
       );
 
     -- Handle subdomain DNS record creation
