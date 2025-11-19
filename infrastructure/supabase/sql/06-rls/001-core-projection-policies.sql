@@ -326,3 +326,128 @@ COMMENT ON POLICY event_types_super_admin_all ON event_types IS
   'Allows super admins full access to event type definitions';
 COMMENT ON POLICY event_types_authenticated_select ON event_types IS
   'Allows authenticated users to view event type definitions';
+
+
+-- ============================================================================
+-- Phase 1: Enable RLS on Tables with Existing Policies
+-- ============================================================================
+-- These tables have policies defined but RLS was not enabled, meaning
+-- the policies were not being enforced. This fixes security advisor issue 0007.
+
+ALTER TABLE public.domain_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_types ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.organization_business_profiles_projection ENABLE ROW LEVEL SECURITY;
+
+
+-- ============================================================================
+-- Invitations Projection
+-- ============================================================================
+
+-- Super admins can view all invitations
+DROP POLICY IF EXISTS invitations_super_admin_all ON invitations_projection;
+CREATE POLICY invitations_super_admin_all
+  ON invitations_projection
+  FOR ALL
+  USING (is_super_admin(get_current_user_id()));
+
+-- Organization admins can view their organization's invitations
+DROP POLICY IF EXISTS invitations_org_admin_select ON invitations_projection;
+CREATE POLICY invitations_org_admin_select
+  ON invitations_projection
+  FOR SELECT
+  USING (is_org_admin(get_current_user_id(), organization_id));
+
+-- Users can view their own invitation by email
+DROP POLICY IF EXISTS invitations_user_own_select ON invitations_projection;
+CREATE POLICY invitations_user_own_select
+  ON invitations_projection
+  FOR SELECT
+  USING (email = (current_setting('request.jwt.claims', true)::json->>'email'));
+
+COMMENT ON POLICY invitations_super_admin_all ON invitations_projection IS
+  'Allows super admins full access to all invitations';
+COMMENT ON POLICY invitations_org_admin_select ON invitations_projection IS
+  'Allows organization admins to view invitations for their organization';
+COMMENT ON POLICY invitations_user_own_select ON invitations_projection IS
+  'Allows users to view their own invitation by email address';
+
+
+-- ============================================================================
+-- Audit Log
+-- ============================================================================
+
+-- Super admins can view all audit log entries
+DROP POLICY IF EXISTS audit_log_super_admin_all ON audit_log;
+CREATE POLICY audit_log_super_admin_all
+  ON audit_log
+  FOR ALL
+  USING (is_super_admin(get_current_user_id()));
+
+-- Organization admins can view their organization's audit entries
+DROP POLICY IF EXISTS audit_log_org_admin_select ON audit_log;
+CREATE POLICY audit_log_org_admin_select
+  ON audit_log
+  FOR SELECT
+  USING (
+    organization_id IS NOT NULL
+    AND is_org_admin(get_current_user_id(), organization_id)
+  );
+
+COMMENT ON POLICY audit_log_super_admin_all ON audit_log IS
+  'Allows super admins full access to all audit log entries';
+COMMENT ON POLICY audit_log_org_admin_select ON audit_log IS
+  'Allows organization admins to view audit entries for their organization';
+
+
+-- ============================================================================
+-- API Audit Log
+-- ============================================================================
+
+-- Super admins can view all API audit log entries
+DROP POLICY IF EXISTS api_audit_log_super_admin_all ON api_audit_log;
+CREATE POLICY api_audit_log_super_admin_all
+  ON api_audit_log
+  FOR ALL
+  USING (is_super_admin(get_current_user_id()));
+
+-- Organization admins can view their organization's API audit entries
+DROP POLICY IF EXISTS api_audit_log_org_admin_select ON api_audit_log;
+CREATE POLICY api_audit_log_org_admin_select
+  ON api_audit_log
+  FOR SELECT
+  USING (
+    organization_id IS NOT NULL
+    AND is_org_admin(get_current_user_id(), organization_id)
+  );
+
+COMMENT ON POLICY api_audit_log_super_admin_all ON api_audit_log IS
+  'Allows super admins full access to all API audit log entries';
+COMMENT ON POLICY api_audit_log_org_admin_select ON api_audit_log IS
+  'Allows organization admins to view API audit entries for their organization';
+
+
+-- ============================================================================
+-- Cross-Tenant Access Grants Projection
+-- ============================================================================
+
+-- Super admins can view all cross-tenant access grants
+DROP POLICY IF EXISTS cross_tenant_grants_super_admin_all ON cross_tenant_access_grants_projection;
+CREATE POLICY cross_tenant_grants_super_admin_all
+  ON cross_tenant_access_grants_projection
+  FOR ALL
+  USING (is_super_admin(get_current_user_id()));
+
+-- Organization admins can view grants where their org is either the consultant or provider
+DROP POLICY IF EXISTS cross_tenant_grants_org_admin_select ON cross_tenant_access_grants_projection;
+CREATE POLICY cross_tenant_grants_org_admin_select
+  ON cross_tenant_access_grants_projection
+  FOR SELECT
+  USING (
+    is_org_admin(get_current_user_id(), consultant_org_id)
+    OR is_org_admin(get_current_user_id(), provider_org_id)
+  );
+
+COMMENT ON POLICY cross_tenant_grants_super_admin_all ON cross_tenant_access_grants_projection IS
+  'Allows super admins full access to all cross-tenant access grants';
+COMMENT ON POLICY cross_tenant_grants_org_admin_select ON cross_tenant_access_grants_projection IS
+  'Allows organization admins to view grants where their organization is consultant or provider';
