@@ -61,7 +61,7 @@ BEGIN
         -- subdomain_status: set from event data if present, otherwise based on type/partner_type
         CASE
           WHEN p_event.event_data ? 'subdomain_status'
-          THEN (safe_jsonb_extract_text(p_event.event_data, 'subdomain_status'))::subdomain_status_enum
+          THEN (safe_jsonb_extract_text(p_event.event_data, 'subdomain_status'))::subdomain_status
           WHEN is_subdomain_required(
             safe_jsonb_extract_text(p_event.event_data, 'type'),
             CASE
@@ -70,7 +70,7 @@ BEGIN
               ELSE NULL
             END
           )
-          THEN 'pending'::subdomain_status_enum
+          THEN 'pending'::subdomain_status
           ELSE NULL
         END
       );
