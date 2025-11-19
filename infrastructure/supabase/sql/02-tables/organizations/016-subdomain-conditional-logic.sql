@@ -64,7 +64,8 @@ BEGIN
   -- Default: subdomain not required (conservative approach)
   RETURN FALSE;
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$ LANGUAGE plpgsql IMMUTABLE
+SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION is_subdomain_required IS
   'Determines if subdomain provisioning is required based on organization type and partner type';
