@@ -29,11 +29,12 @@ export async function deletePhones(params: DeletePhonesParams): Promise<boolean>
     const supabase = getSupabaseClient();
     const tags = buildTags();
 
-    // Query all phones for organization (including soft-deleted)
+    // Query all phones for organization via RPC (PostgREST only exposes 'api' schema)
     const { data: phones, error: queryError } = await supabase
-      .from('phones_projection')
-      .select('id')
-      .eq('organization_id', params.orgId);
+      .schema('api')
+      .rpc('get_phones_by_org', {
+        p_org_id: params.orgId
+      });
 
     if (queryError) {
       console.error(`[DeletePhones] Query failed: ${queryError.message}`);

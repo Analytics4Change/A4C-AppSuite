@@ -29,11 +29,12 @@ export async function deleteContacts(params: DeleteContactsParams): Promise<bool
     const supabase = getSupabaseClient();
     const tags = buildTags();
 
-    // Query all contacts for organization (including soft-deleted)
+    // Query all contacts for organization via RPC (PostgREST only exposes 'api' schema)
     const { data: contacts, error: queryError } = await supabase
-      .from('contacts_projection')
-      .select('id')
-      .eq('organization_id', params.orgId);
+      .schema('api')
+      .rpc('get_contacts_by_org', {
+        p_org_id: params.orgId
+      });
 
     if (queryError) {
       console.error(`[DeleteContacts] Query failed: ${queryError.message}`);

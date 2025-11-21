@@ -150,7 +150,7 @@ export async function organizationBootstrapWorkflow(
 
           // Verify DNS propagation (optional, for production mode)
           try {
-            await verifyDNS({ domain: dnsResult.fqdn });
+            await verifyDNS({ orgId: state.orgId!, domain: dnsResult.fqdn });
             log.info('DNS verified successfully', { fqdn: dnsResult.fqdn });
           } catch (verifyError) {
             // DNS verification failed, but we'll continue
@@ -296,7 +296,7 @@ export async function organizationBootstrapWorkflow(
     if (state.dnsConfigured && params.subdomain) {
       try {
         log.info('Compensation: Removing DNS', { subdomain: params.subdomain });
-        await removeDNS({ subdomain: params.subdomain });
+        await removeDNS({ orgId: state.orgId!, subdomain: params.subdomain });
         log.info('DNS removed', { subdomain: params.subdomain });
       } catch (compError) {
         const compErrorMsg = compError instanceof Error ? compError.message : 'Unknown error';

@@ -43,7 +43,9 @@ function buildInvitationEmailHTML(
   frontendUrl: string
 ): string {
   const invitationUrl = `${frontendUrl}/accept-invitation?token=${invitation.token}`;
-  const expiresDate = invitation.expiresAt.toLocaleDateString('en-US', {
+  // Convert to Date (Temporal serializes Date objects as ISO strings)
+  const expiresAt = new Date(invitation.expiresAt);
+  const expiresDate = expiresAt.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
@@ -112,7 +114,9 @@ function buildInvitationEmailText(
   frontendUrl: string
 ): string {
   const invitationUrl = `${frontendUrl}/accept-invitation?token=${invitation.token}`;
-  const expiresDate = invitation.expiresAt.toLocaleDateString('en-US', {
+  // Convert to Date (Temporal serializes Date objects as ISO strings)
+  const expiresAt = new Date(invitation.expiresAt);
+  const expiresDate = expiresAt.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
@@ -149,18 +153,16 @@ export async function sendInvitationEmails(
   const emailProvider = createEmailProvider();
   const tags = buildTags();
 
-  // Get organization details
-  const { data: org, error: orgError } = await supabase
-    .from('organizations_projection')
-    .select('name')
-    .eq('id', params.orgId)
-    .single();
+  // Get organization details via RPC (PostgREST only exposes 'api' schema)
+  const { data: orgName, error: orgError } = await supabase
+    .schema('api')
+    .rpc('get_organization_name', {
+      p_org_id: params.orgId
+    });
 
-  if (orgError || !org) {
+  if (orgError || !orgName) {
     throw new Error(`Failed to get organization details: ${orgError?.message}`);
   }
-
-  const orgName = org.name;
   let successCount = 0;
   const failures: Array<{ email: string; error: string }> = [];
 
@@ -184,7 +186,7 @@ export async function sendInvitationEmails(
 
       // Emit InvitationEmailSent event
       await emitEvent({
-        event_type: 'InvitationEmailSent',
+        event_type: 'invitation.email.sent',
         aggregate_type: 'Organization',
         aggregate_id: params.orgId,
         event_data: {

@@ -38,9 +38,9 @@ export async function verifyDNS(params: VerifyDNSParams): Promise<boolean> {
 
     // Emit DNSVerified event
     await emitEvent({
-      event_type: 'DNSVerified',
+      event_type: 'organization.dns.verified',
       aggregate_type: 'Organization',
-      aggregate_id: params.domain, // Use domain as aggregate ID (org ID not available)
+      aggregate_id: params.orgId,
       event_data: {
         domain: params.domain,
         verified: true,
@@ -65,9 +65,9 @@ export async function verifyDNS(params: VerifyDNSParams): Promise<boolean> {
 
     // Emit DNSVerified event
     await emitEvent({
-      event_type: 'DNSVerified',
+      event_type: 'organization.dns.verified',
       aggregate_type: 'Organization',
-      aggregate_id: params.domain,
+      aggregate_id: params.orgId,
       event_data: {
         domain: params.domain,
         verified: true,

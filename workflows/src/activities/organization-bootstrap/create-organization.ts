@@ -32,31 +32,29 @@ export async function createOrganization(
   const supabase = getSupabaseClient();
 
   // Check if organization already exists (idempotency)
-  // For orgs with subdomains, check subdomain. For orgs without, check name.
+  // For orgs with subdomains, check slug. For orgs without, check name.
   let existing;
-  let checkError;
 
-  if (params.subdomain) {
-    const result = await supabase
-      .from('organizations_projection')
-      .select('id')
-      .eq('subdomain', params.subdomain)
-      .maybeSingle();
-    existing = result.data;
-    checkError = result.error;
-  } else {
-    const result = await supabase
-      .from('organizations_projection')
-      .select('id')
-      .eq('name', params.name)
-      .is('subdomain', null)
-      .maybeSingle();
-    existing = result.data;
-    checkError = result.error;
-  }
-
-  if (checkError) {
-    throw new Error(`Failed to check existing organization: ${checkError.message}`);
+  try {
+    if (params.subdomain) {
+      const { data, error } = await supabase
+        .schema('api')
+        .rpc('check_organization_by_slug', {
+          p_slug: params.subdomain
+        });
+      if (error) throw error;
+      existing = data && data.length > 0 ? data[0] : null;
+    } else {
+      const { data, error } = await supabase
+        .schema('api')
+        .rpc('check_organization_by_name', {
+          p_name: params.name
+        });
+      if (error) throw error;
+      existing = data && data.length > 0 ? data[0] : null;
+    }
+  } catch (error: any) {
+    throw new Error(`Failed to check existing organization: ${error.message}`);
   }
 
   if (existing) {
@@ -71,19 +69,21 @@ export async function createOrganization(
   const tags = buildTags();
 
   // Emit OrganizationCreated event FIRST (event-driven architecture)
+  // AsyncAPI contract requires: slug, path (not subdomain, parent_org_id)
+  const slug = params.subdomain || params.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const path = params.parentOrgId ? `parent.${slug}` : slug; // TODO: Get actual parent path from DB
+
   await emitEvent({
     event_type: 'organization.created',
     aggregate_type: 'organization',
     aggregate_id: orgId,
     event_data: {
-      organization_id: orgId,
       name: params.name,
+      slug: slug,
       type: params.type,
-      parent_org_id: params.parentOrgId,
-      subdomain: params.subdomain || null,
+      path: path,
       partner_type: params.partnerType || null,
-      referring_partner_id: params.referringPartnerId || null,
-      status: 'provisioning'
+      referring_partner_id: params.referringPartnerId || null
     },
     tags
   });
@@ -101,7 +101,6 @@ export async function createOrganization(
       aggregate_type: 'contact',
       aggregate_id: contactId,
       event_data: {
-        contact_id: contactId,
         organization_id: orgId,
         first_name: contact.firstName,
         last_name: contact.lastName,
@@ -115,9 +114,10 @@ export async function createOrganization(
     });
 
     // Emit organization.contact.linked junction event
+    // AsyncAPI contract: stream_type must be 'junction' not 'organization'
     await emitEvent({
       event_type: 'organization.contact.linked',
-      aggregate_type: 'organization',
+      aggregate_type: 'junction',
       aggregate_id: orgId,
       event_data: {
         organization_id: orgId,
@@ -140,7 +140,6 @@ export async function createOrganization(
       aggregate_type: 'address',
       aggregate_id: addressId,
       event_data: {
-        address_id: addressId,
         organization_id: orgId,
         street1: address.street1,
         street2: address.street2 || null,
@@ -154,9 +153,10 @@ export async function createOrganization(
     });
 
     // Emit organization.address.linked junction event
+    // AsyncAPI contract: stream_type must be 'junction' not 'organization'
     await emitEvent({
       event_type: 'organization.address.linked',
-      aggregate_type: 'organization',
+      aggregate_type: 'junction',
       aggregate_id: orgId,
       event_data: {
         organization_id: orgId,
@@ -179,7 +179,6 @@ export async function createOrganization(
       aggregate_type: 'phone',
       aggregate_id: phoneId,
       event_data: {
-        phone_id: phoneId,
         organization_id: orgId,
         number: phone.number,
         extension: phone.extension || null,
@@ -190,9 +189,10 @@ export async function createOrganization(
     });
 
     // Emit organization.phone.linked junction event
+    // AsyncAPI contract: stream_type must be 'junction' not 'organization'
     await emitEvent({
       event_type: 'organization.phone.linked',
-      aggregate_type: 'organization',
+      aggregate_type: 'junction',
       aggregate_id: orgId,
       event_data: {
         organization_id: orgId,

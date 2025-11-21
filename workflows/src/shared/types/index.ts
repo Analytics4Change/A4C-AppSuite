@@ -199,6 +199,7 @@ export interface ConfigureDNSResult {
  * VerifyDNSActivity parameters
  */
 export interface VerifyDNSParams {
+  orgId: string;
   domain: string;
 }
 
@@ -261,6 +262,7 @@ export interface ActivateOrganizationParams {
  * RemoveDNSActivity parameters (compensation)
  */
 export interface RemoveDNSParams {
+  orgId: string;
   subdomain: string;
 }
 

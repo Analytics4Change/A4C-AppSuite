@@ -37,12 +37,12 @@ export async function revokeInvitations(
   const supabase = getSupabaseClient();
 
   try {
-    // Find all pending invitations
+    // Find all pending invitations via RPC (PostgREST only exposes 'api' schema)
     const { data: invitations, error: fetchError } = await supabase
-      .from('invitations_projection')
-      .select('invitation_id, email')
-      .eq('organization_id', params.orgId)
-      .eq('status', 'pending');
+      .schema('api')
+      .rpc('get_pending_invitations_by_org', {
+        p_org_id: params.orgId
+      });
 
     if (fetchError) {
       console.error(`[RevokeInvitations] Error fetching invitations: ${fetchError.message}`);
@@ -56,29 +56,16 @@ export async function revokeInvitations(
 
     console.log(`[RevokeInvitations] Found ${invitations.length} pending invitations`);
 
-    // Update all pending invitations to deleted
+    // Emit InvitationRevoked events for each invitation
+    // CQRS pattern: Let the trigger update the projection, not direct UPDATE
     const revokedAt = new Date().toISOString();
-    const { error: updateError } = await supabase
-      .from('invitations_projection')
-      .update({
-        status: 'deleted',
-        updated_at: revokedAt
-      })
-      .eq('organization_id', params.orgId)
-      .eq('status', 'pending');
-
-    if (updateError) {
-      console.error(`[RevokeInvitations] Error updating invitations: ${updateError.message}`);
-      return 0; // Don't fail compensation
-    }
-
-    // Emit InvitationRevoked events
     const tags = buildTags();
+
     for (const invitation of invitations) {
       await emitEvent({
-        event_type: 'InvitationRevoked',
-        aggregate_type: 'Organization',
-        aggregate_id: params.orgId,
+        event_type: 'invitation.revoked',
+        aggregate_type: 'invitation',
+        aggregate_id: invitation.invitation_id,
         event_data: {
           org_id: params.orgId,
           invitation_id: invitation.invitation_id,
@@ -90,7 +77,7 @@ export async function revokeInvitations(
       });
     }
 
-    console.log(`[RevokeInvitations] Revoked ${invitations.length} invitations`);
+    console.log(`[RevokeInvitations] Emitted ${invitations.length} InvitationRevoked events`);
 
     return invitations.length;
   } catch (error) {

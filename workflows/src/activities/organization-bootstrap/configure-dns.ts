@@ -7,7 +7,7 @@
  * 1. List zones to find target domain zone
  * 2. Check if DNS record already exists (idempotency)
  * 3. Create CNAME record if not exists
- * 4. Emit DNSConfigured event
+ * 4. Emit organization.dns.configured event
  *
  * Provider:
  * - Uses DNS provider from factory (Cloudflare/Mock/Logging)
@@ -66,7 +66,7 @@ export async function configureDNS(
 
     // Emit event even if record exists (for event replay)
     await emitEvent({
-      event_type: 'DNSConfigured',
+      event_type: 'organization.dns.configured',
       aggregate_type: 'Organization',
       aggregate_id: params.orgId,
       event_data: {
@@ -98,10 +98,10 @@ export async function configureDNS(
 
   console.log(`[ConfigureDNS] Created DNS record: ${record.id}`);
 
-  // Emit DNSConfigured event
+  // Emit organization.dns.configured event
   await emitEvent({
-    event_type: 'DNSConfigured',
-    aggregate_type: 'Organization',
+    event_type: 'organization.dns.configured',
+    aggregate_type: 'organization',
     aggregate_id: params.orgId,
     event_data: {
       org_id: params.orgId,
@@ -114,7 +114,7 @@ export async function configureDNS(
     tags: buildTags()
   });
 
-  console.log(`[ConfigureDNS] Emitted DNSConfigured event for ${params.orgId}`);
+  console.log(`[ConfigureDNS] Emitted organization.dns.configured event for ${params.orgId}`);
 
   return {
     fqdn,

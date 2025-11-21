@@ -36,35 +36,37 @@ export async function deactivateOrganization(
   const supabase = getSupabaseClient();
 
   try {
-    // Check current status (idempotency)
-    const { data: org, error: checkError } = await supabase
-      .from('organizations_projection')
-      .select('status, deleted_at')
-      .eq('id', params.orgId)
-      .maybeSingle();
+    // Check current status (idempotency) via RPC (PostgREST only exposes 'api' schema)
+    const { data: orgData, error: checkError } = await supabase
+      .schema('api')
+      .rpc('get_organization_status', {
+        p_org_id: params.orgId
+      });
 
     if (checkError) {
       console.error(`[DeactivateOrganization] Error checking status: ${checkError.message}`);
       // Continue with deactivation attempt
     }
 
+    const org = orgData && orgData.length > 0 ? orgData[0] : null;
+
     if (!org) {
       console.log(`[DeactivateOrganization] Organization not found: ${params.orgId} (skip)`);
       return true;
     }
 
-    if (org.status === 'failed' && org.deleted_at) {
+    if (!org.is_active && org.deleted_at) {
       console.log(`[DeactivateOrganization] Organization already deactivated: ${params.orgId}`);
 
       // Emit event even if already deactivated (for event replay)
       await emitEvent({
-        event_type: 'OrganizationDeactivated',
+        event_type: 'organization.deactivated',
         aggregate_type: 'Organization',
         aggregate_id: params.orgId,
         event_data: {
           org_id: params.orgId,
           deactivated_at: org.deleted_at,
-          previous_status: org.status,
+          previous_is_active: org.is_active,
           reason: 'workflow_failure'
         },
         tags: buildTags()
@@ -73,15 +75,16 @@ export async function deactivateOrganization(
       return true;
     }
 
-    // Update organization status
+    // Update organization status via RPC (PostgREST only exposes 'api' schema)
     const deactivatedAt = new Date().toISOString();
     const { error: updateError } = await supabase
-      .from('organizations_projection')
-      .update({
-        status: 'failed',
-        deleted_at: deactivatedAt
-      })
-      .eq('id', params.orgId);
+      .schema('api')
+      .rpc('update_organization_status', {
+        p_org_id: params.orgId,
+        p_is_active: false,
+        p_deactivated_at: deactivatedAt,
+        p_deleted_at: deactivatedAt
+      });
 
     if (updateError) {
       console.error(`[DeactivateOrganization] Error updating status: ${updateError.message}`);
@@ -92,13 +95,13 @@ export async function deactivateOrganization(
 
     // Emit OrganizationDeactivated event
     await emitEvent({
-      event_type: 'OrganizationDeactivated',
+      event_type: 'organization.deactivated',
       aggregate_type: 'Organization',
       aggregate_id: params.orgId,
       event_data: {
         org_id: params.orgId,
         deactivated_at: deactivatedAt,
-        previous_status: org.status,
+        previous_is_active: org.is_active,
         reason: 'workflow_failure'
       },
       tags: buildTags()

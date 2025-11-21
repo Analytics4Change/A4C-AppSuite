@@ -29,11 +29,12 @@ export async function deleteAddresses(params: DeleteAddressesParams): Promise<bo
     const supabase = getSupabaseClient();
     const tags = buildTags();
 
-    // Query all addresses for organization (including soft-deleted)
+    // Query all addresses for organization via RPC (PostgREST only exposes 'api' schema)
     const { data: addresses, error: queryError } = await supabase
-      .from('addresses_projection')
-      .select('id')
-      .eq('organization_id', params.orgId);
+      .schema('api')
+      .rpc('get_addresses_by_org', {
+        p_org_id: params.orgId
+      });
 
     if (queryError) {
       console.error(`[DeleteAddresses] Query failed: ${queryError.message}`);

@@ -30,33 +30,35 @@ export async function activateOrganization(
 
   const supabase = getSupabaseClient();
 
-  // Check current status (idempotency)
-  const { data: org, error: checkError } = await supabase
-    .from('organizations_projection')
-    .select('status')
-    .eq('id', params.orgId)
-    .single();
+  // Check current status (idempotency) via RPC (PostgREST only exposes 'api' schema)
+  const { data: orgData, error: checkError } = await supabase
+    .schema('api')
+    .rpc('get_organization_status', {
+      p_org_id: params.orgId
+    });
 
   if (checkError) {
     throw new Error(`Failed to check organization status: ${checkError.message}`);
   }
 
+  const org = orgData && orgData.length > 0 ? orgData[0] : null;
+
   if (!org) {
     throw new Error(`Organization not found: ${params.orgId}`);
   }
 
-  if (org.status === 'active') {
+  if (org.is_active) {
     console.log(`[ActivateOrganization] Organization already active: ${params.orgId}`);
 
     // Emit event even if already active (for event replay)
     await emitEvent({
-      event_type: 'OrganizationActivated',
+      event_type: 'organization.activated',
       aggregate_type: 'Organization',
       aggregate_id: params.orgId,
       event_data: {
         org_id: params.orgId,
         activated_at: new Date().toISOString(),
-        previous_status: org.status
+        previous_is_active: org.is_active
       },
       tags: buildTags()
     });
@@ -64,15 +66,14 @@ export async function activateOrganization(
     return true;
   }
 
-  // Update organization status
-  const activatedAt = new Date().toISOString();
+  // Update organization status via RPC (PostgREST only exposes 'api' schema)
   const { error: updateError } = await supabase
-    .from('organizations_projection')
-    .update({
-      status: 'active',
-      activated_at: activatedAt
-    })
-    .eq('id', params.orgId);
+    .schema('api')
+    .rpc('update_organization_status', {
+      p_org_id: params.orgId,
+      p_is_active: true,
+      p_deactivated_at: null
+    });
 
   if (updateError) {
     throw new Error(`Failed to activate organization: ${updateError.message}`);
@@ -81,14 +82,15 @@ export async function activateOrganization(
   console.log(`[ActivateOrganization] Organization activated: ${params.orgId}`);
 
   // Emit OrganizationActivated event
+  const activatedAt = new Date().toISOString();
   await emitEvent({
-    event_type: 'OrganizationActivated',
+    event_type: 'organization.activated',
     aggregate_type: 'Organization',
     aggregate_id: params.orgId,
     event_data: {
       org_id: params.orgId,
       activated_at: activatedAt,
-      previous_status: org.status
+      previous_is_active: org.is_active
     },
     tags: buildTags()
   });

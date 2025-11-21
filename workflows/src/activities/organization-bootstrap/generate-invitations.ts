@@ -55,13 +55,15 @@ export async function generateInvitations(
   for (const user of params.users) {
     console.log(`[GenerateInvitations] Processing invitation for: ${user.email}`);
 
-    // Check if invitation already exists (idempotency)
-    const { data: existing } = await supabase
-      .from('invitations_projection')
-      .select('invitation_id, email, token, expires_at')
-      .eq('organization_id', params.orgId)
-      .eq('email', user.email)
-      .maybeSingle();
+    // Check if invitation already exists (idempotency) via RPC
+    const { data: existingData } = await supabase
+      .schema('api')
+      .rpc('get_invitation_by_org_and_email', {
+        p_org_id: params.orgId,
+        p_email: user.email
+      });
+
+    const existing = existingData && existingData.length > 0 ? existingData[0] : null;
 
     if (existing) {
       console.log(`[GenerateInvitations] Invitation already exists for ${user.email}`);
@@ -80,7 +82,7 @@ export async function generateInvitations(
 
     // Emit UserInvited event (triggers projection update)
     await emitEvent({
-      event_type: 'UserInvited',
+      event_type: 'user.invited',
       aggregate_type: 'Organization',
       aggregate_id: params.orgId,
       event_data: {

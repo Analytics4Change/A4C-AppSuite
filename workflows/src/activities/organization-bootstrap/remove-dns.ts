@@ -61,9 +61,9 @@ export async function removeDNS(params: RemoveDNSParams): Promise<boolean> {
 
       // Emit event even if not found (for event replay)
       await emitEvent({
-        event_type: 'DNSRemoved',
+        event_type: 'organization.dns.removed',
         aggregate_type: 'Organization',
-        aggregate_id: params.subdomain, // Use subdomain as ID
+        aggregate_id: params.orgId,
         event_data: {
           subdomain: params.subdomain,
           fqdn,
@@ -88,9 +88,9 @@ export async function removeDNS(params: RemoveDNSParams): Promise<boolean> {
 
     // Emit DNSRemoved event
     await emitEvent({
-      event_type: 'DNSRemoved',
+      event_type: 'organization.dns.removed',
       aggregate_type: 'Organization',
-      aggregate_id: params.subdomain,
+      aggregate_id: params.orgId,
       event_data: {
         subdomain: params.subdomain,
         fqdn,
@@ -112,9 +112,9 @@ export async function removeDNS(params: RemoveDNSParams): Promise<boolean> {
 
     // Emit event even on error
     await emitEvent({
-      event_type: 'DNSRemoved',
+      event_type: 'organization.dns.removed',
       aggregate_type: 'Organization',
-      aggregate_id: params.subdomain,
+      aggregate_id: params.orgId,
       event_data: {
         subdomain: params.subdomain,
         fqdn,

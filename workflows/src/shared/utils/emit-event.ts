@@ -106,25 +106,20 @@ export async function emitEvent(params: EmitEventParams): Promise<string> {
     metadata.causation_id = params.causation_id;
   }
 
-  // Insert event into domain_events table
+  // Insert event into domain_events table via RPC function
+  // (PostgREST only exposes 'api' schema, so we use RPC to access public.domain_events)
   const { error } = await supabase
-    .from('domain_events')
-    .insert({
-      event_id: eventId,
-      event_type: params.event_type,
-      aggregate_type: params.aggregate_type,
-      aggregate_id: params.aggregate_id,
-      event_data: params.event_data,
-      event_metadata: metadata
+    .schema('api')
+    .rpc('emit_domain_event', {
+      p_event_id: eventId,
+      p_event_type: params.event_type,
+      p_aggregate_type: params.aggregate_type,
+      p_aggregate_id: params.aggregate_id,
+      p_event_data: params.event_data,
+      p_event_metadata: metadata
     });
 
   if (error) {
-    // Check if error is due to duplicate event_id (idempotency)
-    if (error.code === '23505') { // unique_violation
-      console.log(`[Event Emitter] Event ${eventId} already exists (idempotent)`);
-      return eventId;
-    }
-
     throw new Error(`Failed to emit event: ${error.message}`);
   }
 
