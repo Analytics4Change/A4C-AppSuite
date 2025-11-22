@@ -37,7 +37,7 @@ DROP TRIGGER IF EXISTS process_invitation_revoked_event ON domain_events;
 CREATE TRIGGER process_invitation_revoked_event
 AFTER INSERT ON domain_events
 FOR EACH ROW
-WHEN (NEW.event_type = 'InvitationRevoked')
+WHEN (NEW.event_type = 'invitation.revoked')
 EXECUTE FUNCTION process_invitation_revoked_event();
 
 -- ========================================

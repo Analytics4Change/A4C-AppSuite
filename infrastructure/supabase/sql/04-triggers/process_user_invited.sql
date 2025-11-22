@@ -61,7 +61,7 @@ DROP TRIGGER IF EXISTS process_user_invited_event ON domain_events;
 CREATE TRIGGER process_user_invited_event
 AFTER INSERT ON domain_events
 FOR EACH ROW
-WHEN (NEW.event_type = 'UserInvited')
+WHEN (NEW.event_type = 'user.invited')
 EXECUTE FUNCTION process_user_invited_event();
 
 -- ========================================
