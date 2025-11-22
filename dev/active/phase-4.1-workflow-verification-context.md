@@ -1,8 +1,8 @@
 # Phase 4.1: Workflow Verification Context
 
 **Created**: 2025-11-21
-**Updated**: 2025-11-21
-**Status**: IN PROGRESS - Test Case A partial completion
+**Updated**: 2025-11-22
+**Status**: INFRASTRUCTURE FIXES COMPLETE - Resume workflow planning complete
 **Purpose**: Verify organization bootstrap workflow with new parameter structure and fix infrastructure issues
 
 ---
@@ -64,6 +64,16 @@ Added `tee` command to worker startup script to log both console and file for de
 - **Why**: User requested not having to copy-paste terminal output for error analysis
 - **Impact**: Easier debugging, persistent logs
 - **Date**: 2025-11-21
+
+### 7. **Resume Workflow Strategy**
+After discovering that failed workflows cannot simply be retried (soft-deleted resources aren't recreated), designed comprehensive resume workflow architecture.
+
+**Decision**: Create dedicated `organizationBootstrapResumeWorkflow` to handle recovery from any activity failure
+- **Why**: Retrying original workflow returns early when finding soft-deleted org, doesn't recreate contacts/addresses/phones
+- **Impact**: Requires new workflow + 2 new activities + admin UI + event types
+- **Implementation**: Phased approach over 6-10 days
+- **Date**: 2025-11-22
+- **Document**: `dev/active/resume-workflow-implementation-plan.md`
 
 ---
 
@@ -367,16 +377,66 @@ Added `orgId` parameter to DNS activities:
 
 ---
 
+## Session Summary (2025-11-22)
+
+### What We Learned
+1. **Temporal Workflow Idempotency** - Confirmed three-layer approach:
+   - Layer 1: Workflow ID (Temporal built-in)
+   - Layer 2: Activity check-then-act (business keys like slug, email)
+   - Layer 3: Event deduplication (database constraints)
+
+2. **DNS as Activity** - Confirmed DNS configuration is correctly implemented as activities (not workflows) because:
+   - Involves side effects (Cloudflare API calls)
+   - Non-deterministic operations (network calls)
+   - Needs retry logic for transient failures
+
+3. **Saga Compensation Flow** - Traced complete failure sequence for DNS exhaustion:
+   - 7 retry attempts over ~20 minutes
+   - Compensation runs in reverse order
+   - Organization soft-deleted but preserves audit trail
+
+4. **Resume Workflow Necessity** - Discovered retrying original workflow is broken:
+   - Finds soft-deleted org by slug → Returns early
+   - Contacts/addresses/phones NOT recreated
+   - Organization activated but EMPTY
+   - **Solution**: Dedicated resume workflow (6-10 day implementation)
+
+### Documents Created
+- ✅ `dev/active/resume-workflow-implementation-plan.md` - Comprehensive 13-section plan
+- ✅ Committed with detailed implementation phases
+
+### Git Commits
+- `02dad64f` - Phase 4.1 infrastructure fixes (20 files, 1530 insertions)
+- `f186279a` - Resume workflow implementation plan (1661 lines)
+
+---
+
 ## Next Actions
 
-### Immediate (Before /clear)
-1. ✅ Update dev-docs with session learnings
-2. Document known email issue (development mode limitation)
-3. Mark Test Case A status appropriately
-
-### After /clear
-1. Investigate email failure (if real SMTP configured, or accept dev mode limitation)
+### Immediate Options (User Choice)
+**Option A: Continue Phase 4.1 Testing**
+1. Investigate email failure (dev mode limitation vs real issue)
 2. Run Test Case B (Stakeholder Partner - no subdomain)
 3. Run Test Case C (VAR Partner - with subdomain)
 4. Verify all event-driven projections update correctly
 5. Proceed to Phase 4.2: Event Emission Verification
+
+**Option B: Implement Resume Workflow**
+1. Start Phase 1 of resume workflow (1-2 days)
+   - Implement `detectOrganizationState` activity
+   - Implement `reactivateOrganizationAndResources` activity
+   - Build core resume workflow for DNS failures
+2. Test with Phase 4.1 failed workflow scenarios
+3. Continue with Phases 2-4 per plan
+
+**Option C: Other Work**
+- Provider onboarding enhancement (parked)
+- Other features in backlog
+
+### Recommended Next Step
+**Complete Phase 4.1 testing first** (Option A), then implement resume workflow (Option B) as a separate feature.
+
+**Rationale**:
+- Phase 4.1 infrastructure fixes are complete
+- Resume workflow can be tested against Phase 4.1 failures
+- Clean separation of testing vs implementation work
