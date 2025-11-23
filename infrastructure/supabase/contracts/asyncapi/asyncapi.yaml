@@ -46,6 +46,10 @@ channels:
           - $ref: './domains/medication.yaml#/components/messages/MedicationDiscontinued'
           - $ref: './domains/user.yaml#/components/messages/UserSyncedFromZitadel'
           - $ref: './domains/user.yaml#/components/messages/UserOrganizationSwitched'
+          - $ref: './domains/invitation.yaml#/components/messages/UserInvited'
+          - $ref: './domains/invitation.yaml#/components/messages/InvitationRevoked'
+          - $ref: './domains/invitation.yaml#/components/messages/InvitationAccepted'
+          - $ref: './domains/invitation.yaml#/components/messages/InvitationExpired'
     subscribe:
       summary: Subscribe to domain events
       operationId: onDomainEvent
@@ -83,6 +87,7 @@ components:
             - dosage
             - user
             - organization
+            - invitation
           description: Type of entity this event affects
         stream_version:
           type: integer

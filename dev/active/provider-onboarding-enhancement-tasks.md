@@ -622,14 +622,83 @@ Time:        54.126 s
 
 ---
 
-## Phase 4: Backend Integration Verification ⏸️ FUTURE WORK
+## Phase 4: Backend Integration Verification ✅ EVENT PROCESSOR BUGS FIXED
 
-**Status**: ⏸️ PENDING (Optional verification phase)
-**Priority**: Medium
-**Estimated Effort**: 2-4 hours
+**Status**: ✅ Event processor bugs fixed and verified (2025-11-19)
+**Priority**: CRITICAL
+**Session Date**: 2025-11-19
 **Prerequisites**: Part B deployed to production (✅ Complete)
 
 **Purpose**: Verify that backend infrastructure (Phases 1-3) correctly handles the new frontend parameter structure and event flows.
+
+### Phase 4 Verification Results
+
+#### Completed Verification Steps ✅
+
+- [x] Create GIN index migration for event tags (`idx_domain_events_tags`)
+- [x] Deploy infrastructure via GitHub Actions (commit a8fffcc3)
+- [x] Create test scripts in `dev/active/` (create-test-events.sql, cleanup-test-data-by-tags.sql)
+- [x] Run workflow unit tests (24 passed)
+- [x] Query remote Supabase schema verification (all tables/enums/indexes exist)
+- [x] Verify event processors exist (5 functions confirmed)
+- [x] Verify RLS policies (18 policies on 9 tables)
+- [x] Run test event SQL script
+- [x] Analyze results
+- [x] Cleanup test data
+
+#### Critical Bugs Discovered & Fixed ✅
+
+**ALL 4 BUGS FIXED AND VERIFIED (2025-11-19)**
+
+**Bug 1: Generated Column Error in `process_organization_event`** ✅ FIXED
+- Error: `cannot insert a non-DEFAULT value into column "depth"`
+- File: `infrastructure/supabase/sql/03-functions/event-processing/002-process-organization-events.sql`
+- Fix: Removed `depth` from INSERT column list (it's a generated column from ltree path)
+- Commit: `4f14d358`
+
+**Bug 2: Non-Existent Column in `process_contact_event`** ✅ FIXED
+- Error: `column "phone" of relation "contacts_projection" does not exist`
+- File: `infrastructure/supabase/sql/03-functions/event-processing/008-process-contact-events.sql`
+- Fix: Removed `phone` from INSERT and UPDATE statements (phones are separate entities)
+- Commit: `4f14d358`
+
+**Bug 3: Missing subdomain_status Column** ✅ FIXED
+- Error: `violates check constraint "chk_subdomain_conditional"`
+- Cause: Organization INSERT missing `subdomain_status` column required by check constraint
+- Fix: Added `subdomain_status` to INSERT with CASE logic for conditional defaults
+- Commit: `18eea266`
+
+**Bug 4: Wrong Enum Type Name** ✅ FIXED
+- Error: `type "subdomain_status_enum" does not exist`
+- Cause: Incorrect enum type name in cast expressions
+- Fix: Changed `::subdomain_status_enum` to `::subdomain_status` (correct enum name)
+- Commit: `979b1a09`
+
+**Cascade Failures**: All other events failed due to FK violations (org never created) - resolved after Bug 4 fix
+
+### 4.0 CRITICAL: Fix Event Processor Bugs ✅ COMPLETE
+
+- [x] Fix `process_organization_event` - remove `depth` from INSERT
+- [x] Fix `process_contact_event` - remove `phone` from INSERT
+- [x] Fix `process_organization_event` - add `subdomain_status` with conditional logic
+- [x] Fix `process_organization_event` - correct enum type name (`subdomain_status` not `subdomain_status_enum`)
+- [x] Deploy fixes via GitHub Actions (3 deployments: 4f14d358, 18eea266, 979b1a09)
+- [x] Re-run test events to verify fixes
+- [x] Verify all 7 events process successfully:
+  - ✅ `organization.created` → organizations_projection
+  - ✅ `contact.created` → contacts_projection
+  - ✅ `address.created` → addresses_projection
+  - ✅ `phone.created` → phones_projection
+  - ✅ `organization.contact.linked` → organization_contacts
+  - ✅ `organization.address.linked` → organization_addresses
+  - ✅ `organization.phone.linked` → organization_phones
+- [x] Verify all projections created correctly (org, contact, address, phone, 3 junctions)
+- [x] Run cleanup script to remove test data
+- [x] Mark Phase 4.0 event processor verification complete
+
+---
+
+### Remaining Verification Tasks (After Bug Fixes)
 
 ### 4.1 Workflow Parameter Verification
 - [ ] Test organization bootstrap workflow with new parameters structure
@@ -950,10 +1019,29 @@ Time:        54.126 s
 
 ## Current Status
 
-**Phase**: Phase 4 Frontend UI Implementation ✅ IN PROGRESS
-**Status**: ✅ Phase 1 DEPLOYED | ✅ Phase 2 DEPLOYED | ✅ Phase 3 DEPLOYED | ✅ Part A DEPLOYED
-**Last Updated**: 2025-11-17 20:12 UTC (Part A: Organization Query API Complete)
-**Next Step**: Part B - Frontend UI redesign (upload wireframes, implement dynamic sections)
+**Phase**: Phase 4 Backend Integration Verification - Event Processors ✅ COMPLETE
+**Status**: ✅ Phase 1 DEPLOYED | ✅ Phase 2 DEPLOYED | ✅ Phase 3 DEPLOYED | ✅ Part A DEPLOYED | ✅ Phase 4.0 COMPLETE
+**Last Updated**: 2025-11-19 20:45 UTC (Event Processor Bug Fixes Complete)
+**Next Step**: Phase 4.1-4.5 - Workflow parameter verification, event emission verification, projection verification, RLS testing, edge case testing
+
+### Event Processor Fix Session Summary (2025-11-19)
+
+**4 bugs discovered and fixed in event processors**:
+1. Bug 1: Removed `depth` from org INSERT (generated column)
+2. Bug 2: Removed `phone` from contact INSERT/UPDATE (separate entity)
+3. Bug 3: Added `subdomain_status` with conditional logic
+4. Bug 4: Corrected enum type name (`subdomain_status` not `subdomain_status_enum`)
+
+**Files Modified**:
+- `infrastructure/supabase/sql/03-functions/event-processing/002-process-organization-events.sql`
+- `infrastructure/supabase/sql/03-functions/event-processing/008-process-contact-events.sql`
+
+**Commits**:
+- `4f14d358` - fix(event-processors): Remove invalid columns from INSERT statements
+- `18eea266` - fix(event-processors): Add subdomain_status to organization INSERT
+- `979b1a09` - fix(infrastructure): Correct subdomain_status enum type name
+
+**Verification Results**: All 7 event types now process correctly and create projections
 
 **Migration Investigation Status** (Completed 2025-01-16):
 - ✅ **Remote State Analyzed**: 88 migrations already applied via GitHub Actions workflow

@@ -72,6 +72,22 @@ Update OrganizationCreatePage and related components to match medication managem
 - Converted "Organization Type" to "Organization Info" section heading
 - Added horizontal layout to Organization Type dropdown
 
+### Phase 6: Standardize Card 1 Components for Safari (2025-11-18)
+- Commit: 8f2b4855
+- Converted native `<select>` (SelectDropdown) to Radix UI Select for Organization Type, Partner Type, Timezone
+- Converted `<Input>` component to native `<input>` for Organization Name, Display Name
+- Updated SubdomainInput to use native input instead of Input component
+- All Card 1 now matches Cards 2-9 styling (border-gray-300, shadow-sm, focus:ring-blue-500)
+
+### Phase 7: Remove Duplicate Labels (2025-11-18)
+- Commit: 1af5508a
+- Converted `<Label>` components to native `<label>` elements with text-gray-700
+- Updated SubdomainInput to horizontal grid layout (grid-cols-[160px_1fr])
+- Updated ReferringPartnerDropdown to horizontal grid layout
+- Removed external grid wrappers from SubdomainInput and ReferringPartnerDropdown calls
+- Standardized asterisk color to text-red-500 across all labels
+- All Card 1 fields now have single visible labels (no duplicates)
+
 ## Files Modified
 
 ### OrganizationCreatePage.tsx
@@ -108,6 +124,17 @@ Update OrganizationCreatePage and related components to match medication managem
 ### ReferringPartnerDropdown.tsx
 **Changes**:
 - Removed placeholders: "Loading partners...", "Select referring partner..."
+- Converted to horizontal grid layout (grid-cols-[160px_1fr]) - 2025-11-18
+- Changed label to text-gray-700 color
+- Updated Select.Trigger to match other selects (border-gray-300, shadow-sm, focus:ring-blue-500)
+- Changed description text to text-gray-500
+
+### SubdomainInput.tsx
+**Changes** (2025-11-18):
+- Replaced Input component with native HTML input
+- Converted from vertical (space-y-2) to horizontal grid layout (grid-cols-[160px_1fr])
+- Changed label to text-gray-700 color
+- Removed unused Label import
 
 ## Important Constraints
 
@@ -154,8 +181,18 @@ Update OrganizationCreatePage and related components to match medication managem
 **Deployment Verification**:
 - ✅ All commits pushed to main branch
 - ✅ GitHub Actions deployment workflows completed
-- ✅ Latest commits: 89dc12a0, 4ab92bec, 35482d6d, 2c5ed167, 2bd06fa5
+- ✅ Latest commits: 1af5508a, 8f2b4855, 89dc12a0, 4ab92bec, 35482d6d, 2c5ed167, 2bd06fa5
 - URL: https://a4c.firstovertheline.com
+
+## Issue Discovered During Testing
+
+### OrganizationBootstrapParams Structural Mismatch - 2025-11-18
+While verifying form data wiring, discovered a pre-existing issue:
+- Frontend sends `contacts`, `addresses`, `phones` at root level
+- Workflow expects them inside `orgData`
+- This will cause workflow to fail when trying to access `params.orgData.contacts`
+- **See**: `dev/active/organization-params-mismatch-context.md` for fix plan
+- **Priority**: HIGH - must fix before organization creation works end-to-end
 
 ## Medication Management Styling Reference
 
@@ -219,12 +256,16 @@ Update OrganizationCreatePage and related components to match medication managem
 # View the completed styling work
 cat dev/active/organization-form-styling-context.md
 
+# View the next action item (params mismatch fix)
+cat dev/active/organization-params-mismatch-context.md
+
 # Verify deployment
-kubectl get pods -l app=a4c-frontend
 gh run list --workflow="Deploy Frontend" --limit 1
 
-# Test the form
+# Test the form visually
 open https://a4c.firstovertheline.com/organizations/create
 ```
 
-**Feature is COMPLETE** - No further action needed unless bugs are reported.
+**Styling Feature is COMPLETE** - All UI/UX styling work is done and deployed.
+
+**Next Action**: Fix OrganizationBootstrapParams mismatch (see organization-params-mismatch-context.md)

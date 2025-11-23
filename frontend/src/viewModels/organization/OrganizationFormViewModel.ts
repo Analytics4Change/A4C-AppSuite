@@ -371,6 +371,8 @@ export class OrganizationFormViewModel {
    * - Provider: All 3 sections (General, Billing, Provider Admin)
    * - Partner: 2 sections only (General, Provider Admin - no Billing)
    *
+   * Note: Maps frontend 'provider_partner' type to workflow 'partner' type
+   *
    * @returns Workflow parameters ready for Temporal
    */
   private transformToWorkflowParams(): OrganizationBootstrapParams {
@@ -401,19 +403,30 @@ export class OrganizationFormViewModel {
     }
     phones.push(this.transformPhone(this.formData.providerAdminPhone));
 
+    // Build users array from provider admin (for invitation)
+    const providerAdmin = this.formData.providerAdminContact;
+    const users = [
+      {
+        email: providerAdmin.email,
+        firstName: providerAdmin.firstName,
+        lastName: providerAdmin.lastName,
+        role: 'provider_admin'
+      }
+    ];
+
     return {
+      subdomain: this.formData.subdomain || undefined,
       orgData: {
         name: this.formData.name,
-        displayName: this.formData.displayName,
-        type: this.formData.type,
-        timeZone: this.formData.timeZone,
-        referringPartnerId: this.formData.referringPartnerId,
-        partnerType: this.formData.partnerType
+        // Map frontend 'provider_partner' to workflow 'partner'
+        type: isProvider ? 'provider' : 'partner',
+        contacts,
+        addresses,
+        phones,
+        partnerType: this.formData.partnerType,
+        referringPartnerId: this.formData.referringPartnerId
       },
-      subdomain: this.formData.subdomain || undefined, // Optional for stakeholder partners
-      contacts,
-      addresses,
-      phones
+      users
     };
   }
 
@@ -451,9 +464,10 @@ export class OrganizationFormViewModel {
       log.info('Starting organization bootstrap workflow', {
         orgName: params.orgData.name,
         subdomain: params.subdomain,
-        contactCount: params.contacts.length,
-        addressCount: params.addresses.length,
-        phoneCount: params.phones.length
+        contactCount: params.orgData.contacts.length,
+        addressCount: params.orgData.addresses.length,
+        phoneCount: params.orgData.phones.length,
+        userCount: params.users.length
       });
 
       // Start workflow (emits events, does NOT write to DB directly)

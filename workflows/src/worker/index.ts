@@ -151,6 +151,8 @@ async function run() {
   console.log(`  Task Queue: ${process.env.TEMPORAL_TASK_QUEUE}`);
   console.log(`  Workflow Mode: ${process.env.WORKFLOW_MODE || 'development'}`);
   console.log(`  Health Check Port: ${process.env.HEALTH_CHECK_PORT || '9090'}`);
+  console.log(`  Supabase URL: ${process.env.SUPABASE_URL || '(not set)'}`);
+  console.log(`  Supabase Key: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 20) + '...' : '(not set)'}`);
   console.log('');
   console.log('Health Endpoints:');
   console.log(`  Liveness:  http://localhost:${process.env.HEALTH_CHECK_PORT || '9090'}/health`);

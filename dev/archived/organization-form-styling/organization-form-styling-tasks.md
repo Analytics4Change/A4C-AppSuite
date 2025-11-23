@@ -77,6 +77,25 @@
 - [x] Add horizontal layout to Organization Type dropdown
 - [x] Match heading style: text-lg font-semibold text-gray-900 mb-4
 
+## Phase 7: Standardize Card 1 Components for Safari ✅ COMPLETE
+
+- [x] Convert Organization Type from SelectDropdown to Radix UI Select
+- [x] Convert Partner Type from SelectDropdown to Radix UI Select
+- [x] Convert Timezone from SelectDropdown to Radix UI Select
+- [x] Convert Organization Name from Input component to native input
+- [x] Convert Display Name from Input component to native input
+- [x] Update SubdomainInput to use native input instead of Input component
+- [x] Apply consistent styling: border-gray-300, shadow-sm, focus:ring-blue-500
+
+## Phase 8: Remove Duplicate Labels ✅ COMPLETE
+
+- [x] Convert Label components to native label elements with text-gray-700
+- [x] Update SubdomainInput to horizontal grid layout (grid-cols-[160px_1fr])
+- [x] Update ReferringPartnerDropdown to horizontal grid layout
+- [x] Remove external grid wrappers from SubdomainInput call
+- [x] Remove external grid wrappers from ReferringPartnerDropdown call
+- [x] Standardize asterisk color to text-red-500
+
 ## Deployment Tasks ✅ COMPLETE
 
 - [x] Build frontend (automated via GitHub Actions)
@@ -99,10 +118,11 @@
 
 ## Current Status
 
-**Phase**: All Phases Complete
-**Status**: ✅ COMPLETE
+**Phase**: All Phases Complete (8/8)
+**Status**: ✅ COMPLETE - Styling work done
 **Last Updated**: 2025-11-18
-**Next Step**: Manual user testing and visual verification in browser
+**Completed**: OrganizationBootstrapParams mismatch fixed (see dev/active/organization-params-mismatch-context.md)
+**Next Step**: Address security advisor issues (see dev/active/security-advisor-issues-context.md)
 
 ## Commits
 
@@ -113,13 +133,19 @@
 5. `35482d6d` - feat(frontend): Match organization forms to medication management styling
 6. `4ab92bec` - feat(frontend): Clean up organization form - remove hints and add section heading
 7. `89dc12a0` - feat(frontend): Update Organization Type section layout
+8. `8f2b4855` - fix(frontend): Standardize Card 1 form controls to match Cards 2-9 styling
+9. `1af5508a` - fix(frontend): Remove duplicate labels from Card 1 to match Cards 2-9 pattern
 
 ## Files Changed
 
-- `frontend/src/pages/organizations/OrganizationCreatePage.tsx` (828 lines, major refactor)
+- `frontend/src/pages/organizations/OrganizationCreatePage.tsx` (major refactor)
 - `frontend/src/components/organizations/ContactInput.tsx` (322 lines changed)
 - `frontend/src/components/organizations/AddressInput.tsx` (328 lines changed)
 - `frontend/src/components/organizations/PhoneInputEnhanced.tsx` (222 lines changed)
-- `frontend/src/components/organizations/ReferringPartnerDropdown.tsx` (2 lines changed)
+- `frontend/src/components/organizations/ReferringPartnerDropdown.tsx` (horizontal grid layout)
+- `frontend/src/components/organization/SubdomainInput.tsx` (horizontal grid layout, native input)
 
-**Total Changes**: 1,163 insertions, 758 deletions across 5 files
+## Issue Discovered
+
+**OrganizationBootstrapParams Mismatch** - Frontend sends params in wrong structure for workflow.
+See: `dev/active/organization-params-mismatch-context.md`

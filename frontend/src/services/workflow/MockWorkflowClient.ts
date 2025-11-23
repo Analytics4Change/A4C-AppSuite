@@ -225,7 +225,7 @@ export class MockWorkflowClient implements IWorkflowClient {
    * Returns realistic-looking data based on user input instead of synthetic values.
    * This provides better development UX by showing data that matches what was entered.
    *
-   * Enhanced for Part B: Uses new contacts array structure.
+   * Updated to use nested orgData structure matching workflow contract.
    */
   private generateMockResult(
     params: OrganizationBootstrapParams
@@ -241,9 +241,10 @@ export class MockWorkflowClient implements IWorkflowClient {
     const domain = params.subdomain ? `${params.subdomain}.a4c.app` : 'a4c.app';
     const dnsConfigured = Boolean(params.subdomain);
 
-    // Provider admin is always the last contact in the array
+    // Provider admin is always the last contact in the orgData.contacts array
     // (Providers: billing + providerAdmin, Partners: providerAdmin only)
-    const providerAdminContact = params.contacts[params.contacts.length - 1];
+    const providerAdminContact =
+      params.orgData.contacts[params.orgData.contacts.length - 1];
 
     return {
       orgId,
@@ -257,7 +258,7 @@ export class MockWorkflowClient implements IWorkflowClient {
         lastName: providerAdminContact.lastName,
         role: 'provider_admin'
       },
-      invitationsSent: params.contacts.length, // One invitation per contact
+      invitationsSent: params.users.length, // One invitation per user
       createdAt: new Date().toISOString()
     };
   }

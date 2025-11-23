@@ -52,6 +52,7 @@ export function getSupabaseClient(): SupabaseClient {
   }
 
   supabaseClient = createClient(supabaseUrl, serviceRoleKey, {
+    db: { schema: 'public' },
     auth: {
       autoRefreshToken: false,
       persistSession: false

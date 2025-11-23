@@ -680,15 +680,23 @@ try {
 
 10. **Idempotency Required**: Migrations run multiple times during testing. Events may be replayed. Activities may retry. All operations must be idempotent.
 
+11. **Generated Columns Are Read-Only**: PostgreSQL generated columns (like `depth` on organizations_projection) cannot be included in INSERT statements. The database computes these values automatically from source columns (e.g., `depth` is generated from `nlevel(path)`). - Discovered 2025-11-19
+
+12. **Enum Type Names Must Match Exactly**: When casting to PostgreSQL enum types, use the exact enum name as defined (e.g., `::subdomain_status` not `::subdomain_status_enum`). Check enum definitions in `pg_type` table if unsure. - Discovered 2025-11-19
+
+13. **Check Constraints Require All Referenced Columns**: When a CHECK constraint references a column (like `chk_subdomain_conditional` requires `subdomain_status`), that column must be included in INSERT statements even if nullable. The constraint evaluates on INSERT, so missing columns cause violations. - Discovered 2025-11-19
+
+14. **Event Processor Schema Must Match Projection Schema**: Event processors INSERT into projection tables, so they must match the current table schema exactly. When projections add new columns with constraints, event processors must be updated to include those columns. - Discovered 2025-11-19
+
 ### Schema Constraints
 
-11. **ltree Hierarchy**: Organizations use ltree path for hierarchy (e.g., `root.org_acme_healthcare.north_campus`). Path must be valid ltree format.
+15. **ltree Hierarchy**: Organizations use ltree path for hierarchy (e.g., `root.org_acme_healthcare.north_campus`). Path must be valid ltree format.
 
-12. **Soft Deletes**: Organizations use `deleted_at` for soft deletes. Cascade logic must preserve audit trail.
+16. **Soft Deletes**: Organizations use `deleted_at` for soft deletes. Cascade logic must preserve audit trail.
 
-13. **One Primary Per Org**: Only one contact/address/phone can be marked `is_primary = true` per organization. Unique constraint enforces this.
+17. **One Primary Per Org**: Only one contact/address/phone can be marked `is_primary = true` per organization. Unique constraint enforces this.
 
-14. **Foreign Key Cascades**: Junction tables use `ON DELETE CASCADE` to auto-delete links when parent entity deleted.
+18. **Foreign Key Cascades**: Junction tables use `ON DELETE CASCADE` to auto-delete links when parent entity deleted.
 
 ---
 
@@ -1774,3 +1782,123 @@ Completed Part B Phase 3, successfully rebuilding the OrganizationCreatePage wit
    - Create user guides for new features
 
 **Estimated Effort for Next Phases**: 2-4 hours for documentation
+
+---
+
+## Phase 4 Backend Verification Session (2025-11-19)
+
+### Session Summary
+
+Executed Phase 4: Backend Integration Verification. Discovered **critical bugs** in event processor functions that block the Provider Onboarding workflow from working.
+
+### Completed Steps
+
+1. **GIN Index Migration Deployed** ✅
+   - Created `infrastructure/supabase/sql/01-events/002-domain-events-indexes.sql`
+   - Commit: `a8fffcc3` - GitHub Actions workflow completed successfully
+   - Index: `idx_domain_events_tags` for efficient tag-based cleanup queries
+
+2. **Test Scripts Created** ✅
+   - `dev/active/create-test-events.sql` - Inserts 7 tagged test events
+   - `dev/active/cleanup-test-data-by-tags.sql` - Cleanup by batch tags
+   - Tag format: `['development', 'batch:<batch_id>']`
+   - Usage: `psql $DATABASE_URL -v batch_id='phase4-verify-20251119' -f <script>`
+
+3. **Schema Verification Passed** ✅
+   - All projection tables exist (organizations, contacts, addresses, phones, invitations)
+   - All junction tables exist (organization_contacts, organization_addresses, organization_phones)
+   - All enums exist (organization_type, subdomain_status, contact_type, address_type, phone_type)
+   - GIN index deployed for event tags
+
+4. **Event Processors Exist** ✅
+   - `process_organization_event` - EXISTS
+   - `process_contact_event` - EXISTS
+   - `process_address_event` - EXISTS
+   - `process_phone_event` - EXISTS
+   - `process_invitation_event` - EXISTS
+
+5. **RLS Policies Confirmed** ✅
+   - 18 policies across 9 tables
+   - All core projections covered
+
+### Critical Bugs Discovered
+
+**Event Processor Failures** - ALL 7 test events failed to process:
+
+#### Bug 1: `process_organization_event` - Generated Column Error
+
+**Error**:
+```
+ERROR: cannot insert a non-DEFAULT value into column "depth"
+DETAIL: Column "depth" is a generated column.
+```
+
+**Cause**: The `depth` column in `organizations_projection` is a PostgreSQL generated column (computed from `path` using `nlevel(path)`). The event processor tries to INSERT a value directly into it.
+
+**Location**: `infrastructure/supabase/sql/04-triggers/organization/event-processor.sql`
+
+**Fix Required**: Remove `depth` from INSERT column list - let PostgreSQL compute it automatically.
+
+#### Bug 2: `process_contact_event` - Non-Existent Column Error
+
+**Error**:
+```
+ERROR: column "phone" of relation "contacts_projection" does not exist
+```
+
+**Cause**: The event processor references a `phone` column that doesn't exist in `contacts_projection`. The schema uses separate phone entities with junction tables.
+
+**Location**: `infrastructure/supabase/sql/04-triggers/contact/event-processor.sql`
+
+**Fix Required**: Remove `phone` from INSERT statement.
+
+#### Cascade Failures
+
+All remaining events (address.created, phone.created, junction links) failed with foreign key violations because the organization was never created:
+- `address.created` - FK violation on organization_id
+- `phone.created` - FK violation on organization_id
+- `organization.contact.linked` - FK violation on organization_id
+- `organization.address.linked` - FK violation on organization_id
+- `organization.phone.linked` - FK violation on organization_id
+
+### Test Data Cleanup
+
+Successfully cleaned up all 7 failed test events from domain_events table. No projections were created (all inserts failed), so no projection cleanup needed.
+
+### Impact Assessment
+
+**CRITICAL**: These bugs completely block the Provider Onboarding workflow:
+
+1. **Organization Creation Blocked**: Without a working `process_organization_event`, no organizations can be created via workflows
+2. **Contact Creation Blocked**: Without a working `process_contact_event`, no contacts can be created
+3. **Cascade Failures**: All related entity creation depends on organization existing first
+
+**Workaround**: None - must fix event processors before any organization can be onboarded.
+
+### Next Steps (Priority Order)
+
+1. **IMMEDIATE**: Fix `process_organization_event` to not INSERT into `depth` column
+2. **IMMEDIATE**: Fix `process_contact_event` to not reference non-existent `phone` column
+3. **Re-test**: Run `create-test-events.sql` again after fixes
+4. **Verify**: All 7 events process successfully, projections created correctly
+5. **Cleanup**: Run cleanup script to remove test data
+
+### Test Scripts Location
+
+```bash
+# Create test events (after fixing processors)
+psql $DATABASE_URL -v batch_id='phase4-verify-20251119' \
+  -f dev/active/create-test-events.sql
+
+# Cleanup test data
+psql $DATABASE_URL -v batch_id='phase4-verify-20251119' \
+  -f dev/active/cleanup-test-data-by-tags.sql
+```
+
+### Files to Fix
+
+1. `infrastructure/supabase/sql/04-triggers/organization/event-processor.sql`
+   - Remove `depth` from INSERT column list in `process_organization_event()`
+
+2. `infrastructure/supabase/sql/04-triggers/contact/event-processor.sql`
+   - Remove `phone` from INSERT statement in `process_contact_event()`

@@ -377,7 +377,7 @@ Added `orgId` parameter to DNS activities:
 
 ---
 
-## Session Summary (2025-11-22)
+## Session Summary (2025-11-22 Morning)
 
 ### What We Learned
 1. **Temporal Workflow Idempotency** - Confirmed three-layer approach:
@@ -408,6 +408,96 @@ Added `orgId` parameter to DNS activities:
 ### Git Commits
 - `02dad64f` - Phase 4.1 infrastructure fixes (20 files, 1530 insertions)
 - `f186279a` - Resume workflow implementation plan (1661 lines)
+
+---
+
+## Session Summary (2025-11-22 Evening)
+
+### Test Case A Execution & Investigation
+
+**Test Executed**: Provider Organization (Full Structure)
+- Workflow completed successfully (reported by Temporal)
+- Organization created: `1e2abca5-c0af-4820-90e0-1ac50e1127ac`
+- Created: 2025-11-22 22:07:17
+
+### Verification Results ✅ MAJOR SUCCESS
+
+**Core Entities** (ALL PASSED):
+- ✅ Organization: Active, no soft-delete timestamps
+- ✅ 3 Contacts: All created, **NONE soft-deleted** (deleted_at = NULL)
+- ✅ 3 Addresses: All created, **NONE soft-deleted** (deleted_at = NULL)
+- ✅ 3 Phones: All created, **NONE soft-deleted** (deleted_at = NULL)
+- ✅ Junction Tables: All counts correct (3 each)
+- ✅ 15 Domain Events: All emitted in correct order
+- ✅ DNS Configuration: Events emitted successfully
+
+**Critical Finding**: **The soft-delete bug from previous test is RESOLVED!**
+- Previous test (morning): All entities were soft-deleted after workflow retry
+- Current test (evening): All entities remain active with no soft-delete timestamps
+- **Infrastructure fixes from Phase 4.1 are working correctly**
+
+### Issue Discovered: Invitation Projection Not Updating
+
+**Symptom**: Invitation events emitted but `invitations_projection` table remains empty
+- ✅ Event emitted: `user.invited` (processed_at: 2025-11-22 22:07:19)
+- ✅ Event data complete: invitation_id, email, token, expires_at all present
+- ✅ Event processed: processing_error = NULL, retry_count = 0
+- ❌ Projection empty: 0 rows in `invitations_projection`
+
+**Root Cause Identified**: Event type mismatch in database triggers
+- Trigger expects: `'UserInvited'` (PascalCase) - **OUTDATED**
+- Workflow emits: `'user.invited'` (lowercase.with.dots) - **CORRECT**
+- Result: Trigger condition never matches → Projection never updates
+
+**Files Affected**:
+1. `infrastructure/supabase/sql/04-triggers/process_user_invited.sql` (line 64)
+2. `infrastructure/supabase/sql/04-triggers/process_invitation_revoked.sql` (line 40)
+
+**Why This Happened**:
+- During Phase 4.1 fixes, updated 20+ activity files to use lowercase.with.dots
+- **Missed updating these 2 trigger files** - they still expect PascalCase
+
+### Helper Scripts Created
+- `workflows/src/scripts/cleanup-test-org-dns.ts` - DNS cleanup via Cloudflare API
+  - Fixed domain: Uses `firstovertheline.com` (was incorrectly using `analytics4change.com`)
+  - Tested successfully: DNS record already cleaned by compensation flow
+
+### What We Learned (Evening Session)
+
+1. **Infrastructure Fixes Are Working** ✅
+   - No more soft-delete bugs on workflow retry
+   - All entities persist correctly through workflow completion
+   - Compensation flow works as designed
+
+2. **Event Type Convention Consistency Critical**
+   - Database CHECK constraint enforces: `^[a-z_]+(\.[a-z_]+)+`
+   - Must update BOTH activities AND triggers when changing event types
+   - Easy to miss trigger files during mass refactoring
+
+3. **Cloudflare DNS Domain Configuration**
+   - Target domain: `firstovertheline.com` (not `analytics4change.com`)
+   - Zone ID: `538e5229b00f5660508a1c7fcd097f97`
+   - DNS records already cleaned by compensation flow (no manual cleanup needed)
+
+4. **Test Organization Cleanup Process**
+   - Database cleanup: Simple DELETE statements in FK-safe order
+   - DNS cleanup: Automated via cleanup script
+   - Complete cleanup achieved in ~2 minutes
+
+### Documents Updated
+- ✅ Phase 4.1 context updated with evening session findings
+- ✅ Trigger fix plan documented
+
+### Files Ready for Deployment
+- Trigger fixes identified and ready to apply
+- Migration path clear: Update triggers, apply to database, verify
+
+### Next Action (Immediate)
+**Deploy invitation trigger fixes**:
+1. Update `process_user_invited.sql`: `'UserInvited'` → `'user.invited'`
+2. Update `process_invitation_revoked.sql`: `'InvitationRevoked'` → `'invitation.revoked'`
+3. Apply to Supabase development database
+4. Re-test invitation creation to verify fix
 
 ---
 

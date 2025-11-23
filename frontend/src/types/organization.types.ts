@@ -122,22 +122,48 @@ export interface PhoneInfo {
 
 /**
  * Parameters for starting organization bootstrap workflow
- * Maps to Temporal workflow interface (Phase 3 enhanced)
+ * Maps to Temporal workflow interface (matches workflows/src/shared/types/index.ts)
  */
 export interface OrganizationBootstrapParams {
+  /** Subdomain for the organization (optional - required for providers and VAR partners only) */
+  subdomain?: string;
+
+  /** Organization details */
   orgData: {
     name: string;
-    displayName: string;
-    type: 'provider' | 'provider_partner';
-    timeZone: string;
-    referringPartnerId?: string;
+    type: 'provider' | 'partner';
+    parentOrgId?: string; // Required for partners, optional for providers
+
+    /** Contact information (at least one contact required) */
+    contacts: ContactInfo[];
+
+    /** Address information (required) */
+    addresses: AddressInfo[];
+
+    /** Phone information (required) */
+    phones: PhoneInfo[];
+
+    /** Partner type (required when type='partner') */
     partnerType?: 'var' | 'family' | 'court' | 'other';
+
+    /** Referring partner organization ID (optional) */
+    referringPartnerId?: string;
   };
-  subdomain?: string; // Optional for stakeholder partners
-  contacts: ContactInfo[]; // Array of contacts (Billing + Provider Admin)
-  addresses: AddressInfo[]; // Array of addresses (General + Billing + Provider Admin)
-  phones: PhoneInfo[]; // Array of phones (General + Billing + Provider Admin)
-  dnsPropagationTimeout?: number; // Optional, defaults to 30 minutes in workflow
+
+  /** Users to invite (derived from provider admin contact) */
+  users: Array<{
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+  }>;
+
+  /** Optional DNS retry configuration (for testing) */
+  retryConfig?: {
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+    maxAttempts?: number;
+  };
 }
 
 /**

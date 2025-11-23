@@ -22,53 +22,93 @@ async function main() {
     namespace: process.env.TEMPORAL_NAMESPACE || 'default'
   });
 
-  // Workflow parameters
+  // Workflow parameters - Test Case A: Provider Organization (Full Structure)
   const params: OrganizationBootstrapParams = {
-    subdomain: 'acme',
+    subdomain: 'test-provider-001',
     orgData: {
-      name: 'Acme Corporation',
+      name: 'Test Healthcare Provider',
       type: 'provider',
       contacts: [
         {
           firstName: 'John',
-          lastName: 'Doe',
-          email: 'admin@acme.com',
-          title: 'CEO',
+          lastName: 'Admin',
+          email: 'john@test-provider.com',
+          title: 'Administrator',
+          department: 'Administration',
+          type: 'a4c_admin',
+          label: 'A4C Administrator'
+        },
+        {
+          firstName: 'Sarah',
+          lastName: 'Billing',
+          email: 'sarah@test-provider.com',
+          title: 'Finance Director',
+          department: 'Finance',
           type: 'billing',
-          label: 'Primary Contact'
+          label: 'Billing Contact'
+        },
+        {
+          firstName: 'Mike',
+          lastName: 'Tech',
+          email: 'mike@test-provider.com',
+          title: 'IT Director',
+          department: 'IT',
+          type: 'technical',
+          label: 'Technical Contact'
         }
       ],
       addresses: [
         {
           street1: '100 Main Street',
-          street2: 'Suite 500',
+          street2: 'Suite 200',
           city: 'San Francisco',
           state: 'CA',
           zipCode: '94105',
           type: 'physical',
           label: 'Headquarters'
+        },
+        {
+          street1: '200 Mail Avenue',
+          city: 'Oakland',
+          state: 'CA',
+          zipCode: '94612',
+          type: 'mailing',
+          label: 'Mailing Address'
+        },
+        {
+          street1: '300 Billing Boulevard',
+          city: 'Berkeley',
+          state: 'CA',
+          zipCode: '94704',
+          type: 'billing',
+          label: 'Billing Address'
         }
       ],
       phones: [
         {
           number: '555-0100',
+          extension: '1001',
           type: 'office',
           label: 'Main Office'
+        },
+        {
+          number: '555-0200',
+          type: 'mobile',
+          label: 'Emergency Line'
+        },
+        {
+          number: '555-0300',
+          type: 'fax',
+          label: 'Fax Machine'
         }
       ]
     },
     users: [
       {
-        email: 'john.doe@acme.com',
-        firstName: 'John',
-        lastName: 'Doe',
+        email: 'admin@test-provider.com',
+        firstName: 'Test',
+        lastName: 'Admin',
         role: 'super_admin'
-      },
-      {
-        email: 'jane.smith@acme.com',
-        firstName: 'Jane',
-        lastName: 'Smith',
-        role: 'provider_admin'
       }
     ]
   };
