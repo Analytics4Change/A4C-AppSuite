@@ -29,7 +29,21 @@ export async function deleteAddresses(params: DeleteAddressesParams): Promise<bo
     const supabase = getSupabaseClient();
     const tags = buildTags();
 
-    // Query all addresses for organization via RPC (PostgREST only exposes 'api' schema)
+    // 1. Soft-delete junction records FIRST (prevents orphaned junctions)
+    const { data: junctionCount, error: junctionError } = await supabase
+      .schema('api')
+      .rpc('soft_delete_organization_addresses', {
+        p_org_id: params.orgId
+      });
+
+    if (junctionError) {
+      console.error(`[DeleteAddresses] Junction soft-delete failed: ${junctionError.message}`);
+      // Continue anyway (best-effort)
+    } else {
+      console.log(`[DeleteAddresses] Soft-deleted ${junctionCount} junction records`);
+    }
+
+    // 2. Query all addresses for organization via RPC (PostgREST only exposes 'api' schema)
     const { data: addresses, error: queryError } = await supabase
       .schema('api')
       .rpc('get_addresses_by_org', {
@@ -46,7 +60,7 @@ export async function deleteAddresses(params: DeleteAddressesParams): Promise<bo
       return true;
     }
 
-    // Emit address.deleted event for each address
+    // 3. Emit address.deleted event for each address (audit trail)
     for (const address of addresses) {
       try {
         await emitEvent({

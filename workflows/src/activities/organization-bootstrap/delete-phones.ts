@@ -29,7 +29,21 @@ export async function deletePhones(params: DeletePhonesParams): Promise<boolean>
     const supabase = getSupabaseClient();
     const tags = buildTags();
 
-    // Query all phones for organization via RPC (PostgREST only exposes 'api' schema)
+    // 1. Soft-delete junction records FIRST (prevents orphaned junctions)
+    const { data: junctionCount, error: junctionError } = await supabase
+      .schema('api')
+      .rpc('soft_delete_organization_phones', {
+        p_org_id: params.orgId
+      });
+
+    if (junctionError) {
+      console.error(`[DeletePhones] Junction soft-delete failed: ${junctionError.message}`);
+      // Continue anyway (best-effort)
+    } else {
+      console.log(`[DeletePhones] Soft-deleted ${junctionCount} junction records`);
+    }
+
+    // 2. Query all phones for organization via RPC (PostgREST only exposes 'api' schema)
     const { data: phones, error: queryError } = await supabase
       .schema('api')
       .rpc('get_phones_by_org', {
@@ -46,7 +60,7 @@ export async function deletePhones(params: DeletePhonesParams): Promise<boolean>
       return true;
     }
 
-    // Emit phone.deleted event for each phone
+    // 3. Emit phone.deleted event for each phone (audit trail)
     for (const phone of phones) {
       try {
         await emitEvent({
