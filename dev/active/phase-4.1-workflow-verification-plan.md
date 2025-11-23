@@ -167,7 +167,7 @@ const params: OrganizationBootstrapParams = {
       email: "admin@test-provider.com",
       firstName: "Test",
       lastName: "Admin",
-      role: "super_admin"
+      role: "provider_admin"
     }
   ]
 };
@@ -176,6 +176,10 @@ const params: OrganizationBootstrapParams = {
 ---
 
 ### Test Case B: Stakeholder Partner (No Subdomain)
+
+**Status**: ⚠️ **DEFERRED** - Stakeholder role assignment pending analytics module design
+**Reason**: No defined role for stakeholder partners yet. Analytics view-only access not implemented.
+**Alternative**: Can test organization creation with empty `users: []` array (no invitations)
 
 **Expected**: 1 contact, 2 addresses, 2 phones, DNS SKIPPED
 
@@ -301,7 +305,7 @@ const params: OrganizationBootstrapParams = {
       email: "var.admin@var-partner.com",
       firstName: "VAR",
       lastName: "Admin",
-      role: "provider_admin"
+      role: "partner_admin"
     }
   ]
 };
