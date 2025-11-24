@@ -199,7 +199,7 @@ export class WorkflowEventListener {
     workflowRunId: string
   ): Promise<void> {
     try {
-      const { data: eventId, error } = await this.supabaseClient.rpc(
+      const { data: eventId, error } = await (this.supabaseClient.rpc as any)(
         'emit_workflow_started_event',
         {
           p_stream_id: streamId,
