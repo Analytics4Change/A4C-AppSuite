@@ -201,6 +201,10 @@ export class EventQueries {
     const errorCount = events.filter((e) => e.processing_error !== null).length;
     const firstEvent = events[0];
 
+    if (!firstEvent) {
+      throw new Error(`No events found for workflow ${workflowId}`);
+    }
+
     return {
       workflow_id: workflowId,
       workflow_run_id: firstEvent.event_metadata?.workflow_run_id || null,
@@ -305,7 +309,7 @@ export class EventQueries {
 
     // Build summaries
     const summaries: WorkflowSummary[] = [];
-    for (const [workflowId, events] of workflowMap.entries()) {
+    for (const [workflowId] of workflowMap.entries()) {
       const summary = await this.getWorkflowSummary(workflowId);
       if (summary) {
         summaries.push(summary);

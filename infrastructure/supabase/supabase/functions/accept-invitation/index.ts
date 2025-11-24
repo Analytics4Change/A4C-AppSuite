@@ -97,7 +97,7 @@ serve(async (req) => {
 
     // Create user account based on method
     let userId: string;
-    let authError: any;
+    let authError: Error | null = null;
 
     if (requestData.method === 'email_password') {
       // Create user with email/password

@@ -24,7 +24,7 @@
  */
 
 import { Client as PgClient } from 'pg';
-import { Client as TemporalClient } from '@temporalio/client';
+import { Connection, Client as TemporalClient } from '@temporalio/client';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import type { OrganizationBootstrapParams } from '../shared/types';
 
@@ -71,14 +71,14 @@ export class WorkflowEventListener {
       await this.pgClient.query('LISTEN workflow_events');
 
       // Set up notification handler
-      this.pgClient.on('notification', async (msg) => {
+      this.pgClient.on('notification', async (msg: any) => {
         if (msg.channel === 'workflow_events' && msg.payload) {
           await this.handleNotification(msg.payload);
         }
       });
 
       // Set up error handler
-      this.pgClient.on('error', (err) => {
+      this.pgClient.on('error', (err: Error) => {
         console.error('[EventListener] PostgreSQL client error:', err);
         // Attempt reconnection
         this.reconnect();
@@ -199,8 +199,8 @@ export class WorkflowEventListener {
     workflowRunId: string
   ): Promise<void> {
     try {
-      const { error } = await this.supabaseClient
-        .from('domain_events')
+      const { error } = await (this.supabaseClient
+        .from('domain_events') as any)
         .update({
           event_metadata: {
             workflow_id: workflowId,
@@ -228,11 +228,23 @@ export class WorkflowEventListener {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     try {
-      const { error: updateError } = await this.supabaseClient
-        .from('domain_events')
+      // Get current retry count
+      const { data: event } = await (this.supabaseClient
+        .from('domain_events') as any)
+        .select('event_metadata')
+        .eq('id', eventId)
+        .single();
+
+      const currentRetryCount = (event?.event_metadata as any)?.retry_count || 0;
+
+      const { error: updateError } = await (this.supabaseClient
+        .from('domain_events') as any)
         .update({
-          processing_error: errorMessage,
-          retry_count: this.supabaseClient.rpc('increment', { x: 1 })
+          event_metadata: {
+            ...((event?.event_metadata as any) || {}),
+            processing_error: errorMessage,
+            retry_count: currentRetryCount + 1
+          }
         })
         .eq('id', eventId);
 
@@ -275,9 +287,16 @@ export async function createEventListener(): Promise<WorkflowEventListener> {
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined
   });
 
-  // Temporal client
-  const temporalClient = await TemporalClient.connect({
-    address: process.env.TEMPORAL_ADDRESS || 'localhost:7233',
+  // Connect to PostgreSQL
+  await pgClient.connect();
+
+  // Temporal connection and client
+  const connection = await Connection.connect({
+    address: process.env.TEMPORAL_ADDRESS || 'localhost:7233'
+  });
+
+  const temporalClient = new TemporalClient({
+    connection,
     namespace: process.env.TEMPORAL_NAMESPACE || 'default'
   });
 
@@ -285,7 +304,7 @@ export async function createEventListener(): Promise<WorkflowEventListener> {
   const supabaseClient = createSupabaseClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  ) as any;
 
   const listener = new WorkflowEventListener(pgClient, temporalClient, supabaseClient);
   await listener.start();
