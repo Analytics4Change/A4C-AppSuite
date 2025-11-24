@@ -17,7 +17,7 @@ data:
   TEMPORAL_TASK_QUEUE: "bootstrap"
 
   # Supabase (non-sensitive)
-  SUPABASE_URL: "https://cuvxypuwvbchsngjzdqo.supabase.co"
+  SUPABASE_URL: "https://tmrjlswbsxmbglmaclxu.supabase.co"
 
   # Frontend URL for invitation emails
   FRONTEND_URL: "https://a4c.firstovertheline.com"

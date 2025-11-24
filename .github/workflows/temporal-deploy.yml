@@ -147,6 +147,24 @@ jobs:
 
           echo "✓ kubectl configuration complete"
 
+      - name: Update Supabase Database URL Secret
+        run: |
+          # Extract project reference from SUPABASE_URL
+          PROJECT_REF=$(echo "${{ secrets.SUPABASE_URL }}" | sed 's|https://\([^.]*\).*|\1|')
+          echo "Project reference: $PROJECT_REF"
+
+          # Construct PostgreSQL connection string for session pooler
+          SUPABASE_DB_URL="postgresql://postgres.${PROJECT_REF}:${{ secrets.SUPABASE_DB_PASSWORD }}@aws-1-us-west-1.pooler.supabase.com:6543/postgres"
+
+          # Base64 encode the connection string
+          ENCODED_DB_URL=$(echo -n "$SUPABASE_DB_URL" | base64 -w 0)
+
+          # Update the secret
+          kubectl patch secret workflow-worker-secrets -n temporal \
+            -p "{\"data\":{\"SUPABASE_DB_URL\":\"$ENCODED_DB_URL\"}}"
+
+          echo "✅ SUPABASE_DB_URL secret updated"
+
       - name: Deploy to k3s temporal namespace
         run: |
           # Get the first image tag from the multi-line output
