@@ -67,7 +67,7 @@ export interface OrganizationBootstrapParams {
   /** Organization details */
   orgData: {
     name: string;
-    type: 'provider' | 'partner';
+    type: 'provider' | 'provider_partner' | 'platform_owner';
     parentOrgId?: string;  // Required for partners, optional for providers
 
     /** Contact information (at least one contact required across all sections) */
@@ -165,7 +165,7 @@ export interface WorkflowState {
  */
 export interface CreateOrganizationParams {
   name: string;
-  type: 'provider' | 'partner';
+  type: 'provider' | 'provider_partner' | 'platform_owner';
   parentOrgId?: string;
   subdomain?: string;
   contacts: ContactInfo[];

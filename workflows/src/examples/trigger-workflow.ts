@@ -22,93 +22,61 @@ async function main() {
     namespace: process.env.TEMPORAL_NAMESPACE || 'default'
   });
 
-  // Workflow parameters - Test Case A: Provider Organization (Full Structure)
+  // Workflow parameters - Test Case C: VAR Partner Organization
   const params: OrganizationBootstrapParams = {
-    subdomain: 'test-provider-001',
+    subdomain: 'var-partner-001',
     orgData: {
-      name: 'Test Healthcare Provider',
-      type: 'provider',
+      name: 'Value Added Reseller Corp',
+      type: 'provider_partner',
+      partnerType: 'var',
       contacts: [
         {
-          firstName: 'John',
-          lastName: 'Admin',
-          email: 'john@test-provider.com',
-          title: 'Administrator',
-          department: 'Administration',
+          firstName: 'Alice',
+          lastName: 'Manager',
+          email: 'alice@var-partner.com',
+          title: 'Account Manager',
+          department: 'Sales',
           type: 'a4c_admin',
-          label: 'A4C Administrator'
-        },
-        {
-          firstName: 'Sarah',
-          lastName: 'Billing',
-          email: 'sarah@test-provider.com',
-          title: 'Finance Director',
-          department: 'Finance',
-          type: 'billing',
-          label: 'Billing Contact'
-        },
-        {
-          firstName: 'Mike',
-          lastName: 'Tech',
-          email: 'mike@test-provider.com',
-          title: 'IT Director',
-          department: 'IT',
-          type: 'technical',
-          label: 'Technical Contact'
+          label: 'Primary Contact'
         }
       ],
       addresses: [
         {
-          street1: '100 Main Street',
-          street2: 'Suite 200',
-          city: 'San Francisco',
+          street1: '500 Tech Drive',
+          city: 'San Jose',
           state: 'CA',
-          zipCode: '94105',
+          zipCode: '95110',
           type: 'physical',
-          label: 'Headquarters'
+          label: 'Office'
         },
         {
-          street1: '200 Mail Avenue',
-          city: 'Oakland',
+          street1: '501 Tech Drive',
+          city: 'San Jose',
           state: 'CA',
-          zipCode: '94612',
+          zipCode: '95110',
           type: 'mailing',
-          label: 'Mailing Address'
-        },
-        {
-          street1: '300 Billing Boulevard',
-          city: 'Berkeley',
-          state: 'CA',
-          zipCode: '94704',
-          type: 'billing',
-          label: 'Billing Address'
+          label: 'Mailing'
         }
       ],
       phones: [
         {
-          number: '555-0100',
-          extension: '1001',
+          number: '408-555-0100',
           type: 'office',
-          label: 'Main Office'
+          label: 'Main Line'
         },
         {
-          number: '555-0200',
+          number: '408-555-0200',
           type: 'mobile',
-          label: 'Emergency Line'
-        },
-        {
-          number: '555-0300',
-          type: 'fax',
-          label: 'Fax Machine'
+          label: 'Mobile'
         }
       ]
     },
     users: [
       {
-        email: 'admin@test-provider.com',
-        firstName: 'Test',
+        email: 'var.admin@var-partner.com',
+        firstName: 'VAR',
         lastName: 'Admin',
-        role: 'super_admin'
+        role: 'partner_admin'
       }
     ]
   };
