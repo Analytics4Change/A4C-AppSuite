@@ -8,7 +8,7 @@
 -- Flow:
 --   1. Edge Function emits 'organization.bootstrap.initiated' event
 --   2. Event inserted into domain_events table
---   3. This trigger fires AFTER INSERT
+--   3. This trigger fires BEFORE INSERT (before CQRS projection trigger)
 --   4. PostgreSQL NOTIFY sends message to 'workflow_events' channel
 --   5. Workflow worker (listening on channel) receives notification
 --   6. Worker starts Temporal workflow with event data
@@ -20,7 +20,8 @@
 --   - Auditable: All workflow starts recorded as immutable events
 --   - Observable: Easy to monitor unprocessed events
 --
--- Idempotency: Only notifies for unprocessed events (processed_at IS NULL)
+-- Idempotency: Notifies on INSERT (before CQRS projection trigger sets processed_at)
+-- Runs BEFORE the process_domain_event_trigger to ensure notification always fires
 --
 -- Author: A4C Infrastructure Team
 -- Created: 2025-11-23
@@ -41,8 +42,9 @@ AS $$
 DECLARE
   notification_payload jsonb;
 BEGIN
-  -- Only notify for organization.bootstrap.initiated events that haven't been processed
-  IF NEW.event_type = 'organization.bootstrap.initiated' AND NEW.processed_at IS NULL THEN
+  -- Only notify for organization.bootstrap.initiated events
+  -- Note: This runs BEFORE the CQRS projection trigger, so processed_at is always NULL
+  IF NEW.event_type = 'organization.bootstrap.initiated' THEN
 
     -- Build notification payload with all necessary data for workflow start
     notification_payload := jsonb_build_object(
@@ -73,19 +75,22 @@ $$;
 COMMENT ON FUNCTION notify_workflow_worker_bootstrap() IS
   'Sends PostgreSQL NOTIFY message to workflow_events channel when organization.bootstrap.initiated events are inserted.
    Worker listens on this channel and starts Temporal workflows in response.
-   Only notifies for unprocessed events (processed_at IS NULL).';
+   Runs BEFORE the CQRS projection trigger to ensure notification always fires.';
 
 -- =====================================================
--- Trigger: Fire AFTER INSERT on domain_events
+-- Trigger: Fire BEFORE INSERT on domain_events
 -- =====================================================
+-- Important: This must run BEFORE the process_domain_event_trigger (also BEFORE INSERT)
+-- to ensure notification fires before CQRS projection processing sets processed_at
 CREATE TRIGGER trigger_notify_bootstrap_initiated
-  AFTER INSERT ON domain_events
+  BEFORE INSERT ON domain_events
   FOR EACH ROW
   EXECUTE FUNCTION notify_workflow_worker_bootstrap();
 
 -- Add comment explaining the trigger
 COMMENT ON TRIGGER trigger_notify_bootstrap_initiated ON domain_events IS
   'Notifies workflow worker via PostgreSQL NOTIFY when organization.bootstrap.initiated events are inserted.
+   Fires BEFORE INSERT, before the process_domain_event_trigger sets processed_at.
    Part of the event-driven workflow triggering pattern.';
 
 -- =====================================================

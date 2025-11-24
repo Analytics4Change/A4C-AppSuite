@@ -153,8 +153,10 @@ jobs:
           PROJECT_REF=$(echo "${{ secrets.SUPABASE_URL }}" | sed 's|https://\([^.]*\).*|\1|')
           echo "Project reference: $PROJECT_REF"
 
-          # Construct PostgreSQL connection string for session pooler
-          SUPABASE_DB_URL="postgresql://postgres.${PROJECT_REF}:${{ secrets.SUPABASE_DB_PASSWORD }}@aws-1-us-west-1.pooler.supabase.com:6543/postgres"
+          # Construct PostgreSQL connection string for direct connection (required for LISTEN/NOTIFY)
+          # Note: Session pooler (port 6543) does NOT support LISTEN/NOTIFY
+          # Must use direct connection (port 5432) for event-driven workflow triggering
+          SUPABASE_DB_URL="postgresql://postgres.${PROJECT_REF}:${{ secrets.SUPABASE_DB_PASSWORD }}@aws-1-us-west-1.pooler.supabase.com:5432/postgres"
 
           # Base64 encode the connection string
           ENCODED_DB_URL=$(echo -n "$SUPABASE_DB_URL" | base64 -w 0)
