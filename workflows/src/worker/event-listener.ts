@@ -173,85 +173,52 @@ export class WorkflowEventListener {
         event_id
       });
 
-      // Update event record with workflow context
-      await this.updateEventWithWorkflowContext(
+      // Emit workflow_started event (event sourcing - no updates to existing events)
+      await this.emitWorkflowStartedEvent(
+        stream_id,
         event_id,
         handle.workflowId,
         handle.firstExecutionRunId
       );
 
-      console.log('[EventListener] ✅ Event updated with workflow context:', { event_id });
+      console.log('[EventListener] ✅ Emitted workflow_started event for:', { event_id });
     } catch (error) {
       console.error('[EventListener] Failed to start workflow:', error);
-
-      // Update event with error
-      await this.updateEventWithError(event_id, error);
+      // Log error but don't update events - maintains immutability
     }
   }
 
   /**
-   * Update event record with workflow ID and run ID
+   * Emit organization.bootstrap.workflow_started event
+   * Maintains event sourcing immutability by creating new event instead of updating existing one
    */
-  private async updateEventWithWorkflowContext(
-    eventId: string,
+  private async emitWorkflowStartedEvent(
+    streamId: string,
+    bootstrapEventId: string,
     workflowId: string,
     workflowRunId: string
   ): Promise<void> {
     try {
-      const { error } = await (this.supabaseClient
-        .from('domain_events') as any)
-        .update({
-          event_metadata: {
-            workflow_id: workflowId,
-            workflow_run_id: workflowRunId,
-            workflow_type: 'organizationBootstrapWorkflow',
-            timestamp: new Date().toISOString()
-          },
-          processed_at: new Date().toISOString()
-        })
-        .eq('id', eventId);
+      const { data: eventId, error } = await this.supabaseClient.rpc(
+        'emit_workflow_started_event',
+        {
+          p_stream_id: streamId,
+          p_bootstrap_event_id: bootstrapEventId,
+          p_workflow_id: workflowId,
+          p_workflow_run_id: workflowRunId,
+          p_workflow_type: 'organizationBootstrapWorkflow'
+        }
+      );
 
       if (error) {
-        throw error;
+        console.error('[EventListener] Failed to emit workflow_started event:', error);
+        // Don't throw - workflow already started successfully
+      } else {
+        console.log('[EventListener] ✅ Emitted workflow_started event:', eventId);
       }
     } catch (error) {
-      console.error('[EventListener] Failed to update event with workflow context:', error);
+      console.error('[EventListener] Error emitting workflow_started event:', error);
       // Don't throw - workflow already started successfully
-    }
-  }
-
-  /**
-   * Update event with processing error
-   */
-  private async updateEventWithError(eventId: string, error: unknown): Promise<void> {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-
-    try {
-      // Get current retry count
-      const { data: event } = await (this.supabaseClient
-        .from('domain_events') as any)
-        .select('event_metadata')
-        .eq('id', eventId)
-        .single();
-
-      const currentRetryCount = (event?.event_metadata as any)?.retry_count || 0;
-
-      const { error: updateError } = await (this.supabaseClient
-        .from('domain_events') as any)
-        .update({
-          event_metadata: {
-            ...((event?.event_metadata as any) || {}),
-            processing_error: errorMessage,
-            retry_count: currentRetryCount + 1
-          }
-        })
-        .eq('id', eventId);
-
-      if (updateError) {
-        console.error('[EventListener] Failed to update event with error:', updateError);
-      }
-    } catch (err) {
-      console.error('[EventListener] Error updating event error:', err);
     }
   }
 

@@ -1,0 +1,119 @@
+asyncapi: '2.6.0'
+info:
+  title: Organization Bootstrap Domain Events
+  version: 1.0.0
+  description: |
+    Events emitted during organization bootstrap workflow.
+
+    Event Flow:
+    1. organization.bootstrap.initiated - Edge Function receives bootstrap request
+    2. organization.bootstrap.workflow_started - Event listener starts Temporal workflow
+    3. organization.created - Workflow activity creates organization
+    4. organization.bootstrap.completed - Workflow completes successfully
+
+    See: documentation/infrastructure/reference/events/
+
+channels:
+  organization.bootstrap.initiated:
+    description: |
+      Emitted when Edge Function receives organization bootstrap request.
+      Triggers event listener to start Temporal workflow via PostgreSQL NOTIFY.
+    publish:
+      message:
+        $ref: '#/components/messages/OrganizationBootstrapInitiated'
+
+  organization.bootstrap.workflow_started:
+    description: |
+      Emitted when event listener successfully starts Temporal workflow.
+      Provides audit trail linking domain events to workflow executions.
+      Maintains event sourcing immutability (no updates to bootstrap.initiated event).
+    publish:
+      message:
+        $ref: '#/components/messages/OrganizationBootstrapWorkflowStarted'
+
+components:
+  messages:
+    OrganizationBootstrapInitiated:
+      name: OrganizationBootstrapInitiated
+      title: Organization Bootstrap Initiated
+      summary: Bootstrap process started for new organization
+      contentType: application/json
+      payload:
+        type: object
+        required:
+          - organization_name
+          - organization_slug
+          - organization_type
+          - admin_email
+        properties:
+          organization_name:
+            type: string
+            description: Display name for the organization
+            example: "Acme Healthcare"
+          organization_slug:
+            type: string
+            pattern: '^[a-z0-9-]+$'
+            description: URL-safe slug for the organization
+            example: "acme-healthcare"
+          organization_type:
+            type: string
+            enum: [provider, var, partner]
+            description: Type of organization being created
+          subdomain:
+            type: string
+            nullable: true
+            pattern: '^[a-z0-9-]+$'
+            description: Custom subdomain (optional, triggers DNS provisioning)
+            example: "acme"
+          admin_email:
+            type: string
+            format: email
+            description: Email address for initial super_admin user
+            example: "admin@acme.com"
+          orgData:
+            type: object
+            description: Additional organization configuration data
+          users:
+            type: array
+            description: List of users to invite after organization creation
+            items:
+              type: object
+              required: [email, role]
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  type: string
+                  enum: [super_admin, org_admin, provider_admin, clinician, case_manager, viewer]
+
+    OrganizationBootstrapWorkflowStarted:
+      name: OrganizationBootstrapWorkflowStarted
+      title: Organization Bootstrap Workflow Started
+      summary: Temporal workflow started for organization bootstrap
+      contentType: application/json
+      payload:
+        type: object
+        required:
+          - bootstrap_event_id
+          - workflow_id
+          - workflow_run_id
+          - workflow_type
+        properties:
+          bootstrap_event_id:
+            type: string
+            format: uuid
+            description: ID of the organization.bootstrap.initiated event that triggered this workflow
+            example: "b8309521-a46f-4d71-becb-1f138878425b"
+          workflow_id:
+            type: string
+            description: Deterministic Temporal workflow ID (format org-bootstrap-{stream_id})
+            example: "org-bootstrap-d8846196-8f69-46dc-af9a-87a57843c4e4"
+          workflow_run_id:
+            type: string
+            description: Temporal workflow execution run ID (unique per execution)
+            example: "019ab7a4-a6bf-70a3-8394-7b09371e98ba"
+          workflow_type:
+            type: string
+            description: Temporal workflow type name
+            example: "organizationBootstrapWorkflow"
