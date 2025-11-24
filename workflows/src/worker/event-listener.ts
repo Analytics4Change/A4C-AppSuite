@@ -64,8 +64,7 @@ export class WorkflowEventListener {
     }
 
     try {
-      // Connect to PostgreSQL
-      await this.pgClient.connect();
+      // Note: pgClient is already connected by createEventListener factory function
 
       // Subscribe to workflow_events channel
       await this.pgClient.query('LISTEN workflow_events');
