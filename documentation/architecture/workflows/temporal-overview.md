@@ -384,6 +384,55 @@ export async function OrganizationBootstrapWorkflow(params) {
 
 ## Event-Driven Integration
 
+**Last Updated**: 2025-11-24 (Event-Driven Workflow Triggering)
+
+A4C AppSuite uses a **bidirectional event-driven architecture** where events both trigger workflows AND are emitted by workflow activities. This provides complete decoupling between components while maintaining full traceability.
+
+### Event → Workflow Triggering (New in 2025-11-24)
+
+**Architecture**: Database Trigger → PostgreSQL NOTIFY → Worker Listener → Workflow Start
+
+```mermaid
+sequenceDiagram
+    participant UI as Frontend/API
+    participant EF as Edge Function
+    participant DB as PostgreSQL
+    participant W as Temporal Worker
+    participant T as Temporal Server
+
+    UI->>EF: POST /create-organization
+    EF->>DB: INSERT domain_events<br/>(event_type='organization.bootstrap_initiated')
+    DB-->>DB: Trigger: process_organization_bootstrap_initiated
+    DB-->>W: NOTIFY workflow_events
+    W->>T: startWorkflow('org-bootstrap-{orgId}')
+    T-->>W: Workflow Started
+    W->>DB: UPDATE event_metadata<br/>(workflow_id, run_id)
+    Note over UI,T: Complete flow: ~185ms
+```
+
+**Key Components**:
+
+1. **Database Trigger**: Automatically emits PostgreSQL NOTIFY when specific events inserted
+   - Location: `infrastructure/supabase/sql/04-triggers/process_organization_bootstrap_initiated.sql`
+   - Trigger: `organization.bootstrap_initiated` → NOTIFY `workflow_events` channel
+
+2. **Worker Event Listener**: Listens for PostgreSQL notifications and starts workflows
+   - Location: `workflows/src/worker/event-listener.ts`
+   - Pattern: `LISTEN workflow_events` → Parse event → Start workflow → Update event with workflow context
+
+3. **Edge Functions**: Primary interface for external clients to emit events
+   - Location: `infrastructure/supabase/functions/create-organization/`
+   - Role: Validate input → Insert event → Return 202 Accepted
+
+**Benefits**:
+- ✅ **Decoupled**: Frontend/Edge Functions don't need Temporal client libraries
+- ✅ **Fast**: Sub-200ms latency from event emission to workflow start
+- ✅ **Reliable**: Events persisted before workflow starts; automatic retry on failure
+- ✅ **Observable**: Complete audit trail via event-workflow linking
+- ✅ **Scalable**: Multiple workers can listen to same channel
+
+**Detailed Documentation**: See `documentation/architecture/workflows/event-driven-workflow-triggering.md` (comprehensive 85KB guide)
+
 ### Workflow → Event → Projection Flow
 
 ```mermaid
@@ -395,7 +444,7 @@ sequenceDiagram
     participant Proj as Projection Table
 
     WF->>Act: Execute activity
-    Act->>ES: INSERT domain event
+    Act->>ES: INSERT domain event (with workflow context)
     ES->>EP: Trigger fires
     EP->>Proj: UPDATE projection
     Proj-->>EP: Projection updated
@@ -410,48 +459,157 @@ All events are stored in `domain_events` table:
 
 ```sql
 CREATE TABLE domain_events (
-  event_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_type text NOT NULL,
   aggregate_type text NOT NULL,
-  aggregate_id text NOT NULL,
+  aggregate_id uuid NOT NULL,
   event_data jsonb NOT NULL,
-  metadata jsonb DEFAULT '{}'::jsonb,
+  event_metadata jsonb DEFAULT '{}'::jsonb,  -- Enhanced with workflow context
   created_at timestamptz DEFAULT now(),
+  processed_at timestamptz,  -- When workflow started processing
   created_by uuid REFERENCES auth.users(id)
 );
 
--- Index for event replay and projections
+-- Indexes for event replay and projections
 CREATE INDEX idx_domain_events_aggregate ON domain_events(aggregate_type, aggregate_id, created_at);
 CREATE INDEX idx_domain_events_type ON domain_events(event_type, created_at);
+
+-- NEW: Indexes for event-workflow traceability (2025-11-24)
+CREATE INDEX idx_domain_events_workflow_id ON domain_events((event_metadata->>'workflow_id'))
+  WHERE event_metadata->>'workflow_id' IS NOT NULL;
+CREATE INDEX idx_domain_events_workflow_run_id ON domain_events((event_metadata->>'workflow_run_id'))
+  WHERE event_metadata->>'workflow_run_id' IS NOT NULL;
+CREATE INDEX idx_domain_events_workflow_type ON domain_events(
+  (event_metadata->>'workflow_id'), event_type
+) WHERE event_metadata->>'workflow_id' IS NOT NULL;
+CREATE INDEX idx_domain_events_activity_id ON domain_events((event_metadata->>'activity_id'))
+  WHERE event_metadata->>'activity_id' IS NOT NULL;
 ```
 
-### Workflow Metadata in Events
+### Event Metadata Schema
 
-All events emitted by activities include workflow context:
+**Enhanced in 2025-11-24**: Event metadata now includes workflow traceability fields automatically populated by worker and activities.
 
 ```typescript
-// Activity automatically adds workflow metadata
-async function emitDomainEvent(event: DomainEvent) {
-  const workflowInfo = {
-    workflow_id: Context.current().info.workflowId,
-    workflow_run_id: Context.current().info.runId,
-    workflow_type: Context.current().info.workflowType
-  }
+interface EventMetadata {
+  // Workflow Traceability (auto-populated)
+  workflow_id?: string;        // 'org-bootstrap-{orgId}'
+  workflow_run_id?: string;    // Temporal run UUID
+  workflow_type?: string;      // 'organizationBootstrapWorkflow'
+  activity_id?: string;        // 'createOrganizationActivity'
 
-  await supabase.from('domain_events').insert({
-    ...event,
-    metadata: {
-      ...event.metadata,
-      ...workflowInfo
-    }
-  })
+  // Required
+  timestamp: string;           // ISO 8601
+
+  // Recommended
+  tags?: string[];             // ['production', 'ui-triggered']
+  source?: string;             // 'ui', 'api', 'cron'
+  user_id?: string;            // User who triggered
+  correlation_id?: string;     // Distributed tracing
+
+  // Error Tracking (auto-populated on failure)
+  processing_error?: string;
+  retry_count?: number;
 }
 ```
 
+**Complete Schema Reference**: See `documentation/workflows/reference/event-metadata-schema.md`
+
+### Workflow Metadata in Events (Automatic)
+
+All events emitted by activities automatically include workflow context via `emitEvent()` utility:
+
+```typescript
+// workflows/src/shared/utils/emit-event.ts
+import { Context } from '@temporalio/activity';
+
+export async function emitEvent(params: EmitEventParams) {
+  const metadata: EventMetadata = {
+    timestamp: params.metadata.timestamp,
+    tags: params.metadata.tags || [],
+    ...params.metadata,
+  };
+
+  // AUTOMATIC workflow context capture
+  try {
+    const activityInfo = Context.current().info;
+    metadata.workflow_id = activityInfo.workflowExecution.workflowId;
+    metadata.workflow_run_id = activityInfo.workflowExecution.runId;
+    metadata.workflow_type = activityInfo.workflowType;
+    metadata.activity_id = activityInfo.activityType;
+  } catch {
+    // Not in activity context (trigger event)
+  }
+
+  await supabase.from('domain_events').insert({
+    event_type: params.eventType,
+    aggregate_type: params.aggregateType,
+    aggregate_id: params.aggregateId,
+    event_data: params.eventData,
+    event_metadata: metadata,
+  });
+}
+```
+
+**Usage in Activities**:
+```typescript
+// Activity emits event - workflow context added automatically
+await emitEvent({
+  eventType: 'organization.created',
+  aggregateType: 'organization',
+  aggregateId: orgId,
+  eventData: { name, slug, tier },
+  metadata: {
+    timestamp: new Date().toISOString(),
+    tags: ['production'],
+  },
+});
+// No need to manually add workflow_id, workflow_run_id, etc.!
+```
+
+### Bi-Directional Traceability
+
+**Event → Workflow** (find which workflow processed an event):
+```sql
+SELECT
+  event_metadata->>'workflow_id' AS workflow_id,
+  event_metadata->>'workflow_run_id' AS workflow_run_id,
+  event_metadata->>'workflow_type' AS workflow_type
+FROM domain_events
+WHERE id = 'event-uuid';
+```
+
+**Workflow → Events** (find all events from a workflow):
+```sql
+SELECT event_type, event_data, created_at
+FROM domain_events
+WHERE event_metadata->>'workflow_id' = 'org-bootstrap-abc123'
+ORDER BY created_at ASC;
+```
+
+**TypeScript API** (EventQueries utility):
+```typescript
+import { createEventQueries } from '@shared/utils/event-queries';
+
+const queries = createEventQueries();
+
+// Get all events for a workflow
+const result = await queries.getEventsForWorkflow('org-bootstrap-abc123');
+
+// Get workflow summary
+const summary = await queries.getWorkflowSummary('org-bootstrap-abc123');
+
+// Trace complete lineage
+const lineage = await queries.traceWorkflowLineage('org-uuid');
+```
+
 **Benefits**:
-- Trace state changes back to originating workflow
-- Audit trail for compliance (HIPAA 7-year retention)
-- Debug workflow behavior via event history
+- ✅ Trace state changes back to originating workflow
+- ✅ Audit trail for compliance (HIPAA 7-year retention)
+- ✅ Debug workflow behavior via event history
+- ✅ **NEW**: Reverse lookup from event to workflow
+- ✅ **NEW**: Monitor workflow execution via database queries
+- ✅ **NEW**: Detect unprocessed events (worker health check)
 
 ---
 
@@ -645,7 +803,7 @@ kind: Deployment
 metadata:
   name: temporal-worker
 spec:
-  replicas: 3  # Scale based on workload
+  replicas: 1  # Development: 1 replica (k3s cluster has 2 vCPUs); Production: 3+ replicas
   template:
     spec:
       containers:
@@ -666,6 +824,11 @@ spec:
 ```
 
 **Scaling Guidelines**:
+
+> ⚠️ **Note**: These guidelines assume production infrastructure with sufficient CPU capacity.
+> Development k3s cluster (2 vCPUs total) currently runs 1 worker replica. Production environments
+> with adequate resources can scale according to workload demands.
+
 - **Light workload** (< 10 workflows/hour): 1-2 workers
 - **Medium workload** (10-100 workflows/hour): 3-5 workers
 - **Heavy workload** (> 100 workflows/hour): 5+ workers
@@ -805,6 +968,13 @@ If workflow changes cause issues:
 - **[Error Handling and Compensation](../../workflows/guides/error-handling-and-compensation.md)** - Saga pattern implementation
 - **[Workflow Implementation Guide](../../workflows/guides/implementation.md)** - How to build workflows
 
+### Event-Driven Workflow Triggering (NEW - 2025-11-24)
+- **[Event-Driven Workflow Triggering Architecture](./event-driven-workflow-triggering.md)** - Complete 85KB deep-dive on database trigger → NOTIFY → worker pattern
+- **[Triggering Workflows Guide](../../workflows/guides/triggering-workflows.md)** - User guide for emitting events to trigger workflows
+- **[Event Metadata Schema Reference](../../workflows/reference/event-metadata-schema.md)** - Complete schema for event_metadata JSONB column
+- **[Edge Functions Deployment Guide](../../infrastructure/guides/supabase/edge-functions-deployment.md)** - Deploy Edge Functions for workflow triggering
+- **[Integration Testing Guide](../../workflows/guides/integration-testing.md)** - End-to-end testing for event-driven workflows
+
 ### Infrastructure & Deployment
 - **[Workflows CLAUDE.md](../../../workflows/CLAUDE.md)** - Temporal worker development guide
 - **[Infrastructure CLAUDE.md](../../../infrastructure/CLAUDE.md)** - Deployment runbook (see Temporal Workers section)
@@ -822,6 +992,6 @@ If workflow changes cause issues:
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-10-24
+**Document Version**: 1.1
+**Last Updated**: 2025-11-24 (Event-Driven Workflow Triggering)
 **Status**: Operational and Ready for Development

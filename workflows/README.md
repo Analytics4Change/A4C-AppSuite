@@ -399,7 +399,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: workflow-worker
-  minReplicas: 3
+  minReplicas: 1  # Development: 1 replica (2-vCPU constraint); Production: 3+ replicas
   maxReplicas: 10
   metrics:
   - type: Resource
@@ -435,7 +435,7 @@ kubectl rollout undo deployment/workflow-worker -n temporal
 - ✅ `TAG_DEV_ENTITIES=false` in ConfigMap
 - ✅ Resource limits set appropriately
 - ✅ Health checks responding
-- ✅ 3+ replicas for high availability
+- ✅ 3+ replicas for high availability (production cluster); 1 replica for development (2-vCPU k3s constraint)
 - ✅ Temporal server accessible
 - ✅ Supabase connection verified
 - ✅ DNS provider credentials valid (Cloudflare)

@@ -5,18 +5,27 @@
  * All state changes in the system must be recorded as domain events.
  *
  * Features:
- * - Automatic event metadata (timestamp, workflow_id, run_id)
+ * - Automatic event metadata (timestamp, workflow_id, workflow_run_id, workflow_type, activity_id)
+ * - Bi-directional traceability between events and workflows
  * - Tags support for development entity tracking
  * - Idempotency via event_id
  * - Type-safe event data
+ *
+ * Event Metadata Structure:
+ * - workflow_id: Deterministic workflow ID (e.g., "org-bootstrap-abc123")
+ * - workflow_run_id: Temporal execution ID (UUID)
+ * - workflow_type: Workflow name (e.g., "organizationBootstrapWorkflow")
+ * - activity_id: Activity that emitted the event (e.g., "createOrganizationActivity")
+ * - timestamp: Event emission time (ISO 8601)
+ * - tags: Optional development tracking tags
  *
  * Usage:
  * ```typescript
  * import { emitEvent } from '@shared/utils/emit-event';
  *
  * await emitEvent({
- *   event_type: 'OrganizationCreated',
- *   aggregate_type: 'Organization',
+ *   event_type: 'organization.created',
+ *   aggregate_type: 'organization',
  *   aggregate_id: orgId,
  *   event_data: {
  *     org_id: orgId,
@@ -76,20 +85,33 @@ export async function emitEvent(params: EmitEventParams): Promise<string> {
 
   // Add Temporal workflow context if available
   try {
-    // Try to import Temporal workflow context (only available in workflow context)
-    // This will fail in activities, which is expected
-    const { workflowInfo } = await import('@temporalio/workflow');
-    const info = workflowInfo();
-    metadata.workflow_id = info.workflowId;
-    metadata.run_id = info.runId;
+    // When called from an activity, use Context.current() to get workflow info
+    const { Context } = await import('@temporalio/activity');
+    const activityInfo = Context.current().info;
+
+    // Activity info contains workflow execution details
+    metadata.workflow_id = activityInfo.workflowExecution.workflowId;
+    metadata.workflow_run_id = activityInfo.workflowExecution.runId;
+    metadata.workflow_type = activityInfo.workflowType;
+    metadata.activity_id = activityInfo.activityType;
   } catch {
-    // Not in workflow context (e.g., running in activity)
-    // Try to get from environment or activity context
-    if (process.env.TEMPORAL_WORKFLOW_ID) {
-      metadata.workflow_id = process.env.TEMPORAL_WORKFLOW_ID;
-    }
-    if (process.env.TEMPORAL_RUN_ID) {
-      metadata.run_id = process.env.TEMPORAL_RUN_ID;
+    // Not in activity context - may be in workflow or standalone
+    try {
+      // Try to import Temporal workflow context (only available in workflow context)
+      const { workflowInfo } = await import('@temporalio/workflow');
+      const info = workflowInfo();
+      metadata.workflow_id = info.workflowId;
+      metadata.workflow_run_id = info.runId;
+      metadata.workflow_type = info.workflowType;
+    } catch {
+      // Not in workflow context either
+      // Try to get from environment (for testing/debugging)
+      if (process.env.TEMPORAL_WORKFLOW_ID) {
+        metadata.workflow_id = process.env.TEMPORAL_WORKFLOW_ID;
+      }
+      if (process.env.TEMPORAL_RUN_ID) {
+        metadata.workflow_run_id = process.env.TEMPORAL_RUN_ID;
+      }
     }
   }
 

@@ -1,0 +1,250 @@
+name: Deploy Edge Functions
+
+# This workflow deploys Supabase Edge Functions (Deno runtime).
+# Edge Functions provide serverless API endpoints and event handlers.
+#
+# Prerequisites:
+#   - SUPABASE_ACCESS_TOKEN secret (Supabase Management API token)
+#   - SUPABASE_PROJECT_REF secret (e.g., "tmrjlswbsxmbglmaclxu")
+#   - Supabase CLI installed in workflow
+#
+# Functions Deployed:
+#   - organization-bootstrap: Creates organization.bootstrap.initiated event
+#   - accept-invitation: Processes invitation acceptance
+#   - validate-invitation: Validates invitation tokens
+#   - workflow-status: Queries Temporal workflow status
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infrastructure/supabase/supabase/functions/**'
+      - '.github/workflows/edge-functions-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: 'Target environment'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+jobs:
+  validate-functions:
+    name: Validate Edge Functions
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Lint Edge Functions
+        run: |
+          echo "Linting Edge Functions..."
+          cd infrastructure/supabase/supabase/functions
+
+          for func_dir in */; do
+            func_name="${func_dir%/}"
+            echo "Linting function: $func_name"
+
+            if [ -f "$func_dir/index.ts" ]; then
+              deno lint "$func_dir/index.ts" || {
+                echo "❌ Linting failed for $func_name"
+                exit 1
+              }
+            else
+              echo "⚠️  No index.ts found for $func_name"
+            fi
+          done
+
+          echo "✅ All Edge Functions passed linting"
+
+      - name: Type-check Edge Functions
+        run: |
+          echo "Type-checking Edge Functions..."
+          cd infrastructure/supabase/supabase/functions
+
+          for func_dir in */; do
+            func_name="${func_dir%/}"
+            echo "Type-checking function: $func_name"
+
+            if [ -f "$func_dir/index.ts" ]; then
+              deno check "$func_dir/index.ts" || {
+                echo "❌ Type-check failed for $func_name"
+                exit 1
+              }
+            fi
+          done
+
+          echo "✅ All Edge Functions passed type-checking"
+
+      - name: Check for required files
+        run: |
+          echo "Checking for required files..."
+          cd infrastructure/supabase/supabase/functions
+
+          for func_dir in */; do
+            func_name="${func_dir%/}"
+
+            # Check for index.ts
+            if [ ! -f "$func_dir/index.ts" ]; then
+              echo "❌ Missing index.ts for $func_name"
+              exit 1
+            fi
+
+            echo "✅ $func_name has required files"
+          done
+
+  deploy-functions:
+    name: Deploy Edge Functions to Supabase
+    needs: validate-functions
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.target_environment || 'development' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Install Supabase CLI
+        run: |
+          # Install Supabase CLI v1.200.3 or later
+          curl -fsSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz \
+            | tar -xz --strip-components=1 -C /usr/local/bin
+
+          # Verify installation
+          supabase --version
+
+      - name: Link to Supabase project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          cd infrastructure/supabase
+
+          # Link to remote project
+          supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+          echo "✅ Linked to Supabase project: $SUPABASE_PROJECT_REF"
+
+      - name: Deploy Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          cd infrastructure/supabase
+
+          echo "Deploying Edge Functions to Supabase..."
+
+          # Deploy all functions
+          supabase functions deploy --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+
+          if [ $? -eq 0 ]; then
+            echo "✅ All Edge Functions deployed successfully"
+          else
+            echo "❌ Edge Function deployment failed"
+            exit 1
+          fi
+
+      - name: Verify function deployment
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          echo "Verifying function deployment..."
+
+          # List deployed functions
+          cd infrastructure/supabase
+          supabase functions list --project-ref "$SUPABASE_PROJECT_REF"
+
+          # Expected functions
+          EXPECTED_FUNCTIONS=(
+            "organization-bootstrap"
+            "accept-invitation"
+            "validate-invitation"
+            "workflow-status"
+          )
+
+          # Verify each function
+          for func in "${EXPECTED_FUNCTIONS[@]}"; do
+            if supabase functions list --project-ref "$SUPABASE_PROJECT_REF" | grep -q "$func"; then
+              echo "✅ Function deployed: $func"
+            else
+              echo "❌ Function missing: $func"
+              exit 1
+            fi
+          done
+
+          echo "✅ All functions verified"
+
+      - name: Test organization-bootstrap function
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Testing organization-bootstrap function..."
+
+          # Test with minimal payload (should fail validation, but function should respond)
+          response=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            "$SUPABASE_URL/functions/v1/organization-bootstrap" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"test": true}')
+
+          http_code=$(echo "$response" | tail -n 1)
+          body=$(echo "$response" | head -n -1)
+
+          # Function should return 400 (validation error) or 200
+          # 500 means function is broken
+          if [ "$http_code" = "500" ]; then
+            echo "❌ Function returned 500 error"
+            echo "Response body: $body"
+            exit 1
+          else
+            echo "✅ Function is responding (HTTP $http_code)"
+          fi
+
+      - name: Post-deployment summary
+        if: success()
+        run: |
+          echo ""
+          echo "================================================"
+          echo "✅ Edge Function Deployment Complete"
+          echo "================================================"
+          echo ""
+          echo "Deployed Functions:"
+          echo "  • organization-bootstrap - Creates bootstrap events"
+          echo "  • accept-invitation - Processes invitations"
+          echo "  • validate-invitation - Validates tokens"
+          echo "  • workflow-status - Queries workflows"
+          echo ""
+          echo "Environment: ${{ github.event.inputs.target_environment || 'development' }}"
+          echo "Project Ref: ${{ secrets.SUPABASE_PROJECT_REF }}"
+          echo ""
+          echo "Next Steps:"
+          echo "  1. Verify functions in Supabase Dashboard"
+          echo "  2. Test organization creation workflow"
+          echo "  3. Monitor function logs for errors"
+          echo ""
+          echo "Function URLs:"
+          echo "  ${{ secrets.SUPABASE_URL }}/functions/v1/organization-bootstrap"
+          echo "  ${{ secrets.SUPABASE_URL }}/functions/v1/accept-invitation"
+          echo "  ${{ secrets.SUPABASE_URL }}/functions/v1/validate-invitation"
+          echo "  ${{ secrets.SUPABASE_URL }}/functions/v1/workflow-status"
+          echo ""
+          echo "================================================"

@@ -16,6 +16,7 @@
 import { NativeConnection, Worker } from '@temporalio/worker';
 import { logConfigurationStatus } from '../shared/config';
 import { HealthCheckServer } from './health';
+import { createEventListener, WorkflowEventListener } from './event-listener';
 import * as activities from '../activities/organization-bootstrap';
 
 // Load environment variables in development
@@ -84,6 +85,7 @@ async function run() {
   console.log('');
 
   let worker: Worker;
+  let eventListener: WorkflowEventListener | undefined;
   try {
     worker = await Worker.create({
       connection,
@@ -108,6 +110,21 @@ async function run() {
     process.exit(1);
   }
 
+  // Start event listener for database-triggered workflows
+  console.log('Starting event listener...');
+  console.log(`  PostgreSQL Channel: workflow_events`);
+  console.log(`  Database URL: ${process.env.SUPABASE_DB_URL ? process.env.SUPABASE_DB_URL.substring(0, 30) + '...' : '(not set)'}`);
+  console.log('');
+
+  try {
+    eventListener = await createEventListener();
+    console.log('✅ Event listener started successfully\n');
+  } catch (error) {
+    console.error('❌ Failed to start event listener:', error);
+    console.error('   Worker will continue, but database-triggered workflows will not work\n');
+    // Don't exit - worker can still process manually triggered workflows
+  }
+
   // Graceful shutdown handling
   const shutdown = async (signal: string) => {
     console.log(`\n📡 Received ${signal}, starting graceful shutdown...`);
@@ -115,6 +132,12 @@ async function run() {
     healthCheck.setWorkerRunning(false);
 
     try {
+      if (eventListener) {
+        console.log('  Stopping event listener...');
+        await eventListener.stop();
+        console.log('  ✅ Event listener stopped');
+      }
+
       console.log('  Shutting down worker...');
       await worker.shutdown();
       console.log('  ✅ Worker shutdown complete');
