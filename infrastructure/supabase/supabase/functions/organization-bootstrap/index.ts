@@ -124,19 +124,9 @@ serve(async (req) => {
       );
     }
 
-    // Extract JWT claims and verify permission
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
-    if (sessionError) {
-      console.error('[organization-bootstrap] Failed to get session:', sessionError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to verify permissions' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check for organization.create_root permission
-    const permissions = sessionData.session?.app_metadata?.permissions || [];
+    // Check for organization.create_root permission in JWT custom claims
+    // Custom claims are added via database hook: sql/03-functions/authorization/001-set_custom_jwt_claims.sql
+    const permissions = user.app_metadata?.permissions || [];
     if (!permissions.includes('organization.create_root')) {
       console.error('[organization-bootstrap] Permission denied:', {
         user_id: user.id,
