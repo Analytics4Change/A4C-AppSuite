@@ -85,7 +85,11 @@ export interface OrganizationFormData {
 }
 
 /**
- * Contact info for workflow (matches Phase 3 backend)
+ * Contact information structure
+ *
+ * @remarks
+ * Matches AsyncAPI contract: infrastructure/supabase/contracts/organization-bootstrap-events.yaml lines 76-119
+ * Matches Edge Function: infrastructure/supabase/functions/organization-bootstrap/index.ts lines 19-31
  */
 export interface ContactInfo {
   firstName: string;
@@ -94,11 +98,15 @@ export interface ContactInfo {
   title?: string;
   department?: string;
   type: string; // contact_type enum value
-  label: string;
+  label: string; // Human-readable label (e.g., "Billing Contact", "Provider Admin")
 }
 
 /**
- * Address info for workflow (matches Phase 3 backend)
+ * Address information structure
+ *
+ * @remarks
+ * Matches AsyncAPI contract: infrastructure/supabase/contracts/organization-bootstrap-events.yaml lines 120-162
+ * Matches Edge Function: infrastructure/supabase/functions/organization-bootstrap/index.ts lines 33-45
  */
 export interface AddressInfo {
   street1: string;
@@ -107,40 +115,65 @@ export interface AddressInfo {
   state: string;
   zipCode: string;
   type: string; // address_type enum value
-  label: string;
+  label: string; // Human-readable label (e.g., "Billing Address", "General Address")
 }
 
 /**
- * Phone info for workflow (matches Phase 3 backend)
+ * Phone information structure
+ *
+ * @remarks
+ * Matches AsyncAPI contract: infrastructure/supabase/contracts/organization-bootstrap-events.yaml lines 163-190
+ * Matches Edge Function: infrastructure/supabase/functions/organization-bootstrap/index.ts lines 47-56
  */
 export interface PhoneInfo {
   number: string;
   extension?: string;
   type: string; // phone_type enum value
-  label: string;
+  label: string; // Human-readable label (e.g., "Billing Phone", "General Phone")
 }
 
 /**
  * Parameters for starting organization bootstrap workflow
- * Maps to Temporal workflow interface (matches workflows/src/shared/types/index.ts)
+ *
+ * @remarks
+ * This interface represents the complete payload sent to the Edge Function to initiate
+ * organization bootstrap. It matches the AsyncAPI contract exactly.
+ *
+ * Contract References:
+ * - AsyncAPI: infrastructure/supabase/contracts/organization-bootstrap-events.yaml lines 41-209
+ * - Edge Function: infrastructure/supabase/functions/organization-bootstrap/index.ts lines 65-83
+ * - Workflow Types: workflows/src/shared/types/index.ts
+ *
+ * @see ContactInfo for contact structure (lines 87-102)
+ * @see AddressInfo for address structure (lines 104-119)
+ * @see PhoneInfo for phone structure (lines 121-133)
  */
 export interface OrganizationBootstrapParams {
-  /** Subdomain for the organization (optional - required for providers and VAR partners only) */
+  /**
+   * Subdomain for the organization
+   * Triggers DNS provisioning workflow
+   * @example "acme-healthcare"
+   */
   subdomain?: string;
 
-  /** Organization details */
+  /** Organization configuration and metadata */
   orgData: {
+    /** Display name for the organization */
     name: string;
+
+    /** Type of organization being created */
     type: 'provider' | 'partner';
-    parentOrgId?: string; // Required for partners, optional for providers
+
+    /** Parent organization ID (required for partners, optional for providers) */
+    parentOrgId?: string;
 
     /** Contact information (at least one contact required) */
     contacts: ContactInfo[];
 
-    /** Address information (required) */
+    /** Address information (at least one address required) */
     addresses: AddressInfo[];
 
-    /** Phone information (required) */
+    /** Phone information (at least one phone required) */
     phones: PhoneInfo[];
 
     /** Partner type (required when type='partner') */
@@ -150,7 +183,10 @@ export interface OrganizationBootstrapParams {
     referringPartnerId?: string;
   };
 
-  /** Users to invite (derived from provider admin contact) */
+  /**
+   * Users to invite after organization creation
+   * Derived from provider admin contact during form submission
+   */
   users: Array<{
     email: string;
     firstName: string;

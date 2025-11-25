@@ -16,34 +16,74 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/**
+ * Contact information structure
+ * Matches AsyncAPI contract: organization-bootstrap-events.yaml lines 76-119
+ */
+interface ContactInfo {
+  firstName: string;
+  lastName: string;
+  email: string;
+  title?: string;
+  department?: string;
+  type: string;
+  label: string;
+}
+
+/**
+ * Address information structure
+ * Matches AsyncAPI contract: organization-bootstrap-events.yaml lines 120-162
+ */
+interface AddressInfo {
+  street1: string;
+  street2?: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  type: string;
+  label: string;
+}
+
+/**
+ * Phone information structure
+ * Matches AsyncAPI contract: organization-bootstrap-events.yaml lines 163-190
+ */
+interface PhoneInfo {
+  number: string;
+  extension?: string;
+  type: string;
+  label: string;
+}
+
+/**
+ * Organization user invitation structure
+ * Matches AsyncAPI contract: organization-bootstrap-events.yaml lines 181-209
+ */
+interface OrganizationUser {
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+}
+
+/**
+ * Organization bootstrap request payload
+ * Matches AsyncAPI contract: organization-bootstrap-events.yaml lines 41-209
+ * Matches frontend: frontend/src/types/organization.types.ts lines 127-167
+ */
 interface BootstrapRequest {
-  organizationName: string;
-  organizationSlug: string;
-  organizationType: 'provider' | 'provider_partner';
-  subdomain: string;
-  timezone: string;
-  adminContact: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    title?: string;
-  };
-  billingAddress: {
-    street1: string;
-    street2?: string;
-    city: string;
-    state: string;
-    zipCode: string;
-  };
-  billingPhone: {
-    number: string;
-  };
-  program: {
+  subdomain?: string;
+  orgData: {
     name: string;
-    type: string;
-    description?: string;
-    capacity?: number;
+    type: 'provider' | 'partner';
+    parentOrgId?: string;
+    contacts: ContactInfo[];
+    addresses: AddressInfo[];
+    phones: PhoneInfo[];
+    partnerType?: 'var' | 'family' | 'court' | 'other';
+    referringPartnerId?: string;
   };
+  users: OrganizationUser[];
 }
 
 interface BootstrapResponse {
@@ -125,11 +165,28 @@ serve(async (req) => {
     // Parse request body
     const requestData: BootstrapRequest = await req.json();
 
+    // Validate required fields (AsyncAPI contract enforcement)
+    if (!requestData.subdomain || !requestData.orgData || !requestData.users) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid request payload',
+          details: 'Required fields: subdomain, orgData, users',
+          received: {
+            subdomain: !!requestData.subdomain,
+            orgData: !!requestData.orgData,
+            users: !!requestData.users
+          }
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Generate IDs
     const workflowId = crypto.randomUUID();
     const organizationId = crypto.randomUUID();
 
     // Emit organization.bootstrap.initiated event
+    // Event data matches AsyncAPI contract exactly
     const { error: eventError } = await supabase
       .from('domain_events')
       .insert({
@@ -139,15 +196,9 @@ serve(async (req) => {
         event_type: 'organization.bootstrap.initiated',
         event_data: {
           bootstrap_id: workflowId,
-          organization_name: requestData.organizationName,
-          organization_slug: requestData.organizationSlug,
-          organization_type: requestData.organizationType,
           subdomain: requestData.subdomain,
-          timezone: requestData.timezone,
-          admin_contact: requestData.adminContact,
-          billing_address: requestData.billingAddress,
-          billing_phone: requestData.billingPhone,
-          program: requestData.program,
+          orgData: requestData.orgData,
+          users: requestData.users,
         },
         event_metadata: {
           user_id: user.id,
