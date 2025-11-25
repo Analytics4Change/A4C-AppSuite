@@ -120,14 +120,10 @@ jobs:
         with:
           deno-version: v1.x
 
-      - name: Install Supabase CLI
-        run: |
-          # Install Supabase CLI v1.200.3 or later
-          curl -fsSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz \
-            | sudo tar -xz --strip-components=1 -C /usr/local/bin
-
-          # Verify installation
-          supabase --version
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
       - name: Link to Supabase project
         env:
