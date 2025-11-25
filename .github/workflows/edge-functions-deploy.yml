@@ -124,7 +124,7 @@ jobs:
         run: |
           # Install Supabase CLI v1.200.3 or later
           curl -fsSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz \
-            | tar -xz --strip-components=1 -C /usr/local/bin
+            | sudo tar -xz --strip-components=1 -C /usr/local/bin
 
           # Verify installation
           supabase --version
