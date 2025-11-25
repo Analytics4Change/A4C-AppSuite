@@ -125,7 +125,6 @@ serve(async (req) => {
     }
 
     // Extract JWT claims and verify permission
-    const authToken = authHeader.replace('Bearer ', '');
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
     if (sessionError) {
@@ -217,21 +216,9 @@ serve(async (req) => {
       );
     }
 
-    // In production, this would invoke Temporal workflow via HTTP API
-    // For now, we return the workflow ID for tracking
-    const temporalAddress = Deno.env.get('TEMPORAL_ADDRESS') || 'temporal-frontend.temporal.svc.cluster.local:7233';
-
-    // TODO: Invoke Temporal workflow via HTTP API
-    // const temporalResponse = await fetch(`${temporalAddress}/api/v1/namespaces/default/workflows/${workflowId}`, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     workflowId,
-    //     workflowType: 'organizationBootstrap',
-    //     taskQueue: 'bootstrap',
-    //     input: requestData,
-    //   }),
-    // });
+    // NOTE: Temporal workflow is triggered by PostgreSQL NOTIFY listener
+    // Event listener watches domain_events table and starts workflow automatically
+    // See: documentation/infrastructure/reference/events/organization-bootstrap-workflow-started.md
 
     console.log(`Bootstrap initiated: workflow_id=${workflowId}, org_id=${organizationId}, user=${user.email}`);
 
