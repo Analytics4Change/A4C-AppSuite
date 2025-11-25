@@ -96,7 +96,7 @@ serve(async (req) => {
     }
 
     // Create user account based on method
-    let userId: string;
+    let userId: string | undefined;
     let authError: Error | null = null;
 
     if (requestData.method === 'email_password') {
@@ -141,10 +141,10 @@ serve(async (req) => {
       }
     }
 
-    if (authError) {
+    if (authError || !userId) {
       console.error('Failed to create user:', authError);
       return new Response(
-        JSON.stringify({ error: 'Failed to create user account', details: authError.message }),
+        JSON.stringify({ error: 'Failed to create user account', details: authError?.message || 'User ID not assigned' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
