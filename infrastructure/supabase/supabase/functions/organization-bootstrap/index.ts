@@ -98,9 +98,28 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Validate required environment variables
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error('[organization-bootstrap] Missing required environment variables:', {
+      has_supabase_url: !!supabaseUrl,
+      has_service_role_key: !!supabaseServiceKey
+    });
+    return new Response(
+      JSON.stringify({
+        error: 'Server configuration error',
+        details: 'Missing required environment variables'
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
   // Initialize Supabase client outside try block for proper scope
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
