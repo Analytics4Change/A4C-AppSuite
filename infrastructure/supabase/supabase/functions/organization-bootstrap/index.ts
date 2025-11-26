@@ -146,10 +146,19 @@ serve(async (req) => {
     }
 
     // Decode JWT payload (base64)
-    let jwtPayload: any;
+    interface JWTPayload {
+      permissions?: string[];
+      org_id?: string;
+      user_role?: string;
+      scope_path?: string;
+      sub?: string;
+      email?: string;
+    }
+
+    let jwtPayload: JWTPayload;
     try {
       jwtPayload = JSON.parse(atob(jwtParts[1]));
-    } catch (e) {
+    } catch (_e) {
       return new Response(
         JSON.stringify({ error: 'Failed to decode JWT token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
