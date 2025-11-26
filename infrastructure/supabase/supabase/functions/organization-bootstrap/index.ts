@@ -267,6 +267,8 @@ serve(async (req) => {
       );
     }
 
+    console.log(`Bootstrap event emitted successfully: event_id=${_eventId}, workflow_id=${workflowId}, org_id=${organizationId}`);
+
     // NOTE: Temporal workflow is triggered by PostgreSQL NOTIFY listener
     // Event listener watches domain_events table and starts workflow automatically
     // See: documentation/infrastructure/reference/events/organization-bootstrap-workflow-started.md

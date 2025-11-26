@@ -186,6 +186,8 @@ serve(async (req) => {
       console.error('Failed to emit user.created event:', eventError);
       // Note: This function continues even if event emission fails
       // Consider returning error response for consistency with organization-bootstrap
+    } else {
+      console.log(`User created event emitted successfully: event_id=${_eventId}, user_id=${userId}, org_id=${invitation.organization_id}`);
     }
 
     // Build response
