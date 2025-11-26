@@ -8,6 +8,11 @@
 -- IMPORTANT: Return columns MUST match actual database schema in:
 -- infrastructure/supabase/sql/02-tables/organizations/001-organizations_projection.sql
 
+-- Drop old function signatures to prevent ambiguity
+DROP FUNCTION IF EXISTS api.get_organizations(TEXT, BOOLEAN, TEXT, TEXT);
+DROP FUNCTION IF EXISTS api.get_organization_by_id(UUID);
+DROP FUNCTION IF EXISTS api.get_child_organizations(UUID);
+
 -- 1. Get organizations with optional filters
 -- Maps to: SupabaseOrganizationQueryService.getOrganizations()
 -- Frontend usage: Referring partner dropdown, organization lists
