@@ -132,6 +132,30 @@ serve(async (req) => {
       );
     }
 
+    // Extract and decode JWT token to access custom claims
+    // Custom claims are added to the JWT payload via database hook, NOT to user.app_metadata
+    // See: infrastructure/supabase/sql/03-functions/authorization/003-supabase-auth-jwt-hook.sql
+    const jwt = authHeader.replace('Bearer ', '');
+    const jwtParts = jwt.split('.');
+
+    if (jwtParts.length !== 3) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JWT token format' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Decode JWT payload (base64)
+    let jwtPayload: any;
+    try {
+      jwtPayload = JSON.parse(atob(jwtParts[1]));
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: 'Failed to decode JWT token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Create client with user's JWT for auth validation
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
@@ -150,9 +174,9 @@ serve(async (req) => {
       );
     }
 
-    // Check for organization.create_root permission in JWT custom claims
-    // Custom claims are added via database hook: sql/03-functions/authorization/001-set_custom_jwt_claims.sql
-    const permissions = user.app_metadata?.permissions || [];
+    // Extract custom claims from JWT payload (not from user.app_metadata!)
+    // The JWT hook adds claims directly to the token payload, accessible here via jwtPayload
+    const permissions = jwtPayload.permissions || [];
     if (!permissions.includes('organization.create_root')) {
       console.error('[organization-bootstrap] Permission denied:', {
         user_id: user.id,
