@@ -88,7 +88,7 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
       }
 
       log.info(`Fetched ${data.length} organizations`, { filters });
-      return data.map(row => this.mapRowToOrganization(row));
+      return data.map((row: OrganizationRow) => this.mapRowToOrganization(row));
     } catch (error) {
       log.error('Error in getOrganizations', { error, filters });
       throw error;
@@ -147,7 +147,7 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
       }
 
       log.info(`Fetched ${data.length} child organizations`, { parentOrgId });
-      return data.map(row => this.mapRowToOrganization(row));
+      return data.map((row: OrganizationRow) => this.mapRowToOrganization(row));
     } catch (error) {
       log.error('Error in getChildOrganizations', { error, parentOrgId });
       throw error;
