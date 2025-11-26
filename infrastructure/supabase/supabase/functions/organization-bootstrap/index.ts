@@ -98,11 +98,12 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Initialize Supabase client outside try block for proper scope
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
   try {
-    // Initialize Supabase client with service role
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify authorization (JWT token)
     const authHeader = req.headers.get('Authorization');
