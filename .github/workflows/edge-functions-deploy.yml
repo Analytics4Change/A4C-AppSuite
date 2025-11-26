@@ -137,6 +137,23 @@ jobs:
 
           echo "✅ Linked to Supabase project: $SUPABASE_PROJECT_REF"
 
+      - name: Set GIT_COMMIT_SHA secret in Supabase
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          echo "Setting GIT_COMMIT_SHA secret in Supabase project..."
+
+          # Update or create the GIT_COMMIT_SHA secret via Supabase Management API
+          curl -X POST "https://api.supabase.com/v1/projects/${{ secrets.SUPABASE_PROJECT_REF }}/secrets" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "name": "GIT_COMMIT_SHA",
+              "value": "${{ github.sha }}"
+            }'
+
+          echo "✅ GIT_COMMIT_SHA secret set to ${{ github.sha }}"
+
       - name: Deploy Edge Functions
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -146,13 +163,8 @@ jobs:
           echo "Deploying Edge Functions to Supabase..."
           echo "Git Commit: ${{ github.sha }}"
 
-          # Create temporary .env file with git commit SHA for deployment
-          echo "GIT_COMMIT_SHA=${{ github.sha }}" > /tmp/edge-function.env
-
-          # Deploy all functions with environment variable
-          supabase functions deploy \
-            --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" \
-            --env-file /tmp/edge-function.env
+          # Deploy all functions (will pick up GIT_COMMIT_SHA from project secrets)
+          supabase functions deploy --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
 
           if [ $? -eq 0 ]; then
             echo "✅ All Edge Functions deployed successfully with version ${{ github.sha }}"
