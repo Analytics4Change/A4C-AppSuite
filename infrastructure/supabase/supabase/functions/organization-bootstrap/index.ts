@@ -10,6 +10,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// Deployment version tracking (injected by CI/CD)
+const DEPLOY_VERSION = Deno.env.get('GIT_COMMIT_SHA')?.substring(0, 8) || 'dev-local';
+
 // CORS headers for frontend requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -93,6 +96,8 @@ interface BootstrapResponse {
 }
 
 serve(async (req) => {
+  console.log(`[organization-bootstrap v${DEPLOY_VERSION}] Processing ${req.method} request`);
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -262,7 +267,11 @@ serve(async (req) => {
     if (eventError) {
       console.error('Failed to emit bootstrap event:', eventError);
       return new Response(
-        JSON.stringify({ error: 'Failed to initiate bootstrap', details: eventError.message }),
+        JSON.stringify({
+          error: 'Failed to initiate bootstrap',
+          details: eventError.message,
+          version: DEPLOY_VERSION
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

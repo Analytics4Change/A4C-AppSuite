@@ -10,6 +10,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// Deployment version tracking (injected by CI/CD)
+const DEPLOY_VERSION = Deno.env.get('GIT_COMMIT_SHA')?.substring(0, 8) || 'dev-local';
+
 // CORS headers for frontend requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,6 +38,8 @@ interface AcceptInvitationResponse {
 }
 
 serve(async (req) => {
+  console.log(`[accept-invitation v${DEPLOY_VERSION}] Processing ${req.method} request`);
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -209,7 +214,11 @@ serve(async (req) => {
   } catch (error) {
     console.error('Accept invitation edge function error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      JSON.stringify({
+        error: 'Internal server error',
+        details: error.message,
+        version: DEPLOY_VERSION
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

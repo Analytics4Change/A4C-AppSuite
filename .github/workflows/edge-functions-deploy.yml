@@ -144,12 +144,18 @@ jobs:
           cd infrastructure/supabase
 
           echo "Deploying Edge Functions to Supabase..."
+          echo "Git Commit: ${{ github.sha }}"
 
-          # Deploy all functions
-          supabase functions deploy --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+          # Create temporary .env file with git commit SHA for deployment
+          echo "GIT_COMMIT_SHA=${{ github.sha }}" > /tmp/edge-function.env
+
+          # Deploy all functions with environment variable
+          supabase functions deploy \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" \
+            --env-file /tmp/edge-function.env
 
           if [ $? -eq 0 ]; then
-            echo "✅ All Edge Functions deployed successfully"
+            echo "✅ All Edge Functions deployed successfully with version ${{ github.sha }}"
           else
             echo "❌ Edge Function deployment failed"
             exit 1
