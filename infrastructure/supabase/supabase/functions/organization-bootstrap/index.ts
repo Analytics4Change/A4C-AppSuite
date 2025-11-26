@@ -245,6 +245,7 @@ serve(async (req) => {
     // Event data matches AsyncAPI contract exactly
     // Uses api.emit_domain_event() wrapper to avoid PostgREST schema restrictions
     const { data: _eventId, error: eventError } = await supabaseAdmin
+      .schema('api')
       .rpc('emit_domain_event', {
         p_stream_id: organizationId,
         p_stream_type: 'organization',

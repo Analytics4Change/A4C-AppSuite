@@ -141,16 +141,12 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
+          cd infrastructure/supabase
+
           echo "Setting GIT_COMMIT_SHA secret in Supabase project..."
 
-          # Update or create the GIT_COMMIT_SHA secret via Supabase Management API
-          curl -X POST "https://api.supabase.com/v1/projects/${{ secrets.SUPABASE_PROJECT_REF }}/secrets" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "name": "GIT_COMMIT_SHA",
-              "value": "${{ github.sha }}"
-            }'
+          # Set secret using Supabase CLI (requires project to be linked first)
+          supabase secrets set GIT_COMMIT_SHA="${{ github.sha }}"
 
           echo "✅ GIT_COMMIT_SHA secret set to ${{ github.sha }}"
 

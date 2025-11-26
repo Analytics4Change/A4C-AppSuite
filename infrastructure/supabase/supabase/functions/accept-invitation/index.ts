@@ -167,6 +167,7 @@ serve(async (req) => {
     // Emit user.created event via API wrapper
     // Uses api.emit_domain_event() wrapper to avoid PostgREST schema restrictions
     const { data: _eventId, error: eventError } = await supabase
+      .schema('api')
       .rpc('emit_domain_event', {
         p_stream_id: userId,
         p_stream_type: 'user',
