@@ -2,12 +2,8 @@
  * Configuration Barrel Export
  *
  * Centralizes exports for cleaner imports throughout the application.
- * Usage: import { appConfig } from '@/config';
+ * Usage: import { getDeploymentConfig } from '@/config';
  */
-
-// Application Configuration
-export { appConfig } from './app.config';
-export type { DevProfile, AppConfig } from './app.config';
 
 // Authentication Configuration
 export { getDevAuthConfig, DEV_USER_PROFILES } from './dev-auth.config';

@@ -91,7 +91,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
       if (workflowId) {
         log.info('Organization workflow started', { workflowId });
         // Navigate to status page
-        navigate(`/organizations/status/${workflowId}`);
+        navigate(`/organizations/bootstrap/${workflowId}`);
       } else {
         // Submission failed - error is already displayed in submissionError
         log.warn('Organization submission returned null - staying on form');

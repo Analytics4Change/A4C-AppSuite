@@ -1,8 +1,8 @@
 /**
  * Invitation Service Factory
  *
- * Factory pattern for creating invitation service instances based on application configuration.
- * Reads appConfig.userCreation.useMock to determine which implementation to instantiate.
+ * Factory pattern for creating invitation service instances based on deployment configuration.
+ * Uses VITE_APP_MODE to determine which implementation to instantiate.
  *
  * Usage:
  * ```typescript
@@ -16,14 +16,13 @@
  * }
  * ```
  *
- * Configuration Profiles:
- * - full-mock: Uses MockInvitationService (localStorage simulation)
- * - mock-auth-real-api: Uses SupabaseInvitationService (real user creation)
- * - integration: Uses SupabaseInvitationService
- * - production: Uses SupabaseInvitationService
+ * Deployment Modes (via VITE_APP_MODE):
+ * - mock: Uses MockInvitationService (localStorage simulation)
+ * - integration-auth: Uses SupabaseInvitationService (real user creation, mock auth)
+ * - production: Uses SupabaseInvitationService (real user creation, real auth)
  */
 
-import { appConfig } from '@/config/app.config';
+import { getDeploymentConfig, getAppMode } from '@/config/deployment.config';
 import type { IInvitationService } from './IInvitationService';
 import { MockInvitationService } from './MockInvitationService';
 import { SupabaseInvitationService } from './SupabaseInvitationService';
@@ -41,15 +40,19 @@ export class InvitationServiceFactory {
   private static supabaseInstance: SupabaseInvitationService | null = null;
 
   /**
-   * Create invitation service based on application configuration
+   * Create invitation service based on deployment configuration
    *
    * Returns singleton instances to ensure consistent state across the application.
    *
    * @returns IInvitationService implementation (Mock or Supabase)
    */
   static create(): IInvitationService {
-    if (appConfig.userCreation.useMock) {
-      log.info('Using MockInvitationService (development mode)');
+    const config = getDeploymentConfig();
+
+    if (config.useMockInvitation) {
+      log.info('[InvitationServiceFactory] Using MockInvitationService', {
+        mode: getAppMode()
+      });
 
       if (!this.mockInstance) {
         this.mockInstance = new MockInvitationService();
@@ -58,7 +61,9 @@ export class InvitationServiceFactory {
       return this.mockInstance;
     }
 
-    log.info('Using SupabaseInvitationService (production mode)');
+    log.info('[InvitationServiceFactory] Using SupabaseInvitationService', {
+      mode: getAppMode()
+    });
 
     if (!this.supabaseInstance) {
       this.supabaseInstance = new SupabaseInvitationService();
@@ -77,16 +82,16 @@ export class InvitationServiceFactory {
   }
 
   /**
-   * Get current configuration profile
+   * Get current deployment mode
    */
-  static getCurrentProfile(): string {
-    return appConfig.profile;
+  static getCurrentMode(): string {
+    return getAppMode();
   }
 
   /**
    * Check if using mock implementation
    */
   static isMock(): boolean {
-    return appConfig.userCreation.useMock;
+    return getDeploymentConfig().useMockInvitation;
   }
 }

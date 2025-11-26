@@ -1,8 +1,8 @@
 /**
  * Workflow Client Factory
  *
- * Factory pattern for creating workflow client instances based on application configuration.
- * Reads appConfig.workflow.useMock to determine which implementation to instantiate.
+ * Factory pattern for creating workflow client instances based on deployment configuration.
+ * Uses VITE_APP_MODE to determine which implementation to instantiate.
  *
  * Usage:
  * ```typescript
@@ -16,14 +16,13 @@
  * }
  * ```
  *
- * Configuration Profiles:
- * - full-mock: Uses MockWorkflowClient (localStorage simulation)
- * - mock-auth-real-api: Uses TemporalWorkflowClient (real workflows)
- * - integration: Uses TemporalWorkflowClient
- * - production: Uses TemporalWorkflowClient
+ * Deployment Modes (via VITE_APP_MODE):
+ * - mock: Uses MockWorkflowClient (localStorage simulation)
+ * - integration-auth: Uses TemporalWorkflowClient (real workflows, mock auth)
+ * - production: Uses TemporalWorkflowClient (real workflows, real auth)
  */
 
-import { appConfig } from '@/config/app.config';
+import { getDeploymentConfig, getAppMode } from '@/config/deployment.config';
 import type { IWorkflowClient } from './IWorkflowClient';
 import { MockWorkflowClient } from './MockWorkflowClient';
 import { TemporalWorkflowClient } from './TemporalWorkflowClient';
@@ -41,15 +40,19 @@ export class WorkflowClientFactory {
   private static temporalInstance: TemporalWorkflowClient | null = null;
 
   /**
-   * Create workflow client based on application configuration
+   * Create workflow client based on deployment configuration
    *
    * Returns singleton instances to ensure consistent state across the application.
    *
    * @returns IWorkflowClient implementation (Mock or Temporal)
    */
   static create(): IWorkflowClient {
-    if (appConfig.workflow.useMock) {
-      log.info('Using MockWorkflowClient (development mode)');
+    const config = getDeploymentConfig();
+
+    if (config.useMockWorkflow) {
+      log.info('[WorkflowClientFactory] Using MockWorkflowClient', {
+        mode: getAppMode()
+      });
 
       if (!this.mockInstance) {
         this.mockInstance = new MockWorkflowClient();
@@ -58,7 +61,9 @@ export class WorkflowClientFactory {
       return this.mockInstance;
     }
 
-    log.info('Using TemporalWorkflowClient (production mode)');
+    log.info('[WorkflowClientFactory] Using TemporalWorkflowClient', {
+      mode: getAppMode()
+    });
 
     if (!this.temporalInstance) {
       this.temporalInstance = new TemporalWorkflowClient();
@@ -77,16 +82,16 @@ export class WorkflowClientFactory {
   }
 
   /**
-   * Get current configuration profile
+   * Get current deployment mode
    */
-  static getCurrentProfile(): string {
-    return appConfig.profile;
+  static getCurrentMode(): string {
+    return getAppMode();
   }
 
   /**
    * Check if using mock implementation
    */
   static isMock(): boolean {
-    return appConfig.workflow.useMock;
+    return getDeploymentConfig().useMockWorkflow;
   }
 }

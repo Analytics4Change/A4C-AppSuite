@@ -2,10 +2,11 @@
  * Deployment Mode Configuration
  *
  * Centralized mapping from deployment mode to service implementations.
- * Eliminates functional dependency between auth provider and organization service.
+ * Single source of truth for all mock vs production decisions.
  *
  * Valid Modes:
  * - mock: All services mocked (fast local dev, offline capable)
+ * - integration-auth: Mock auth but real workflows/invitations (for workflow testing)
  * - production: All services real (integration testing, production)
  *
  * Invalid Combinations Prevented:
@@ -13,21 +14,33 @@
  * - Real auth + Mock organization service (Data inconsistency)
  */
 
-export type AppMode = 'mock' | 'production';
+export type AppMode = 'mock' | 'integration-auth' | 'production';
 
 export interface DeploymentConfig {
   authProvider: 'mock' | 'supabase';
   useMockOrganization: boolean;
+  useMockWorkflow: boolean;
+  useMockInvitation: boolean;
 }
 
 const DEPLOYMENT_CONFIGS: Record<AppMode, DeploymentConfig> = {
   mock: {
     authProvider: 'mock',
     useMockOrganization: true,
+    useMockWorkflow: true,
+    useMockInvitation: true,
+  },
+  'integration-auth': {
+    authProvider: 'mock',
+    useMockOrganization: true,
+    useMockWorkflow: false,
+    useMockInvitation: false,
   },
   production: {
     authProvider: 'supabase',
     useMockOrganization: false,
+    useMockWorkflow: false,
+    useMockInvitation: false,
   }
 };
 
@@ -46,7 +59,7 @@ export function getDeploymentConfig(): DeploymentConfig {
 
   if (!config) {
     throw new Error(
-      `Invalid VITE_APP_MODE: "${mode}". Must be 'mock' or 'production'.`
+      `Invalid VITE_APP_MODE: "${mode}". Must be 'mock', 'integration-auth', or 'production'.`
     );
   }
 
