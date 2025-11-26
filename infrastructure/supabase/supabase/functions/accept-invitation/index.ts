@@ -159,32 +159,33 @@ serve(async (req) => {
       console.error('Failed to mark invitation as accepted:', updateError);
     }
 
-    // Emit user.created event
-    const { error: eventError } = await supabase
-      .from('domain_events')
-      .insert({
-        stream_id: userId,
-        stream_type: 'user',
-        stream_version: 1,
-        event_type: 'user.created',
-        event_data: {
+    // Emit user.created event via API wrapper
+    // Uses api.emit_domain_event() wrapper to avoid PostgREST schema restrictions
+    const { data: eventId, error: eventError } = await supabase
+      .rpc('emit_domain_event', {
+        p_stream_id: userId,
+        p_stream_type: 'user',
+        p_stream_version: 1,
+        p_event_type: 'user.created',
+        p_event_data: {
           user_id: userId,
           email: invitation.email,
           organization_id: invitation.organization_id,
           invited_via: 'organization_bootstrap',
           auth_method: requestData.method,
         },
-        event_metadata: {
+        p_event_metadata: {
           user_id: userId,
           organization_id: invitation.organization_id,
           invitation_token: requestData.token,
           automated: true,
-        },
-        created_at: new Date().toISOString(),
+        }
       });
 
     if (eventError) {
       console.error('Failed to emit user.created event:', eventError);
+      // Note: This function continues even if event emission fails
+      // Consider returning error response for consistency with organization-bootstrap
     }
 
     // Build response

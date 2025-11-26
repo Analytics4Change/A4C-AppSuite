@@ -236,28 +236,27 @@ serve(async (req) => {
     // Create service role client for database operations (bypasses RLS)
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Emit organization.bootstrap.initiated event
+    // Emit organization.bootstrap.initiated event via API wrapper
     // Event data matches AsyncAPI contract exactly
-    const { error: eventError } = await supabaseAdmin
-      .from('domain_events')
-      .insert({
-        stream_id: organizationId,
-        stream_type: 'organization',
-        stream_version: 1,
-        event_type: 'organization.bootstrap.initiated',
-        event_data: {
+    // Uses api.emit_domain_event() wrapper to avoid PostgREST schema restrictions
+    const { data: eventId, error: eventError } = await supabaseAdmin
+      .rpc('emit_domain_event', {
+        p_stream_id: organizationId,
+        p_stream_type: 'organization',
+        p_stream_version: 1,
+        p_event_type: 'organization.bootstrap.initiated',
+        p_event_data: {
           bootstrap_id: workflowId,
           subdomain: requestData.subdomain,
           orgData: requestData.orgData,
           users: requestData.users,
         },
-        event_metadata: {
+        p_event_metadata: {
           user_id: user.id,
           organization_id: organizationId,
           initiated_by: user.email,
           initiated_via: 'edge_function',
-        },
-        created_at: new Date().toISOString(),
+        }
       });
 
     if (eventError) {
