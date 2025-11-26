@@ -64,42 +64,18 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
     try {
       log.debug('Fetching organizations with filters', { filters });
 
-      // Start query with all columns
-      let query = supabase
-        .from(this.TABLE_NAME)
-        .select('*');
-
-      // Apply filters if provided
-      if (filters) {
-        // Filter by organization type
-        if (filters.type && filters.type !== 'all') {
-          query = query.eq('type', filters.type);
-        }
-
-        // Filter by active/inactive status
-        if (filters.status && filters.status !== 'all') {
-          query = query.eq('is_active', filters.status === 'active');
-        }
-
-        // Filter by partner type (only applies to provider_partner orgs)
-        if (filters.partnerType) {
-          query = query.eq('partner_type', filters.partnerType);
-        }
-
-        // Search by name or subdomain
-        if (filters.searchTerm) {
-          // Use Supabase text search operators
-          // ilike = case-insensitive LIKE
-          query = query.or(
-            `name.ilike.%${filters.searchTerm}%,subdomain.ilike.%${filters.searchTerm}%`
-          );
-        }
-      }
-
-      // Sort alphabetically by name
-      query = query.order('name', { ascending: true });
-
-      const { data, error } = await query;
+      // Use API schema RPC function instead of direct table query
+      // This matches the established pattern for Temporal workflow activities
+      const { data, error } = await supabase
+        .schema('api')
+        .rpc('get_organizations', {
+          p_type: filters?.type && filters.type !== 'all' ? filters.type : null,
+          p_is_active: filters?.status && filters.status !== 'all'
+            ? filters.status === 'active'
+            : null,
+          p_partner_type: filters?.partnerType || null,
+          p_search_term: filters?.searchTerm || null,
+        });
 
       if (error) {
         log.error('Failed to fetch organizations', { error, filters });
@@ -123,30 +99,26 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
     try {
       log.debug('Fetching organization by ID', { orgId });
 
+      // Use API schema RPC function instead of direct table query
       const { data, error } = await supabase
-        .from(this.TABLE_NAME)
-        .select('*')
-        .eq('id', orgId)
-        .single();
+        .schema('api')
+        .rpc('get_organization_by_id', {
+          p_org_id: orgId,
+        });
 
       if (error) {
-        // Not found is expected for unauthorized access or missing org
-        if (error.code === 'PGRST116') {
-          log.debug('Organization not found or access denied', { orgId });
-          return null;
-        }
-
         log.error('Failed to fetch organization by ID', { error, orgId });
         throw new Error(`Failed to fetch organization: ${error.message}`);
       }
 
-      if (!data) {
-        log.debug('Organization not found', { orgId });
+      // RPC returns array, even with LIMIT 1
+      if (!data || data.length === 0) {
+        log.debug('Organization not found or access denied', { orgId });
         return null;
       }
 
-      log.info('Fetched organization by ID', { orgId, name: data.name });
-      return this.mapRowToOrganization(data);
+      log.info('Fetched organization by ID', { orgId, name: data[0].name });
+      return this.mapRowToOrganization(data[0]);
     } catch (error) {
       log.error('Error in getOrganizationById', { error, orgId });
       throw error;
@@ -157,11 +129,12 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
     try {
       log.debug('Fetching child organizations', { parentOrgId });
 
+      // Use API schema RPC function instead of direct table query
       const { data, error } = await supabase
-        .from(this.TABLE_NAME)
-        .select('*')
-        .eq('parent_org_id', parentOrgId)
-        .order('name', { ascending: true });
+        .schema('api')
+        .rpc('get_child_organizations', {
+          p_parent_org_id: parentOrgId,
+        });
 
       if (error) {
         log.error('Failed to fetch child organizations', { error, parentOrgId });
