@@ -133,7 +133,6 @@ serve(async (req) => {
     }
 
     // Create client with user's JWT for auth validation
-    const userToken = authHeader.replace('Bearer ', '');
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: {
