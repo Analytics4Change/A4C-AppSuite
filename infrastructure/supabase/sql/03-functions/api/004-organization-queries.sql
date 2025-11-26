@@ -4,6 +4,9 @@
 --
 -- Matches frontend service: frontend/src/services/organization/SupabaseOrganizationQueryService.ts
 -- Frontend calls: .schema('api').rpc('get_organizations', params)
+--
+-- IMPORTANT: Return columns MUST match actual database schema in:
+-- infrastructure/supabase/sql/02-tables/organizations/001-organizations_projection.sql
 
 -- 1. Get organizations with optional filters
 -- Maps to: SupabaseOrganizationQueryService.getOrganizations()
@@ -11,22 +14,18 @@
 CREATE OR REPLACE FUNCTION api.get_organizations(
   p_type TEXT DEFAULT NULL,
   p_is_active BOOLEAN DEFAULT NULL,
-  p_partner_type TEXT DEFAULT NULL,
   p_search_term TEXT DEFAULT NULL
 )
 RETURNS TABLE (
   id UUID,
   name TEXT,
   display_name TEXT,
+  slug TEXT,
   type TEXT,
-  domain TEXT,
-  subdomain TEXT,
-  time_zone TEXT,
-  is_active BOOLEAN,
-  parent_org_id UUID,
   path TEXT,
-  partner_type TEXT,
-  referring_partner_id UUID,
+  parent_path TEXT,
+  timezone TEXT,
+  is_active BOOLEAN,
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 )
@@ -40,15 +39,12 @@ BEGIN
     o.id,
     o.name,
     o.display_name,
+    o.slug,
     o.type::TEXT,
-    o.domain,
-    o.subdomain,
-    o.time_zone,
-    o.is_active,
-    o.parent_org_id,
     o.path::TEXT,
-    o.partner_type::TEXT,
-    o.referring_partner_id,
+    o.parent_path::TEXT,
+    o.timezone,
+    o.is_active,
     o.created_at,
     o.updated_at
   FROM organizations_projection o
@@ -57,13 +53,11 @@ BEGIN
     (p_type IS NULL OR p_type = 'all' OR o.type::TEXT = p_type)
     -- Filter by active status (if provided and not 'all')
     AND (p_is_active IS NULL OR o.is_active = p_is_active)
-    -- Filter by partner type (if provided)
-    AND (p_partner_type IS NULL OR o.partner_type::TEXT = p_partner_type)
-    -- Search by name or subdomain (if provided)
+    -- Search by name or slug (if provided)
     AND (
       p_search_term IS NULL
       OR o.name ILIKE '%' || p_search_term || '%'
-      OR o.subdomain ILIKE '%' || p_search_term || '%'
+      OR o.slug ILIKE '%' || p_search_term || '%'
     )
   ORDER BY o.name ASC;
 END;
@@ -80,15 +74,12 @@ RETURNS TABLE (
   id UUID,
   name TEXT,
   display_name TEXT,
+  slug TEXT,
   type TEXT,
-  domain TEXT,
-  subdomain TEXT,
-  time_zone TEXT,
-  is_active BOOLEAN,
-  parent_org_id UUID,
   path TEXT,
-  partner_type TEXT,
-  referring_partner_id UUID,
+  parent_path TEXT,
+  timezone TEXT,
+  is_active BOOLEAN,
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 )
@@ -102,15 +93,12 @@ BEGIN
     o.id,
     o.name,
     o.display_name,
+    o.slug,
     o.type::TEXT,
-    o.domain,
-    o.subdomain,
-    o.time_zone,
-    o.is_active,
-    o.parent_org_id,
     o.path::TEXT,
-    o.partner_type::TEXT,
-    o.referring_partner_id,
+    o.parent_path::TEXT,
+    o.timezone,
+    o.is_active,
     o.created_at,
     o.updated_at
   FROM organizations_projection o
@@ -130,15 +118,12 @@ RETURNS TABLE (
   id UUID,
   name TEXT,
   display_name TEXT,
+  slug TEXT,
   type TEXT,
-  domain TEXT,
-  subdomain TEXT,
-  time_zone TEXT,
-  is_active BOOLEAN,
-  parent_org_id UUID,
   path TEXT,
-  partner_type TEXT,
-  referring_partner_id UUID,
+  parent_path TEXT,
+  timezone TEXT,
+  is_active BOOLEAN,
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 )
@@ -146,25 +131,35 @@ SECURITY DEFINER
 SET search_path = public, extensions, pg_temp
 LANGUAGE plpgsql
 AS $$
+DECLARE
+  v_parent_path LTREE;
 BEGIN
+  -- Get parent's path first
+  SELECT path INTO v_parent_path
+  FROM organizations_projection
+  WHERE id = p_parent_org_id;
+
+  -- If parent not found, return empty
+  IF v_parent_path IS NULL THEN
+    RETURN;
+  END IF;
+
+  -- Find all children using ltree path matching
   RETURN QUERY
   SELECT
     o.id,
     o.name,
     o.display_name,
+    o.slug,
     o.type::TEXT,
-    o.domain,
-    o.subdomain,
-    o.time_zone,
-    o.is_active,
-    o.parent_org_id,
     o.path::TEXT,
-    o.partner_type::TEXT,
-    o.referring_partner_id,
+    o.parent_path::TEXT,
+    o.timezone,
+    o.is_active,
     o.created_at,
     o.updated_at
   FROM organizations_projection o
-  WHERE o.parent_org_id = p_parent_org_id
+  WHERE o.parent_path = v_parent_path
   ORDER BY o.name ASC;
 END;
 $$;
@@ -173,6 +168,6 @@ $$;
 GRANT EXECUTE ON FUNCTION api.get_child_organizations TO authenticated, service_role;
 
 -- Comment for documentation
-COMMENT ON FUNCTION api.get_organizations IS 'Frontend RPC: Query organizations with optional filters (type, status, partner_type, search)';
-COMMENT ON FUNCTION api.get_organization_by_id IS 'Frontend RPC: Get single organization by UUID';
-COMMENT ON FUNCTION api.get_child_organizations IS 'Frontend RPC: Get child organizations by parent org UUID';
+COMMENT ON FUNCTION api.get_organizations IS 'Frontend RPC: Query organizations with optional filters (type, status, search). Returns actual database columns only.';
+COMMENT ON FUNCTION api.get_organization_by_id IS 'Frontend RPC: Get single organization by UUID. Returns actual database columns only.';
+COMMENT ON FUNCTION api.get_child_organizations IS 'Frontend RPC: Get child organizations by parent org UUID using ltree hierarchy.';

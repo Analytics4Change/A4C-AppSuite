@@ -16,28 +16,25 @@ import type { IOrganizationQueryService } from './IOrganizationQueryService';
 const log = Logger.getLogger('api');
 
 /**
- * Database row type for organizations_projection table
+ * Database row type for organizations_projection table RPC results
+ * MUST match: infrastructure/supabase/sql/02-tables/organizations/001-organizations_projection.sql
+ * MUST match: infrastructure/supabase/sql/03-functions/api/004-organization-queries.sql
  */
 interface OrganizationRow {
   id: string;
   name: string;
   display_name: string;
+  slug: string;
   type: 'platform_owner' | 'provider' | 'provider_partner';
-  domain: string;
-  subdomain: string;
-  time_zone: string;
+  path: string; // ltree path
+  parent_path: string | null; // ltree parent path
+  timezone: string;
   is_active: boolean;
-  parent_org_id: string | null;
-  path: string;
-  partner_type: 'var' | 'family' | 'court' | 'other' | null;
-  referring_partner_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export class SupabaseOrganizationQueryService implements IOrganizationQueryService {
-  private readonly TABLE_NAME = 'organizations_projection';
-
   /**
    * Converts database row to Organization type
    */
@@ -47,14 +44,15 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
       name: row.name,
       display_name: row.display_name,
       type: row.type,
-      domain: row.domain,
-      subdomain: row.subdomain,
-      time_zone: row.time_zone,
+      // Map database columns to frontend expectations
+      domain: '', // Not in database - frontend will need to derive or remove
+      subdomain: row.slug, // Use slug as subdomain
+      time_zone: row.timezone,
       is_active: row.is_active,
-      parent_org_id: row.parent_org_id ?? undefined,
+      parent_org_id: undefined, // Not directly available - would need to derive from parent_path
       path: row.path,
-      partner_type: row.partner_type ?? undefined,
-      referring_partner_id: row.referring_partner_id ?? undefined,
+      partner_type: undefined, // Not in database - frontend will need to store elsewhere
+      referring_partner_id: undefined, // Not in database - frontend will need to store elsewhere
       created_at: new Date(row.created_at),
       updated_at: new Date(row.updated_at),
     };
@@ -73,7 +71,6 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
           p_is_active: filters?.status && filters.status !== 'all'
             ? filters.status === 'active'
             : null,
-          p_partner_type: filters?.partnerType || null,
           p_search_term: filters?.searchTerm || null,
         });
 
