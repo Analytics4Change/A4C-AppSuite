@@ -101,11 +101,13 @@ serve(async (req) => {
   // Validate required environment variables
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
-  if (!supabaseUrl || !supabaseServiceKey) {
+  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
     console.error('[organization-bootstrap] Missing required environment variables:', {
       has_supabase_url: !!supabaseUrl,
-      has_service_role_key: !!supabaseServiceKey
+      has_service_role_key: !!supabaseServiceKey,
+      has_anon_key: !!supabaseAnonKey
     });
     return new Response(
       JSON.stringify({
@@ -119,9 +121,6 @@ serve(async (req) => {
     );
   }
 
-  // Initialize Supabase client outside try block for proper scope
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
   try {
 
     // Verify authorization (JWT token)
@@ -133,9 +132,17 @@ serve(async (req) => {
       );
     }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
+    // Create client with user's JWT for auth validation
+    const userToken = authHeader.replace('Bearer ', '');
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: authHeader
+        }
+      }
+    });
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
 
     if (authError || !user) {
       return new Response(
@@ -194,9 +201,12 @@ serve(async (req) => {
     const workflowId = crypto.randomUUID();
     const organizationId = crypto.randomUUID();
 
+    // Create service role client for database operations (bypasses RLS)
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
     // Emit organization.bootstrap.initiated event
     // Event data matches AsyncAPI contract exactly
-    const { error: eventError } = await supabase
+    const { error: eventError } = await supabaseAdmin
       .from('domain_events')
       .insert({
         stream_id: organizationId,
