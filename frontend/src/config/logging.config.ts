@@ -72,18 +72,36 @@ export function getLoggingConfig(): LogConfig {
   // Check for environment variable overrides
   const envLogLevel = import.meta.env.VITE_LOG_LEVEL;
   const envLogCategories = import.meta.env.VITE_LOG_CATEGORIES;
-  
+  const debugLogsEnabled = import.meta.env.VITE_DEBUG_LOGS === 'true';
+
   // Determine base configuration
   let config: LogConfig;
-  
+
   if (import.meta.env.MODE === 'test') {
     config = testConfig;
-  } else if (import.meta.env.PROD) {
+  } else if (import.meta.env.PROD && !debugLogsEnabled) {
+    // Production mode: disabled by default unless VITE_DEBUG_LOGS=true
     config = productionConfig;
+  } else if (import.meta.env.PROD && debugLogsEnabled) {
+    // Production mode with debug logging enabled
+    config = {
+      enabled: true,
+      level: 'info',
+      categories: {
+        'main': 'info',
+        'viewmodel': 'info',
+        'api': 'info',
+        'validation': 'warn',
+        'default': 'info'
+      },
+      output: 'console',
+      includeTimestamp: true,
+      includeLocation: false
+    };
   } else {
     config = developmentConfig;
   }
-  
+
   // Apply environment variable overrides in development
   if (import.meta.env.DEV) {
     if (envLogLevel) {
@@ -92,7 +110,7 @@ export function getLoggingConfig(): LogConfig {
         level: envLogLevel as any
       };
     }
-    
+
     if (envLogCategories) {
       // Parse comma-separated categories
       const categories = envLogCategories.split(',').reduce((acc: any, cat: string) => {
@@ -100,7 +118,7 @@ export function getLoggingConfig(): LogConfig {
         acc[name] = level || 'debug';
         return acc;
       }, {});
-      
+
       config = {
         ...config,
         categories: {
@@ -110,7 +128,7 @@ export function getLoggingConfig(): LogConfig {
       };
     }
   }
-  
+
   return config;
 }
 

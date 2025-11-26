@@ -492,6 +492,21 @@ export class OrganizationFormViewModel {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to submit organization';
 
+      // CRITICAL: Force error visibility in production (logger disabled)
+      // This helps diagnose why Edge Function calls are failing
+      if (typeof window !== 'undefined') {
+        console.error('[CRITICAL] Organization bootstrap failed:', error);
+        console.error('[CRITICAL] Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+
+        // Temporary: Show alert for immediate visibility
+        alert(
+          `⚠️ Organization Bootstrap Failed\n\n` +
+          `Error: ${errorMessage}\n\n` +
+          `This error has been logged to the browser console.\n` +
+          `Please check the Network tab for the Edge Function call.`
+        );
+      }
+
       runInAction(() => {
         this.isSubmitting = false;
         this.submissionError = errorMessage;
@@ -501,6 +516,15 @@ export class OrganizationFormViewModel {
 
       return null;
     }
+  }
+
+  /**
+   * Clear submission error
+   */
+  clearSubmissionError() {
+    runInAction(() => {
+      this.submissionError = null;
+    });
   }
 
   /**
