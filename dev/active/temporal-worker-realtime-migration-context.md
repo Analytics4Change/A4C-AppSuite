@@ -85,9 +85,29 @@ Replace PostgreSQL `pg` LISTEN with Supabase Realtime subscriptions.
     - **Applies to**: `emit_domain_event`, `emit_workflow_started_event`, all api schema RPCs
     - **Does NOT apply to**: Table operations (`.from('table')` uses public schema by default)
 
+12. **Docker Build Cache Must Invalidate Per Commit**: Use commit SHA in cache scope to prevent stale image caching - 2025-11-29
+    - **Problem**: GitHub Actions cache reused layers from previous builds even when source code changed
+    - **Solution**: `cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-${{ github.sha }}`
+    - **Benefit**: Each commit gets unique cache key, forcing rebuild of changed layers
+    - **Impact**: Prevents deploying stale code while maintaining fast builds via layer caching
+
+13. **Kubernetes Deployment Requires Unique Image Tags**: Using `:latest` tag prevents pod restarts when image changes - 2025-11-29
+    - **Problem**: `kubectl set image` with same tag (`:latest`) doesn't trigger pod restart
+    - **Root Cause**: Kubernetes sees no tag change, doesn't pull new image, pod runs old code
+    - **Solution**: Deploy using commit SHA tag (`:f89c848`) instead of `:latest`
+    - **Implementation**: `IMAGE_TAG=$(echo "$tags" | grep -v latest | head -n1)`
+    - **Benefit**: Each commit gets unique tag, forcing automatic pod restart with new image
+
+14. **Apply Same Tagging Strategy to All Deployments**: Frontend and all services should use identical Docker tagging and deployment patterns - 2025-11-29
+    - **Consistency**: Frontend now uses same commit SHA tagging as Temporal worker
+    - **Pattern**: Short SHA tag (`:12b1168`), semver tags (`:1.0.0`, `:1.0`, `:1`), `:latest`
+    - **Deployment**: `kubectl set image` with SHA tag, no manual `rollout restart` needed
+    - **Cache**: Branch + commit SHA scoping prevents stale builds
+    - **Benefit**: Unified deployment strategy across all services, better traceability
+
 ## Scope of Changes
 
-**Files modified** (Phase 2 & 3 - COMPLETE):
+**Files modified** (Phases 2, 3 & 4 - COMPLETE):
 - ✅ `workflows/src/worker/event-listener.ts` - Complete rewrite for strict CQRS (509 lines, major refactor)
   - Changed subscription from `domain_events` to `workflow_queue_projection`
   - Changed filter from `event_type=eq.organization.bootstrap.initiated` to `status=eq.pending`
@@ -96,6 +116,13 @@ Replace PostgreSQL `pg` LISTEN with Supabase Realtime subscriptions.
 - ✅ `workflows/src/worker/index.ts` - Updated logging messages (5 lines changed)
 - ✅ `workflows/package.json` - Removed `pg` and `@types/pg` dependencies (2 dependencies removed, 15 packages total)
 - ✅ `workflows/package-lock.json` - Updated lockfile (161 lines removed)
+- ✅ `.github/workflows/temporal-deploy.yml` - Fixed Docker cache invalidation and deployment tagging (Phase 4)
+  - Line 77-78: Added commit SHA to cache scope for proper invalidation
+  - Line 173: Use commit SHA tag instead of `:latest` for deployments
+- ✅ `.github/workflows/frontend-deploy.yml` - Applied same fixes to frontend deployment (2025-11-29, commit 12b1168e)
+  - Lines 102-109: Updated Docker metadata tags (commit SHA + semver patterns)
+  - Lines 116-117: Added commit SHA to cache scope
+  - Lines 200-208: Changed to `kubectl set image` with SHA tag, removed manual restart
 
 **Files created** (Phase 3 - Strict CQRS):
 - ✅ `infrastructure/supabase/sql/02-tables/workflow_queue_projection/table.sql` - CQRS read model (workflow queue)
