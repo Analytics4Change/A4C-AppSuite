@@ -65,9 +65,8 @@ serve(async (req) => {
       );
     }
 
-    // Get workflow ID from URL params
-    const url = new URL(req.url);
-    const workflowId = url.searchParams.get('workflowId');
+    // Get workflow ID from request body
+    const { workflowId } = await req.json();
 
     if (!workflowId) {
       return new Response(

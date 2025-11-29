@@ -166,6 +166,11 @@ export async function sendInvitationEmails(
   let successCount = 0;
   const failures: Array<{ email: string; error: string }> = [];
 
+  // Extract parent domain for email sender (e.g., firstovertheline.com from poc-test1.firstovertheline.com)
+  // This ensures we send from the verified domain, not the subdomain
+  const domainParts = params.domain.split('.');
+  const parentDomain = domainParts.slice(-2).join('.');
+
   // Send emails
   for (const invitation of params.invitations) {
     try {
@@ -175,7 +180,7 @@ export async function sendInvitationEmails(
       const text = buildInvitationEmailText(invitation, orgName, params.frontendUrl);
 
       await emailProvider.sendEmail({
-        from: `Analytics4Change <noreply@${params.domain}>`,
+        from: `Analytics4Change <noreply@${parentDomain}>`,
         to: invitation.email,
         subject: `Invitation to join ${orgName}`,
         html,

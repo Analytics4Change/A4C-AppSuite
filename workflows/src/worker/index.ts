@@ -113,8 +113,9 @@ async function run() {
   // Start event listener for database-triggered workflows
   console.log('Starting event listener...');
   console.log(`  Method: Supabase Realtime`);
-  console.log(`  Channel: workflow_events`);
-  console.log(`  Table: domain_events`);
+  console.log(`  Channel: workflow_queue`);
+  console.log(`  Table: workflow_queue_projection`);
+  console.log(`  Filter: status=eq.pending`);
   console.log('');
 
   try {
