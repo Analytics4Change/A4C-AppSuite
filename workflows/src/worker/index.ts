@@ -112,8 +112,9 @@ async function run() {
 
   // Start event listener for database-triggered workflows
   console.log('Starting event listener...');
-  console.log(`  PostgreSQL Channel: workflow_events`);
-  console.log(`  Database URL: ${process.env.SUPABASE_DB_URL ? process.env.SUPABASE_DB_URL.substring(0, 30) + '...' : '(not set)'}`);
+  console.log(`  Method: Supabase Realtime`);
+  console.log(`  Channel: workflow_events`);
+  console.log(`  Table: domain_events`);
   console.log('');
 
   try {

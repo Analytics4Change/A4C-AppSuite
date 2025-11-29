@@ -7,9 +7,17 @@ info:
 
     Event Flow:
     1. organization.bootstrap.initiated - Edge Function receives bootstrap request
-    2. organization.bootstrap.workflow_started - Event listener starts Temporal workflow
-    3. organization.created - Workflow activity creates organization
-    4. organization.bootstrap.completed - Workflow completes successfully
+    2. workflow.queue.pending - Event trigger adds job to workflow queue projection
+    3. workflow.queue.claimed - Worker claims job from queue
+    4. organization.bootstrap.workflow_started - Workflow execution starts in Temporal
+    5. organization.created - Workflow activity creates organization
+    6. workflow.queue.completed - Workflow completes successfully
+    7. organization.bootstrap.completed - Bootstrap process complete
+
+    CQRS Architecture:
+    - domain_events table is the write model (event store)
+    - workflow_queue_projection is the read model (queue for workers)
+    - All workflow queue updates happen via events + triggers (strict CQRS)
 
     See: documentation/infrastructure/reference/events/
 
@@ -30,6 +38,42 @@ channels:
     publish:
       message:
         $ref: '#/components/messages/OrganizationBootstrapWorkflowStarted'
+
+  workflow.queue.pending:
+    description: |
+      Emitted by database trigger when organization.bootstrap.initiated event is processed.
+      Creates a new job in workflow_queue_projection with status='pending'.
+      Worker subscribes to this projection via Supabase Realtime to detect new jobs.
+    publish:
+      message:
+        $ref: '#/components/messages/WorkflowQueuePending'
+
+  workflow.queue.claimed:
+    description: |
+      Emitted by worker when it claims a pending job from the queue.
+      Updates workflow_queue_projection status to 'processing'.
+      Prevents other workers from claiming the same job (distributed locking).
+    publish:
+      message:
+        $ref: '#/components/messages/WorkflowQueueClaimed'
+
+  workflow.queue.completed:
+    description: |
+      Emitted by worker when workflow execution completes successfully.
+      Updates workflow_queue_projection status to 'completed'.
+      Includes final workflow result for audit trail.
+    publish:
+      message:
+        $ref: '#/components/messages/WorkflowQueueCompleted'
+
+  workflow.queue.failed:
+    description: |
+      Emitted by worker when workflow execution fails permanently.
+      Updates workflow_queue_projection status to 'failed'.
+      Includes error details for troubleshooting and retry logic.
+    publish:
+      message:
+        $ref: '#/components/messages/WorkflowQueueFailed'
 
 components:
   messages:
@@ -258,3 +302,140 @@ components:
             type: string
             description: Temporal workflow type name
             example: "organizationBootstrapWorkflow"
+
+    WorkflowQueuePending:
+      name: WorkflowQueuePending
+      title: Workflow Queue Job Pending
+      summary: New workflow job enqueued and awaiting worker claim
+      contentType: application/json
+      payload:
+        type: object
+        required:
+          - queue_id
+          - event_id
+          - event_type
+          - stream_id
+          - stream_type
+        properties:
+          queue_id:
+            type: string
+            format: uuid
+            description: Unique ID for this queue entry (primary key of workflow_queue_projection)
+            example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+          event_id:
+            type: string
+            format: uuid
+            description: ID of the triggering domain event (organization.bootstrap.initiated)
+            example: "b8309521-a46f-4d71-becb-1f138878425b"
+          event_type:
+            type: string
+            description: Type of domain event that triggered this workflow job
+            example: "organization.bootstrap.initiated"
+          stream_id:
+            type: string
+            format: uuid
+            description: Stream ID from the domain event
+            example: "d8846196-8f69-46dc-af9a-87a57843c4e4"
+          stream_type:
+            type: string
+            description: Stream type from the domain event
+            example: "organization"
+          event_data:
+            type: object
+            description: Event payload from the domain event
+            additionalProperties: true
+
+    WorkflowQueueClaimed:
+      name: WorkflowQueueClaimed
+      title: Workflow Queue Job Claimed
+      summary: Worker claimed job from queue and started processing
+      contentType: application/json
+      payload:
+        type: object
+        required:
+          - queue_id
+          - worker_id
+          - claimed_at
+        properties:
+          queue_id:
+            type: string
+            format: uuid
+            description: ID of the queue entry being claimed
+            example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+          worker_id:
+            type: string
+            description: Identifier for the worker claiming the job (hostname or pod name)
+            example: "workflow-worker-7d9f8b6c5d-xz4jq"
+          claimed_at:
+            type: string
+            format: date-time
+            description: Timestamp when job was claimed
+            example: "2025-11-28T19:30:00.000Z"
+          workflow_id:
+            type: string
+            description: Temporal workflow ID that will process this job
+            example: "org-bootstrap-d8846196-8f69-46dc-af9a-87a57843c4e4"
+
+    WorkflowQueueCompleted:
+      name: WorkflowQueueCompleted
+      title: Workflow Queue Job Completed
+      summary: Workflow execution completed successfully
+      contentType: application/json
+      payload:
+        type: object
+        required:
+          - queue_id
+          - completed_at
+        properties:
+          queue_id:
+            type: string
+            format: uuid
+            description: ID of the queue entry that completed
+            example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+          completed_at:
+            type: string
+            format: date-time
+            description: Timestamp when workflow completed
+            example: "2025-11-28T19:35:00.000Z"
+          workflow_run_id:
+            type: string
+            description: Temporal workflow execution run ID
+            example: "019ab7a4-a6bf-70a3-8394-7b09371e98ba"
+          result:
+            type: object
+            description: Workflow execution result (optional)
+            additionalProperties: true
+
+    WorkflowQueueFailed:
+      name: WorkflowQueueFailed
+      title: Workflow Queue Job Failed
+      summary: Workflow execution failed permanently
+      contentType: application/json
+      payload:
+        type: object
+        required:
+          - queue_id
+          - failed_at
+          - error_message
+        properties:
+          queue_id:
+            type: string
+            format: uuid
+            description: ID of the queue entry that failed
+            example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+          failed_at:
+            type: string
+            format: date-time
+            description: Timestamp when workflow failed
+            example: "2025-11-28T19:32:00.000Z"
+          error_message:
+            type: string
+            description: Error message describing the failure
+            example: "Activity failed: DNS provisioning timeout"
+          error_stack:
+            type: string
+            description: Full error stack trace (optional, for debugging)
+          retry_count:
+            type: integer
+            description: Number of retry attempts before permanent failure
+            example: 3
