@@ -99,9 +99,14 @@ jobs:
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         tags: |
-          type=ref,event=branch
-          type=sha,prefix={{branch}}-
+          # Tag with commit SHA
+          type=sha,prefix=,format=short
+          # Tag with 'latest' on main branch
           type=raw,value=latest,enable={{is_default_branch}}
+          # Tag with version on git tags (e.g., v1.0.0)
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
 
     - name: Build and push Docker image
       id: build
@@ -112,8 +117,8 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-from: type=gha,scope=${{ github.ref_name }}
+        cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-${{ github.sha }}
 
   deploy:
     name: Deploy Frontend to Kubernetes
@@ -196,19 +201,15 @@ jobs:
 
     - name: Deploy to k3s
       run: |
-        # Get the first image tag from the multi-line output
-        IMAGE_TAG=$(echo "${{ needs.build.outputs.image-tag }}" | head -n1)
+        # Get the commit SHA tag (not :latest) to force pod restart
+        IMAGE_TAG=$(echo "${{ needs.build.outputs.image-tag }}" | grep -v latest | head -n1)
         echo "Using image tag: $IMAGE_TAG"
 
-        # Update deployment YAML with new image tag
-        sed -i "s|image: ghcr.io/analytics4change/a4c-appsuite-frontend:.*|image: $IMAGE_TAG|g" frontend/k8s/deployment.yaml
+        # Update the frontend image using kubectl set image
+        kubectl set image deployment/a4c-frontend \
+          nginx=$IMAGE_TAG
 
-        # Apply the updated deployment (preserves imagePullSecrets)
-        kubectl apply -f frontend/k8s/deployment.yaml
-
-        # Force rollout restart to ensure latest image is pulled
-        # This is necessary when using :main tag since Kubernetes may not pull updated images
-        kubectl rollout restart deployment/a4c-frontend
+        echo "✅ Image updated in deployment"
 
     - name: Wait for rollout
       run: |
