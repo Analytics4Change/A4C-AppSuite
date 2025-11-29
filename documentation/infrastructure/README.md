@@ -26,7 +26,12 @@ Documentation for the A4C-AppSuite infrastructure, including Terraform IaC, Kube
 
 ## Quick Links
 
-Documentation will be populated here during migration from scattered infrastructure documentation.
+### Deployment & CI/CD
+- **[Docker Image Tagging Strategy](./guides/docker-image-tagging-strategy.md)** - Commit SHA-based tagging for all containerized deployments
+- **[Deployment Checklist](./operations/deployment/DEPLOYMENT_CHECKLIST.md)** - Step-by-step deployment procedures
+
+### Supabase
+- **[Supabase Guides](./guides/supabase/)** - Comprehensive Supabase documentation
 
 ## See Also
 

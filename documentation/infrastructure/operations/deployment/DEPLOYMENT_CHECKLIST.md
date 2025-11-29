@@ -22,6 +22,10 @@ This checklist provides step-by-step instructions for deploying the A4C-AppSuite
 6. [Rollback Procedures](#rollback-procedures)
 7. [Troubleshooting](#troubleshooting)
 
+## Related Documentation
+
+- **[Docker Image Tagging Strategy](../../guides/docker-image-tagging-strategy.md)** - Explains commit SHA-based tagging for all deployments
+
 ---
 
 ## Pre-Deployment Checklist
