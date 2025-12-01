@@ -108,8 +108,6 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-  const temporalAddress = Deno.env.get('TEMPORAL_ADDRESS') || 'temporal-frontend.temporal.svc.cluster.local:7233';
-  const temporalNamespace = Deno.env.get('TEMPORAL_NAMESPACE') || 'default';
 
   if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
     console.error('[organization-bootstrap] Missing required environment variables:', {
@@ -129,7 +127,48 @@ serve(async (req) => {
     );
   }
 
-  console.log('[organization-bootstrap] Temporal configuration:', {
+  // Defensive: Validate Temporal configuration
+  const temporalAddress = Deno.env.get('TEMPORAL_ADDRESS') || 'temporal-frontend.temporal.svc.cluster.local:7233';
+  const temporalNamespace = Deno.env.get('TEMPORAL_NAMESPACE') || 'default';
+
+  // Validate Temporal address format (must be host:port)
+  const addressPattern = /^[a-zA-Z0-9.-]+:\d+$/;
+  if (!addressPattern.test(temporalAddress)) {
+    console.error('[organization-bootstrap] Invalid TEMPORAL_ADDRESS format:', {
+      address: temporalAddress,
+      expected_format: 'host:port (e.g., temporal-frontend.temporal.svc.cluster.local:7233)'
+    });
+    return new Response(
+      JSON.stringify({
+        error: 'Server configuration error',
+        details: `Invalid TEMPORAL_ADDRESS format: ${temporalAddress} (expected "host:port")`
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
+  // Validate Temporal namespace is not empty
+  if (!temporalNamespace || temporalNamespace.trim() === '') {
+    console.error('[organization-bootstrap] Invalid TEMPORAL_NAMESPACE:', {
+      namespace: temporalNamespace,
+      expected: 'non-empty string (e.g., "default")'
+    });
+    return new Response(
+      JSON.stringify({
+        error: 'Server configuration error',
+        details: 'TEMPORAL_NAMESPACE must be a non-empty string'
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
+  console.log('[organization-bootstrap] ✓ Temporal configuration validated:', {
     address: temporalAddress,
     namespace: temporalNamespace
   });
