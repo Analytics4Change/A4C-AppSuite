@@ -28,12 +28,12 @@ startServer().catch((error) => {
 });
 
 // Graceful shutdown
-process.on('SIGINT', async () => {
+process.on('SIGINT', () => {
   console.log('\n👋 Received SIGINT, shutting down gracefully...');
   process.exit(0);
 });
 
-process.on('SIGTERM', async () => {
+process.on('SIGTERM', () => {
   console.log('\n👋 Received SIGTERM, shutting down gracefully...');
   process.exit(0);
 });

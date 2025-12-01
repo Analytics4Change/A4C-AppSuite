@@ -15,6 +15,13 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 const TEMPORAL_ADDRESS = process.env.TEMPORAL_ADDRESS || 'temporal-frontend.temporal.svc.cluster.local:7233';
 
+// Extend FastifyInstance with custom properties
+declare module 'fastify' {
+  interface FastifyInstance {
+    temporalConnected?: boolean;
+  }
+}
+
 /**
  * Create and configure Fastify server
  */
@@ -63,11 +70,12 @@ export async function createServer(): Promise<FastifyInstance> {
     server.log.info({ address: TEMPORAL_ADDRESS }, 'Checking Temporal connection...');
     const connection = await Connection.connect({ address: TEMPORAL_ADDRESS });
     await connection.close();
-    (server as any).temporalConnected = true;
+    server.temporalConnected = true;
     server.log.info('✅ Temporal connection verified');
-  } catch (error: any) {
-    server.log.error({ error: error.message }, '❌ Failed to connect to Temporal');
-    (server as any).temporalConnected = false;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    server.log.error({ error: errorMessage }, '❌ Failed to connect to Temporal');
+    server.temporalConnected = false;
   }
 
   // Register routes
@@ -75,14 +83,17 @@ export async function createServer(): Promise<FastifyInstance> {
   registerWorkflowRoutes(server);
 
   // Global error handler
-  server.setErrorHandler((error, request, reply) => {
+  server.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
     request.log.error({ error, request_id: request.id }, 'Unhandled error');
 
-    reply.code(error.statusCode || 500).send({
+    const statusCode = error.statusCode || 500;
+    const message = process.env.NODE_ENV === 'production'
+      ? 'An error occurred processing your request'
+      : error.message;
+
+    void reply.code(statusCode).send({
       error: 'Internal Server Error',
-      message: process.env.NODE_ENV === 'production'
-        ? 'An error occurred processing your request'
-        : error.message,
+      message,
       request_id: request.id
     });
   });
@@ -109,7 +120,7 @@ Configuration:
   Port: ${PORT}
   Environment: ${process.env.NODE_ENV || 'development'}
   Temporal Address: ${TEMPORAL_ADDRESS}
-  Temporal Connected: ${(server as any).temporalConnected}
+  Temporal Connected: ${server.temporalConnected}
 
 Endpoints:
   Health: http://${HOST}:${PORT}/health

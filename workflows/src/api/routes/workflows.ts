@@ -9,8 +9,17 @@ import { Client, Connection } from '@temporalio/client';
 import { createClient } from '@supabase/supabase-js';
 import { authMiddleware, requirePermission } from '../middleware/auth.js';
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// Validate required environment variables
+function getRequiredEnvVar(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+const supabaseUrl = getRequiredEnvVar('SUPABASE_URL');
+const supabaseServiceKey = getRequiredEnvVar('SUPABASE_SERVICE_ROLE_KEY');
 const temporalAddress = process.env.TEMPORAL_ADDRESS || 'temporal-frontend.temporal.svc.cluster.local:7233';
 const temporalNamespace = process.env.TEMPORAL_NAMESPACE || 'default';
 
@@ -124,7 +133,7 @@ async function bootstrapOrganizationHandler(
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
   // Emit organization.bootstrap.initiated event
-  const { data: _eventId, error: eventError } = await supabaseAdmin
+  const { error: eventError } = await supabaseAdmin
     .schema('api')
     .rpc('emit_domain_event', {
       p_stream_id: organizationId,
@@ -154,7 +163,6 @@ async function bootstrapOrganizationHandler(
   }
 
   request.log.info({
-    event_id: _eventId,
     workflow_id: workflowId,
     organization_id: organizationId
   }, 'Bootstrap event emitted successfully');
@@ -185,11 +193,12 @@ async function bootstrapOrganizationHandler(
     // Close connection
     await connection.close();
 
-  } catch (temporalError: any) {
+  } catch (temporalError) {
+    const errorMessage = temporalError instanceof Error ? temporalError.message : 'Unknown error';
     request.log.error({ error: temporalError }, 'Failed to start Temporal workflow');
     return reply.code(500).send({
       error: 'Failed to start workflow',
-      details: temporalError.message
+      details: errorMessage
     });
   }
 
@@ -200,14 +209,14 @@ async function bootstrapOrganizationHandler(
     status: 'initiated'
   };
 
-  reply.code(200).send(response);
+  void reply.code(200).send(response);
 }
 
 /**
  * Register workflow routes
  */
 export function registerWorkflowRoutes(server: FastifyInstance): void {
-  server.post(
+  server.post<{ Body: BootstrapRequest }>(
     '/api/v1/workflows/organization-bootstrap',
     {
       preHandler: [authMiddleware, requirePermission('organization.create_root')]

@@ -7,9 +7,18 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
+// Validate required environment variables
+function getRequiredEnvVar(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+// These will throw on module load if env vars are missing
+const supabaseUrl = getRequiredEnvVar('SUPABASE_URL');
+const supabaseAnonKey = getRequiredEnvVar('SUPABASE_ANON_KEY');
 
 interface JWTPayload {
   permissions?: string[];
@@ -41,8 +50,18 @@ function decodeJWT(token: string): JWTPayload | null {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
 
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
-    return payload;
+    const payloadPart = parts[1];
+    if (!payloadPart) return null;
+
+    const decoded = Buffer.from(payloadPart, 'base64').toString('utf-8');
+    const payload: unknown = JSON.parse(decoded);
+
+    // Validate it's an object
+    if (typeof payload !== 'object' || payload === null) {
+      return null;
+    }
+
+    return payload as JWTPayload;
   } catch {
     return null;
   }
