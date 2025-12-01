@@ -163,7 +163,7 @@ jobs:
               \"data\": {
                 \"SUPABASE_URL\": \"$(echo -n '${{ secrets.SUPABASE_URL }}' | base64 -w 0)\",
                 \"SUPABASE_SERVICE_ROLE_KEY\": \"$(echo -n '${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' | base64 -w 0)\",
-                \"SUPABASE_ANON_KEY\": \"$(echo -n '${{ secrets.SUPABASE_ANON_KEY }}' | base64 -w 0)\"
+                \"SUPABASE_ANON_KEY\": \"$(echo -n '${{ secrets.VITE_SUPABASE_ANON_KEY }}' | base64 -w 0)\"
               }
             }"
           else
@@ -172,7 +172,7 @@ jobs:
               --namespace=temporal \
               --from-literal=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
               --from-literal=SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-              --from-literal=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+              --from-literal=SUPABASE_ANON_KEY="${{ secrets.VITE_SUPABASE_ANON_KEY }}"
           fi
 
           echo "✅ Supabase secrets configured"
