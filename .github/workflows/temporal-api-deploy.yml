@@ -143,6 +143,16 @@ jobs:
 
           echo "✓ kubectl configuration complete"
 
+      - name: Create image pull secret
+        run: |
+          kubectl create secret docker-registry ghcr-secret \
+            --namespace=temporal \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.K8S_IMAGE_PULL_TOKEN }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "✅ Image pull secret configured"
+
       - name: Create or update Supabase secrets
         run: |
           echo "Checking if temporal-api-secrets exists..."

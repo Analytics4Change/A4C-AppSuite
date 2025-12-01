@@ -113,7 +113,7 @@ spec:
 
       # Image pull secrets for GitHub Container Registry
       imagePullSecrets:
-        - name: ghcr-pull-secret
+        - name: ghcr-secret
 
       # Security context for the pod
       securityContext:
