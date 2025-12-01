@@ -340,10 +340,7 @@ serve(async (req) => {
         args: [{
           subdomain: requestData.subdomain,
           orgData: requestData.orgData,
-          users: requestData.users,
-          eventId: _eventId, // Link to audit event
-          organizationId: organizationId,
-          workflowId: workflowId
+          users: requestData.users
         }]
       });
 
