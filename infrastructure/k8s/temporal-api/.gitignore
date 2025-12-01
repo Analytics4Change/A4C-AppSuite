@@ -1,0 +1,7 @@
+# Kubernetes Secrets - DO NOT COMMIT!
+secrets.yaml
+
+# Backup files
+*.bak
+*.backup
+*~

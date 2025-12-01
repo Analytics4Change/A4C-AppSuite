@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: temporal-api-ingress
+  namespace: temporal
+  labels:
+    app: temporal-api
+    component: backend-api
+  annotations:
+    # TLS certificate via Let's Encrypt
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Traefik annotations
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: api.a4c.firstovertheline.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: temporal-api
+                port:
+                  number: 3000
+  tls:
+    - hosts:
+        - api.a4c.firstovertheline.com
+      secretName: temporal-api-tls

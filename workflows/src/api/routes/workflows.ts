@@ -1,0 +1,217 @@
+/**
+ * Workflow API Routes
+ *
+ * Handles workflow triggering via Temporal
+ */
+
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { Client, Connection } from '@temporalio/client';
+import { createClient } from '@supabase/supabase-js';
+import { authMiddleware, requirePermission } from '../middleware/auth.js';
+
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const temporalAddress = process.env.TEMPORAL_ADDRESS || 'temporal-frontend.temporal.svc.cluster.local:7233';
+const temporalNamespace = process.env.TEMPORAL_NAMESPACE || 'default';
+
+/**
+ * Contact information structure
+ */
+interface ContactInfo {
+  firstName: string;
+  lastName: string;
+  email: string;
+  title?: string;
+  department?: string;
+  type: string;
+  label: string;
+}
+
+/**
+ * Address information structure
+ */
+interface AddressInfo {
+  street1: string;
+  street2?: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  type: string;
+  label: string;
+}
+
+/**
+ * Phone information structure
+ */
+interface PhoneInfo {
+  number: string;
+  extension?: string;
+  type: string;
+  label: string;
+}
+
+/**
+ * Organization user invitation structure
+ */
+interface OrganizationUser {
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+}
+
+/**
+ * Organization bootstrap request payload
+ */
+interface BootstrapRequest {
+  subdomain: string;
+  orgData: {
+    name: string;
+    type: 'provider' | 'partner';
+    parentOrgId?: string;
+    contacts: ContactInfo[];
+    addresses: AddressInfo[];
+    phones: PhoneInfo[];
+    partnerType?: 'var' | 'family' | 'court' | 'other';
+    referringPartnerId?: string;
+  };
+  users: OrganizationUser[];
+}
+
+interface BootstrapResponse {
+  workflowId: string;
+  organizationId: string;
+  status: 'initiated';
+}
+
+/**
+ * Organization Bootstrap Workflow Endpoint
+ *
+ * POST /api/v1/workflows/organization-bootstrap
+ */
+async function bootstrapOrganizationHandler(
+  request: FastifyRequest<{ Body: BootstrapRequest }>,
+  reply: FastifyReply
+): Promise<void> {
+  const requestData = request.body;
+
+  // Validate required fields
+  if (!requestData.subdomain || !requestData.orgData || !requestData.users) {
+    return reply.code(400).send({
+      error: 'Invalid request payload',
+      details: 'Required fields: subdomain, orgData, users',
+      received: {
+        subdomain: !!requestData.subdomain,
+        orgData: !!requestData.orgData,
+        users: !!requestData.users
+      }
+    });
+  }
+
+  // Generate IDs
+  const workflowId = crypto.randomUUID();
+  const organizationId = crypto.randomUUID();
+
+  request.log.info({
+    workflow_id: workflowId,
+    organization_id: organizationId,
+    subdomain: requestData.subdomain,
+    user_id: request.user!.id,
+    user_email: request.user!.email
+  }, 'Starting organization bootstrap workflow');
+
+  // Create Supabase admin client for event emission
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+  // Emit organization.bootstrap.initiated event
+  const { data: _eventId, error: eventError } = await supabaseAdmin
+    .schema('api')
+    .rpc('emit_domain_event', {
+      p_stream_id: organizationId,
+      p_stream_type: 'organization',
+      p_stream_version: 1,
+      p_event_type: 'organization.bootstrap.initiated',
+      p_event_data: {
+        bootstrap_id: workflowId,
+        subdomain: requestData.subdomain,
+        orgData: requestData.orgData,
+        users: requestData.users
+      },
+      p_event_metadata: {
+        user_id: request.user!.id,
+        organization_id: organizationId,
+        initiated_by: request.user!.email,
+        initiated_via: 'backend_api'
+      }
+    });
+
+  if (eventError) {
+    request.log.error({ error: eventError }, 'Failed to emit bootstrap event');
+    return reply.code(500).send({
+      error: 'Failed to initiate bootstrap',
+      details: eventError.message
+    });
+  }
+
+  request.log.info({
+    event_id: _eventId,
+    workflow_id: workflowId,
+    organization_id: organizationId
+  }, 'Bootstrap event emitted successfully');
+
+  // Start Temporal workflow
+  try {
+    const connection = await Connection.connect({ address: temporalAddress });
+    const client = new Client({ connection, namespace: temporalNamespace });
+
+    const temporalWorkflowId = `org-bootstrap-${requestData.subdomain}-${Date.now()}`;
+
+    await client.workflow.start('organizationBootstrap', {
+      taskQueue: 'bootstrap',
+      workflowId: temporalWorkflowId,
+      args: [{
+        subdomain: requestData.subdomain,
+        orgData: requestData.orgData,
+        users: requestData.users
+      }]
+    });
+
+    request.log.info({
+      temporal_workflow_id: temporalWorkflowId,
+      organization_id: organizationId,
+      user_email: request.user!.email
+    }, 'Temporal workflow started successfully');
+
+    // Close connection
+    await connection.close();
+
+  } catch (temporalError: any) {
+    request.log.error({ error: temporalError }, 'Failed to start Temporal workflow');
+    return reply.code(500).send({
+      error: 'Failed to start workflow',
+      details: temporalError.message
+    });
+  }
+
+  // Return response
+  const response: BootstrapResponse = {
+    workflowId,
+    organizationId,
+    status: 'initiated'
+  };
+
+  reply.code(200).send(response);
+}
+
+/**
+ * Register workflow routes
+ */
+export function registerWorkflowRoutes(server: FastifyInstance): void {
+  server.post(
+    '/api/v1/workflows/organization-bootstrap',
+    {
+      preHandler: [authMiddleware, requirePermission('organization.create_root')]
+    },
+    bootstrapOrganizationHandler
+  );
+}

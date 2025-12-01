@@ -1,0 +1,301 @@
+name: Deploy Temporal Backend API
+
+# This workflow builds the Temporal Backend API Docker image and deploys it to the k3s cluster.
+# The Backend API enables the frontend to trigger Temporal workflows from outside the cluster.
+#
+# Prerequisites:
+#   - KUBECONFIG secret must point to https://k8s.firstovertheline.com (public endpoint)
+#   - Supabase secrets configured (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY)
+#   - See infrastructure/k8s/temporal-api/README.md for deployment details
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'workflows/src/api/**'
+      - 'workflows/Dockerfile.api'
+      - 'infrastructure/k8s/temporal-api/**'
+      - '.github/workflows/temporal-api-deploy.yml'
+    tags:
+      - 'api-v*'
+  pull_request:
+    paths:
+      - 'workflows/src/api/**'
+      - 'workflows/Dockerfile.api'
+      - 'infrastructure/k8s/temporal-api/**'
+      - '.github/workflows/temporal-api-deploy.yml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/a4c-temporal-api
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tags: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Tag with commit SHA
+            type=sha,prefix=,format=short
+            # Tag with 'latest' on main branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Tag with version on git tags (e.g., api-v1.0.0)
+            type=semver,pattern={{version}},prefix=
+            type=semver,pattern={{major}}.{{minor}},prefix=
+            type=semver,pattern={{major}},prefix=
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./workflows
+          file: ./workflows/Dockerfile.api
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=temporal-api-${{ github.ref_name }}
+          cache-to: type=gha,mode=max,scope=temporal-api-${{ github.ref_name }}-${{ github.sha }}
+          platforms: linux/amd64
+
+      - name: Image digest
+        run: echo "Image digest: ${{ steps.build.outputs.digest }}"
+
+  deploy:
+    name: Deploy API to Kubernetes
+    needs: build-and-push
+    # Only deploy on push to main (not PRs or tags)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "Checking KUBECONFIG secret..."
+          if [ -z "${{ secrets.KUBECONFIG }}" ]; then
+            echo "❌ KUBECONFIG secret is empty"
+            exit 1
+          fi
+          echo "✓ KUBECONFIG secret exists and is not empty"
+
+          # Try to decode the secret
+          if echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config 2>/dev/null; then
+            echo "✓ Successfully decoded KUBECONFIG secret"
+          else
+            echo "❌ Failed to decode KUBECONFIG secret as base64"
+            echo "Trying to use secret as plain text kubeconfig..."
+            echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+          fi
+
+          chmod 600 ~/.kube/config
+
+          # Test kubectl connectivity
+          echo "Testing kubectl configuration..."
+          if timeout 30 kubectl cluster-info 2>/dev/null; then
+            echo "✓ kubectl configuration is valid and cluster is reachable"
+          else
+            echo "❌ kubectl cluster connection failed"
+            echo ""
+            echo "🌐 NETWORK CONNECTIVITY ISSUE"
+            echo "See infrastructure/KUBECONFIG_UPDATE_GUIDE.md for setup instructions"
+            exit 1
+          fi
+
+          echo "✓ kubectl configuration complete"
+
+      - name: Create or update Supabase secrets
+        run: |
+          echo "Checking if temporal-api-secrets exists..."
+
+          if kubectl get secret temporal-api-secrets -n temporal >/dev/null 2>&1; then
+            echo "✓ Secret exists, updating..."
+            kubectl patch secret temporal-api-secrets -n temporal -p "{
+              \"data\": {
+                \"SUPABASE_URL\": \"$(echo -n '${{ secrets.SUPABASE_URL }}' | base64 -w 0)\",
+                \"SUPABASE_SERVICE_ROLE_KEY\": \"$(echo -n '${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' | base64 -w 0)\",
+                \"SUPABASE_ANON_KEY\": \"$(echo -n '${{ secrets.SUPABASE_ANON_KEY }}' | base64 -w 0)\"
+              }
+            }"
+          else
+            echo "Creating new secret..."
+            kubectl create secret generic temporal-api-secrets \
+              --namespace=temporal \
+              --from-literal=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+              --from-literal=SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              --from-literal=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          fi
+
+          echo "✅ Supabase secrets configured"
+
+      - name: Apply ConfigMap
+        run: |
+          kubectl apply -f infrastructure/k8s/temporal-api/configmap.yaml
+          echo "✅ ConfigMap applied"
+
+      - name: Apply Service
+        run: |
+          kubectl apply -f infrastructure/k8s/temporal-api/service.yaml
+          echo "✅ Service applied"
+
+      - name: Apply Ingress
+        run: |
+          kubectl apply -f infrastructure/k8s/temporal-api/ingress.yaml
+          echo "✅ Ingress applied"
+
+      - name: Deploy API
+        run: |
+          # Get the commit SHA tag (not :latest) to force pod restart
+          IMAGE_TAG=$(echo "${{ needs.build-and-push.outputs.image-tags }}" | grep -v latest | head -n1)
+          echo "Using image tag: $IMAGE_TAG"
+
+          # Update the deployment with the new image tag
+          # First apply the deployment file
+          kubectl apply -f infrastructure/k8s/temporal-api/deployment.yaml
+
+          # Then update the image to the specific SHA tag
+          kubectl set image deployment/temporal-api \
+            api=$IMAGE_TAG \
+            -n temporal
+
+          echo "✅ Deployment updated with image: $IMAGE_TAG"
+
+      - name: Wait for rollout
+        run: |
+          echo "Waiting for deployment rollout..."
+          if kubectl rollout status deployment/temporal-api -n temporal --timeout=300s; then
+            echo "✅ Rollout completed successfully"
+          else
+            echo "⚠️ Rollout timed out, checking actual status..."
+
+            READY_REPLICAS=$(kubectl get deployment temporal-api -n temporal -o jsonpath='{.status.readyReplicas}')
+            DESIRED_REPLICAS=$(kubectl get deployment temporal-api -n temporal -o jsonpath='{.spec.replicas}')
+
+            if [ "$READY_REPLICAS" = "$DESIRED_REPLICAS" ] && [ "$READY_REPLICAS" != "" ]; then
+              echo "✅ Deployment completed ($READY_REPLICAS/$DESIRED_REPLICAS ready)"
+            else
+              echo "❌ Deployment failed - only $READY_REPLICAS/$DESIRED_REPLICAS replicas ready"
+              kubectl get pods -l app=temporal-api -n temporal
+              kubectl describe deployment temporal-api -n temporal
+              kubectl logs -l app=temporal-api -n temporal --tail=50
+              exit 1
+            fi
+          fi
+
+      - name: Wait for TLS certificate
+        run: |
+          echo "Checking TLS certificate status..."
+          # Give cert-manager time to issue certificate
+          sleep 10
+
+          if kubectl get certificate temporal-api-tls -n temporal >/dev/null 2>&1; then
+            CERT_READY=$(kubectl get certificate temporal-api-tls -n temporal -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+            if [ "$CERT_READY" = "True" ]; then
+              echo "✅ TLS certificate is ready"
+            else
+              echo "⏳ TLS certificate is being issued (this may take a minute)..."
+              # Don't fail - cert-manager will eventually issue the certificate
+            fi
+          else
+            echo "⏳ TLS certificate not yet created (cert-manager will create it)"
+          fi
+
+      - name: Verify deployment
+        run: |
+          echo "📊 Deployment Status:"
+          kubectl get deployment temporal-api -n temporal
+          echo ""
+          echo "📦 Pod Status:"
+          kubectl get pods -l app=temporal-api -n temporal
+          echo ""
+          echo "🌐 Service Status:"
+          kubectl get svc temporal-api -n temporal
+          echo ""
+          echo "🔗 Ingress Status:"
+          kubectl get ingress temporal-api-ingress -n temporal
+          echo ""
+          echo "🔒 Certificate Status:"
+          kubectl get certificate -n temporal 2>/dev/null || echo "No certificates found yet"
+          echo ""
+          echo "🔍 Recent Events:"
+          kubectl get events -n temporal --sort-by='.lastTimestamp' | grep -i temporal-api | tail -10 || true
+
+      - name: Health check
+        run: |
+          echo "Running health checks..."
+
+          # Port-forward temporarily to test health endpoint
+          kubectl port-forward svc/temporal-api 3000:3000 -n temporal &
+          PF_PID=$!
+          sleep 5
+
+          # Test health endpoint
+          if curl -sf http://localhost:3000/health > /dev/null; then
+            echo "✅ Health check passed"
+          else
+            echo "⚠️ Health check via port-forward failed (API may still be starting)"
+          fi
+
+          # Test readiness endpoint
+          if curl -sf http://localhost:3000/ready > /dev/null; then
+            echo "✅ Readiness check passed"
+          else
+            echo "⚠️ Readiness check failed (Temporal connection may not be ready)"
+          fi
+
+          # Cleanup port-forward
+          kill $PF_PID 2>/dev/null || true
+
+      - name: Report deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "🎉 Temporal Backend API deployment completed successfully!"
+            echo ""
+            echo "📍 API Endpoints:"
+            echo "   Internal: http://temporal-api.temporal.svc.cluster.local:3000"
+            echo "   External: https://api.a4c.firstovertheline.com"
+            echo ""
+            echo "🔗 Health Check: https://api.a4c.firstovertheline.com/health"
+          else
+            echo "❌ Deployment failed. Check the logs above for details."
+          fi
