@@ -173,6 +173,85 @@ paths:
         - BearerAuth: []
         - ApiKeyAuth: []
 
+  /organization-bootstrap:
+    post:
+      summary: Initiate organization bootstrap workflow
+      description: |
+        Creates a new organization via Temporal workflow orchestration.
+        Requires 'organization.create_root' permission.
+        Returns immediately with workflow ID for status tracking.
+
+        Architecture: Direct RPC (Phase 2)
+        - Edge Function → Temporal (direct)
+        - Domain event emitted for audit trail (parallel)
+      operationId: bootstrapOrganization
+      tags:
+        - Organizations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationBootstrapRequest'
+      responses:
+        '200':
+          description: Bootstrap initiated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationBootstrapResponse'
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingField:
+                  summary: Missing required field
+                  value:
+                    error: "Invalid request payload"
+                    message: "Missing required fields"
+                    details:
+                      subdomain: false
+                      orgData: true
+                      users: true
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Missing required permission (organization.create_root)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                permissionDenied:
+                  summary: Permission denied
+                  value:
+                    error: "Forbidden: organization.create_root permission required to bootstrap organizations"
+                    message: "organization.create_root permission required"
+                    details:
+                      required_permission: "organization.create_root"
+                      user_permissions: ["organization.read", "organization.update"]
+        '500':
+          description: Workflow initiation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                temporalError:
+                  summary: Temporal workflow failed to start
+                  value:
+                    error: "Failed to start workflow"
+                    message: "Temporal connection failed"
+      security:
+        - BearerAuth: []
+
 components:
   schemas:
     DomainEventRequest:
@@ -333,6 +412,200 @@ components:
               code:
                 type: string
 
+    OrganizationBootstrapRequest:
+      type: object
+      required:
+        - subdomain
+        - orgData
+        - users
+      properties:
+        subdomain:
+          type: string
+          pattern: '^[a-z0-9-]+$'
+          description: Custom subdomain for organization (triggers DNS provisioning)
+          example: "acme-healthcare"
+        orgData:
+          $ref: '#/components/schemas/OrganizationData'
+        users:
+          type: array
+          description: Users to invite after organization creation
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrganizationUser'
+
+    OrganizationData:
+      type: object
+      required:
+        - name
+        - type
+        - contacts
+        - addresses
+        - phones
+      properties:
+        name:
+          type: string
+          description: Organization display name
+          example: "Acme Healthcare"
+        type:
+          type: string
+          enum: [provider, provider_partner]
+          description: Organization classification
+        parentOrgId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Parent organization UUID (for hierarchical structures)
+        contacts:
+          type: array
+          minItems: 1
+          description: Organization contact information
+          items:
+            $ref: '#/components/schemas/ContactInfo'
+        addresses:
+          type: array
+          minItems: 1
+          description: Organization physical addresses
+          items:
+            $ref: '#/components/schemas/AddressInfo'
+        phones:
+          type: array
+          minItems: 1
+          description: Organization phone numbers
+          items:
+            $ref: '#/components/schemas/PhoneInfo'
+        partnerType:
+          type: string
+          enum: [var, family, court, other]
+          nullable: true
+          description: Partner classification (if type is provider_partner)
+        referringPartnerId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Referring partner organization UUID
+
+    ContactInfo:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - email
+        - type
+        - label
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        title:
+          type: string
+          nullable: true
+        department:
+          type: string
+          nullable: true
+        type:
+          type: string
+          description: Contact type identifier from contact_type enum
+        label:
+          type: string
+          description: Human-readable label
+
+    AddressInfo:
+      type: object
+      required:
+        - street1
+        - city
+        - state
+        - zipCode
+        - type
+        - label
+      properties:
+        street1:
+          type: string
+        street2:
+          type: string
+          nullable: true
+        city:
+          type: string
+        state:
+          type: string
+          pattern: '^[A-Z]{2}$'
+          description: Two-letter US state code
+        zipCode:
+          type: string
+          pattern: '^\d{5}(-\d{4})?$'
+          description: US ZIP code (5 or 9 digits)
+        type:
+          type: string
+          description: Address type identifier from address_type enum
+        label:
+          type: string
+          description: Human-readable label
+
+    PhoneInfo:
+      type: object
+      required:
+        - number
+        - type
+        - label
+      properties:
+        number:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+          description: E.164 format phone number
+        extension:
+          type: string
+          nullable: true
+        type:
+          type: string
+          description: Phone type identifier from phone_type enum
+        label:
+          type: string
+          description: Human-readable label
+
+    OrganizationUser:
+      type: object
+      required:
+        - email
+        - firstName
+        - lastName
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, org_admin, provider_admin, clinician, case_manager, viewer]
+          description: User role within organization
+
+    OrganizationBootstrapResponse:
+      type: object
+      required:
+        - workflowId
+        - organizationId
+        - status
+      properties:
+        workflowId:
+          type: string
+          format: uuid
+          description: Temporal workflow execution ID (use for status tracking)
+        organizationId:
+          type: string
+          format: uuid
+          description: Created organization UUID
+        status:
+          type: string
+          enum: [initiated]
+          description: Bootstrap workflow status
+
   securitySchemes:
     BearerAuth:
       type: http
@@ -352,3 +625,5 @@ security:
 tags:
   - name: Events
     description: Domain event operations
+  - name: Organizations
+    description: Organization lifecycle and workflow operations
