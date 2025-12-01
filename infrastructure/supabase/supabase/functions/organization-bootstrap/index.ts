@@ -9,6 +9,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { Connection, Client } from 'npm:@temporalio/client@^1.10.0';
 
 // Deployment version tracking (injected by CI/CD)
 const DEPLOY_VERSION = Deno.env.get('GIT_COMMIT_SHA')?.substring(0, 8) || 'dev-local';
@@ -107,6 +108,8 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  const temporalAddress = Deno.env.get('TEMPORAL_ADDRESS') || 'temporal-frontend.temporal.svc.cluster.local:7233';
+  const temporalNamespace = Deno.env.get('TEMPORAL_NAMESPACE') || 'default';
 
   if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
     console.error('[organization-bootstrap] Missing required environment variables:', {
@@ -125,6 +128,11 @@ serve(async (req) => {
       }
     );
   }
+
+  console.log('[organization-bootstrap] Temporal configuration:', {
+    address: temporalAddress,
+    namespace: temporalNamespace
+  });
 
   try {
 
@@ -279,9 +287,43 @@ serve(async (req) => {
 
     console.log(`Bootstrap event emitted successfully: event_id=${_eventId}, workflow_id=${workflowId}, org_id=${organizationId}`);
 
-    // NOTE: Temporal workflow is triggered by PostgreSQL NOTIFY listener
-    // Event listener watches domain_events table and starts workflow automatically
-    // See: documentation/infrastructure/reference/events/organization-bootstrap-workflow-started.md
+    // Start Temporal workflow directly (no event-driven triggering)
+    // This replaces the PostgreSQL NOTIFY → Realtime → Worker listener chain
+    // See: dev/active/architecture-simplification-option-c.md
+    try {
+      const connection = await Connection.connect({ address: temporalAddress });
+      const client = new Client({ connection, namespace: temporalNamespace });
+
+      const temporalWorkflowId = `org-bootstrap-${requestData.subdomain}-${Date.now()}`;
+      await client.workflow.start('organizationBootstrap', {
+        taskQueue: 'bootstrap',
+        workflowId: temporalWorkflowId,
+        args: [{
+          subdomain: requestData.subdomain,
+          orgData: requestData.orgData,
+          users: requestData.users,
+          eventId: _eventId, // Link to audit event
+          organizationId: organizationId,
+          workflowId: workflowId
+        }]
+      });
+
+      console.log(`Temporal workflow started: ${temporalWorkflowId}, org_id=${organizationId}, user=${user.email}`);
+
+      // Close connection after starting workflow
+      await connection.close();
+
+    } catch (temporalError) {
+      console.error('Failed to start Temporal workflow:', temporalError);
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to start workflow',
+          details: temporalError.message,
+          version: DEPLOY_VERSION
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log(`Bootstrap initiated: workflow_id=${workflowId}, org_id=${organizationId}, user=${user.email}`);
 
