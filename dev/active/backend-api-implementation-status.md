@@ -1,7 +1,8 @@
 # Backend API Service Implementation Status
 
 **Date**: 2025-12-01
-**Status**: Phases 1-4 Complete, Ready for Phase 5 (Frontend Integration)
+**Status**: ✅ Phases 1-4 Complete + Deployed Successfully, Ready for Phase 5 (Frontend Integration)
+**Last Updated**: 2025-12-01 23:20 UTC
 
 ## Problem Discovered
 
@@ -31,8 +32,8 @@
 
 **Dependencies Added** (`package.json`):
 - `fastify@^5.1.0` - HTTP server
-- `@fastify/cors@^9.0.1` - CORS middleware
-- `@fastify/helmet@^12.0.0` - Security headers
+- `@fastify/cors@^11.0.0` - CORS middleware (upgraded from 9.x for Fastify 5 compatibility)
+- `@fastify/helmet@^13.0.0` - Security headers (upgraded from 12.x for Fastify 5 compatibility)
 - `fastify-tsconfig@^2.0.0` (dev) - TypeScript config
 
 **Scripts Added**:
@@ -148,7 +149,7 @@ Internet → Cloudflare (*.firstovertheline.com) → k3s:443 → Traefik → tem
 
 ---
 
-## Phase 4: GitHub Actions CI/CD ✅ COMPLETE
+## Phase 4: GitHub Actions CI/CD ✅ COMPLETE + DEPLOYED
 
 ### Workflow Created
 
@@ -158,8 +159,9 @@ Internet → Cloudflare (*.firstovertheline.com) → k3s:443 → Traefik → tem
 - Push to `main` with changes to:
   - `workflows/src/api/**`
   - `workflows/Dockerfile.api`
+  - `workflows/package*.json` (added 2025-12-01 to catch dependency updates)
   - `infrastructure/k8s/temporal-api/**`
-- Manual dispatch via `workflow_dispatch`
+- Manual dispatch via `workflow_dispatch` (now also deploys, not just builds)
 - Tags matching `api-v*`
 
 **Build Job**:
@@ -167,15 +169,57 @@ Internet → Cloudflare (*.firstovertheline.com) → k3s:443 → Traefik → tem
 - Pushes to `ghcr.io/analytics4change/a4c-temporal-api`
 - Tags: commit SHA, `latest` (on main), semver (on tags)
 
-**Deploy Job** (only on main branch push):
+**Deploy Job** (on main branch push OR workflow_dispatch):
 1. Configure kubectl with KUBECONFIG secret
-2. Create/update Supabase secrets (`temporal-api-secrets`)
-3. Apply ConfigMap, Service, Ingress
-4. Deploy with SHA-tagged image
-5. Wait for rollout completion
-6. Verify TLS certificate
-7. Run health checks via port-forward
-8. Report deployment status
+2. Create/update image pull secret (`ghcr-secret` with `K8S_IMAGE_PULL_TOKEN`)
+3. Create/update Supabase secrets (`temporal-api-secrets` with `VITE_SUPABASE_ANON_KEY`)
+4. Apply ConfigMap, Service, Ingress
+5. Deploy with SHA-tagged image
+6. Wait for rollout completion
+7. Verify TLS certificate
+8. Run health checks via port-forward
+9. Report deployment status
+
+### Issues Fixed During Initial Deployment (2025-12-01)
+
+**Issue 1: ImagePullBackOff (401 Unauthorized from GHCR)**
+- Root cause: Deployment referenced `ghcr-pull-secret` which didn't exist
+- Fix: Changed to use `ghcr-secret` (same pattern as frontend workflow)
+- Added step to create/update `ghcr-secret` using `K8S_IMAGE_PULL_TOKEN`
+- Commit: `ee692c05`
+
+**Issue 2: CrashLoopBackOff (Missing SUPABASE_ANON_KEY)**
+- Root cause: GitHub secret `SUPABASE_ANON_KEY` didn't exist
+- Fix: Used existing `VITE_SUPABASE_ANON_KEY` secret instead
+- Commit: `36363390`
+
+**Issue 3: CrashLoopBackOff (Fastify Plugin Version Mismatch)**
+- Root cause: `@fastify/cors@9.x` and `@fastify/helmet@12.x` expected Fastify 4.x but 5.x installed
+- Error: `FST_ERR_PLUGIN_VERSION_MISMATCH`
+- Fix: Upgraded to `@fastify/cors@11.x` and `@fastify/helmet@13.x`
+- Commit: `afb570dd`
+
+**Issue 4: workflow_dispatch Only Built, Didn't Deploy**
+- Root cause: Deploy job condition only matched `push` events
+- Fix: Updated condition to `(push && main) || workflow_dispatch`
+- Also added `workflows/package*.json` to path triggers
+- Commit: `fecd16ab`
+
+### Current Deployment Status (Verified 2025-12-01 23:19 UTC)
+
+```
+✅ Pods: 2/2 Running and Ready
+✅ Temporal Connection: Verified
+✅ Health Endpoint: Responding 200 OK
+✅ Ready Endpoint: Responding 200 OK
+```
+
+**Pod Status**:
+```
+NAME                            READY   STATUS    RESTARTS   AGE
+temporal-api-6f55986956-7w6n6   1/1     Running   0          ~1min
+temporal-api-6f55986956-bxx7d   1/1     Running   0          ~1min
+```
 
 ---
 
@@ -262,22 +306,23 @@ Frontend → Backend API (k8s) → Temporal
 
 1. ~~**Complete Phase 2**: Create remaining Kubernetes manifests + Dockerfile~~ ✅ DONE
 2. ~~**Complete Phase 3**: Configure external access~~ ✅ DONE (Traefik Ingress)
-3. ~~**Complete Phase 4**: Create GitHub Actions CI/CD workflows~~ ✅ DONE
-4. **Complete Phase 5**: Update Edge Function and Frontend code
+3. ~~**Complete Phase 4**: Create GitHub Actions CI/CD workflows~~ ✅ DONE + DEPLOYED
+4. **Complete Phase 5**: Update Edge Function and Frontend code ⏸️ NEXT
 5. **Complete Phase 6**: Test end-to-end flow
 
 ---
 
 ## Timeline Estimate
 
-- **Remaining work**: 4-5 hours
+- **Completed work**: ~4 hours
+  - Phase 1 (API Code): 2 hours
   - Phase 2 (K8s + Docker): 1 hour
   - Phase 3 (Cloudflare): 30 mins
-  - Phase 4 (CI/CD): 1-2 hours
+  - Phase 4 (CI/CD + deployment debugging): 30 mins
+
+- **Remaining work**: 1-2 hours
   - Phase 5 (Code updates): 30 mins
   - Phase 6 (Testing): 1-2 hours
-
-- **Total implementation**: 6-9 hours (Phase 1 complete: ~2 hours)
 
 ---
 
@@ -318,6 +363,30 @@ dev/active/
 
 ---
 
+## Success Criteria
+
+✅ Phase 1 Complete (API Code)
+✅ Phase 2 Complete (K8s Manifests)
+✅ Phase 3 Complete (External Access via Traefik Ingress)
+✅ Phase 4 Complete (GitHub Actions CI/CD + Deployed)
+⏸️ Phases 5-6 Pending
+
+**Infrastructure Validation**:
+- [x] API running in k8s with 2 replicas
+- [x] Health checks passing (`/health` returns 200)
+- [x] Readiness checks passing (`/ready` returns 200)
+- [x] Temporal connection verified from pods
+- [x] CI/CD pipeline functional (build + deploy)
+- [ ] TLS certificate via cert-manager (pending first external request)
+- [ ] Accessible via `https://api.a4c.firstovertheline.com`
+
+**When all phases complete**:
+- [ ] Frontend calls API successfully
+- [ ] Organization creation works end-to-end
+- [ ] 2-hop architecture validated
+
+---
+
 ## Commands for Continuation
 
 **After /clear**:
@@ -326,49 +395,31 @@ dev/active/
 # 1. Read this status document
 cat dev/active/backend-api-implementation-status.md
 
-# 2. Continue with Phase 2 K8s manifests
-# Create: infrastructure/k8s/temporal-api/deployment.yaml
-# Create: infrastructure/k8s/temporal-api/service.yaml
-# Create: infrastructure/k8s/temporal-api/configmap.yaml
-# Create: infrastructure/k8s/temporal-api/secrets.yaml.example
-# Create: workflows/Dockerfile.api
-
-# 3. Test API locally
-cd workflows
-npm run dev:api
-
-# 4. Build Docker image (after Dockerfile created)
-docker build -f Dockerfile.api -t a4c-temporal-api:test .
-
-# 5. Deploy to k8s (after manifests created)
-kubectl apply -f infrastructure/k8s/temporal-api/configmap.yaml
-kubectl apply -f infrastructure/k8s/temporal-api/deployment.yaml
-kubectl apply -f infrastructure/k8s/temporal-api/service.yaml
-
-# 6. Check deployment
+# 2. Verify deployment is still running
 kubectl get pods -n temporal -l app=temporal-api
-kubectl logs -n temporal -l app=temporal-api
+
+# 3. Test external endpoint (if TLS ready)
+curl https://api.a4c.firstovertheline.com/health
+
+# 4. Continue with Phase 5: Update Frontend
+# File: frontend/src/services/api/TemporalWorkflowClient.ts
+# Change endpoint from Edge Function to Backend API:
+# Old: ${SUPABASE_URL}/functions/v1/organization-bootstrap
+# New: https://api.a4c.firstovertheline.com/api/v1/workflows/organization-bootstrap
+
+# 5. Test end-to-end flow via UI
 ```
 
 ---
 
-## Success Criteria
+## API Endpoints Reference
 
-✅ Phase 1 Complete (API Code)
-✅ Phase 2 Complete (K8s Manifests)
-✅ Phase 3 Complete (External Access via Traefik Ingress)
-✅ Phase 4 Complete (GitHub Actions CI/CD)
-⏸️ Phases 5-6 Pending
-
-**When all phases complete**:
-- [ ] API running in k8s with 2 replicas
-- [ ] Health checks passing
-- [ ] Accessible via `api.a4c.firstovertheline.com`
-- [ ] Frontend calls API successfully
-- [ ] Organization creation works end-to-end
-- [ ] 2-hop architecture validated
-- [ ] CI/CD pipeline functional
+| Endpoint | Internal URL | External URL |
+|----------|-------------|--------------|
+| Health | `http://temporal-api.temporal.svc.cluster.local:3000/health` | `https://api.a4c.firstovertheline.com/health` |
+| Ready | `http://temporal-api.temporal.svc.cluster.local:3000/ready` | `https://api.a4c.firstovertheline.com/ready` |
+| Bootstrap | `http://temporal-api.temporal.svc.cluster.local:3000/api/v1/workflows/organization-bootstrap` | `https://api.a4c.firstovertheline.com/api/v1/workflows/organization-bootstrap` |
 
 ---
 
-**Last Updated**: 2025-12-01 (Phases 1-4 complete)
+**Last Updated**: 2025-12-01 23:20 UTC (Phases 1-4 complete + deployed successfully)
