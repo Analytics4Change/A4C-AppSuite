@@ -15,6 +15,7 @@ on:
     paths:
       - 'workflows/src/api/**'
       - 'workflows/Dockerfile.api'
+      - 'workflows/package*.json'
       - 'infrastructure/k8s/temporal-api/**'
       - '.github/workflows/temporal-api-deploy.yml'
     tags:
@@ -23,6 +24,7 @@ on:
     paths:
       - 'workflows/src/api/**'
       - 'workflows/Dockerfile.api'
+      - 'workflows/package*.json'
       - 'infrastructure/k8s/temporal-api/**'
       - '.github/workflows/temporal-api-deploy.yml'
   workflow_dispatch:
@@ -91,8 +93,8 @@ jobs:
   deploy:
     name: Deploy API to Kubernetes
     needs: build-and-push
-    # Only deploy on push to main (not PRs or tags)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Deploy on push to main or manual workflow_dispatch (not PRs or tags)
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
     permissions:
