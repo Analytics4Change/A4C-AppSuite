@@ -63,7 +63,9 @@ coverage/
 
 # Kubernetes secrets (never commit actual secrets!)
 **/secrets.yaml
+**/*-secrets.yaml
 !**/secrets-template.yaml
+!**/*-secrets.yaml.example
 
 # Git-crypt
 .git-crypt/
