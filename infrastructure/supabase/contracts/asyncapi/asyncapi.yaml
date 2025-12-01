@@ -50,6 +50,10 @@ channels:
           - $ref: './domains/invitation.yaml#/components/messages/InvitationRevoked'
           - $ref: './domains/invitation.yaml#/components/messages/InvitationAccepted'
           - $ref: './domains/invitation.yaml#/components/messages/InvitationExpired'
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapInitiated'
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapCompleted'
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapFailed'
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapCancelled'
     subscribe:
       summary: Subscribe to domain events
       operationId: onDomainEvent
