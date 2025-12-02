@@ -1,126 +1,133 @@
-# Post-Clear Context Recovery Prompt
+# Post-Clear Context Prompt
 
-**Use this prompt after running `/clear` to quickly regain context:**
-
----
-
-Read the following documents to understand our current state:
-
-1. **Migration Status**: `@dev/active/temporal-worker-realtime-migration-tasks.md`
-   - Shows Phase 1-4 COMPLETE (including production deployment)
-   - Phase 5-7 still pending (end-to-end testing, cleanup, monitoring)
-
-2. **Architecture Context**: `@dev/active/temporal-worker-realtime-migration-context.md`
-   - Contains all architectural decisions (13 decisions total)
-   - Explains why we migrated from PostgreSQL LISTEN/NOTIFY to Supabase Realtime
-   - Documents strict CQRS implementation with workflow queue projection
-
-3. **Implementation Plan**: `@dev/active/temporal-worker-realtime-migration.md`
-   - Complete step-by-step migration guide
-   - Environment variable requirements
-   - Testing procedures
+**Last Updated**: 2025-12-02 20:16 UTC
+**Branch**: main
+**Status**: Code Review Complete - Deployments Successful - Ready for Implementation
 
 ---
 
-## Current State (as of 2025-11-29 01:14:19 UTC)
+## What Was Just Completed
 
-**✅ DEPLOYED TO PRODUCTION** (commit f89c848)
+### Deployments Completed (2025-12-02)
 
-The Temporal worker has been successfully migrated from PostgreSQL LISTEN/NOTIFY to Supabase Realtime with strict CQRS architecture. All code changes, database migrations, and CI/CD fixes have been deployed to the production Kubernetes cluster.
+All GitHub Actions workflows completed successfully:
 
-### What Was Deployed
+- ✅ **Temporal Backend API** (Run 19840746349): Build & Deploy to Kubernetes
+- ✅ **Frontend** (Run 19842693418): Build, Test & Deploy to Kubernetes
 
-1. **Worker Code** (`workflows/src/worker/event-listener.ts`):
-   - Migrated from PostgreSQL LISTEN to Supabase Realtime subscription
-   - Subscribes to `workflow_queue_projection` table (status=eq.pending)
-   - Implements strict CQRS (all updates via events, not direct SQL)
-   - Fixed all RPC calls to use `.schema('api')` prefix
+### Comprehensive Code Review (2025-12-02)
 
-2. **Database Schema** (via Supabase migrations):
-   - `workflow_queue_projection` table (CQRS read model)
-   - `enqueue_workflow_from_bootstrap_event` trigger
-   - `update_workflow_queue_projection_from_event` trigger
+Three parallel `software-architect-dbc` agents reviewed the entire codebase:
 
-3. **CI/CD Pipeline** (`.github/workflows/temporal-deploy.yml`):
-   - Fixed Docker build cache invalidation (scoped per commit SHA)
-   - Fixed Kubernetes deployment to use commit SHA tags (not `:latest`)
+- **Frontend** (`frontend/`): 0 Critical, 0 High, 5 Medium, 5 Low issues
+- **Workflows** (`workflows/`): 0 Critical, 3 High, 5 Medium, 4 Low issues
+- **Infrastructure** (`infrastructure/`): 0 Critical, 0 High, 0 Medium, 0 Low issues
 
-### Verified Working
+**Overall Grade: B+** - Production-ready with minor improvements recommended.
 
-- ✅ Worker starts successfully in production pod
-- ✅ Subscribes to Realtime (`workflow_queue` channel)
-- ✅ 5-event chain tested end-to-end:
-  1. `organization.bootstrap.initiated`
-  2. `workflow.queue.pending` (trigger auto-creates queue job)
-  3. `workflow.queue.claimed` (worker claims job)
-  4. `organization.bootstrap.workflow_started` (workflow starts in Temporal)
-  5. `workflow.queue.completed` (job marked complete)
+**Full Report**: `dev/active/comprehensive-code-review-plan.md`
 
-### Next Steps (When Ready)
+### Environment Variable Standardization (Completed Earlier)
 
-**Phase 5: End-to-End Testing** (test via UI)
-- Navigate to `https://a4c.firstovertheline.com/organizations/new`
-- Create test organization and verify workflow executes
-- Check Temporal Web UI for workflow completion
-- Verify database projections populated correctly
-
-**Phase 6: Cleanup** (remove deprecated config)
-- Remove `SUPABASE_DB_URL` from Kubernetes secrets (no longer needed)
-- Clean up test data from development testing
-
-**Phase 7: Monitoring** (production stability)
-- Monitor worker logs for 24 hours
-- Track workflow success rate
-- Verify no reconnection loops
+- Added Zod runtime validation across all components
+- Updated `documentation/infrastructure/operations/configuration/ENVIRONMENT_VARIABLES.md`
+- Archived to `dev/archived/environment-variable-standardization/`
 
 ---
 
-## Quick Commands
+## High Priority Action Items (From Code Review)
 
-**Verify worker is running:**
+### 1. Workflows - Externalize Hardcoded Configuration
+**Files**:
+- `workflows/src/activities/organization-bootstrap/remove-dns.ts:32` - Hardcoded `targetDomain = 'firstovertheline.com'`
+- `workflows/src/workflows/organization-bootstrap/workflow.ts:227` - Hardcoded `frontendUrl`
+
+**Fix**: Add to `env-schema.ts`:
+```typescript
+TARGET_DOMAIN: z.string().default('firstovertheline.com'),
+```
+
+### 2. Workflows - Standardize Aggregate Type Casing
+**Files**: Multiple activities using inconsistent casing ('Organization' vs 'organization')
+
+**Fix**: Create shared constants:
+```typescript
+// shared/constants.ts
+export const AGGREGATE_TYPES = {
+  ORGANIZATION: 'organization',
+  CONTACT: 'contact',
+  ADDRESS: 'address',
+  PHONE: 'phone',
+} as const;
+```
+
+### 3. Frontend - Fix ProtectedRoute Loading State
+**File**: `frontend/src/components/auth/ProtectedRoute.tsx`
+
+**Problem**: Missing `loading` state check causes redirect flash
+
+**Fix**:
+```typescript
+export const ProtectedRoute: React.FC = () => {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;
+};
+```
+
+---
+
+## Medium Priority Items
+
+4. **Frontend**: Remove `console.log` statements - use Logger utility
+5. **Frontend**: Remove `alert()` in `OrganizationFormViewModel.ts:497`
+6. **Frontend**: Update test mocks to match actual interfaces
+7. **Workflows**: Add database-level idempotency with `ON CONFLICT`
+8. **Workflows**: Add JSDoc contract documentation to workflows
+
+---
+
+## Uncommitted Changes
+
+The following changes are staged but not committed:
+
+- Documentation updates (architecture, workflows)
+- Environment variable standardization files
+- Code review report (`dev/active/comprehensive-code-review-plan.md`)
+- Archived dev docs
+
+---
+
+## Next Steps
+
+After `/clear`, you can:
+
+1. **Implement high-priority fixes**: Start with workflow hardcoded values
+2. **Read the full review**: `cat dev/active/comprehensive-code-review-plan.md`
+3. **Commit current changes**: Stage and commit documentation updates
+
+**Suggested prompt after /clear**:
+```
+Read dev/active/comprehensive-code-review-plan.md and help me implement the high-priority fixes starting with externalizing hardcoded configuration in workflows.
+```
+
+---
+
+## Background Processes
+
+All GitHub Actions workflows have completed successfully. No active background processes.
+
+To verify deployment status:
 ```bash
-kubectl logs -n temporal -l app=workflow-worker --tail=50
+gh run list --limit 5
+curl -s https://api-a4c.firstovertheline.com/health | jq
+curl -s https://a4c.firstovertheline.com | head -20
 ```
-
-**Check Realtime subscription:**
-```bash
-kubectl logs -n temporal -l app=workflow-worker --tail=50 | grep Realtime
-```
-
-**Expected output:**
-```
-[EventListener] ✅ Subscribed to workflow queue via Supabase Realtime
-[EventListener]    Channel: workflow_queue
-[EventListener]    Table: workflow_queue_projection
-[EventListener]    Filter: status=eq.pending
-```
-
-**Test organization bootstrap via UI:**
-```
-https://a4c.firstovertheline.com/organizations/new
-```
-
-**Port-forward Temporal Web UI:**
-```bash
-kubectl port-forward -n temporal svc/temporal-frontend 8080:8080
-# Then visit: http://localhost:8080
-```
-
----
-
-## If You Need to Rollback
-
-See `temporal-worker-realtime-migration-tasks.md` section "Rollback Procedure" for three rollback options.
-
----
-
-## Related Documents
-
-- **AsyncAPI Contract**: `@infrastructure/supabase/contracts/organization-bootstrap-events.yaml`
-- **Worker Code**: `@workflows/src/worker/event-listener.ts`
-- **CI/CD Pipeline**: `@.github/workflows/temporal-deploy.yml`
-- **Database Schema**: `@infrastructure/supabase/sql/02-tables/workflow_queue_projection/table.sql`
-
----
-
-**IMPORTANT**: Before making any changes, verify the worker is healthy in production using the commands above.

@@ -1,8 +1,8 @@
 # Temporal Worker Realtime Migration Plan
 
-**Status**: Phase 2 Complete - Ready for Phase 3 Testing
+**Status**: Phase 9 Complete - UAT Testing & Bug Fixes
 **Created**: 2025-11-27
-**Updated**: 2025-11-27
+**Updated**: 2025-11-29
 **Priority**: High - Blocks organization bootstrap workflow
 **Test Plan**: See `temporal-worker-realtime-migration-test-plan.md` for automated testing procedures
 
@@ -413,6 +413,122 @@ kubectl patch secret workflow-worker-secrets -n temporal \
   --type=json \
   -p='[{"op":"remove","path":"/data/SUPABASE_DB_URL"}]'
 ```
+
+### Step 9: UAT Testing & Bug Fixes (2025-11-29)
+
+**Background**: Initial UAT submission uncovered critical issues not caught in local testing due to environment differences. Local tests used direct SQL (bypassed RLS via SECURITY DEFINER) and mock Realtime, while production enforced RLS policies and used real Realtime subscriptions.
+
+#### Issue 1: Missing RLS Policies for Realtime
+
+**Symptom**: Worker subscribed successfully (logs showed "SUBSCRIBED") but never received notifications. Workflow queue jobs remained stuck in "pending" status indefinitely.
+
+**Root Cause**: Supabase Realtime enforces RLS policies even for service_role operations. Only SELECT policy existed on `workflow_queue_projection`, missing INSERT/UPDATE/DELETE policies blocked change notifications.
+
+**Fix**: Create idempotent migration `add_realtime_policies_workflow_queue`:
+
+```sql
+-- Allow service_role to INSERT (required for Realtime to broadcast INSERT events)
+DROP POLICY IF EXISTS workflow_queue_projection_service_role_insert ON workflow_queue_projection;
+CREATE POLICY workflow_queue_projection_service_role_insert
+  ON workflow_queue_projection
+  FOR INSERT
+  TO service_role
+  WITH CHECK (true);
+
+-- Allow service_role to UPDATE (required for Realtime to broadcast UPDATE events)
+DROP POLICY IF EXISTS workflow_queue_projection_service_role_update ON workflow_queue_projection;
+CREATE POLICY workflow_queue_projection_service_role_update
+  ON workflow_queue_projection
+  FOR UPDATE
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- Allow service_role to DELETE (required for Realtime to broadcast DELETE events)
+DROP POLICY IF EXISTS workflow_queue_projection_service_role_delete ON workflow_queue_projection;
+CREATE POLICY workflow_queue_projection_service_role_delete
+  ON workflow_queue_projection
+  FOR DELETE
+  TO service_role
+  USING (true);
+```
+
+**Result**: Second UAT submission processed in 187ms (INSERT to worker claim).
+
+#### Issue 2: Resend Email Domain Configuration
+
+**Symptom**: `403 Forbidden` error: "The {subdomain}.firstovertheline.com domain is not verified"
+
+**Root Cause**: Resend verifies parent domain only, not subdomains. Activities sent from `noreply@{subdomain}.firstovertheline.com` which Resend rejected.
+
+**Fix Part 1 - DNS Setup** (one-time): Configure parent domain in Cloudflare:
+
+```bash
+# DKIM TXT record
+resend._domainkey.firstovertheline.com → "p=MIGfMA0GCS..."
+
+# SPF MX record
+send.firstovertheline.com → feedback-smtp.us-east-1.amazonses.com (priority 10)
+
+# SPF TXT record
+send.firstovertheline.com → "v=spf1 include:amazonses.com ~all"
+
+# DMARC TXT record
+_dmarc.firstovertheline.com → "v=DMARC1; p=none;"
+```
+
+**Fix Part 2 - Code Update** (`workflows/src/activities/organization-bootstrap/send-invitation-emails.ts`):
+
+```typescript
+// Extract parent domain for email sender (e.g., firstovertheline.com from poc-test1.firstovertheline.com)
+const domainParts = params.domain.split('.');
+const parentDomain = domainParts.slice(-2).join('.');
+
+// Send from verified parent domain, not subdomain
+await emailProvider.sendEmail({
+  from: `Analytics4Change <noreply@${parentDomain}>`,  // Uses parent domain
+  to: invitation.email,
+  subject: `Invitation to join ${orgName}`,
+  html,
+  text
+});
+```
+
+**Known Limitation**: Hardcoded `.slice(-2)` fails for multi-part TLDs like `.co.uk`. TODO: Replace with PSL (Public Suffix List) library.
+
+**Critical Discovery**: Domain name typo in Resend ("firstoverttheline.com" with extra 't') caused 2+ hour verification delay. Deleting and recreating domain generated new DKIM key, requiring Cloudflare DNS update.
+
+#### Issue 3: Frontend API Mismatch
+
+**Symptom**: Form submission returned 400 error: "Missing workflowId parameter"
+
+**Root Cause**: Edge Function expected `workflowId` in URL query params, frontend sent it in POST body.
+
+**Fix** (`infrastructure/supabase/supabase/functions/workflow-status/index.ts`):
+
+```typescript
+// BEFORE
+const url = new URL(req.url);
+const workflowId = url.searchParams.get('workflowId');  // ❌ Wrong
+
+// AFTER
+const { workflowId } = await req.json();  // ✅ Correct - reads from body
+```
+
+#### Issue 4: Misleading Worker Logs
+
+**Symptom**: Startup logs showed incorrect subscription details (wrong channel/table names).
+
+**Fix** (`workflows/src/worker/index.ts`):
+
+```typescript
+// Corrected log output
+console.log(`  Channel: workflow_queue`);       // Was: workflow_events
+console.log(`  Table: workflow_queue_projection`); // Was: domain_events
+console.log(`  Filter: status=eq.pending`);     // Added
+```
+
+**All fixes committed**: Commit `655707d9` (2025-11-29)
 
 ## Benefits of Supabase Realtime
 
