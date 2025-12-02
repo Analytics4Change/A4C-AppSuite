@@ -8,6 +8,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { Client, Connection } from '@temporalio/client';
 import { createClient } from '@supabase/supabase-js';
 import { authMiddleware, requirePermission } from '../middleware/auth.js';
+import type { ContactInfo, AddressInfo, PhoneInfo } from '@shared/types/index.js';
 
 // Validate required environment variables
 function getRequiredEnvVar(name: string): string {
@@ -25,43 +26,7 @@ const temporalNamespace = process.env.TEMPORAL_NAMESPACE || 'default';
 const frontendUrl = process.env.FRONTEND_URL || 'https://a4c.firstovertheline.com';
 
 /**
- * Contact information structure
- */
-interface ContactInfo {
-  firstName: string;
-  lastName: string;
-  email: string;
-  title?: string;
-  department?: string;
-  type: string;
-  label: string;
-}
-
-/**
- * Address information structure
- */
-interface AddressInfo {
-  street1: string;
-  street2?: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  type: string;
-  label: string;
-}
-
-/**
- * Phone information structure
- */
-interface PhoneInfo {
-  number: string;
-  extension?: string;
-  type: string;
-  label: string;
-}
-
-/**
- * Organization user invitation structure
+ * Organization user invitation structure (API-specific, role is string for flexibility)
  */
 interface OrganizationUser {
   email: string;

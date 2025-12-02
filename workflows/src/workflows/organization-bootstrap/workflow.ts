@@ -71,8 +71,70 @@ const {
 
 /**
  * Organization Bootstrap Workflow
+ *
+ * Orchestrates the complete provisioning of a new organization including
+ * database records, DNS configuration, user invitations, and activation.
+ * Implements the Saga pattern for automatic compensation (rollback) on failure.
+ *
  * @param params - Organization bootstrap parameters
- * @returns Bootstrap result
+ * @param params.subdomain - Optional subdomain for DNS (required for providers/VAR partners)
+ * @param params.orgData - Organization details (name, type, contacts, addresses, phones)
+ * @param params.orgData.name - Organization display name
+ * @param params.orgData.type - Organization type: 'provider' | 'provider_partner' | 'platform_owner'
+ * @param params.orgData.contacts - Array of contact records (at least one required)
+ * @param params.orgData.addresses - Array of address records
+ * @param params.orgData.phones - Array of phone records
+ * @param params.users - Array of users to invite with email, name, and role
+ * @param params.frontendUrl - Frontend URL for invitation links (passed from caller)
+ * @param params.retryConfig - Optional DNS retry configuration for testing
+ *
+ * @returns Promise<OrganizationBootstrapResult> - Bootstrap result
+ * @returns {string} result.orgId - Created organization UUID
+ * @returns {string} result.domain - Full domain name (e.g., 'subdomain.firstovertheline.com')
+ * @returns {boolean} result.dnsConfigured - Whether DNS was successfully configured
+ * @returns {number} result.invitationsSent - Count of successfully sent invitation emails
+ * @returns {string[]} result.errors - Non-fatal errors (email failures, compensation errors)
+ *
+ * @precondition Workflow ID must be unique (e.g., `org-bootstrap-{subdomain}`)
+ * @precondition params.orgData.contacts must contain at least one contact
+ * @precondition params.users must contain at least one user to invite
+ * @precondition For providers/VAR partners: params.subdomain must be unique and available
+ *
+ * @postcondition On success: Organization record exists with status='active'
+ * @postcondition On success: All contacts, addresses, phones linked to organization
+ * @postcondition On success: DNS CNAME record exists (if subdomain provided)
+ * @postcondition On success: Invitation emails sent to all users
+ * @postcondition On failure: Compensation runs in reverse order (Saga pattern)
+ * @postcondition On failure: Organization status='inactive', DNS removed, invitations revoked
+ *
+ * @sideeffect Emits domain events: organization.created, contact.created, address.created,
+ *             phone.created, invitation.generated, invitation.sent, organization.activated
+ * @sideeffect Creates Cloudflare DNS CNAME record (if subdomain provided)
+ * @sideeffect Sends invitation emails via configured email provider
+ * @sideeffect On compensation: Emits *.deleted events and removes external resources
+ *
+ * @throws {Error} DNS configuration failed after max retries (triggers compensation)
+ * @throws {Error} Activity execution timeout (10 minutes per activity)
+ *
+ * @example
+ * // Start workflow with unique ID
+ * const handle = await client.workflow.start(organizationBootstrapWorkflow, {
+ *   workflowId: `org-bootstrap-${subdomain}`,
+ *   taskQueue: 'bootstrap',
+ *   args: [{
+ *     subdomain: 'acme-health',
+ *     orgData: {
+ *       name: 'ACME Health Services',
+ *       type: 'provider',
+ *       contacts: [{ firstName: 'John', lastName: 'Doe', email: 'john@acme.com', type: 'a4c_admin', label: 'Primary' }],
+ *       addresses: [{ street1: '123 Main St', city: 'Austin', state: 'TX', zipCode: '78701', type: 'physical', label: 'HQ' }],
+ *       phones: [{ number: '512-555-1234', type: 'office', label: 'Main' }]
+ *     },
+ *     users: [{ email: 'john@acme.com', firstName: 'John', lastName: 'Doe', role: 'org_admin' }],
+ *     frontendUrl: 'https://a4c.firstovertheline.com'
+ *   }]
+ * });
+ * const result = await handle.result();
  */
 export async function organizationBootstrapWorkflow(
   params: OrganizationBootstrapParams

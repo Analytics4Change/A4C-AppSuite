@@ -23,6 +23,9 @@ interface HealthStatus {
   temporalConnected: boolean;
 }
 
+/** Default request timeout in milliseconds (30 seconds) */
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+
 export class HealthCheckServer {
   private server: http.Server;
   private port: number;
@@ -31,11 +34,22 @@ export class HealthCheckServer {
     temporalConnected: false
   };
 
-  constructor(port: number = 9090) {
+  /**
+   * Create a new health check server
+   * @param port - Port to listen on (default: 9090)
+   * @param requestTimeout - Request timeout in milliseconds (default: 30000)
+   */
+  constructor(port: number = 9090, requestTimeout: number = DEFAULT_REQUEST_TIMEOUT_MS) {
     this.port = port;
     this.server = http.createServer((req, res) => {
       this.handleRequest(req, res);
     });
+
+    // Configure server timeouts to prevent hanging connections
+    this.server.timeout = requestTimeout;
+    this.server.requestTimeout = requestTimeout;
+    this.server.headersTimeout = requestTimeout + 1000; // Headers timeout should be slightly longer
+    this.server.keepAliveTimeout = 5000; // Close idle connections after 5 seconds
   }
 
   /**
