@@ -1,0 +1,11 @@
+{
+  "name": "@a4c/config",
+  "version": "1.0.0",
+  "description": "Shared environment variable schemas for A4C-AppSuite",
+  "type": "module",
+  "main": "env-schema.ts",
+  "types": "env-schema.ts",
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
+}

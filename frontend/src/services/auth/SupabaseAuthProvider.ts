@@ -31,6 +31,7 @@ import {
   PermissionCheckResult,
   JWTClaims,
 } from '@/types/auth.types';
+import { getEnv } from '@/config/env-validation';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('api');
@@ -54,12 +55,17 @@ export class SupabaseAuthProvider implements IAuthProvider {
   private currentSession: Session | null = null;
 
   constructor(config?: SupabaseAuthConfig) {
-    // Use config or fall back to environment variables
-    this.config = config || {
-      supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-      supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      debug: import.meta.env.DEV,
-    };
+    // Use config or fall back to validated environment variables
+    if (config) {
+      this.config = config;
+    } else {
+      const env = getEnv();
+      this.config = {
+        supabaseUrl: env.VITE_SUPABASE_URL,
+        supabaseAnonKey: env.VITE_SUPABASE_ANON_KEY,
+        debug: import.meta.env.DEV,
+      };
+    }
 
     if (!this.config.supabaseUrl || !this.config.supabaseAnonKey) {
       throw new Error(

@@ -14,9 +14,10 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v2';
+const DEPLOY_VERSION = 'v3';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -108,33 +109,18 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Validate required environment variables
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-
-  // Backend API URL - this is the k8s service that connects to Temporal
-  // Default to production URL, can be overridden for testing
-  const backendApiUrl = Deno.env.get('BACKEND_API_URL') || 'https://api-a4c.firstovertheline.com';
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error(`[organization-bootstrap ${DEPLOY_VERSION}] Missing required environment variables:`, {
-      has_supabase_url: !!supabaseUrl,
-      has_anon_key: !!supabaseAnonKey,
-      version: DEPLOY_VERSION
-    });
-    return new Response(
-      JSON.stringify({
-        error: 'Server configuration error',
-        details: 'Missing required environment variables',
-        version: DEPLOY_VERSION
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
+  // ==========================================================================
+  // ENVIRONMENT VALIDATION - FAIL FAST
+  // Zod validates required env vars and returns typed object
+  // ==========================================================================
+  let env;
+  try {
+    env = validateEdgeFunctionEnv('organization-bootstrap');
+  } catch (error) {
+    return createEnvErrorResponse('organization-bootstrap', DEPLOY_VERSION, error.message, corsHeaders);
   }
 
+  const { SUPABASE_URL: supabaseUrl, SUPABASE_ANON_KEY: supabaseAnonKey, BACKEND_API_URL: backendApiUrl } = env;
   console.log(`[organization-bootstrap ${DEPLOY_VERSION}] ✓ Environment validated, Backend API: ${backendApiUrl}`);
 
   try {

@@ -4,7 +4,8 @@
  * Initializes and runs the Temporal worker for organization bootstrap workflows.
  *
  * Features:
- * - Configuration validation on startup
+ * - Zod environment validation on startup (fail-fast)
+ * - Configuration validation with business logic
  * - Graceful shutdown handling
  * - Health check server for Kubernetes probes
  * - Automatic reconnection on Temporal disconnection
@@ -13,18 +14,21 @@
  *   NODE_ENV=production node dist/worker/index.js
  */
 
-import { NativeConnection, Worker } from '@temporalio/worker';
-import { logConfigurationStatus } from '../shared/config';
-import { HealthCheckServer } from './health';
-import * as activities from '../activities/organization-bootstrap';
-
-// Load environment variables in development
+// =============================================================================
+// ENVIRONMENT LOADING - MUST BE FIRST
+// Load dotenv before any other code runs (development only)
+// =============================================================================
 if (process.env.NODE_ENV !== 'production') {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   require('dotenv').config({ path: '.env.local' });
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   require('dotenv').config();
 }
+
+import { NativeConnection, Worker } from '@temporalio/worker';
+import { logConfigurationStatus, getWorkflowsEnv } from '../shared/config';
+import { HealthCheckServer } from './health';
+import * as activities from '../activities/organization-bootstrap';
 
 /**
  * Main worker initialization
@@ -35,7 +39,10 @@ async function run() {
   console.log('='.repeat(60));
   console.log('');
 
-  // Validate configuration
+  // ==========================================================================
+  // CONFIGURATION VALIDATION - FAIL FAST
+  // Zod validates required env vars, then business logic checks provider combos
+  // ==========================================================================
   try {
     logConfigurationStatus();
   } catch (error) {
@@ -44,10 +51,11 @@ async function run() {
     process.exit(1);
   }
 
+  // Get validated environment (safe to use after validation)
+  const env = getWorkflowsEnv();
+
   // Start health check server
-  const healthCheck = new HealthCheckServer(
-    parseInt(process.env.HEALTH_CHECK_PORT || '9090', 10)
-  );
+  const healthCheck = new HealthCheckServer(env.HEALTH_CHECK_PORT);
 
   try {
     await healthCheck.start();
@@ -58,14 +66,14 @@ async function run() {
 
   // Connect to Temporal
   console.log('Connecting to Temporal...');
-  console.log(`  Address: ${process.env.TEMPORAL_ADDRESS}`);
-  console.log(`  Namespace: ${process.env.TEMPORAL_NAMESPACE}`);
+  console.log(`  Address: ${env.TEMPORAL_ADDRESS}`);
+  console.log(`  Namespace: ${env.TEMPORAL_NAMESPACE}`);
   console.log('');
 
   let connection: NativeConnection;
   try {
     connection = await NativeConnection.connect({
-      address: process.env.TEMPORAL_ADDRESS || 'localhost:7233'
+      address: env.TEMPORAL_ADDRESS
     });
     healthCheck.setTemporalConnected(true);
     console.log('✅ Connected to Temporal\n');
@@ -78,7 +86,7 @@ async function run() {
 
   // Create worker
   console.log('Creating worker...');
-  console.log(`  Task Queue: ${process.env.TEMPORAL_TASK_QUEUE}`);
+  console.log(`  Task Queue: ${env.TEMPORAL_TASK_QUEUE}`);
   console.log(`  Workflows: organization-bootstrap`);
   console.log(`  Activities: 9 activities (6 forward, 3 compensation)`);
   console.log('');
@@ -87,15 +95,15 @@ async function run() {
   try {
     worker = await Worker.create({
       connection,
-      namespace: process.env.TEMPORAL_NAMESPACE || 'default',
-      taskQueue: process.env.TEMPORAL_TASK_QUEUE || 'bootstrap',
+      namespace: env.TEMPORAL_NAMESPACE,
+      taskQueue: env.TEMPORAL_TASK_QUEUE,
       workflowsPath: require.resolve('../workflows/organization-bootstrap'),
       activities,
       // Worker options
       maxConcurrentActivityTaskExecutions: 10,
       maxConcurrentWorkflowTaskExecutions: 10,
       // Enable verbose logging in development
-      enableSDKTracing: process.env.NODE_ENV !== 'production'
+      enableSDKTracing: env.NODE_ENV !== 'production'
     });
 
     healthCheck.setWorkerRunning(true);
@@ -146,17 +154,17 @@ async function run() {
   console.log('='.repeat(60));
   console.log('');
   console.log('Configuration:');
-  console.log(`  Temporal Address: ${process.env.TEMPORAL_ADDRESS}`);
-  console.log(`  Temporal Namespace: ${process.env.TEMPORAL_NAMESPACE}`);
-  console.log(`  Task Queue: ${process.env.TEMPORAL_TASK_QUEUE}`);
-  console.log(`  Workflow Mode: ${process.env.WORKFLOW_MODE || 'development'}`);
-  console.log(`  Health Check Port: ${process.env.HEALTH_CHECK_PORT || '9090'}`);
-  console.log(`  Supabase URL: ${process.env.SUPABASE_URL || '(not set)'}`);
-  console.log(`  Supabase Key: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 20) + '...' : '(not set)'}`);
+  console.log(`  Temporal Address: ${env.TEMPORAL_ADDRESS}`);
+  console.log(`  Temporal Namespace: ${env.TEMPORAL_NAMESPACE}`);
+  console.log(`  Task Queue: ${env.TEMPORAL_TASK_QUEUE}`);
+  console.log(`  Workflow Mode: ${env.WORKFLOW_MODE}`);
+  console.log(`  Health Check Port: ${env.HEALTH_CHECK_PORT}`);
+  console.log(`  Supabase URL: ${env.SUPABASE_URL}`);
+  console.log(`  Supabase Key: ${env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 20)}...`);
   console.log('');
   console.log('Health Endpoints:');
-  console.log(`  Liveness:  http://localhost:${process.env.HEALTH_CHECK_PORT || '9090'}/health`);
-  console.log(`  Readiness: http://localhost:${process.env.HEALTH_CHECK_PORT || '9090'}/ready`);
+  console.log(`  Liveness:  http://localhost:${env.HEALTH_CHECK_PORT}/health`);
+  console.log(`  Readiness: http://localhost:${env.HEALTH_CHECK_PORT}/ready`);
   console.log('');
   console.log('Press Ctrl+C to stop');
   console.log('');

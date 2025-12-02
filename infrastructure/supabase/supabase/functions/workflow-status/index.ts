@@ -9,9 +9,10 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v20';
+const DEPLOY_VERSION = 'v21';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -44,34 +45,27 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // ==========================================================================
+  // ENVIRONMENT VALIDATION - FAIL FAST
+  // Zod validates required env vars and returns typed object
+  // ==========================================================================
+  let env;
   try {
-    // Validate required environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    env = validateEdgeFunctionEnv('workflow-status');
+  } catch (error) {
+    return createEnvErrorResponse('workflow-status', DEPLOY_VERSION, error.message, corsHeaders);
+  }
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error(`[workflow-status ${DEPLOY_VERSION}] Missing required environment variables:`, {
-        has_supabase_url: !!supabaseUrl,
-        has_service_role_key: !!supabaseServiceKey
-      });
-      return new Response(
-        JSON.stringify({
-          error: 'Server configuration error',
-          details: 'Missing required environment variables',
-          version: DEPLOY_VERSION,
-          step: 'env_validation'
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
+  // This function requires service role key (not auto-set by Supabase)
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    return createEnvErrorResponse('workflow-status', DEPLOY_VERSION, 'SUPABASE_SERVICE_ROLE_KEY is required', corsHeaders);
+  }
 
-    console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ Environment variables validated`);
+  console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ Environment variables validated`);
 
+  try {
     // Initialize Supabase client with service role
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
     // Verify authorization (JWT token)
     const authHeader = req.headers.get('Authorization');

@@ -9,6 +9,10 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+
+// Deployment version tracking
+const DEPLOY_VERSION = 'v2';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -28,16 +32,32 @@ interface InvitationValidation {
 }
 
 serve(async (req) => {
+  console.log(`[validate-invitation v${DEPLOY_VERSION}] Processing ${req.method} request`);
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // ==========================================================================
+  // ENVIRONMENT VALIDATION - FAIL FAST
+  // Zod validates required env vars and returns typed object
+  // ==========================================================================
+  let env;
+  try {
+    env = validateEdgeFunctionEnv('validate-invitation');
+  } catch (error) {
+    return createEnvErrorResponse('validate-invitation', DEPLOY_VERSION, error.message, corsHeaders);
+  }
+
+  // This function requires service role key (not auto-set by Supabase)
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    return createEnvErrorResponse('validate-invitation', DEPLOY_VERSION, 'SUPABASE_SERVICE_ROLE_KEY is required', corsHeaders);
+  }
+
   try {
     // Initialize Supabase client with service role
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
     // Get invitation token from URL params
     const url = new URL(req.url);

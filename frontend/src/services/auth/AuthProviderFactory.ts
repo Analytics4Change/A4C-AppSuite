@@ -21,6 +21,7 @@ import { DevAuthProvider } from './DevAuthProvider';
 import { SupabaseAuthProvider } from './SupabaseAuthProvider';
 import { getDevAuthConfig } from '@/config/dev-auth.config';
 import { getDeploymentConfig } from '@/config/deployment.config';
+import { getEnv } from '@/config/env-validation';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('api');
@@ -52,21 +53,25 @@ export function createAuthProvider(): IAuthProvider {
       log.warn('⚠️  Using mock authentication - NOT for production!');
       return new DevAuthProvider(getDevAuthConfig());
 
-    case 'supabase':
+    case 'supabase': {
       log.info('🔐 Creating SupabaseAuthProvider (real authentication)');
+      const env = getEnv();
       return new SupabaseAuthProvider({
-        supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-        supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        supabaseUrl: env.VITE_SUPABASE_URL,
+        supabaseAnonKey: env.VITE_SUPABASE_ANON_KEY,
         debug: import.meta.env.DEV,
       });
+    }
 
-    default:
+    default: {
       log.warn(`Unknown auth provider type: ${providerType}, defaulting to Supabase`);
+      const env = getEnv();
       return new SupabaseAuthProvider({
-        supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-        supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        supabaseUrl: env.VITE_SUPABASE_URL,
+        supabaseAnonKey: env.VITE_SUPABASE_ANON_KEY,
         debug: import.meta.env.DEV,
       });
+    }
   }
 }
 

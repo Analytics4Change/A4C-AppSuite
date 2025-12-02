@@ -1,3 +1,10 @@
+// ============================================================================
+// ENVIRONMENT VALIDATION - MUST BE FIRST
+// Validates all VITE_* env vars. Throws if required vars are undefined.
+// ============================================================================
+import { validateEnvironment } from './config/env-validation';
+validateEnvironment();
+
 // Initialize MobX configuration before anything else
 import './config/mobx.config';
 
