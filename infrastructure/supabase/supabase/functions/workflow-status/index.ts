@@ -11,7 +11,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v19';
+const DEPLOY_VERSION = 'v20';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -126,10 +126,10 @@ serve(async (req) => {
 
     console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ workflowId: ${workflowId}`);
 
-    // Query bootstrap status using the existing PostgreSQL function
-    // Note: get_bootstrap_status is in public schema, not api schema
+    // Query bootstrap status using the API wrapper function
+    // Note: PostgREST only exposes 'api' schema, so we use the wrapper
     const { data: statusData, error: statusError } = await supabase
-      .schema('public')
+      .schema('api')
       .rpc('get_bootstrap_status', { p_bootstrap_id: workflowId });
 
     if (statusError) {
