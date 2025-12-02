@@ -1,13 +1,14 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-02
 ---
 
 # Organization Onboarding Workflow - Temporal Implementation
 
-**Status**: ✅ Primary workflow for organization bootstrap
+**Status**: ✅ Fully Implemented and Deployed (2025-12-01)
 **Priority**: Critical - Core business process
 **Pattern**: Workflow-First with Event-Driven Activities
+**Architecture**: 2-Hop (Frontend → Backend API → Temporal)
 
 > **Related Documentation**: This document provides a concise implementation guide for developers. For comprehensive design rationale, architecture decisions, complexity analysis, and risk assessment, see [OrganizationBootstrapWorkflow Design Specification](../../workflows/architecture/organization-bootstrap-workflow-design.md).
 
@@ -29,16 +30,31 @@ last_updated: 2025-01-12
 
 The Organization Onboarding Workflow orchestrates the complete bootstrap process for new provider and partner organizations, including:
 
-1. **Organization Creation**: Emit event to create organization record
-2. **DNS Configuration**: Provision subdomain via Cloudflare API
-3. **DNS Propagation Wait**: Durable timer (5-30 minutes)
-4. **DNS Verification**: Confirm subdomain resolves correctly
-5. **User Invitations**: Generate secure invitation tokens
-6. **Email Delivery**: Send invitation emails to users
+1. **Organization Creation**: Create organization with type, partner_type, referring_partner_id
+2. **Contact Creation**: Create contacts with type/label (headquarters, billing, admin)
+3. **Address Creation**: Create addresses with type/label (headquarters, billing, admin)
+4. **Phone Creation**: Create phones with type/label (main, billing, admin)
+5. **DNS Configuration**: Provision subdomain via Cloudflare API (providers only)
+6. **User Invitations**: Generate secure invitation tokens + send emails
 7. **Organization Activation**: Mark organization as active
 
+**Architecture**: 2-Hop Direct RPC
+```
+Frontend (React)
+     ↓ POST /api/v1/workflows/organization-bootstrap
+Backend API (Fastify @ api-a4c.firstovertheline.com)
+     ↓ client.workflow.start()
+Temporal Server (temporal-frontend.temporal.svc.cluster.local:7233)
+     ↓
+Temporal Worker (workflow-worker deployment)
+```
+
+**Activities**: 12 total (6 forward + 6 compensation)
+- **Forward**: createOrganization, createContacts, createAddresses, createPhones, configureDNS, generateAndSendInvitations
+- **Compensation**: compensateOrganization, compensateContacts, compensateAddresses, compensatePhones, compensateDNS, compensateInvitations
+
 **Key Characteristics**:
-- **Duration**: 10-40 minutes (depends on DNS propagation)
+- **Duration**: 2-5 minutes (DNS instant with Cloudflare proxy)
 - **Durability**: Survives worker crashes and restarts
 - **Retry Logic**: Automatic retries with exponential backoff
 - **Compensation**: Saga pattern for rollback on failures
@@ -78,20 +94,44 @@ const {
 })
 
 export interface OrganizationBootstrapParams {
+  subdomain: string // e.g., "acme-healthcare"
   orgData: {
     name: string
     type: 'provider' | 'partner'
-    parentOrgId?: string // For partner organizations
-    contactEmail: string
+    parentOrgId?: string             // For partner organizations
+    partnerType?: 'var' | 'family' | 'court' | 'other'  // For partner orgs
+    referringPartnerId?: string      // Who referred this organization
+    contacts: Array<{                // 3-section form contacts
+      firstName: string
+      lastName: string
+      email: string
+      title?: string
+      department?: string
+      type: 'headquarters' | 'billing' | 'admin' | 'emergency' | 'other'
+      label: string                  // e.g., "Headquarters Contact"
+    }>
+    addresses: Array<{               // 3-section form addresses
+      street1: string
+      street2?: string
+      city: string
+      state: string
+      zipCode: string
+      type: 'headquarters' | 'billing' | 'shipping' | 'mailing' | 'other'
+      label: string                  // e.g., "Billing Address"
+    }>
+    phones: Array<{                  // 3-section form phones
+      number: string
+      extension?: string
+      type: 'main' | 'billing' | 'mobile' | 'fax' | 'other'
+      label: string                  // e.g., "Main Office"
+    }>
   }
-  subdomain: string // e.g., "acme-healthcare"
   users: Array<{
     email: string
     firstName: string
     lastName: string
     role: 'provider_admin' | 'organization_member'
   }>
-  dnsPropagationTimeout?: number // Optional, default 30 minutes
 }
 
 export interface OrganizationBootstrapResult {
@@ -1167,6 +1207,8 @@ bootstrapOrganization().catch(console.error)
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-10-24
-**Status**: Ready for Implementation
+**Document Version**: 2.0
+**Last Updated**: 2025-12-02
+**Status**: ✅ Fully Implemented and Deployed
+
+**Implementation Location**: `workflows/src/workflows/organizationBootstrapWorkflow.ts`

@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-02
 ---
 
 # Temporal.io Integration Overview
@@ -382,56 +382,79 @@ export async function OrganizationBootstrapWorkflow(params) {
 
 ---
 
-## Event-Driven Integration
+## Workflow Triggering Architecture
 
-**Last Updated**: 2025-11-24 (Event-Driven Workflow Triggering)
+**Last Updated**: 2025-12-02 (2-Hop Architecture)
 
-A4C AppSuite uses a **bidirectional event-driven architecture** where events both trigger workflows AND are emitted by workflow activities. This provides complete decoupling between components while maintaining full traceability.
+A4C AppSuite uses a **direct RPC architecture** for workflow triggering with domain events used for **audit/state tracking only**.
 
-### Event → Workflow Triggering (New in 2025-11-24)
+### Current Architecture: 2-Hop Direct RPC
 
-**Architecture**: Database Trigger → PostgreSQL NOTIFY → Worker Listener → Workflow Start
+**Pattern**: Frontend → Backend API → Temporal (2 hops)
 
 ```mermaid
 sequenceDiagram
-    participant UI as Frontend/API
-    participant EF as Edge Function
-    participant DB as PostgreSQL
-    participant W as Temporal Worker
+    participant UI as Frontend
+    participant API as Backend API (k8s)
     participant T as Temporal Server
+    participant W as Temporal Worker
+    participant DB as PostgreSQL
 
-    UI->>EF: POST /create-organization
-    EF->>DB: INSERT domain_events<br/>(event_type='organization.bootstrap_initiated')
-    DB-->>DB: Trigger: process_organization_bootstrap_initiated
-    DB-->>W: NOTIFY workflow_events
-    W->>T: startWorkflow('org-bootstrap-{orgId}')
-    T-->>W: Workflow Started
-    W->>DB: UPDATE event_metadata<br/>(workflow_id, run_id)
-    Note over UI,T: Complete flow: ~185ms
+    UI->>API: POST /api/v1/workflows/organization-bootstrap
+    API->>DB: Emit organization.bootstrap.initiated event (audit)
+    API->>T: startWorkflow('organizationBootstrapWorkflow')
+    T-->>API: Workflow ID returned
+    API-->>UI: { workflowId, organizationId }
+    T->>W: Execute workflow tasks
+    W->>DB: Emit domain events (state changes)
+    Note over UI,DB: Complete flow: ~150ms to workflow start
 ```
 
-**Key Components**:
+### Key Components
 
-1. **Database Trigger**: Automatically emits PostgreSQL NOTIFY when specific events inserted
-   - Location: `infrastructure/supabase/sql/04-triggers/process_organization_bootstrap_initiated.sql`
-   - Trigger: `organization.bootstrap_initiated` → NOTIFY `workflow_events` channel
+1. **Backend API Service**: Internal Kubernetes service that calls Temporal directly
+   - Location: `workflows/src/api/`
+   - Endpoint: `POST /api/v1/workflows/organization-bootstrap`
+   - External URL: `https://api-a4c.firstovertheline.com`
+   - Authentication: JWT token from Supabase Auth
+   - Permission: `organization.create_root` required
 
-2. **Worker Event Listener**: Listens for PostgreSQL notifications and starts workflows
-   - Location: `workflows/src/worker/event-listener.ts`
-   - Pattern: `LISTEN workflow_events` → Parse event → Start workflow → Update event with workflow context
+2. **Edge Functions** (Optional Proxy): Can proxy requests to Backend API
+   - Location: `infrastructure/supabase/supabase/functions/organization-bootstrap/`
+   - Role: Validate JWT → Forward to Backend API → Return response
+   - Note: Edge Functions cannot reach Temporal directly (Deno Deploy is external to k8s)
 
-3. **Edge Functions**: Primary interface for external clients to emit events
-   - Location: `infrastructure/supabase/functions/create-organization/`
-   - Role: Validate input → Insert event → Return 202 Accepted
+3. **Temporal Worker**: Standard Temporal task queue polling
+   - Location: `workflows/src/worker/`
+   - Pattern: Poll `bootstrap` task queue → Execute workflows → Emit events
+   - No event listener required - Temporal handles work distribution
 
-**Benefits**:
-- ✅ **Decoupled**: Frontend/Edge Functions don't need Temporal client libraries
-- ✅ **Fast**: Sub-200ms latency from event emission to workflow start
-- ✅ **Reliable**: Events persisted before workflow starts; automatic retry on failure
-- ✅ **Observable**: Complete audit trail via event-workflow linking
-- ✅ **Scalable**: Multiple workers can listen to same channel
+### Architecture Evolution
 
-**Detailed Documentation**: See `documentation/architecture/workflows/event-driven-workflow-triggering.md` (comprehensive 85KB guide)
+**Previous Architecture (deprecated 2025-12-01)**:
+```
+Frontend → Edge Function → PostgreSQL → Realtime → Worker Listener → Temporal (5 hops)
+```
+
+**Current Architecture (2025-12-02)**:
+```
+Frontend → Backend API → Temporal (2 hops)
+```
+
+**Why We Changed**:
+- ❌ Supabase Realtime required RLS policies for service communication (complex)
+- ❌ Silent failures when RLS policies missing (hard to debug)
+- ❌ Event listener code added 509 lines of complexity
+- ❌ Local testing didn't match production behavior
+- ✅ Direct RPC is simpler, more reliable, easier to debug
+
+### Benefits of 2-Hop Architecture
+
+- ✅ **Simple**: Direct RPC call, no event-driven triggering complexity
+- ✅ **Fast**: ~150ms from UI submit to workflow start
+- ✅ **Reliable**: Immediate error feedback if workflow fails to start
+- ✅ **Observable**: Errors surface in Backend API logs immediately
+- ✅ **Testable**: Local development matches production behavior
 
 ### Workflow → Event → Projection Flow
 
@@ -968,12 +991,11 @@ If workflow changes cause issues:
 - **[Error Handling and Compensation](../../workflows/guides/error-handling-and-compensation.md)** - Saga pattern implementation
 - **[Workflow Implementation Guide](../../workflows/guides/implementation.md)** - How to build workflows
 
-### Event-Driven Workflow Triggering (NEW - 2025-11-24)
-- **[Event-Driven Workflow Triggering Architecture](./event-driven-workflow-triggering.md)** - Complete 85KB deep-dive on database trigger → NOTIFY → worker pattern
-- **[Triggering Workflows Guide](../../workflows/guides/triggering-workflows.md)** - User guide for emitting events to trigger workflows
+### Backend API & Workflow Triggering
+- **[Backend API Implementation](../../../dev/active/backend-api-implementation-status.md)** - Backend API service design and deployment
+- **[Triggering Workflows Guide](../../workflows/guides/triggering-workflows.md)** - How to trigger workflows via Backend API
 - **[Event Metadata Schema Reference](../../workflows/reference/event-metadata-schema.md)** - Complete schema for event_metadata JSONB column
-- **[Edge Functions Deployment Guide](../../infrastructure/guides/supabase/edge-functions-deployment.md)** - Deploy Edge Functions for workflow triggering
-- **[Integration Testing Guide](../../workflows/guides/integration-testing.md)** - End-to-end testing for event-driven workflows
+- **[Provider Onboarding Quickstart](../../workflows/guides/provider-onboarding-quickstart.md)** - Step-by-step organization creation guide
 
 ### Infrastructure & Deployment
 - **[Workflows CLAUDE.md](../../../workflows/CLAUDE.md)** - Temporal worker development guide
@@ -992,6 +1014,6 @@ If workflow changes cause issues:
 
 ---
 
-**Document Version**: 1.1
-**Last Updated**: 2025-11-24 (Event-Driven Workflow Triggering)
-**Status**: Operational and Ready for Development
+**Document Version**: 2.0
+**Last Updated**: 2025-12-02 (2-Hop Architecture - Backend API)
+**Status**: Operational and Production-Ready

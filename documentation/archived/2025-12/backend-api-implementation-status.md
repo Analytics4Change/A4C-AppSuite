@@ -511,4 +511,118 @@ curl https://api-a4c.firstovertheline.com/health
 
 ---
 
-**Last Updated**: 2025-12-02 00:16 UTC (Hostname renamed to api-a4c for Cloudflare Universal SSL compatibility, HTTPS verified working)
+**Last Updated**: 2025-12-02 02:10 UTC (Phase 6 UAT PASSED - End-to-end organization bootstrap working!)
+
+---
+
+## Phase 6: UAT Testing ✅ COMPLETE
+
+**Date**: 2025-12-02
+**Result**: ✅ END-TO-END TEST PASSED
+
+### Issues Fixed During Testing
+
+**Issue 1: workflow-status Edge Function - Wrong Env Var Name**
+- Error: 500 Server Error accessing undefined `SERVICE_ROLE_KEY`
+- Fix: Changed to `SUPABASE_SERVICE_ROLE_KEY` (correct Supabase env var name)
+- Commit: `b216e328`
+
+**Issue 2: workflow-status Edge Function - Schema Error**
+- Error: `"details": "The schema must be one of the following: api"`
+- Fix: Changed `.schema('public')` to `.schema('api')` for RPC call
+- Created `api.get_bootstrap_status()` wrapper function
+- Commit: `0df45be4`
+
+**Issue 3: organization-bootstrap Edge Function - Temporal Connection Timeout**
+- Error: 11 second timeout connecting to `temporal-frontend.temporal.svc.cluster.local:7233`
+- Root cause: Edge Functions run in Deno Deploy, cannot reach k8s internal DNS
+- Fix: Updated Edge Function to call Backend API instead of Temporal directly
+- New flow: Frontend → Edge Function (auth) → Backend API (k8s) → Temporal
+- Commit: `b632fe77`
+
+**Issue 4: Backend API - Wrong Workflow Name**
+- Error: `TypeError: Failed to initialize workflow of type 'organizationBootstrap': no such function is exported by the workflow bundle`
+- Root cause: Backend API called `'organizationBootstrap'` but worker exports `organizationBootstrapWorkflow`
+- Fix: Changed to `'organizationBootstrapWorkflow'`
+- Commit: `506f58d5`
+
+### Successful UAT Run
+
+**Organization Created**: `poc-test1-20251201`
+**Organization ID**: `37870161-ef02-4d4b-b44d-98b2b24cd194`
+**Workflow ID**: `org-bootstrap-poc-test1-20251201-1764640895831`
+
+**Workflow Steps Completed**:
+1. ✅ Organization created
+2. ✅ Contacts created (2) and linked
+3. ✅ Addresses created (3) and linked
+4. ✅ Phones created (3) and linked
+5. ✅ DNS configured: `poc-test1-20251201.firstovertheline.com`
+6. ✅ User invitation generated
+7. ✅ Invitation email sent to `johnltice@yahoo.com` (via Resend)
+8. ✅ Organization activated
+
+**Events Emitted**:
+- `contact.created` (2), `organization.contact.linked` (2)
+- `address.created` (3), `organization.address.linked` (3)
+- `phone.created` (3), `organization.phone.linked` (3)
+- `organization.dns.configured`
+- `user.invited`
+- `invitation.email.sent`
+- `organization.activated`
+
+### Architecture Confirmed Working
+
+```
+Frontend → Edge Function (auth) → Backend API (k8s) → Temporal → Worker → Events → Database
+```
+
+**Edge Functions Updated** (`infrastructure/supabase/supabase/functions/`):
+- `organization-bootstrap/index.ts` - v2: Proxies to Backend API
+- `workflow-status/index.ts` - v20: Uses `.schema('api')` for RPC
+
+**Backend API** (`workflows/src/api/routes/workflows.ts`):
+- Calls `organizationBootstrapWorkflow` (correct name)
+
+---
+
+## Success Criteria ✅ ALL MET
+
+**Infrastructure Validation**:
+- [x] API running in k8s with 2 replicas
+- [x] Health checks passing
+- [x] Temporal connection verified
+- [x] CI/CD pipeline functional
+- [x] DNS and TLS working
+- [x] Traefik ingress routing fixed
+
+**Frontend Integration**:
+- [x] `VITE_BACKEND_API_URL` environment variable configured
+- [x] `TemporalWorkflowClient.ts` uses Backend API
+- [x] **End-to-end test from UI PASSED**
+
+**Workflow Execution**:
+- [x] Frontend calls API successfully with JWT authentication
+- [x] Organization creation works end-to-end
+- [x] 2-hop architecture validated
+- [x] Email delivery confirmed
+
+---
+
+## Commands for Continuation
+
+**After /clear** (Phase 6 is complete, ready for production use):
+
+```bash
+# 1. Verify deployment is running
+kubectl get pods -n temporal -l app=temporal-api
+kubectl get pods -n temporal -l app=workflow-worker
+
+# 2. Test external endpoint
+curl https://api-a4c.firstovertheline.com/health
+
+# 3. Test organization bootstrap (via UI)
+# Navigate to: https://a4c.firstovertheline.com/organizations/new
+```
+
+---

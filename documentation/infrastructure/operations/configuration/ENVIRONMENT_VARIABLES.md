@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-02
 ---
 
 # Environment Variables Reference
 
-**Last Updated**: 2025-11-04
-**Version**: 1.0.0
+**Last Updated**: 2025-12-02
+**Version**: 2.0.0
 
 This document provides a comprehensive reference for all environment variables used across the A4C-AppSuite monorepo.
 
@@ -15,12 +15,14 @@ This document provides a comprehensive reference for all environment variables u
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Frontend Configuration](#frontend-configuration)
-3. [Temporal Workflows Configuration](#temporal-workflows-configuration)
-4. [Infrastructure Configuration](#infrastructure-configuration)
-5. [Cross-Component Interactions](#cross-component-interactions)
-6. [Security Best Practices](#security-best-practices)
-7. [Troubleshooting](#troubleshooting)
+2. [Zod Runtime Validation](#zod-runtime-validation)
+3. [Frontend Configuration](#frontend-configuration)
+4. [Temporal Workflows Configuration](#temporal-workflows-configuration)
+5. [Infrastructure Configuration](#infrastructure-configuration)
+6. [Edge Functions Configuration](#edge-functions-configuration)
+7. [Cross-Component Interactions](#cross-component-interactions)
+8. [Security Best Practices](#security-best-practices)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -48,6 +50,214 @@ A4C-AppSuite/
 └── infrastructure/k8s/temporal/
     ├── worker-configmap.yaml     # Non-sensitive Kubernetes config
     └── worker-secret.yaml.example # Sensitive credentials template
+```
+
+---
+
+## Zod Runtime Validation
+
+All environment variables across the A4C-AppSuite are validated at runtime using [Zod](https://zod.dev/) schemas. This ensures:
+
+1. **Fail Fast**: Missing required variables cause immediate startup failure with clear error messages
+2. **Type Safety**: Runtime validation produces TypeScript-inferred types
+3. **Consistency**: Same validation approach across frontend, workflows, and Edge functions
+
+### Validation Pattern
+
+Each component validates environment variables at the earliest possible point:
+
+| Component | Entry Point | Schema File | Accessor Function |
+|-----------|-------------|-------------|-------------------|
+| Frontend | `main.tsx` | `src/config/env-validation.ts` | `getEnv()` |
+| Workflows | `worker/index.ts` | `src/shared/config/env-schema.ts` | `getWorkflowsEnv()` |
+| Edge Functions | Each function | `_shared/env-schema.ts` | `validateEdgeFunctionEnv()` |
+
+### Schema Behavior
+
+Zod schemas define required vs optional environment variables:
+
+```typescript
+// REQUIRED - throws ZodError if undefined
+z.string()
+z.string().min(1)
+z.string().url()
+
+// OPTIONAL - allows undefined
+z.string().optional()
+
+// OPTIONAL with default - undefined becomes the default value
+z.string().default('localhost:7233')
+
+// Transform with default (note: .default() MUST come BEFORE .transform())
+z.string().default('9090').transform((v) => parseInt(v, 10))
+```
+
+### Frontend Validation
+
+The frontend validates environment variables before React initialization:
+
+```typescript
+// frontend/src/main.tsx
+import { validateEnv } from '@/config/env-validation';
+
+// Validate environment BEFORE React starts
+validateEnv();
+
+// Now safe to render
+ReactDOM.createRoot(document.getElementById('root')!).render(<App />);
+```
+
+**Mode-Aware Validation**: The frontend has three auth modes:
+- `mock` - Supabase variables optional (for UI development)
+- `integration` - Supabase variables required
+- `production` - Supabase variables required
+
+```typescript
+// frontend/src/config/env-validation.ts
+const authMode = rawEnv.VITE_AUTH_MODE || 'mock';
+
+if (authMode === 'mock') {
+  // Use schema with optional Supabase vars
+  result = mockModeSchema.safeParse(rawEnv);
+} else {
+  // Use schema with required Supabase vars
+  result = productionModeSchema.safeParse(rawEnv);
+}
+```
+
+**Accessing Validated Environment**:
+
+```typescript
+import { getEnv } from '@/config/env-validation';
+
+const env = getEnv();
+// env.VITE_SUPABASE_URL is typed as string (not string | undefined)
+```
+
+### Workflows Validation
+
+The workflow worker validates environment at startup:
+
+```typescript
+// workflows/src/worker/index.ts
+import { validateWorkflowsEnv, getWorkflowsEnv } from '../shared/config';
+
+// Validate during worker startup (throws on invalid config)
+const env = getWorkflowsEnv();
+
+// Use validated environment
+const connection = await NativeConnection.connect({
+  address: env.TEMPORAL_ADDRESS,  // string, not string | undefined
+});
+```
+
+**Business Logic Validation**: After Zod validates types, additional checks run:
+
+```typescript
+// workflows/src/shared/config/validate-config.ts
+export function validateConfiguration(): ConfigValidationResult {
+  // Step 1: Zod validates types
+  const env = validateWorkflowsEnv();
+
+  // Step 2: Business logic validation
+  if (env.WORKFLOW_MODE === 'production') {
+    if (!env.CLOUDFLARE_API_TOKEN) {
+      errors.push('Production mode requires CLOUDFLARE_API_TOKEN');
+    }
+    if (!env.RESEND_API_KEY && !env.SMTP_HOST) {
+      errors.push('Production mode requires RESEND_API_KEY or SMTP credentials');
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+```
+
+### Edge Functions Validation
+
+Edge functions validate at the start of each request handler:
+
+```typescript
+// infrastructure/supabase/supabase/functions/organization-bootstrap/index.ts
+import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+
+serve(async (req) => {
+  // Validate environment - fail fast
+  let env;
+  try {
+    env = validateEdgeFunctionEnv('organization-bootstrap');
+  } catch (error) {
+    return createEnvErrorResponse('organization-bootstrap', DEPLOY_VERSION, error.message, corsHeaders);
+  }
+
+  // Additional check for service role key
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    return createEnvErrorResponse('organization-bootstrap', DEPLOY_VERSION,
+      'SUPABASE_SERVICE_ROLE_KEY is required', corsHeaders);
+  }
+
+  // Now safe to use env.SUPABASE_URL, env.BACKEND_API_URL, etc.
+});
+```
+
+### Error Messages
+
+When validation fails, clear error messages indicate what's missing:
+
+**Frontend**:
+```
+[A4C-FrontEnd] Environment validation failed:
+  - VITE_SUPABASE_URL: Invalid url
+  - VITE_SUPABASE_ANON_KEY: Required
+```
+
+**Workflows**:
+```
+[workflows] Environment validation failed:
+  - SUPABASE_URL: Invalid url
+  - SUPABASE_SERVICE_ROLE_KEY: String must contain at least 1 character(s)
+```
+
+**Edge Functions** (HTTP 500 response):
+```json
+{
+  "error": "Server configuration error",
+  "details": "Missing required environment variables",
+  "version": "v3"
+}
+```
+
+### Adding New Environment Variables
+
+When adding a new environment variable:
+
+1. **Add to Zod schema** in the appropriate file:
+   - Frontend: `frontend/src/config/env-validation.ts`
+   - Workflows: `workflows/src/shared/config/env-schema.ts`
+   - Edge Functions: `infrastructure/supabase/supabase/functions/_shared/env-schema.ts`
+
+2. **Add TypeScript declaration** (frontend only):
+   - Update `frontend/src/vite-env.d.ts`
+
+3. **Update documentation**:
+   - Add to this file under the appropriate section
+
+4. **Update `.env.example`** files
+
+Example of adding a new variable:
+
+```typescript
+// In schema file
+export const mySchema = z.object({
+  // ... existing variables
+
+  // Add new variable
+  MY_NEW_VAR: z.string().min(1),  // Required
+  // or
+  MY_OPTIONAL_VAR: z.string().optional(),  // Optional
+  // or
+  MY_DEFAULT_VAR: z.string().default('default-value'),  // Optional with default
+});
 ```
 
 ---
@@ -767,6 +977,130 @@ SMTP_PASS: <base64-encoded>
 
 ---
 
+## Edge Functions Configuration
+
+Supabase Edge Functions run in Deno Deploy and have their own environment variable configuration.
+
+### Platform-Provided Variables (Auto-Injected)
+
+These are automatically provided by the Supabase platform:
+
+#### `SUPABASE_URL`
+
+**Purpose**: Supabase project URL for database and API operations
+**Auto-Injected**: Yes (by Supabase platform)
+**Required**: Yes
+
+**Behavior Influence**: Determines which Supabase instance the Edge function connects to
+
+**Note**: No `VITE_` prefix - Edge functions use the Node.js naming convention
+
+#### `SUPABASE_ANON_KEY`
+
+**Purpose**: Anonymous API key for public operations
+**Auto-Injected**: Yes (by Supabase platform)
+**Required**: Yes
+
+**Behavior Influence**: Enables API calls constrained by RLS policies
+
+#### `SUPABASE_SERVICE_ROLE_KEY`
+
+**Purpose**: Service role API key for privileged operations
+**Auto-Injected**: Yes (by Supabase platform)
+**Required**: Depends on function
+
+**Behavior Influence**: Enables bypassing RLS for administrative operations
+
+**Security Note**: Only use for trusted backend operations, never expose to clients
+
+---
+
+### Custom Variables (Manually Set)
+
+These must be set via Supabase Dashboard or CLI:
+
+#### `BACKEND_API_URL`
+
+**Purpose**: Backend API URL for Temporal workflow operations
+**Default**: `https://api-a4c.firstovertheline.com`
+**Required**: Yes (for `organization-bootstrap` function)
+
+**Behavior Influence**: Edge functions proxy workflow requests to this Backend API
+
+**Setting via Dashboard**:
+1. Go to Supabase Dashboard → Settings → Edge Functions
+2. Add `BACKEND_API_URL` with appropriate value
+
+**Setting via CLI**:
+```bash
+supabase secrets set BACKEND_API_URL=https://api-a4c.firstovertheline.com
+```
+
+#### `GIT_COMMIT_SHA`
+
+**Purpose**: Deployment tracking for debugging
+**Default**: None
+**Required**: No
+
+**Behavior Influence**: Included in error responses for deployment tracking
+
+**Set by CI/CD**: Typically injected during deployment
+
+---
+
+### Edge Function Schema
+
+All Edge functions use a shared Zod schema:
+
+**File**: `infrastructure/supabase/supabase/functions/_shared/env-schema.ts`
+
+```typescript
+export const edgeFunctionEnvSchema = z.object({
+  // Auto-injected by Supabase platform
+  SUPABASE_URL: z.string().url(),
+  SUPABASE_ANON_KEY: z.string().min(1),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+
+  // Custom variables (set via Dashboard or CLI)
+  BACKEND_API_URL: z.string().url().default('https://api-a4c.firstovertheline.com'),
+  GIT_COMMIT_SHA: z.string().optional(),
+});
+```
+
+---
+
+### Available Edge Functions
+
+| Function | Purpose | Requires Service Role |
+|----------|---------|----------------------|
+| `organization-bootstrap` | Initiate org bootstrap workflow via Backend API | No |
+| `workflow-status` | Query workflow progress from database | Yes |
+| `validate-invitation` | Validate invitation tokens | Yes |
+| `accept-invitation` | Accept invitation and create user | Yes |
+
+---
+
+### Deployment
+
+Deploy Edge functions with secrets:
+
+```bash
+# Set secrets first
+supabase secrets set BACKEND_API_URL=https://api-a4c.firstovertheline.com
+
+# Deploy all functions
+supabase functions deploy
+
+# Deploy specific function
+supabase functions deploy organization-bootstrap
+```
+
+**Files**:
+- `infrastructure/supabase/supabase/functions/` - Edge function source
+- `infrastructure/supabase/supabase/functions/_shared/env-schema.ts` - Shared validation
+
+---
+
 ## Cross-Component Interactions
 
 ### Mode Consistency Requirements
@@ -787,17 +1121,17 @@ SMTP_PASS: <base64-encoded>
 
 ### Cross-Component Behavior Matrix
 
-| Variable | Frontend | Workflows | Infrastructure | Behavior |
-|----------|----------|-----------|-----------------|----------|
+| Variable | Frontend | Workflows | Edge Functions | Behavior |
+|----------|----------|-----------|----------------|----------|
 | VITE_APP_MODE | Primary | N/A | N/A | Controls auth provider (mock vs real) |
-| WORKFLOW_MODE | N/A | Primary | Config | Controls DNS/email providers |
-| SUPABASE_URL | Required (prod) | Required | Config | Database connection point |
-| SUPABASE_ANON_KEY | Required (prod) | N/A | N/A | Frontend API access |
-| SUPABASE_SERVICE_ROLE_KEY | N/A | Required | Secret | Backend privileged operations |
-| CLOUDFLARE_API_TOKEN | N/A | If DNS | Secret | DNS provisioning |
-| RESEND_API_KEY | N/A | If Email | Secret | Email delivery |
-| NODE_ENV | Build | Runtime | N/A | Logging, optimizations |
-| TEMPORAL_ADDRESS | N/A | Required | Config | Workflow server connection |
+| WORKFLOW_MODE | N/A | Primary | N/A | Controls DNS/email providers |
+| SUPABASE_URL | Required (prod) | Required | Auto-injected | Database connection point |
+| SUPABASE_ANON_KEY | Required (prod) | N/A | Auto-injected | Frontend/Edge API access |
+| SUPABASE_SERVICE_ROLE_KEY | N/A | Required | Auto-injected | Backend privileged operations |
+| BACKEND_API_URL | N/A | N/A | Required | Edge→Backend API proxy |
+| CLOUDFLARE_API_TOKEN | N/A | If DNS | N/A | DNS provisioning |
+| RESEND_API_KEY | N/A | If Email | N/A | Email delivery |
+| TEMPORAL_ADDRESS | N/A | Required | N/A | Workflow server connection |
 
 ---
 
@@ -1033,32 +1367,53 @@ RESEND_API_KEY=re_xxx...
 
 ## Appendix: Configuration Validation
 
-All environment configurations are validated on application startup. Here's what gets validated:
+All environment configurations are validated on application startup using **Zod schemas**. See [Zod Runtime Validation](#zod-runtime-validation) for the full implementation details.
 
-### Frontend Validation (`frontend/src/services/auth/supabase.service.ts`)
+### Schema File Locations
 
-```typescript
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase configuration missing. Check your environment variables.');
-}
-```
+| Component | Schema File | Entry Point |
+|-----------|-------------|-------------|
+| Frontend | `frontend/src/config/env-validation.ts` | `main.tsx` |
+| Workflows | `workflows/src/shared/config/env-schema.ts` | `worker/index.ts` |
+| Edge Functions | `infrastructure/supabase/supabase/functions/_shared/env-schema.ts` | Each function |
 
-### Workflows Validation (`workflows/src/shared/config/validate-config.ts`)
+### What Gets Validated
 
-1. **WORKFLOW_MODE validation**
-   - Must be `mock`, `development`, or `production`
-   - Warnings for suspicious configurations
+**Frontend** (`frontend/src/config/env-validation.ts`):
+- `VITE_RXNORM_API_URL` - URL format validation
+- `VITE_SUPABASE_URL` - Required in production/integration modes
+- `VITE_SUPABASE_ANON_KEY` - Required in production/integration modes
+- `VITE_AUTH_MODE` - Enum: `mock`, `integration`, `production`
+- `VITE_BACKEND_API_URL` - URL format validation
 
-2. **Provider credential validation**
-   - If `DNS_PROVIDER=cloudflare`: Requires `CLOUDFLARE_API_TOKEN`
-   - If `EMAIL_PROVIDER=resend`: Requires `RESEND_API_KEY`
-   - If `EMAIL_PROVIDER=smtp`: Requires `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`
+**Workflows** (`workflows/src/shared/config/env-schema.ts`):
+- `WORKFLOW_MODE` - Enum: `mock`, `development`, `production`
+- `TEMPORAL_ADDRESS` - Required string (default: `localhost:7233`)
+- `SUPABASE_URL` - Required URL
+- `SUPABASE_SERVICE_ROLE_KEY` - Required non-empty string
+- `CLOUDFLARE_API_TOKEN` - Optional (required if production DNS)
+- `RESEND_API_KEY` - Optional (required if production email)
 
-3. **Production mode validation**
+**Edge Functions** (`_shared/env-schema.ts`):
+- `SUPABASE_URL` - Required URL (auto-injected)
+- `SUPABASE_ANON_KEY` - Required non-empty string (auto-injected)
+- `SUPABASE_SERVICE_ROLE_KEY` - Optional (auto-injected)
+- `BACKEND_API_URL` - URL with default
+
+### Business Logic Validation
+
+After Zod validates types, additional business logic checks run:
+
+1. **Production mode** (`WORKFLOW_MODE=production`):
    - Requires `CLOUDFLARE_API_TOKEN`
    - Requires `RESEND_API_KEY` or SMTP credentials
    - Warns if `TAG_DEV_ENTITIES=true`
    - Errors if `AUTO_CLEANUP=true`
+
+2. **Provider credential validation**:
+   - If `DNS_PROVIDER=cloudflare`: Requires `CLOUDFLARE_API_TOKEN`
+   - If `EMAIL_PROVIDER=resend`: Requires `RESEND_API_KEY`
+   - If `EMAIL_PROVIDER=smtp`: Requires `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`
 
 ---
 

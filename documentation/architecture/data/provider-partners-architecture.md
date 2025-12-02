@@ -1,17 +1,23 @@
 ---
-status: aspirational
-last_updated: 2025-01-12
+status: foundation-implemented
+last_updated: 2025-12-02
 ---
 
 # Provider Partner Architecture
-> [!WARNING]
-> **This feature is not yet implemented.** This document describes planned functionality that has not been built. Implementation timeline and approach are subject to change based on business priorities.
 
+> [!NOTE]
+> **Foundation Implemented (2025-12-02)**. Core infrastructure for provider partners is complete:
+> - ✅ Partner type enum (`var`, `family`, `court`, `other`) in organization bootstrap
+> - ✅ Conditional subdomain provisioning (providers get subdomains, partners don't by default)
+> - ✅ Referring partner relationship tracking
+> - ✅ Organization bootstrap workflow handles both providers and partners
+>
+> **Not Yet Implemented**: Type-specific relationship projections (VAR contracts, court authorizations, agency assignments, family consents) and cross-tenant access grants.
 
-**Status**: ✅ Integrated with Supabase Auth + Temporal.io
-**Version**: 2.1 (Updated for Supabase Auth integration)
-**Last Updated**: 2025-10-24
-**Authentication**: Supabase Auth (replaces Zitadel)
+**Status**: ✅ Foundation Implemented | ⏳ Type-Specific Features Planned
+**Version**: 2.2 (Updated for foundation implementation)
+**Last Updated**: 2025-12-02
+**Authentication**: Supabase Auth
 
 ## Executive Summary
 
@@ -140,12 +146,12 @@ Provider partners are organizations with legitimate need for cross-tenant access
 
 ### CRITICAL PRINCIPLE: Flat Organizational Structure
 
-**All provider organizations and provider partner organizations exist at the root level in Zitadel** (flat structure). Provider partner relationships are tracked as **business metadata** in projection tables, **NOT as hierarchical ownership in Zitadel**.
+**All provider organizations and provider partner organizations exist at the root level in the database** (flat structure). Provider partner relationships are tracked as **business metadata** in projection tables, **NOT as hierarchical ownership**.
 
 **Rationale:**
-- Contract/agreement expiration cannot trigger Zitadel organization restructuring
+- Contract/agreement expiration cannot trigger organization restructuring
 - Provider organizational structure must remain stable regardless of partner relationships
-- Providers may change partners or partnerships may end without affecting their Zitadel organization
+- Providers may change partners or partnerships may end without affecting their organization
 - Multiple provider partners may have relationships with the same provider
 
 ### Event-Sourced Architecture
@@ -168,48 +174,55 @@ Provider partner organizations are created using the same bootstrap architecture
 
 ## Organizational Structure
 
-### Zitadel Hierarchy (Flat Model)
+### Database Organization Model (Flat)
 
 ```
-Zitadel Instance: analytics4change-zdswvg.us1.zitadel.cloud
+organizations_projection (PostgreSQL)
 │
 ├── Analytics4Change (A4C Internal Org) - Root level
-│   ├── Super Admin (role) - Can manage all provider partner relationships
-│   ├── Partnership Manager (role) - Can create/manage specific relationship types
-│   └── Internal users
+│   ├── type: 'internal'
+│   ├── Roles: Super Admin, Partnership Manager
+│   └── Can manage all provider partner relationships
 │
 ├── VAR Partner ABC (Provider Partner Org) - Root level
-│   ├── Partner Administrator (role)
-│   ├── VAR Consultant (role) - Access to Provider data via grants
-│   └── Access: Via cross_tenant_access_grants (NOT Zitadel hierarchy)
+│   ├── type: 'partner'
+│   ├── partner_type: 'var'
+│   ├── Roles: Partner Administrator, VAR Consultant
+│   └── Access: Via cross_tenant_access_grants (future)
 │
 ├── Juvenile Court XYZ (Provider Partner Org) - Root level
-│   ├── Court Administrator (role)
-│   ├── Guardian ad Litem (role) - Access to specific case data via grants
-│   └── Access: Court order-based grants with legal references
+│   ├── type: 'partner'
+│   ├── partner_type: 'court'
+│   ├── Roles: Court Administrator, Guardian ad Litem
+│   └── Access: Court order-based grants (future)
 │
 ├── County CPS (Provider Partner Org) - Root level
-│   ├── Agency Administrator (role)
-│   ├── Case Worker (role) - Access to assigned case data via grants
-│   └── Access: Assignment-based grants with statutory authority
+│   ├── type: 'partner'
+│   ├── partner_type: 'other' (social services)
+│   ├── Roles: Agency Administrator, Case Worker
+│   └── Access: Assignment-based grants (future)
 │
 ├── Johnson Family Org (Provider Partner Org) - Root level
-│   ├── Parent/Guardian (role) - Access to family member data via grants
-│   └── Access: Consent-based grants with relationship verification
+│   ├── type: 'partner'
+│   ├── partner_type: 'family'
+│   ├── Roles: Parent/Guardian
+│   └── Access: Consent-based grants (future)
 │
 ├── Provider A (Provider Org) - Root level
-│   ├── Administrator (role)
-│   ├── Provider-defined internal hierarchy
+│   ├── type: 'provider'
+│   ├── subdomain: 'provider-a.firstovertheline.com' ✅
+│   ├── referring_partner_id: 'var_partner_abc' (if applicable)
 │   └── May have relationships with multiple provider partners
 │
 └── Provider B (Provider Org) - Root level (No partners)
-    ├── Administrator (role)
+    ├── type: 'provider'
+    ├── subdomain: 'provider-b.firstovertheline.com' ✅
     └── Provider-defined internal hierarchy
 ```
 
 ### Key Relationships (Event-Sourced Metadata)
 
-**NOT in Zitadel hierarchy** - tracked in PostgreSQL via bootstrap architecture:
+**Tracked in PostgreSQL via organization bootstrap workflow**:
 
 ```sql
 -- Provider partner relationships (type-specific projections)
@@ -627,17 +640,35 @@ Enhanced metadata captures provider partner context:
 
 ## Implementation Plan
 
-### Phase 1: Database Infrastructure (PARTIALLY COMPLETED ✅)
+### Phase 0: Foundation (COMPLETED ✅ - 2025-12-02)
 
 **Completed:**
-- ✅ Cross-tenant access grants projection and event processing
-- ✅ Bootstrap architecture for provider partner organization creation
-- ✅ Event schemas for access grant lifecycle
+- ✅ Organization bootstrap workflow supports both `provider` and `partner` types
+- ✅ `partner_type` enum: `var`, `family`, `court`, `other`
+- ✅ Conditional subdomain provisioning (providers get DNS, partners don't)
+- ✅ `referring_partner_id` field for tracking partner referrals
+- ✅ 2-hop architecture: Frontend → Backend API → Temporal
+- ✅ 12 activities (6 forward + 6 compensation) in bootstrap workflow
+
+**Database Schema (Implemented)**:
+```sql
+-- organizations_projection supports partner organizations
+CREATE TYPE organization_type AS ENUM ('provider', 'partner');
+CREATE TYPE partner_type AS ENUM ('var', 'family', 'court', 'other');
+
+-- organizations_projection includes:
+--   type: organization_type (provider or partner)
+--   partner_type: partner_type (for partner orgs only)
+--   referring_partner_id: UUID (optional, who referred this org)
+```
+
+### Phase 1: Cross-Tenant Access (PLANNED)
 
 **Remaining Tasks:**
-1. Create type-specific relationship projection tables
-2. Implement relationship-specific event processors
-3. Update authorization validation to check relationship status
+1. Create `cross_tenant_access_grants_projection` table
+2. Implement access grant event processors
+3. Create RLS policies for cross-tenant data access
+4. Build UI for managing access grants
 
 ### Phase 2: VAR Partnership Implementation
 
@@ -708,26 +739,27 @@ Enhanced metadata captures provider partner context:
 
 ## Related Documents
 
-### Type-Specific Implementation
-- 📋 `.plans/provider-partners/var-partnerships.md` - VAR-specific implementation (planned)
-- 📋 `.plans/provider-partners/court-access.md` - Court system integration (planned)
-- 📋 `.plans/provider-partners/social-services.md` - Agency assignment workflows (planned)  
-- 📋 `.plans/provider-partners/family-access.md` - Family member access (planned)
+### Type-Specific Implementation (Planned)
+- 📋 VAR-specific implementation (future)
+- 📋 Court system integration (future)
+- 📋 Agency assignment workflows (future)
+- 📋 Family member access (future)
 
 ### Bootstrap and Organization Management (✅ IMPLEMENTED)
-- ✅ `.plans/provider-management/bootstrap-workflows.md` - Organization bootstrap architecture
-- ✅ `.plans/provider-management/partner-bootstrap-sequence.md` - Provider partner bootstrap workflow
-- ✅ `.plans/zitadel-integration/bootstrap-api-flows.md` - Zitadel Management API integration
+- ✅ `documentation/architecture/workflows/organization-onboarding-workflow.md` - Workflow design
+- ✅ `documentation/workflows/architecture/organization-bootstrap-workflow-design.md` - Detailed spec
+- ✅ `documentation/architecture/data/organization-management-architecture.md` - Full architecture
 
-### Implemented Infrastructure (✅ COMPLETED)
-- ✅ `/infrastructure/supabase/contracts/asyncapi/domains/access_grant.yaml` - Access grant event contracts
-- ✅ `/infrastructure/supabase/sql/03-functions/event-processing/006-process-access-grant-events.sql` - Access grant processors
-- ✅ `/infrastructure/supabase/sql/02-tables/rbac/005-cross_tenant_access_grants_projection.sql` - Cross-tenant access schema
+### Implemented Infrastructure
+- ✅ `workflows/src/workflows/organizationBootstrapWorkflow.ts` - Workflow implementation
+- ✅ `workflows/src/activities/` - All 12 activities
+- ✅ `workflows/src/api/routes/workflows.ts` - Backend API endpoint
+- ✅ `infrastructure/supabase/sql/02-tables/organizations/` - Database schema
 
 ### Platform Architecture
-- `.plans/consolidated/agent-observations.md` - Overall architecture overview
-- `.plans/auth-integration/tenants-as-organization-thoughts.md` - Organizational structure patterns
-- `.plans/rbac-permissions/architecture.md` - Permission system integration
+- `documentation/architecture/data/multi-tenancy-architecture.md` - Multi-tenant design
+- `documentation/architecture/authorization/rbac-architecture.md` - RBAC system
+- `documentation/architecture/workflows/temporal-overview.md` - Workflow orchestration
 
 ---
 
@@ -742,7 +774,7 @@ Enhanced metadata captures provider partner context:
 
 ---
 
-**Document Version:** 2.0  
-**Last Updated:** 2025-10-15  
-**Status:** Approved for Implementation  
+**Document Version:** 2.2
+**Last Updated:** 2025-12-02
+**Status:** Foundation Implemented | Type-Specific Features Planned
 **Owner:** A4C Architecture Team

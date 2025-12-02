@@ -1,13 +1,13 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-02
 ---
 
 # Organization Management Module - Architecture
 
-**Last Updated**: 2025-10-31
-**Status**: ✅ Implementation Complete (~90%)
-**Remaining Work**: Temporal backend workflows (~10%)
+**Last Updated**: 2025-12-02
+**Status**: ✅ Implementation Complete (100%)
+**UAT Status**: Passed (2025-12-02)
 
 ---
 
@@ -47,7 +47,8 @@ last_updated: 2025-01-12
 
 **Backend**:
 - Supabase (PostgreSQL + Auth + Edge Functions)
-- Temporal.io for workflow orchestration (design complete, not implemented)
+- Temporal.io for workflow orchestration (✅ fully implemented and operational)
+- Backend API Service (Fastify, deployed to k8s)
 - PostgreSQL with ltree for hierarchical data
 - CQRS projections for read-optimized views
 
@@ -101,11 +102,34 @@ The frontend follows strict Model-View-ViewModel separation:
 #### Pages (5 total)
 
 1. **OrganizationCreatePage** (`frontend/src/pages/organizations/OrganizationCreatePage.tsx`)
-   - Full organization creation form (638 lines)
-   - Collapsible sections: Basic Info, Contact, Address, Phone, Program
+   - Full organization creation form (~700 lines)
+   - **3-Section Structure**:
+     - **General Information**: Organization type, name, subdomain, timezone, headquarters address/phone
+     - **Billing Information**: Billing contact, address, phone (visible for providers only)
+     - **Provider Admin Information**: Admin contact, address, phone
+   - "Use General Information" checkboxes for address/phone sharing (see below)
    - Auto-save to drafts (localStorage)
    - Inline validation with error messages
-   - Glassomorphic UI styling
+   - Conditional section visibility based on organization type
+
+   **"Use General Information" Checkbox Behavior**:
+
+   Both the Billing and Provider Admin sections include checkboxes to reuse data from General Information:
+
+   | Checkbox | When Checked | When Unchecked |
+   |----------|--------------|----------------|
+   | "Use General Information for Address" | Billing/Admin address fields hidden, uses HQ address | Shows separate address fields |
+   | "Use General Information for Phone" | Billing/Admin phone fields hidden, uses HQ phone | Shows separate phone fields |
+
+   **Implementation**:
+   - Checkboxes are checked by default (pre-populate with HQ data)
+   - Unchecking reveals separate input fields for that section
+   - On submit, if checked: workflow receives reference to HQ entity
+   - On submit, if unchecked: workflow creates new entity with section-specific data
+
+   **Database Effect**:
+   - When checkbox is checked: Junction table links org to same address/phone entity
+   - When checkbox is unchecked: New entity created with appropriate type/label
 
 2. **OrganizationBootstrapStatusPage** (`frontend/src/pages/organizations/OrganizationBootstrapStatusPage.tsx`)
    - Real-time workflow progress tracking (350 lines)
@@ -271,23 +295,53 @@ const vm = new OrganizationFormViewModel(mockClient);
 
 ## Backend Infrastructure
 
+### Architecture: 2-Hop Direct RPC
+
+**Pattern**: Frontend → Backend API → Temporal (2 hops)
+
+```
+Frontend (React) → Backend API (Fastify/k8s) → Temporal Server → Worker
+                                ↓
+                          PostgreSQL (audit events)
+```
+
+### Backend API Service (NEW - 2025-12-01)
+
+**Runtime**: Node.js 20 + Fastify
+**Deployment**: Kubernetes (temporal namespace)
+**Location**: `workflows/src/api/`
+**External URL**: `https://api-a4c.firstovertheline.com`
+
+**Endpoints**:
+- `GET /health` - Liveness probe
+- `GET /ready` - Readiness probe (checks Temporal connection)
+- `POST /api/v1/workflows/organization-bootstrap` - Start bootstrap workflow
+
+**Authentication**: JWT from Supabase Auth (Authorization header)
+**Permission Required**: `organization.create_root`
+
+**Why Backend API instead of Edge Functions?**
+- Edge Functions run on Deno Deploy (external to k8s cluster)
+- Cannot reach Temporal's internal DNS (`temporal-frontend.temporal.svc.cluster.local:7233`)
+- Backend API runs inside k8s, has direct Temporal access
+
 ### Supabase Edge Functions
 
 **Runtime**: Deno (TypeScript on V8)
 **Deployment**: Supabase platform
-**Location**: `infrastructure/supabase/functions/`
+**Location**: `infrastructure/supabase/supabase/functions/`
 
-#### 1. organization-bootstrap
+#### 1. organization-bootstrap (Proxy)
 
-**File**: `functions/organization-bootstrap/index.ts` (209 lines)
+**File**: `supabase/functions/organization-bootstrap/index.ts`
 
-**Purpose**: Initiates organization bootstrap workflow
+**Purpose**: Proxies requests to Backend API (cannot call Temporal directly)
 
 **Flow**:
 1. Accepts organization data from frontend
 2. Validates JWT authorization
-3. Emits `organization.bootstrap.initiated` event to `domain_events` table
-4. Returns `workflowId` for tracking
+3. Forwards request to Backend API
+4. Returns `workflowId` and `organizationId`
 
 **Request**:
 ```typescript
@@ -481,84 +535,150 @@ CREATE TABLE programs_projection (
 
 **File**: `infrastructure/supabase/sql/02-tables/organizations/005-contacts_projection.sql`
 
-**Purpose**: Contact persons for organizations
+**Purpose**: Contact persons for organizations with type/label classification
 
 **Schema**:
 ```sql
 CREATE TABLE contacts_projection (
-  contact_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organizations_projection(org_id),
+  label TEXT NOT NULL,        -- Human-readable: 'Headquarters', 'Billing Contact', 'Provider Admin'
+  type contact_type NOT NULL, -- ENUM: 'headquarters', 'billing', 'admin', 'emergency', 'other'
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
-  email TEXT NOT NULL CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
-  role_label TEXT, -- e.g., "Executive Director", "Clinical Director"
+  email TEXT NOT NULL,
+  title TEXT,                 -- Job title: 'Executive Director', 'CFO'
+  department TEXT,            -- Department: 'Finance', 'Operations'
   is_primary BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
   metadata JSONB,
   created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ,
   deleted_at TIMESTAMPTZ
 );
 ```
 
+**Type/Label System**:
+- `type`: Machine-readable classification for queries (enum values)
+- `label`: Human-readable display name (free text)
+- Example: `type='billing', label='Billing Contact'`
+
 **Business Rules**:
-- Exactly one primary contact per organization (enforced by unique partial index)
-- Email validation via CHECK constraint
+- One primary contact per organization (unique partial index)
+- Contact types support the 3-section form (headquarters, billing, admin)
 
 #### 3. addresses_projection
 
 **File**: `infrastructure/supabase/sql/02-tables/organizations/006-addresses_projection.sql`
 
-**Purpose**: Physical addresses for organizations
+**Purpose**: Physical addresses for organizations with type/label classification
 
 **Schema**:
 ```sql
 CREATE TABLE addresses_projection (
-  address_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organizations_projection(org_id),
-  street_line_1 TEXT NOT NULL,
-  street_line_2 TEXT,
+  label TEXT NOT NULL,          -- Human-readable: 'Headquarters', 'Billing Address', 'Provider Admin'
+  type address_type NOT NULL,   -- ENUM: 'headquarters', 'billing', 'shipping', 'mailing', 'other'
+  street1 TEXT NOT NULL,
+  street2 TEXT,
   city TEXT NOT NULL,
-  state TEXT NOT NULL CHECK (state ~ '^[A-Z]{2}$'), -- US state codes
-  zip_code TEXT NOT NULL CHECK (zip_code ~ '^\d{5}(-\d{4})?$'),
+  state TEXT NOT NULL,          -- US state codes (2-letter)
+  zip_code TEXT NOT NULL,       -- xxxxx or xxxxx-xxxx format
+  country TEXT DEFAULT 'US',
   is_primary BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
   metadata JSONB,
   created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ,
   deleted_at TIMESTAMPTZ
 );
 ```
 
+**Type/Label System**:
+- `type`: Machine-readable classification for queries (enum values)
+- `label`: Human-readable display name (free text)
+- Example: `type='billing', label='Billing Address'`
+
 **Business Rules**:
-- Exactly one primary address per organization
-- US state validation (2-letter codes)
-- Zip code validation (xxxxx or xxxxx-xxxx)
+- One primary address per organization
+- Address types support the 3-section form (headquarters, billing, admin)
 
 #### 4. phones_projection
 
 **File**: `infrastructure/supabase/sql/02-tables/organizations/007-phones_projection.sql`
 
-**Purpose**: Phone numbers for organizations
+**Purpose**: Phone numbers for organizations with type/label classification
 
 **Schema**:
 ```sql
 CREATE TABLE phones_projection (
-  phone_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organizations_projection(org_id),
-  phone_number TEXT NOT NULL CHECK (phone_number ~ '^\d{10}$'), -- 10 digits only
+  label TEXT NOT NULL,          -- Human-readable: 'Main Office', 'Billing Phone', 'Provider Admin'
+  type phone_type NOT NULL,     -- ENUM: 'main', 'billing', 'mobile', 'fax', 'other'
+  number TEXT NOT NULL,         -- 10 digits (no formatting)
   extension TEXT,
-  phone_type TEXT CHECK (phone_type IN ('mobile', 'office', 'fax')),
+  country_code TEXT DEFAULT '+1',
   is_primary BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
   metadata JSONB,
   created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ,
   deleted_at TIMESTAMPTZ
 );
 ```
 
+**Type/Label System**:
+- `type`: Machine-readable classification for queries (enum values)
+- `label`: Human-readable display name (free text)
+- Example: `type='billing', label='Billing Phone'`
+
 **Business Rules**:
-- Exactly one primary phone per organization
-- Phone number format: 10 digits (no formatting)
+- One primary phone per organization
+- Phone number format: 10 digits (no formatting, stored as digits only)
 - Frontend formats as (xxx) xxx-xxxx for display
+- Phone types support the 3-section form (main, billing, admin)
+
+#### 5. Junction Tables (Many-to-Many Relationships)
+
+The 3-section form creates multiple contacts, addresses, and phones per organization. Junction tables link them:
+
+**organization_contacts**:
+```sql
+CREATE TABLE organization_contacts (
+  organization_id UUID NOT NULL REFERENCES organizations_projection(org_id),
+  contact_id UUID NOT NULL REFERENCES contacts_projection(id),
+  deleted_at TIMESTAMPTZ,
+  PRIMARY KEY (organization_id, contact_id)
+);
+```
+
+**organization_addresses**:
+```sql
+CREATE TABLE organization_addresses (
+  organization_id UUID NOT NULL REFERENCES organizations_projection(org_id),
+  address_id UUID NOT NULL REFERENCES addresses_projection(id),
+  deleted_at TIMESTAMPTZ,
+  PRIMARY KEY (organization_id, address_id)
+);
+```
+
+**organization_phones**:
+```sql
+CREATE TABLE organization_phones (
+  organization_id UUID NOT NULL REFERENCES organizations_projection(org_id),
+  phone_id UUID NOT NULL REFERENCES phones_projection(id),
+  deleted_at TIMESTAMPTZ,
+  PRIMARY KEY (organization_id, phone_id)
+);
+```
+
+**Junction Table Purpose**:
+- Allow multiple contacts/addresses/phones per organization
+- Support "Use General Information" checkbox (reuse same entity)
+- Enable soft-delete of relationships without deleting the entity
+- Query: "Get all contacts for organization X" or "Get all organizations using address Y"
 
 ### Common Patterns
 
@@ -995,81 +1115,96 @@ Load Draft:
 
 ---
 
-## Temporal Integration (Not Yet Implemented)
+## Temporal Integration (Complete)
 
-### Workflow Design (Complete)
+### Workflow Implementation
 
-**File**: `.plans/in-progress/temporal-workflow-design.md`
+**Status**: ✅ Fully implemented and deployed (2025-12-01)
 
-**Status**: ✅ Design complete, ❌ Code not written
+**Location**: `workflows/src/workflows/organizationBootstrapWorkflow.ts`
 
 ### Workflow: OrganizationBootstrapWorkflow
 
 **10-Stage Process**:
 
 1. **Stage 1**: Create organization in database
-2. **Stage 2**: Configure DNS subdomain (Cloudflare API)
-3. **Stage 3**: Verify DNS propagation (10-40 minutes)
-4. **Stage 4**: Generate user invitation token
-5. **Stage 5**: Send invitation email (Resend API)
-6. **Stage 6**: Activate organization
-7. **Stage 7-10**: Reserved for future steps
+2. **Stage 2**: Create contacts (HQ, Billing, Admin)
+3. **Stage 3**: Create addresses (HQ, Billing, Admin)
+4. **Stage 4**: Create phones (HQ, Billing, Admin)
+5. **Stage 5**: Configure DNS subdomain (Cloudflare API)
+6. **Stage 6**: Verify DNS propagation
+7. **Stage 7**: Generate user invitation tokens
+8. **Stage 8**: Send invitation emails (Resend API)
+9. **Stage 9**: Activate organization
+10. **Stage 10**: Emit completion event
 
-### Activities (8 total)
+### Activities (12 total: 6 forward + 6 compensation)
 
-**Design complete, implementation pending**:
+**Forward Activities**:
+1. `createOrganization()` - Create org, emit `organization.created` event
+2. `createContacts()` - Create contacts with type/label, emit `contact.created` events
+3. `createAddresses()` - Create addresses with type/label, emit `address.created` events
+4. `createPhones()` - Create phones with type/label, emit `phone.created` events
+5. `configureDNS()` - Cloudflare API call
+6. `generateAndSendInvitations()` - Create tokens + send emails
 
-1. `createOrganization()` - Emit `organization.created` event
-2. `configureDNS()` - Cloudflare API call
-3. `verifyDNS()` - DNS propagation check (with retry)
-4. `generateInvitations()` - Create invitation tokens
-5. `sendInvitationEmails()` - Resend API call
-6. `activateOrganization()` - Emit `organization.activated` event
-7. `removeDNS()` - Compensation activity (rollback)
-8. `deactivateOrganization()` - Compensation activity (rollback)
+**Compensation Activities** (Saga pattern rollback):
+1. `compensateOrganization()` - Soft-delete organization
+2. `compensateContacts()` - Soft-delete contacts
+3. `compensateAddresses()` - Soft-delete addresses
+4. `compensatePhones()` - Soft-delete phones
+5. `compensateDNS()` - Remove DNS record from Cloudflare
+6. `compensateInvitations()` - Mark invitations as cancelled
 
-### Remaining Work
+### Triggering Architecture
 
-To complete Temporal integration (~10% of total project):
+**2-Hop Pattern**: Frontend → Backend API → Temporal
 
-1. Implement `temporal/src/workflows/OrganizationBootstrapWorkflow.ts`
-2. Implement `temporal/src/activities/*.ts` (8 activities)
-3. Configure Cloudflare API client
-4. Configure Resend email client
-5. Build Docker image for worker
-6. Deploy worker to Kubernetes cluster
-7. Update Edge Function to actually trigger Temporal workflow (currently emits event only)
+```
+Frontend (React)
+     ↓ POST /api/v1/workflows/organization-bootstrap
+Backend API (Fastify @ api-a4c.firstovertheline.com)
+     ↓ client.workflow.start()
+Temporal Server (temporal-frontend.temporal.svc.cluster.local:7233)
+     ↓
+Temporal Worker (workflow-worker deployment)
+```
 
 ---
 
 ## Summary
 
-### What's Complete (90%)
+### Implementation Status: 100% Complete
 
-✅ Frontend (5 pages, 3 components, 2 ViewModels)
-✅ Service Layer (factory pattern, mock + production)
-✅ Backend Edge Functions (4 Deno functions)
-✅ Database Schema (4 CQRS projections)
-✅ Event Processing (trigger-based updates)
-✅ Testing (100+ unit tests, 27 E2E tests)
-✅ Configuration System (profile-based)
-✅ Authentication (Supabase Auth + JWT claims)
+✅ **Frontend** (5 pages, 3 components, 2 ViewModels)
+✅ **Service Layer** (factory pattern, mock + production)
+✅ **Backend API** (Fastify service deployed to k8s)
+✅ **Edge Functions** (4 Deno functions - proxying to Backend API)
+✅ **Database Schema** (4 CQRS projections + 3 junction tables)
+✅ **Event Processing** (trigger-based updates)
+✅ **Temporal Workflows** (12 activities: 6 forward + 6 compensation)
+✅ **Worker Deployment** (workflow-worker in temporal namespace)
+✅ **Testing** (100+ unit tests, 27 E2E tests)
+✅ **Configuration System** (profile-based)
+✅ **Authentication** (Supabase Auth + JWT claims)
+✅ **UAT Testing** (Passed 2025-12-02)
 
-### What's Remaining (10%)
+### Key Architecture Decisions
 
-❌ Temporal workflow implementation (design complete, code not written)
-❌ Worker deployment to Kubernetes
-❌ Production schema deployment
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Workflow Triggering | 2-Hop (Frontend → Backend API → Temporal) | Edge Functions can't reach k8s internal DNS |
+| Form Structure | 3 Sections (General, Billing, Admin) | Captures all required organization data |
+| Data Reuse | "Use General Information" checkboxes | Reduces data entry, uses junction tables |
+| Entity Classification | Type/Label system | Machine queries (type) + human display (label) |
+| Compensation | Saga pattern (6 rollback activities) | Graceful failure recovery |
 
-### Next Steps
+### Future Enhancements
 
-1. Deploy database migrations to Supabase production
-2. Deploy Edge Functions to Supabase production
-3. Implement Temporal workflows and activities
-4. Deploy Temporal workers to Kubernetes
-5. Configure DNS (Cloudflare)
-6. Set up monitoring (Sentry/LogRocket)
-7. Configure CI/CD pipelines
+- Real-time workflow status via WebSocket (currently polling)
+- Bulk organization import from CSV
+- Organization templates (pre-filled forms)
+- Multi-step invitation acceptance wizard
 
 ---
 
@@ -1105,7 +1240,7 @@ To complete Temporal integration (~10% of total project):
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-10-31
+**Document Version**: 2.0
+**Last Updated**: 2025-12-02
 **Author**: Claude Code
-**Status**: ✅ Architecture Documentation Complete
+**Status**: ✅ Implementation Complete (100%)
