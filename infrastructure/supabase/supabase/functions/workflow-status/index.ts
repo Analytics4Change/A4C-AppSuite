@@ -10,6 +10,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// Deployment version tracking
+const DEPLOY_VERSION = 'v19';
+
 // CORS headers for frontend requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,62 +37,119 @@ interface WorkflowStage {
 }
 
 serve(async (req) => {
+  console.log(`[workflow-status ${DEPLOY_VERSION}] Processing ${req.method} request`);
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    // Validate required environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error(`[workflow-status ${DEPLOY_VERSION}] Missing required environment variables:`, {
+        has_supabase_url: !!supabaseUrl,
+        has_service_role_key: !!supabaseServiceKey
+      });
+      return new Response(
+        JSON.stringify({
+          error: 'Server configuration error',
+          details: 'Missing required environment variables',
+          version: DEPLOY_VERSION,
+          step: 'env_validation'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ Environment variables validated`);
+
     // Initialize Supabase client with service role
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify authorization (JWT token)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
+        JSON.stringify({ error: 'Missing authorization header', version: DEPLOY_VERSION }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ Authorization header present`);
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(
       authHeader.replace('Bearer ', '')
     );
 
     if (authError || !user) {
+      console.error(`[workflow-status ${DEPLOY_VERSION}] Auth error:`, authError);
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ error: 'Unauthorized', details: authError?.message, version: DEPLOY_VERSION }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Get workflow ID from request body
-    const { workflowId } = await req.json();
+    console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ User authenticated: ${user.email}`);
 
-    if (!workflowId) {
+    // Get workflow ID from request body
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error(`[workflow-status ${DEPLOY_VERSION}] Failed to parse request body:`, parseError);
       return new Response(
-        JSON.stringify({ error: 'Missing workflowId parameter' }),
+        JSON.stringify({
+          error: 'Invalid request body',
+          details: 'Could not parse JSON',
+          version: DEPLOY_VERSION,
+          step: 'body_parse'
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    const { workflowId } = requestBody;
+
+    if (!workflowId) {
+      return new Response(
+        JSON.stringify({ error: 'Missing workflowId parameter', version: DEPLOY_VERSION }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ workflowId: ${workflowId}`);
+
     // Query bootstrap status using the existing PostgreSQL function
+    // Note: get_bootstrap_status is in public schema, not api schema
     const { data: statusData, error: statusError } = await supabase
+      .schema('public')
       .rpc('get_bootstrap_status', { p_bootstrap_id: workflowId });
 
     if (statusError) {
-      console.error('Failed to get bootstrap status:', statusError);
+      console.error(`[workflow-status ${DEPLOY_VERSION}] RPC error:`, statusError);
       return new Response(
-        JSON.stringify({ error: 'Failed to get workflow status', details: statusError.message }),
+        JSON.stringify({
+          error: 'Failed to get workflow status',
+          details: statusError.message,
+          version: DEPLOY_VERSION,
+          step: 'rpc_call'
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ RPC returned ${statusData?.length || 0} rows`);
+
     if (!statusData || statusData.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'Workflow not found', workflowId }),
+        JSON.stringify({ error: 'Workflow not found', workflowId, version: DEPLOY_VERSION }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -160,9 +220,14 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Workflow status edge function error:', error);
+    console.error(`[workflow-status ${DEPLOY_VERSION}] Unhandled error:`, error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      JSON.stringify({
+        error: 'Internal server error',
+        details: error.message,
+        version: DEPLOY_VERSION,
+        step: 'unhandled_exception'
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
