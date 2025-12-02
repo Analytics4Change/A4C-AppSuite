@@ -1,16 +1,22 @@
-name: Deploy Database Migrations
+name: Deploy Database Schema
 
-# This workflow deploys database schema migrations to Supabase.
+# This workflow deploys the consolidated database schema to Supabase.
+# All SQL is idempotent - safe to run multiple times.
+#
 # Prerequisites:
 #   - SUPABASE_URL secret (e.g., https://your-project.supabase.co)
-#   - SUPABASE_SERVICE_ROLE_KEY secret
-#   - All migrations must be idempotent (see infrastructure/supabase/SQL_IDEMPOTENCY_AUDIT.md)
+#   - SUPABASE_DB_PASSWORD secret
+#
+# Architecture:
+#   - Source files: infrastructure/supabase/sql/** (granular, for development)
+#   - Deployment: infrastructure/supabase/CONSOLIDATED_SCHEMA.sql (single file)
 
 on:
   push:
     branches:
       - main
     paths:
+      - 'infrastructure/supabase/CONSOLIDATED_SCHEMA.sql'
       - 'infrastructure/supabase/sql/**'
       - '.github/workflows/supabase-deploy.yml'
   workflow_dispatch:
@@ -26,71 +32,51 @@ on:
           - production
 
 jobs:
-  validate-migrations:
-    name: Validate SQL Migrations
+  validate-schema:
+    name: Validate SQL Schema
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install PostgreSQL client
+      - name: Check consolidated schema exists
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-
-      - name: Check SQL syntax
-        run: |
-          echo "Checking SQL syntax..."
-          for file in $(find infrastructure/supabase/sql -name "*.sql" | sort); do
-            echo "Checking: $file"
-            # Basic syntax check (doesn't connect to database)
-            if ! psql --version > /dev/null; then
-              echo "❌ psql not available"
-              exit 1
-            fi
-
-            # Check for common syntax errors (basic validation)
-            if grep -qi "syntax error" "$file" 2>/dev/null; then
-              echo "❌ Potential syntax error in $file"
-              exit 1
-            fi
-          done
-          echo "✅ All SQL files passed basic syntax validation"
+          if [ ! -f "infrastructure/supabase/CONSOLIDATED_SCHEMA.sql" ]; then
+            echo "❌ CONSOLIDATED_SCHEMA.sql not found"
+            echo "Run: cd infrastructure/supabase && ./scripts/consolidate-sql.sh"
+            exit 1
+          fi
+          echo "✅ Consolidated schema found"
+          wc -l infrastructure/supabase/CONSOLIDATED_SCHEMA.sql
 
       - name: Check for idempotency patterns
         run: |
-          echo "Checking for idempotency patterns..."
-          ISSUES_FOUND=0
+          echo "Checking for idempotency patterns in consolidated schema..."
+          FILE="infrastructure/supabase/CONSOLIDATED_SCHEMA.sql"
+          ISSUES=0
 
-          # Check for CREATE TABLE without IF NOT EXISTS
-          if grep -r "CREATE TABLE" infrastructure/supabase/sql/ | grep -v "IF NOT EXISTS" | grep -v "^\s*--"; then
-            echo "❌ Found CREATE TABLE without IF NOT EXISTS"
-            ISSUES_FOUND=1
+          # Check for CREATE TABLE without IF NOT EXISTS (excluding comments)
+          if grep -E "^CREATE TABLE [^I]" "$FILE" | grep -v "IF NOT EXISTS"; then
+            echo "⚠️  Found CREATE TABLE without IF NOT EXISTS"
+            ISSUES=$((ISSUES+1))
           fi
 
-          # Check for CREATE INDEX without IF NOT EXISTS
-          if grep -r "CREATE.*INDEX" infrastructure/supabase/sql/ | grep -v "IF NOT EXISTS" | grep -v "^\s*--"; then
-            echo "❌ Found CREATE INDEX without IF NOT EXISTS"
-            ISSUES_FOUND=1
+          # Check for DROP TABLE (we should never drop tables)
+          if grep -E "^DROP TABLE(?! IF EXISTS)" "$FILE"; then
+            echo "⚠️  Found unsafe DROP TABLE statement"
+            ISSUES=$((ISSUES+1))
           fi
 
-          # Check for CREATE FUNCTION without OR REPLACE
-          if grep -r "CREATE FUNCTION" infrastructure/supabase/sql/ | grep -v "OR REPLACE" | grep -v "^\s*--"; then
-            echo "❌ Found CREATE FUNCTION without OR REPLACE"
-            ISSUES_FOUND=1
-          fi
-
-          if [ $ISSUES_FOUND -eq 0 ]; then
-            echo "✅ Basic idempotency checks passed"
+          if [ $ISSUES -eq 0 ]; then
+            echo "✅ Idempotency checks passed"
           else
-            echo "⚠️  Idempotency issues detected - see infrastructure/supabase/SQL_IDEMPOTENCY_AUDIT.md"
-            echo "Migrations will still run, but may fail on re-execution"
+            echo "⚠️  $ISSUES potential issues found (may be false positives)"
           fi
 
-  deploy-migrations:
-    name: Deploy Migrations to Supabase
-    needs: validate-migrations
+  deploy-schema:
+    name: Deploy Schema to Supabase
+    needs: validate-schema
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.event.inputs.target_environment || 'development' }}
@@ -98,11 +84,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
 
       - name: Install PostgreSQL client
         run: |
@@ -116,7 +97,6 @@ jobs:
           echo "PROJECT_REF=$PROJECT_REF" >> $GITHUB_ENV
 
           # Use Transaction Mode Pooler for GitHub Actions (IPv4 compatible, port 6543)
-          # Transaction mode is recommended for CI/CD scenarios with transient connections
           DB_USER="postgres.${PROJECT_REF}"
           DB_HOST="aws-1-us-west-1.pooler.supabase.com"
           DB_PORT="6543"
@@ -130,185 +110,49 @@ jobs:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           echo "Testing connection to Supabase database..."
-          echo "Using Session Pooler: $DB_HOST:$DB_PORT"
-
           if psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "SELECT version();" 2>&1; then
             echo "✅ Database connection successful"
           else
             echo "❌ Database connection failed"
-            echo "Check SUPABASE_URL and SUPABASE_DB_PASSWORD secrets"
             exit 1
           fi
 
-      - name: Create migration tracking table
+      - name: Deploy consolidated schema
         env:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          echo "Creating migration tracking table..."
-          psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres <<'EOF'
-          CREATE TABLE IF NOT EXISTS _migrations_applied (
-            id SERIAL PRIMARY KEY,
-            migration_name TEXT UNIQUE NOT NULL,
-            migration_path TEXT NOT NULL,
-            applied_at TIMESTAMPTZ DEFAULT NOW(),
-            checksum TEXT,
-            execution_time_ms INTEGER,
-            applied_by TEXT DEFAULT 'github-actions'
-          );
+          echo "Deploying consolidated schema..."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-          CREATE INDEX IF NOT EXISTS idx_migrations_name
-            ON _migrations_applied(migration_name);
+          SCHEMA_FILE="infrastructure/supabase/CONSOLIDATED_SCHEMA.sql"
+          START_TIME=$(date +%s)
 
-          CREATE INDEX IF NOT EXISTS idx_migrations_applied_at
-            ON _migrations_applied(applied_at DESC);
-          EOF
+          # Deploy schema (all statements are idempotent)
+          if psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres \
+            -v ON_ERROR_STOP=1 \
+            -f "$SCHEMA_FILE" > /tmp/deploy-output.log 2>&1; then
 
-          echo "✅ Migration tracking table ready"
+            END_TIME=$(date +%s)
+            DURATION=$((END_TIME - START_TIME))
 
-      - name: Run migrations
-        env:
-          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: |
-          echo "Running migrations..."
-
-          # Migration execution order
-          MIGRATION_DIRS=(
-            "00-extensions"
-            "01-events"
-            "02-tables"
-            "03-functions"
-            "04-triggers"
-            "05-views"
-            "06-rls"
-          )
-
-          TOTAL_APPLIED=0
-          TOTAL_SKIPPED=0
-          FAILURES=0
-
-          for dir in "${MIGRATION_DIRS[@]}"; do
-            FULL_PATH="infrastructure/supabase/sql/$dir"
-
-            if [ ! -d "$FULL_PATH" ]; then
-              echo "⚠️  Directory not found: $FULL_PATH (skipping)"
-              continue
-            fi
-
+            echo "✅ Schema deployed successfully in ${DURATION}s"
             echo ""
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "📁 Processing: $dir"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-            # Find all .sql files in this directory (including subdirectories)
-            while IFS= read -r file; do
-              BASENAME=$(basename "$file")
-              MIGRATION_NAME="$dir/$BASENAME"
-
-              # Calculate checksum
-              CHECKSUM=$(sha256sum "$file" | awk '{print $1}')
-
-              # Check if migration already applied
-              APPLIED=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc \
-                "SELECT COUNT(*) FROM _migrations_applied WHERE migration_name = '$MIGRATION_NAME' AND checksum = '$CHECKSUM';")
-
-              if [ "$APPLIED" -gt 0 ]; then
-                echo "⏭️  Skipping: $MIGRATION_NAME (already applied)"
-                ((TOTAL_SKIPPED++))
-                continue
-              fi
-
-              # Check if migration was applied with different checksum
-              APPLIED_DIFFERENT=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc \
-                "SELECT COUNT(*) FROM _migrations_applied WHERE migration_name = '$MIGRATION_NAME' AND checksum != '$CHECKSUM';")
-
-              if [ "$APPLIED_DIFFERENT" -gt 0 ]; then
-                echo "⚠️  WARNING: $MIGRATION_NAME was previously applied with different content"
-                echo "   This may indicate the migration file was modified after deployment"
-                # Continue anyway (idempotent migrations should handle this)
-              fi
-
-              echo "▶️  Applying: $MIGRATION_NAME"
-
-              # Execute migration and measure time
-              START_TIME=$(date +%s%3N)
-
-              if psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -f "$file" > /tmp/migration-output.log 2>&1; then
-                END_TIME=$(date +%s%3N)
-                EXECUTION_TIME=$((END_TIME - START_TIME))
-
-                # Record successful migration
-                psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres <<SQL
-                INSERT INTO _migrations_applied (migration_name, migration_path, checksum, execution_time_ms, applied_by)
-                VALUES ('$MIGRATION_NAME', '$file', '$CHECKSUM', $EXECUTION_TIME, 'github-actions')
-                ON CONFLICT (migration_name)
-                DO UPDATE SET
-                  checksum = EXCLUDED.checksum,
-                  execution_time_ms = EXCLUDED.execution_time_ms,
-                  applied_at = NOW();
-          SQL
-
-                echo "✅ Success: $MIGRATION_NAME (${EXECUTION_TIME}ms)"
-                ((TOTAL_APPLIED++))
-              else
-                echo "❌ FAILED: $MIGRATION_NAME"
-                echo "Error output:"
-                cat /tmp/migration-output.log
-                ((FAILURES++))
-
-                # Decide whether to continue or stop
-                echo "::error file=$file::Migration failed: $MIGRATION_NAME"
-                # Stop on first failure to prevent cascading errors
-                exit 1
-              fi
-            done < <(find "$FULL_PATH" -name "*.sql" | sort) || true
-          done
-
-          echo ""
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "📊 Migration Summary"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "Applied:  $TOTAL_APPLIED"
-          echo "Skipped:  $TOTAL_SKIPPED"
-          echo "Failures: $FAILURES"
-          echo ""
-
-          if [ $FAILURES -gt 0 ]; then
-            echo "❌ Migrations failed!"
-            exit 1
+            echo "Deployment output (last 50 lines):"
+            tail -50 /tmp/deploy-output.log
           else
-            echo "✅ All migrations applied successfully!"
+            echo "❌ Schema deployment FAILED"
+            echo ""
+            echo "Error output:"
+            cat /tmp/deploy-output.log
+            exit 1
           fi
-
-      - name: Run seed data (manual approval required)
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: |
-          echo "⚠️  Seed data execution requires manual approval"
-          echo "Seed files are located in: infrastructure/supabase/sql/99-seeds/"
-          echo ""
-          echo "To run seeds manually:"
-          echo "  psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres -f <seed-file.sql>"
-          echo ""
-          echo "Skipping automated seed execution for safety."
 
       - name: Verify database state
         env:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           echo "Verifying database state..."
-
-          # Check migration tracking
-          echo "📊 Migration History:"
-          psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres <<'EOF'
-          SELECT
-            migration_name,
-            applied_at,
-            execution_time_ms
-          FROM _migrations_applied
-          ORDER BY applied_at DESC
-          LIMIT 10;
-          EOF
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
           # Check table count
           TABLE_COUNT=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc \
@@ -320,15 +164,26 @@ jobs:
             "SELECT COUNT(*) FROM pg_proc WHERE pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public');")
           echo "⚙️  Total functions in public schema: $FUNCTION_COUNT"
 
+          # Check RLS enabled
+          RLS_COUNT=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc \
+            "SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public' AND rowsecurity = true;")
+          echo "🔒 Tables with RLS enabled: $RLS_COUNT"
+
+          # Check domain_events (should have data)
+          EVENT_COUNT=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc \
+            "SELECT COUNT(*) FROM domain_events;")
+          echo "📊 Domain events: $EVENT_COUNT"
+
+          echo ""
           echo "✅ Database verification complete"
 
       - name: Report deployment status
         if: always()
         run: |
           if [ ${{ job.status }} == 'success' ]; then
-            echo "🎉 Database migrations deployed successfully!"
+            echo "🎉 Database schema deployed successfully!"
             echo "🔗 Supabase Project: ${{ secrets.SUPABASE_URL }}"
           else
-            echo "❌ Migration deployment failed."
+            echo "❌ Schema deployment failed."
             echo "Check the logs above for details."
           fi

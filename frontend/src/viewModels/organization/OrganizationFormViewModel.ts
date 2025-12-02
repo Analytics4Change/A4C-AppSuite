@@ -51,6 +51,7 @@ import {
 } from '@/utils/organization-validation';
 import { DEFAULT_ORGANIZATION_FORM } from '@/constants';
 import { Logger } from '@/utils/logger';
+import { toast } from 'sonner';
 
 const log = Logger.getLogger('viewmodel');
 
@@ -492,20 +493,11 @@ export class OrganizationFormViewModel {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to submit organization';
 
-      // CRITICAL: Force error visibility in production (logger disabled)
-      // This helps diagnose why Edge Function calls are failing
-      if (typeof window !== 'undefined') {
-        console.error('[CRITICAL] Organization bootstrap failed:', error);
-        console.error('[CRITICAL] Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-
-        // Temporary: Show alert for immediate visibility
-        alert(
-          `⚠️ Organization Bootstrap Failed\n\n` +
-          `Error: ${errorMessage}\n\n` +
-          `This error has been logged to the browser console.\n` +
-          `Please check the Network tab for the Edge Function call.`
-        );
-      }
+      // Show toast notification for user visibility
+      toast.error('Organization Bootstrap Failed', {
+        description: errorMessage,
+        duration: 10000, // Show for 10 seconds since it's an error
+      });
 
       runInAction(() => {
         this.isSubmitting = false;

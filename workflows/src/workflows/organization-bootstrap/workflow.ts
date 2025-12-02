@@ -220,11 +220,14 @@ export async function organizationBootstrapWorkflow(
       count: state.invitations.length
     });
 
+    // Use frontendUrl from params (passed by caller), with fallback default
+    const frontendUrl = params.frontendUrl || 'https://a4c.firstovertheline.com';
+
     const emailResult = await sendInvitationEmails({
       orgId: state.orgId!,
       invitations: state.invitations,
       domain: state.domain!,
-      frontendUrl: 'https://a4c.firstovertheline.com'  // Default frontend URL (can't use process.env in workflows)
+      frontendUrl
     });
 
     state.invitationsSent = true;

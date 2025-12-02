@@ -24,6 +24,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { GenerateInvitationsParams, Invitation } from '@shared/types';
 import { getSupabaseClient } from '@shared/utils/supabase';
 import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { AGGREGATE_TYPES } from '@shared/constants';
 
 /**
  * Generate secure invitation token
@@ -83,7 +84,7 @@ export async function generateInvitations(
     // Emit UserInvited event (triggers projection update)
     await emitEvent({
       event_type: 'user.invited',
-      aggregate_type: 'Organization',
+      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
       aggregate_id: params.orgId,
       event_data: {
         invitation_id: invitationId,

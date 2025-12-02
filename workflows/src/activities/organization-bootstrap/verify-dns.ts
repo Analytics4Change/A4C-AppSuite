@@ -21,6 +21,7 @@
 import { promises as dns } from 'dns';
 import type { VerifyDNSParams } from '@shared/types';
 import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { AGGREGATE_TYPES } from '@shared/constants';
 
 /**
  * Verify DNS activity
@@ -39,7 +40,7 @@ export async function verifyDNS(params: VerifyDNSParams): Promise<boolean> {
     // Emit DNSVerified event
     await emitEvent({
       event_type: 'organization.dns.verified',
-      aggregate_type: 'Organization',
+      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
       aggregate_id: params.orgId,
       event_data: {
         domain: params.domain,
@@ -66,7 +67,7 @@ export async function verifyDNS(params: VerifyDNSParams): Promise<boolean> {
     // Emit DNSVerified event
     await emitEvent({
       event_type: 'organization.dns.verified',
-      aggregate_type: 'Organization',
+      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
       aggregate_id: params.orgId,
       event_data: {
         domain: params.domain,

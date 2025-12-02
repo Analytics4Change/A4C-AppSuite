@@ -17,6 +17,7 @@
 import type { ActivateOrganizationParams } from '@shared/types';
 import { getSupabaseClient } from '@shared/utils/supabase';
 import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { AGGREGATE_TYPES } from '@shared/constants';
 
 /**
  * Activate organization activity
@@ -53,7 +54,7 @@ export async function activateOrganization(
     // Emit event even if already active (for event replay)
     await emitEvent({
       event_type: 'organization.activated',
-      aggregate_type: 'Organization',
+      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
       aggregate_id: params.orgId,
       event_data: {
         org_id: params.orgId,

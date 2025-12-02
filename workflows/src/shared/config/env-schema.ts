@@ -85,6 +85,9 @@ export const workflowsEnvSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   HEALTH_CHECK_PORT: numberString(9090),
   FRONTEND_URL: z.string().url().optional(),
+
+  // === Domain Configuration ===
+  TARGET_DOMAIN: z.string().default('firstovertheline.com'),
 });
 
 // =============================================================================

@@ -20,6 +20,7 @@ import { DebugControlPanel } from '@/components/debug/DebugControlPanel';
 import { LogOverlay } from '@/components/debug/LogOverlay';
 import { DiagnosticsProvider } from '@/contexts/DiagnosticsContext';
 import { Logger } from '@/utils/logger';
+import { Toaster } from 'sonner';
 import './index.css';
 
 const log = Logger.getLogger('main');
@@ -52,7 +53,10 @@ function App() {
       {/* Debug Control Panel and Log Overlay */}
       <DebugControlPanel />
       <LogOverlay />
-      
+
+      {/* Toast notifications */}
+      <Toaster richColors position="top-right" />
+
       <BrowserRouter>
         <AuthProvider>
           <Routes>
@@ -79,13 +83,7 @@ function App() {
                 </Route>
 
                 {/* Organization Management routes */}
-                <Route
-                  path="/organizations"
-                  element={(() => {
-                    console.log('[App.tsx] 🎯 /organizations route matched!');
-                    return <OrganizationListPage />;
-                  })()}
-                />
+                <Route path="/organizations" element={<OrganizationListPage />} />
                 <Route path="/organizations/create" element={
                   <RequirePermission permission="organization.create" fallback="/clients">
                     <OrganizationCreatePage />

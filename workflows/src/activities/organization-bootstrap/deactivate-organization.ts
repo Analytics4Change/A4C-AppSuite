@@ -22,6 +22,7 @@
 import type { DeactivateOrganizationParams } from '@shared/types';
 import { getSupabaseClient } from '@shared/utils/supabase';
 import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { AGGREGATE_TYPES } from '@shared/constants';
 
 /**
  * Deactivate organization activity (compensation)
@@ -61,7 +62,7 @@ export async function deactivateOrganization(
       // Emit event even if already deactivated (for event replay)
       await emitEvent({
         event_type: 'organization.deactivated',
-        aggregate_type: 'Organization',
+        aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
         aggregate_id: params.orgId,
         event_data: {
           org_id: params.orgId,
@@ -96,7 +97,7 @@ export async function deactivateOrganization(
     // Emit OrganizationDeactivated event
     await emitEvent({
       event_type: 'organization.deactivated',
-      aggregate_type: 'Organization',
+      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
       aggregate_id: params.orgId,
       event_data: {
         org_id: params.orgId,

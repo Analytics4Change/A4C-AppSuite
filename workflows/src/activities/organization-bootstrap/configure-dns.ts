@@ -22,6 +22,7 @@
 import type { ConfigureDNSParams, ConfigureDNSResult } from '@shared/types';
 import { createDNSProvider } from '@shared/providers/dns/factory';
 import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { AGGREGATE_TYPES } from '@shared/constants';
 
 /**
  * Configure DNS activity
@@ -67,7 +68,7 @@ export async function configureDNS(
     // Emit event even if record exists (for event replay)
     await emitEvent({
       event_type: 'organization.dns.configured',
-      aggregate_type: 'Organization',
+      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
       aggregate_id: params.orgId,
       event_data: {
         org_id: params.orgId,
@@ -101,7 +102,7 @@ export async function configureDNS(
   // Emit organization.dns.configured event
   await emitEvent({
     event_type: 'organization.dns.configured',
-    aggregate_type: 'organization',
+    aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
     aggregate_id: params.orgId,
     event_data: {
       org_id: params.orgId,

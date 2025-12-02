@@ -3,12 +3,9 @@
 -- CQRS projection maintained by contact.* event processors
 -- Source of truth: contact.* events in domain_events table
 
--- Drop old table (no data to migrate - empty table)
-DROP TABLE IF EXISTS contacts_projection CASCADE;
-
--- Create new contacts_projection with all required fields
+-- Create contacts_projection with all required fields (idempotent)
 -- Note: No ON DELETE CASCADE - event-driven deletion required (emit contact.deleted events via workflow)
-CREATE TABLE contacts_projection (
+CREATE TABLE IF NOT EXISTS contacts_projection (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organizations_projection(id),
 
@@ -38,32 +35,36 @@ CREATE TABLE contacts_projection (
   deleted_at TIMESTAMPTZ  -- Soft delete support
 );
 
--- Performance indexes
-CREATE INDEX idx_contacts_organization
+-- Performance indexes (idempotent)
+CREATE INDEX IF NOT EXISTS idx_contacts_organization
   ON contacts_projection(organization_id)
   WHERE deleted_at IS NULL;
 
-CREATE INDEX idx_contacts_email
+CREATE INDEX IF NOT EXISTS idx_contacts_email
   ON contacts_projection(email)
   WHERE deleted_at IS NULL;
 
-CREATE INDEX idx_contacts_type
+CREATE INDEX IF NOT EXISTS idx_contacts_type
   ON contacts_projection(type, organization_id)
   WHERE deleted_at IS NULL;
 
-CREATE INDEX idx_contacts_primary
+CREATE INDEX IF NOT EXISTS idx_contacts_primary
   ON contacts_projection(organization_id, is_primary)
   WHERE is_primary = true AND deleted_at IS NULL;
 
-CREATE INDEX idx_contacts_active
+CREATE INDEX IF NOT EXISTS idx_contacts_active
   ON contacts_projection(is_active, organization_id)
   WHERE is_active = true AND deleted_at IS NULL;
 
--- Unique constraint: one primary contact per organization
-CREATE UNIQUE INDEX idx_contacts_one_primary_per_org
-  ON contacts_projection(organization_id)
-  WHERE is_primary = true AND deleted_at IS NULL;
-
+-- Unique constraint: one primary contact per organization (idempotent via DO block)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_contacts_one_primary_per_org') THEN
+    CREATE UNIQUE INDEX idx_contacts_one_primary_per_org
+      ON contacts_projection(organization_id)
+      WHERE is_primary = true AND deleted_at IS NULL;
+  END IF;
+END $$;
 -- Documentation
 COMMENT ON TABLE contacts_projection IS 'CQRS projection of contact.* events - contact persons associated with organizations';
 COMMENT ON COLUMN contacts_projection.organization_id IS 'Owning organization (org-scoped for RLS, future multi-org support via junction tables)';

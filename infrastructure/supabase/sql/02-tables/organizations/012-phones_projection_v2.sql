@@ -4,11 +4,11 @@
 -- Source of truth: phone.* events in domain_events table
 
 -- Drop old table (no data to migrate - empty table)
-DROP TABLE IF EXISTS phones_projection CASCADE;
+
 
 -- Create new phones_projection with all required fields
 -- Note: No ON DELETE CASCADE - event-driven deletion required (emit phone.deleted events via workflow)
-CREATE TABLE phones_projection (
+CREATE TABLE IF NOT EXISTS phones_projection (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organizations_projection(id),
 
@@ -35,28 +35,28 @@ CREATE TABLE phones_projection (
 );
 
 -- Performance indexes
-CREATE INDEX idx_phones_organization
+CREATE INDEX IF NOT EXISTS idx_phones_organization
   ON phones_projection(organization_id)
   WHERE deleted_at IS NULL;
 
-CREATE INDEX idx_phones_type
+CREATE INDEX IF NOT EXISTS idx_phones_type
   ON phones_projection(type, organization_id)
   WHERE deleted_at IS NULL;
 
-CREATE INDEX idx_phones_number
+CREATE INDEX IF NOT EXISTS idx_phones_number
   ON phones_projection(number)
   WHERE deleted_at IS NULL;
 
-CREATE INDEX idx_phones_primary
+CREATE INDEX IF NOT EXISTS idx_phones_primary
   ON phones_projection(organization_id, is_primary)
   WHERE is_primary = true AND deleted_at IS NULL;
 
-CREATE INDEX idx_phones_active
+CREATE INDEX IF NOT EXISTS idx_phones_active
   ON phones_projection(is_active, organization_id)
   WHERE is_active = true AND deleted_at IS NULL;
 
 -- Unique constraint: one primary phone per organization
-CREATE UNIQUE INDEX idx_phones_one_primary_per_org
+CREATE UNIQUE INDEX IF NOT EXISTS idx_phones_one_primary_per_org
   ON phones_projection(organization_id)
   WHERE is_primary = true AND deleted_at IS NULL;
 

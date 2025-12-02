@@ -19,6 +19,8 @@
 import type { RemoveDNSParams } from '@shared/types';
 import { createDNSProvider } from '@shared/providers/dns/factory';
 import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { getWorkflowsEnv } from '@shared/config/env-schema';
+import { AGGREGATE_TYPES } from '@shared/constants';
 
 /**
  * Remove DNS activity (compensation)
@@ -29,7 +31,7 @@ export async function removeDNS(params: RemoveDNSParams): Promise<boolean> {
   console.log(`[RemoveDNS] Starting for subdomain: ${params.subdomain}`);
 
   const dnsProvider = createDNSProvider();
-  const targetDomain = 'firstovertheline.com'; // TODO: Make configurable
+  const targetDomain = getWorkflowsEnv().TARGET_DOMAIN;
   const fqdn = `${params.subdomain}.${targetDomain}`;
 
   try {
@@ -62,7 +64,7 @@ export async function removeDNS(params: RemoveDNSParams): Promise<boolean> {
       // Emit event even if not found (for event replay)
       await emitEvent({
         event_type: 'organization.dns.removed',
-        aggregate_type: 'Organization',
+        aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
         aggregate_id: params.orgId,
         event_data: {
           subdomain: params.subdomain,
@@ -89,7 +91,7 @@ export async function removeDNS(params: RemoveDNSParams): Promise<boolean> {
     // Emit DNSRemoved event
     await emitEvent({
       event_type: 'organization.dns.removed',
-      aggregate_type: 'Organization',
+      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
       aggregate_id: params.orgId,
       event_data: {
         subdomain: params.subdomain,
@@ -113,7 +115,7 @@ export async function removeDNS(params: RemoveDNSParams): Promise<boolean> {
     // Emit event even on error
     await emitEvent({
       event_type: 'organization.dns.removed',
-      aggregate_type: 'Organization',
+      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
       aggregate_id: params.orgId,
       event_data: {
         subdomain: params.subdomain,

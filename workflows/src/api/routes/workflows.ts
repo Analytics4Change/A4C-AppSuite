@@ -22,6 +22,7 @@ const supabaseUrl = getRequiredEnvVar('SUPABASE_URL');
 const supabaseServiceKey = getRequiredEnvVar('SUPABASE_SERVICE_ROLE_KEY');
 const temporalAddress = process.env.TEMPORAL_ADDRESS || 'temporal-frontend.temporal.svc.cluster.local:7233';
 const temporalNamespace = process.env.TEMPORAL_NAMESPACE || 'default';
+const frontendUrl = process.env.FRONTEND_URL || 'https://a4c.firstovertheline.com';
 
 /**
  * Contact information structure
@@ -180,7 +181,8 @@ async function bootstrapOrganizationHandler(
       args: [{
         subdomain: requestData.subdomain,
         orgData: requestData.orgData,
-        users: requestData.users
+        users: requestData.users,
+        frontendUrl  // Pass FRONTEND_URL from env to workflow
       }]
     });
 

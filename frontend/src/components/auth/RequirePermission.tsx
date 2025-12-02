@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { Logger, devLog } from '@/utils/logger';
+
+const log = Logger.getLogger('auth');
 
 interface RequirePermissionProps {
   permission: string;
@@ -33,30 +36,20 @@ export const RequirePermission: React.FC<RequirePermissionProps> = ({
 
   useEffect(() => {
     const checkPermission = async () => {
-      // Enhanced debug logging
-      console.log('[RequirePermission] Checking permission:', {
-        required: permission,
-        user: session?.user.email,
+      // Debug logging (stripped in production - devLog compiles to no-op)
+      devLog.debug(`Checking permission: ${permission}`, {
         role: session?.claims.user_role,
-        userPermissions: session?.claims.permissions,
         orgId: session?.claims.org_id
       });
 
       const result = await hasPermission(permission);
 
       if (!result) {
-        console.warn(`[RequirePermission] ❌ Access DENIED: missing ${permission}`, {
-          user: session?.user.email,
-          role: session?.claims.user_role,
-          userPermissions: session?.claims.permissions,
-          required: permission
-        });
+        // Log access denied (production-safe - no sensitive data)
+        log.warn(`Access denied: missing permission ${permission}`);
         navigate(fallback, { replace: true });
       } else {
-        console.log(`[RequirePermission] ✅ Access GRANTED for ${permission}`, {
-          user: session?.user.email,
-          role: session?.claims.user_role
-        });
+        devLog.debug(`Access granted for ${permission}`);
       }
 
       setAllowed(result);

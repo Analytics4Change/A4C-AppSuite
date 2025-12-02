@@ -4,11 +4,11 @@
 -- Source of truth: address.* events in domain_events table
 
 -- Drop old table (no data to migrate - empty table)
-DROP TABLE IF EXISTS addresses_projection CASCADE;
+
 
 -- Create new addresses_projection with all required fields
 -- Note: No ON DELETE CASCADE - event-driven deletion required (emit address.deleted events via workflow)
-CREATE TABLE addresses_projection (
+CREATE TABLE IF NOT EXISTS addresses_projection (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organizations_projection(id),
 
@@ -38,29 +38,29 @@ CREATE TABLE addresses_projection (
 );
 
 -- Performance indexes
-CREATE INDEX idx_addresses_organization
+CREATE INDEX IF NOT EXISTS idx_addresses_organization
   ON addresses_projection(organization_id)
   WHERE deleted_at IS NULL;
 
-CREATE INDEX idx_addresses_type
+CREATE INDEX IF NOT EXISTS idx_addresses_type
   ON addresses_projection(type, organization_id)
   WHERE deleted_at IS NULL;
 
-CREATE INDEX idx_addresses_primary
+CREATE INDEX IF NOT EXISTS idx_addresses_primary
   ON addresses_projection(organization_id, is_primary)
   WHERE is_primary = true AND deleted_at IS NULL;
 
-CREATE INDEX idx_addresses_active
+CREATE INDEX IF NOT EXISTS idx_addresses_active
   ON addresses_projection(is_active, organization_id)
   WHERE is_active = true AND deleted_at IS NULL;
 
 -- Index for zip code lookups (useful for geographic queries)
-CREATE INDEX idx_addresses_zip
+CREATE INDEX IF NOT EXISTS idx_addresses_zip
   ON addresses_projection(zip_code)
   WHERE deleted_at IS NULL;
 
 -- Unique constraint: one primary address per organization
-CREATE UNIQUE INDEX idx_addresses_one_primary_per_org
+CREATE UNIQUE INDEX IF NOT EXISTS idx_addresses_one_primary_per_org
   ON addresses_projection(organization_id)
   WHERE is_primary = true AND deleted_at IS NULL;
 

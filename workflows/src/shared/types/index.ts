@@ -95,6 +95,12 @@ export interface OrganizationBootstrapParams {
   }>;
 
   /**
+   * Frontend URL for invitation links
+   * Passed from caller (edge function/API) since workflows can't read env vars
+   */
+  frontendUrl?: string;
+
+  /**
    * Optional DNS retry configuration (for testing)
    * Defaults to production values if not specified
    */
