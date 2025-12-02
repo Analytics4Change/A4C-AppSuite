@@ -174,7 +174,7 @@ async function bootstrapOrganizationHandler(
 
     const temporalWorkflowId = `org-bootstrap-${requestData.subdomain}-${Date.now()}`;
 
-    await client.workflow.start('organizationBootstrap', {
+    await client.workflow.start('organizationBootstrapWorkflow', {
       taskQueue: 'bootstrap',
       workflowId: temporalWorkflowId,
       args: [{
