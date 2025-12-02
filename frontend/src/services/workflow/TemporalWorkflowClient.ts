@@ -1,15 +1,17 @@
 /**
  * Temporal Workflow Client Implementation
  *
- * Production workflow client that communicates with Temporal via Supabase Edge Functions.
+ * Production workflow client that communicates with Temporal via the Backend API.
  * This client does NOT directly interact with Temporal - all operations go through
- * authenticated Edge Functions that emit domain events.
+ * the authenticated Backend API service running inside the k8s cluster.
  *
- * Architecture:
- * Frontend → Supabase Edge Function → Temporal API → Domain Events → PostgreSQL Triggers
+ * Architecture (2-hop):
+ * Frontend → Backend API (k8s) → Temporal → Domain Events → PostgreSQL Triggers
  *
- * Edge Functions:
- * - /organization-bootstrap: Start bootstrap workflow
+ * Backend API Endpoints:
+ * - POST /api/v1/workflows/organization-bootstrap: Start bootstrap workflow
+ *
+ * Legacy Edge Functions (for operations not yet migrated):
  * - /workflow-status: Get workflow status
  * - /workflow-cancel: Cancel running workflow
  *
@@ -22,36 +24,47 @@ import type {
   WorkflowStatus
 } from '@/types/organization.types';
 import { supabaseService } from '@/services/auth/supabase.service';
+import { getBackendApiUrl } from '@/lib/backend-api';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('workflow');
 
 /**
- * Supabase Edge Function endpoints for workflow operations
+ * Backend API endpoints for workflow operations
+ */
+const API_ENDPOINTS = {
+  ORGANIZATION_BOOTSTRAP: '/api/v1/workflows/organization-bootstrap'
+} as const;
+
+/**
+ * Legacy Edge Function endpoints (for operations not yet migrated to Backend API)
  */
 const EDGE_FUNCTIONS = {
-  START_BOOTSTRAP: 'organization-bootstrap',
   GET_STATUS: 'workflow-status',
   CANCEL_WORKFLOW: 'workflow-cancel'
 } as const;
 
 /**
- * Production workflow client using Temporal via Supabase Edge Functions
+ * Production workflow client using Temporal via Backend API
  *
  * Event-Driven Architecture:
  * - NO direct database inserts/updates
  * - All state changes via domain events
  * - PostgreSQL triggers update CQRS projections
+ *
+ * The Backend API runs inside the k8s cluster and can access Temporal directly.
+ * Edge Functions cannot reach Temporal (runs in Deno Deploy, external to cluster).
  */
 export class TemporalWorkflowClient implements IWorkflowClient {
   /**
    * Start organization bootstrap workflow
    *
    * Flow:
-   * 1. Call Supabase Edge Function
-   * 2. Edge Function starts Temporal workflow
-   * 3. Workflow emits domain events
-   * 4. PostgreSQL triggers update projections
+   * 1. Get JWT token from current Supabase session
+   * 2. Call Backend API with authenticated request
+   * 3. Backend API starts Temporal workflow
+   * 4. Workflow emits domain events
+   * 5. PostgreSQL triggers update projections
    *
    * Events Emitted (by Temporal activities):
    * - OrganizationCreated
@@ -63,7 +76,7 @@ export class TemporalWorkflowClient implements IWorkflowClient {
    *
    * @param params - Organization bootstrap parameters
    * @returns Workflow ID for status tracking
-   * @throws Error if Edge Function call fails
+   * @throws Error if Backend API call fails or user not authenticated
    */
   async startBootstrapWorkflow(
     params: OrganizationBootstrapParams
@@ -74,25 +87,57 @@ export class TemporalWorkflowClient implements IWorkflowClient {
         orgType: params.orgData.type
       });
 
+      // Get Backend API URL (validates based on deployment mode)
+      const apiUrl = getBackendApiUrl();
+      if (!apiUrl) {
+        throw new Error(
+          'Backend API not available in current mode. ' +
+          'Workflow operations require production or integration-auth mode.'
+        );
+      }
+
+      // Get current session for JWT token
       const client = supabaseService.getClient();
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.START_BOOTSTRAP,
+      const { data: { session }, error: sessionError } = await client.auth.getSession();
+
+      if (sessionError) {
+        log.error('Failed to get session', sessionError);
+        throw new Error(`Authentication error: ${sessionError.message}`);
+      }
+
+      if (!session?.access_token) {
+        throw new Error('Authentication required to start workflow');
+      }
+
+      // Call Backend API
+      const response = await fetch(
+        `${apiUrl}${API_ENDPOINTS.ORGANIZATION_BOOTSTRAP}`,
         {
-          body: params
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify(params)
         }
       );
 
-      if (error) {
-        log.error('Failed to start bootstrap workflow', error);
-        throw new Error(`Failed to start workflow: ${error.message}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+        log.error('Backend API error', { status: response.status, error: errorData });
+        throw new Error(`Failed to start workflow: ${errorMessage}`);
       }
+
+      const data = await response.json();
 
       if (!data?.workflowId) {
         throw new Error('Invalid response from workflow service');
       }
 
       log.info('Bootstrap workflow started', {
-        workflowId: data.workflowId
+        workflowId: data.workflowId,
+        organizationId: data.organizationId
       });
 
       return data.workflowId;

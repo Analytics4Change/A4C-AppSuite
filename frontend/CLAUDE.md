@@ -419,7 +419,11 @@ The application uses centralized configuration files for consistent behavior acr
 VITE_RXNORM_API_URL=https://rxnav.nlm.nih.gov/REST
 VITE_API_TIMEOUT=5000
 
-# Cache Configuration  
+# Backend API (required for workflow operations in production/integration modes)
+# The Backend API runs inside k8s cluster and proxies requests to Temporal
+VITE_BACKEND_API_URL=https://api-a4c.firstovertheline.com
+
+# Cache Configuration
 VITE_CACHE_TTL=3600000
 VITE_CACHE_MAX_SIZE=50MB
 

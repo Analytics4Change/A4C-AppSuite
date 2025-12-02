@@ -7,15 +7,13 @@ metadata:
     app: temporal-api
     component: backend-api
   annotations:
-    # TLS certificate via Let's Encrypt
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    # Traefik annotations
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.tls: "true"
+    # TLS termination handled by Cloudflare - cloudflared sends HTTP to Traefik
+    # No cert-manager needed - Cloudflare Universal SSL covers *.firstovertheline.com
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
 spec:
   ingressClassName: traefik
   rules:
-    - host: api.a4c.firstovertheline.com
+    - host: api-a4c.firstovertheline.com
       http:
         paths:
           - path: /
@@ -25,7 +23,3 @@ spec:
                 name: temporal-api
                 port:
                   number: 3000
-  tls:
-    - hosts:
-        - api.a4c.firstovertheline.com
-      secretName: temporal-api-tls

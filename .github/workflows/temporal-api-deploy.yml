@@ -233,23 +233,12 @@ jobs:
             fi
           fi
 
-      - name: Wait for TLS certificate
+      - name: Verify ingress configuration
         run: |
-          echo "Checking TLS certificate status..."
-          # Give cert-manager time to issue certificate
-          sleep 10
-
-          if kubectl get certificate temporal-api-tls -n temporal >/dev/null 2>&1; then
-            CERT_READY=$(kubectl get certificate temporal-api-tls -n temporal -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
-            if [ "$CERT_READY" = "True" ]; then
-              echo "✅ TLS certificate is ready"
-            else
-              echo "⏳ TLS certificate is being issued (this may take a minute)..."
-              # Don't fail - cert-manager will eventually issue the certificate
-            fi
-          else
-            echo "⏳ TLS certificate not yet created (cert-manager will create it)"
-          fi
+          echo "Checking ingress configuration..."
+          kubectl get ingress temporal-api-ingress -n temporal
+          echo ""
+          echo "✅ TLS is handled by Cloudflare (Universal SSL covers *.firstovertheline.com)"
 
       - name: Verify deployment
         run: |
@@ -265,8 +254,7 @@ jobs:
           echo "🔗 Ingress Status:"
           kubectl get ingress temporal-api-ingress -n temporal
           echo ""
-          echo "🔒 Certificate Status:"
-          kubectl get certificate -n temporal 2>/dev/null || echo "No certificates found yet"
+          echo "🔒 TLS: Cloudflare Universal SSL (*.firstovertheline.com)"
           echo ""
           echo "🔍 Recent Events:"
           kubectl get events -n temporal --sort-by='.lastTimestamp' | grep -i temporal-api | tail -10 || true
@@ -305,9 +293,9 @@ jobs:
             echo ""
             echo "📍 API Endpoints:"
             echo "   Internal: http://temporal-api.temporal.svc.cluster.local:3000"
-            echo "   External: https://api.a4c.firstovertheline.com"
+            echo "   External: https://api-a4c.firstovertheline.com"
             echo ""
-            echo "🔗 Health Check: https://api.a4c.firstovertheline.com/health"
+            echo "🔗 Health Check: https://api-a4c.firstovertheline.com/health"
           else
             echo "❌ Deployment failed. Check the logs above for details."
           fi

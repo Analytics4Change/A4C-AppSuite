@@ -234,11 +234,12 @@ curl http://localhost:3000/metrics
 ## External Access
 
 The API is exposed externally via:
-- **URL**: `https://api.a4c.firstovertheline.com`
-- **Ingress**: Traefik ingress controller with Let's Encrypt TLS
-- **Cloudflare**: Existing `*.firstovertheline.com` tunnel rule handles routing
+- **URL**: `https://api-a4c.firstovertheline.com`
+- **Ingress**: Traefik ingress controller
+- **TLS**: Cloudflare handles TLS termination (Universal SSL covers `*.firstovertheline.com`)
+- **Cloudflare Tunnel**: Routes traffic from Cloudflare edge to k8s cluster
 
-The ingress uses cert-manager with the `letsencrypt-prod` cluster issuer for automatic TLS certificates.
+**Note**: The hostname uses `api-a4c` (first-level subdomain) rather than `api.a4c` (nested subdomain) because Cloudflare Universal SSL only covers first-level wildcards.
 
 ### Verify External Access
 
@@ -246,11 +247,8 @@ The ingress uses cert-manager with the `letsencrypt-prod` cluster issuer for aut
 # Check ingress status
 kubectl get ingress -n temporal temporal-api-ingress
 
-# Check TLS certificate
-kubectl get certificate -n temporal temporal-api-tls
-
 # Test external endpoint (after deployment)
-curl https://api.a4c.firstovertheline.com/health
+curl https://api-a4c.firstovertheline.com/health
 ```
 
 ## Next Steps

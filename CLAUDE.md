@@ -247,8 +247,9 @@ VITE_RXNORM_API_URL=https://rxnav.nlm.nih.gov/REST
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 
-# Note: Zitadel migration complete (October 2025) - now using Supabase Auth
-# VITE_ZITADEL_AUTHORITY=https://analytics4change-zdswvg.us1.zitadel.cloud (deprecated)
+# Backend API for workflow operations (organization bootstrap, etc.)
+# Required in production/integration modes, not needed in mock mode
+VITE_BACKEND_API_URL=https://api-a4c.firstovertheline.com
 ```
 
 ### Workflows (`workflows/.env` for local development)
