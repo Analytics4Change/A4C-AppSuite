@@ -1,6 +1,5 @@
 {
   "imports": {
-    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2",
-    "@temporalio/client": "npm:@temporalio/client@^1.10.0"
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2"
   }
 }

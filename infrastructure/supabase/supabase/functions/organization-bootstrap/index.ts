@@ -1,18 +1,22 @@
 /**
  * Organization Bootstrap Edge Function
  *
- * This Edge Function initiates the organization bootstrap workflow via Temporal.
- * It's called by the frontend TemporalWorkflowClient to start the bootstrap process.
+ * This Edge Function initiates the organization bootstrap workflow via the Backend API.
+ * It validates authentication and permissions, then forwards the request to the
+ * Backend API which connects to Temporal.
  *
- * CQRS-compliant: Emits domain events, delegates orchestration to Temporal
+ * Architecture:
+ *   Frontend → Edge Function (auth validation) → Backend API → Temporal
+ *
+ * Note: Edge Functions cannot connect to Temporal directly because they run in
+ * Deno Deploy (external to k8s cluster) and cannot reach k8s internal DNS.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { Connection, Client } from 'npm:@temporalio/client@^1.10.0';
 
-// Deployment version tracking (injected by CI/CD)
-const DEPLOY_VERSION = Deno.env.get('GIT_COMMIT_SHA')?.substring(0, 8) || 'dev-local';
+// Deployment version tracking
+const DEPLOY_VERSION = 'v2';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -97,7 +101,7 @@ interface BootstrapResponse {
 }
 
 serve(async (req) => {
-  console.log(`[organization-bootstrap v${DEPLOY_VERSION}] Processing ${req.method} request`);
+  console.log(`[organization-bootstrap ${DEPLOY_VERSION}] Processing ${req.method} request`);
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -106,19 +110,23 @@ serve(async (req) => {
 
   // Validate required environment variables
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
-  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
-    console.error('[organization-bootstrap] Missing required environment variables:', {
+  // Backend API URL - this is the k8s service that connects to Temporal
+  // Default to production URL, can be overridden for testing
+  const backendApiUrl = Deno.env.get('BACKEND_API_URL') || 'https://api-a4c.firstovertheline.com';
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error(`[organization-bootstrap ${DEPLOY_VERSION}] Missing required environment variables:`, {
       has_supabase_url: !!supabaseUrl,
-      has_service_role_key: !!supabaseServiceKey,
-      has_anon_key: !!supabaseAnonKey
+      has_anon_key: !!supabaseAnonKey,
+      version: DEPLOY_VERSION
     });
     return new Response(
       JSON.stringify({
         error: 'Server configuration error',
-        details: 'Missing required environment variables'
+        details: 'Missing required environment variables',
+        version: DEPLOY_VERSION
       }),
       {
         status: 500,
@@ -127,51 +135,7 @@ serve(async (req) => {
     );
   }
 
-  // Defensive: Validate Temporal configuration
-  const temporalAddress = Deno.env.get('TEMPORAL_ADDRESS') || 'temporal-frontend.temporal.svc.cluster.local:7233';
-  const temporalNamespace = Deno.env.get('TEMPORAL_NAMESPACE') || 'default';
-
-  // Validate Temporal address format (must be host:port)
-  const addressPattern = /^[a-zA-Z0-9.-]+:\d+$/;
-  if (!addressPattern.test(temporalAddress)) {
-    console.error('[organization-bootstrap] Invalid TEMPORAL_ADDRESS format:', {
-      address: temporalAddress,
-      expected_format: 'host:port (e.g., temporal-frontend.temporal.svc.cluster.local:7233)'
-    });
-    return new Response(
-      JSON.stringify({
-        error: 'Server configuration error',
-        details: `Invalid TEMPORAL_ADDRESS format: ${temporalAddress} (expected "host:port")`
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
-  }
-
-  // Validate Temporal namespace is not empty
-  if (!temporalNamespace || temporalNamespace.trim() === '') {
-    console.error('[organization-bootstrap] Invalid TEMPORAL_NAMESPACE:', {
-      namespace: temporalNamespace,
-      expected: 'non-empty string (e.g., "default")'
-    });
-    return new Response(
-      JSON.stringify({
-        error: 'Server configuration error',
-        details: 'TEMPORAL_NAMESPACE must be a non-empty string'
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
-  }
-
-  console.log('[organization-bootstrap] ✓ Temporal configuration validated:', {
-    address: temporalAddress,
-    namespace: temporalNamespace
-  });
+  console.log(`[organization-bootstrap ${DEPLOY_VERSION}] ✓ Environment validated, Backend API: ${backendApiUrl}`);
 
   try {
 
@@ -263,7 +227,20 @@ serve(async (req) => {
     });
 
     // Parse request body
-    const requestData: BootstrapRequest = await req.json();
+    let requestData: BootstrapRequest;
+    try {
+      requestData = await req.json();
+    } catch (parseError) {
+      console.error(`[organization-bootstrap ${DEPLOY_VERSION}] Failed to parse request body:`, parseError);
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid request body',
+          details: 'Could not parse JSON',
+          version: DEPLOY_VERSION
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Validate required fields (AsyncAPI contract enforcement)
     if (!requestData.subdomain || !requestData.orgData || !requestData.users) {
@@ -275,113 +252,103 @@ serve(async (req) => {
             subdomain: !!requestData.subdomain,
             orgData: !!requestData.orgData,
             users: !!requestData.users
-          }
+          },
+          version: DEPLOY_VERSION
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Generate IDs
-    const workflowId = crypto.randomUUID();
-    const organizationId = crypto.randomUUID();
+    console.log(`[organization-bootstrap ${DEPLOY_VERSION}] ✓ Request validated, forwarding to Backend API: ${backendApiUrl}`);
 
-    // Create service role client for database operations (bypasses RLS)
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    // Forward request to Backend API
+    // The Backend API handles:
+    // - Event emission (organization.bootstrap.initiated)
+    // - Temporal workflow creation
+    // - ID generation
+    const apiEndpoint = `${backendApiUrl}/api/v1/workflows/organization-bootstrap`;
 
-    // Emit organization.bootstrap.initiated event via API wrapper
-    // Event data matches AsyncAPI contract exactly
-    // Uses api.emit_domain_event() wrapper to avoid PostgREST schema restrictions
-    const { data: _eventId, error: eventError } = await supabaseAdmin
-      .schema('api')
-      .rpc('emit_domain_event', {
-        p_stream_id: organizationId,
-        p_stream_type: 'organization',
-        p_stream_version: 1,
-        p_event_type: 'organization.bootstrap.initiated',
-        p_event_data: {
-          bootstrap_id: workflowId,
+    try {
+      const apiResponse = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader,
+        },
+        body: JSON.stringify({
           subdomain: requestData.subdomain,
           orgData: requestData.orgData,
           users: requestData.users,
-        },
-        p_event_metadata: {
-          user_id: user.id,
-          organization_id: organizationId,
-          initiated_by: user.email,
-          initiated_via: 'edge_function',
-        }
+        }),
       });
 
-    if (eventError) {
-      console.error('Failed to emit bootstrap event:', eventError);
-      return new Response(
-        JSON.stringify({
-          error: 'Failed to initiate bootstrap',
-          details: eventError.message,
-          version: DEPLOY_VERSION
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+      console.log(`[organization-bootstrap ${DEPLOY_VERSION}] Backend API responded with status: ${apiResponse.status}`);
 
-    console.log(`Bootstrap event emitted successfully: event_id=${_eventId}, workflow_id=${workflowId}, org_id=${organizationId}`);
-
-    // Start Temporal workflow directly (no event-driven triggering)
-    // This replaces the PostgreSQL NOTIFY → Realtime → Worker listener chain
-    // See: dev/active/architecture-simplification-option-c.md
-    try {
-      const connection = await Connection.connect({ address: temporalAddress });
-      const client = new Client({ connection, namespace: temporalNamespace });
-
-      const temporalWorkflowId = `org-bootstrap-${requestData.subdomain}-${Date.now()}`;
-      await client.workflow.start('organizationBootstrap', {
-        taskQueue: 'bootstrap',
-        workflowId: temporalWorkflowId,
-        args: [{
-          subdomain: requestData.subdomain,
-          orgData: requestData.orgData,
-          users: requestData.users
-        }]
-      });
-
-      console.log(`Temporal workflow started: ${temporalWorkflowId}, org_id=${organizationId}, user=${user.email}`);
-
-      // Close connection after starting workflow
-      await connection.close();
-
-    } catch (temporalError) {
-      console.error('Failed to start Temporal workflow:', temporalError);
-      return new Response(
-        JSON.stringify({
-          error: 'Failed to start workflow',
-          details: temporalError.message,
-          version: DEPLOY_VERSION
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`Bootstrap initiated: workflow_id=${workflowId}, org_id=${organizationId}, user=${user.email}`);
-
-    // Return response
-    const response: BootstrapResponse = {
-      workflowId,
-      organizationId,
-      status: 'initiated',
-    };
-
-    return new Response(
-      JSON.stringify(response),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      // Get response body
+      const responseText = await apiResponse.text();
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch {
+        responseData = { raw: responseText };
       }
-    );
+
+      // Forward the response status and body from Backend API
+      if (!apiResponse.ok) {
+        console.error(`[organization-bootstrap ${DEPLOY_VERSION}] Backend API error:`, {
+          status: apiResponse.status,
+          response: responseData,
+        });
+        return new Response(
+          JSON.stringify({
+            error: 'Backend API error',
+            details: responseData.error || responseData.message || 'Unknown error',
+            backendStatus: apiResponse.status,
+            version: DEPLOY_VERSION
+          }),
+          {
+            status: apiResponse.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      console.log(`[organization-bootstrap ${DEPLOY_VERSION}] ✓ Bootstrap initiated successfully:`, {
+        workflowId: responseData.workflowId,
+        organizationId: responseData.organizationId,
+        user: user.email,
+      });
+
+      // Return the Backend API response (includes workflowId, organizationId)
+      return new Response(
+        JSON.stringify(responseData),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+
+    } catch (fetchError) {
+      console.error(`[organization-bootstrap ${DEPLOY_VERSION}] Failed to call Backend API:`, fetchError);
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to reach Backend API',
+          details: fetchError.message,
+          endpoint: apiEndpoint,
+          version: DEPLOY_VERSION
+        }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
   } catch (error) {
-    console.error('Bootstrap edge function error:', error);
+    console.error(`[organization-bootstrap ${DEPLOY_VERSION}] Unhandled error:`, error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      JSON.stringify({
+        error: 'Internal server error',
+        details: error.message,
+        version: DEPLOY_VERSION
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
