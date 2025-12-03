@@ -18,7 +18,7 @@ import { OrganizationDashboard } from '@/pages/organizations/OrganizationDashboa
 import { AcceptInvitationPage } from '@/pages/organizations/AcceptInvitationPage';
 import { DebugControlPanel } from '@/components/debug/DebugControlPanel';
 import { LogOverlay } from '@/components/debug/LogOverlay';
-import { DiagnosticsProvider } from '@/contexts/DiagnosticsContext';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Logger } from '@/utils/logger';
 import { Toaster } from 'sonner';
 import './index.css';
@@ -49,7 +49,7 @@ const SettingsPage = () => (
 function App() {
   log.info('Application starting');
   return (
-    <DiagnosticsProvider>
+    <ErrorBoundary>
       {/* Debug Control Panel and Log Overlay */}
       <DebugControlPanel />
       <LogOverlay />
@@ -105,7 +105,7 @@ function App() {
           </Routes>
         </AuthProvider>
       </BrowserRouter>
-    </DiagnosticsProvider>
+    </ErrorBoundary>
   );
 }
 

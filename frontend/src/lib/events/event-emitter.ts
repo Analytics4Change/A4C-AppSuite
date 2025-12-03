@@ -396,7 +396,7 @@ export const eventEmitter = {
     return instance.getEventHistory(streamId, streamType, options);
   },
 
-  subscribeToEvents(
+  async subscribeToEvents(
     callback: (event: DomainEvent) => void,
     filters?: {
       streamId?: string;
@@ -404,8 +404,8 @@ export const eventEmitter = {
       eventTypes?: string[];
     }
   ) {
-    // For subscriptions, we need the instance synchronously
-    // This will throw if not initialized, which is acceptable
-    return getEventEmitter().subscribeToEvents(callback, filters);
+    // Initialize instance if not yet created (consistent with other methods)
+    const instance = await getOrCreateEventEmitter();
+    return instance.subscribeToEvents(callback, filters);
   }
 };

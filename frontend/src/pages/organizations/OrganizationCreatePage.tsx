@@ -45,6 +45,62 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const log = Logger.getLogger('component');
 
+// =============================================================================
+// Glassmorphism Style Constants
+// =============================================================================
+
+/**
+ * Glassmorphism styles for main section cards (3 sections)
+ */
+const GLASSMORPHISM_SECTION_STYLE: React.CSSProperties = {
+  background: 'rgba(255, 255, 255, 0.75)',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  border: '1px solid',
+  borderImage: 'linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.5) 100%) 1',
+  boxShadow: `
+    0 0 0 1px rgba(255, 255, 255, 0.18) inset,
+    0 2px 4px rgba(0, 0, 0, 0.04),
+    0 4px 8px rgba(0, 0, 0, 0.04),
+    0 8px 16px rgba(0, 0, 0, 0.04),
+    0 0 24px rgba(59, 130, 246, 0.03)
+  `.trim()
+};
+
+/**
+ * Glassmorphism styles for inner cards (9 sub-cards)
+ */
+const GLASSMORPHISM_CARD_STYLE: React.CSSProperties = {
+  background: 'rgba(255, 255, 255, 0.7)',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  border: '1px solid rgba(255, 255, 255, 0.3)',
+  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+};
+
+/**
+ * Hover shadow for inner cards
+ */
+const CARD_HOVER_SHADOW = `
+  0 0 0 1px rgba(255, 255, 255, 0.25) inset,
+  0 0 20px rgba(59, 130, 246, 0.15) inset,
+  0 12px 24px rgba(0, 0, 0, 0.08)
+`.trim();
+
+/**
+ * Create hover handlers for glassmorphism cards
+ */
+const createCardHoverHandlers = () => ({
+  onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => {
+    e.currentTarget.style.boxShadow = CARD_HOVER_SHADOW;
+    e.currentTarget.style.transform = 'translateY(-2px)';
+  },
+  onMouseLeave: (e: React.MouseEvent<HTMLDivElement>) => {
+    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+    e.currentTarget.style.transform = 'translateY(0)';
+  }
+});
+
 /**
  * Organization Create Page Component
  *
@@ -186,20 +242,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
           {/* Section 1: General Information */}
           <Card
             className="transition-all duration-200"
-            style={{
-              background: 'rgba(255, 255, 255, 0.75)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              border: '1px solid',
-              borderImage: 'linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.5) 100%) 1',
-              boxShadow: `
-                0 0 0 1px rgba(255, 255, 255, 0.18) inset,
-                0 2px 4px rgba(0, 0, 0, 0.04),
-                0 4px 8px rgba(0, 0, 0, 0.04),
-                0 8px 16px rgba(0, 0, 0, 0.04),
-                0 0 24px rgba(59, 130, 246, 0.03)
-              `.trim()
-            }}
+            style={GLASSMORPHISM_SECTION_STYLE}
           >
             <CardHeader
               className="border-b border-gray-200/50 cursor-pointer"
@@ -226,25 +269,8 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                   {/* Card 1: Organization Details */}
                   <div
                     className="p-4 rounded-lg transition-all duration-200"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.7)',
-                      backdropFilter: 'blur(20px)',
-                      WebkitBackdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = `
-                        0 0 0 1px rgba(255, 255, 255, 0.25) inset,
-                        0 0 20px rgba(59, 130, 246, 0.15) inset,
-                        0 12px 24px rgba(0, 0, 0, 0.08)
-                      `.trim();
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
+                    style={GLASSMORPHISM_CARD_STYLE}
+                    {...createCardHoverHandlers()}
                   >
                     <div className="space-y-3">
                       {/* Organization Info */}
@@ -441,25 +467,8 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                   {/* Card 2: Headquarters Address */}
                   <div
                     className="p-4 rounded-lg transition-all duration-200"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.7)',
-                      backdropFilter: 'blur(20px)',
-                      WebkitBackdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = `
-                        0 0 0 1px rgba(255, 255, 255, 0.25) inset,
-                        0 0 20px rgba(59, 130, 246, 0.15) inset,
-                        0 12px 24px rgba(0, 0, 0, 0.08)
-                      `.trim();
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
+                    style={GLASSMORPHISM_CARD_STYLE}
+                    {...createCardHoverHandlers()}
                   >
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Headquarters Address
@@ -473,25 +482,8 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                   {/* Card 3: Main Office Phone */}
                   <div
                     className="p-4 rounded-lg transition-all duration-200"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.7)',
-                      backdropFilter: 'blur(20px)',
-                      WebkitBackdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = `
-                        0 0 0 1px rgba(255, 255, 255, 0.25) inset,
-                        0 0 20px rgba(59, 130, 246, 0.15) inset,
-                        0 12px 24px rgba(0, 0, 0, 0.08)
-                      `.trim();
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
+                    style={GLASSMORPHISM_CARD_STYLE}
+                    {...createCardHoverHandlers()}
                   >
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Main Office Phone
@@ -510,20 +502,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
           {isProvider && (
             <Card
               className="transition-all duration-200"
-              style={{
-                background: 'rgba(255, 255, 255, 0.75)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                border: '1px solid',
-                borderImage: 'linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.5) 100%) 1',
-                boxShadow: `
-                  0 0 0 1px rgba(255, 255, 255, 0.18) inset,
-                  0 2px 4px rgba(0, 0, 0, 0.04),
-                  0 4px 8px rgba(0, 0, 0, 0.04),
-                  0 8px 16px rgba(0, 0, 0, 0.04),
-                  0 0 24px rgba(59, 130, 246, 0.03)
-                `.trim()
-              }}
+              style={GLASSMORPHISM_SECTION_STYLE}
             >
               <CardHeader
                 className="border-b border-gray-200/50 cursor-pointer"
@@ -550,25 +529,8 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                     {/* Billing Contact Card */}
                     <div
                       className="p-4 rounded-lg transition-all duration-200"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.7)',
-                        backdropFilter: 'blur(20px)',
-                        WebkitBackdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.boxShadow = `
-                          0 0 0 1px rgba(255, 255, 255, 0.25) inset,
-                          0 0 20px rgba(59, 130, 246, 0.15) inset,
-                          0 12px 24px rgba(0, 0, 0, 0.08)
-                        `.trim();
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                      }}
+                      style={GLASSMORPHISM_CARD_STYLE}
+                      {...createCardHoverHandlers()}
                     >
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         Billing Contact
@@ -582,25 +544,8 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                     {/* Billing Address Card */}
                     <div
                       className="p-4 rounded-lg transition-all duration-200"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.7)',
-                        backdropFilter: 'blur(20px)',
-                        WebkitBackdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.boxShadow = `
-                          0 0 0 1px rgba(255, 255, 255, 0.25) inset,
-                          0 0 20px rgba(59, 130, 246, 0.15) inset,
-                          0 12px 24px rgba(0, 0, 0, 0.08)
-                        `.trim();
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                      }}
+                      style={GLASSMORPHISM_CARD_STYLE}
+                      {...createCardHoverHandlers()}
                     >
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold text-gray-900">
@@ -629,25 +574,8 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                     {/* Billing Phone Card */}
                     <div
                       className="p-4 rounded-lg transition-all duration-200"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.7)',
-                        backdropFilter: 'blur(20px)',
-                        WebkitBackdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.boxShadow = `
-                          0 0 0 1px rgba(255, 255, 255, 0.25) inset,
-                          0 0 20px rgba(59, 130, 246, 0.15) inset,
-                          0 12px 24px rgba(0, 0, 0, 0.08)
-                        `.trim();
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                      }}
+                      style={GLASSMORPHISM_CARD_STYLE}
+                      {...createCardHoverHandlers()}
                     >
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold text-gray-900">
@@ -681,20 +609,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
           {/* Section 3: Provider Admin Information (always visible) */}
           <Card
             className="transition-all duration-200"
-            style={{
-              background: 'rgba(255, 255, 255, 0.75)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              border: '1px solid',
-              borderImage: 'linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.5) 100%) 1',
-              boxShadow: `
-                0 0 0 1px rgba(255, 255, 255, 0.18) inset,
-                0 2px 4px rgba(0, 0, 0, 0.04),
-                0 4px 8px rgba(0, 0, 0, 0.04),
-                0 8px 16px rgba(0, 0, 0, 0.04),
-                0 0 24px rgba(59, 130, 246, 0.03)
-              `.trim()
-            }}
+            style={GLASSMORPHISM_SECTION_STYLE}
           >
             <CardHeader
               className="border-b border-gray-200/50 cursor-pointer"
@@ -721,25 +636,8 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                   {/* Provider Admin Contact Card */}
                   <div
                     className="p-4 rounded-lg transition-all duration-200"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.7)',
-                      backdropFilter: 'blur(20px)',
-                      WebkitBackdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = `
-                        0 0 0 1px rgba(255, 255, 255, 0.25) inset,
-                        0 0 20px rgba(59, 130, 246, 0.15) inset,
-                        0 12px 24px rgba(0, 0, 0, 0.08)
-                      `.trim();
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
+                    style={GLASSMORPHISM_CARD_STYLE}
+                    {...createCardHoverHandlers()}
                   >
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Provider Admin Contact
@@ -753,25 +651,8 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                   {/* Provider Admin Address Card */}
                   <div
                     className="p-4 rounded-lg transition-all duration-200"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.7)',
-                      backdropFilter: 'blur(20px)',
-                      WebkitBackdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = `
-                        0 0 0 1px rgba(255, 255, 255, 0.25) inset,
-                        0 0 20px rgba(59, 130, 246, 0.15) inset,
-                        0 12px 24px rgba(0, 0, 0, 0.08)
-                      `.trim();
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
+                    style={GLASSMORPHISM_CARD_STYLE}
+                    {...createCardHoverHandlers()}
                   >
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-gray-900">
@@ -800,25 +681,8 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                   {/* Provider Admin Phone Card */}
                   <div
                     className="p-4 rounded-lg transition-all duration-200"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.7)',
-                      backdropFilter: 'blur(20px)',
-                      WebkitBackdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = `
-                        0 0 0 1px rgba(255, 255, 255, 0.25) inset,
-                        0 0 20px rgba(59, 130, 246, 0.15) inset,
-                        0 12px 24px rgba(0, 0, 0, 0.08)
-                      `.trim();
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
+                    style={GLASSMORPHISM_CARD_STYLE}
+                    {...createCardHoverHandlers()}
                   >
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-gray-900">

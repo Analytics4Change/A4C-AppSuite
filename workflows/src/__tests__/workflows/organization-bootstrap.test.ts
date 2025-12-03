@@ -275,7 +275,7 @@ describe('OrganizationBootstrapWorkflow', () => {
           },
           {
             email: 'invalid@example.com',
-            lastName: 'Invalid',
+            firstName: 'Invalid',
             lastName: 'User',
             role: 'user'
           }

@@ -53,8 +53,9 @@ export async function createOrganization(
       if (error) throw error;
       existing = data && data.length > 0 ? data[0] : null;
     }
-  } catch (error: any) {
-    throw new Error(`Failed to check existing organization: ${error.message}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to check existing organization: ${errorMessage}`);
   }
 
   if (existing) {

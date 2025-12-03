@@ -64,8 +64,8 @@ export const workflowsEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
 
   // === Cloudflare (required if DNS_PROVIDER=cloudflare) ===
+  // Note: Zone ID is auto-discovered via API; only token is needed
   CLOUDFLARE_API_TOKEN: z.string().optional(),
-  CLOUDFLARE_ZONE_ID: z.string().optional(),
 
   // === Resend (required if EMAIL_PROVIDER=resend) ===
   RESEND_API_KEY: z.string().optional(),

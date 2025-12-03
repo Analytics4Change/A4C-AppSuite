@@ -57,14 +57,6 @@ export function createDNSProvider(): IDNSProvider {
     }
   }
 
-  // Log provider selection
-  console.log(`\n[DNS Provider Factory]`);
-  console.log(`  Mode: ${mode}`);
-  if (dnsProviderOverride) {
-    console.log(`  Override: ${dnsProviderOverride}`);
-  }
-  console.log(`  Selected: ${providerType}Provider\n`);
-
   // Create provider
   switch (providerType) {
     case 'cloudflare':

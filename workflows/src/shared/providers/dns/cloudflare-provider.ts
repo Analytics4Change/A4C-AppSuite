@@ -7,7 +7,8 @@
  * Requirements:
  * - CLOUDFLARE_API_TOKEN environment variable
  * - Token must have Zone:Read and DNS:Edit permissions
- * - Optional: CLOUDFLARE_ZONE_ID (auto-discovered if not provided)
+ *
+ * Note: Zone ID is auto-discovered via the listZones() API call.
  *
  * API Documentation: https://developers.cloudflare.com/api/operations/dns-records-for-a-zone-list-dns-records
  */
