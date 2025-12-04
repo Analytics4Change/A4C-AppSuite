@@ -30,14 +30,14 @@ export abstract class BasePlugin implements Plugin {
   /**
    * Cleanup plugin resources
    */
-  async onDestroy(context: PluginContext): Promise<void> {
+  async onDestroy(_context: PluginContext): Promise<void> {
     this.logger.info('Plugin destroyed');
   }
   
   /**
    * Called before plugin execution
    */
-  async onBeforeExecute(context: PluginContext): Promise<void> {
+  async onBeforeExecute(_context: PluginContext): Promise<void> {
     this.logger.debug('Plugin execution starting');
   }
   
@@ -86,7 +86,7 @@ export abstract class BasePlugin implements Plugin {
   /**
    * Check if a dependency is available
    */
-  protected isDependencyAvailable(dependency: string, context: PluginContext): boolean {
+  protected isDependencyAvailable(_dependency: string, _context: PluginContext): boolean {
     // Implementation would check for plugin availability in registry
     // For now, assume all dependencies are available
     return true;
@@ -249,7 +249,7 @@ export abstract class BaseValidatorPlugin extends BasePlugin implements Validato
   /**
    * Extract files from plugin context
    */
-  protected extractFilesFromContext(context: PluginContext): FileInfo[] {
+  protected extractFilesFromContext(_context: PluginContext): FileInfo[] {
     // This would be implemented based on how files are passed to the context
     // For now, return empty array
     return [];
@@ -358,7 +358,7 @@ export abstract class BaseProcessorPlugin extends BasePlugin implements Processo
   /**
    * Extract files from plugin context
    */
-  protected extractFilesFromContext(context: PluginContext): FileInfo[] {
+  protected extractFilesFromContext(_context: PluginContext): FileInfo[] {
     // This would be implemented based on how files are passed to the context
     // For now, return empty array
     return [];

@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2025-12-02
+last_updated: 2025-12-03
 ---
 
 # Environment Variables Reference
 
-**Last Updated**: 2025-12-02
-**Version**: 2.0.0
+**Last Updated**: 2025-12-03
+**Version**: 2.1.0
 
 This document provides a comprehensive reference for all environment variables used across the A4C-AppSuite monorepo.
 
@@ -725,6 +725,27 @@ TEMPORAL_ADDRESS=temporal-frontend.temporal.svc.cluster.local:7233
 
 ### DNS Provider Credentials
 
+#### `TARGET_DOMAIN`
+
+**Purpose**: Target domain for DNS subdomain operations
+**Default**: `firstovertheline.com`
+**Required**: No (has default)
+
+**Behavior Influence**: Determines which domain zone to use for organization subdomains (e.g., `org-name.firstovertheline.com`)
+
+**Files**:
+- `workflows/src/shared/config/env-schema.ts` - Environment schema
+- `workflows/src/activities/organization-bootstrap/remove-dns.ts` - DNS cleanup activity
+
+**Example**:
+```bash
+# Default (production)
+TARGET_DOMAIN=firstovertheline.com
+
+# Custom domain
+TARGET_DOMAIN=myapp.example.com
+```
+
 #### `CLOUDFLARE_API_TOKEN`
 
 **Purpose**: API token for Cloudflare DNS operations
@@ -740,16 +761,7 @@ TEMPORAL_ADDRESS=temporal-frontend.temporal.svc.cluster.local:7233
 **Files**:
 - `workflows/src/shared/providers/dns/cloudflare-provider.ts` - Cloudflare DNS provider
 
-#### `CLOUDFLARE_ZONE_ID`
-
-**Purpose**: Specific Cloudflare zone ID (optional, can be queried if not provided)
-**Default**: None (will query zone by domain)
-**Required**: No (optional for efficiency)
-
-**Behavior Influence**: Speeds up DNS operations if zone ID is known in advance
-
-**Files**:
-- `workflows/src/shared/providers/dns/cloudflare-provider.ts` - Cloudflare DNS provider
+**Note**: The Cloudflare Zone ID is automatically discovered from the domain name; no manual configuration required.
 
 ---
 
@@ -1391,6 +1403,7 @@ All environment configurations are validated on application startup using **Zod 
 - `TEMPORAL_ADDRESS` - Required string (default: `localhost:7233`)
 - `SUPABASE_URL` - Required URL
 - `SUPABASE_SERVICE_ROLE_KEY` - Required non-empty string
+- `TARGET_DOMAIN` - Optional string (default: `firstovertheline.com`)
 - `CLOUDFLARE_API_TOKEN` - Optional (required if production DNS)
 - `RESEND_API_KEY` - Optional (required if production email)
 

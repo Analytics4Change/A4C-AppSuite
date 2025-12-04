@@ -439,8 +439,8 @@ describe('useKeyboardNavigation', () => {
   describe('isNavigating state', () => {
     it('should track navigation state correctly', () => {
       const containerRef = { current: container };
-      
-      const { result } = renderHook(() => 
+
+      renderHook(() =>
         useKeyboardNavigation({
           containerRef,
           enabled: true

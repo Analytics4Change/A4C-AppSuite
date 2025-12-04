@@ -212,7 +212,7 @@ export class Logger {
     const level = config.enableColors ? this.colorizeLevel(entry.level) : entry.level.toUpperCase();
     const timestamp = config.enableTimestamps ? entry.timestamp.toISOString() : '';
     
-    let parts: string[] = [];
+    const parts: string[] = [];
     
     if (timestamp) parts.push(`[${timestamp}]`);
     parts.push(`${level}`);

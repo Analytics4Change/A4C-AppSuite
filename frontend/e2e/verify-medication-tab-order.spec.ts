@@ -114,7 +114,7 @@ test.describe('Medication Form Tab Order', () => {
     }
     
     // Verify the sequence follows our expected tabIndex order
-    const expectedSequence = [
+    const _expectedSequence = [
       { id: 'dosage-category', tabIndex: '1' },  // After X button
       { ariaLabel: 'Open dosage form dropdown', tabIndex: '2' },
       { id: 'form-type', tabIndex: '3' },

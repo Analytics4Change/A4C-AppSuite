@@ -23,14 +23,12 @@ import { observer } from 'mobx-react-lite';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ContactInput } from '@/components/organizations/ContactInput';
 import { AddressInput } from '@/components/organizations/AddressInput';
 import { PhoneInputEnhanced } from '@/components/organizations/PhoneInputEnhanced';
 import { ReferringPartnerDropdown } from '@/components/organizations/ReferringPartnerDropdown';
-import { SelectDropdown } from '@/components/organization/SelectDropdown';
 import { SubdomainInput } from '@/components/organization/SubdomainInput';
 import { OrganizationFormViewModel } from '@/viewModels/organization/OrganizationFormViewModel';
 import {
@@ -108,7 +106,7 @@ const createCardHoverHandlers = () => ({
  */
 export const OrganizationCreatePage: React.FC = observer(() => {
   const navigate = useNavigate();
-  const { session } = useAuth();
+  useAuth(); // For auth context availability
   const [viewModel] = useState(() => new OrganizationFormViewModel());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -126,6 +124,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
 
       return () => clearTimeout(timeoutId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- viewModel is a stable MobX store created in useMemo
   }, [viewModel.formData, viewModel.isDirty]);
 
   // Form submission handler
@@ -645,6 +644,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                     <ContactInput
                       value={formData.providerAdminContact}
                       onChange={(contact) => viewModel.updateField('providerAdminContact', contact)}
+                      showEmailConfirmation={true}
                     />
                   </div>
 

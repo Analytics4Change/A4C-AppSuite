@@ -4,7 +4,7 @@
  * They exclude PII and specific prescription details
  */
 
-import { DosageForm, DosageRoute, DosageUnit, DosageFrequency } from './models/Dosage';
+import { DosageForm, DosageRoute, DosageFrequency } from './models/Dosage';
 import { MedicationCategory, MedicationFlags } from './models/Medication';
 
 /**

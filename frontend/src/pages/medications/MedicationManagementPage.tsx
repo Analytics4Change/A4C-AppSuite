@@ -3,7 +3,6 @@ import { observer } from 'mobx-react-lite';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { useViewModel } from '@/hooks/useViewModel';
 import { MedicationManagementViewModel } from '@/viewModels/medication/MedicationManagementViewModel';
 import { MedicationSearchModal } from '@/components/medication/MedicationSearchModal';
@@ -33,7 +32,7 @@ export const MedicationManagementPage = observer(() => {
   const formContainerRef = useRef<HTMLDivElement | null>(null);
   
   // Use keyboard navigation hook for focus trap when medication is selected
-  const navResult = useKeyboardNavigation({
+  const _navResult = useKeyboardNavigation({
     containerRef: formContainerRef as RefObject<HTMLElement>,
     enabled: !!vm.selectedMedication && !showSearchModal,
     trapFocus: true,              // Trap focus within form
@@ -58,6 +57,7 @@ export const MedicationManagementPage = observer(() => {
         }
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Mount-only effect for initial setup
   }, []);
 
   // Handle medication selection from modal

@@ -38,6 +38,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
     return () => {
       console.log('[DynamicInput] Component unmounting for checkbox:', checkboxId);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- currentValue is logged on mount only, changes tracked in separate effect
   }, [checkboxId]);
   
   // Update initial value when it changes externally
@@ -188,20 +189,20 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
         }
         break;
         
-      case 'Escape':
+      case 'Escape': {
         console.log('[DynamicInput] Escape pressed - intentional exit without save');
         e.preventDefault();
         const originalValue = initialValueRef.current;
         const isEmpty = !localValue || localValue === '';
         const isRequired = strategy.focusManagement?.requiresInput !== false;
-        
+
         console.log('[DynamicInput] Escape handler:', {
           isEmpty,
           isRequired,
           localValue,
           originalValue
         });
-        
+
         if (isEmpty && isRequired) {
           // Deselect the checkbox for empty required fields
           console.log('[DynamicInput] Deselecting checkbox due to empty required field');
@@ -218,11 +219,12 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
           setLocalValue(originalValue);
           onDataChange(originalValue || null);
         }
-        
+
         if (onIntentionalExit) {
           onIntentionalExit(checkboxId, false);
         }
         break;
+      }
         
       default:
         // All other keys work naturally
@@ -380,7 +382,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
           />
         );
         
-      case 'custom':
+      case 'custom': {
         // For custom components, pass all necessary props
         const CustomComponent = componentProps.component;
         if (!CustomComponent) {
@@ -397,6 +399,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
             checkboxId={checkboxId}
           />
         );
+      }
         
       default:
         console.warn(`Unknown component type: ${componentType}`);

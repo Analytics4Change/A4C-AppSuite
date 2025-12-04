@@ -3,13 +3,13 @@
  * Provides integration between impersonation service and UI components
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { impersonationService } from '@/services/auth/impersonation.service';
 import { ImpersonationSession } from '@/services/auth/impersonation.service';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function useImpersonationUI() {
-  const { user, session: authSession } = useAuth();
+  const { session: authSession } = useAuth();
   const [session, setSession] = useState<ImpersonationSession | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);

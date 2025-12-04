@@ -37,7 +37,7 @@ export const MedicationSearch: React.FC<MedicationSearchProps> = ({
       isLoading={isLoading}
       showDropdown={showDropdown}
       onSearch={onSearch}
-      onSelect={(medication, method) => {
+      onSelect={(medication, _method) => {
         onSelect(medication);
         // Method parameter available if needed for focus advancement
       }}
@@ -45,7 +45,7 @@ export const MedicationSearch: React.FC<MedicationSearchProps> = ({
       minSearchLength={2}
       placeholder="Type medication name..."
       error={error}
-      renderItem={(medication, index, isHighlighted) => (
+      renderItem={(medication, _index, _isHighlighted) => (
         <>
           <div className="font-medium text-gray-900">{medication.name}</div>
           {medication.genericName && (

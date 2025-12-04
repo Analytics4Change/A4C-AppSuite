@@ -151,6 +151,7 @@ export const FocusBehaviorProvider: React.FC<{ children: React.ReactNode }> = ({
 /**
  * Hook to use the FocusBehaviorContext
  */
+// eslint-disable-next-line react-refresh/only-export-components -- Hook exported with provider is standard context pattern
 export function useFocusBehaviorContext(): FocusBehaviorContextValue {
   const context = useContext(FocusBehaviorContext);
   if (!context) {
@@ -170,6 +171,7 @@ export function useFocusBehaviorContext(): FocusBehaviorContextValue {
  * Hook to register a focus behavior for a component
  * Automatically handles registration/unregistration on mount/unmount
  */
+// eslint-disable-next-line react-refresh/only-export-components -- Hook exported with provider is standard context pattern
 export function useFocusBehavior(
   behavior: FocusBehaviorType,
   enabled: boolean = true

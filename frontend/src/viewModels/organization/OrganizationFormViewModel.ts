@@ -45,7 +45,6 @@ import type {
 } from '@/types';
 import {
   validateOrganizationForm,
-  formatPhone,
   formatSubdomain,
   type ValidationError
 } from '@/utils/organization-validation';

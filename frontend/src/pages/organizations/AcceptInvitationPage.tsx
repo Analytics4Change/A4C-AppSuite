@@ -26,7 +26,6 @@ import {
 import {
   Building,
   Mail,
-  Lock,
   AlertCircle,
   CheckCircle,
   Loader2

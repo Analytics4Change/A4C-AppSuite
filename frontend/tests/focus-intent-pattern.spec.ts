@@ -1,4 +1,4 @@
-import { test, expect, Page, chromium, firefox, webkit, Browser, BrowserContext } from '@playwright/test';
+import { test, expect, Page, chromium, firefox, Browser, BrowserContext } from '@playwright/test';
 import * as fs from 'fs';
 
 /**

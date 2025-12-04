@@ -438,7 +438,7 @@ class MedicationTemplateService {
   /**
    * Get source medication details
    */
-  private async getSourceMedication(medicationId: string): Promise<MedicationHistory | null> {
+  private async getSourceMedication(_medicationId: string): Promise<MedicationHistory | null> {
     // This would fetch from the actual medication records
     // For now, returning null as we don't have the full medication service yet
     log.warn('getSourceMedication not fully implemented');
@@ -448,7 +448,7 @@ class MedicationTemplateService {
   /**
    * Get client initials from medication
    */
-  private async getClientInitials(medicationId: string): Promise<string | undefined> {
+  private async getClientInitials(_medicationId: string): Promise<string | undefined> {
     // This would fetch client initials from the medication's client
     // For now, returning undefined
     log.warn('getClientInitials not fully implemented');

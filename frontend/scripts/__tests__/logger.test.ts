@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Logger, createLogger, getLogger } from '../utils/logger.js';
 import { ConfigManager } from '../config/manager.js';
-import { captureConsole, suppressConsole } from './setup.js';
+import { captureConsole } from './setup.js';
 
 describe('Logger', () => {
   let logger: Logger;

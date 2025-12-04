@@ -207,8 +207,8 @@ export function createMockSession(profile: DevUserProfile): Session {
   const claims = createMockJWTClaims(profile);
 
   // Create a simple mock JWT token (not cryptographically valid, just for dev)
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const payload = btoa(JSON.stringify(claims));
+  const header = globalThis.btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payload = globalThis.btoa(JSON.stringify(claims));
   const signature = 'mock-signature';
   const mockToken = `${header}.${payload}.${signature}`;
 

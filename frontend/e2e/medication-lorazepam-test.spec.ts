@@ -58,7 +58,7 @@ class MedicationFlowTester {
           clientSelected = true;
           break;
         }
-      } catch (error) {
+      } catch {
         console.log(`Selector ${selector} not found or not clickable`);
       }
     }
@@ -86,7 +86,7 @@ class MedicationFlowTester {
             clientSelected = true;
             break;
           }
-        } catch (error) {
+        } catch {
           console.log(`Generic selector ${selector} not found`);
         }
       }
@@ -127,7 +127,7 @@ class MedicationFlowTester {
           buttonFound = true;
           break;
         }
-      } catch (error) {
+      } catch {
         console.log(`Add Medication selector ${selector} not found`);
       }
     }
@@ -165,7 +165,7 @@ class MedicationFlowTester {
           optionFound = true;
           break;
         }
-      } catch (error) {
+      } catch {
         console.log(`Prescribed Medication selector ${selector} not found`);
       }
     }
@@ -203,7 +203,7 @@ class MedicationFlowTester {
           searchField = element;
           break;
         }
-      } catch (error) {
+      } catch {
         console.log(`Search field selector ${selector} not found`);
       }
     }
@@ -283,8 +283,8 @@ class MedicationFlowTester {
             break;
           }
         }
-      } catch (error) {
-        console.log(`Search results selector ${selector} not found or error: ${error}`);
+      } catch (e) {
+        console.log(`Search results selector ${selector} not found or error: ${e}`);
       }
     }
 
@@ -415,7 +415,7 @@ test.describe('Medication Entry Flow - Lorazepam Search Test', () => {
       console.log('✅ Step 5: Successfully entered Lorazepam search term');
 
       // Step 6: Verify search results and no infinite loops
-      const searchWorked = await tester.verifySearchResults();
+      await tester.verifySearchResults();
       console.log('✅ Step 6: Search verification completed');
 
       // Check for any errors
@@ -431,16 +431,16 @@ test.describe('Medication Entry Flow - Lorazepam Search Test', () => {
       await expect(page.locator('body')).toBeVisible();
       console.log('✅ Final verification: Page remains interactive');
 
-    } catch (error) {
-      console.log('❌ Test failed with error:', error.message);
-      
+    } catch (err) {
+      console.log('❌ Test failed with error:', err instanceof Error ? err.message : String(err));
+
       // Take a final screenshot for debugging
-      await page.screenshot({ 
-        path: 'test-results/test-failure.png', 
-        fullPage: true 
+      await page.screenshot({
+        path: 'test-results/test-failure.png',
+        fullPage: true
       });
-      
-      throw error;
+
+      throw err;
     }
   });
 

@@ -1,7 +1,6 @@
-import { 
-  DosageForm, 
+import {
+  DosageForm,
   DosageFormHierarchy,
-  DosageRoute,
   DosageRouteOption,
   DosageFormMap,
   SolidDosageForm,

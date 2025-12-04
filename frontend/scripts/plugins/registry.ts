@@ -7,7 +7,6 @@ import { readdir } from 'fs/promises';
 import { join, extname } from 'path';
 import { Plugin, PluginConfig, PluginRegistryEntry, PluginDiscoveryResult, PluginExecutionPlan, PluginContext, PluginResult, PluginMetrics } from './types.js';
 import { getLogger } from '../utils/logger.js';
-import { configManager } from '../config/manager.js';
 
 export class PluginRegistry {
   private plugins = new Map<string, PluginRegistryEntry>();
@@ -368,13 +367,11 @@ export class PluginRegistry {
       
       // Execute the plugin
       const result = await entry.plugin.execute(context);
-      
+
       // Execute post-execution hook
       await entry.plugin.onAfterExecute?.(context, result);
-      
+
       return result;
-    } catch (error) {
-      throw error;
     } finally {
       const executionTime = Date.now() - startTime;
       this.updateExecutionTime(entry.plugin.name, executionTime);

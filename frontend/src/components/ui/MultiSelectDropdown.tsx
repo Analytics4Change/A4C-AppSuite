@@ -64,6 +64,7 @@ export const MultiSelectDropdown = observer(({
       setIsOpen(false);
       buttonRef.current?.focus();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- id is only for logging
   }, [selected, onChange, closeOnSelect]);
 
   // Handle keyboard navigation

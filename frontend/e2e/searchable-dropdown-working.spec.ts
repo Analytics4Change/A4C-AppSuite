@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test('Test SearchableDropdown focus trap issues', async ({ page }) => {
   console.log('\n=== Testing SearchableDropdown Focus Trap ===\n');

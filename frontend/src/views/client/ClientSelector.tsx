@@ -2,7 +2,6 @@ import React from 'react';
 import { observer } from 'mobx-react-lite';
 import { User, Calendar, Phone } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useViewModel } from '@/hooks/useViewModel';
 import { ClientSelectionViewModel } from '@/viewModels/client/ClientSelectionViewModel';

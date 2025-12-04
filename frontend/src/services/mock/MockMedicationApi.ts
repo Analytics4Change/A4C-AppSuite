@@ -50,7 +50,7 @@ export class MockMedicationApi implements IMedicationApi {
     console.log('Mock: Saved medication', dosageInfo);
   }
 
-  async getMedicationHistory(clientId: string): Promise<MedicationHistory[]> {
+  async getMedicationHistory(_clientId: string): Promise<MedicationHistory[]> {
     await this.simulateDelay(300);
     return this.medicationHistory.filter(h => h.status === 'active');
   }

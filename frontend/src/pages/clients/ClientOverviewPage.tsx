@@ -1,7 +1,7 @@
 import React from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, Phone, Mail, MapPin, Calendar } from 'lucide-react';
+import { User, Phone, Mail, Calendar } from 'lucide-react';
 
 interface ClientContext {
   client: any;

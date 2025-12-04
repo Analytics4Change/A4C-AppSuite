@@ -80,7 +80,7 @@ export function MedicationPrescriptionForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const prescriptionId = crypto.randomUUID();
+    const prescriptionId = globalThis.crypto.randomUUID();
 
     const eventMetadata: any = {};
 

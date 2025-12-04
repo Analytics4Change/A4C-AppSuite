@@ -2,11 +2,8 @@ import { makeAutoObservable, runInAction } from 'mobx';
 import { IMedicationApi } from '@/services/api/interfaces/IMedicationApi';
 import {
   Medication,
-  DosageInfo,
   DosageForm,  // Now refers to broad categories (Solid, Liquid, etc.)
-  DosageRoute, // Specific routes (Tablet, Capsule, etc.)
-  DosageUnit,
-  DosageFrequency
+  DosageUnit
 } from '@/types/models';
 import { DosageValidator } from '@/services/validation/DosageValidator';
 import { IDosageDataService } from '@/services/data/interfaces/IDosageDataService';
@@ -585,7 +582,7 @@ export class MedicationManagementViewModel {
       };
 
       // Emit medication.prescribed event
-      const streamId = crypto.randomUUID();
+      const streamId = globalThis.crypto.randomUUID();
       await eventEmitter.emit(
         streamId,
         'medication',

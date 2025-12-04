@@ -1,11 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Edit2 } from 'lucide-react';
 import { Label } from './label';
 import { EnhancedAutocompleteDropdown } from './EnhancedAutocompleteDropdown';
 import { useFocusAdvancement } from '@/hooks/useFocusAdvancement';
-import { Logger } from '@/utils/logger';
-
-const log = Logger.getLogger('navigation');
 
 interface EditableDropdownProps {
   id: string;
@@ -48,15 +45,12 @@ export const EditableDropdown: React.FC<EditableDropdownProps> = ({
   onChange,
   onDropdownOpen,
   filterMode = 'contains',
-  testIdPrefix,
+  testIdPrefix: _testIdPrefix,
   className = '',
   showLabel = true
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [internalValue, setInternalValue] = useState(value);
-
-  // Use testIdPrefix or id for test IDs
-  const testId = testIdPrefix || id;
 
   // Focus advancement hook for keyboard navigation
   const focusAdvancement = useFocusAdvancement({

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test('SearchableDropdown "pra" search - tests startsWith and contains', async ({ page }) => {
   console.log('\n=== Testing SearchableDropdown with "pra" Search ===\n');

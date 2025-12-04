@@ -4,13 +4,9 @@
  * Requires user selection and reason input
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, AlertTriangle, Search, User } from 'lucide-react';
-import { supabaseService } from '@/services/auth/supabase.service';
 import { impersonationService } from '@/services/auth/impersonation.service';
-import { Logger } from '@/utils/logger';
-
-const log = Logger.getLogger('component');
 
 interface ImpersonationModalProps {
   isOpen: boolean;
@@ -45,19 +41,7 @@ export const ImpersonationModal: React.FC<ImpersonationModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadUsers();
-    } else {
-      // Reset form when modal closes
-      setSearchTerm('');
-      setSelectedUser(null);
-      setReason('');
-      setError(null);
-    }
-  }, [isOpen]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -70,13 +54,24 @@ export const ImpersonationModal: React.FC<ImpersonationModalProps> = ({
       ].filter(u => u.id !== currentUser.id); // Don't show current user
 
       setUsers(mockUsers);
-    } catch (err) {
-      log.error('Failed to load users', err);
+    } catch {
       setError('Failed to load users');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser.id]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadUsers();
+    } else {
+      // Reset form when modal closes
+      setSearchTerm('');
+      setSelectedUser(null);
+      setReason('');
+      setError(null);
+    }
+  }, [isOpen, loadUsers]);
 
   const filteredUsers = users.filter(user =>
     user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -111,15 +106,9 @@ export const ImpersonationModal: React.FC<ImpersonationModalProps> = ({
         reason
       );
 
-      log.info('Impersonation started', {
-        targetUser: selectedUser.email,
-        reason
-      });
-
       onImpersonationStart();
       onClose();
     } catch (err) {
-      log.error('Failed to start impersonation', err);
       setError(err instanceof Error ? err.message : 'Failed to start impersonation');
     } finally {
       setIsSubmitting(false);

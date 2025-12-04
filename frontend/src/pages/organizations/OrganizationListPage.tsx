@@ -52,6 +52,7 @@ export const OrganizationListPage: React.FC = () => {
     console.log('[OrganizationListPage] ✅ COMPONENT MOUNTED');
     log.debug('OrganizationListPage mounting');
     loadDrafts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadDrafts is stable and called once on mount
   }, []);
 
   /**
@@ -66,7 +67,7 @@ export const OrganizationListPage: React.FC = () => {
    * Handle draft deletion
    */
   const handleDeleteDraft = (draftId: string) => {
-    if (confirm('Are you sure you want to delete this draft?')) {
+    if (globalThis.confirm('Are you sure you want to delete this draft?')) {
       organizationService.deleteDraft(draftId);
       loadDrafts();
       log.info('Draft deleted', { draftId });

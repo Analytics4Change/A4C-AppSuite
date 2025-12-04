@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test.describe('SearchableDropdown Focus Behavior - Proper Flow', () => {
   test.beforeEach(async ({ page }) => {
@@ -69,7 +69,7 @@ test.describe('SearchableDropdown Focus Behavior - Proper Flow', () => {
           clientSelected = true;
           break;
         }
-      } catch (e) {
+      } catch {
         // Try next selector
       }
     }

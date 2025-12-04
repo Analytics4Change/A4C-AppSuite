@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
-import { EnhancedCheckboxGroupProps, FocusSource, FocusIntent, CheckboxMetadata, ContinueButtonBehavior } from './metadata-types';
+import { EnhancedCheckboxGroupProps, FocusSource, FocusIntent, CheckboxMetadata } from './metadata-types';
 import { DynamicAdditionalInput } from './DynamicAdditionalInput';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -169,7 +169,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   maxVisibleItems = 7,
   // Reordering configuration
   enableReordering = false,
-  reorderTrigger = 'onBlur',
+  reorderTrigger: _reorderTrigger = 'onBlur',
   onFocusLost,
   // Summary display
   summaryRenderer,
@@ -177,7 +177,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   baseTabIndex,
   nextTabIndex,
   // ARIA support
-  ariaLabel,
+  ariaLabel: _ariaLabel,
   ariaLabelledBy,
   ariaDescribedBy,
   isRequired = false,
@@ -192,7 +192,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   onBack,
   showBackButton = false,
   backButtonText = 'Back',
-  previousTabIndex
+  previousTabIndex: _previousTabIndex
 }) => {
   const [focusedElement, setFocusedElement] = useState(0);
   const [focusedCheckboxIndex, setFocusedCheckboxIndex] = useState(0);
@@ -215,9 +215,9 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   
   // Debug flag - set to true only when debugging ref issues
   const DEBUG_REFS = process.env.NODE_ENV === 'development' && false;
-  
-  // Default summary strategy if none provided
-  const defaultSummaryStrategy = new DefaultSummaryStrategy();
+
+  // Default summary strategy if none provided - memoized to avoid recreating on each render
+  const defaultSummaryStrategy = useMemo(() => new DefaultSummaryStrategy(), []);
   
   // Create stable ref callback factory with environment checks
   const createCheckboxRef = useCallback((checkboxId: string) => {
@@ -263,7 +263,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
       return summaryRenderer(checkboxId, data);
     }
     return defaultSummaryStrategy.generateSummary(checkboxId, data);
-  }, [summaryRenderer]);
+  }, [summaryRenderer, defaultSummaryStrategy]);
   
   // Ensure focused item is visible in scroll container
   const ensureItemVisible = useCallback((index: number) => {
@@ -637,7 +637,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
     // When focus is in input region, let inputs handle their own keyboard events naturally
     // This follows the Focus Region Tracking design principle from CLAUDE.md
     // When focus is in button region, standard behavior applies
-  }, [focusedElement, focusedCheckboxIndex, checkboxes, handleCheckboxChange, handleCancel, handleBack, focusRegion, maxVisibleItems, ensureItemVisible, onBack, showBackButton]);
+  }, [focusedElement, focusedCheckboxIndex, checkboxes, handleCheckboxChange, handleBack, focusRegion, maxVisibleItems, ensureItemVisible, onBack, showBackButton]);
   
   // No need for focus on mount - handled by container focus event
   
@@ -748,7 +748,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   }, [checkboxes, additionalData, focusedFieldState, continueButtonText]);
   
   // Stable callback for checkbox focus
-  const handleCheckboxFocus = useCallback((index: number, checkboxId: string) => {
+  const _handleCheckboxFocus = useCallback((index: number, checkboxId: string) => {
     setFocusedCheckboxIndex(index);
     setFocusedCheckboxId(checkboxId);
     setFocusRegion('checkbox');
@@ -760,12 +760,16 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
     if (DEBUG_REFS) {
       console.log(`[CheckboxGroup ${id}] Component mounted with ${checkboxes.length} checkboxes`);
     }
-    
+
+    // Capture refs for cleanup
+    const currentCheckboxRefs = checkboxRefs.current;
+    const currentRefCallbacks = refCallbacks.current;
+
     return () => {
       // Clear all refs on unmount
-      checkboxRefs.current.clear();
-      refCallbacks.current.clear();
-      
+      currentCheckboxRefs.clear();
+      currentRefCallbacks.clear();
+
       if (DEBUG_REFS) {
         console.log(`[CheckboxGroup ${id}] Cleaned up all refs and callbacks`);
       }
@@ -811,7 +815,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
           performance.clearMeasures(measureName);
           performance.clearMarks(startMark);
           performance.clearMarks(endMark);
-        } catch (e) {
+        } catch {
           // Ignore if marks don't exist
         }
       };

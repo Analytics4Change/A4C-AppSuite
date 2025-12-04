@@ -19,7 +19,7 @@
  * See .plans/supabase-auth-integration/frontend-auth-architecture.md
  */
 
-import { createClient, SupabaseClient, AuthError, Session as SupabaseSession } from '@supabase/supabase-js';
+import { SupabaseClient, Session as SupabaseSession } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { IAuthProvider } from './IAuthProvider';
 import {
@@ -172,7 +172,7 @@ export class SupabaseAuthProvider implements IAuthProvider {
   async loginWithOAuth(provider: OAuthProvider, options?: OAuthOptions): Promise<Session | void> {
     log.info('🔐 SupabaseAuthProvider: OAuth login with', provider);
 
-    const { data, error } = await this.client.auth.signInWithOAuth({
+    const { error } = await this.client.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: options?.redirectTo || window.location.origin + '/auth/callback',
@@ -195,7 +195,7 @@ export class SupabaseAuthProvider implements IAuthProvider {
   /**
    * Handle OAuth callback after redirect
    */
-  async handleOAuthCallback(callbackUrl: string): Promise<Session> {
+  async handleOAuthCallback(_callbackUrl: string): Promise<Session> {
     log.info('🔐 SupabaseAuthProvider: Handling OAuth callback');
 
     // Supabase client automatically processes the callback
@@ -358,7 +358,7 @@ export class SupabaseAuthProvider implements IAuthProvider {
 
     // Call the Supabase function to update active organization
     // This should update user_roles_projection.is_active
-    const { data, error } = await this.client.rpc('switch_active_organization', {
+    const { error } = await this.client.rpc('switch_active_organization', {
       new_org_id: orgId,
     });
 
@@ -415,7 +415,7 @@ export class SupabaseAuthProvider implements IAuthProvider {
   private decodeJWT(token: string): JWTClaims {
     try {
       const payload = token.split('.')[1];
-      const decoded = JSON.parse(atob(payload));
+      const decoded = JSON.parse(globalThis.atob(payload));
 
       return {
         sub: decoded.sub,

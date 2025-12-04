@@ -188,6 +188,7 @@ function SearchableDropdownInner<T>({
     return () => {
       inputElement.removeEventListener('blur', handleBlur);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleSelect is intentionally omitted to avoid recreating blur handler on every render
   }, [showDropdown, searchResults, selectedItem, getItemText]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -210,7 +211,7 @@ function SearchableDropdownInner<T>({
         handleArrowKey('up');
         break;
       
-      case 'Enter':
+      case 'Enter': {
         e.preventDefault();
         // Check how many items start with the typed text
         const searchText = localValue.toLowerCase().trim();
@@ -218,7 +219,7 @@ function SearchableDropdownInner<T>({
           const itemText = getItemText(item).toLowerCase();
           return itemText.startsWith(searchText);
         });
-        
+
         if (navigationIndex >= 0 && searchResults[navigationIndex]) {
           // User has navigated with arrows - always respect that choice
           handleSelect(searchResults[navigationIndex], 'keyboard');
@@ -231,6 +232,7 @@ function SearchableDropdownInner<T>({
         }
         // Otherwise, do nothing (multiple non-startsWith matches)
         break;
+      }
       
       case 'Escape':
         if (showDropdown && searchResults.length > 0) {
@@ -299,6 +301,7 @@ function SearchableDropdownInner<T>({
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resetHighlighting is stable from hook but eslint cannot verify
   }, [showDropdown, searchResults.length, onSearch]);
 
   return (

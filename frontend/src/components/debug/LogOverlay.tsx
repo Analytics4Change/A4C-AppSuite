@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDiagnostics } from '@/contexts/DiagnosticsContext';
-import { Logger } from '@/utils/logger';
-import { X, Trash2, Filter, Download, Search } from 'lucide-react';
+import { X, Trash2, Download, Search } from 'lucide-react';
 
 interface LogEntry {
   timestamp: number;
@@ -25,13 +24,12 @@ export const LogOverlay: React.FC = () => {
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
-  // Don't render if not enabled
-  if (!import.meta.env.DEV || !config.enableLogOverlay) {
-    return null;
-  }
+  const isEnabled = import.meta.env.DEV && config.enableLogOverlay;
 
   // Intercept console methods
   useEffect(() => {
+    if (!isEnabled) return;
+
     const originalMethods = {
       log: console.log,
       info: console.info,
@@ -41,7 +39,7 @@ export const LogOverlay: React.FC = () => {
     };
 
     // Create interceptors
-    const interceptor = (level: string, originalFn: Function) => {
+    const interceptor = (level: string, originalFn: (...args: unknown[]) => void) => {
       return function(...args: any[]) {
         // Call original console method
         originalFn.apply(console, args);
@@ -103,7 +101,7 @@ export const LogOverlay: React.FC = () => {
       console.error = originalMethods.error;
       console.debug = originalMethods.debug;
     };
-  }, []);
+  }, [isEnabled]);
 
   // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
@@ -111,6 +109,11 @@ export const LogOverlay: React.FC = () => {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, [logs, autoScroll]);
+
+  // Don't render if not enabled
+  if (!isEnabled) {
+    return null;
+  }
 
   // Filter logs
   const filteredLogs = logs.filter(log => {

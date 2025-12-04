@@ -113,6 +113,7 @@ export const MainLayout: React.FC = () => {
     };
 
     filterItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- allNavItems is a module-level constant
   }, [authSession, userRole, hasPermission]);
 
   return (

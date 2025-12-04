@@ -4,7 +4,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ConfigManager } from '../config/manager.js';
-import { defaultConfig } from '../config/defaults.js';
 
 describe('ConfigManager', () => {
   let configManager: ConfigManager;

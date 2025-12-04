@@ -116,7 +116,7 @@ export async function createTempDir(): Promise<string> {
   afterEach(async () => {
     try {
       await rm(tempDir, { recursive: true, force: true });
-    } catch (error) {
+    } catch {
       // Ignore cleanup errors
     }
   });

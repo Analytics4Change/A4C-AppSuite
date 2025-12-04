@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, Page } from '@playwright/test';
 
 // Helper to capture console logs
 async function setupConsoleCapture(page: Page) {

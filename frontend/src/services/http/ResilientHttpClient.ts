@@ -95,7 +95,7 @@ export class ResilientHttpClient {
    * Cancel all active requests
    */
   cancelAllRequests(): void {
-    for (const [requestId, controller] of this.activeRequests) {
+    for (const [_requestId, controller] of this.activeRequests) {
       controller.abort();
     }
     this.activeRequests.clear();

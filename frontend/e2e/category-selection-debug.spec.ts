@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test.describe('Category Selection Debug', () => {
   test('Debug keyboard navigation with isolated context', async ({ page }) => {

@@ -237,6 +237,7 @@ export const DiagnosticsProvider: React.FC<{ children: ReactNode }> = ({ childre
 /**
  * Hook to use diagnostics configuration
  */
+// eslint-disable-next-line react-refresh/only-export-components -- Hook exported with provider is standard context pattern
 export const useDiagnostics = (): DiagnosticsContextValue => {
   const context = useContext(DiagnosticsContext);
   

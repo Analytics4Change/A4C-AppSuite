@@ -16,7 +16,7 @@ export function toSentenceCase(str: string): string {
   ];
   
   // Split by spaces and process each word
-  return str.split(' ').map((word, index) => {
+  return str.split(' ').map((word, _index) => {
     // Check if this word should be preserved
     const upperWord = word.toUpperCase();
     if (preserveUppercase.includes(upperWord)) {

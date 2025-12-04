@@ -56,7 +56,8 @@ export const AuthCallback: React.FC = () => {
     };
 
     processCallback();
-  }, []); // Empty deps to prevent re-runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally runs once on mount
+  }, []);
 
   if (error) {
     return (

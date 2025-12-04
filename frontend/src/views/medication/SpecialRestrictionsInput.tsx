@@ -89,7 +89,7 @@ export const SpecialRestrictionsInput: React.FC<SpecialRestrictionsInputProps> =
     nextElement?.focus();
   };
 
-  const handleContinue = (selectedIds: string[], additionalData: Map<string, any>) => {
+  const handleContinue = (selectedIds: string[], _additionalData: Map<string, unknown>) => {
     // Validate before continuing
     if (!viewModel.isValid) {
       console.warn('Invalid special restrictions configuration');

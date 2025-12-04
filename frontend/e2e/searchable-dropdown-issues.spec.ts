@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test.describe('SearchableDropdown Focus Trap Issues', () => {
   test.beforeEach(async ({ page }) => {

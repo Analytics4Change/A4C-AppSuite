@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, Page } from '@playwright/test';
 
 /**
  * Diagnostic test suite to identify the root cause of Space key selection issue
@@ -260,7 +260,7 @@ test.describe('Category Selection Diagnostics', () => {
     // Inject spy into ViewModel
     await page.addInitScript(() => {
       // We'll override the toggle method when it's created
-      const originalLog = console.log;
+      const _originalLog = console.log;
       (window as any).__vmToggleSpy = {
         calls: [],
         original: null
@@ -462,7 +462,7 @@ test.describe('Category Selection Diagnostics', () => {
 });
 
 test.describe('Summary Report', () => {
-  test('Generate Diagnostic Summary', async ({ page }) => {
+  test('Generate Diagnostic Summary', async ({ page: _page }) => {
     console.log('\n' + '='.repeat(60));
     console.log('DIAGNOSTIC SUMMARY REPORT');
     console.log('='.repeat(60));

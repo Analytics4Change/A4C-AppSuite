@@ -4,13 +4,12 @@
  */
 
 import { Medication } from '@/types/models';
-import { 
-  RXNormDisplayNamesResponse, 
-  ControlledStatus, 
+import {
+  RXNormDisplayNamesResponse,
+  ControlledStatus,
   PsychotropicStatus,
-  RXNormRelationsResponse,
   RXNormClassResponse,
-  MedicationPurpose 
+  MedicationPurpose
 } from '@/types/medication-search.types';
 import { ResilientHttpClient } from '../http/ResilientHttpClient';
 import { API_CONFIG } from '@/config/medication-search.config';
@@ -415,8 +414,7 @@ export class RXNormAdapter {
 
       for (const info of drugInfo) {
         const classId = info.rxclassMinConceptItem?.classId;
-        const className = info.rxclassMinConceptItem?.className;
-        
+
         if (classId) {
           // Check if ATC code starts with N05 or N06 (psychotropic drugs)
           if (classId.startsWith('N05') || classId.startsWith('N06')) {

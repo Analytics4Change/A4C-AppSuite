@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test.describe('Category Selection Direct Test', () => {
   test('Test keyboard navigation directly', async ({ page }) => {

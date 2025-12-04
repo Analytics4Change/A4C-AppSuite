@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useFocusBehavior } from '@/contexts/FocusBehaviorContext';
 
 /**
@@ -59,15 +59,15 @@ export function useEnterAsTabForRangeInput(config: {
   onEscape: () => void;
   enabled?: boolean;
 }) {
-  const { 
-    minInputRef, 
-    maxInputRef, 
+  const {
+    minInputRef: _minInputRef,
+    maxInputRef,
     checkboxId,
     localMin,
     localMax,
     onValidChange,
     onEscape,
-    enabled = true 
+    enabled = true
   } = config;
   
   // Register this behavior with the focus context
@@ -125,7 +125,7 @@ export function useEnterAsTabForRangeInput(config: {
     }
     
     // All other keys work normally
-  }, [isActive, enabled, localMin, localMax, minInputRef, maxInputRef, checkboxId, onValidChange, onEscape]);
+  }, [isActive, enabled, localMin, localMax, maxInputRef, checkboxId, onValidChange, onEscape]);
   
   const handleMinKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     handleKeyDown(e, 'min');

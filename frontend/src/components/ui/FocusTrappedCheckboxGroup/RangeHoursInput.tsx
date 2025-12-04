@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { useEnterAsTabForRangeInput } from '@/hooks/useEnterAsTab';
 
@@ -29,14 +29,14 @@ export const RangeHoursInput: React.FC<RangeHoursInputProps> = ({
   disabled = false,
   minPlaceholder = 'Min',
   maxPlaceholder = 'Max',
-  ariaLabel = 'Enter hour range',
+  ariaLabel: _ariaLabel = 'Enter hour range',
   helpText,
   tabIndex
 }) => {
   const [localMin, setLocalMin] = useState<string>(value?.min?.toString() || '');
   const [localMax, setLocalMax] = useState<string>(value?.max?.toString() || '');
   const [validationError, setValidationError] = useState<string>('');
-  const [isValid, setIsValid] = useState(false);
+  const [_isValid, setIsValid] = useState(false);
   const minInputRef = useRef<HTMLInputElement>(null);
   const maxInputRef = useRef<HTMLInputElement>(null);
   
@@ -265,9 +265,9 @@ export const RangeHoursInput: React.FC<RangeHoursInputProps> = ({
           className="text-xs text-gray-500"
           role="status"
         >
-          {!inputsComplete 
+          {!inputsComplete
             ? "Enter min hours, then max hours. Tab/Enter to advance. Escape to cancel."
-            : isValid 
+            : _isValid
               ? "Tab/Enter to save, Escape to cancel."
               : "Enter valid range where min < max"}
         </p>

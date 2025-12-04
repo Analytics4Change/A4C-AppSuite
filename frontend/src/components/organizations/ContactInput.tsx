@@ -29,6 +29,7 @@ interface ContactInputProps extends Omit<ComponentPropsWithoutRef<"div">, "onCha
   value: ContactFormData;
   onChange: (contact: ContactFormData) => void;
   disabled?: boolean;
+  showEmailConfirmation?: boolean;
 }
 
 const CONTACT_TYPES = [
@@ -39,7 +40,7 @@ const CONTACT_TYPES = [
 ] as const;
 
 export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
-  ({ value, onChange, disabled = false, className, ...props }, ref) => {
+  ({ value, onChange, disabled = false, showEmailConfirmation = false, className, ...props }, ref) => {
     const handleChange = (field: keyof ContactFormData, newValue: string) => {
       onChange({ ...value, [field]: newValue });
     };
@@ -166,6 +167,26 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
                 aria-required="true"
               />
             </div>
+
+            {/* Email Confirmation (Provider Admin only) */}
+            {showEmailConfirmation && (
+              <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+                <label className="block text-sm font-medium text-gray-700">
+                  Confirm Email<span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={value.emailConfirmation || ""}
+                  onChange={(e) => handleChange("emailConfirmation", e.target.value)}
+                  onPaste={(e) => e.preventDefault()}
+                  disabled={disabled}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  aria-label="Confirm email address"
+                  aria-required="true"
+                  autoComplete="off"
+                />
+              </div>
+            )}
 
             {/* Title (Optional) */}
             <div className="grid grid-cols-[160px_1fr] items-start gap-4">

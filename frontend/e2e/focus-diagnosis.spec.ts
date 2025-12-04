@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test.describe('Focus Navigation Diagnosis', () => {
   test('diagnose tab navigation from Psychotropic to Dosage Form', async ({ page }) => {

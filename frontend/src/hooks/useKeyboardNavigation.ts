@@ -264,26 +264,26 @@ export function useKeyboardNavigation(options: UseKeyboardNavigationOptions): Us
     }
     
     switch (event.key) {
-      case 'Tab':
+      case 'Tab': {
         // Check if the event target is controlling or inside a dropdown
         const target = event.target as HTMLElement;
-        
+
         // Check if target is inside an open dropdown
         const inDropdown = target?.closest('[data-focus-context="open"]');
-        
+
         // Check if target is an input controlling an open dropdown
-        const isDropdownController = target?.getAttribute('aria-controls') && 
+        const isDropdownController = target?.getAttribute('aria-controls') &&
                                      target?.getAttribute('aria-expanded') === 'true';
-        
+
         if (inDropdown || isDropdownController) {
           return;
         }
-        
+
         if (allowTabNavigation && (trapFocus || wrapAround)) {
           // Only prevent default if we're trapping or wrapping
           const isFirstElement = currentFocusIndex === 0;
           const isLastElement = currentFocusIndex === focusableElementsRef.current.length - 1;
-          
+
           if (event.shiftKey && isFirstElement && wrapAround) {
             event.preventDefault();
             focusPrevious();
@@ -301,6 +301,7 @@ export function useKeyboardNavigation(options: UseKeyboardNavigationOptions): Us
           }
         }
         break;
+      }
         
       case 'ArrowDown':
       case 'ArrowRight':
@@ -318,17 +319,17 @@ export function useKeyboardNavigation(options: UseKeyboardNavigationOptions): Us
         }
         break;
         
-      case 'Escape':
+      case 'Escape': {
         // Check if the event target is in a dropdown context
         const escapeTarget = event.target as HTMLElement;
         const inDropdownContext = escapeTarget?.closest('[data-focus-context="open"]') ||
-                                  (escapeTarget?.getAttribute('aria-controls') && 
+                                  (escapeTarget?.getAttribute('aria-controls') &&
                                    escapeTarget?.getAttribute('aria-expanded') === 'true');
-        
+
         if (inDropdownContext) {
           return;
         }
-        
+
         if (onEscape) {
           // Check if we should handle escape based on condition
           const shouldHandleEscape = checkEscapeCondition ? checkEscapeCondition() : true;
@@ -339,6 +340,7 @@ export function useKeyboardNavigation(options: UseKeyboardNavigationOptions): Us
           }
         }
         break;
+      }
         
       case 'Home':
         if (allowArrowNavigation) {
@@ -362,7 +364,6 @@ export function useKeyboardNavigation(options: UseKeyboardNavigationOptions): Us
     trapFocus,
     wrapAround,
     currentFocusIndex,
-    focusableElementsRef.current.length,
     focusNext,
     focusPrevious,
     focusFirst,

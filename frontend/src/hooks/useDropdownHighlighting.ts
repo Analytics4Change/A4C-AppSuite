@@ -114,19 +114,28 @@ export function useDropdownHighlighting<T>({
   // Handle mouse enter on item
   const handleMouseEnter = useCallback((index: number) => {
     if (!enabled) return;
-    
+
     // Mouse interaction switches to navigation mode
     setInteractionMode('navigating');
     setNavigationIndex(index);
     isTypingRef.current = false;
   }, [enabled]);
 
+  // Reset all highlighting - defined before handleSelect to avoid circular dependency
+  const reset = useCallback(() => {
+    setInteractionMode('idle');
+    setNavigationIndex(-1);
+    setTypedPrefix('');
+    lastInputValueRef.current = '';
+    isTypingRef.current = false;
+  }, []);
+
   // Handle item selection
   const handleSelect = useCallback((item: T, method: SelectionMethod) => {
     onSelect?.(item, method);
     // Reset after selection
     reset();
-  }, [onSelect]);
+  }, [onSelect, reset]);
 
   // Get highlight type for an item
   const getItemHighlightType = useCallback((item: T, index: number): HighlightType => {
@@ -150,15 +159,6 @@ export function useDropdownHighlighting<T>({
     const highlightType = getItemHighlightType(item, index);
     return highlightType !== HighlightType.None;
   }, [getItemHighlightType]);
-
-  // Reset all highlighting
-  const reset = useCallback(() => {
-    setInteractionMode('idle');
-    setNavigationIndex(-1);
-    setTypedPrefix('');
-    lastInputValueRef.current = '';
-    isTypingRef.current = false;
-  }, []);
 
   // Get currently highlighted item (for navigation mode)
   const getHighlightedItem = useCallback((): T | undefined => {

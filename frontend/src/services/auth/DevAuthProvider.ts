@@ -115,7 +115,7 @@ export class DevAuthProvider implements IAuthProvider {
    * Mock OAuth login - instantly returns session
    * In real OAuth, this would initiate a redirect
    */
-  async loginWithOAuth(provider: OAuthProvider, options?: OAuthOptions): Promise<Session> {
+  async loginWithOAuth(provider: OAuthProvider, _options?: OAuthOptions): Promise<Session> {
     log.info('🔧 DevAuthProvider: Mock OAuth login with', provider);
 
     // Simulate login delay if configured

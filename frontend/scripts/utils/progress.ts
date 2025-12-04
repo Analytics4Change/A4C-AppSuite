@@ -168,7 +168,7 @@ class DotsProgressReporter implements ProgressReporter {
     logger.debug('Dots progress started', { total: this.total, message });
   }
   
-  update(current: number, message?: string): void {
+  update(current: number, _message?: string): void {
     const newCurrent = Math.min(current, this.total);
     const dotsToAdd = newCurrent - this.current;
     
@@ -209,26 +209,26 @@ class DotsProgressReporter implements ProgressReporter {
  * No-op implementation for when progress reporting is disabled
  */
 class NoProgressReporter implements ProgressReporter {
-  start(message?: string): void {
+  start(_message?: string): void {
     // No-op
   }
-  
-  update(current: number, message?: string): void {
+
+  update(_current: number, _message?: string): void {
     // No-op
   }
-  
-  increment(delta?: number, message?: string): void {
+
+  increment(_delta?: number, _message?: string): void {
     // No-op
   }
-  
-  complete(message?: string): void {
+
+  complete(_message?: string): void {
     // No-op
   }
-  
-  fail(message?: string): void {
+
+  fail(_message?: string): void {
     // No-op
   }
-  
+
   stop(): void {
     // No-op
   }

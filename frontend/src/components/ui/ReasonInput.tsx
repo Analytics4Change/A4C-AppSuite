@@ -39,7 +39,6 @@ export function ReasonInput({
 
   const error = externalError || internalError;
   const characterCount = value.length;
-  const isValid = characterCount >= minLength && characterCount <= maxLength;
 
   useEffect(() => {
     if (value && characterCount < minLength) {

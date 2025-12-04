@@ -46,7 +46,7 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
   onBlur,
   onFocus,
   allowCustomValue = true,
-  filterStrategy = 'contains'
+  filterStrategy: _filterStrategy = 'contains'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
@@ -158,16 +158,16 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
         handleArrowKey('end');
         break;
       
-      case 'Enter':
+      case 'Enter': {
         e.preventDefault();
-        
+
         // Check how many items start with the typed text
         const searchText = inputValue.toLowerCase().trim();
-        const startsWithMatches = searchText ? 
-          filteredOptions.filter(option => 
+        const startsWithMatches = searchText ?
+          filteredOptions.filter(option =>
             option.toLowerCase().startsWith(searchText)
           ) : [];
-        
+
         if (navigationIndex >= 0 && filteredOptions[navigationIndex]) {
           // User has navigated with arrows - always respect that choice
           handleOptionSelect(filteredOptions[navigationIndex]);
@@ -184,6 +184,7 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
           resetHighlighting();
         }
         break;
+      }
       
       case 'Escape':
         e.preventDefault();
@@ -206,7 +207,7 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
     }
   };
 
-  const handleInputBlur = (e: React.FocusEvent) => {
+  const handleInputBlur = (_e: React.FocusEvent) => {
     // Use a small delay to allow clicking on options
     setTimeout(() => {
       if (!dropdownRef.current?.contains(document.activeElement)) {

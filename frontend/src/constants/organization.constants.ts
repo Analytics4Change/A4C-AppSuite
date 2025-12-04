@@ -238,6 +238,7 @@ export const DEFAULT_ORGANIZATION_FORM = {
     firstName: '',
     lastName: '',
     email: '',
+    emailConfirmation: '',
     title: '',
     department: ''
   },

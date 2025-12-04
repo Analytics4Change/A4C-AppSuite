@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { observer } from 'mobx-react-lite';
-import { ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '../button';
 import { Checkbox } from '../checkbox';
 import { cn } from '../utils';
-import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
-import { FocusTrappedCheckboxGroupProps, CheckboxItem } from './types';
+import { FocusTrappedCheckboxGroupProps } from './types';
 
 /**
  * Focus-Trapped Checkbox Group Component

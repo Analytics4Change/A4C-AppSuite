@@ -14,7 +14,6 @@ import chalk from 'chalk';
 import { sanitizePath, isValidProjectPath } from '../utils/security.js';
 import { getLogger } from '../utils/logger.js';
 import { ProgressTracker } from '../utils/progress.js';
-import { configManager } from '../config/manager.js';
 
 const logger = getLogger('docs-validation');
 
@@ -224,7 +223,7 @@ class DocumentValidator {
         const filePath = sanitizePath(requiredFile, allowedBase);
         await fs.access(filePath);
         this.result.addInfo(`Required file exists: ${requiredFile}`);
-      } catch (error) {
+      } catch {
         this.result.addError(`Required documentation file missing: ${requiredFile}`);
       }
     }
@@ -460,7 +459,7 @@ class DocumentValidator {
           try {
             await fs.access(resolvedPath);
             logger.debug('Valid internal link found', { filePath, linkPath, resolvedPath });
-          } catch (error) {
+          } catch {
             brokenLinks++;
             this.result.addError(
               `Broken internal link: "${linkText}" -> "${linkPath}" at line ${lineNum}`,

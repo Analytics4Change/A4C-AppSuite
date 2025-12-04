@@ -67,6 +67,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
  * useAuth hook
  * Provides access to authentication context in any component
  */
+// eslint-disable-next-line react-refresh/only-export-components -- Hook exported with provider is standard context pattern
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

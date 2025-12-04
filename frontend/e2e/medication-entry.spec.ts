@@ -402,7 +402,7 @@ test.describe('2. UI/UX Testing (TC068-TC084)', () => {
     await helper.searchMedication('Aspirin');
     
     // Check for loading indicators
-    const loadingIndicator = page.locator('[data-testid="loading"], .spinner, [class*="loading"]');
+    const _loadingIndicator = page.locator('[data-testid="loading"], .spinner, [class*="loading"]');
     // Loading states are often brief, so we'll check if they appear/disappear
     
     // Test save loading state
@@ -614,7 +614,7 @@ test.describe('6. Performance Testing (TC127-TC138)', () => {
     helper = new MedicationEntryHelper(page);
   });
 
-  test('TC127-TC132: Page load and rendering performance', async ({ page }) => {
+  test('TC127-TC132: Page load and rendering performance', async ({ page: _page }) => {
     const startTime = Date.now();
     
     await helper.navigateToApp();
@@ -649,7 +649,7 @@ test.describe('6. Performance Testing (TC127-TC138)', () => {
       const searchTime = Date.now() - searchStartTime;
       console.log(`Search response time: ${searchTime}ms`);
       expect(searchTime).toBeLessThan(3000);
-    } catch (error) {
+    } catch {
       // Search might not return results in test environment
       console.log('Search functionality may not be fully implemented');
     }
@@ -834,7 +834,7 @@ test.describe('8. Integration Testing (TC156-TC165)', () => {
       }
       
       // Check if save button becomes enabled
-      const saveButton = page.locator('text=Save Medication');
+      const _saveButton = page.locator('text=Save Medication');
       // Note: Save button might still be disabled due to other required fields
     }
   });
@@ -866,7 +866,7 @@ test.describe('9. Security Testing (TC166-TC172)', () => {
       await page.waitForTimeout(500);
       
       // Verify no script execution
-      const alerts = page.locator('[role="alert"]');
+      const _alerts = page.locator('[role="alert"]');
       // Should not execute malicious scripts
     }
   });

@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, Page } from '@playwright/test';
 
 // Helper to capture console logs
 async function setupConsoleCapture(page: Page) {
@@ -323,11 +323,10 @@ test.describe('Category Selection Keyboard Navigation UAT', () => {
     // Test focus trap
     logAction('Testing focus trap (Tab should stay within list)');
     // Tab through all items and check if focus stays within
-    let focusedElementId = '';
     for (let i = 0; i < 10; i++) {
       await page.keyboard.press('Tab');
       await page.waitForTimeout(50);
-      focusedElementId = await page.evaluate(() => document.activeElement?.id || '');
+      const _focusedElementId = await page.evaluate(() => document.activeElement?.id || '');
       
       // Check if focus left the list
       const inList = await page.evaluate(() => {

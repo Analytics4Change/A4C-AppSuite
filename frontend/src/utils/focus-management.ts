@@ -15,7 +15,7 @@ const FOCUSABLE_INPUT_SELECTORS = [
 /**
  * All focusable elements including buttons
  */
-const ALL_FOCUSABLE_SELECTORS = [
+const _ALL_FOCUSABLE_SELECTORS = [
   'input:not([disabled]):not([type="hidden"])',
   'textarea:not([disabled])',
   'select:not([disabled])',

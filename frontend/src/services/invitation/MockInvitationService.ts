@@ -105,7 +105,7 @@ export class MockInvitationService implements IInvitationService {
    */
   async acceptInvitation(
     token: string,
-    credentials: UserCredentials
+    _credentials: UserCredentials
   ): Promise<AcceptInvitationResult> {
     // Validate invitation first
     const invitation = await this.validateInvitation(token);
@@ -140,7 +140,7 @@ export class MockInvitationService implements IInvitationService {
    * @param invitationId - Invitation identifier
    * @returns True if successful
    */
-  async resendInvitation(invitationId: string): Promise<boolean> {
+  async resendInvitation(_invitationId: string): Promise<boolean> {
     // Simulate email sending delay
     await this.delay(500);
 

@@ -6,7 +6,6 @@
 
 import React from 'react';
 import { AlertTriangle, X, Clock } from 'lucide-react';
-import { impersonationService } from '@/services/auth/impersonation.service';
 import { ImpersonationSession } from '@/services/auth/impersonation.service';
 
 interface ImpersonationBannerProps {

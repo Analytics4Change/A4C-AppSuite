@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test('Test isolated FocusBehaviorProvider', async ({ page }) => {
   console.log('\n=== Testing Isolated FocusBehaviorProvider ===\n');

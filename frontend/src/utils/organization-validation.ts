@@ -307,6 +307,19 @@ export function validateOrganizationForm(
     ValidationRules.email(data.providerAdminContact.email)
   );
 
+  // Email confirmation must match email for Provider Admin
+  if (
+    data.providerAdminContact.email &&
+    data.providerAdminContact.emailConfirmation !== undefined &&
+    data.providerAdminContact.email !== data.providerAdminContact.emailConfirmation
+  ) {
+    addError(
+      errors,
+      'providerAdminContact.emailConfirmation',
+      'Email addresses must match'
+    );
+  }
+
   // Provider Admin Address (if not using general)
   if (!data.useProviderAdminGeneralAddress) {
     addError(

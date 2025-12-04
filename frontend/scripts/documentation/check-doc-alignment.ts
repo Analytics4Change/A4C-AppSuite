@@ -9,13 +9,12 @@
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { spawn, ChildProcess } from 'child_process';
-import { promisify } from 'util';
 import { glob } from 'glob';
 import chalk from 'chalk';
 
-import { sanitizePath, isValidProjectPath, SECURITY_CONFIG } from '../utils/security.js';
-import { getLogger, createLogger } from '../utils/logger.js';
-import { createProgress, ProgressTracker } from '../utils/progress.js';
+import { isValidProjectPath } from '../utils/security.js';
+import { getLogger } from '../utils/logger.js';
+import { ProgressTracker } from '../utils/progress.js';
 import { configManager } from '../config/manager.js';
 
 const logger = getLogger('doc-alignment');

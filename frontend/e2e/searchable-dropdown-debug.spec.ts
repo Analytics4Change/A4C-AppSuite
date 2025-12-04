@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test('Debug navigation to medication search', async ({ page }) => {
   console.log('\n=== Debugging Navigation Flow ===\n');
@@ -142,7 +142,7 @@ test('Debug navigation to medication search', async ({ page }) => {
           console.log(`After Tab: focus on #${focusAfterTab.id}, in dropdown: ${focusAfterTab.inDropdown}`);
         }
         
-      } catch (e) {
+      } catch {
         console.log('❌ Medication search modal did not open');
       }
     }

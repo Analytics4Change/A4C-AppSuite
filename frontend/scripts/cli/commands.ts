@@ -6,7 +6,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { promises as fs } from 'fs';
-import { join } from 'path';
 
 import { configManager } from '../config/manager.js';
 import { getLogger } from '../utils/logger.js';
@@ -94,7 +93,7 @@ function createCheckCommand(): Command {
     .option('--fix', 'Attempt to fix alignment issues automatically')
     .option('--report <format>', 'Report format (console|json|html)', 'console')
     .option('--output <path>', 'Output file for report')
-    .action(async (options) => {
+    .action(async (_options) => {
       const operation = logger.start('check command');
       
       try {
@@ -139,7 +138,7 @@ function createGenerateCommand(): Command {
     .option('-o, --output <path>', 'Output directory', 'docs')
     .option('--format <format>', 'Output format (json|html|both)', 'both')
     .option('--template <path>', 'Custom template file')
-    .action(async (options) => {
+    .action(async (_options) => {
       const operation = logger.start('generate command');
       
       try {

@@ -3,7 +3,7 @@
  * iOS-safe implementation with 45MB limit
  */
 
-import { CacheEntry, CacheStats } from '@/types/medication-search.types';
+import { CacheStats } from '@/types/medication-search.types';
 import { INDEXED_DB_CONFIG, CACHE_CONFIG } from '@/config/medication-search.config';
 import { Logger } from '@/utils/logger';
 
@@ -226,7 +226,7 @@ export class IndexedDBCache<V> {
       const store = transaction.objectStore(this.storeName);
       const countRequest = store.count();
       
-      const count = await new Promise<number>((resolve, reject) => {
+      await new Promise<number>((resolve, reject) => {
         countRequest.onsuccess = () => resolve(countRequest.result);
         countRequest.onerror = () => reject(countRequest.error);
       });

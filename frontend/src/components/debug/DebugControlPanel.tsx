@@ -1,6 +1,6 @@
 import React from 'react';
 import { useDiagnostics } from '@/contexts/DiagnosticsContext';
-import { Settings, X, Minimize2, Maximize2, Bug } from 'lucide-react';
+import { X, Minimize2, Bug } from 'lucide-react';
 
 /**
  * Debug Control Panel Component

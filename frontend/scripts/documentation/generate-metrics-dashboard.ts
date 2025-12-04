@@ -7,14 +7,13 @@
  */
 
 import { promises as fs } from 'fs';
-import { join, extname, basename } from 'path';
+import { join, basename } from 'path';
 import { glob } from 'glob';
 import { spawn, ChildProcess } from 'child_process';
 import chalk from 'chalk';
 
-import { sanitizePath, isValidProjectPath, SECURITY_CONFIG } from '../utils/security.js';
-import { getLogger, createLogger } from '../utils/logger.js';
-import { createProgress, ProgressTracker, withProgress } from '../utils/progress.js';
+import { getLogger } from '../utils/logger.js';
+import { withProgress } from '../utils/progress.js';
 import { configManager } from '../config/manager.js';
 
 const logger = getLogger('metrics-dashboard');

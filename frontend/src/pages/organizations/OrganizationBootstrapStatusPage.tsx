@@ -40,7 +40,7 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
 
   const [status, setStatus] = useState<WorkflowStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [_isLoading, setIsLoading] = useState(true);
 
   const workflowClient = WorkflowClientFactory.create();
 
@@ -97,6 +97,7 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
     return () => {
       clearInterval(interval);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchStatus is stable within the component
   }, [workflowId, status?.status]);
 
   /**
@@ -141,7 +142,7 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
   /**
    * Get overall status color
    */
-  const getStatusColor = (workflowStatus: string) => {
+  const _getStatusColor = (workflowStatus: string) => {
     switch (workflowStatus) {
       case 'running':
         return 'text-blue-600';

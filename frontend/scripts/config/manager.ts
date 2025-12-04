@@ -4,7 +4,7 @@
  */
 
 import { readFile } from 'fs/promises';
-import { join, resolve } from 'path';
+import { resolve } from 'path';
 import { ScriptConfig, EnvironmentConfig, LogLevel } from './types.js';
 import { defaultConfig, environmentConfig } from './defaults.js';
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { useParams, Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { mockClients } from '@/mocks/data/clients.mock';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Calendar, FileText } from 'lucide-react';
+import { ArrowLeft, User, Calendar } from 'lucide-react';
 
 export const ClientDetailLayout: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();

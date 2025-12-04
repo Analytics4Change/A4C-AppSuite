@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TIMINGS } from '@/config/timings';
 
 /**
  * Hook that debounces a value by a specified delay

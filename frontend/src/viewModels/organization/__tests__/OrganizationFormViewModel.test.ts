@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { OrganizationFormViewModel } from '../OrganizationFormViewModel';
 import { OrganizationService } from '@/services/organization/OrganizationService';
 import type { IWorkflowClient } from '@/services/workflow/IWorkflowClient';
-import type { OrganizationFormData } from '@/types/organization.types';
 
 // Mock sonner toast to prevent test failures
 vi.mock('sonner', () => ({

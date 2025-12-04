@@ -97,7 +97,7 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
     nextElement?.focus();
   };
 
-  const handleContinue = (selectedIds: string[], additionalData: Map<string, any>) => {
+  const handleContinue = (selectedIds: string[], _additionalData: Map<string, unknown>) => {
     console.log('[DosageTimings] Continue pressed:', { selectedIds, hasPRNSelection });
     
     // Validate using ViewModel business logic (which now considers PRN context)

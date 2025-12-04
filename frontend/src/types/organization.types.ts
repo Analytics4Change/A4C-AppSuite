@@ -18,6 +18,7 @@ export interface ContactFormData {
   firstName: string;
   lastName: string;
   email: string;
+  emailConfirmation?: string; // Only used for Provider Admin to verify email entry
   title?: string;
   department?: string;
 }

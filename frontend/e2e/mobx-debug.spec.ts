@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test.describe('MobX Reactivity Debug', () => {
   test('Debug Space key selection', async ({ page }) => {

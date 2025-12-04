@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, Page } from '@playwright/test';
 
 // Helper to capture and log console messages
 class ConsoleLogger {
@@ -56,12 +56,12 @@ test.describe('Focus Trap Comparison: SearchableDropdown vs AutocompleteDropdown
       };
       
       // Add focus tracking
-      let lastFocusedElement: Element | null = null;
+      let _lastFocusedElement: Element | null = null;
       document.addEventListener('focusin', (e) => {
         const target = e.target as Element;
         const id = target.id || target.className || target.tagName;
         console.log(`[UAT-FOCUS]: Focus moved to: ${id}`);
-        lastFocusedElement = target;
+        _lastFocusedElement = target;
       }, true);
       
       // Add keydown tracking
@@ -243,8 +243,8 @@ test.describe('Focus Trap Comparison: SearchableDropdown vs AutocompleteDropdown
     console.log('\n2. Testing Tab in AutocompleteDropdown...');
     await page.keyboard.press('Tab');
     await page.waitForTimeout(100);
-    
-    let focusedElement = await page.evaluate(() => {
+
+    const focusedElement = await page.evaluate(() => {
       const el = document.activeElement;
       return {
         id: el?.id,

@@ -56,4 +56,5 @@ const Button = React.forwardRef<
 
 Button.displayName = "Button";
 
+// eslint-disable-next-line react-refresh/only-export-components -- Variant helper exported with component is intentional
 export { Button, buttonVariants };

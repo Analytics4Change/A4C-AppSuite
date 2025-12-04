@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test('AutocompleteDropdown Enter key behavior - Type field with "tab" search', async ({ page }) => {
   console.log('\n=== Testing AutocompleteDropdown Enter Key Behavior ===\n');
