@@ -44,7 +44,8 @@ INSERT INTO organizations_projection (
   NULL,
   true,
   NOW()
-);
+)
+ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================================
