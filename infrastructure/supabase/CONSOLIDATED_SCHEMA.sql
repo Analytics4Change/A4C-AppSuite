@@ -802,6 +802,11 @@ CREATE INDEX IF NOT EXISTS idx_impersonation_sessions_justification
 CREATE INDEX IF NOT EXISTS idx_impersonation_sessions_org_started
   ON impersonation_sessions_projection(target_org_id, started_at DESC);
 
+-- Ensure columns exist for schema drift in production
+ALTER TABLE impersonation_sessions_projection ADD COLUMN IF NOT EXISTS total_duration_ms INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE impersonation_sessions_projection ADD COLUMN IF NOT EXISTS renewal_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE impersonation_sessions_projection ADD COLUMN IF NOT EXISTS actions_performed INTEGER NOT NULL DEFAULT 0;
+
 -- Comments
 COMMENT ON TABLE impersonation_sessions_projection IS 'CQRS projection of impersonation sessions. Source: domain_events with stream_type=impersonation. Tracks Super Admin impersonation sessions with full audit trail.';
 COMMENT ON COLUMN impersonation_sessions_projection.session_id IS 'Unique session identifier (from event_data.session_id)';
