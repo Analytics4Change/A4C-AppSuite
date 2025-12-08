@@ -8285,8 +8285,8 @@ CREATE POLICY roles_org_admin_select
   ON roles_projection
   FOR SELECT
   USING (
-    org_id IS NOT NULL
-    AND is_org_admin(get_current_user_id(), org_id)
+    organization_id IS NOT NULL
+    AND is_org_admin(get_current_user_id(), organization_id)
   );
 
 -- All authenticated users can view global roles (templates like provider_admin, partner_admin)
@@ -8295,7 +8295,7 @@ CREATE POLICY roles_global_select
   ON roles_projection
   FOR SELECT
   USING (
-    org_id IS NULL
+    organization_id IS NULL
     AND get_current_user_id() IS NOT NULL
   );
 
