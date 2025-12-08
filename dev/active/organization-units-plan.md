@@ -277,10 +277,45 @@ Before starting Phase 1, ensure the permission exists and is properly granted:
 
 ---
 
+## Deployment Blocker: CONSOLIDATED_SCHEMA.sql Idempotency Fix ⏳ PENDING
+
+**Issue**: GitHub Actions `Deploy Database Schema` workflow fails because `CONSOLIDATED_SCHEMA.sql` has non-idempotent `CREATE INDEX` statements (lines 136-143) for `domain_events` table.
+
+**Error**: `relation "idx_domain_events_stream" already exists`
+
+**Fix Required**: Add `IF NOT EXISTS` to 6 indexes on `domain_events` table:
+
+```sql
+-- Lines 136-143: Change from:
+CREATE INDEX idx_domain_events_stream ON domain_events(...);
+CREATE INDEX idx_domain_events_type ON domain_events(...);
+CREATE INDEX idx_domain_events_created ON domain_events(...);
+CREATE INDEX idx_domain_events_unprocessed ON domain_events(...);
+CREATE INDEX idx_domain_events_correlation ON domain_events(...);
+CREATE INDEX idx_domain_events_user ON domain_events(...);
+
+-- To:
+CREATE INDEX IF NOT EXISTS idx_domain_events_stream ON domain_events(...);
+CREATE INDEX IF NOT EXISTS idx_domain_events_type ON domain_events(...);
+CREATE INDEX IF NOT EXISTS idx_domain_events_created ON domain_events(...);
+CREATE INDEX IF NOT EXISTS idx_domain_events_unprocessed ON domain_events(...);
+CREATE INDEX IF NOT EXISTS idx_domain_events_correlation ON domain_events(...);
+CREATE INDEX IF NOT EXISTS idx_domain_events_user ON domain_events(...);
+```
+
+**File**: `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql`
+
+**Impact**: Until fixed, the new OU SQL files (RPC functions, RLS policies, permission seed) cannot be deployed via CI/CD.
+
+**Workaround**: Deploy new OU SQL files manually via psql or Supabase SQL Editor.
+
+---
+
 ## Next Steps After Completion
 
-1. Unit move operations (change parent OU)
-2. Bulk operations (CSV import/export)
-3. User documentation for end-users
-4. Integration with setup wizard (parked feature - `dev/parked/provider-admin-post-invitation`)
-5. Drag-and-drop reordering in tree view
+1. **Fix CONSOLIDATED_SCHEMA.sql idempotency** (deployment blocker)
+2. Unit move operations (change parent OU)
+3. Bulk operations (CSV import/export)
+4. User documentation for end-users
+5. Integration with setup wizard (parked feature - `dev/parked/provider-admin-post-invitation`)
+6. Drag-and-drop reordering in tree view

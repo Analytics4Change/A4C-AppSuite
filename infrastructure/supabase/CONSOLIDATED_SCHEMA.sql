@@ -132,15 +132,15 @@ CREATE TABLE IF NOT EXISTS domain_events (
   CONSTRAINT event_data_not_empty CHECK (jsonb_typeof(event_data) = 'object')
 );
 
--- Indexes for performance
-CREATE INDEX idx_domain_events_stream ON domain_events(stream_id, stream_type);
-CREATE INDEX idx_domain_events_type ON domain_events(event_type);
-CREATE INDEX idx_domain_events_created ON domain_events(created_at DESC);
-CREATE INDEX idx_domain_events_unprocessed ON domain_events(processed_at)
+-- Indexes for performance (idempotent)
+CREATE INDEX IF NOT EXISTS idx_domain_events_stream ON domain_events(stream_id, stream_type);
+CREATE INDEX IF NOT EXISTS idx_domain_events_type ON domain_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_domain_events_created ON domain_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_domain_events_unprocessed ON domain_events(processed_at)
   WHERE processed_at IS NULL;
-CREATE INDEX idx_domain_events_correlation ON domain_events((event_metadata->>'correlation_id'))
+CREATE INDEX IF NOT EXISTS idx_domain_events_correlation ON domain_events((event_metadata->>'correlation_id'))
   WHERE event_metadata ? 'correlation_id';
-CREATE INDEX idx_domain_events_user ON domain_events((event_metadata->>'user_id'))
+CREATE INDEX IF NOT EXISTS idx_domain_events_user ON domain_events((event_metadata->>'user_id'))
   WHERE event_metadata ? 'user_id';
 
 -- Comments for documentation

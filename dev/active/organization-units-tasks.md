@@ -275,6 +275,24 @@
   - [x] Component documentation via inline JSDoc comments
   - [x] Run `npm run docs:check` - PASSED (0 issues)
 
+## Deployment Blocker: CONSOLIDATED_SCHEMA.sql Idempotency Fix ✅ COMPLETE
+
+**Issue**: CI/CD `Deploy Database Schema` workflow fails on existing non-idempotent indexes.
+
+- [x] Fix `CONSOLIDATED_SCHEMA.sql` idempotency issue
+  - [x] Add `IF NOT EXISTS` to `idx_domain_events_stream` (line 136)
+  - [x] Add `IF NOT EXISTS` to `idx_domain_events_type` (line 137)
+  - [x] Add `IF NOT EXISTS` to `idx_domain_events_created` (line 138)
+  - [x] Add `IF NOT EXISTS` to `idx_domain_events_unprocessed` (line 139)
+  - [x] Add `IF NOT EXISTS` to `idx_domain_events_correlation` (line 141)
+  - [x] Add `IF NOT EXISTS` to `idx_domain_events_user` (line 143)
+  - [ ] Commit and push fix
+  - [ ] Verify `Deploy Database Schema` workflow passes
+
+**File**: `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql`
+
+**Error**: `relation "idx_domain_events_stream" already exists`
+
 ---
 
 ## Success Validation Checkpoints
