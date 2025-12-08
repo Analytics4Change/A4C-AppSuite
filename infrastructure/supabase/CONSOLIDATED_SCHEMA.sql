@@ -469,6 +469,9 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_resource ON audit_log(resource_type, re
 -- Source: sql/02-tables/audit_log/indexes/idx_audit_log_session.sql
 -- ----------------------------------------------------------------------------
 
+-- Ensure session_id column exists (for schema drift in production)
+ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS session_id TEXT;
+
 -- Index on session_id
 CREATE INDEX IF NOT EXISTS idx_audit_log_session ON audit_log(session_id);
 
