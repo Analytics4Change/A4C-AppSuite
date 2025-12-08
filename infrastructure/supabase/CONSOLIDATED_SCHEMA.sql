@@ -1289,11 +1289,10 @@ COMMENT ON COLUMN organization_business_profiles_projection.physical_address IS
 -- Part of Phase 2: Database Schema for Subdomain Support
 -- Full subdomain computed as: {slug}.{BASE_DOMAIN} (environment-aware)
 
-ALTER TABLE organizations_projection
-  ADD COLUMN subdomain_status subdomain_status DEFAULT 'pending',
-  ADD COLUMN cloudflare_record_id TEXT,
-  ADD COLUMN dns_verified_at TIMESTAMPTZ,
-  ADD COLUMN subdomain_metadata JSONB DEFAULT '{}';
+ALTER TABLE organizations_projection ADD COLUMN IF NOT EXISTS subdomain_status subdomain_status DEFAULT 'pending';
+ALTER TABLE organizations_projection ADD COLUMN IF NOT EXISTS cloudflare_record_id TEXT;
+ALTER TABLE organizations_projection ADD COLUMN IF NOT EXISTS dns_verified_at TIMESTAMPTZ;
+ALTER TABLE organizations_projection ADD COLUMN IF NOT EXISTS subdomain_metadata JSONB DEFAULT '{}';
 
 -- Index for querying organizations by provisioning status
 -- Partial index excludes verified orgs (most common case) for efficiency
