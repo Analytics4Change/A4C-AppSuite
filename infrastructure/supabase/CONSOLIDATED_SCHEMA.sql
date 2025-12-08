@@ -2672,6 +2672,9 @@ CREATE INDEX IF NOT EXISTS idx_access_grants_lookup ON cross_tenant_access_grant
 CREATE INDEX IF NOT EXISTS idx_access_grants_expires ON cross_tenant_access_grants_projection(expires_at, status)
   WHERE expires_at IS NOT NULL AND status IN ('active', 'suspended');
 
+-- Ensure suspension columns exist (for schema drift)
+ALTER TABLE cross_tenant_access_grants_projection ADD COLUMN IF NOT EXISTS expected_resolution_date TIMESTAMPTZ;
+
 -- Index for suspended grants monitoring
 CREATE INDEX IF NOT EXISTS idx_access_grants_suspended ON cross_tenant_access_grants_projection(expected_resolution_date)
   WHERE status = 'suspended';
