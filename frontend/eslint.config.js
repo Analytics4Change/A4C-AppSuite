@@ -48,6 +48,8 @@ export default [
         HTMLFormElement: 'readonly',
         HTMLSelectElement: 'readonly',
         HTMLTextAreaElement: 'readonly',
+        HTMLLIElement: 'readonly',
+        HTMLUListElement: 'readonly',
         Element: 'readonly',
         Node: 'readonly',
         Document: 'readonly',

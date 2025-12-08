@@ -2390,6 +2390,1242 @@ channels:
                             - User selected different organization from dropdown
                             - Automatic switch after single org access granted
                             - Session initialization with default organization
+          - name: invitation.user_invited
+            title: User Invited
+            summary: An invitation has been sent to a user to join an organization
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: >-
+                    Organization UUID (invitation belongs to organization
+                    aggregate)
+                stream_type:
+                  type: string
+                  enum:
+                    - organization
+                  description: Events emitted on organization aggregate
+                event_type:
+                  type: string
+                  enum:
+                    - UserInvited
+                event_data:
+                  type: object
+                  required:
+                    - invitation_id
+                    - org_id
+                    - email
+                    - first_name
+                    - last_name
+                    - role
+                    - token
+                    - expires_at
+                  properties:
+                    invitation_id:
+                      type: string
+                      format: uuid
+                      description: Unique identifier for this invitation
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization the user is being invited to
+                    email:
+                      type: string
+                      format: email
+                      description: Email address of the invited user
+                      examples:
+                        - admin@provider.com
+                        - clinician@healthcare.org
+                    first_name:
+                      type: string
+                      maxLength: 100
+                      description: First name of the invited user
+                    last_name:
+                      type: string
+                      maxLength: 100
+                      description: Last name of the invited user
+                    role:
+                      type: string
+                      enum:
+                        - provider_admin
+                        - partner_admin
+                        - clinician
+                        - viewer
+                      description: >
+                        Role to assign when invitation is accepted:
+
+                        - provider_admin: Full administrative access for
+                        provider organizations
+
+                        - partner_admin: Full administrative access for partner
+                        organizations
+
+                        - clinician: Clinical staff with medication management
+                        access
+
+                        - viewer: Read-only access
+                    token:
+                      type: string
+                      description: >-
+                        Cryptographically secure invitation token (256 bits,
+                        base64url encoded)
+                      examples:
+                        - xK9m2nP4qR7sT1vW3xY5zA8bC0dE2fG4hI6jK8lM0nO
+                    expires_at:
+                      type: string
+                      format: date-time
+                      description: >-
+                        When the invitation expires (default 7 days from
+                        creation)
+                      examples:
+                        - '2025-11-25T13:54:00.000Z'
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: invitation.revoked
+            title: Invitation Revoked
+            summary: >-
+              A pending invitation has been revoked (typically during workflow
+              compensation)
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Invitation UUID being revoked
+                stream_type:
+                  type: string
+                  enum:
+                    - invitation
+                  description: Events emitted on invitation aggregate
+                event_type:
+                  type: string
+                  enum:
+                    - InvitationRevoked
+                event_data:
+                  type: object
+                  required:
+                    - invitation_id
+                    - org_id
+                    - email
+                    - revoked_at
+                    - reason
+                  properties:
+                    invitation_id:
+                      type: string
+                      format: uuid
+                      description: Invitation being revoked
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization the invitation belonged to
+                    email:
+                      type: string
+                      format: email
+                      description: Email of the user whose invitation was revoked
+                    revoked_at:
+                      type: string
+                      format: date-time
+                      description: Timestamp when the invitation was revoked
+                    reason:
+                      type: string
+                      enum:
+                        - workflow_failure
+                        - manual_revocation
+                        - organization_deactivated
+                      description: >
+                        Reason for revocation:
+
+                        - workflow_failure: Saga compensation during failed
+                        organization bootstrap
+
+                        - manual_revocation: Administrator manually revoked the
+                        invitation
+
+                        - organization_deactivated: Organization was
+                        deactivated, invalidating invitations
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: invitation.accepted
+            title: Invitation Accepted
+            summary: A user has accepted an invitation and joined the organization
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Invitation UUID that was accepted
+                stream_type:
+                  type: string
+                  enum:
+                    - invitation
+                event_type:
+                  type: string
+                  enum:
+                    - InvitationAccepted
+                event_data:
+                  type: object
+                  required:
+                    - invitation_id
+                    - org_id
+                    - user_id
+                    - email
+                    - role
+                    - accepted_at
+                  properties:
+                    invitation_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: User ID created in auth system
+                    email:
+                      type: string
+                      format: email
+                    role:
+                      type: string
+                      enum:
+                        - provider_admin
+                        - partner_admin
+                        - clinician
+                        - viewer
+                    accepted_at:
+                      type: string
+                      format: date-time
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: invitation.expired
+            title: Invitation Expired
+            summary: An invitation has expired without being accepted
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  enum:
+                    - invitation
+                event_type:
+                  type: string
+                  enum:
+                    - InvitationExpired
+                event_data:
+                  type: object
+                  required:
+                    - invitation_id
+                    - org_id
+                    - email
+                    - expired_at
+                    - original_expires_at
+                  properties:
+                    invitation_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                    email:
+                      type: string
+                      format: email
+                    expired_at:
+                      type: string
+                      format: date-time
+                      description: When the system processed the expiration
+                    original_expires_at:
+                      type: string
+                      format: date-time
+                      description: Original expiration date from the invitation
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: organization.bootstrap.initiated
+            title: Organization Bootstrap Initiated
+            summary: >-
+              Bootstrap process started for new provider or provider_partner
+              organization
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Organization UUID (generated for new org)
+                stream_type:
+                  type: string
+                  enum:
+                    - organization
+                event_type:
+                  type: string
+                  enum:
+                    - organization.bootstrap.initiated
+                event_data:
+                  type: object
+                  required:
+                    - organization_type
+                    - organization_name
+                    - admin_email
+                    - bootstrap_id
+                  properties:
+                    bootstrap_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        Unique identifier for this bootstrap process (for
+                        tracking)
+                    organization_type:
+                      type: string
+                      enum:
+                        - provider
+                        - provider_partner
+                      description: Type of organization being bootstrapped
+                    organization_name:
+                      type: string
+                      maxLength: 200
+                      description: Human-readable organization name
+                      examples:
+                        - ACME Healthcare Services
+                        - XYZ Consulting Partners
+                    admin_email:
+                      type: string
+                      format: email
+                      description: Email address for the initial organization administrator
+                      examples:
+                        - admin@acmehealthcare.com
+                        - director@xyzconsulting.com
+                    slug:
+                      type: string
+                      pattern: ^[a-z0-9_]+$
+                      description: >-
+                        URL-safe organization identifier (auto-generated if not
+                        provided)
+                      examples:
+                        - acme_healthcare
+                        - xyz_consulting
+                    contact_info:
+                      type: object
+                      description: Optional contact information for the organization
+                      properties:
+                        phone_number:
+                          type: string
+                        timezone:
+                          type: string
+                          default: America/New_York
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: organization.bootstrap.completed
+            title: Organization Bootstrap Completed
+            summary: Organization bootstrap process successfully completed
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  enum:
+                    - organization
+                event_type:
+                  type: string
+                  enum:
+                    - organization.bootstrap.completed
+                event_data:
+                  type: object
+                  required:
+                    - bootstrap_id
+                    - organization_id
+                    - admin_role_assigned
+                    - permissions_granted
+                  properties:
+                    bootstrap_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    admin_role_assigned:
+                      type: string
+                      enum:
+                        - provider_admin
+                        - partner_admin
+                      description: Role assigned to the initial administrator
+                    permissions_granted:
+                      type: integer
+                      description: Number of permissions granted to the admin role
+                    ltree_path:
+                      type: string
+                      description: Organization ltree path in hierarchy
+                      examples:
+                        - root.org_acme_healthcare
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: organization.bootstrap.failed
+            title: Organization Bootstrap Failed
+            summary: Organization bootstrap process failed, triggering compensation
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  enum:
+                    - organization
+                event_type:
+                  type: string
+                  enum:
+                    - organization.bootstrap.failed
+                event_data:
+                  type: object
+                  required:
+                    - bootstrap_id
+                    - failure_stage
+                    - error_message
+                  properties:
+                    bootstrap_id:
+                      type: string
+                      format: uuid
+                    failure_stage:
+                      type: string
+                      enum:
+                        - organization_creation
+                        - dns_provisioning
+                        - admin_user_creation
+                        - role_assignment
+                        - permission_grants
+                        - invitation_email
+                      description: Stage where bootstrap process failed
+                    error_message:
+                      type: string
+                      description: Error details for troubleshooting
+                    partial_cleanup_required:
+                      type: boolean
+                      description: Whether partial resources need cleanup
+                      default: false
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: organization.bootstrap.cancelled
+            title: Organization Bootstrap Cancelled
+            summary: Organization bootstrap process cancelled and cleanup completed
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  enum:
+                    - organization
+                event_type:
+                  type: string
+                  enum:
+                    - organization.bootstrap.cancelled
+                event_data:
+                  type: object
+                  required:
+                    - bootstrap_id
+                    - cleanup_completed
+                  properties:
+                    bootstrap_id:
+                      type: string
+                      format: uuid
+                    cleanup_completed:
+                      type: boolean
+                      description: >-
+                        Whether all partial resources were successfully cleaned
+                        up
+                    cleanup_actions:
+                      type: array
+                      items:
+                        type: string
+                      description: List of cleanup actions performed
+                      examples:
+                        - removed_dns_records
+                        - removed_partial_database_records
+                        - deleted_pending_invitations
+                    original_failure_stage:
+                      type: string
+                      description: Original stage where bootstrap failed
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
     subscribe:
       summary: Subscribe to domain events
       operationId: onDomainEvent
@@ -4754,6 +5990,1242 @@ channels:
                             - User selected different organization from dropdown
                             - Automatic switch after single org access granted
                             - Session initialization with default organization
+          - name: invitation.user_invited
+            title: User Invited
+            summary: An invitation has been sent to a user to join an organization
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: >-
+                    Organization UUID (invitation belongs to organization
+                    aggregate)
+                stream_type:
+                  type: string
+                  enum:
+                    - organization
+                  description: Events emitted on organization aggregate
+                event_type:
+                  type: string
+                  enum:
+                    - UserInvited
+                event_data:
+                  type: object
+                  required:
+                    - invitation_id
+                    - org_id
+                    - email
+                    - first_name
+                    - last_name
+                    - role
+                    - token
+                    - expires_at
+                  properties:
+                    invitation_id:
+                      type: string
+                      format: uuid
+                      description: Unique identifier for this invitation
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization the user is being invited to
+                    email:
+                      type: string
+                      format: email
+                      description: Email address of the invited user
+                      examples:
+                        - admin@provider.com
+                        - clinician@healthcare.org
+                    first_name:
+                      type: string
+                      maxLength: 100
+                      description: First name of the invited user
+                    last_name:
+                      type: string
+                      maxLength: 100
+                      description: Last name of the invited user
+                    role:
+                      type: string
+                      enum:
+                        - provider_admin
+                        - partner_admin
+                        - clinician
+                        - viewer
+                      description: >
+                        Role to assign when invitation is accepted:
+
+                        - provider_admin: Full administrative access for
+                        provider organizations
+
+                        - partner_admin: Full administrative access for partner
+                        organizations
+
+                        - clinician: Clinical staff with medication management
+                        access
+
+                        - viewer: Read-only access
+                    token:
+                      type: string
+                      description: >-
+                        Cryptographically secure invitation token (256 bits,
+                        base64url encoded)
+                      examples:
+                        - xK9m2nP4qR7sT1vW3xY5zA8bC0dE2fG4hI6jK8lM0nO
+                    expires_at:
+                      type: string
+                      format: date-time
+                      description: >-
+                        When the invitation expires (default 7 days from
+                        creation)
+                      examples:
+                        - '2025-11-25T13:54:00.000Z'
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: invitation.revoked
+            title: Invitation Revoked
+            summary: >-
+              A pending invitation has been revoked (typically during workflow
+              compensation)
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Invitation UUID being revoked
+                stream_type:
+                  type: string
+                  enum:
+                    - invitation
+                  description: Events emitted on invitation aggregate
+                event_type:
+                  type: string
+                  enum:
+                    - InvitationRevoked
+                event_data:
+                  type: object
+                  required:
+                    - invitation_id
+                    - org_id
+                    - email
+                    - revoked_at
+                    - reason
+                  properties:
+                    invitation_id:
+                      type: string
+                      format: uuid
+                      description: Invitation being revoked
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization the invitation belonged to
+                    email:
+                      type: string
+                      format: email
+                      description: Email of the user whose invitation was revoked
+                    revoked_at:
+                      type: string
+                      format: date-time
+                      description: Timestamp when the invitation was revoked
+                    reason:
+                      type: string
+                      enum:
+                        - workflow_failure
+                        - manual_revocation
+                        - organization_deactivated
+                      description: >
+                        Reason for revocation:
+
+                        - workflow_failure: Saga compensation during failed
+                        organization bootstrap
+
+                        - manual_revocation: Administrator manually revoked the
+                        invitation
+
+                        - organization_deactivated: Organization was
+                        deactivated, invalidating invitations
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: invitation.accepted
+            title: Invitation Accepted
+            summary: A user has accepted an invitation and joined the organization
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Invitation UUID that was accepted
+                stream_type:
+                  type: string
+                  enum:
+                    - invitation
+                event_type:
+                  type: string
+                  enum:
+                    - InvitationAccepted
+                event_data:
+                  type: object
+                  required:
+                    - invitation_id
+                    - org_id
+                    - user_id
+                    - email
+                    - role
+                    - accepted_at
+                  properties:
+                    invitation_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: User ID created in auth system
+                    email:
+                      type: string
+                      format: email
+                    role:
+                      type: string
+                      enum:
+                        - provider_admin
+                        - partner_admin
+                        - clinician
+                        - viewer
+                    accepted_at:
+                      type: string
+                      format: date-time
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: invitation.expired
+            title: Invitation Expired
+            summary: An invitation has expired without being accepted
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  enum:
+                    - invitation
+                event_type:
+                  type: string
+                  enum:
+                    - InvitationExpired
+                event_data:
+                  type: object
+                  required:
+                    - invitation_id
+                    - org_id
+                    - email
+                    - expired_at
+                    - original_expires_at
+                  properties:
+                    invitation_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                    email:
+                      type: string
+                      format: email
+                    expired_at:
+                      type: string
+                      format: date-time
+                      description: When the system processed the expiration
+                    original_expires_at:
+                      type: string
+                      format: date-time
+                      description: Original expiration date from the invitation
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: organization.bootstrap.initiated
+            title: Organization Bootstrap Initiated
+            summary: >-
+              Bootstrap process started for new provider or provider_partner
+              organization
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Organization UUID (generated for new org)
+                stream_type:
+                  type: string
+                  enum:
+                    - organization
+                event_type:
+                  type: string
+                  enum:
+                    - organization.bootstrap.initiated
+                event_data:
+                  type: object
+                  required:
+                    - organization_type
+                    - organization_name
+                    - admin_email
+                    - bootstrap_id
+                  properties:
+                    bootstrap_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        Unique identifier for this bootstrap process (for
+                        tracking)
+                    organization_type:
+                      type: string
+                      enum:
+                        - provider
+                        - provider_partner
+                      description: Type of organization being bootstrapped
+                    organization_name:
+                      type: string
+                      maxLength: 200
+                      description: Human-readable organization name
+                      examples:
+                        - ACME Healthcare Services
+                        - XYZ Consulting Partners
+                    admin_email:
+                      type: string
+                      format: email
+                      description: Email address for the initial organization administrator
+                      examples:
+                        - admin@acmehealthcare.com
+                        - director@xyzconsulting.com
+                    slug:
+                      type: string
+                      pattern: ^[a-z0-9_]+$
+                      description: >-
+                        URL-safe organization identifier (auto-generated if not
+                        provided)
+                      examples:
+                        - acme_healthcare
+                        - xyz_consulting
+                    contact_info:
+                      type: object
+                      description: Optional contact information for the organization
+                      properties:
+                        phone_number:
+                          type: string
+                        timezone:
+                          type: string
+                          default: America/New_York
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: organization.bootstrap.completed
+            title: Organization Bootstrap Completed
+            summary: Organization bootstrap process successfully completed
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  enum:
+                    - organization
+                event_type:
+                  type: string
+                  enum:
+                    - organization.bootstrap.completed
+                event_data:
+                  type: object
+                  required:
+                    - bootstrap_id
+                    - organization_id
+                    - admin_role_assigned
+                    - permissions_granted
+                  properties:
+                    bootstrap_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    admin_role_assigned:
+                      type: string
+                      enum:
+                        - provider_admin
+                        - partner_admin
+                      description: Role assigned to the initial administrator
+                    permissions_granted:
+                      type: integer
+                      description: Number of permissions granted to the admin role
+                    ltree_path:
+                      type: string
+                      description: Organization ltree path in hierarchy
+                      examples:
+                        - root.org_acme_healthcare
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: organization.bootstrap.failed
+            title: Organization Bootstrap Failed
+            summary: Organization bootstrap process failed, triggering compensation
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  enum:
+                    - organization
+                event_type:
+                  type: string
+                  enum:
+                    - organization.bootstrap.failed
+                event_data:
+                  type: object
+                  required:
+                    - bootstrap_id
+                    - failure_stage
+                    - error_message
+                  properties:
+                    bootstrap_id:
+                      type: string
+                      format: uuid
+                    failure_stage:
+                      type: string
+                      enum:
+                        - organization_creation
+                        - dns_provisioning
+                        - admin_user_creation
+                        - role_assignment
+                        - permission_grants
+                        - invitation_email
+                      description: Stage where bootstrap process failed
+                    error_message:
+                      type: string
+                      description: Error details for troubleshooting
+                    partial_cleanup_required:
+                      type: boolean
+                      description: Whether partial resources need cleanup
+                      default: false
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: organization.bootstrap.cancelled
+            title: Organization Bootstrap Cancelled
+            summary: Organization bootstrap process cancelled and cleanup completed
+            contentType: application/json
+            payload:
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  enum:
+                    - organization
+                event_type:
+                  type: string
+                  enum:
+                    - organization.bootstrap.cancelled
+                event_data:
+                  type: object
+                  required:
+                    - bootstrap_id
+                    - cleanup_completed
+                  properties:
+                    bootstrap_id:
+                      type: string
+                      format: uuid
+                    cleanup_completed:
+                      type: boolean
+                      description: >-
+                        Whether all partial resources were successfully cleaned
+                        up
+                    cleanup_actions:
+                      type: array
+                      items:
+                        type: string
+                      description: List of cleanup actions performed
+                      examples:
+                        - removed_dns_records
+                        - removed_partial_database_records
+                        - deleted_pending_invitations
+                    original_failure_stage:
+                      type: string
+                      description: Original stage where bootstrap failed
+                event_metadata:
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    approval_chain:
+                      type: array
+                      description: Chain of approvals for this action
+                      items:
+                        type: object
+                        required:
+                          - approver_id
+                          - approved_at
+                          - role
+                        properties:
+                          approver_id:
+                            type: string
+                            format: uuid
+                            description: ID of the approver
+                          approver_name:
+                            type: string
+                            description: Name of the approver
+                          approver_email:
+                            type: string
+                            format: email
+                          approved_at:
+                            type: string
+                            format: date-time
+                            description: When approval was granted
+                          role:
+                            type: string
+                            enum:
+                              - physician
+                              - nurse_practitioner
+                              - pharmacist
+                              - administrator
+                              - supervisor
+                            description: Role of the approver
+                          notes:
+                            type: string
+                            description: Approval notes or conditions
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
 components:
   schemas:
     DomainEvent:
@@ -4785,6 +7257,7 @@ components:
             - dosage
             - user
             - organization
+            - invitation
           description: Type of entity this event affects
         stream_version:
           type: integer

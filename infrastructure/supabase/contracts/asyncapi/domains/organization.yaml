@@ -434,19 +434,73 @@ components:
           type: boolean
           description: User explicitly confirmed cascade deletion of children
 
-    # Placeholder schemas for update/reactivation events
+    # Organization Update Event - emitted when organization properties change
     OrganizationUpdatedEvent:
       type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
       properties:
         stream_id:
           type: string
           format: uuid
+          description: Organization UUID
         stream_type:
           type: string
           enum: [organization]
         event_type:
           type: string
           enum: [organization.updated]
+        event_data:
+          $ref: '#/components/schemas/OrganizationUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationUpdateData:
+      type: object
+      required:
+        - organization_id
+        - updated_fields
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: UUID of the organization being updated
+        name:
+          type: string
+          maxLength: 200
+          description: Updated organization name (only present if changed)
+        display_name:
+          type: string
+          maxLength: 200
+          description: Updated display name (only present if changed)
+        timezone:
+          type: string
+          description: Updated timezone (only present if changed)
+          examples:
+            - "America/New_York"
+            - "America/Chicago"
+            - "America/Los_Angeles"
+        is_active:
+          type: boolean
+          description: Updated active status (only present if changed)
+        updated_fields:
+          type: array
+          items:
+            type: string
+            enum: [name, display_name, timezone, is_active]
+          description: List of fields that were updated in this event
+          examples:
+            - ["name", "display_name"]
+            - ["timezone"]
+            - ["is_active"]
+        previous_values:
+          type: object
+          description: Previous values of updated fields (for audit trail)
+          additionalProperties: true
 
     OrganizationBusinessProfileUpdatedEvent:
       type: object

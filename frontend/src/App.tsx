@@ -16,6 +16,12 @@ import { OrganizationCreatePage } from '@/pages/organizations/OrganizationCreate
 import { OrganizationBootstrapStatusPage } from '@/pages/organizations/OrganizationBootstrapStatusPage';
 import { OrganizationDashboard } from '@/pages/organizations/OrganizationDashboard';
 import { AcceptInvitationPage } from '@/pages/organizations/AcceptInvitationPage';
+import {
+  OrganizationUnitsListPage,
+  OrganizationUnitsManagePage,
+  OrganizationUnitCreatePage,
+  OrganizationUnitEditPage,
+} from '@/pages/organization-units';
 import { DebugControlPanel } from '@/components/debug/DebugControlPanel';
 import { LogOverlay } from '@/components/debug/LogOverlay';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -92,6 +98,28 @@ function App() {
                 <Route path="/organizations/bootstrap/:workflowId" element={<OrganizationBootstrapStatusPage />} />
                 <Route path="/organizations/:orgId/dashboard" element={<OrganizationDashboard />} />
                 <Route path="/organizations/:orgId/edit" element={<div>Organization Edit - Coming Soon</div>} />
+
+                {/* Organization Units routes (internal hierarchy management) */}
+                <Route path="/organization-units" element={
+                  <RequirePermission permission="organization.create_ou" fallback="/clients">
+                    <OrganizationUnitsListPage />
+                  </RequirePermission>
+                } />
+                <Route path="/organization-units/manage" element={
+                  <RequirePermission permission="organization.create_ou" fallback="/clients">
+                    <OrganizationUnitsManagePage />
+                  </RequirePermission>
+                } />
+                <Route path="/organization-units/create" element={
+                  <RequirePermission permission="organization.create_ou" fallback="/clients">
+                    <OrganizationUnitCreatePage />
+                  </RequirePermission>
+                } />
+                <Route path="/organization-units/:unitId/edit" element={
+                  <RequirePermission permission="organization.create_ou" fallback="/clients">
+                    <OrganizationUnitEditPage />
+                  </RequirePermission>
+                } />
 
                 {/* Other main sections */}
                 <Route path="/medications" element={<MedicationsPage />} />

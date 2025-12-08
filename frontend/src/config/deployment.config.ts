@@ -19,6 +19,7 @@ export type AppMode = 'mock' | 'integration-auth' | 'production';
 export interface DeploymentConfig {
   authProvider: 'mock' | 'supabase';
   useMockOrganization: boolean;
+  useMockOrganizationUnit: boolean;
   useMockWorkflow: boolean;
   useMockInvitation: boolean;
 }
@@ -27,18 +28,21 @@ const DEPLOYMENT_CONFIGS: Record<AppMode, DeploymentConfig> = {
   mock: {
     authProvider: 'mock',
     useMockOrganization: true,
+    useMockOrganizationUnit: true,
     useMockWorkflow: true,
     useMockInvitation: true,
   },
   'integration-auth': {
     authProvider: 'mock',
     useMockOrganization: true,
+    useMockOrganizationUnit: true,
     useMockWorkflow: false,
     useMockInvitation: false,
   },
   production: {
     authProvider: 'supabase',
     useMockOrganization: false,
+    useMockOrganizationUnit: false,
     useMockWorkflow: false,
     useMockInvitation: false,
   }

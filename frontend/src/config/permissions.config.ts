@@ -42,13 +42,13 @@ export const PERMISSIONS: Record<string, Permission> = {
     scope: 'global',
     riskLevel: 'high'
   },
-  'organization.create_sub': {
-    id: 'organization.create_sub',
+  'organization.create_ou': {
+    id: 'organization.create_ou',
     category: 'Organization Management',
     resource: 'organization',
-    action: 'create_sub',
-    displayName: 'Create Sub-Organization',
-    description: 'Create sub-organizations within hierarchy',
+    action: 'create_ou',
+    displayName: 'Create Organizational Unit',
+    description: 'Create organizational units (departments, locations, campuses) within hierarchy',
     scope: 'organization',
     riskLevel: 'medium'
   },

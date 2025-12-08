@@ -68,10 +68,11 @@ This feature implements a complete post-invitation onboarding flow for provider_
   - OU name, description, type (custom fields)
   - Delete OU (if no children)
 - **Validation**: 0+ OUs allowed (fully optional)
-- **Backend**: Temporal workflow `createSubOrganizationActivity`
+- **Backend**: Supabase RPC `create_organization_unit` (NOT Temporal - synchronous DB operation)
 - **Database**: Insert into `organizations_projection` with ltree path
 - **Navigation**: Skip or Next → Step 4
 - **Time**: 2 days
+- **Reference**: See `dev/active/organization-units-context.md` Decision #7 for Temporal vs RPC rationale
 
 ### 2.5 Step 4: Create Custom Roles (Optional)
 - **Component**: `RoleCreationStep.tsx`
@@ -90,7 +91,7 @@ This feature implements a complete post-invitation onboarding flow for provider_
 ### 2.6 Wizard Completion & Redirect Logic
 - **Logic**: Wizard-guided navigation determines final destination
 - **Redirect rules**:
-  - If OUs created → `/organization/structure` (continue building hierarchy)
+  - If OUs created → `/organization-units` (continue building hierarchy)
   - If roles created → `/organization/users` (invite staff with roles)
   - If both created → `/organization/users` (ready to invite with roles)
   - If neither created → `/dashboard` (clean slate, explore app)
@@ -103,24 +104,26 @@ This feature implements a complete post-invitation onboarding flow for provider_
 - **Problem**: `/organizations` currently used by super_admin for platform-level org list
 - **Solution**: Separate routes
   - `/organizations` (plural) → Platform owners (super_admin, partner_onboarder)
-  - `/organization/structure` (singular) → Provider admins (manage their OU hierarchy)
+  - `/organization-units/*` → Provider admins (manage their OU hierarchy)
   - `/organization/users` (singular) → Provider admins (user invitations)
   - `/organization/roles` (singular) → Provider admins (custom role management)
 - **Navigation**: Update `MainLayout.tsx` to show different nav items based on role
 - **Time**: 1 day
+- **Note**: Updated 2025-12-08 to align with active organization-units plan
 
 ### 3.2 OU Hierarchy Management Page
-- **Route**: `/organization/structure`
-- **Component**: `OrganizationStructurePage.tsx`
+- **Route**: `/organization-units/*` (list, manage, create, edit)
+- **Components**: `OrganizationUnitsListPage.tsx`, `OrganizationUnitsManagePage.tsx`, etc.
 - **Features**:
   - Tree view of complete OU hierarchy (read-only visualization)
   - Add OU button (opens create form)
   - Edit OU inline (name, description)
   - Delete OU (validation: no children, no assigned users)
   - Drag-and-drop reordering (future enhancement)
-- **ViewModel**: `OUManagementViewModel` (MobX)
-- **Backend**: `createSubOrganizationActivity`, `updateOUActivity`, `deleteOUActivity`
+- **ViewModel**: `OrganizationUnitsViewModel` + `OrganizationUnitFormViewModel` (MobX)
+- **Backend**: Supabase RPC functions (`create_organization_unit`, `update_organization_unit`, `deactivate_organization_unit`)
 - **Time**: 2 days
+- **Reference**: See active plan at `dev/active/organization-units-*.md`
 
 ### 3.3 User Management & Invitation Page
 - **Route**: `/organization/users`
@@ -149,20 +152,23 @@ This feature implements a complete post-invitation onboarding flow for provider_
 - **Backend**: `createCustomRoleActivity`, `updateRoleActivity`, `deleteRoleActivity`
 - **Time**: 1 day
 
-## Phase 4: Temporal Workflows & Activities (2-3 days)
+## Phase 4: Backend Implementation (2-3 days)
 
-### 4.1 Create Sub-Organization Activity
-- **File**: `workflows/src/activities/organization-bootstrap/create-sub-organization.ts`
-- **Params**: `{ parentOrgId, name, description, type }`
-- **Logic**:
-  - Query parent org for path
-  - Generate child path: `parent.path + '.' + slug(name)`
-  - Insert into `organizations_projection`
-  - Emit `OrganizationCreated` domain event
-- **Idempotency**: Check if OU with same name + parent already exists
+### 4.1 Supabase RPC Functions for OU CRUD
+**Note**: OU operations use Supabase RPC, NOT Temporal (synchronous DB transaction, no external APIs).
+See `dev/active/organization-units-context.md` Decision #7 for rationale.
+
+- **Files**: `infrastructure/supabase/sql/03-functions/organizations/`
+  - `create_organization_unit.sql` - Create OU with ltree path generation
+  - `update_organization_unit.sql` - Update OU fields
+  - `deactivate_organization_unit.sql` - Soft delete with validation
+  - `get_organization_units.sql` - List OUs within scope
+- **Logic**: Same as originally planned, but via RPC not Temporal activity
+- **Events**: RPC functions emit domain events directly to `domain_events` table
 - **Time**: 1 day
+- **Reference**: See `dev/active/organization-units-tasks.md` Phase 5.6
 
-### 4.2 Create Custom Role Activity
+### 4.2 Create Custom Role Activity (Temporal)
 - **File**: `workflows/src/activities/rbac/create-custom-role.ts`
 - **Params**: `{ orgId, name, description, permissionIds }`
 - **Logic**:
@@ -217,10 +223,10 @@ This feature implements a complete post-invitation onboarding flow for provider_
 - [ ] Provider admin can create 0+ OUs during wizard (optional)
 - [ ] Provider admin can create 0+ custom roles during wizard (optional)
 - [ ] Wizard completion redirects based on state (dynamic routing)
-- [ ] Provider admin can access `/organization/structure` (OU management)
+- [ ] Provider admin can access `/organization-units` (OU management)
 - [ ] Provider admin can access `/organization/users` (user invitations)
 - [ ] Provider admin can access `/organization/roles` (custom role management)
-- [ ] OU creation uses Temporal workflows (event-sourced)
+- [ ] OU creation uses Supabase RPC (event-sourced via domain_events)
 - [ ] Custom role creation uses Temporal workflows (event-sourced)
 
 ### Long-Term (Production Stability)

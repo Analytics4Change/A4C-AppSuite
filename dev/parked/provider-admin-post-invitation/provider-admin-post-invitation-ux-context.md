@@ -20,11 +20,12 @@
    - **Alternative Considered**: Require at least 1 OU - Rejected as too restrictive for small providers
    - **Impact**: Faster onboarding, but some users may never define proper structure
 
-3. **Separate Routes: `/organizations` vs `/organization/*`**:
-   - **Decision**: Platform owners use `/organizations` (plural), provider admins use `/organization/structure` (singular)
+3. **Separate Routes: `/organizations` vs `/organization-units`**:
+   - **Decision**: Platform owners use `/organizations` (plural), provider admins use `/organization-units` for OU management
    - **Rationale**: Clear semantic separation, no role-based conditional logic complexity
    - **Alternative Considered**: Overload `/organizations` with role-based rendering - Rejected due to complexity
    - **Impact**: Cleaner codebase, easier to maintain, clear mental model
+   - **Note**: Updated 2025-12-08 to align with active organization-units plan
 
 4. **Custom Role Creation (Permission Selection UI)**:
    - **Decision**: Wizard allows creating custom roles with full permission selection
@@ -86,7 +87,7 @@ This feature is the **first time provider admins (non-platform owners) get organ
 │    └── Step 4: Create Custom Roles (optional, 0+)               │
 │    ↓                                                             │
 │ 8. Wizard Completion → Redirect (based on state)                │
-│    ├── OUs created → /organization/structure                    │
+│    ├── OUs created → /organization-units                        │
 │    ├── Roles created → /organization/users                      │
 │    ├── Both → /organization/users                               │
 │    └── Neither → /dashboard                                     │
@@ -183,13 +184,13 @@ This feature is the **first time provider admins (non-platform owners) get organ
 
 **Navigation**:
 - `frontend/src/components/layout/MainLayout.tsx` (lines 44-116)
-  - Update nav items to show `/organization/structure` for provider_admin
+  - Update nav items to show `/organization-units` for provider_admin
   - Hide `/organizations` from provider_admin, show to super_admin only
 
 **Routing**:
 - `frontend/src/App.tsx`
   - Add `/onboarding/*` routes for wizard steps
-  - Add `/organization/structure` route for OU management
+  - Add `/organization-units/*` routes for OU management
   - Add `/organization/users` route for user invitations
   - Add `/organization/roles` route for custom role management
 
@@ -211,29 +212,39 @@ This feature is the **first time provider admins (non-platform owners) get organ
 - `frontend/src/pages/onboarding/SetupWizardPage.tsx` - Main wizard page (routes to steps)
 
 **Organization Management Components**:
-- `frontend/src/components/organization/OUTreeView.tsx` - Hierarchical OU tree visualization
-- `frontend/src/components/organization/OUCreateForm.tsx` - Form for creating sub-organizations
+- `frontend/src/components/organization-units/OrganizationTree.tsx` - Hierarchical OU tree visualization
+- `frontend/src/components/organization-units/OrganizationTreeNode.tsx` - Tree node component
 - `frontend/src/components/organization/RolePermissionSelector.tsx` - Permission checkbox grid
 - `frontend/src/components/organization/UserInvitationForm.tsx` - Invite user with role assignment
 
 **Organization Management Pages**:
-- `frontend/src/pages/organization/OrganizationStructurePage.tsx` - OU hierarchy management
+- `frontend/src/pages/organization-units/OrganizationUnitsListPage.tsx` - OU hierarchy view
+- `frontend/src/pages/organization-units/OrganizationUnitsManagePage.tsx` - OU CRUD interface
 - `frontend/src/pages/organization/OrganizationUsersPage.tsx` - User list + invitations
 - `frontend/src/pages/organization/OrganizationRolesPage.tsx` - Custom role management
 
 **ViewModels (MobX Stores)**:
 - `frontend/src/viewModels/onboarding/SetupWizardViewModel.ts` - Wizard state, navigation, auto-save
-- `frontend/src/viewModels/organization/OUManagementViewModel.ts` - OU CRUD operations
+- `frontend/src/viewModels/organization/OrganizationUnitsViewModel.ts` - OU CRUD operations
+- `frontend/src/viewModels/organization/OrganizationUnitFormViewModel.ts` - OU form state
 - `frontend/src/viewModels/organization/RoleManagementViewModel.ts` - Custom role CRUD
 - `frontend/src/viewModels/organization/UserInvitationViewModel.ts` - User invitation workflow
 
 **Services**:
-- `frontend/src/services/organization/OUService.ts` - OU API calls (Temporal workflow triggers)
+- `frontend/src/services/organization/IOrganizationUnitService.ts` - OU service interface
+- `frontend/src/services/organization/MockOrganizationUnitService.ts` - Mock implementation
+- `frontend/src/services/organization/OrganizationUnitServiceFactory.ts` - Factory for DI
 - `frontend/src/services/organization/RoleService.ts` - Custom role API calls
 - `frontend/src/services/onboarding/SetupWizardService.ts` - Wizard state persistence
 
-**Temporal Workflows**:
-- `workflows/src/activities/organization-bootstrap/create-sub-organization.ts` - Create OU activity
+**Supabase RPC Functions** (OU CRUD uses direct database calls, not Temporal):
+- `infrastructure/supabase/sql/03-functions/organizations/create_organization_unit.sql` - Create OU RPC
+- `infrastructure/supabase/sql/03-functions/organizations/update_organization_unit.sql` - Update OU RPC
+- `infrastructure/supabase/sql/03-functions/organizations/deactivate_organization_unit.sql` - Deactivate OU RPC
+- `infrastructure/supabase/sql/03-functions/organizations/get_organization_units.sql` - List OUs RPC
+- **Note**: Temporal is NOT used for OU CRUD (synchronous DB operation). See `dev/active/organization-units-context.md` Decision #7.
+
+**Temporal Workflows** (for complex orchestration only):
 - `workflows/src/activities/rbac/create-custom-role.ts` - Create custom role activity
 - `workflows/src/activities/rbac/update-role.ts` - Update role permissions activity
 - `workflows/src/activities/rbac/delete-role.ts` - Delete role activity (with validation)
@@ -285,11 +296,13 @@ This feature is the **first time provider admins (non-platform owners) get organ
 - **Pattern**: Style with Tailwind + CVA for variants
 - **Pattern**: Forward refs for polymorphic components (`asChild` prop)
 
-### Temporal Workflows
+### Temporal Workflows (for complex orchestration only)
 - **Pattern**: Workflows orchestrate, activities execute
 - **Pattern**: Every activity emits domain event to `domain_events` table
 - **Pattern**: Idempotent activities (check if operation already completed)
 - **Pattern**: Saga compensation for rollback
+- **Decision**: OU CRUD does NOT use Temporal - uses Supabase RPC directly (synchronous DB transaction)
+- **Temporal IS appropriate for**: Organization bootstrap (DNS, email), custom role management (complex validation)
 
 ### CQRS Event Sourcing
 - **Pattern**: All state changes emit domain events (immutable audit trail)
@@ -340,9 +353,10 @@ This feature is the **first time provider admins (non-platform owners) get organ
 
 ### Technical Constraints
 1. **ltree Extension**: OU hierarchy uses PostgreSQL ltree (efficient, but vendor-specific)
-2. **Temporal.io Required**: Workflows need Temporal cluster running
-3. **Supabase Edge Functions**: Invitation validation uses Deno runtime (not Node.js)
-4. **localStorage Limits**: Wizard state limited to 5MB (browser constraint)
+2. **Temporal.io Required for Complex Workflows**: Organization bootstrap, custom roles need Temporal cluster
+3. **OU CRUD Does NOT Require Temporal**: Uses Supabase RPC directly (no worker dependency)
+4. **Supabase Edge Functions**: Invitation validation uses Deno runtime (not Node.js)
+5. **localStorage Limits**: Wizard state limited to 5MB (browser constraint)
 
 ### Performance Constraints
 1. **OU Depth Limit**: Recommend max 5 levels deep (ltree performs well, but UX suffers)
@@ -365,19 +379,21 @@ This feature is the **first time provider admins (non-platform owners) get organ
 - **Higher Friction**: Users can't explore app before committing to setup
 - **Abandonment Risk**: Some users may close browser mid-wizard (mitigated by auto-save)
 
-### Why Separate Routes (/organizations vs /organization/*)?
+### Why Separate Routes (/organizations vs /organization-units)?
 **Chosen**: Separate routes for platform owners vs provider admins
 **Alternative**: Overload `/organizations` with role-based conditional rendering
 
 **Rationale**:
 - **Code Clarity**: No complex role-based conditionals in components
-- **Semantic Separation**: Plural (platform-level list) vs singular (single org management)
+- **Semantic Separation**: `/organizations` (platform-level root orgs) vs `/organization-units` (internal hierarchy)
 - **Future-Proof**: Easier to add features to each route independently
 - **Testing**: Can test platform and provider routes separately
 
 **Trade-offs**:
 - **URL Inconsistency**: Different routes for similar concepts (org management)
 - **Navigation Updates**: Need to update nav items to show correct routes per role
+
+**Note**: Updated 2025-12-08 to use `/organization-units` consistently with active plan.
 
 ### Why Optional OU/Role Creation vs Required?
 **Chosen**: Optional (0+ OUs, 0+ roles)

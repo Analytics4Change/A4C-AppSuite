@@ -57,22 +57,19 @@
 
 ### 2.4 Step 3: Create Organizational Units (Optional)
 - [ ] Create `OUCreationStep.tsx` component
-- [ ] Implement tree view for OU hierarchy visualization
+- [ ] Implement tree view for OU hierarchy visualization (reuse `OrganizationTree.tsx`)
 - [ ] Add "Add OU" button (opens create form modal)
-- [ ] Create `OUCreateForm.tsx` component
+- [ ] Reuse `OrganizationUnitFormViewModel` for form state
+- [ ] Create OU form fields:
   - OU name input (required)
   - Description textarea (optional)
-  - Type dropdown (optional, custom field)
   - Parent selection (auto-populate from tree click)
 - [ ] Implement "Delete OU" action (validation: no children)
-- [ ] Create `createSubOrganizationActivity` Temporal activity
-  - Query parent org for ltree path
-  - Generate child path: `parent.path + '.' + slug(name)`
-  - Insert into `organizations_projection`
-  - Emit `OrganizationCreated` domain event
+- [ ] Use Supabase RPC `create_organization_unit` (NOT Temporal - see active plan Decision #7)
 - [ ] Implement idempotency check (prevent duplicate OUs)
 - [ ] Add temporary in-memory OU storage (save to DB on wizard completion)
 - [ ] Add "Skip" and "Next" navigation
+- [ ] **Reference**: See `dev/active/organization-units-tasks.md` for shared component details
 
 ### 2.5 Step 4: Create Custom Roles (Optional)
 - [ ] Create `RoleCreationStep.tsx` component
@@ -93,11 +90,11 @@
 
 ### 2.6 Wizard Completion & Redirect
 - [ ] Implement wizard completion logic in `SetupWizardViewModel`
-- [ ] Save all OUs to database (batch insert via Temporal workflow)
+- [ ] Save all OUs to database (batch via Supabase RPC - NOT Temporal)
 - [ ] Save all custom roles to database (batch insert via Temporal workflow)
 - [ ] Update `setup_completed_at` timestamp in user_roles_projection
 - [ ] Implement dynamic redirect logic:
-  - If OUs created → `/organization/structure`
+  - If OUs created → `/organization-units`
   - If roles created → `/organization/users`
   - If both created → `/organization/users`
   - If neither created → `/dashboard`
@@ -116,16 +113,16 @@
 ### 3.1 Route Separation & Navigation
 - [ ] Update `MainLayout.tsx` navigation items:
   - Hide `/organizations` from provider_admin
-  - Show `/organization/structure` to provider_admin
+  - Show `/organization-units` to provider_admin
   - Show `/organization/users` to provider_admin
   - Show `/organization/roles` to provider_admin
 - [ ] Update `App.tsx` routing:
   - Keep `/organizations` for platform owners only
-  - Add `/organization/structure` for provider admins
+  - Add `/organization-units/*` for provider admins
   - Add `/organization/users` for provider admins
   - Add `/organization/roles` for provider admins
 - [ ] Add permission guards (`RequirePermission` HOC):
-  - `/organization/structure` requires `organization.view`
+  - `/organization-units/*` requires `organization.create_ou`
   - `/organization/users` requires `user.view`
   - `/organization/roles` requires `access_grant.view`
 
@@ -167,22 +164,21 @@
 - [ ] Add role template library (copy from global roles)
 - [ ] Add loading states, error handling
 
-## Phase 4: Temporal Workflows & Activities ⏸️ PENDING
+## Phase 4: Backend Implementation ⏸️ PENDING
 
-### 4.1 Create Sub-Organization Activity
-- [ ] Create `workflows/src/activities/organization-bootstrap/create-sub-organization.ts`
-- [ ] Define `CreateSubOrganizationParams` interface
-- [ ] Implement activity logic:
-  - Query parent org for ltree path
-  - Generate child path: `parent.path + '.' + slug(name)`
-  - Validate path uniqueness
-  - Insert into `organizations_projection`
-  - Emit `OrganizationCreated` domain event
-- [ ] Implement idempotency check (check if OU exists)
-- [ ] Add activity tests
-- [ ] Export from `workflows/src/activities/organization/index.ts`
+### 4.1 Supabase RPC Functions for OU CRUD
+**Note**: OU operations use Supabase RPC, NOT Temporal (synchronous DB transaction).
+See `dev/active/organization-units-context.md` Decision #7 and `dev/active/organization-units-tasks.md` Phase 5.6.
 
-### 4.2 Create Custom Role Activity
+- [ ] **Defer to active plan** - OU RPC functions defined in `dev/active/organization-units-tasks.md`
+- [ ] Shared components: `OrganizationTree.tsx`, `OrganizationUnitFormViewModel.ts`
+- [ ] Files: `infrastructure/supabase/sql/03-functions/organizations/`
+  - `create_organization_unit.sql`
+  - `update_organization_unit.sql`
+  - `deactivate_organization_unit.sql`
+  - `get_organization_units.sql`
+
+### 4.2 Create Custom Role Activity (Temporal)
 - [ ] Create `workflows/src/activities/rbac/create-custom-role.ts`
 - [ ] Define `CreateCustomRoleParams` interface
 - [ ] Implement activity logic:
@@ -194,23 +190,17 @@
 - [ ] Add activity tests
 - [ ] Export from `workflows/src/activities/rbac/index.ts`
 
-### 4.3 Update/Delete Activities
-- [ ] Create `workflows/src/activities/organization-bootstrap/update-sub-organization.ts`
-- [ ] Create `workflows/src/activities/organization-bootstrap/delete-sub-organization.ts`
-  - Validate no children OUs
-  - Validate no assigned users
-  - Soft delete (set `deleted_at` timestamp)
+### 4.3 Update/Delete Role Activities (Temporal)
 - [ ] Create `workflows/src/activities/rbac/update-custom-role.ts`
 - [ ] Create `workflows/src/activities/rbac/delete-custom-role.ts`
   - Validate no assigned users
   - Soft delete (set `deleted_at` timestamp)
-- [ ] Add activity tests for all CRUD operations
+- [ ] Add activity tests for role CRUD operations
 
 ### 4.4 Batch Operations Workflow
 - [ ] Create `workflows/src/workflows/onboarding/complete-setup-wizard.ts`
-- [ ] Implement batch OU creation (accept array of OUs)
-- [ ] Implement batch role creation (accept array of roles)
-- [ ] Add saga compensation (rollback on failure)
+- [ ] Implement batch OU creation via Supabase RPC (NOT Temporal)
+- [ ] Implement batch role creation (via Temporal activities)
 - [ ] Emit `SetupWizardCompleted` event
 - [ ] Add workflow tests
 
@@ -321,13 +311,14 @@
 - [ ] Provider admin can create 0+ OUs during wizard (optional)
 - [ ] Provider admin can create 0+ custom roles during wizard (optional)
 - [ ] Wizard completion redirects based on state (dynamic routing works)
-- [ ] Provider admin can access `/organization/structure` (OU management)
+- [ ] Provider admin can access `/organization-units` (OU management)
 - [ ] Provider admin can access `/organization/users` (user invitations)
 - [ ] Provider admin can access `/organization/roles` (custom role management)
-- [ ] OU creation uses Temporal workflows (event-sourced, audit trail)
+- [ ] OU creation uses Supabase RPC (event-sourced via domain_events, NOT Temporal)
 - [ ] Custom role creation uses Temporal workflows (event-sourced)
 - [ ] RLS policies enforce org isolation (provider admins cannot access other orgs)
 - [ ] Super admins still have full access (impersonation works)
+- [ ] **Reference**: See `dev/active/organization-units-tasks.md` for OU implementation details
 
 ### Production Readiness Validation (Phase 6 Complete)
 - [ ] All unit tests pass (95%+ coverage)
@@ -354,5 +345,15 @@
 - Security is critical - RLS policies must be bulletproof (HIPAA compliance)
 - Subdomain routing deferred to Phase 2 (future sprint) - MVP uses path-based routing
 - Wizard state persistence uses localStorage - consider IndexedDB for larger datasets
-- Tree view component may need custom implementation or third-party library (investigate Radix UI or react-arborist)
+- Tree view component: Reuse `OrganizationTree.tsx` from active plan (custom WAI-ARIA implementation)
 - Permission selector UI with 200+ permissions needs optimization (virtualization, search, filtering)
+
+## Alignment with Active Plan
+
+**Updated 2025-12-08**: This parked plan now aligns with the active `organization-units` plan:
+
+- **Route namespace**: `/organization-units/*` (not `/organization/structure`)
+- **OU CRUD backend**: Supabase RPC functions (NOT Temporal)
+- **Shared components**: `OrganizationTree.tsx`, `OrganizationTreeNode.tsx`, `OrganizationUnitsViewModel.ts`, `OrganizationUnitFormViewModel.ts`
+- **Two-ViewModel architecture**: List ViewModel (long-lived) + Form ViewModel (transient)
+- **Reference**: See `dev/active/organization-units-*.md` for detailed specifications
