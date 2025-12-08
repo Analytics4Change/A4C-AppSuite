@@ -12,6 +12,7 @@
 
 import { Session, User, JWTClaims, UserRole, Permission } from '@/types/auth.types';
 import { getRolePermissions } from './roles.config';
+import { PERMISSIONS } from './permissions.config';
 
 /**
  * Complete permission catalog for development testing
@@ -82,6 +83,33 @@ export function getAllPermissions(): Permission[] {
 }
 
 /**
+ * Get permissions for a dev profile, including implicit org grants for provider_admin
+ *
+ * This is MOCK MODE ONLY - production gets permissions from JWT claims populated
+ * by the Temporal workflow during organization bootstrap.
+ *
+ * In mock mode, provider_admin users get all organization-scoped permissions
+ * to simulate the implicit "full control within their org" behavior that would
+ * be granted via the Temporal workflow in production.
+ *
+ * See: documentation/architecture/authorization/provider-admin-permissions-architecture.md
+ */
+export function getDevProfilePermissions(role: UserRole): Permission[] {
+  const basePermissions = getRolePermissions(role);
+
+  // In mock mode, provider_admin gets all organization-scoped permissions
+  // This simulates the implicit grant that would come from Temporal workflow in production
+  if (role === 'provider_admin') {
+    const orgPermissions = Object.values(PERMISSIONS)
+      .filter(p => p.scope === 'organization')
+      .map(p => p.id);
+    return [...new Set([...basePermissions, ...orgPermissions])];
+  }
+
+  return basePermissions;
+}
+
+/**
  * Test user profile interface
  */
 export interface DevUserProfile {
@@ -99,8 +127,9 @@ export interface DevUserProfile {
 /**
  * Default test user profile (provider_admin)
  *
- * Uses getRolePermissions() from roles.config.ts to ensure dev mode
- * uses the same canonical role definitions as production.
+ * Uses getDevProfilePermissions() to include implicit organization-scoped
+ * permissions for provider_admin in mock mode. This simulates the behavior
+ * that would come from Temporal workflow grants in production.
  *
  * Environment variables can override these values:
  * - VITE_DEV_USER_ID
@@ -121,7 +150,7 @@ export const DEFAULT_DEV_USER: DevUserProfile = {
   scope_path: import.meta.env.VITE_DEV_SCOPE_PATH || 'org_dev_organization',
   permissions: import.meta.env.VITE_DEV_PERMISSIONS
     ? import.meta.env.VITE_DEV_PERMISSIONS.split(',')
-    : getRolePermissions((import.meta.env.VITE_DEV_USER_ROLE as UserRole) || 'provider_admin'),
+    : getDevProfilePermissions((import.meta.env.VITE_DEV_USER_ROLE as UserRole) || 'provider_admin'),
   picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=dev-user',
 };
 
@@ -129,6 +158,9 @@ export const DEFAULT_DEV_USER: DevUserProfile = {
  * Additional test user profiles for canonical roles
  * Only includes system-defined roles from CANONICAL_ROLES
  * Custom organization roles should be tested via real database queries
+ *
+ * Note: Uses getDevProfilePermissions() to include implicit org permissions
+ * for provider_admin in mock mode.
  */
 export const DEV_USER_PROFILES: Record<string, DevUserProfile> = {
   provider_admin: DEFAULT_DEV_USER,
@@ -141,7 +173,7 @@ export const DEV_USER_PROFILES: Record<string, DevUserProfile> = {
     org_id: '*', // Wildcard indicates all orgs
     org_name: 'Platform (All Organizations)',
     scope_path: '*', // Global scope
-    permissions: getRolePermissions('super_admin'),
+    permissions: getDevProfilePermissions('super_admin'),
     picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=super-admin',
   },
 
@@ -153,7 +185,7 @@ export const DEV_USER_PROFILES: Record<string, DevUserProfile> = {
     org_id: '*', // Wildcard indicates all orgs
     org_name: 'Platform (All Organizations)',
     scope_path: '*', // Global scope
-    permissions: getRolePermissions('partner_onboarder'),
+    permissions: getDevProfilePermissions('partner_onboarder'),
     picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=partner-onboarder',
   },
 };

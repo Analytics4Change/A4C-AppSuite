@@ -1,6 +1,16 @@
 -- User Permission Check Function
 -- Queries CQRS projections to determine if a user has a specific permission
 -- Supports both super_admin (global) and org-scoped permissions
+--
+-- Permission Grant Strategy:
+-- 1. super_admin: Global scope (org_id IS NULL) - has all permissions everywhere
+-- 2. provider_admin: Implicit full control within their organization
+--    (all organization-scoped permissions granted implicitly)
+-- 3. Other roles: Only explicitly granted permissions via role_permissions_projection
+--
+-- Note: provider_admin implicit grant is a short-term implementation.
+-- Long-term, permissions will be explicitly granted via Temporal workflow.
+-- See: documentation/architecture/authorization/provider-admin-permissions-architecture.md
 CREATE OR REPLACE FUNCTION user_has_permission(
   p_user_id UUID,
   p_permission_name TEXT,
@@ -8,6 +18,29 @@ CREATE OR REPLACE FUNCTION user_has_permission(
   p_scope_path LTREE DEFAULT NULL
 ) RETURNS BOOLEAN AS $$
 BEGIN
+  -- Check 1: provider_admin implicit grant
+  -- Provider admins have all organization-scoped permissions within their org
+  IF EXISTS (
+    SELECT 1
+    FROM user_roles_projection ur
+    JOIN roles_projection r ON r.id = ur.role_id
+    WHERE ur.user_id = p_user_id
+      AND r.name = 'provider_admin'
+      AND ur.org_id = p_org_id
+      AND r.deleted_at IS NULL
+  ) THEN
+    -- Verify the permission is organization-scoped (not global-only)
+    -- If permission doesn't exist in projections, allow it (forward compatibility)
+    IF NOT EXISTS (
+      SELECT 1 FROM permissions_projection p
+      WHERE p.name = p_permission_name
+        AND p.scope_type = 'global'
+    ) THEN
+      RETURN TRUE;
+    END IF;
+  END IF;
+
+  -- Check 2: Explicit permission grant via role_permissions_projection
   RETURN EXISTS (
     SELECT 1
     FROM user_roles_projection ur
@@ -42,7 +75,7 @@ END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = public, extensions, pg_temp;
 
-COMMENT ON FUNCTION user_has_permission IS 'Checks if user has specified permission within given org/scope context';
+COMMENT ON FUNCTION user_has_permission IS 'Checks if user has specified permission within given org/scope context. Provider admins have implicit full control within their organization.';
 
 
 -- Convenience function: Get all permissions for a user in an org

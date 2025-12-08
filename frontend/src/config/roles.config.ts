@@ -156,6 +156,15 @@ export const ROLE_HIERARCHY = {
 
 /**
  * Get all permissions for a role, including inherited permissions
+ *
+ * Permission Grant Strategy:
+ * - super_admin: All permissions (global + organization-scoped)
+ * - provider_admin: Only explicitly defined permissions in CANONICAL_ROLES
+ *   (in production, additional permissions come from JWT claims via Temporal workflow)
+ *   (in mock mode, DevAuthProvider adds implicit org permissions via getDevProfilePermissions())
+ * - Other roles: Only explicitly assigned permissions
+ *
+ * See: documentation/architecture/authorization/provider-admin-permissions-architecture.md
  */
 export function getRolePermissions(roleKey: string): string[] {
   const role = CANONICAL_ROLES[roleKey];
