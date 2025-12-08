@@ -773,33 +773,33 @@ CREATE TABLE IF NOT EXISTS impersonation_sessions_projection (
 );
 
 -- Indexes for common query patterns
-CREATE INDEX idx_impersonation_sessions_super_admin
+CREATE INDEX IF NOT EXISTS idx_impersonation_sessions_super_admin
   ON impersonation_sessions_projection(super_admin_user_id);
 
-CREATE INDEX idx_impersonation_sessions_target_user
+CREATE INDEX IF NOT EXISTS idx_impersonation_sessions_target_user
   ON impersonation_sessions_projection(target_user_id);
 
-CREATE INDEX idx_impersonation_sessions_target_org
+CREATE INDEX IF NOT EXISTS idx_impersonation_sessions_target_org
   ON impersonation_sessions_projection(target_org_id);
 
-CREATE INDEX idx_impersonation_sessions_status
+CREATE INDEX IF NOT EXISTS idx_impersonation_sessions_status
   ON impersonation_sessions_projection(status)
   WHERE status = 'active';  -- Partial index for active sessions only
 
-CREATE INDEX idx_impersonation_sessions_started_at
+CREATE INDEX IF NOT EXISTS idx_impersonation_sessions_started_at
   ON impersonation_sessions_projection(started_at DESC);
 
-CREATE INDEX idx_impersonation_sessions_expires_at
+CREATE INDEX IF NOT EXISTS idx_impersonation_sessions_expires_at
   ON impersonation_sessions_projection(expires_at)
   WHERE status = 'active';  -- Partial index for session expiration checks
 
 -- Session ID lookup (unique constraint provides implicit index)
 -- Justification reason for compliance reports
-CREATE INDEX idx_impersonation_sessions_justification
+CREATE INDEX IF NOT EXISTS idx_impersonation_sessions_justification
   ON impersonation_sessions_projection(justification_reason);
 
 -- Composite index for org-scoped audit queries
-CREATE INDEX idx_impersonation_sessions_org_started
+CREATE INDEX IF NOT EXISTS idx_impersonation_sessions_org_started
   ON impersonation_sessions_projection(target_org_id, started_at DESC);
 
 -- Comments
@@ -858,19 +858,19 @@ CREATE TABLE IF NOT EXISTS invitations_projection (
 -- ========================================
 
 -- Primary lookup: Edge Functions validate token
-CREATE INDEX idx_invitations_projection_token
+CREATE INDEX IF NOT EXISTS idx_invitations_projection_token
 ON invitations_projection(token);
 
 -- Query invitations by organization
-CREATE INDEX idx_invitations_projection_org_email
+CREATE INDEX IF NOT EXISTS idx_invitations_projection_org_email
 ON invitations_projection(organization_id, email);
 
 -- Query by status (find pending invitations)
-CREATE INDEX idx_invitations_projection_status
+CREATE INDEX IF NOT EXISTS idx_invitations_projection_status
 ON invitations_projection(status);
 
 -- Development entity cleanup (GIN index for array contains)
-CREATE INDEX idx_invitations_projection_tags
+CREATE INDEX IF NOT EXISTS idx_invitations_projection_tags
 ON invitations_projection USING GIN(tags);
 
 -- ========================================
