@@ -6660,7 +6660,7 @@ GRANT EXECUTE ON FUNCTION api.emit_domain_event(UUID, TEXT, INTEGER, TEXT, JSONB
 COMMENT ON SCHEMA api IS
   'API schema for PostgREST-accessible functions used by Edge Functions and external clients';
 
-COMMENT ON FUNCTION api.emit_domain_event IS
+COMMENT ON FUNCTION api.emit_domain_event(UUID, TEXT, INTEGER, TEXT, JSONB, JSONB) IS
   'Wrapper function for emitting domain events from Edge Functions via PostgREST API.
    Uses SECURITY DEFINER to bypass RLS policies on domain_events table.
 
