@@ -10800,7 +10800,7 @@ END $$;
 DO $$
 DECLARE
   user_record RECORD;
-  stream_version INT;
+  v_stream_version INT;  -- Renamed to avoid ambiguity with column name
 BEGIN
   -- Define platform admin users
   -- Format: (auth_user_id, email, full_name)
@@ -10812,14 +10812,14 @@ BEGIN
       -- ,('YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY'::UUID, 'admin3@example.com', 'Admin User 3')
     ) AS t(auth_user_id, email, full_name)
   LOOP
-    stream_version := 1;
+    v_stream_version := 1;
 
     -- Create user.synced_from_auth event
     INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
     VALUES (
       user_record.auth_user_id,
       'user',
-      stream_version,
+      v_stream_version,
       'user.synced_from_auth',
       jsonb_build_object(
         'email', user_record.email,
@@ -10851,13 +10851,13 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
 
     -- Assign super_admin role to user (in A4C organization context)
-    stream_version := stream_version + 1;
+    v_stream_version := v_stream_version + 1;
 
     INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
     VALUES (
       user_record.auth_user_id,
       'user',
-      stream_version,
+      v_stream_version,
       'user.role.assigned',
       jsonb_build_object(
         'role_id', '11111111-1111-1111-1111-111111111111',  -- super_admin role
