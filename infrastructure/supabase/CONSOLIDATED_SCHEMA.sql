@@ -1053,6 +1053,12 @@ CREATE INDEX IF NOT EXISTS idx_medications_is_active ON medications(is_active);
 -- Source: sql/02-tables/medications/indexes/idx_medications_is_controlled.sql
 -- ----------------------------------------------------------------------------
 
+-- Ensure controlled substance columns exist (for schema drift in production)
+ALTER TABLE medications ADD COLUMN IF NOT EXISTS is_psychotropic BOOLEAN DEFAULT false;
+ALTER TABLE medications ADD COLUMN IF NOT EXISTS is_controlled BOOLEAN DEFAULT false;
+ALTER TABLE medications ADD COLUMN IF NOT EXISTS controlled_substance_schedule TEXT;
+ALTER TABLE medications ADD COLUMN IF NOT EXISTS is_narcotic BOOLEAN DEFAULT false;
+
 -- Index on is_controlled
 CREATE INDEX IF NOT EXISTS idx_medications_is_controlled ON medications(is_controlled);
 
