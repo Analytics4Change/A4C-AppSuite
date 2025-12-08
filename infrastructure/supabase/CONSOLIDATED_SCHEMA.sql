@@ -2084,8 +2084,7 @@ COMMENT ON TABLE phone_addresses IS 'Many-to-many junction: phones ↔ addresses
 
 -- Drop the program event processor (was in file 007-process-organization-child-events.sql)
 DROP FUNCTION IF EXISTS process_program_event(RECORD);
-
-COMMENT ON FUNCTION process_program_event IS NULL; -- Remove comment
+-- Note: COMMENT ON FUNCTION removed - function doesn't exist to comment on
 
 -- ============================================================================
 -- Drop Programs Projection Table
