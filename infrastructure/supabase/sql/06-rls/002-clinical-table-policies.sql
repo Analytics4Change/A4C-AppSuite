@@ -148,6 +148,9 @@ COMMENT ON POLICY medications_delete ON medications IS
 -- Medication History Table
 -- ============================================================================
 
+-- Ensure prescribed_by column exists (referenced by RLS policies)
+ALTER TABLE medication_history ADD COLUMN IF NOT EXISTS prescribed_by UUID;
+
 -- Super admins can view all prescription records across all organizations
 DROP POLICY IF EXISTS medication_history_super_admin_select ON medication_history;
 CREATE POLICY medication_history_super_admin_select
