@@ -8328,8 +8328,8 @@ CREATE POLICY role_permissions_org_admin_select
       SELECT 1
       FROM roles_projection r
       WHERE r.id = role_permissions_projection.role_id
-        AND r.org_id IS NOT NULL
-        AND is_org_admin(get_current_user_id(), r.org_id)
+        AND r.organization_id IS NOT NULL
+        AND is_org_admin(get_current_user_id(), r.organization_id)
     )
   );
 
@@ -8343,7 +8343,7 @@ CREATE POLICY role_permissions_global_select
       SELECT 1
       FROM roles_projection r
       WHERE r.id = role_permissions_projection.role_id
-        AND r.org_id IS NULL
+        AND r.organization_id IS NULL
     )
     AND get_current_user_id() IS NOT NULL
   );
