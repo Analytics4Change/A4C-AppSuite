@@ -618,6 +618,9 @@ COMMENT ON TABLE clients IS 'Patient/client records with full medical informatio
 -- Source: sql/02-tables/dosage_info/indexes/idx_dosage_info_administered_by.sql
 -- ----------------------------------------------------------------------------
 
+-- Ensure administered_by column exists (for schema drift in production)
+ALTER TABLE dosage_info ADD COLUMN IF NOT EXISTS administered_by UUID;
+
 -- Index on administered_by
 CREATE INDEX IF NOT EXISTS idx_dosage_info_administered_by ON dosage_info(administered_by);
 
