@@ -923,6 +923,10 @@ CREATE INDEX IF NOT EXISTS idx_medication_history_client ON medication_history(c
 -- Source: sql/02-tables/medication_history/indexes/idx_medication_history_is_prn.sql
 -- ----------------------------------------------------------------------------
 
+-- Ensure is_prn column exists (for schema drift in production)
+ALTER TABLE medication_history ADD COLUMN IF NOT EXISTS is_prn BOOLEAN DEFAULT false;
+ALTER TABLE medication_history ADD COLUMN IF NOT EXISTS prn_reason TEXT;
+
 -- Index on is_prn
 CREATE INDEX IF NOT EXISTS idx_medication_history_is_prn ON medication_history(is_prn);
 
