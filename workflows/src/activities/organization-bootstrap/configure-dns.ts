@@ -35,23 +35,28 @@ export async function configureDNS(
 ): Promise<ConfigureDNSResult> {
   console.log(`[ConfigureDNS] Starting for subdomain: ${params.subdomain}`);
 
-  // Use targetDomain from params or default to PLATFORM_BASE_DOMAIN from env config
-  const targetDomain = params.targetDomain ?? getWorkflowsEnv().PLATFORM_BASE_DOMAIN;
+  // Get domain configuration from environment
+  const env = getWorkflowsEnv();
+
+  // PLATFORM_BASE_DOMAIN is the root domain for tenant subdomains (e.g., firstovertheline.com)
+  // TARGET_DOMAIN is the CNAME target for subdomain routing (e.g., a4c.firstovertheline.com)
+  const baseDomain = env.PLATFORM_BASE_DOMAIN;
+  const cnameTarget = params.targetDomain ?? env.TARGET_DOMAIN;
 
   const dnsProvider = createDNSProvider();
-  const fqdn = `${params.subdomain}.${targetDomain}`;
+  const fqdn = `${params.subdomain}.${baseDomain}`;
 
-  // Find zone for target domain
-  console.log(`[ConfigureDNS] Finding zone for: ${targetDomain}`);
-  const zones = await dnsProvider.listZones(targetDomain);
+  // Find zone for base domain
+  console.log(`[ConfigureDNS] Finding zone for: ${baseDomain}`);
+  const zones = await dnsProvider.listZones(baseDomain);
 
   if (zones.length === 0) {
-    throw new Error(`No DNS zone found for domain: ${targetDomain}`);
+    throw new Error(`No DNS zone found for domain: ${baseDomain}`);
   }
 
   const zone = zones[0];
   if (!zone) {
-    throw new Error(`Zone list returned empty zone for domain: ${targetDomain}`);
+    throw new Error(`Zone list returned empty zone for domain: ${baseDomain}`);
   }
   console.log(`[ConfigureDNS] Using zone: ${zone.id} (${zone.name})`);
 
@@ -92,11 +97,11 @@ export async function configureDNS(
   }
 
   // Create CNAME record (proxied through Cloudflare for tunnel routing)
-  console.log(`[ConfigureDNS] Creating CNAME record: ${fqdn} → ${targetDomain}`);
+  console.log(`[ConfigureDNS] Creating CNAME record: ${fqdn} → ${cnameTarget}`);
   const record = await dnsProvider.createRecord(zone.id, {
     type: 'CNAME',
     name: fqdn,
-    content: targetDomain,
+    content: cnameTarget,
     ttl: 1,  // Auto TTL when proxied
     proxied: true  // Required for Cloudflare Tunnel routing
   });
