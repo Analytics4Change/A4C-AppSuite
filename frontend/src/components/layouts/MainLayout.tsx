@@ -45,7 +45,7 @@ export const MainLayout: React.FC = () => {
   const allNavItems = [
     { to: '/clients', icon: Users, label: 'Clients', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse', 'caregiver'] },
     { to: '/organizations', icon: Building, label: 'Organizations', roles: ['super_admin', 'partner_onboarder'], permission: 'organization.create' },
-    { to: '/organization-units', icon: FolderTree, label: 'Org Units', roles: ['super_admin', 'provider_admin'], permission: 'organization.create_ou' },
+    { to: '/organization-units', icon: FolderTree, label: 'Org Units', roles: ['super_admin', 'provider_admin'], permission: 'organization.view_ou' },
     { to: '/medications', icon: Pill, label: 'Medications', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse'] },
     { to: '/reports', icon: FileText, label: 'Reports', roles: ['super_admin', 'provider_admin', 'administrator'] },
     { to: '/settings', icon: Settings, label: 'Settings', roles: ['super_admin', 'provider_admin', 'administrator'] },

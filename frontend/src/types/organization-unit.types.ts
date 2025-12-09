@@ -239,12 +239,19 @@ export function buildOrganizationUnitTree(
   }
 
   // Sort children at each level alphabetically (but keep root org first if multiple roots)
+  // Deactivated OUs are moved to the bottom of each hierarchy level
   const sortChildren = (nodes: OrganizationUnitNode[]): void => {
     nodes.sort((a, b) => {
       // Root org always comes first
       if (a.isRootOrganization && !b.isRootOrganization) return -1;
       if (!a.isRootOrganization && b.isRootOrganization) return 1;
-      return a.name.localeCompare(b.name);
+
+      // Active OUs come before inactive OUs
+      if (a.isActive && !b.isActive) return -1;
+      if (!a.isActive && b.isActive) return 1;
+
+      // Within active or inactive groups, sort alphabetically by display name
+      return a.displayName.localeCompare(b.displayName);
     });
     for (const node of nodes) {
       if (node.children.length > 0) {

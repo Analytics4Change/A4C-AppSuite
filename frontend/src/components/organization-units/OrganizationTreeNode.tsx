@@ -135,6 +135,9 @@ export const OrganizationTreeNode = observer(
           tabIndex={isSelected ? 0 : -1}
           className="outline-none list-none"
           data-node-id={node.id}
+          data-testid="ou-tree-node"
+          data-root={node.isRootOrganization ? 'true' : undefined}
+          data-inactive={!node.isActive ? 'true' : undefined}
         >
           {/* Node Row */}
           <div
@@ -183,6 +186,7 @@ export const OrganizationTreeNode = observer(
 
             {/* Node Name */}
             <span
+              data-testid="ou-name"
               className={cn(
                 'flex-grow text-sm font-medium truncate',
                 isSelected && 'text-blue-900',

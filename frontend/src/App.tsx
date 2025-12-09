@@ -101,12 +101,12 @@ function App() {
 
                 {/* Organization Units routes (internal hierarchy management) */}
                 <Route path="/organization-units" element={
-                  <RequirePermission permission="organization.create_ou" fallback="/clients">
+                  <RequirePermission permission="organization.view_ou" fallback="/clients">
                     <OrganizationUnitsListPage />
                   </RequirePermission>
                 } />
                 <Route path="/organization-units/manage" element={
-                  <RequirePermission permission="organization.create_ou" fallback="/clients">
+                  <RequirePermission permission="organization.view_ou" fallback="/clients">
                     <OrganizationUnitsManagePage />
                   </RequirePermission>
                 } />

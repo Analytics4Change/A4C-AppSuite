@@ -42,6 +42,16 @@ export const PERMISSIONS: Record<string, Permission> = {
     scope: 'global',
     riskLevel: 'high'
   },
+  'organization.view_ou': {
+    id: 'organization.view_ou',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'view_ou',
+    displayName: 'View Organizational Units',
+    description: 'View organizational unit hierarchy (departments, locations, campuses)',
+    scope: 'organization',
+    riskLevel: 'low'
+  },
   'organization.create_ou': {
     id: 'organization.create_ou',
     category: 'Organization Management',

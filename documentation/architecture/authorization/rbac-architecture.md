@@ -109,7 +109,8 @@ Permissions are defined per **applet** (distinct functional modules in the appli
 #### Organization Management Applet
 
 - `organization.create_root` - Create top-level organizations (Platform Owner only) - **IMPLEMENTED ✅** via bootstrap architecture
-- `organization.create_ou` - Create organizational units (departments, locations, campuses) within hierarchy - Provider admin scoped
+- `organization.view_ou` - View organizational unit hierarchy (departments, locations, campuses) - Provider admin scoped - **IMPLEMENTED ✅**
+- `organization.create_ou` - Create organizational units (departments, locations, campuses) within hierarchy - Provider admin scoped - **IMPLEMENTED ✅**
 - `organization.create_sub` - Create sub-organizations within hierarchy (deprecated, use `organization.create_ou` instead)
 - `organization.view` - View organization information and hierarchy
 - `organization.update` - Update organization information
@@ -1114,8 +1115,9 @@ EXECUTE FUNCTION raise_exception('Events are immutable for audit integrity');
 |-----------|-------------|----------------|
 | medication.* | ✅ | ✅ |
 | organization.create_root | ✅ | ❌ |
+| organization.view_ou | ✅ | ✅ (own org) |
 | organization.create_ou | ✅ | ✅ (own org) |
-| organization.create_sub (deprecated) | ✅ | ✅ (own org) |
+| organization.create_sub (deprecated) | ✅ | ❌ (removed) |
 | organization.view | ✅ | ✅ (own org) |
 | organization.update | ✅ | ✅ (own org) |
 | organization.deactivate | ✅ | ✅ (own org) |

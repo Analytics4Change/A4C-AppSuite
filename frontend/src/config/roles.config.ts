@@ -84,8 +84,9 @@ const PROVIDER_ADMIN_ROLE: RoleDefinition = {
   description: 'Organization owner with full control, created during bootstrap process',
   scope: 'organization',
   permissions: [
-    // Organization management (sub-orgs only, not root creation)
-    'organization.create_sub',
+    // Organization management (organizational units, not root creation)
+    'organization.view_ou',
+    'organization.create_ou',
     'organization.view',
     'organization.update',
     'organization.business_profile_update',

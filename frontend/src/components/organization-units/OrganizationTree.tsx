@@ -226,6 +226,7 @@ export const OrganizationTree = observer(
         ref={treeRef}
         role="tree"
         aria-label={ariaLabel}
+        data-testid="ou-tree"
         className={cn('list-none p-0 m-0', className)}
         onKeyDown={handleKeyDown}
       >

@@ -18,9 +18,8 @@ BEGIN
   FOR user_record IN
     SELECT * FROM (VALUES
       ('5a975b95-a14d-4ddd-bdb6-949033dab0b8'::UUID, 'lars.tice@gmail.com', 'Lars Tice')
-      -- To add more users, uncomment and add entries here:
-      -- ,('XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX'::UUID, 'admin2@example.com', 'Admin User 2')
-      -- ,('YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY'::UUID, 'admin3@example.com', 'Admin User 3')
+      ,('7c8dbdef-ee7b-4d5a-89e7-ef82efe9fe41'::UUID, 'troygshaw@gmail.com', 'Troy Shaw')
+      ,('f4951f70-41eb-476d-a635-9f36e7a35c67'::UUID, 'ticerachel@gmail.com', 'Rachel Tice')
     ) AS t(auth_user_id, email, full_name)
   LOOP
     v_stream_version := 1;
@@ -82,6 +81,25 @@ BEGIN
     )
     ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
 
+    -- Create user_roles_projection entry manually
+    -- NOTE: The event router routes stream_type='user' to process_user_event() which doesn't exist,
+    -- so user.role.assigned events are NOT automatically processed into user_roles_projection.
+    -- This direct insert is required until a proper process_user_event function is implemented.
+    INSERT INTO user_roles_projection (
+      user_id,
+      role_id,
+      org_id,
+      scope_path,
+      assigned_at
+    ) VALUES (
+      user_record.auth_user_id,
+      '11111111-1111-1111-1111-111111111111'::UUID,  -- super_admin role
+      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID,  -- A4C organization
+      NULL,  -- No scope_path restriction for super_admin
+      NOW()
+    )
+    ON CONFLICT (user_id, role_id, COALESCE(org_id, '00000000-0000-0000-0000-000000000000'::UUID)) DO NOTHING;
+
     RAISE NOTICE 'Created platform admin: % (%) with super_admin role', user_record.full_name, user_record.auth_user_id;
   END LOOP;
 END $$;
@@ -100,9 +118,8 @@ BEGIN
   FOR user_record IN
     SELECT * FROM (VALUES
       ('5a975b95-a14d-4ddd-bdb6-949033dab0b8'::UUID, 'lars.tice@gmail.com', 'Lars Tice')
-      -- Match the list above for verification
-      -- ,('XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX'::UUID, 'admin2@example.com', 'Admin User 2')
-      -- ,('YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY'::UUID, 'admin3@example.com', 'Admin User 3')
+      ,('7c8dbdef-ee7b-4d5a-89e7-ef82efe9fe41'::UUID, 'troygshaw@gmail.com', 'Troy Shaw')
+      ,('f4951f70-41eb-476d-a635-9f36e7a35c67'::UUID, 'ticerachel@gmail.com', 'Rachel Tice')
     ) AS t(auth_user_id, email, full_name)
   LOOP
     -- Verify user exists

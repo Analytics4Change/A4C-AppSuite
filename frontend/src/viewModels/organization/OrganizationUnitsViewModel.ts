@@ -348,7 +348,7 @@ export class OrganizationUnitsViewModel {
   }
 
   /**
-   * Expand to reveal a specific node (expand all ancestors)
+   * Expand to reveal a specific node (expand the node itself and all ancestors)
    *
    * @param unitId - ID of unit to reveal
    */
@@ -357,6 +357,9 @@ export class OrganizationUnitsViewModel {
     if (!unit) return;
 
     runInAction(() => {
+      // Expand the target node itself
+      this.expandedNodeIds.add(unitId);
+
       // Find and expand all ancestors
       let currentId: string | null = unit.parentId;
       while (currentId) {

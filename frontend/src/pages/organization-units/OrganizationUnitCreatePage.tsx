@@ -77,8 +77,22 @@ export const OrganizationUnitCreatePage: React.FC = observer(() => {
       const result = await formViewModel.submit();
 
       if (result.success) {
-        log.info('Unit created successfully', { unitId: result.unit?.id });
-        navigate('/organization-units/manage');
+        const parentId = formViewModel.formData.parentId;
+        log.info('✅ Unit created successfully', {
+          unitId: result.unit?.id,
+          parentId,
+          navigatingWithExpand: !!parentId
+        });
+
+        // Navigate back to manage page with parent ID to auto-expand
+        if (parentId) {
+          const url = `/organization-units/manage?expandParent=${parentId}`;
+          log.debug('Navigating to manage page with expandParent', { url, parentId });
+          navigate(url);
+        } else {
+          log.debug('Navigating to manage page without expandParent (no parent)');
+          navigate('/organization-units/manage');
+        }
       }
     },
     [formViewModel, navigate]

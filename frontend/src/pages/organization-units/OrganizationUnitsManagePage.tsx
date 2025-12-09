@@ -18,7 +18,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { observer } from 'mobx-react-lite';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { OrganizationTree } from '@/components/organization-units';
@@ -142,6 +142,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
  */
 export const OrganizationUnitsManagePage: React.FC = observer(() => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [viewModel] = useState(() => new OrganizationUnitsViewModel());
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
@@ -151,6 +152,37 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
     log.debug('OrganizationUnitsManagePage mounted, loading units');
     viewModel.loadUnits();
   }, [viewModel]);
+
+  // Auto-expand parent node if specified in URL (e.g., after creating a new unit)
+  useEffect(() => {
+    const expandParentId = searchParams.get('expandParent');
+
+    log.debug('Auto-expand effect triggered', {
+      expandParentId,
+      unitCount: viewModel.unitCount,
+      hasExpandParam: !!expandParentId
+    });
+
+    if (expandParentId && viewModel.unitCount > 0) {
+      // Verify the parent exists
+      const parent = viewModel.getUnitById(expandParentId);
+      if (parent) {
+        // Expand to reveal the parent node
+        viewModel.expandToNode(expandParentId);
+        log.info('✅ Auto-expanded parent node from URL', {
+          parentId: expandParentId,
+          parentName: parent.name
+        });
+
+        // Clean up the URL parameter
+        setSearchParams({});
+      } else {
+        log.warn('⚠️ Parent node not found for auto-expand', { parentId: expandParentId });
+      }
+    } else if (expandParentId && viewModel.unitCount === 0) {
+      log.debug('Waiting for units to load before expanding...', { expandParentId });
+    }
+  }, [searchParams, viewModel.unitCount, viewModel, setSearchParams]);
 
   // Navigation handlers
   const handleBackClick = () => {
