@@ -9,21 +9,15 @@ import { Client, Connection } from '@temporalio/client';
 import { createClient } from '@supabase/supabase-js';
 import { authMiddleware, requirePermission } from '../middleware/auth.js';
 import type { ContactInfo, AddressInfo, PhoneInfo } from '@shared/types/index.js';
+import { getWorkflowsEnv } from '@shared/config/env-schema.js';
 
-// Validate required environment variables
-function getRequiredEnvVar(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
-
-const supabaseUrl = getRequiredEnvVar('SUPABASE_URL');
-const supabaseServiceKey = getRequiredEnvVar('SUPABASE_SERVICE_ROLE_KEY');
-const temporalAddress = process.env.TEMPORAL_ADDRESS || 'temporal-frontend.temporal.svc.cluster.local:7233';
-const temporalNamespace = process.env.TEMPORAL_NAMESPACE || 'default';
-const frontendUrl = process.env.FRONTEND_URL || 'https://a4c.firstovertheline.com';
+// Get validated environment (FRONTEND_URL derived from PLATFORM_BASE_DOMAIN if not set)
+const env = getWorkflowsEnv();
+const supabaseUrl = env.SUPABASE_URL;
+const supabaseServiceKey = env.SUPABASE_SERVICE_ROLE_KEY;
+const temporalAddress = env.TEMPORAL_ADDRESS;
+const temporalNamespace = env.TEMPORAL_NAMESPACE;
+const frontendUrl = env.FRONTEND_URL;
 
 /**
  * Organization user invitation structure (API-specific, role is string for flexibility)

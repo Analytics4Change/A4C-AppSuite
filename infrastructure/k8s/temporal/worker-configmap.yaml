@@ -19,8 +19,13 @@ data:
   # Supabase (non-sensitive)
   SUPABASE_URL: "https://tmrjlswbsxmbglmaclxu.supabase.co"
 
-  # Frontend URL for invitation emails
-  FRONTEND_URL: "https://a4c.firstovertheline.com"
+  # === Domain Configuration ===
+  # PLATFORM_BASE_DOMAIN is the single source of truth for all domain configuration.
+  # Derived values (not set here - computed at runtime):
+  #   - TARGET_DOMAIN = a4c.${PLATFORM_BASE_DOMAIN}   (CNAME target for tenant subdomains)
+  #   - FRONTEND_URL  = https://a4c.${PLATFORM_BASE_DOMAIN}  (invitation emails)
+  #   - Tenant subdomains = {slug}.${PLATFORM_BASE_DOMAIN}
+  PLATFORM_BASE_DOMAIN: "firstovertheline.com"
 
   # Development features (should be false in production)
   TAG_DEV_ENTITIES: "false"
@@ -32,7 +37,3 @@ data:
 
   # Health check
   HEALTH_CHECK_PORT: "9090"
-
-  # DNS configuration for tenant subdomain CNAMEs
-  # CNAMEs point to a4c.firstovertheline.com which has A records
-  TARGET_DOMAIN: "a4c.firstovertheline.com"

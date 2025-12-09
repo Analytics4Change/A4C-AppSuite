@@ -195,8 +195,8 @@ export async function organizationBootstrapWorkflow(
         try {
           const dnsResult = await configureDNS({
             orgId: state.orgId!,
-            subdomain: params.subdomain,
-            targetDomain: 'firstovertheline.com'
+            subdomain: params.subdomain
+            // targetDomain defaults to PLATFORM_BASE_DOMAIN from env config
           });
 
           state.domain = dnsResult.fqdn;
@@ -282,14 +282,12 @@ export async function organizationBootstrapWorkflow(
       count: state.invitations.length
     });
 
-    // Use frontendUrl from params (passed by caller), with fallback default
-    const frontendUrl = params.frontendUrl || 'https://a4c.firstovertheline.com';
-
     const emailResult = await sendInvitationEmails({
       orgId: state.orgId!,
       invitations: state.invitations,
       domain: state.domain!,
-      frontendUrl
+      // frontendUrl passed from params if provided, otherwise activity uses FRONTEND_URL from env
+      frontendUrl: params.frontendUrl
     });
 
     state.invitationsSent = true;

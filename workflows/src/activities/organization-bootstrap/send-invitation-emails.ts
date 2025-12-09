@@ -30,6 +30,7 @@ import { createEmailProvider } from '@shared/providers/email/factory';
 import { getSupabaseClient } from '@shared/utils/supabase';
 import { emitEvent, buildTags } from '@shared/utils/emit-event';
 import { AGGREGATE_TYPES } from '@shared/constants';
+import { getWorkflowsEnv } from '@shared/config/env-schema';
 
 /**
  * Build invitation email HTML
@@ -167,6 +168,9 @@ export async function sendInvitationEmails(
   let successCount = 0;
   const failures: Array<{ email: string; error: string }> = [];
 
+  // Use frontendUrl from params or default to FRONTEND_URL from env config
+  const frontendUrl = params.frontendUrl ?? getWorkflowsEnv().FRONTEND_URL;
+
   // Extract parent domain for email sender (e.g., firstovertheline.com from poc-test1.firstovertheline.com)
   // This ensures we send from the verified domain, not the subdomain
   const domainParts = params.domain.split('.');
@@ -177,8 +181,8 @@ export async function sendInvitationEmails(
     try {
       console.log(`[SendInvitationEmails] Sending email to: ${invitation.email}`);
 
-      const html = buildInvitationEmailHTML(invitation, orgName, params.frontendUrl);
-      const text = buildInvitationEmailText(invitation, orgName, params.frontendUrl);
+      const html = buildInvitationEmailHTML(invitation, orgName, frontendUrl);
+      const text = buildInvitationEmailText(invitation, orgName, frontendUrl);
 
       await emailProvider.sendEmail({
         from: `Analytics4Change <noreply@${parentDomain}>`,

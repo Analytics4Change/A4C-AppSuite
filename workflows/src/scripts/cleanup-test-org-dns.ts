@@ -1,9 +1,11 @@
 // Direct Cloudflare API call to remove DNS record
-// Uses same domain as remove-dns activity: firstovertheline.com
+// Uses PLATFORM_BASE_DOMAIN from env config (or defaults to firstovertheline.com)
+import { validateWorkflowsEnv } from '../shared/config/env-schema';
 
 async function main() {
+  const env = validateWorkflowsEnv();
   const subdomain = 'test-provider-001';
-  const baseDomain = 'firstovertheline.com';  // ← FIXED: Was analytics4change.com
+  const baseDomain = env.PLATFORM_BASE_DOMAIN;
   const fullDomain = `${subdomain}.${baseDomain}`;
 
   console.log(`Removing DNS record for: ${fullDomain}`);
@@ -16,7 +18,7 @@ async function main() {
   }
 
   try {
-    // Step 1: List zones to find the zone ID for firstovertheline.com
+    // Step 1: List zones to find the zone ID for the base domain
     console.log(`Fetching zones for domain: ${baseDomain}`);
     const zonesResponse = await fetch(
       `https://api.cloudflare.com/client/v4/zones?name=${baseDomain}`,

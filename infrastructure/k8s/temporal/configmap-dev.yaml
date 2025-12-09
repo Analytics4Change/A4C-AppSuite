@@ -7,8 +7,14 @@ metadata:
     app: temporal
     environment: development
 data:
-  # Environment-specific configuration
-  BASE_DOMAIN: "firstovertheline.com"
+  # === Domain Configuration ===
+  # PLATFORM_BASE_DOMAIN is the single source of truth for all domain configuration.
+  # Derived values (computed at runtime if not explicitly set):
+  #   - TARGET_DOMAIN = a4c.${PLATFORM_BASE_DOMAIN}
+  #   - FRONTEND_URL  = https://a4c.${PLATFORM_BASE_DOMAIN}
+  PLATFORM_BASE_DOMAIN: "firstovertheline.com"
+
+  # Legacy references (may be removed in future)
   APP_URL: "https://app.firstovertheline.com"
   LOGIN_URL: "https://login.firstovertheline.com"
 

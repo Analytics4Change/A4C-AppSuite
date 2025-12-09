@@ -23,6 +23,7 @@ import type { ConfigureDNSParams, ConfigureDNSResult } from '@shared/types';
 import { createDNSProvider } from '@shared/providers/dns/factory';
 import { emitEvent, buildTags } from '@shared/utils/emit-event';
 import { AGGREGATE_TYPES } from '@shared/constants';
+import { getWorkflowsEnv } from '@shared/config/env-schema';
 
 /**
  * Configure DNS activity
@@ -34,20 +35,23 @@ export async function configureDNS(
 ): Promise<ConfigureDNSResult> {
   console.log(`[ConfigureDNS] Starting for subdomain: ${params.subdomain}`);
 
+  // Use targetDomain from params or default to PLATFORM_BASE_DOMAIN from env config
+  const targetDomain = params.targetDomain ?? getWorkflowsEnv().PLATFORM_BASE_DOMAIN;
+
   const dnsProvider = createDNSProvider();
-  const fqdn = `${params.subdomain}.${params.targetDomain}`;
+  const fqdn = `${params.subdomain}.${targetDomain}`;
 
   // Find zone for target domain
-  console.log(`[ConfigureDNS] Finding zone for: ${params.targetDomain}`);
-  const zones = await dnsProvider.listZones(params.targetDomain);
+  console.log(`[ConfigureDNS] Finding zone for: ${targetDomain}`);
+  const zones = await dnsProvider.listZones(targetDomain);
 
   if (zones.length === 0) {
-    throw new Error(`No DNS zone found for domain: ${params.targetDomain}`);
+    throw new Error(`No DNS zone found for domain: ${targetDomain}`);
   }
 
   const zone = zones[0];
   if (!zone) {
-    throw new Error(`Zone list returned empty zone for domain: ${params.targetDomain}`);
+    throw new Error(`Zone list returned empty zone for domain: ${targetDomain}`);
   }
   console.log(`[ConfigureDNS] Using zone: ${zone.id} (${zone.name})`);
 
@@ -88,11 +92,11 @@ export async function configureDNS(
   }
 
   // Create CNAME record (proxied through Cloudflare for tunnel routing)
-  console.log(`[ConfigureDNS] Creating CNAME record: ${fqdn} → ${params.targetDomain}`);
+  console.log(`[ConfigureDNS] Creating CNAME record: ${fqdn} → ${targetDomain}`);
   const record = await dnsProvider.createRecord(zone.id, {
     type: 'CNAME',
     name: fqdn,
-    content: params.targetDomain,
+    content: targetDomain,
     ttl: 1,  // Auto TTL when proxied
     proxied: true  // Required for Cloudflare Tunnel routing
   });

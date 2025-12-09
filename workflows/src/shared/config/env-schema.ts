@@ -84,18 +84,41 @@ export const workflowsEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   HEALTH_CHECK_PORT: numberString(9090),
-  FRONTEND_URL: z.string().url().optional(),
 
   // === Domain Configuration ===
+  // PLATFORM_BASE_DOMAIN is the single source of truth for all domain configuration.
+  // Other domain-related values are derived from this:
+  //   - TARGET_DOMAIN    = a4c.${PLATFORM_BASE_DOMAIN}  (CNAME target for tenant subdomains)
+  //   - FRONTEND_URL     = https://a4c.${PLATFORM_BASE_DOMAIN}
+  //   - Tenant subdomains = {slug}.${PLATFORM_BASE_DOMAIN}
+  // Individual values can be overridden if needed (e.g., for testing).
+  PLATFORM_BASE_DOMAIN: z.string().default('firstovertheline.com'),
+
   // CNAMEs for tenant subdomains point to this domain (which has A records)
-  TARGET_DOMAIN: z.string().default('a4c.firstovertheline.com'),
+  // Derived from PLATFORM_BASE_DOMAIN if not explicitly set
+  TARGET_DOMAIN: z.string().optional(),
+
+  // Frontend URL for invitation emails and redirects
+  // Derived from PLATFORM_BASE_DOMAIN if not explicitly set
+  FRONTEND_URL: z.string().url().optional(),
 });
 
 // =============================================================================
 // Inferred Types
 // =============================================================================
 
-export type WorkflowsEnv = z.infer<typeof workflowsEnvSchema>;
+/** Raw type from Zod schema (TARGET_DOMAIN and FRONTEND_URL may be undefined) */
+type RawWorkflowsEnv = z.infer<typeof workflowsEnvSchema>;
+
+/**
+ * Validated environment type with guaranteed domain configuration.
+ * TARGET_DOMAIN and FRONTEND_URL are derived from PLATFORM_BASE_DOMAIN if not set.
+ */
+export type WorkflowsEnv = RawWorkflowsEnv & {
+  TARGET_DOMAIN: string;
+  FRONTEND_URL: string;
+};
+
 export type WorkflowMode = z.infer<typeof workflowModeSchema>;
 export type DNSProvider = z.infer<typeof dnsProviderSchema>;
 export type EmailProvider = z.infer<typeof emailProviderSchema>;
@@ -109,6 +132,9 @@ let validatedEnv: WorkflowsEnv | null = null;
 /**
  * Validate environment variables at startup.
  * Throws immediately if required variables are undefined.
+ *
+ * After validation, derives TARGET_DOMAIN and FRONTEND_URL from
+ * PLATFORM_BASE_DOMAIN if not explicitly set.
  *
  * Call this ONCE at worker startup after dotenv is loaded.
  */
@@ -140,7 +166,24 @@ ${errors}
     throw new Error(`Environment validation failed:\n${errors}`);
   }
 
-  validatedEnv = result.data;
+  // Derive domain configuration from PLATFORM_BASE_DOMAIN
+  const rawEnv = result.data;
+  const baseDomain = rawEnv.PLATFORM_BASE_DOMAIN;
+
+  // TARGET_DOMAIN: CNAME target for tenant subdomains (e.g., a4c.firstovertheline.com)
+  const targetDomain = rawEnv.TARGET_DOMAIN ?? `a4c.${baseDomain}`;
+
+  // FRONTEND_URL: URL for invitation emails and redirects
+  const frontendUrl = rawEnv.FRONTEND_URL ?? `https://a4c.${baseDomain}`;
+
+  // Create validated env with guaranteed domain fields
+  const env: WorkflowsEnv = {
+    ...rawEnv,
+    TARGET_DOMAIN: targetDomain,
+    FRONTEND_URL: frontendUrl,
+  };
+
+  validatedEnv = env;
   return validatedEnv;
 }
 

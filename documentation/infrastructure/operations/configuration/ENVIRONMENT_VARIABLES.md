@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2025-12-03
+last_updated: 2025-12-09
 ---
 
 # Environment Variables Reference
 
-**Last Updated**: 2025-12-03
-**Version**: 2.1.0
+**Last Updated**: 2025-12-09
+**Version**: 2.2.0
 
 This document provides a comprehensive reference for all environment variables used across the A4C-AppSuite monorepo.
 
@@ -14,15 +14,77 @@ This document provides a comprehensive reference for all environment variables u
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Zod Runtime Validation](#zod-runtime-validation)
-3. [Frontend Configuration](#frontend-configuration)
-4. [Temporal Workflows Configuration](#temporal-workflows-configuration)
-5. [Infrastructure Configuration](#infrastructure-configuration)
-6. [Edge Functions Configuration](#edge-functions-configuration)
-7. [Cross-Component Interactions](#cross-component-interactions)
-8. [Security Best Practices](#security-best-practices)
-9. [Troubleshooting](#troubleshooting)
+1. [Domain Configuration](#domain-configuration)
+2. [Overview](#overview)
+3. [Zod Runtime Validation](#zod-runtime-validation)
+4. [Frontend Configuration](#frontend-configuration)
+5. [Temporal Workflows Configuration](#temporal-workflows-configuration)
+6. [Infrastructure Configuration](#infrastructure-configuration)
+7. [Edge Functions Configuration](#edge-functions-configuration)
+8. [Cross-Component Interactions](#cross-component-interactions)
+9. [Security Best Practices](#security-best-practices)
+10. [Troubleshooting](#troubleshooting)
+
+---
+
+## Domain Configuration
+
+### Single Source of Truth
+
+The A4C-AppSuite uses `PLATFORM_BASE_DOMAIN` as the single source of truth for all domain-related configuration. All other domain-derived URLs are computed from this base value.
+
+```
+PLATFORM_BASE_DOMAIN = "firstovertheline.com"
+         │
+         ├── FRONTEND_URL      = https://a4c.${PLATFORM_BASE_DOMAIN}
+         ├── TARGET_DOMAIN     = a4c.${PLATFORM_BASE_DOMAIN}  (CNAME target)
+         ├── BACKEND_API_URL   = https://api-a4c.${PLATFORM_BASE_DOMAIN}
+         └── Tenant subdomains = {slug}.${PLATFORM_BASE_DOMAIN}
+```
+
+### Why This Approach?
+
+1. **Single point of change**: Update one variable to switch environments
+2. **Consistency**: All components derive from the same base
+3. **Flexibility**: Individual URLs can still be overridden if needed
+4. **Multi-environment**: Easy to deploy to different domains (dev/staging/prod)
+
+### Configuration by Component
+
+| Component | Sets `PLATFORM_BASE_DOMAIN` | Derives |
+|-----------|----------------------------|---------|
+| Workflows | ConfigMap or `.env` | `FRONTEND_URL`, `TARGET_DOMAIN` |
+| Edge Functions | Supabase env vars | `BACKEND_API_URL`, redirect URLs |
+| Frontend | N/A (uses backend URLs) | N/A |
+| Kubernetes | ConfigMap | Ingress hosts |
+
+### Default Behavior
+
+If `PLATFORM_BASE_DOMAIN` is not set, it defaults to `firstovertheline.com`. All derived URLs use this default:
+
+```typescript
+// In env-schema.ts
+PLATFORM_BASE_DOMAIN: z.string().default('firstovertheline.com'),
+
+// Derived at validation time:
+FRONTEND_URL: env.FRONTEND_URL ?? `https://a4c.${baseDomain}`,
+TARGET_DOMAIN: env.TARGET_DOMAIN ?? `a4c.${baseDomain}`,
+BACKEND_API_URL: env.BACKEND_API_URL ?? `https://api-a4c.${baseDomain}`,
+```
+
+### Override Capability
+
+Individual URLs can be overridden without changing the base domain:
+
+```bash
+# Use custom base domain
+PLATFORM_BASE_DOMAIN=mycompany.com
+
+# Or override specific URLs while keeping base domain
+PLATFORM_BASE_DOMAIN=firstovertheline.com
+FRONTEND_URL=https://custom-frontend.example.com  # Override
+TARGET_DOMAIN=a4c.firstovertheline.com            # Uses default derivation
+```
 
 ---
 
@@ -723,27 +785,65 @@ TEMPORAL_ADDRESS=temporal-frontend.temporal.svc.cluster.local:7233
 
 ---
 
+### Domain Configuration (Workflows)
+
+#### `PLATFORM_BASE_DOMAIN`
+
+**Purpose**: Base domain for all platform URLs - the single source of truth for domain configuration
+**Default**: `firstovertheline.com`
+**Required**: No (has default)
+
+**Behavior Influence**: All other domain-related URLs are derived from this value at validation time:
+- `FRONTEND_URL` defaults to `https://a4c.${PLATFORM_BASE_DOMAIN}`
+- `TARGET_DOMAIN` defaults to `a4c.${PLATFORM_BASE_DOMAIN}`
+- Tenant subdomains are constructed as `{slug}.${PLATFORM_BASE_DOMAIN}`
+
+**Files**:
+- `workflows/src/shared/config/env-schema.ts` - Environment schema with derivation logic
+
+**Example**:
+```bash
+# Default (current production)
+PLATFORM_BASE_DOMAIN=firstovertheline.com
+
+# Custom domain (switches all derived URLs)
+PLATFORM_BASE_DOMAIN=analytics4change.com
+# Results in:
+#   FRONTEND_URL = https://a4c.analytics4change.com
+#   TARGET_DOMAIN = a4c.analytics4change.com
+#   Tenant URLs = {slug}.analytics4change.com
+```
+
+**See Also**: [Domain Configuration](#domain-configuration) for the complete domain architecture.
+
+---
+
 ### DNS Provider Credentials
 
 #### `TARGET_DOMAIN`
 
-**Purpose**: Target domain for DNS subdomain operations
-**Default**: `firstovertheline.com`
-**Required**: No (has default)
+**Purpose**: CNAME target domain for tenant subdomains
+**Default**: Derived from `PLATFORM_BASE_DOMAIN` as `a4c.${PLATFORM_BASE_DOMAIN}`
+**Required**: No (derived from `PLATFORM_BASE_DOMAIN`)
 
-**Behavior Influence**: Determines which domain zone to use for organization subdomains (e.g., `org-name.firstovertheline.com`)
+**Behavior Influence**: Determines the CNAME target for organization subdomains. Tenant subdomains (e.g., `acme.firstovertheline.com`) point to this domain via CNAME records.
+
+**Derivation**: If not explicitly set, computed as `a4c.${PLATFORM_BASE_DOMAIN}` during environment validation.
 
 **Files**:
 - `workflows/src/shared/config/env-schema.ts` - Environment schema
+- `workflows/src/activities/organization-bootstrap/configure-dns.ts` - DNS configuration activity
 - `workflows/src/activities/organization-bootstrap/remove-dns.ts` - DNS cleanup activity
 
 **Example**:
 ```bash
-# Default (production)
-TARGET_DOMAIN=firstovertheline.com
+# Derived automatically (recommended)
+PLATFORM_BASE_DOMAIN=firstovertheline.com
+# TARGET_DOMAIN will be: a4c.firstovertheline.com
 
-# Custom domain
-TARGET_DOMAIN=myapp.example.com
+# Explicit override (if needed)
+PLATFORM_BASE_DOMAIN=firstovertheline.com
+TARGET_DOMAIN=custom-target.example.com
 ```
 
 #### `CLOUDFLARE_API_TOKEN`
@@ -893,20 +993,28 @@ TARGET_DOMAIN=myapp.example.com
 #### `FRONTEND_URL`
 
 **Purpose**: Frontend application URL for invitation email links
+**Default**: Derived from `PLATFORM_BASE_DOMAIN` as `https://a4c.${PLATFORM_BASE_DOMAIN}`
 **Example**: `https://a4c.firstovertheline.com`
-**Required**: Yes (for GenerateInvitationsActivity)
+**Required**: No (derived from `PLATFORM_BASE_DOMAIN`)
 
 **Behavior Influence**: Invitation emails include clickable links to this URL for new users to complete registration
 
+**Derivation**: If not explicitly set, computed as `https://a4c.${PLATFORM_BASE_DOMAIN}` during environment validation.
+
 **Files**:
+- `workflows/src/shared/config/env-schema.ts` - Environment schema with derivation logic
 - `workflows/src/activities/organization-bootstrap/generate-invitations.ts` - Email template generation
 
 **Example**:
 ```bash
-# Development
+# Derived automatically (recommended)
+PLATFORM_BASE_DOMAIN=firstovertheline.com
+# FRONTEND_URL will be: https://a4c.firstovertheline.com
+
+# Local development override
 FRONTEND_URL=http://localhost:5173
 
-# Production
+# Explicit production override
 FRONTEND_URL=https://app.analytics4change.com
 ```
 
@@ -1031,20 +1139,49 @@ These are automatically provided by the Supabase platform:
 
 These must be set via Supabase Dashboard or CLI:
 
-#### `BACKEND_API_URL`
+#### `PLATFORM_BASE_DOMAIN`
 
-**Purpose**: Backend API URL for Temporal workflow operations
-**Default**: `https://api-a4c.firstovertheline.com`
-**Required**: Yes (for `organization-bootstrap` function)
+**Purpose**: Base domain for all platform URLs - the single source of truth for domain configuration
+**Default**: `firstovertheline.com`
+**Required**: No (has default)
 
-**Behavior Influence**: Edge functions proxy workflow requests to this Backend API
+**Behavior Influence**: Used to derive other domain-related URLs and construct tenant subdomain redirect URLs after invitation acceptance.
+
+**Derivations**:
+- `BACKEND_API_URL` defaults to `https://api-a4c.${PLATFORM_BASE_DOMAIN}`
+- Tenant redirect URLs constructed as `https://{slug}.${PLATFORM_BASE_DOMAIN}/dashboard`
 
 **Setting via Dashboard**:
 1. Go to Supabase Dashboard → Settings → Edge Functions
-2. Add `BACKEND_API_URL` with appropriate value
+2. Add `PLATFORM_BASE_DOMAIN` with appropriate value
 
 **Setting via CLI**:
 ```bash
+supabase secrets set PLATFORM_BASE_DOMAIN=firstovertheline.com
+```
+
+**See Also**: [Domain Configuration](#domain-configuration) for the complete domain architecture.
+
+#### `BACKEND_API_URL`
+
+**Purpose**: Backend API URL for Temporal workflow operations
+**Default**: Derived from `PLATFORM_BASE_DOMAIN` as `https://api-a4c.${PLATFORM_BASE_DOMAIN}`
+**Required**: No (derived from `PLATFORM_BASE_DOMAIN`)
+
+**Behavior Influence**: Edge functions proxy workflow requests to this Backend API
+
+**Derivation**: If not explicitly set, computed as `https://api-a4c.${PLATFORM_BASE_DOMAIN}` during environment validation.
+
+**Setting via Dashboard**:
+1. Go to Supabase Dashboard → Settings → Edge Functions
+2. Add `BACKEND_API_URL` with appropriate value (or rely on derivation from `PLATFORM_BASE_DOMAIN`)
+
+**Setting via CLI**:
+```bash
+# Set base domain (recommended - derives BACKEND_API_URL automatically)
+supabase secrets set PLATFORM_BASE_DOMAIN=firstovertheline.com
+
+# Or set explicit override
 supabase secrets set BACKEND_API_URL=https://api-a4c.firstovertheline.com
 ```
 

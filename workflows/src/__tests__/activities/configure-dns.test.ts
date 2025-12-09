@@ -14,6 +14,13 @@ jest.mock('@shared/utils/emit-event', () => ({
   emitEvent: jest.fn().mockResolvedValue(undefined),
   buildTags: jest.fn().mockReturnValue([])
 }));
+jest.mock('@shared/config/env-schema', () => ({
+  getWorkflowsEnv: jest.fn().mockReturnValue({
+    PLATFORM_BASE_DOMAIN: 'firstovertheline.com',
+    FRONTEND_URL: 'https://a4c.firstovertheline.com',
+    TARGET_DOMAIN: 'a4c.firstovertheline.com'
+  })
+}));
 
 describe('ConfigureDNS Activity', () => {
   const mockDNSProvider = {

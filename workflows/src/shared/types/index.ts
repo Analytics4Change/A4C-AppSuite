@@ -95,8 +95,8 @@ export interface OrganizationBootstrapParams {
   }>;
 
   /**
-   * Frontend URL for invitation links
-   * Passed from caller (edge function/API) since workflows can't read env vars
+   * Frontend URL for invitation links.
+   * Optional - if not provided, activity will use FRONTEND_URL from env config.
    */
   frontendUrl?: string;
 
@@ -187,7 +187,8 @@ export interface CreateOrganizationParams {
 export interface ConfigureDNSParams {
   orgId: string;
   subdomain: string;
-  targetDomain: string;  // e.g., 'firstovertheline.com'
+  /** Target domain for CNAME. Defaults to PLATFORM_BASE_DOMAIN from env config. */
+  targetDomain?: string;
 }
 
 /**
@@ -239,7 +240,8 @@ export interface SendInvitationEmailsParams {
   orgId: string;
   invitations: Invitation[];
   domain: string;
-  frontendUrl: string;
+  /** Frontend URL for invitation links. Defaults to FRONTEND_URL from env config. */
+  frontendUrl?: string;
 }
 
 /**

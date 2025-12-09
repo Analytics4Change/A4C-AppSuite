@@ -179,6 +179,17 @@ serve(async (req) => {
       console.error('Failed to mark invitation as accepted:', updateError);
     }
 
+    // Query organization data for tenant redirect
+    const { data: orgData, error: orgError } = await supabase
+      .from('organizations_projection')
+      .select('slug, subdomain_status')
+      .eq('id', invitation.organization_id)
+      .single();
+
+    if (orgError) {
+      console.warn('Failed to query organization for redirect:', orgError);
+    }
+
     // Emit user.created event via API wrapper
     // Uses api.emit_domain_event() wrapper to avoid PostgREST schema restrictions
     const { data: _eventId, error: eventError } = await supabase
@@ -211,12 +222,27 @@ serve(async (req) => {
       console.log(`User created event emitted successfully: event_id=${_eventId}, user_id=${userId}, org_id=${invitation.organization_id}`);
     }
 
+    // Build redirect URL based on organization subdomain status
+    // If subdomain is verified, redirect to tenant subdomain (cross-origin)
+    // Otherwise, fall back to organization ID path (same-origin)
+    let redirectUrl: string;
+    if (orgData?.slug && orgData?.subdomain_status === 'verified') {
+      // Tenant subdomain redirect (cross-origin)
+      const baseDomain = env.PLATFORM_BASE_DOMAIN;
+      redirectUrl = `https://${orgData.slug}.${baseDomain}/dashboard`;
+      console.log(`[accept-invitation] Redirecting to tenant subdomain: ${redirectUrl}`);
+    } else {
+      // Fallback to org ID path (same-origin relative URL)
+      redirectUrl = `/organizations/${invitation.organization_id}/dashboard`;
+      console.log(`[accept-invitation] Redirecting to org ID path: ${redirectUrl} (subdomain_status: ${orgData?.subdomain_status || 'unknown'})`);
+    }
+
     // Build response
     const response: AcceptInvitationResponse = {
       success: true,
       userId,
       organizationId: invitation.organization_id,
-      redirectUrl: `/organizations/${invitation.organization_id}/dashboard`,
+      redirectUrl,
     };
 
     return new Response(

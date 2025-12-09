@@ -26,6 +26,7 @@
 
 import { createDNSProvider } from '../shared/providers/dns/factory';
 import { getSupabaseClient } from '../shared/utils/supabase';
+import { getWorkflowsEnv } from '../shared/config/env-schema';
 import * as readline from 'readline';
 
 interface CleanupStats {
@@ -109,7 +110,7 @@ async function queryDevelopmentEntities(tag: string) {
 async function deleteDNSRecord(subdomain: string, stats: CleanupStats): Promise<void> {
   try {
     const dnsProvider = createDNSProvider();
-    const targetDomain = 'firstovertheline.com';
+    const targetDomain = getWorkflowsEnv().PLATFORM_BASE_DOMAIN;
     const fqdn = `${subdomain}.${targetDomain}`;
 
     // Find zone
@@ -286,7 +287,7 @@ async function cleanup(options: CleanupOptions): Promise<void> {
       // Delete organization
       await deleteOrganization(org.id, stats);
     } else {
-      console.log(`   [DRY RUN] Would delete DNS record: ${org.subdomain}.firstovertheline.com`);
+      console.log(`   [DRY RUN] Would delete DNS record: ${org.subdomain}.${getWorkflowsEnv().PLATFORM_BASE_DOMAIN}`);
       console.log(`   [DRY RUN] Would revoke invitations for org: ${org.id}`);
       console.log(`   [DRY RUN] Would mark organization as deleted: ${org.id}`);
     }

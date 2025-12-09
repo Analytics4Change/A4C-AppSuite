@@ -57,6 +57,22 @@ export const AcceptInvitationPage: React.FC = observer(() => {
   }, [token, viewModel]);
 
   /**
+   * Handle redirect after invitation acceptance.
+   * Uses navigate() for same-origin paths, window.location.href for cross-origin URLs.
+   */
+  const handleRedirect = (redirectUrl: string) => {
+    if (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')) {
+      // Cross-origin redirect (tenant subdomain)
+      log.info('Cross-origin redirect to tenant subdomain', { redirectUrl });
+      window.location.href = redirectUrl;
+    } else {
+      // Same-origin relative path
+      log.info('Same-origin redirect', { redirectUrl });
+      navigate(redirectUrl);
+    }
+  };
+
+  /**
    * Handle email/password submission
    */
   const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
@@ -68,7 +84,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
       log.info('Invitation accepted, redirecting', {
         redirectUrl: result.redirectUrl
       });
-      navigate(result.redirectUrl);
+      handleRedirect(result.redirectUrl);
     }
   };
 
@@ -82,7 +98,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
       log.info('Invitation accepted via Google, redirecting', {
         redirectUrl: result.redirectUrl
       });
-      navigate(result.redirectUrl);
+      handleRedirect(result.redirectUrl);
     }
   };
 
