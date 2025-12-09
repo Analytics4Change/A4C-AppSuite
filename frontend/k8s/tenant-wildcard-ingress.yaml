@@ -1,0 +1,28 @@
+---
+# Wildcard ingress for multi-tenant subdomain routing
+# Routes *.firstovertheline.com to the frontend service
+# SSL is terminated at Cloudflare Tunnel, so no TLS config needed here
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tenant-wildcard-ingress
+  namespace: default
+  labels:
+    app: a4c-frontend
+    component: tenant-routing
+  annotations:
+    # Lower priority than specific host rules
+    traefik.ingress.kubernetes.io/router.priority: "1"
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: "*.firstovertheline.com"
+    http:
+      paths:
+      - backend:
+          service:
+            name: a4c-frontend-service
+            port:
+              number: 80
+        path: /
+        pathType: Prefix

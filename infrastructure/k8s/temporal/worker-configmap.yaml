@@ -32,3 +32,7 @@ data:
 
   # Health check
   HEALTH_CHECK_PORT: "9090"
+
+  # DNS configuration for tenant subdomain CNAMEs
+  # CNAMEs point to a4c.firstovertheline.com which has A records
+  TARGET_DOMAIN: "a4c.firstovertheline.com"

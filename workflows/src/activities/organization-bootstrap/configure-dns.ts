@@ -87,14 +87,14 @@ export async function configureDNS(
     };
   }
 
-  // Create CNAME record
+  // Create CNAME record (proxied through Cloudflare for tunnel routing)
   console.log(`[ConfigureDNS] Creating CNAME record: ${fqdn} → ${params.targetDomain}`);
   const record = await dnsProvider.createRecord(zone.id, {
     type: 'CNAME',
     name: fqdn,
     content: params.targetDomain,
-    ttl: 3600,
-    proxied: false
+    ttl: 1,  // Auto TTL when proxied
+    proxied: true  // Required for Cloudflare Tunnel routing
   });
 
   console.log(`[ConfigureDNS] Created DNS record: ${record.id}`);

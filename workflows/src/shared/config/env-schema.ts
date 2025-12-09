@@ -87,7 +87,8 @@ export const workflowsEnvSchema = z.object({
   FRONTEND_URL: z.string().url().optional(),
 
   // === Domain Configuration ===
-  TARGET_DOMAIN: z.string().default('firstovertheline.com'),
+  // CNAMEs for tenant subdomains point to this domain (which has A records)
+  TARGET_DOMAIN: z.string().default('a4c.firstovertheline.com'),
 });
 
 // =============================================================================
