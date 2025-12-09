@@ -54,6 +54,13 @@ jobs:
 
           for func_dir in */; do
             func_name="${func_dir%/}"
+
+            # Skip directories starting with underscore (shared modules)
+            if [[ "$func_name" == _* ]]; then
+              echo "⏭️  Skipping shared module: $func_name"
+              continue
+            fi
+
             echo "Linting function: $func_name"
 
             if [ -f "$func_dir/index.ts" ]; then
@@ -75,6 +82,13 @@ jobs:
 
           for func_dir in */; do
             func_name="${func_dir%/}"
+
+            # Skip directories starting with underscore (shared modules)
+            if [[ "$func_name" == _* ]]; then
+              echo "⏭️  Skipping shared module: $func_name"
+              continue
+            fi
+
             echo "Type-checking function: $func_name"
 
             if [ -f "$func_dir/index.ts" ]; then
@@ -94,6 +108,12 @@ jobs:
 
           for func_dir in */; do
             func_name="${func_dir%/}"
+
+            # Skip directories starting with underscore (shared modules)
+            if [[ "$func_name" == _* ]]; then
+              echo "⏭️  Skipping shared module: $func_name"
+              continue
+            fi
 
             # Check for index.ts
             if [ ! -f "$func_dir/index.ts" ]; then
