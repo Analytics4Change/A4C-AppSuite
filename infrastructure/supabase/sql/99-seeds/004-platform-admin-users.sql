@@ -95,10 +95,10 @@ BEGIN
       user_record.auth_user_id,
       '11111111-1111-1111-1111-111111111111'::UUID,  -- super_admin role
       'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID,  -- A4C organization
-      NULL,  -- No scope_path restriction for super_admin
+      'a4c'::ltree,  -- scope_path required when org_id is set (CHECK constraint)
       NOW()
     )
-    ON CONFLICT (user_id, role_id, COALESCE(org_id, '00000000-0000-0000-0000-000000000000'::UUID)) DO NOTHING;
+    ON CONFLICT (user_id, role_id, org_id) DO NOTHING;
 
     RAISE NOTICE 'Created platform admin: % (%) with super_admin role', user_record.full_name, user_record.auth_user_id;
   END LOOP;
