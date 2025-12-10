@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v21';
+const DEPLOY_VERSION = 'v22';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -262,6 +262,11 @@ function getStageStatus(currentStage: string, stageName: string): 'pending' | 'i
   if (stageIndex < currentIndex) {
     return 'completed';
   } else if (stageIndex === currentIndex) {
+    // Special case: 'completed' is a terminal stage, not an in-progress stage
+    // When we're AT the completed stage, the workflow IS completed
+    if (stageName === 'completed') {
+      return 'completed';
+    }
     return 'in_progress';
   } else {
     return 'pending';
