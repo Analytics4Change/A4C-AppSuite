@@ -89,17 +89,32 @@ async function bootstrapOrganizationHandler(
   const organizationId = crypto.randomUUID();
 
   // Get Supabase admin client for validation and event emission
+  console.log('[Bootstrap] Getting Supabase client...');
   const supabaseAdmin = getSupabaseClient();
 
   // P0 #1: Validate organizationId doesn't already exist
   // (UUID collision is astronomically unlikely but validates precondition)
+  console.log('[Bootstrap] Checking organization ID uniqueness...');
+  console.log(`  Organization ID: ${organizationId}`);
+  console.log('  Query: organizations_projection.select(id).eq(id, organizationId).maybeSingle()');
+
   const { data: existingById, error: idCheckError } = await supabaseAdmin
     .from('organizations_projection')
     .select('id')
     .eq('id', organizationId)
     .maybeSingle();
 
+  console.log('[Bootstrap] Query result:');
+  console.log(`  Data: ${JSON.stringify(existingById)}`);
+  console.log(`  Error: ${JSON.stringify(idCheckError)}`);
+
   if (idCheckError) {
+    console.error('[Bootstrap] ❌ Validation query failed:', {
+      code: idCheckError.code,
+      message: idCheckError.message,
+      details: idCheckError.details,
+      hint: idCheckError.hint
+    });
     request.log.error({ error: idCheckError }, 'Failed to check organization ID');
     return reply.code(500).send({
       error: 'Failed to validate organization ID',
