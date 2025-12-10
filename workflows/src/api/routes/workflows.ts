@@ -6,15 +6,13 @@
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { Client, Connection } from '@temporalio/client';
-import { createClient } from '@supabase/supabase-js';
 import { authMiddleware, requirePermission } from '../middleware/auth.js';
 import type { ContactInfo, AddressInfo, PhoneInfo } from '@shared/types/index.js';
 import { getWorkflowsEnv } from '@shared/config/env-schema.js';
+import { getSupabaseClient } from '@shared/utils/supabase.js';
 
 // Get validated environment (FRONTEND_URL derived from PLATFORM_BASE_DOMAIN if not set)
 const env = getWorkflowsEnv();
-const supabaseUrl = env.SUPABASE_URL;
-const supabaseServiceKey = env.SUPABASE_SERVICE_ROLE_KEY;
 const temporalAddress = env.TEMPORAL_ADDRESS;
 const temporalNamespace = env.TEMPORAL_NAMESPACE;
 const frontendUrl = env.FRONTEND_URL;
@@ -90,8 +88,8 @@ async function bootstrapOrganizationHandler(
   // - As the ID returned to the frontend for status polling
   const organizationId = crypto.randomUUID();
 
-  // Create Supabase admin client for validation and event emission
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+  // Get Supabase admin client for validation and event emission
+  const supabaseAdmin = getSupabaseClient();
 
   // P0 #1: Validate organizationId doesn't already exist
   // (UUID collision is astronomically unlikely but validates precondition)

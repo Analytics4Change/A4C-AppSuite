@@ -22,8 +22,12 @@ async function main() {
     namespace: process.env.TEMPORAL_NAMESPACE || 'default'
   });
 
+  // Generate organization ID (in production, the API generates this)
+  const organizationId = crypto.randomUUID();
+
   // Workflow parameters - Test Case C: VAR Partner Organization
   const params: OrganizationBootstrapParams = {
+    organizationId,
     subdomain: 'var-partner-001',
     orgData: {
       name: 'Value Added Reseller Corp',
@@ -82,8 +86,8 @@ async function main() {
   };
 
   // Start workflow
-  // Workflow ID should be unique per organization
-  const workflowId = `org-bootstrap-${params.subdomain}-${Date.now()}`;
+  // Workflow ID uses organizationId for unified ID system
+  const workflowId = `org-bootstrap-${organizationId}`;
 
   console.log('Starting OrganizationBootstrapWorkflow...');
   console.log(`Workflow ID: ${workflowId}`);
