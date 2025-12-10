@@ -1,17 +1,45 @@
 ---
 status: current
-last_updated: 2025-12-02
+last_updated: 2025-12-09
 ---
 
 # OrganizationBootstrapWorkflow - Implementation & Design Specification
 
 **Status**: ✅ Fully Implemented and Operational
 **Implemented**: 2025-12-01 (production deployment with UAT passed)
+**Updated**: 2025-12-09 (Unified ID System, Event Order Fix)
 **Architecture**: 2-Hop (Frontend → Backend API → Temporal)
 **Activities**: 12 total (6 forward + 6 compensation)
 **Design Pattern**: Design by Contract with Three-Layer Idempotency
 **Complexity Score**: 2.6/5 (Moderate - Justified)
 **Priority**: Critical - Core business functionality
+
+## Unified ID System (2025-12-09 Update)
+
+The workflow uses a **Unified ID System** where `organizationId` is the single identifier:
+
+| Use Case | Identifier | Example |
+|----------|-----------|---------|
+| Event Stream ID | `stream_id = organizationId` | `550e8400-e29b-41d4-a716-446655440000` |
+| Temporal Workflow ID | `org-bootstrap-{organizationId}` | `org-bootstrap-550e8400-e29b-41d4-a716-446655440000` |
+| Frontend Route | `/organizations/bootstrap/:organizationId/status` | `/organizations/bootstrap/550e8400.../status` |
+| Status Polling | `get_bootstrap_status(p_bootstrap_id)` | Pass `organizationId` directly |
+
+### Breaking Change: `workflowId` Deprecated
+
+The `WorkflowStatus` interface's `workflowId` field is now deprecated. Use `organizationId` instead:
+
+```typescript
+interface WorkflowStatus {
+  /** @deprecated Use organizationId instead */
+  workflowId: string;
+  /** Primary identifier in unified ID system */
+  organizationId: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  progress: Array<{ step: string; completed: boolean; error?: string; }>;
+  result?: OrganizationBootstrapResult;
+}
+```
 
 > **Related Documentation**: This document provides comprehensive design specification and architecture rationale. For a more concise implementation guide focused on Temporal.io deployment, see [Organization Onboarding Workflow](../../../architecture/workflows/organization-onboarding-workflow.md).
 
@@ -2721,7 +2749,59 @@ All identified risks have concrete mitigations:
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-10-28
-**Status**: Design Complete - Ready for Implementation
+## Event Emission Order (2025-12-09 Fix)
+
+The API endpoint now uses the following order to prevent orphaned events:
+
+```typescript
+// 1. Generate organizationId
+const organizationId = crypto.randomUUID();
+
+// 2. Validate organizationId doesn't exist (P0 precondition)
+const { data: existingById } = await supabaseAdmin
+  .from('organizations_projection')
+  .select('id')
+  .eq('id', organizationId)
+  .maybeSingle();
+if (existingById) {
+  return reply.code(409).send({ error: 'Organization ID collision' });
+}
+
+// 3. Start Temporal workflow FIRST
+try {
+  await client.workflow.start('organizationBootstrapWorkflow', {
+    workflowId: `org-bootstrap-${organizationId}`,
+    args: [{ organizationId, ...params }]
+  });
+} catch (error) {
+  // No event emitted - safe for frontend to retry
+  return reply.code(500).send({ error: 'Failed to start workflow' });
+}
+
+// 4. Emit event AFTER Temporal succeeds
+const { error: eventError } = await supabaseAdmin
+  .schema('api')
+  .rpc('emit_domain_event', {
+    p_stream_id: organizationId,
+    p_event_type: 'organization.bootstrap.initiated',
+    // ...
+  });
+
+// 5. If event fails, log warning but DON'T fail request
+// (Workflow is running and will emit its own events)
+if (eventError) {
+  request.log.warn('Event emission failed, workflow running');
+}
+
+// 6. Return organizationId
+return { organizationId, status: 'initiated' };
+```
+
+**Rationale**: Starting Temporal first ensures no orphaned events if Temporal is unavailable. If the `organization.bootstrap.initiated` event fails to emit, the workflow is already running and will emit subsequent events (`organization.created`, etc.), so the status page will still work correctly.
+
+---
+
+**Document Version**: 1.1
+**Last Updated**: 2025-12-09
+**Status**: Fully Implemented and Operational
 **Approved By**: Software Architect (Design by Contract)

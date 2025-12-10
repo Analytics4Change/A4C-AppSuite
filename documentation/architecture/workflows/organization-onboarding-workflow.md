@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-02
+last_updated: 2025-12-09
 ---
 
 # Organization Onboarding Workflow - Temporal Implementation
@@ -9,6 +9,29 @@ last_updated: 2025-12-02
 **Priority**: Critical - Core business process
 **Pattern**: Workflow-First with Event-Driven Activities
 **Architecture**: 2-Hop (Frontend → Backend API → Temporal)
+
+## Unified ID System (Updated 2025-12-09)
+
+The workflow uses a **Unified ID System** where `organizationId` serves as the single identifier across all components:
+
+- **Frontend Route Parameter**: `/organizations/bootstrap/:organizationId/status`
+- **Status Polling**: `stream_id = organizationId` in `domain_events` table
+- **Temporal Workflow ID Suffix**: `org-bootstrap-{organizationId}`
+- **Event Stream**: All events emitted with `stream_id = organizationId`
+
+This eliminates the previous confusion between separate `workflowId` and `organizationId` values.
+
+### Status Checking Architecture
+
+```
+Frontend (React)
+     ↓ supabase.functions.invoke('workflow-status', { workflowId: organizationId })
+Supabase Edge Function (workflow-status)
+     ↓ supabase.schema('api').rpc('get_bootstrap_status', { p_bootstrap_id: organizationId })
+PostgreSQL RPC Function (api.get_bootstrap_status)
+     ↓ Queries domain_events by stream_id
+Returns: { status, currentStage, domain, dnsConfigured, invitationsSent }
+```
 
 > **Related Documentation**: This document provides a concise implementation guide for developers. For comprehensive design rationale, architecture decisions, complexity analysis, and risk assessment, see [OrganizationBootstrapWorkflow Design Specification](../../workflows/architecture/organization-bootstrap-workflow-design.md).
 
@@ -1207,8 +1230,34 @@ bootstrapOrganization().catch(console.error)
 
 ---
 
-**Document Version**: 2.0
-**Last Updated**: 2025-12-02
+## API Endpoint: Start Bootstrap Workflow
+
+**Endpoint**: `POST /api/v1/workflows/organization-bootstrap`
+
+**Location**: `workflows/src/api/routes/workflows.ts`
+
+**Flow (Updated 2025-12-09)**:
+1. Validate request (subdomain, orgData, users)
+2. Generate `organizationId` (UUID)
+3. Validate `organizationId` doesn't exist in `organizations_projection` (P0 fix)
+4. Start Temporal workflow FIRST (idempotent - prevents orphaned events)
+5. Emit `organization.bootstrap.initiated` event AFTER Temporal succeeds
+6. Return `{ organizationId, status: 'initiated' }`
+
+**Key Invariants**:
+- Temporal workflow starts BEFORE event emission (prevents orphaned events if Temporal fails)
+- If event emission fails after Temporal starts, log warning but don't fail request (workflow will emit its own events)
+- `organizationId` is used as stream_id in all subsequent events
+
+---
+
+**Document Version**: 2.1
+**Last Updated**: 2025-12-09
 **Status**: ✅ Fully Implemented and Deployed
 
-**Implementation Location**: `workflows/src/workflows/organizationBootstrapWorkflow.ts`
+**Implementation Locations**:
+- Workflow: `workflows/src/workflows/organization-bootstrap/workflow.ts`
+- API Endpoint: `workflows/src/api/routes/workflows.ts`
+- Status RPC: `infrastructure/supabase/sql/04-triggers/bootstrap-event-listener.sql`
+- Edge Function: `infrastructure/supabase/supabase/functions/workflow-status/index.ts`
+- Frontend Client: `frontend/src/services/workflow/TemporalWorkflowClient.ts`
