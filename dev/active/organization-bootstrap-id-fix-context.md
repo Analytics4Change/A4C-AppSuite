@@ -92,7 +92,7 @@ The `organizationId` is NOT in the workflow input despite API code appearing to 
 
 The workflow generates its own UUID because it doesn't receive the API's ID.
 
-### Issue #3: Database Migration Not Applied
+### Issue #3: Database Migration Not Applied ✅ FIXED
 
 **File**: `infrastructure/supabase/sql/04-triggers/bootstrap-event-listener.sql`
 
@@ -101,9 +101,7 @@ The SQL file contains an updated `get_bootstrap_status` function with columns:
 - `dns_configured` (boolean)
 - `invitations_sent` (integer)
 
-**Production database** has the OLD version without these columns.
-
-**Last applied migration**: `20251202014055_create_api_get_bootstrap_status_wrapper`
+**Resolution**: Applied via Supabase MCP `apply_migration` tool on 2025-12-10
 
 ### Issue #4: No `organization.created` Events
 
@@ -138,17 +136,18 @@ Status query by `organizationId` only finds `bootstrap.initiated`.
 
 ### Critical Files to Modify
 
-- `workflows/src/api/routes/workflows.ts:50-70` - Backend API workflow start
+- `workflows/src/api/routes/workflows.ts:85-110` - Backend API workflow start
   - Generates organizationId, passes to Temporal client
-  - **Issue**: organizationId not appearing in workflow input
+  - ✅ FIXED: Removed UUID collision validation query (was lines 95-131, now removed)
+  - Query was failing due to RLS issues on `organizations_projection`
 
-- `workflows/src/activities/organization-bootstrap/create-organization.ts:61-64` - Idempotency check
-  - Returns `existing.id` instead of `params.organizationId`
-  - **Issue**: Breaks ID consistency on retries
+- `workflows/src/activities/organization-bootstrap/create-organization.ts:61-67` - Idempotency check
+  - ✅ FIXED: Now returns `params.organizationId` instead of `existing.id`
+  - Ensures unified ID system works on activity retries
 
 - `infrastructure/supabase/sql/04-triggers/bootstrap-event-listener.sql` - Status function
   - Contains updated `get_bootstrap_status` with new columns
-  - **Issue**: Not applied to production database
+  - ✅ FIXED: Applied to production database via Supabase MCP on 2025-12-10
 
 - `workflows/src/shared/utils/emit-event.ts` - Event emission utility
   - Uses `aggregate_id` as `stream_id`
@@ -208,6 +207,10 @@ await emitEvent({
 3. **Backwards Compatibility**: Existing workflows in flight may have wrong IDs. Focus on fixing new workflows.
 
 4. **RLS Policies**: Events may have RLS policies. Ensure service role is used for event emission.
+
+5. **UUID Collision Check** (Added 2025-12-10): Removed the UUID collision validation query from API. The check was failing due to RLS issues and was unnecessary - UUID collision probability is 1 in 2^122, and Temporal workflow ID uniqueness provides collision protection.
+
+6. **Development Guideline** (Added 2025-12-10): Run `npm run build` in `workflows/` after each major code change to catch TypeScript errors early.
 
 ## Why This Approach?
 
