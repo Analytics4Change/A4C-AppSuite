@@ -178,7 +178,30 @@ export class TemporalWorkflowClient implements IWorkflowClient {
         throw new Error('Invalid workflow status response');
       }
 
-      return data as WorkflowStatus;
+      // Transform Edge Function response to WorkflowStatus type
+      // Edge Function returns: { stages: [...], status, workflowId, organizationId?, ... }
+      // Frontend expects: { progress: [...], status, workflowId, result? }
+      const transformedStatus: WorkflowStatus = {
+        workflowId: data.workflowId,
+        status: data.status === 'unknown' ? 'failed' : data.status,
+        progress: (data.stages || []).map((stage: {
+          name: string;
+          status: string;
+          error?: string;
+        }) => ({
+          step: stage.name,
+          completed: stage.status === 'completed',
+          error: stage.error
+        })),
+        result: data.organizationId ? {
+          orgId: data.organizationId,
+          domain: '',
+          dnsConfigured: false,
+          invitationsSent: 0
+        } : undefined
+      };
+
+      return transformedStatus;
     } catch (error) {
       log.error('Error fetching workflow status', error);
       throw error;

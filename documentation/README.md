@@ -118,6 +118,8 @@ Terraform IaC, Kubernetes deployments, Supabase resources
   - **[Configuration](./infrastructure/operations/configuration/)** - Configuration management
     - [KUBECONFIG Update Guide](./infrastructure/operations/KUBECONFIG_UPDATE_GUIDE.md) - K8s cluster access configuration
     - [Environment Variables](./infrastructure/operations/configuration/ENVIRONMENT_VARIABLES.md) - Complete env var reference
+  - **[Utilities](./infrastructure/operations/utilities/)** - Ad-hoc scripts, cleanup tools, manual testing
+    - [cleanup-org.ts](./infrastructure/operations/utilities/cleanup-org.md) - Hard delete organization by slug
   - [Troubleshooting](./infrastructure/operations/troubleshooting/) - Common issues and fixes
 
 ### [Architecture Documentation](./architecture/)
@@ -185,6 +187,10 @@ Historical and deprecated content preserved for reference
 - [Deployment Procedures](./infrastructure/operations/deployment/)
 - [Environment Configuration](./infrastructure/operations/configuration/)
 - [Workflow Deployment](./workflows/operations/)
+
+#### Utilities & Scripts
+- [Operational Utilities](./infrastructure/operations/utilities/) - Cleanup, testing, diagnostics
+- [cleanup-org.ts](./infrastructure/operations/utilities/cleanup-org.md) - Hard delete organization by slug
 
 #### Monitoring & Troubleshooting
 - [Troubleshooting Guide](./infrastructure/operations/troubleshooting/)

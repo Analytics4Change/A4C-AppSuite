@@ -21,6 +21,7 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "cleanup:dev": "ts-node -r tsconfig-paths/register src/scripts/cleanup-dev.ts",
+    "cleanup:org": "ts-node -r tsconfig-paths/register src/scripts/cleanup-org.ts",
     "query:dev": "ts-node -r tsconfig-paths/register src/scripts/query-dev.ts",
     "validate": "ts-node -r tsconfig-paths/register src/scripts/validate-system.ts",
     "trigger-workflow": "ts-node -r tsconfig-paths/register src/examples/trigger-workflow.ts"
