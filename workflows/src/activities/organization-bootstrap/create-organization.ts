@@ -59,8 +59,11 @@ export async function createOrganization(
   }
 
   if (existing) {
-    console.log(`[CreateOrganization] Organization already exists: ${existing.id}`);
-    return existing.id;
+    console.log(`[CreateOrganization] Organization already exists with slug: ${params.subdomain || params.name}`);
+    console.log(`[CreateOrganization] Existing ID: ${existing.id}, Requested ID: ${params.organizationId}`);
+    // Return the requested organizationId to maintain unified ID system
+    // This ensures status polling works even on activity retries
+    return params.organizationId;
   }
 
   // Use the pre-generated organization ID from the API
