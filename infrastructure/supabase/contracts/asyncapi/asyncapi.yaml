@@ -54,6 +54,7 @@ channels:
           - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapCompleted'
           - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapFailed'
           - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapCancelled'
+          - $ref: './domains/program.yaml#/components/messages/ProgramCreated'
     subscribe:
       summary: Subscribe to domain events
       operationId: onDomainEvent
@@ -92,6 +93,7 @@ components:
             - user
             - organization
             - invitation
+            - program
           description: Type of entity this event affects
         stream_version:
           type: integer

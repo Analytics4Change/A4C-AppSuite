@@ -20,14 +20,14 @@ import { emitEvent, buildTags } from '@shared/utils/emit-event';
 
 /**
  * Create organization activity
- * @param params - Organization creation parameters
- * @returns Created organization ID
+ * @param params - Organization creation parameters (includes pre-generated organizationId)
+ * @returns Created organization ID (same as input organizationId)
  */
 export async function createOrganization(
   params: CreateOrganizationParams
 ): Promise<string> {
   const displayName = params.subdomain || params.name;
-  console.log(`[CreateOrganization] Starting for: ${displayName}`);
+  console.log(`[CreateOrganization] Starting for: ${displayName} with organizationId: ${params.organizationId}`);
 
   const supabase = getSupabaseClient();
 
@@ -63,8 +63,9 @@ export async function createOrganization(
     return existing.id;
   }
 
-  // Generate organization ID
-  const orgId = uuidv4();
+  // Use the pre-generated organization ID from the API
+  // This ensures the same ID is used for status polling (stream_id in events)
+  const orgId = params.organizationId;
 
   // Build tags for development entity tracking
   const tags = buildTags();

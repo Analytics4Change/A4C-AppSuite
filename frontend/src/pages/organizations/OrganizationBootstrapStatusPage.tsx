@@ -35,7 +35,8 @@ const log = Logger.getLogger('component');
  * Real-time workflow progress tracking with polling.
  */
 export const OrganizationBootstrapStatusPage: React.FC = () => {
-  const { workflowId } = useParams<{ workflowId: string }>();
+  // Route uses organizationId (unified ID system - same ID used for events and status polling)
+  const { organizationId } = useParams<{ organizationId: string }>();
   const navigate = useNavigate();
 
   const [status, setStatus] = useState<WorkflowStatus | null>(null);
@@ -45,13 +46,14 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
   const workflowClient = WorkflowClientFactory.create();
 
   /**
-   * Fetch workflow status
+   * Fetch workflow status using organizationId
    */
   const fetchStatus = async () => {
-    if (!workflowId) return;
+    if (!organizationId) return;
 
     try {
-      const currentStatus = await workflowClient.getWorkflowStatus(workflowId);
+      // getWorkflowStatus now queries by organizationId (stream_id in events)
+      const currentStatus = await workflowClient.getWorkflowStatus(organizationId);
       setStatus(currentStatus);
       setError(null);
 
@@ -76,13 +78,13 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
    * Poll workflow status every 2 seconds
    */
   useEffect(() => {
-    if (!workflowId) {
-      setError('No workflow ID provided');
+    if (!organizationId) {
+      setError('No organization ID provided');
       setIsLoading(false);
       return;
     }
 
-    log.debug('Starting workflow status polling', { workflowId });
+    log.debug('Starting workflow status polling', { organizationId });
 
     // Initial fetch
     fetchStatus();
@@ -98,17 +100,17 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
       clearInterval(interval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchStatus is stable within the component
-  }, [workflowId, status?.status]);
+  }, [organizationId, status?.status]);
 
   /**
    * Handle workflow cancellation
    */
   const handleCancel = async () => {
-    if (!workflowId) return;
+    if (!organizationId) return;
 
     try {
-      await workflowClient.cancelWorkflow(workflowId);
-      log.info('Workflow cancelled', { workflowId });
+      await workflowClient.cancelWorkflow(organizationId);
+      log.info('Workflow cancelled', { organizationId });
       await fetchStatus(); // Refresh status
     } catch (err) {
       log.error('Failed to cancel workflow', err);
@@ -241,12 +243,12 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Workflow ID */}
+            {/* Organization ID */}
             <div className="mb-6 p-3 bg-gray-50 rounded-md">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
-                Workflow ID
+                Organization ID
               </p>
-              <p className="text-sm font-mono text-gray-700">{workflowId}</p>
+              <p className="text-sm font-mono text-gray-700">{organizationId}</p>
             </div>
 
             {/* Progress Steps */}

@@ -315,19 +315,19 @@ test.describe('OU CRUD - Integration Mode (Event Verification)', () => {
     }
   });
 
-  test('should emit organization.updated event on OU update', async ({ page }) => {
+  test('should emit organization.updated event on OU update', async ({ _page }) => {
     // This test requires an existing OU to update
     // Implementation depends on having test fixtures or creating an OU first
     test.skip();
   });
 
-  test('should emit organization.deactivated event on OU deactivation', async ({ page }) => {
+  test('should emit organization.deactivated event on OU deactivation', async ({ _page }) => {
     // This test requires an existing OU to deactivate
     // Implementation depends on having test fixtures or creating an OU first
     test.skip();
   });
 
-  test('should update organizations_projection after event', async ({ page }) => {
+  test('should update organizations_projection after event', async ({ _page }) => {
     // This test verifies the projection table is updated after event processing
     // Implementation depends on having Supabase access
     test.skip();

@@ -95,7 +95,7 @@ function App() {
                     <OrganizationCreatePage />
                   </RequirePermission>
                 } />
-                <Route path="/organizations/bootstrap/:workflowId" element={<OrganizationBootstrapStatusPage />} />
+                <Route path="/organizations/:organizationId/bootstrap" element={<OrganizationBootstrapStatusPage />} />
                 <Route path="/organizations/:orgId/dashboard" element={<OrganizationDashboard />} />
                 <Route path="/organizations/:orgId/edit" element={<div>Organization Edit - Coming Soon</div>} />
 

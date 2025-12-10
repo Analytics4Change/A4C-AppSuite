@@ -139,10 +139,15 @@ const {
 export async function organizationBootstrapWorkflow(
   params: OrganizationBootstrapParams
 ): Promise<OrganizationBootstrapResult> {
-  log.info('Starting OrganizationBootstrapWorkflow', { subdomain: params.subdomain });
+  log.info('Starting OrganizationBootstrapWorkflow', {
+    organizationId: params.organizationId,
+    subdomain: params.subdomain
+  });
 
   // Initialize workflow state for compensation tracking
+  // Use pre-generated organizationId from the API as the canonical ID
   const state: WorkflowState = {
+    orgId: params.organizationId,  // Pre-set from API-generated ID
     orgCreated: false,
     dnsConfigured: false,
     dnsSkipped: false,
@@ -155,9 +160,14 @@ export async function organizationBootstrapWorkflow(
     // ========================================
     // Step 1: Create Organization
     // ========================================
-    log.info('Step 1: Creating organization', { subdomain: params.subdomain });
+    log.info('Step 1: Creating organization', {
+      organizationId: params.organizationId,
+      subdomain: params.subdomain
+    });
 
-    state.orgId = await createOrganization({
+    // Create organization using the pre-generated organizationId from the API
+    await createOrganization({
+      organizationId: params.organizationId,
       name: params.orgData.name,
       type: params.orgData.type,
       parentOrgId: params.orgData.parentOrgId,

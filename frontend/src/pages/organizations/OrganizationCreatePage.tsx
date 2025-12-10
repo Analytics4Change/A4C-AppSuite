@@ -141,12 +141,12 @@ export const OrganizationCreatePage: React.FC = observer(() => {
     setIsSubmitting(true);
 
     try {
-      const workflowId = await viewModel.submit();
+      const organizationId = await viewModel.submit();
 
-      if (workflowId) {
-        log.info('Organization workflow started', { workflowId });
-        // Navigate to status page
-        navigate(`/organizations/bootstrap/${workflowId}`);
+      if (organizationId) {
+        log.info('Organization workflow started', { organizationId });
+        // Navigate to status page - route uses organizationId (unified ID system)
+        navigate(`/organizations/${organizationId}/bootstrap`);
       } else {
         // Submission failed - error is already displayed in submissionError
         log.warn('Organization submission returned null - staying on form');

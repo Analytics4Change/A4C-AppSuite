@@ -1,0 +1,71 @@
+components:
+  messages:
+    ProgramCreated:
+      name: program.created
+      title: Program Created
+      summary: A new program has been created within an organization during bootstrap
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ProgramCreatedEvent'
+
+  schemas:
+    ProgramCreatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization UUID that owns this program
+        stream_type:
+          type: string
+          enum: [organization]
+          description: Program events use organization as stream type during bootstrap
+        event_type:
+          type: string
+          enum: [program.created]
+        event_data:
+          $ref: '#/components/schemas/ProgramCreationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ProgramCreationData:
+      type: object
+      required:
+        - program_id
+        - organization_id
+        - name
+      properties:
+        program_id:
+          type: string
+          format: uuid
+          description: Unique identifier for the program
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization that owns this program
+        name:
+          type: string
+          maxLength: 200
+          description: Human-readable program name
+          examples:
+            - "Default Program"
+            - "Substance Abuse Recovery"
+            - "Mental Health Services"
+        description:
+          type: string
+          maxLength: 1000
+          description: Description of the program and its services
+        is_default:
+          type: boolean
+          default: true
+          description: Whether this is the default program for the organization
+        settings:
+          type: object
+          description: Program-specific configuration settings
+          additionalProperties: true
