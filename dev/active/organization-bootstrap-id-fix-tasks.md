@@ -53,6 +53,24 @@
 - [x] `temporal-api` pods running (2 replicas)
 - [x] All pods in `Running` status
 
+## Phase 4: UI Bug Fix ✅ COMPLETE
+
+### 4.1 Diagnose UI Bug
+- [x] User reported: "Complete Bootstrap" step shows spinner while overall status shows "COMPLETED"
+- [x] Traced data flow: Frontend → Edge Function → `getStageStatus` function
+- [x] Root cause: `getStageStatus` returned `'in_progress'` when `stageIndex === currentIndex`, even for terminal 'completed' stage
+
+### 4.2 Fix Edge Function
+- [x] Modified `infrastructure/supabase/supabase/functions/workflow-status/index.ts`
+- [x] Added special case in `getStageStatus`: when `stageName === 'completed'`, return `'completed'`
+- [x] Updated version from v21 to v22
+- [x] Commit: `d24f15f7`
+
+### 4.3 Deploy Edge Function
+- [x] Pushed to main branch
+- [x] GitHub Actions `Deploy Edge Functions` workflow triggered
+- [x] Deployment completed successfully in 22s
+
 ### 3.3 End-to-End Validation ⏸️ AWAITING USER TEST
 - [ ] Create new organization via frontend
 - [ ] Verify status page shows real-time progress
@@ -104,11 +122,14 @@ The unified ID system broke because:
 ### Files Modified
 - `workflows/src/api/routes/workflows.ts` - Removed lines 95-131 (UUID collision check)
 - `workflows/src/activities/organization-bootstrap/create-organization.ts` - Fixed idempotency return value (lines 61-67)
+- `infrastructure/supabase/supabase/functions/workflow-status/index.ts` - Fixed terminal stage status (v22)
 
 ### Deployment
-- Commit: `e38e1ba1`
-- Image: `ghcr.io/analytics4change/a4c-workflows:e38e1ba`
+- Backend API Commit: `e38e1ba1`
+- Backend Image: `ghcr.io/analytics4change/a4c-workflows:e38e1ba`
+- Edge Function Commit: `d24f15f7`
 - Both `Deploy Temporal Workers` and `Deploy Temporal Backend API` workflows completed successfully
+- `Deploy Edge Functions` workflow completed successfully (v22)
 
 ## Commands Reference
 
