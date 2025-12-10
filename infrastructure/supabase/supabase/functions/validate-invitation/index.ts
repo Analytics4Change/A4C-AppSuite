@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v2';
+const DEPLOY_VERSION = 'v8';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -24,8 +24,9 @@ interface InvitationValidation {
   valid: boolean;
   token: string;
   email: string;
-  organizationName: string;
+  orgName: string;  // Frontend expects orgName, not organizationName
   organizationId: string;
+  role: string;  // Frontend expects role
   expiresAt: string;
   expired: boolean;
   alreadyAccepted: boolean;
@@ -57,11 +58,31 @@ serve(async (req) => {
 
   try {
     // Initialize Supabase client with service role
-    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+    // Use 'api' schema since that's what's exposed through PostgREST
+    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      db: {
+        schema: 'api',
+      },
+    });
 
-    // Get invitation token from URL params
-    const url = new URL(req.url);
-    const token = url.searchParams.get('token');
+    // Get invitation token from request body (POST) or URL params (GET)
+    let token: string | null = null;
+
+    if (req.method === 'POST') {
+      // Frontend sends token in POST body via supabase.functions.invoke()
+      const body = await req.json();
+      token = body.token;
+      console.log(`[validate-invitation v${DEPLOY_VERSION}] Token from POST: ${token ? 'present' : 'missing'}`);
+    } else {
+      // Fallback to URL params for GET requests
+      const url = new URL(req.url);
+      token = url.searchParams.get('token');
+      console.log(`[validate-invitation v${DEPLOY_VERSION}] Token from URL: ${token ? 'present' : 'missing'}`);
+    }
 
     if (!token) {
       return new Response(
@@ -70,24 +91,34 @@ serve(async (req) => {
       );
     }
 
-    // Query invitation from database
-    // Table: invitations_projection (CQRS read model)
-    // Schema: id, token, email, organization_id, expires_at, accepted_at, created_at
-    const { data: invitation, error: invitationError } = await supabase
-      .from('invitations_projection')
-      .select('*, organizations_projection!inner(name)')
-      .eq('token', token)
-      .single();
+    // Query invitation via RPC function in api schema (bypasses public schema restriction)
+    console.log(`[validate-invitation v${DEPLOY_VERSION}] Querying invitation via RPC...`);
+    const { data: invitations, error: invitationError } = await supabase
+      .rpc('get_invitation_by_token', { p_token: token });
 
-    if (invitationError || !invitation) {
+    if (invitationError) {
+      console.error(`[validate-invitation v${DEPLOY_VERSION}] RPC error:`, invitationError);
       return new Response(
-        JSON.stringify({
-          valid: false,
-          error: 'Invalid invitation token',
-        }),
+        JSON.stringify({ valid: false, error: 'Database error', details: invitationError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // RPC returns array, get first result
+    const invitation = invitations?.[0];
+
+    if (!invitation) {
+      console.log(`[validate-invitation v${DEPLOY_VERSION}] No invitation found for token`);
+      return new Response(
+        JSON.stringify({ valid: false, error: 'Invalid invitation token' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log(`[validate-invitation v${DEPLOY_VERSION}] Found invitation: ${invitation.id}`);
+
+    // Organization name comes from RPC join
+    const orgName = invitation.organization_name || 'Unknown Organization';
 
     // Check if invitation has expired
     const expiresAt = new Date(invitation.expires_at);
@@ -98,16 +129,20 @@ serve(async (req) => {
     const alreadyAccepted = invitation.accepted_at !== null;
 
     // Build validation response
+    // Frontend expects: orgName, role (not organizationName)
     const response: InvitationValidation = {
       valid: !expired && !alreadyAccepted,
       token,
       email: invitation.email,
-      organizationName: invitation.organizations_projection.name,
+      orgName,
       organizationId: invitation.organization_id,
+      role: invitation.role,
       expiresAt: invitation.expires_at,
       expired,
       alreadyAccepted,
     };
+
+    console.log(`[validate-invitation v${DEPLOY_VERSION}] Success - valid: ${response.valid}`);
 
     return new Response(
       JSON.stringify(response),

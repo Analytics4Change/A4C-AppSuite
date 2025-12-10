@@ -11,8 +11,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 
-// Deployment version tracking (injected by CI/CD)
-const DEPLOY_VERSION = Deno.env.get('GIT_COMMIT_SHA')?.substring(0, 8) || 'v2';
+// Deployment version tracking
+const DEPLOY_VERSION = 'v3';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -64,7 +64,16 @@ serve(async (req) => {
 
   try {
     // Initialize Supabase client with service role
-    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+    // Use 'api' schema since that's what's exposed through PostgREST
+    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      db: {
+        schema: 'api',
+      },
+    });
 
     // Parse request body
     const requestData: AcceptInvitationRequest = await req.json();
@@ -84,19 +93,30 @@ serve(async (req) => {
       );
     }
 
-    // Query invitation from invitations_projection (CQRS read model)
-    const { data: invitation, error: invitationError } = await supabase
-      .from('invitations_projection')
-      .select('*')
-      .eq('token', requestData.token)
-      .single();
+    // Query invitation via RPC function in api schema (bypasses public schema restriction)
+    console.log(`[accept-invitation v${DEPLOY_VERSION}] Querying invitation via RPC...`);
+    const { data: invitations, error: invitationError } = await supabase
+      .rpc('get_invitation_by_token', { p_token: requestData.token });
 
-    if (invitationError || !invitation) {
+    if (invitationError) {
+      console.error(`[accept-invitation v${DEPLOY_VERSION}] RPC error:`, invitationError);
+      return new Response(
+        JSON.stringify({ error: 'Database error', details: invitationError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // RPC returns array, get first result
+    const invitation = invitations?.[0];
+
+    if (!invitation) {
       return new Response(
         JSON.stringify({ error: 'Invalid invitation token' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log(`[accept-invitation v${DEPLOY_VERSION}] Found invitation: ${invitation.id}`);
 
     // Validate invitation
     const expiresAt = new Date(invitation.expires_at);
@@ -169,31 +189,27 @@ serve(async (req) => {
       );
     }
 
-    // Mark invitation as accepted in invitations_projection
+    // Mark invitation as accepted via RPC
     const { error: updateError } = await supabase
-      .from('invitations_projection')
-      .update({ accepted_at: new Date().toISOString() })
-      .eq('id', invitation.id);
+      .rpc('accept_invitation', { p_invitation_id: invitation.id });
 
     if (updateError) {
       console.error('Failed to mark invitation as accepted:', updateError);
     }
 
-    // Query organization data for tenant redirect
-    const { data: orgData, error: orgError } = await supabase
-      .from('organizations_projection')
-      .select('slug, subdomain_status')
-      .eq('id', invitation.organization_id)
-      .single();
+    // Query organization data for tenant redirect via RPC
+    const { data: orgResults, error: orgError } = await supabase
+      .rpc('get_organization_by_id', { p_org_id: invitation.organization_id });
 
     if (orgError) {
       console.warn('Failed to query organization for redirect:', orgError);
     }
 
+    const orgData = orgResults?.[0];
+
     // Emit user.created event via API wrapper
-    // Uses api.emit_domain_event() wrapper to avoid PostgREST schema restrictions
+    // Client already configured with api schema
     const { data: _eventId, error: eventError } = await supabase
-      .schema('api')
       .rpc('emit_domain_event', {
         p_stream_id: userId,
         p_stream_type: 'user',

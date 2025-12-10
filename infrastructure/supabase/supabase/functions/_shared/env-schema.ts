@@ -13,7 +13,7 @@
  *   import { validateEdgeFunctionEnv } from '../_shared/env-schema.ts';
  *   const env = validateEdgeFunctionEnv();
  */
-import { z } from 'zod';
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 // =============================================================================
 // Edge Function Environment Schema

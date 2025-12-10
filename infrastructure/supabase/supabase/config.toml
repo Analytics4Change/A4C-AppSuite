@@ -327,6 +327,20 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
+# =============================================================================
+# Edge Function Configuration
+# =============================================================================
+
+# validate-invitation: Public endpoint for invitation token validation
+# Called by unauthenticated users clicking invitation links
+[functions.validate-invitation]
+verify_jwt = false
+
+# accept-invitation: Public endpoint for invitation acceptance
+# Called by unauthenticated users completing invitation acceptance
+[functions.accept-invitation]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
