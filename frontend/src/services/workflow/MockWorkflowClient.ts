@@ -68,8 +68,10 @@ export class MockWorkflowClient implements IWorkflowClient {
     const workflowId = this.generateWorkflowId();
 
     // Initialize workflow status
+    // In unified ID system, workflowId and organizationId are the same
     const initialStatus: WorkflowStatus = {
       workflowId,
+      organizationId: workflowId,  // Unified ID system
       status: 'running',
       progress: WORKFLOW_STEPS.map((step) => ({
         step,

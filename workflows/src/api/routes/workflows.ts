@@ -48,7 +48,6 @@ interface BootstrapRequest {
 }
 
 interface BootstrapResponse {
-  workflowId: string;
   organizationId: string;
   status: 'initiated';
 }
@@ -57,6 +56,14 @@ interface BootstrapResponse {
  * Organization Bootstrap Workflow Endpoint
  *
  * POST /api/v1/workflows/organization-bootstrap
+ *
+ * Flow (P1 #6 - corrected order):
+ * 1. Validate request
+ * 2. Generate organizationId
+ * 3. Check organizationId doesn't already exist (P0 #1)
+ * 4. Start Temporal workflow FIRST
+ * 5. Emit organization.bootstrap.initiated event (after Temporal succeeds)
+ * 6. Return organizationId to frontend
  */
 async function bootstrapOrganizationHandler(
   request: FastifyRequest<{ Body: BootstrapRequest }>,
@@ -77,67 +84,61 @@ async function bootstrapOrganizationHandler(
     });
   }
 
-  // Generate IDs
-  const workflowId = crypto.randomUUID();
+  // Generate organization ID - this single ID is used everywhere:
+  // - As the stream_id for all events
+  // - As the Temporal workflow ID suffix
+  // - As the ID returned to the frontend for status polling
   const organizationId = crypto.randomUUID();
 
+  // Create Supabase admin client for validation and event emission
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+  // P0 #1: Validate organizationId doesn't already exist
+  // (UUID collision is astronomically unlikely but validates precondition)
+  const { data: existingById, error: idCheckError } = await supabaseAdmin
+    .from('organizations_projection')
+    .select('id')
+    .eq('id', organizationId)
+    .maybeSingle();
+
+  if (idCheckError) {
+    request.log.error({ error: idCheckError }, 'Failed to check organization ID');
+    return reply.code(500).send({
+      error: 'Failed to validate organization ID',
+      details: idCheckError.message
+    });
+  }
+
+  if (existingById) {
+    request.log.warn({ organizationId }, 'UUID collision detected - should regenerate');
+    return reply.code(409).send({
+      error: 'Organization ID collision - please retry',
+      retry: true
+    });
+  }
+
   request.log.info({
-    workflow_id: workflowId,
     organization_id: organizationId,
     subdomain: requestData.subdomain,
     user_id: request.user!.id,
     user_email: request.user!.email
   }, 'Starting organization bootstrap workflow');
 
-  // Create Supabase admin client for event emission
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-
-  // Emit organization.bootstrap.initiated event
-  const { error: eventError } = await supabaseAdmin
-    .schema('api')
-    .rpc('emit_domain_event', {
-      p_stream_id: organizationId,
-      p_stream_type: 'organization',
-      p_stream_version: 1,
-      p_event_type: 'organization.bootstrap.initiated',
-      p_event_data: {
-        bootstrap_id: workflowId,
-        subdomain: requestData.subdomain,
-        orgData: requestData.orgData,
-        users: requestData.users
-      },
-      p_event_metadata: {
-        user_id: request.user!.id,
-        organization_id: organizationId,
-        initiated_by: request.user!.email,
-        initiated_via: 'backend_api'
-      }
-    });
-
-  if (eventError) {
-    request.log.error({ error: eventError }, 'Failed to emit bootstrap event');
-    return reply.code(500).send({
-      error: 'Failed to initiate bootstrap',
-      details: eventError.message
-    });
-  }
-
-  request.log.info({
-    workflow_id: workflowId,
-    organization_id: organizationId
-  }, 'Bootstrap event emitted successfully');
-
-  // Start Temporal workflow
+  // P1 #6: Start Temporal workflow FIRST (before event emission)
+  // This prevents orphaned events if Temporal fails to start
+  let temporalWorkflowId: string;
   try {
     const connection = await Connection.connect({ address: temporalAddress });
     const client = new Client({ connection, namespace: temporalNamespace });
 
-    const temporalWorkflowId = `org-bootstrap-${requestData.subdomain}-${Date.now()}`;
+    // Use organizationId as part of the Temporal workflow ID for easy correlation
+    temporalWorkflowId = `org-bootstrap-${organizationId}`;
 
     await client.workflow.start('organizationBootstrapWorkflow', {
       taskQueue: 'bootstrap',
       workflowId: temporalWorkflowId,
       args: [{
+        organizationId,  // Pass organizationId so activities emit events with correct stream_id
         subdomain: requestData.subdomain,
         orgData: requestData.orgData,
         users: requestData.users,
@@ -155,6 +156,7 @@ async function bootstrapOrganizationHandler(
     await connection.close();
 
   } catch (temporalError) {
+    // Temporal failed - no event emitted, safe for frontend to retry
     const errorMessage = temporalError instanceof Error ? temporalError.message : 'Unknown error';
     request.log.error({ error: temporalError }, 'Failed to start Temporal workflow');
     return reply.code(500).send({
@@ -163,9 +165,41 @@ async function bootstrapOrganizationHandler(
     });
   }
 
-  // Return response
+  // P1 #6: Emit event AFTER Temporal workflow started successfully
+  // If this fails, the workflow is already running and will emit its own events
+  const { error: eventError } = await supabaseAdmin
+    .schema('api')
+    .rpc('emit_domain_event', {
+      p_stream_id: organizationId,
+      p_stream_type: 'organization',
+      p_stream_version: 1,
+      p_event_type: 'organization.bootstrap.initiated',
+      p_event_data: {
+        subdomain: requestData.subdomain,
+        orgData: requestData.orgData,
+        users: requestData.users,
+        temporal_workflow_id: temporalWorkflowId  // Include for traceability
+      },
+      p_event_metadata: {
+        user_id: request.user!.id,
+        organization_id: organizationId,
+        initiated_by: request.user!.email,
+        initiated_via: 'backend_api'
+      }
+    });
+
+  if (eventError) {
+    // Workflow started but event failed - log warning but don't fail request
+    // Workflow will emit its own events as it progresses
+    request.log.warn({ error: eventError }, 'Failed to emit bootstrap.initiated event (workflow running)');
+  } else {
+    request.log.info({
+      organization_id: organizationId
+    }, 'Bootstrap event emitted successfully');
+  }
+
+  // Return response - only organizationId (used for status polling)
   const response: BootstrapResponse = {
-    workflowId,
     organizationId,
     status: 'initiated'
   };

@@ -119,8 +119,115 @@ END;
 $$ LANGUAGE plpgsql
 SET search_path = public, extensions, pg_temp;
 
--- Function to get bootstrap status
+-- Function to get bootstrap status by organization ID
+-- Queries by stream_id (organization ID) and checks ALL events to determine current stage
+-- Returns additional result data: domain, dns_configured, invitations_sent (P1 #4)
+-- Returns zero rows for non-existent organizations (P0 #3)
 CREATE OR REPLACE FUNCTION get_bootstrap_status(
+  p_organization_id UUID
+) RETURNS TABLE (
+  bootstrap_id UUID,
+  organization_id UUID,
+  status TEXT,
+  current_stage TEXT,
+  error_message TEXT,
+  created_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  domain TEXT,
+  dns_configured BOOLEAN,
+  invitations_sent INTEGER
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH org_events AS (
+    -- Get all distinct event types for this organization
+    SELECT DISTINCT de.event_type
+    FROM domain_events de
+    WHERE de.stream_id = p_organization_id
+  ),
+  first_event AS (
+    -- Get the first event timestamp for created_at
+    SELECT MIN(de.created_at) AS ts
+    FROM domain_events de
+    WHERE de.stream_id = p_organization_id
+  ),
+  completion_event AS (
+    -- Get the completion timestamp if completed
+    SELECT de.created_at AS ts, de.event_data->>'error_message' AS error_msg
+    FROM domain_events de
+    WHERE de.stream_id = p_organization_id
+      AND de.event_type IN ('organization.bootstrap.completed', 'organization.bootstrap.failed', 'organization.activated')
+    ORDER BY de.created_at DESC
+    LIMIT 1
+  ),
+  dns_event AS (
+    -- Extract FQDN from DNS configured event
+    SELECT de.event_data->>'fqdn' AS fqdn
+    FROM domain_events de
+    WHERE de.stream_id = p_organization_id
+      AND de.event_type = 'organization.dns.configured'
+    LIMIT 1
+  ),
+  invitation_count AS (
+    -- Count invitation emails sent
+    SELECT COUNT(*)::INTEGER AS cnt
+    FROM domain_events de
+    WHERE de.stream_id = p_organization_id
+      AND de.event_type = 'invitation.email.sent'
+  )
+  SELECT
+    p_organization_id AS bootstrap_id,
+    p_organization_id AS organization_id,
+    -- Determine overall status
+    CASE
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'organization.activated') THEN 'completed'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'organization.bootstrap.completed') THEN 'completed'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'organization.bootstrap.failed') THEN 'failed'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'organization.bootstrap.cancelled') THEN 'cancelled'
+      WHEN EXISTS (SELECT 1 FROM org_events) THEN 'running'
+      ELSE 'unknown'
+    END::TEXT,
+    -- Determine current stage based on highest completed event
+    CASE
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'organization.activated') THEN 'completed'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'organization.bootstrap.completed') THEN 'completed'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'invitation.email.sent') THEN 'invitation_email'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'user.invited') THEN 'role_assignment'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type IN ('organization.dns.configured', 'organization.dns.verified')) THEN 'dns_provisioning'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'program.created') THEN 'program_creation'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'phone.created') THEN 'phone_creation'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'address.created') THEN 'address_creation'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'contact.created') THEN 'contact_creation'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'organization.created') THEN 'organization_creation'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type LIKE 'organization.bootstrap.%') THEN 'temporal_workflow_started'
+      ELSE 'temporal_workflow_started'
+    END::TEXT,
+    ce.error_msg::TEXT,
+    fe.ts,
+    CASE
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type IN ('organization.activated', 'organization.bootstrap.completed')) THEN ce.ts
+      ELSE NULL
+    END,
+    -- NEW: domain from DNS event
+    dns.fqdn::TEXT,
+    -- NEW: dns_configured boolean
+    EXISTS (SELECT 1 FROM org_events WHERE event_type = 'organization.dns.configured'),
+    -- NEW: invitations_sent count
+    COALESCE(ic.cnt, 0)
+  FROM first_event fe
+  LEFT JOIN completion_event ce ON TRUE
+  LEFT JOIN dns_event dns ON TRUE
+  LEFT JOIN invitation_count ic ON TRUE
+  WHERE fe.ts IS NOT NULL;  -- P0 #3: Only return rows if events exist for this organization
+END;
+$$ LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp;
+
+-- API wrapper for PostgREST access (Edge Functions use 'api' schema)
+-- Includes authorization check (P1 #5) and extended return type (P1 #4)
+CREATE SCHEMA IF NOT EXISTS api;
+
+CREATE OR REPLACE FUNCTION api.get_bootstrap_status(
   p_bootstrap_id UUID
 ) RETURNS TABLE (
   bootstrap_id UUID,
@@ -129,53 +236,61 @@ CREATE OR REPLACE FUNCTION get_bootstrap_status(
   current_stage TEXT,
   error_message TEXT,
   created_at TIMESTAMPTZ,
-  completed_at TIMESTAMPTZ
-) AS $$
+  completed_at TIMESTAMPTZ,
+  domain TEXT,
+  dns_configured BOOLEAN,
+  invitations_sent INTEGER
+)
+SECURITY DEFINER
+SET search_path = public
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_user_id UUID;
 BEGIN
+  -- Get current user from JWT (P1 #5: Authorization check)
+  v_user_id := auth.uid();
+
+  -- Allow access if:
+  -- 1. User is super_admin (global access)
+  -- 2. User has a role in the organization being queried
+  -- 3. User initiated the bootstrap (found in event metadata)
+  IF v_user_id IS NOT NULL THEN
+    IF NOT (
+      -- Super admin can view any organization
+      EXISTS (
+        SELECT 1 FROM user_roles_projection ur
+        JOIN roles_projection r ON r.id = ur.role_id
+        WHERE ur.user_id = v_user_id
+          AND r.name = 'super_admin'
+          AND ur.org_id IS NULL
+      )
+      OR
+      -- User has role in the organization being queried
+      EXISTS (
+        SELECT 1 FROM user_roles_projection
+        WHERE user_id = v_user_id
+          AND org_id = p_bootstrap_id
+      )
+      OR
+      -- User initiated the bootstrap (check event metadata)
+      EXISTS (
+        SELECT 1 FROM domain_events
+        WHERE stream_id = p_bootstrap_id
+          AND event_type = 'organization.bootstrap.initiated'
+          AND event_metadata->>'user_id' = v_user_id::TEXT
+      )
+    ) THEN
+      -- Not authorized - return empty result (consistent with "not found" behavior)
+      RETURN;
+    END IF;
+  END IF;
+
+  -- The p_bootstrap_id is now the organization_id (unified ID system)
   RETURN QUERY
-  WITH bootstrap_events AS (
-    SELECT
-      de.stream_id AS org_id,
-      de.event_type,
-      de.event_data,
-      de.created_at,
-      ROW_NUMBER() OVER (ORDER BY de.created_at DESC) AS rn
-    FROM domain_events de
-    WHERE de.event_data->>'bootstrap_id' = p_bootstrap_id::TEXT
-      AND de.stream_type = 'organization'
-      AND (de.event_type LIKE 'organization.bootstrap.%'
-         OR de.event_type = 'organization.created')
-  )
-  SELECT
-    p_bootstrap_id,
-    be.org_id,
-    CASE
-      WHEN be.event_type = 'organization.bootstrap.completed' THEN 'completed'
-      WHEN be.event_type = 'organization.bootstrap.failed' THEN 'failed'
-      WHEN be.event_type = 'organization.bootstrap.cancelled' THEN 'cancelled'
-      WHEN be.event_type = 'organization.bootstrap.initiated' THEN 'initiated'
-      WHEN be.event_type = 'organization.bootstrap.temporal_initiated' THEN 'initiated'
-      ELSE 'unknown'
-    END,
-    CASE
-      WHEN be.event_type = 'organization.bootstrap.initiated' THEN 'temporal_workflow_started'
-      WHEN be.event_type = 'organization.bootstrap.temporal_initiated' THEN 'temporal_workflow_started'
-      WHEN be.event_type = 'organization.created' THEN 'role_assignment'
-      WHEN be.event_type = 'organization.bootstrap.completed' THEN 'completed'
-      WHEN be.event_type = 'organization.bootstrap.failed' THEN be.event_data->>'failure_stage'
-      ELSE 'unknown'
-    END,
-    be.event_data->>'error_message',
-    be.created_at,
-    CASE
-      WHEN be.event_type = 'organization.bootstrap.completed' THEN be.created_at
-      ELSE NULL
-    END
-  FROM bootstrap_events be
-  WHERE be.rn = 1; -- Most recent event
+  SELECT * FROM get_bootstrap_status(p_bootstrap_id);
 END;
-$$ LANGUAGE plpgsql STABLE
-SET search_path = public, extensions, pg_temp;
+$$;
 
 -- Function to list all bootstrap processes (for admin dashboard)
 CREATE OR REPLACE FUNCTION list_bootstrap_processes(
@@ -272,7 +387,9 @@ COMMENT ON FUNCTION handle_bootstrap_workflow IS
 COMMENT ON FUNCTION retry_failed_bootstrap IS
   'Emit retry request event for Temporal to pick up and orchestrate';
 COMMENT ON FUNCTION get_bootstrap_status IS
-  'Get current status of a bootstrap process by bootstrap_id (tracks Temporal workflow progress)';
+  'Get current status of a bootstrap process by organization_id (unified ID system - tracks Temporal workflow progress). Returns domain, dns_configured, and invitations_sent from events.';
+COMMENT ON FUNCTION api.get_bootstrap_status IS
+  'API wrapper for get_bootstrap_status with authorization check. Returns empty result if user is not authorized.';
 COMMENT ON FUNCTION list_bootstrap_processes IS
   'List all bootstrap processes with their current status (admin dashboard)';
 COMMENT ON FUNCTION cleanup_old_bootstrap_failures IS

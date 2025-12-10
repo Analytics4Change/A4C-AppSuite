@@ -205,9 +205,23 @@ export interface OrganizationBootstrapParams {
 
 /**
  * Workflow status response from Temporal
+ *
+ * Uses the unified ID system where organizationId is the single ID used for:
+ * - Status polling (stream_id in events)
+ * - Temporal workflow ID suffix
+ * - Route parameter
  */
 export interface WorkflowStatus {
+  /**
+   * @deprecated Use organizationId instead. Present for backwards compatibility.
+   * This field equals organizationId in the unified ID system.
+   */
   workflowId: string;
+  /**
+   * Unified ID - used for status polling, Temporal workflow, and routing.
+   * This is the primary identifier in the unified ID system.
+   */
+  organizationId: string;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
   progress: Array<{
     step: string;

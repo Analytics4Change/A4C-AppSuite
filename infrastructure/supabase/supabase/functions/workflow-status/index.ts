@@ -28,6 +28,10 @@ interface WorkflowStatusResponse {
   stages: WorkflowStage[];
   error?: string;
   completedAt?: string;
+  // Result data from events (P1 #4)
+  domain?: string;
+  dnsConfigured?: boolean;
+  invitationsSent?: number;
 }
 
 interface WorkflowStage {
@@ -194,7 +198,7 @@ serve(async (req) => {
       },
     ];
 
-    // Build response
+    // Build response with result data from events (P1 #4)
     const response: WorkflowStatusResponse = {
       workflowId,
       organizationId: status.organization_id,
@@ -203,6 +207,10 @@ serve(async (req) => {
       stages,
       error: status.error_message,
       completedAt: status.completed_at,
+      // Result data from events (populated by extended RPC)
+      domain: status.domain || '',
+      dnsConfigured: status.dns_configured ?? false,
+      invitationsSent: status.invitations_sent ?? 0,
     };
 
     return new Response(

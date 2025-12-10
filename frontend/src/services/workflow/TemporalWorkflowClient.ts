@@ -131,16 +131,20 @@ export class TemporalWorkflowClient implements IWorkflowClient {
 
       const data = await response.json();
 
-      if (!data?.workflowId) {
+      // API now only returns organizationId (unified ID system)
+      if (!data?.organizationId) {
         throw new Error('Invalid response from workflow service');
       }
 
       log.info('Bootstrap workflow started', {
-        workflowId: data.workflowId,
         organizationId: data.organizationId
       });
 
-      return data.workflowId;
+      // Return organizationId - this is now the single ID used for everything:
+      // - Status polling (stream_id in events)
+      // - Temporal workflow ID suffix
+      // - Route parameter
+      return data.organizationId;
     } catch (error) {
       log.error('Error starting bootstrap workflow', error);
       throw error;
@@ -179,10 +183,13 @@ export class TemporalWorkflowClient implements IWorkflowClient {
       }
 
       // Transform Edge Function response to WorkflowStatus type
-      // Edge Function returns: { stages: [...], status, workflowId, organizationId?, ... }
-      // Frontend expects: { progress: [...], status, workflowId, result? }
+      // Edge Function returns: { stages: [...], status, workflowId, organizationId, domain, dnsConfigured, invitationsSent, ... }
+      // Frontend expects: { progress: [...], status, workflowId, organizationId, result? }
       const transformedStatus: WorkflowStatus = {
-        workflowId: data.workflowId,
+        // Backwards compatibility: workflowId equals organizationId in unified ID system
+        workflowId: data.workflowId || data.organizationId,
+        // Primary ID in unified system
+        organizationId: data.organizationId || data.workflowId,
         status: data.status === 'unknown' ? 'failed' : data.status,
         progress: (data.stages || []).map((stage: {
           name: string;
@@ -193,11 +200,12 @@ export class TemporalWorkflowClient implements IWorkflowClient {
           completed: stage.status === 'completed',
           error: stage.error
         })),
+        // Result populated with data from events (domain, dnsConfigured, invitationsSent)
         result: data.organizationId ? {
           orgId: data.organizationId,
-          domain: '',
-          dnsConfigured: false,
-          invitationsSent: 0
+          domain: data.domain || '',
+          dnsConfigured: data.dnsConfigured ?? false,
+          invitationsSent: data.invitationsSent ?? 0
         } : undefined
       };
 
