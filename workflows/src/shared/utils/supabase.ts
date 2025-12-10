@@ -61,7 +61,7 @@ export function getSupabaseClient(): SupabaseClient {
 
   // Add explicit headers to fix 406 Not Acceptable error
   const clientConfig = {
-    db: { schema: 'public' },
+    db: { schema: 'public' as const },
     auth: {
       autoRefreshToken: false,
       persistSession: false
