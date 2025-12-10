@@ -91,6 +91,10 @@ if (existing) {
 1. `workflows/src/api/routes/workflows.ts` - Remove validation query (lines 95-131)
 2. `workflows/src/activities/organization-bootstrap/create-organization.ts` - Fix idempotency return value
 
+## Development Guidelines
+
+- **Run type checks and linting after each major write**: `npm run build` in the `workflows/` directory to catch TypeScript errors early
+
 ## Success Criteria
 
 - [ ] API no longer returns 500 "Failed to validate organization ID"
