@@ -69,7 +69,7 @@ function App() {
             {/* Public Routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/organizations/invitation" element={<AcceptInvitationPage />} />
+            <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
 
             {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>
