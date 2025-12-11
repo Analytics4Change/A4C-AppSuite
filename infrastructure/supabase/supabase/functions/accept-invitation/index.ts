@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v3';
+const DEPLOY_VERSION = 'v4';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -20,20 +20,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface AcceptInvitationRequest {
-  token: string;
-  method: 'email_password' | 'google_oauth';
-  // For email/password method
-  password?: string;
-  // For OAuth method
-  oauthUserId?: string;
-  oauthProvider?: string;
+/**
+ * Supported OAuth providers (matches frontend OAuthProvider type)
+ * See: frontend/src/types/auth.types.ts
+ */
+type OAuthProvider = 'google' | 'github' | 'facebook' | 'apple';
+
+/**
+ * User credentials from frontend
+ * See: frontend/src/types/organization.types.ts
+ */
+interface UserCredentials {
+  email: string;
+  password?: string;      // For email/password auth
+  oauth?: OAuthProvider;  // For OAuth auth
 }
 
+/**
+ * Request format from frontend:
+ * - Email/password: { token, credentials: { email, password } }
+ * - OAuth: { token, credentials: { email, oauth: 'google' } }
+ */
+interface AcceptInvitationRequest {
+  token: string;
+  credentials: UserCredentials;
+}
+
+/**
+ * Response format (matches frontend AcceptInvitationResult)
+ * See: frontend/src/types/organization.types.ts
+ */
 interface AcceptInvitationResponse {
   success: boolean;
   userId?: string;
-  organizationId?: string;
+  orgId?: string;        // Frontend expects orgId, not organizationId
   redirectUrl?: string;
   error?: string;
 }
@@ -86,12 +106,25 @@ serve(async (req) => {
       );
     }
 
-    if (requestData.method === 'email_password' && !requestData.password) {
+    if (!requestData.credentials) {
       return new Response(
-        JSON.stringify({ error: 'Missing password for email/password method' }),
+        JSON.stringify({ error: 'Missing credentials' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Determine auth method from credentials
+    const isOAuth = !!requestData.credentials.oauth;
+    const isEmailPassword = !!requestData.credentials.password;
+
+    if (!isOAuth && !isEmailPassword) {
+      return new Response(
+        JSON.stringify({ error: 'Missing password or OAuth provider' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[accept-invitation v${DEPLOY_VERSION}] Auth method: ${isOAuth ? 'oauth' : 'email_password'}`);
 
     // Query invitation via RPC function in api schema (bypasses public schema restriction)
     console.log(`[accept-invitation v${DEPLOY_VERSION}] Querying invitation via RPC...`);
@@ -135,15 +168,17 @@ serve(async (req) => {
       );
     }
 
-    // Create user account based on method
+    // Create user account based on auth method
     let userId: string | undefined;
     let authError: Error | null = null;
+    const { credentials } = requestData;
 
-    if (requestData.method === 'email_password') {
+    if (isEmailPassword) {
       // Create user with email/password
+      console.log(`[accept-invitation v${DEPLOY_VERSION}] Creating user with email/password...`);
       const { data: authData, error: createError } = await supabase.auth.admin.createUser({
         email: invitation.email,
-        password: requestData.password,
+        password: credentials.password!,
         email_confirm: true, // Auto-confirm email since they're accepting an invitation
         user_metadata: {
           organization_id: invitation.organization_id,
@@ -153,32 +188,23 @@ serve(async (req) => {
 
       if (createError) {
         authError = createError;
+        console.error(`[accept-invitation v${DEPLOY_VERSION}] User creation failed:`, createError);
       } else {
         userId = authData.user.id;
+        console.log(`[accept-invitation v${DEPLOY_VERSION}] User created: ${userId}`);
       }
-    } else if (requestData.method === 'google_oauth') {
-      // Link OAuth user to invitation
-      // Note: OAuth user should already exist from OAuth flow
-      if (!requestData.oauthUserId) {
-        return new Response(
-          JSON.stringify({ error: 'Missing OAuth user ID' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      userId = requestData.oauthUserId;
-
-      // Update user metadata
-      const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
-        user_metadata: {
-          organization_id: invitation.organization_id,
-          invited_via: 'organization_bootstrap',
-        },
-      });
-
-      if (updateError) {
-        authError = updateError;
-      }
+    } else if (isOAuth) {
+      // OAuth flow: User needs to complete OAuth first, then we link the invitation
+      // For now, OAuth acceptance is not implemented - user must use email/password
+      // TODO: Implement OAuth acceptance flow
+      console.warn(`[accept-invitation v${DEPLOY_VERSION}] OAuth acceptance not yet implemented`);
+      return new Response(
+        JSON.stringify({
+          error: 'OAuth acceptance not yet implemented. Please use email/password.',
+          provider: credentials.oauth
+        }),
+        { status: 501, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     if (authError || !userId) {
@@ -220,7 +246,7 @@ serve(async (req) => {
           email: invitation.email,
           organization_id: invitation.organization_id,
           invited_via: 'organization_bootstrap',
-          auth_method: requestData.method,
+          auth_method: isEmailPassword ? 'email_password' : 'oauth',
         },
         p_event_metadata: {
           user_id: userId,
@@ -257,7 +283,7 @@ serve(async (req) => {
     const response: AcceptInvitationResponse = {
       success: true,
       userId,
-      organizationId: invitation.organization_id,
+      orgId: invitation.organization_id,
       redirectUrl,
     };
 
