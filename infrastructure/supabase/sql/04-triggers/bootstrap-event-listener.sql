@@ -161,11 +161,11 @@ BEGIN
     LIMIT 1
   ),
   dns_event AS (
-    -- Extract FQDN from DNS configured event
-    SELECT de.event_data->>'fqdn' AS fqdn
+    -- Extract FQDN from DNS created event (contract: organization.subdomain.dns_created)
+    SELECT COALESCE(de.event_data->>'full_subdomain', de.event_data->>'fqdn') AS fqdn
     FROM domain_events de
     WHERE de.stream_id = p_organization_id
-      AND de.event_type = 'organization.dns.configured'
+      AND de.event_type = 'organization.subdomain.dns_created'
     LIMIT 1
   ),
   invitation_count AS (
@@ -193,7 +193,7 @@ BEGIN
       WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'organization.bootstrap.completed') THEN 'completed'
       WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'invitation.email.sent') THEN 'invitation_email'
       WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'user.invited') THEN 'role_assignment'
-      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type IN ('organization.dns.configured', 'organization.dns.verified')) THEN 'dns_provisioning'
+      WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type IN ('organization.subdomain.dns_created', 'organization.subdomain.verified')) THEN 'dns_provisioning'
       WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'program.created') THEN 'program_creation'
       WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'phone.created') THEN 'phone_creation'
       WHEN EXISTS (SELECT 1 FROM org_events WHERE event_type = 'address.created') THEN 'address_creation'
@@ -210,8 +210,8 @@ BEGIN
     END,
     -- NEW: domain from DNS event
     dns.fqdn::TEXT,
-    -- NEW: dns_configured boolean
-    EXISTS (SELECT 1 FROM org_events WHERE event_type = 'organization.dns.configured'),
+    -- NEW: dns_configured boolean (contract: organization.subdomain.dns_created)
+    EXISTS (SELECT 1 FROM org_events WHERE event_type = 'organization.subdomain.dns_created'),
     -- NEW: invitations_sent count
     COALESCE(ic.cnt, 0)
   FROM first_event fe

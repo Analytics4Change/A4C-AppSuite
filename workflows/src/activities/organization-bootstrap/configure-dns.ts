@@ -7,7 +7,7 @@
  * 1. List zones to find target domain zone
  * 2. Check if DNS record already exists (idempotency)
  * 3. Create CNAME record if not exists
- * 4. Emit organization.dns.configured event
+ * 4. Emit organization.subdomain.dns_created event (AsyncAPI contract)
  *
  * Provider:
  * - Uses DNS provider from factory (Cloudflare/Mock/Logging)
@@ -75,17 +75,20 @@ export async function configureDNS(
     console.log(`[ConfigureDNS] DNS record already exists: ${existing.id}`);
 
     // Emit event even if record exists (for event replay)
+    // Contract: organization.subdomain.dns_created (AsyncAPI)
     await emitEvent({
-      event_type: 'organization.dns.configured',
+      event_type: 'organization.subdomain.dns_created',
       aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
       aggregate_id: params.orgId,
       event_data: {
-        org_id: params.orgId,
-        subdomain: params.subdomain,
-        fqdn,
-        record_id: existing.id,
-        record_type: existing.type,
-        record_content: existing.content
+        organization_id: params.orgId,
+        slug: params.subdomain,
+        base_domain: baseDomain,
+        full_subdomain: fqdn,
+        cloudflare_record_id: existing.id,
+        dns_record_type: existing.type,
+        dns_record_value: existing.content,
+        cloudflare_zone_id: zone.id
       },
       tags: buildTags()
     });
@@ -108,23 +111,25 @@ export async function configureDNS(
 
   console.log(`[ConfigureDNS] Created DNS record: ${record.id}`);
 
-  // Emit organization.dns.configured event
+  // Emit organization.subdomain.dns_created event (contract-compliant)
   await emitEvent({
-    event_type: 'organization.dns.configured',
+    event_type: 'organization.subdomain.dns_created',
     aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
     aggregate_id: params.orgId,
     event_data: {
-      org_id: params.orgId,
-      subdomain: params.subdomain,
-      fqdn,
-      record_id: record.id,
-      record_type: record.type,
-      record_content: record.content
+      organization_id: params.orgId,
+      slug: params.subdomain,
+      base_domain: baseDomain,
+      full_subdomain: fqdn,
+      cloudflare_record_id: record.id,
+      dns_record_type: record.type,
+      dns_record_value: record.content,
+      cloudflare_zone_id: zone.id
     },
     tags: buildTags()
   });
 
-  console.log(`[ConfigureDNS] Emitted organization.dns.configured event for ${params.orgId}`);
+  console.log(`[ConfigureDNS] Emitted organization.subdomain.dns_created event for ${params.orgId}`);
 
   return {
     fqdn,
