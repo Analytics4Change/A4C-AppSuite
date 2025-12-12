@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v22';
+const DEPLOY_VERSION = 'v23';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -165,15 +165,15 @@ serve(async (req) => {
         status: getStageStatus(status.current_stage, 'organization_creation'),
       },
       {
-        name: 'Create Admin Contact',
+        name: 'Create Contacts',
         status: getStageStatus(status.current_stage, 'contact_creation'),
       },
       {
-        name: 'Create Billing Address',
+        name: 'Create Addresses',
         status: getStageStatus(status.current_stage, 'address_creation'),
       },
       {
-        name: 'Create Billing Phone',
+        name: 'Create Phones',
         status: getStageStatus(status.current_stage, 'phone_creation'),
       },
       {
@@ -181,15 +181,19 @@ serve(async (req) => {
         status: getStageStatus(status.current_stage, 'program_creation'),
       },
       {
-        name: 'Provision DNS (Subdomain)',
+        name: 'Configure DNS',
         status: getStageStatus(status.current_stage, 'dns_provisioning'),
+      },
+      {
+        name: 'Verify DNS',
+        status: getStageStatus(status.current_stage, 'dns_verification'),
       },
       {
         name: 'Assign Admin Role',
         status: getStageStatus(status.current_stage, 'role_assignment'),
       },
       {
-        name: 'Send Invitation Email',
+        name: 'Send Invitations',
         status: getStageStatus(status.current_stage, 'invitation_email'),
       },
       {
@@ -247,6 +251,7 @@ function getStageStatus(currentStage: string, stageName: string): 'pending' | 'i
     'phone_creation',
     'program_creation',
     'dns_provisioning',
+    'dns_verification',
     'role_assignment',
     'invitation_email',
     'completed',

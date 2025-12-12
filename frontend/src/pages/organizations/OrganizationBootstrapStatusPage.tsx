@@ -252,11 +252,11 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
             </div>
 
             {/* Progress Steps */}
-            <div className="space-y-4">
+            <div className="space-y-2">
               {(status.progress ?? []).map((step, index) => (
                 <div
                   key={index}
-                  className="flex items-start gap-4 p-4 rounded-lg transition-all"
+                  className="flex items-start gap-3 p-3 rounded-lg transition-all"
                   style={{
                     background: step.completed
                       ? 'rgba(240, 253, 244, 0.6)'
