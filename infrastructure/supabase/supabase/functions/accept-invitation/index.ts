@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v4';
+const DEPLOY_VERSION = 'v5';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -262,6 +262,34 @@ serve(async (req) => {
       // Consider returning error response for consistency with organization-bootstrap
     } else {
       console.log(`User created event emitted successfully: event_id=${_eventId}, user_id=${userId}, org_id=${invitation.organization_id}`);
+    }
+
+    // Emit invitation.accepted event per AsyncAPI contract
+    const { data: _acceptedEventId, error: acceptedEventError } = await supabase
+      .rpc('emit_domain_event', {
+        p_stream_id: invitation.id,
+        p_stream_type: 'invitation',
+        p_stream_version: 1,
+        p_event_type: 'invitation.accepted',
+        p_event_data: {
+          invitation_id: invitation.id,
+          org_id: invitation.organization_id,
+          user_id: userId,
+          email: invitation.email,
+          role: invitation.role,
+          accepted_at: new Date().toISOString(),
+        },
+        p_event_metadata: {
+          user_id: userId,
+          organization_id: invitation.organization_id,
+          automated: true,
+        }
+      });
+
+    if (acceptedEventError) {
+      console.error('Failed to emit invitation.accepted event:', acceptedEventError);
+    } else {
+      console.log(`Invitation accepted event emitted: event_id=${_acceptedEventId}, invitation_id=${invitation.id}`);
     }
 
     // Build redirect URL based on organization subdomain status

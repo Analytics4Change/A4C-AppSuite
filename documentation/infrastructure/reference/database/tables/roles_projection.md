@@ -9,10 +9,12 @@ last_updated: 2025-01-13
 
 The `roles_projection` table is a **CQRS read model** that stores role definitions for the RBAC (Role-Based Access Control) system. Roles are collections of permissions that can be assigned to users. The table supports two distinct patterns:
 
-1. **Global Role Templates** - Platform-level roles (`super_admin`, `provider_admin`, `partner_admin`) with `NULL` organization scope
-2. **Organization-Scoped Roles** - Custom roles tied to specific organizations with hierarchical scope inheritance via ltree paths
+1. **System Role** - `super_admin` only - platform-level with `NULL` organization scope (global access)
+2. **Organization-Scoped Roles** - All other roles tied to specific organizations with hierarchical scope inheritance via ltree paths
 
-This dual-pattern design enables both platform administration and multi-tenant organization management within a single table structure.
+**Built-in Org-Scoped Roles**: `provider_admin`, `partner_admin`, `clinician`, `viewer` are built-in role names that MUST be created with an `organization_id` when assigned. They are not global templates.
+
+This dual-pattern design enables both platform administration (super_admin) and multi-tenant organization management within a single table structure.
 
 **Data Sensitivity**: INTERNAL (access control configuration)
 **CQRS Role**: Read model projection (event-sourced)
@@ -46,8 +48,9 @@ This dual-pattern design enables both platform administration and multi-tenant o
 - **Purpose**: Role identifier and display name
 - **Constraints**: UNIQUE, NOT NULL
 - **Patterns**:
-  - **Global templates**: `super_admin`, `provider_admin`, `partner_admin`
-  - **Org-scoped**: `clinician`, `nurse`, `facility_admin`, `program_coordinator`
+  - **System role**: `super_admin` (NULL organization_id)
+  - **Built-in org-scoped**: `provider_admin`, `partner_admin`, `clinician`, `viewer` (requires organization_id)
+  - **Custom org-scoped**: `nurse`, `facility_admin`, `program_coordinator` (requires organization_id)
 - **Case Sensitivity**: Lowercase with underscores (e.g., `facility_admin`)
 - **Index**: `idx_roles_name` (BTREE) for fast lookups
 
@@ -68,18 +71,18 @@ This dual-pattern design enables both platform administration and multi-tenant o
 - **Foreign Key**: References `organizations_projection(id)` (implicit, not enforced for global roles)
 - **Index**: `idx_roles_organization_id` (partial WHERE NOT NULL)
 - **Scoping Rules**:
-  - `NULL` - Global role template (super_admin, provider_admin, partner_admin)
-  - `<uuid>` - Organization-specific role instance
+  - `NULL` - System role (`super_admin` only - global platform access)
+  - `<uuid>` - Organization-scoped role (all other roles including `provider_admin`, `partner_admin`)
 - **Multi-Tenancy**: Enables organization-isolated role management
 
 #### org_hierarchy_scope
 - **Type**: `ltree` (PostgreSQL hierarchical label tree)
 - **Purpose**: Hierarchical scope path for permission inheritance
-- **Nullable**: YES (NULL for global roles)
+- **Nullable**: YES (NULL for `super_admin` system role only)
 - **Format**: `analytics4change.org_<uuid>.facility_<uuid>.program_<uuid>`
 - **Examples**:
-  - Global role: `NULL`
-  - Org-level: `analytics4change.org_123`
+  - System role (`super_admin`): `NULL`
+  - Org-level (`provider_admin`, `clinician`): `analytics4change.org_123`
   - Facility-level: `analytics4change.org_123.facility_456`
   - Program-level: `analytics4change.org_123.facility_456.program_789`
 - **Index**: `idx_roles_hierarchy_scope` (GIST WHERE NOT NULL) for hierarchical queries
@@ -199,7 +202,7 @@ CREATE POLICY roles_org_admin_select
 - **Scope**: Only organization-scoped roles (excludes global templates)
 - **Function**: `is_org_admin(user_id, org_id)` checks user's admin role assignment
 
-### Policy 3: Global Role Templates Visibility
+### Policy 3: System Role Visibility (super_admin)
 ```sql
 CREATE POLICY roles_global_select
   ON roles_projection FOR SELECT
@@ -208,13 +211,13 @@ CREATE POLICY roles_global_select
     AND get_current_user_id() IS NOT NULL
   );
 ```
-- **Purpose**: All authenticated users can view global role templates
+- **Purpose**: All authenticated users can view the system role (`super_admin`)
 - **Operations**: SELECT only
-- **Rationale**: Users need to see available role templates for:
-  - Understanding platform role hierarchy
-  - Organization setup (copying global templates)
-  - Self-service role exploration
-- **Security**: Read-only prevents template modification
+- **Rationale**: Users need to see the platform hierarchy for:
+  - Understanding super_admin capabilities
+  - Platform administration visibility
+- **Security**: Read-only prevents modification
+- **Note**: This only returns `super_admin`. Organization-scoped roles (`provider_admin`, etc.) are visible via Policy 2.
 
 ### Testing RLS Policies
 
@@ -242,8 +245,8 @@ VALUES (
 SET request.jwt.claims = '{"sub": "org-admin-id", "org_id": "org-123", "role": "provider_admin"}';
 
 -- Should return:
--- 1. Global templates (super_admin, provider_admin, partner_admin)
--- 2. Roles for org-123 only
+-- 1. System role (super_admin only - NULL organization_id)
+-- 2. Organization-scoped roles for org-123 (provider_admin, clinician, etc.)
 SELECT name, organization_id
 FROM roles_projection
 ORDER BY organization_id NULLS FIRST, name;
@@ -257,11 +260,12 @@ INSERT INTO roles_projection (...) VALUES (...);
 ```sql
 SET request.jwt.claims = '{"sub": "user-id", "org_id": "org-456", "role": "clinician"}';
 
--- Should return ONLY global templates (org-456 roles NOT visible)
+-- Should return system role (super_admin) and roles for org-456 only
 SELECT name, organization_id
 FROM roles_projection;
 
--- Returns: super_admin, provider_admin, partner_admin
+-- Returns: super_admin (NULL org), plus any org-456 scoped roles
+-- Does NOT return roles from other organizations
 ```
 
 ## Constraints
@@ -269,32 +273,43 @@ FROM roles_projection;
 ### Check Constraint: roles_projection_scope_check
 ```sql
 ALTER TABLE roles_projection ADD CONSTRAINT roles_projection_scope_check CHECK (
-  (name IN ('super_admin', 'provider_admin', 'partner_admin')
+  (name = 'super_admin'
    AND organization_id IS NULL
    AND org_hierarchy_scope IS NULL)
   OR
-  (name NOT IN ('super_admin', 'provider_admin', 'partner_admin')
+  (name <> 'super_admin'
    AND organization_id IS NOT NULL
    AND org_hierarchy_scope IS NOT NULL)
 );
 ```
 
-**Purpose**: Enforces dual-pattern design (global templates vs org-scoped roles)
+**Purpose**: Enforces system role vs org-scoped role pattern
 
 **Rules**:
-1. **Global role templates** (`super_admin`, `provider_admin`, `partner_admin`):
+1. **System role** (`super_admin` only):
    - MUST have `organization_id = NULL`
    - MUST have `org_hierarchy_scope = NULL`
+   - Has global platform access
 
-2. **Organization-scoped roles** (all others):
+2. **Organization-scoped roles** (all others including `provider_admin`, `partner_admin`, `clinician`, `viewer`):
    - MUST have `organization_id = <uuid>`
    - MUST have `org_hierarchy_scope = <ltree>`
 
 **Validation Examples**:
 ```sql
--- ✅ VALID: Global super_admin
+-- ✅ VALID: System super_admin (only role with NULL org scope)
 INSERT INTO roles_projection (id, name, description, organization_id, org_hierarchy_scope)
 VALUES (gen_random_uuid(), 'super_admin', 'Platform super admin', NULL, NULL);
+
+-- ✅ VALID: Org-scoped provider_admin role (MUST have org_id)
+INSERT INTO roles_projection (id, name, description, organization_id, org_hierarchy_scope)
+VALUES (
+  gen_random_uuid(),
+  'provider_admin',
+  'Provider organization administrator',
+  'org-123',
+  'analytics4change.org_123'::ltree
+);
 
 -- ✅ VALID: Org-scoped clinician role
 INSERT INTO roles_projection (id, name, description, organization_id, org_hierarchy_scope)
@@ -306,12 +321,17 @@ VALUES (
   'analytics4change.org_123'::ltree
 );
 
--- ❌ INVALID: Global role with org scope
+-- ❌ INVALID: super_admin with org scope (system role must be global)
 INSERT INTO roles_projection (id, name, description, organization_id, org_hierarchy_scope)
 VALUES (gen_random_uuid(), 'super_admin', 'Super admin', 'org-123', 'analytics4change.org_123'::ltree);
 -- ERROR: new row violates check constraint "roles_projection_scope_check"
 
--- ❌ INVALID: Org-scoped role without org_id
+-- ❌ INVALID: provider_admin without org_id (built-in roles must have org scope)
+INSERT INTO roles_projection (id, name, description, organization_id, org_hierarchy_scope)
+VALUES (gen_random_uuid(), 'provider_admin', 'Provider admin', NULL, NULL);
+-- ERROR: new row violates check constraint "roles_projection_scope_check"
+
+-- ❌ INVALID: clinician without org_id
 INSERT INTO roles_projection (id, name, description, organization_id, org_hierarchy_scope)
 VALUES (gen_random_uuid(), 'clinician', 'Clinician', NULL, NULL);
 -- ERROR: new row violates check constraint "roles_projection_scope_check"
@@ -416,7 +436,7 @@ WHERE organization_id = 'org-123'
 ORDER BY name;
 ```
 
-### Get Global Role Templates
+### Get System Role (super_admin)
 
 ```sql
 SELECT
@@ -433,10 +453,10 @@ ORDER BY name;
 ```
 id                                   | name              | description
 -------------------------------------|-------------------|------------------------------------------
-uuid-1                               | provider_admin    | Provider organization administrator
-uuid-2                               | partner_admin     | Partner organization administrator
-uuid-3                               | super_admin       | Platform super administrator
+uuid-1                               | super_admin       | Platform super administrator with global access
 ```
+
+**Note**: Only `super_admin` has NULL organization_id. Other built-in roles (`provider_admin`, `partner_admin`) must be created per-organization.
 
 ### Find Roles with Facility-Level or Higher Access
 
@@ -491,16 +511,18 @@ ORDER BY u.last_name, u.first_name;
 
 ## Usage Examples
 
-### 1. Create Global Role Template (via Event)
+### 1. Create System Role (super_admin) - Administrative Only
 
-**Scenario**: Define new global role template `consultant_admin`
+**Scenario**: System role creation is typically done via seed data, not runtime events.
+
+**Note**: Only `super_admin` can be a system role with NULL organization_id. All other roles (including `provider_admin`, `partner_admin`) must be organization-scoped.
 
 ```typescript
-// Temporal Activity: CreateGlobalRoleActivity
-async function createGlobalRole(params: {
-  name: string;
-  description: string;
-}) {
+// System role (super_admin) is created via seed data, not dynamically
+// See: infrastructure/supabase/sql/99-seeds/001-system-roles.sql
+
+// If dynamic creation needed (rare):
+async function createSystemRole() {
   const roleId = uuidv4();
 
   await supabase.from('domain_events').insert({
@@ -509,9 +531,9 @@ async function createGlobalRole(params: {
     aggregate_type: 'role',
     payload: {
       id: roleId,
-      name: params.name,
-      description: params.description,
-      organization_id: null,  // Global template
+      name: 'super_admin',  // Only super_admin can have NULL org
+      description: 'Platform super administrator with global access',
+      organization_id: null,  // System role - global scope
       org_hierarchy_scope: null
     },
     metadata: {
@@ -522,12 +544,6 @@ async function createGlobalRole(params: {
 
   return roleId;
 }
-
-// Usage
-await createGlobalRole({
-  name: 'consultant_admin',
-  description: 'Consultant organization administrator'
-});
 ```
 
 ### 2. Create Organization-Scoped Role (via Event)
@@ -711,9 +727,9 @@ SELECT is_org_admin('<user-uuid>', '<org-uuid>');
 3. Role is inactive (`is_active = false`)
 4. User is not assigned `provider_admin` or `partner_admin` role
 
-### Issue: Global Role Template Has Org Scope
+### Issue: System Role (super_admin) Has Org Scope
 
-**Symptoms**: Constraint violation when creating/updating global role
+**Symptoms**: Constraint violation when creating/updating super_admin with org_id
 
 **Error**:
 ```
@@ -722,13 +738,16 @@ ERROR: new row violates check constraint "roles_projection_scope_check"
 
 **Resolution**:
 ```sql
--- Global role templates MUST have NULL org fields
+-- Only super_admin should have NULL org fields
+-- All other roles (provider_admin, partner_admin, clinician) MUST have org_id
 UPDATE roles_projection
 SET
   organization_id = NULL,
   org_hierarchy_scope = NULL
-WHERE name IN ('super_admin', 'provider_admin', 'partner_admin');
+WHERE name = 'super_admin';
 ```
+
+**Note**: If you're getting this error for `provider_admin` or `partner_admin`, those roles **must** have an organization_id. They are not system roles.
 
 ### Issue: Organization Role Missing Scope Path
 

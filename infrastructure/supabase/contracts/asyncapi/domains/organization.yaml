@@ -89,6 +89,31 @@ components:
       payload:
         $ref: '#/components/schemas/OrganizationBootstrapCancelledEvent'
 
+    # Subdomain Provisioning Events
+    OrganizationSubdomainDnsCreated:
+      name: organization.subdomain.dns_created
+      title: Organization Subdomain DNS Created
+      summary: DNS CNAME record created in Cloudflare for organization subdomain
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationSubdomainDnsCreatedEvent'
+
+    OrganizationSubdomainVerified:
+      name: organization.subdomain.verified
+      title: Organization Subdomain Verified
+      summary: DNS resolution verified for organization subdomain
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationSubdomainVerifiedEvent'
+
+    OrganizationSubdomainVerificationFailed:
+      name: organization.subdomain.verification_failed
+      title: Organization Subdomain Verification Failed
+      summary: DNS verification failed for organization subdomain
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationSubdomainVerificationFailedEvent'
+
   schemas:
     OrganizationCreatedEvent:
       type: object
@@ -742,3 +767,160 @@ components:
         original_failure_stage:
           type: string
           description: Original stage where bootstrap failed
+
+    # Subdomain Provisioning Event Schemas
+    OrganizationSubdomainDnsCreatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.subdomain.dns_created]
+        event_data:
+          $ref: '#/components/schemas/SubdomainDnsCreatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    SubdomainDnsCreatedData:
+      type: object
+      required:
+        - subdomain
+        - cloudflare_record_id
+        - dns_record_type
+        - dns_record_value
+      properties:
+        subdomain:
+          type: string
+          description: Subdomain name (e.g., "acme-healthcare")
+          examples:
+            - "acme-healthcare"
+            - "poc-test1-20251212"
+        cloudflare_record_id:
+          type: string
+          description: Cloudflare DNS record ID
+        cloudflare_zone_id:
+          type: string
+          description: Cloudflare zone ID
+        dns_record_type:
+          type: string
+          enum: [CNAME, A]
+          description: DNS record type
+        dns_record_value:
+          type: string
+          description: DNS record target value
+          examples:
+            - "a4c.firstovertheline.com"
+
+    OrganizationSubdomainVerifiedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.subdomain.verified]
+        event_data:
+          $ref: '#/components/schemas/SubdomainVerifiedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    SubdomainVerifiedData:
+      type: object
+      required:
+        - domain
+        - verified
+        - verified_at
+      properties:
+        domain:
+          type: string
+          description: Full domain that was verified
+          examples:
+            - "acme-healthcare.firstovertheline.com"
+        verified:
+          type: boolean
+          description: Whether DNS verification succeeded
+        verified_at:
+          type: string
+          format: date-time
+          description: Timestamp when verification completed
+        verification_method:
+          type: string
+          enum: [dns_lookup, mock, development]
+          description: Method used for verification
+        verification_attempts:
+          type: integer
+          description: Number of verification attempts made
+        mode:
+          type: string
+          enum: [production, development, mock]
+          description: Workflow execution mode
+
+    OrganizationSubdomainVerificationFailedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        stream_type:
+          type: string
+          enum: [organization]
+        event_type:
+          type: string
+          enum: [organization.subdomain.verification_failed]
+        event_data:
+          $ref: '#/components/schemas/SubdomainVerificationFailedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    SubdomainVerificationFailedData:
+      type: object
+      required:
+        - domain
+        - failure_reason
+      properties:
+        domain:
+          type: string
+          description: Full domain that failed verification
+        failure_reason:
+          type: string
+          description: Reason for verification failure
+          examples:
+            - "DNS_TIMEOUT"
+            - "CNAME_NOT_FOUND"
+            - "WRONG_TARGET"
+        retry_count:
+          type: integer
+          description: Number of retries attempted
+        will_retry:
+          type: boolean
+          description: Whether verification will be retried

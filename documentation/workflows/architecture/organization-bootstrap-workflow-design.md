@@ -1,13 +1,13 @@
 ---
 status: current
-last_updated: 2025-12-09
+last_updated: 2025-12-12
 ---
 
 # OrganizationBootstrapWorkflow - Implementation & Design Specification
 
 **Status**: ✅ Fully Implemented and Operational
 **Implemented**: 2025-12-01 (production deployment with UAT passed)
-**Updated**: 2025-12-09 (Unified ID System, Event Order Fix)
+**Updated**: 2025-12-12 (Quorum-based DNS verification for Cloudflare proxy support)
 **Architecture**: 2-Hop (Frontend → Backend API → Temporal)
 **Activities**: 12 total (6 forward + 6 compensation)
 **Design Pattern**: Design by Contract with Three-Layer Idempotency
@@ -310,7 +310,11 @@ export async function OrganizationBootstrapWorkflow(
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        await verifyDNSActivity({ domain: state.domain });
+        // NOTE: verifyDNSActivity uses quorum-based multi-server lookup
+        // - Queries 3 DNS servers in parallel (Google, Cloudflare, OpenDNS)
+        // - Requires 2/3 quorum for success
+        // - Emits organization.subdomain.verified event on success
+        await verifyDNSActivity({ orgId: state.orgId, domain: state.domain });
         console.log('[WORKFLOW] DNS verified on attempt', attempt);
         break;
       } catch (error) {
@@ -1047,59 +1051,108 @@ interface ConfigureDNSResult {
 
 ```typescript
 /**
- * Verifies DNS record propagation
+ * Verifies DNS record propagation using quorum-based multi-server lookup
  *
  * PRECONDITIONS:
- * - DNS record has been created
+ * - DNS record has been created via Cloudflare
  * - params.domain is valid FQDN
+ * - params.orgId is valid organization UUID
  *
  * POSTCONDITIONS:
- * - DNS lookup succeeds and returns CNAME pointing to expected target
- * - Throws error if DNS not ready (will be retried by workflow)
+ * - At least 2 of 3 DNS servers confirm A records exist
+ * - organization.subdomain.verified event emitted
+ * - subdomain_status updated to 'verified' in organizations_projection
+ * - Throws error if quorum not reached (will be retried by workflow)
+ *
+ * WHY QUORUM-BASED:
+ * - Cloudflare proxied records return A records, not CNAME
+ * - dns.resolveCname() fails with ENODATA for proxied records
+ * - Quorum provides redundancy against single server failures
+ * - Different providers = global propagation confirmation
+ *
+ * DNS SERVERS QUERIED (parallel):
+ * - Google DNS (8.8.8.8)
+ * - Cloudflare DNS (1.1.1.1)
+ * - OpenDNS (208.67.222.222)
+ *
+ * QUORUM CONFIGURATION:
+ * - Total servers: 3
+ * - Required for success: 2
+ * - Timeout per server: 5000ms
  *
  * INVARIANTS:
- * - No state changes (read-only operation)
- * - Safe to retry unlimited times
+ * - Uses Resolver.resolve4() for A record lookup (not CNAME)
+ * - Each server queried via isolated Resolver instance
+ * - Event emission is idempotent (ON CONFLICT DO NOTHING)
  *
  * IDEMPOTENCY:
- * - Fully idempotent (read-only query)
- * - No side effects
+ * - DNS queries are read-only (fully idempotent)
+ * - Event emission uses idempotent insert
+ * - Safe to retry unlimited times
  *
  * PERFORMANCE:
- * - DNS query: 100-500ms
- * - Total: < 1s p99
+ * - Parallel DNS queries: ~100-500ms per server
+ * - 5s timeout prevents hanging on slow servers
+ * - Total: < 6s worst case (timeout + event emission)
  *
- * COMPLEXITY: 1/5 (Low)
- * - Simple DNS lookup
- * - No state changes
+ * COMPLEXITY: 2/5 (Low-Moderate)
+ * - Parallel DNS queries to multiple servers
+ * - Quorum logic
+ * - Event emission with rich debugging data
  */
 export async function verifyDNSActivity(
   params: VerifyDNSParams
-): Promise<void> {
+): Promise<boolean> {
 
-  try {
-    // Resolve CNAME record
-    const addresses = await dns.resolve(params.domain, 'CNAME');
-
-    if (addresses.length === 0) {
-      throw new Error('DNS record not found');
-    }
-
-    console.log(`[ACTIVITY] DNS verified: ${params.domain} -> ${addresses[0]}`);
-
-    // Verify it points to correct target
-    const expectedTarget = 'app.firstovertheline.com';
-    if (!addresses.some(addr => addr.includes(expectedTarget))) {
-      throw new Error(`DNS points to unexpected target: ${addresses[0]}`);
-    }
-
-  } catch (error) {
-    console.log(`[ACTIVITY] DNS verification failed for ${params.domain}:`, error);
-    throw new Error(`DNS not ready: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  // Development/mock mode: skip real DNS verification
+  const workflowMode = process.env.WORKFLOW_MODE || 'development';
+  if (workflowMode === 'mock' || workflowMode === 'development') {
+    await emitEvent({
+      event_type: 'organization.subdomain.verified',
+      aggregate_type: 'Organization',
+      aggregate_id: params.orgId,
+      event_data: {
+        domain: params.domain,
+        verified: true,
+        verification_method: 'development'
+      }
+    });
+    return true;
   }
+
+  // Production mode: Quorum-based DNS verification
+  const { verified, results } = await verifyDnsWithQuorum(params.domain);
+
+  const successCount = results.filter(r => r.success).length;
+  console.log(`[ACTIVITY] DNS quorum: ${successCount}/3 (required: 2)`);
+
+  if (!verified) {
+    throw new Error(
+      `DNS verification failed: only ${successCount}/3 servers confirmed. ` +
+      `Required quorum: 2. Domain may not be fully propagated.`
+    );
+  }
+
+  // Emit verification event with full debugging data
+  await emitEvent({
+    event_type: 'organization.subdomain.verified',
+    aggregate_type: 'Organization',
+    aggregate_id: params.orgId,
+    event_data: {
+      domain: params.domain,
+      verified: true,
+      verification_method: 'dns_quorum',
+      quorum: `${successCount}/3`,
+      dns_results: results,
+      resolved_ips: results.find(r => r.success)?.ips || []
+    }
+  });
+
+  return true;
 }
 
 interface VerifyDNSParams {
+  orgId: string;
   domain: string;
 }
 ```
@@ -2001,7 +2054,7 @@ export const retryDNSVerificationSignal = defineSignal('retryDNSVerification');
 
 setHandler(retryDNSVerificationSignal, async () => {
   console.log('[WORKFLOW] Manual DNS retry triggered');
-  await verifyDNSActivity({ domain: state.domain });
+  await verifyDNSActivity({ orgId: state.orgId, domain: state.domain });
 });
 ```
 

@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-12
 ---
 
 # Temporal Activities Reference
@@ -267,39 +267,102 @@ if (existingRecords.result && existingRecords.result.length > 0) {
 
 ### `verifyDNSActivity`
 
-Verifies that DNS subdomain resolves correctly.
+Verifies DNS record propagation using quorum-based multi-server lookup. Queries multiple public DNS servers in parallel and requires a quorum to confirm propagation.
+
+**Why Quorum-Based Verification**:
+- **Cloudflare Proxy**: When Cloudflare proxy is enabled (orange cloud), DNS queries return **A records** (Cloudflare IPs), not CNAME records. Using `dns.resolveCname()` would fail with `ENODATA`.
+- **Redundancy**: Single DNS server might be temporarily unreachable
+- **Global Confirmation**: Different providers = different network paths
+- **Prevents False Negatives**: One slow server won't block verification
 
 **Signature**:
 ```typescript
 export async function verifyDNSActivity(
   params: VerifyDNSParams
-): Promise<void>
+): Promise<boolean>
 ```
 
 **Parameters**:
 ```typescript
 interface VerifyDNSParams {
+  orgId: string   // Organization UUID (for event emission)
   domain: string  // FQDN to verify (e.g., "acme-healthcare.firstovertheline.com")
 }
 ```
 
-**Returns**: `void`
+**Returns**: `boolean` - `true` if DNS verified (quorum reached)
 
-**Events Emitted**: None (read-only verification)
+**DNS Servers Queried** (parallel execution):
+| Server | IP | Provider |
+|--------|-----|----------|
+| Google DNS | `8.8.8.8` | Google (most widely used globally) |
+| Cloudflare DNS | `1.1.1.1` | Cloudflare (fast, privacy-focused) |
+| OpenDNS | `208.67.222.222` | Cisco (enterprise-grade) |
+
+**Quorum Configuration**:
+- **Total servers**: 3
+- **Required for success**: 2 (quorum)
+- **Timeout per server**: 5000ms
+- **Resolution method**: `resolver.resolve4()` (A records, not CNAME)
+
+**Events Emitted**:
+- `organization.subdomain.verified` → Updates `subdomain_status='verified'` in `organizations_projection`
+
+**Event Data**:
+```typescript
+{
+  event_type: 'organization.subdomain.verified',
+  aggregate_type: 'Organization',
+  aggregate_id: orgId,
+  event_data: {
+    domain: string,              // FQDN verified
+    verified: true,
+    verified_at: string,         // ISO 8601 timestamp
+    verification_method: 'dns_quorum' | 'development',
+    quorum: string,              // e.g., "3/3" or "2/3"
+    dns_results: Array<{         // Individual server results
+      server: string,            // "Google", "Cloudflare", "OpenDNS"
+      success: boolean,
+      ips?: string[]             // Resolved IP addresses
+    }>,
+    resolved_ips: string[]       // IPs from first successful result
+  },
+  metadata: {
+    workflow_id: string,
+    workflow_run_id: string,
+    workflow_type: string
+  }
+}
+```
+
+**Development/Mock Mode**:
+- In `development` or `mock` workflow mode, DNS verification is skipped
+- Event emitted with `verification_method: 'development'`
+- Always returns `true` (no network calls)
 
 **External Dependency**:
-- **DNS Resolution**: Uses Node.js `dns.promises.resolve()`
+- **DNS Resolution**: Uses Node.js `Resolver` class with `setServers()` for isolated queries
+- Each server queried via separate `Resolver` instance (avoids affecting other queries)
 
 **Error Conditions**:
-- DNS not propagated yet (NXDOMAIN)
-- DNS points to unexpected target
+- **Quorum not reached**: Less than 2 servers confirmed A records
+- **DNS timeout**: Individual server timeout (5s) doesn't fail activity, just reduces quorum count
+- **DNS not propagated**: Returns NXDOMAIN (normal during propagation, workflow retries)
+
+**Error Message Example**:
+```
+DNS verification failed: only 1/3 servers confirmed. Required quorum: 2.
+Domain may not be fully propagated. This is normal during DNS propagation (60-300 seconds).
+Workflow will retry automatically.
+```
 
 **Retry Policy**:
 - **Called by workflow** with custom retry logic
-- Workflow retries every 5 minutes for up to 30 minutes
-- Activity itself has minimal retries (1-2 attempts)
+- Workflow retries with exponential backoff
+- DNS propagation typically takes 60-300 seconds
+- Activity throws error if quorum not reached (workflow retries)
 
-**Idempotency**: Fully idempotent (read-only operation).
+**Idempotency**: Fully idempotent. Read-only DNS queries, event emission is idempotent via `ON CONFLICT`.
 
 ---
 
@@ -797,6 +860,6 @@ alerts:
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-10-24
+**Document Version**: 1.1
+**Last Updated**: 2025-12-12
 **Status**: Complete Reference

@@ -1,12 +1,28 @@
 components:
   messages:
-    UserSyncedFromZitadel:
-      name: user.synced_from_zitadel
-      title: User Synced from Zitadel
-      summary: User information synchronized from Zitadel identity provider
+    UserCreated:
+      name: user.created
+      title: User Created
+      summary: A new user account has been created (typically via invitation acceptance)
       contentType: application/json
       payload:
-        $ref: '#/components/schemas/UserSyncedEvent'
+        $ref: '#/components/schemas/UserCreatedEvent'
+
+    UserSyncedFromAuth:
+      name: user.synced_from_auth
+      title: User Synced from Auth
+      summary: User information synchronized from Supabase Auth
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserSyncedFromAuthEvent'
+
+    UserRoleAssigned:
+      name: user.role.assigned
+      title: User Role Assigned
+      summary: A role has been assigned to a user within an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserRoleAssignedEvent'
 
     UserOrganizationSwitched:
       name: user.organization_switched
@@ -17,7 +33,62 @@ components:
         $ref: '#/components/schemas/UserOrgSwitchedEvent'
 
   schemas:
-    UserSyncedEvent:
+    UserCreatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID (same as auth.users.id)
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.created
+        event_data:
+          $ref: '#/components/schemas/UserCreatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserCreatedData:
+      type: object
+      required:
+        - user_id
+        - email
+        - organization_id
+        - auth_method
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: Supabase Auth user ID
+        email:
+          type: string
+          format: email
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization the user is joining
+        auth_method:
+          type: string
+          enum: [email_password, oauth_google, oauth_github]
+          description: How the user authenticated
+        invited_via:
+          type: string
+          enum: [organization_bootstrap, manual_invitation]
+          description: How the user was invited
+        name:
+          type: string
+          description: User's display name (optional)
+
+    UserSyncedFromAuthEvent:
       type: object
       required:
         - stream_id
@@ -34,47 +105,80 @@ components:
           const: user
         event_type:
           type: string
-          const: user.synced_from_zitadel
+          const: user.synced_from_auth
         event_data:
           type: object
           required:
-            - external_id
+            - auth_user_id
             - email
-            - roles
+            - is_active
           properties:
-            external_id:
+            auth_user_id:
               type: string
-              description: Zitadel User ID
+              format: uuid
+              description: Supabase Auth User ID
             email:
               type: string
               format: email
             name:
               type: string
-            roles:
-              type: array
-              items:
-                type: string
-                enum:
-                  - super_admin
-                  - administrator
-                  - clinician
-                  - specialist
-                  - parent
-                  - youth
-            accessible_organizations:
-              type: array
-              items:
-                type: string
-                format: uuid
+            is_active:
+              type: boolean
         event_metadata:
           allOf:
             - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
             - properties:
                 reason:
                   examples:
-                    - "Initial user sync after Zitadel registration"
-                    - "Role update sync after admin promotion"
+                    - "Initial user sync after registration"
                     - "Periodic sync to ensure consistency"
+
+    UserRoleAssignedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.role.assigned
+        event_data:
+          $ref: '#/components/schemas/UserRoleAssignedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserRoleAssignedData:
+      type: object
+      required:
+        - org_id
+        - role_id
+        - role_name
+      properties:
+        org_id:
+          type: string
+          format: uuid
+          description: Organization where the role is assigned
+        role_id:
+          type: string
+          format: uuid
+          description: Role UUID from roles_projection
+        role_name:
+          type: string
+          enum: [super_admin, provider_admin, partner_admin, clinician, viewer]
+          description: Human-readable role name
+        scope_path:
+          type: string
+          description: Organizational scope path (ltree format)
 
     UserOrgSwitchedEvent:
       type: object

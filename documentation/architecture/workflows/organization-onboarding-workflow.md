@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-09
+last_updated: 2025-12-12
 ---
 
 # Organization Onboarding Workflow - Temporal Implementation
@@ -229,7 +229,12 @@ export async function OrganizationBootstrapWorkflow(
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        await verifyDNSActivity({ domain: result.domain })
+        // NOTE: verifyDNSActivity uses quorum-based multi-server lookup
+        // - Queries Google, Cloudflare, and OpenDNS in parallel
+        // - Requires 2/3 quorum to confirm A record propagation
+        // - Handles Cloudflare proxied records (A records, not CNAME)
+        // - Emits organization.subdomain.verified event on success
+        await verifyDNSActivity({ orgId: result.orgId, domain: result.domain })
         result.dnsConfigured = true
         console.log('[WORKFLOW] DNS verified successfully on attempt', attempt)
         break
@@ -504,38 +509,132 @@ export async function configureDNSActivity(
 }
 ```
 
-### Activity 3: Verify DNS
+### Activity 3: Verify DNS (Quorum-Based)
+
+Uses quorum-based multi-server DNS verification to confirm A record propagation. This approach handles Cloudflare proxied records (which return A records, not CNAME) and provides redundancy against single DNS server failures.
+
+**DNS Servers Queried** (in parallel):
+| Server | IP | Provider |
+|--------|-----|----------|
+| Google DNS | `8.8.8.8` | Most widely used globally |
+| Cloudflare DNS | `1.1.1.1` | Fast, privacy-focused |
+| OpenDNS | `208.67.222.222` | Enterprise-grade, different network |
+
+**Quorum Rules**:
+- Total servers: 3
+- Required for success: 2 (quorum)
+- Timeout per server: 5000ms
 
 ```typescript
-// File: temporal/src/activities/organization/verify-dns.ts
+// File: workflows/src/activities/organization-bootstrap/verify-dns.ts
 
-import { promises as dns } from 'dns'
+import { Resolver } from 'dns'
+import { emitEvent, buildTags } from '@shared/utils/emit-event'
+import { AGGREGATE_TYPES } from '@shared/constants'
+
+const DNS_SERVERS = [
+  { name: 'Google', ip: '8.8.8.8' },
+  { name: 'Cloudflare', ip: '1.1.1.1' },
+  { name: 'OpenDNS', ip: '208.67.222.222' }
+] as const
+
+const QUORUM_REQUIRED = 2
+const DNS_TIMEOUT_MS = 5000
 
 export interface VerifyDNSParams {
+  orgId: string
   domain: string
 }
 
-export async function verifyDNSActivity(params: VerifyDNSParams): Promise<void> {
+interface DnsCheckResult {
+  server: string
+  success: boolean
+  ips?: string[]
+  error?: string
+}
+
+async function checkDnsWithServer(
+  domain: string,
+  server: { name: string; ip: string }
+): Promise<DnsCheckResult> {
+  const resolver = new Resolver()
+  resolver.setServers([server.ip])
+
   try {
-    // Resolve CNAME record
-    const addresses = await dns.resolve(params.domain, 'CNAME')
+    const ips = await Promise.race([
+      new Promise<string[]>((resolve, reject) => {
+        resolver.resolve4(domain, (err, addresses) => {
+          if (err) reject(err)
+          else resolve(addresses)
+        })
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('DNS timeout')), DNS_TIMEOUT_MS)
+      )
+    ])
 
-    if (addresses.length === 0) {
-      throw new Error('DNS record not found')
-    }
-
-    console.log(`[ACTIVITY] DNS verified: ${params.domain} -> ${addresses[0]}`)
-
-    // Optionally verify it points to correct target
-    const expectedTarget = 'app.firstovertheline.com'
-    if (!addresses.some(addr => addr.includes(expectedTarget))) {
-      throw new Error(`DNS points to unexpected target: ${addresses[0]}`)
-    }
-
+    return { server: server.name, success: true, ips }
   } catch (error) {
-    console.log(`[ACTIVITY] DNS verification failed for ${params.domain}:`, error)
-    throw new Error(`DNS not ready: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    return {
+      server: server.name,
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
   }
+}
+
+export async function verifyDNSActivity(params: VerifyDNSParams): Promise<boolean> {
+  // Development mode: skip real DNS verification
+  const workflowMode = process.env.WORKFLOW_MODE || 'development'
+  if (workflowMode === 'mock' || workflowMode === 'development') {
+    await emitEvent({
+      event_type: 'organization.subdomain.verified',
+      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
+      aggregate_id: params.orgId,
+      event_data: {
+        domain: params.domain,
+        verified: true,
+        verification_method: 'development'
+      },
+      tags: buildTags()
+    })
+    return true
+  }
+
+  // Production mode: Quorum-based DNS verification
+  const results = await Promise.all(
+    DNS_SERVERS.map(server => checkDnsWithServer(params.domain, server))
+  )
+
+  const successCount = results.filter(r => r.success).length
+  const verified = successCount >= QUORUM_REQUIRED
+
+  console.log(`[VerifyDNS] Quorum: ${successCount}/${DNS_SERVERS.length} (required: ${QUORUM_REQUIRED})`)
+
+  if (!verified) {
+    throw new Error(
+      `DNS verification failed: only ${successCount}/${DNS_SERVERS.length} servers confirmed. ` +
+      `Required quorum: ${QUORUM_REQUIRED}. Domain may not be fully propagated.`
+    )
+  }
+
+  // Emit organization.subdomain.verified event
+  await emitEvent({
+    event_type: 'organization.subdomain.verified',
+    aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
+    aggregate_id: params.orgId,
+    event_data: {
+      domain: params.domain,
+      verified: true,
+      verification_method: 'dns_quorum',
+      quorum: `${successCount}/${DNS_SERVERS.length}`,
+      dns_results: results,
+      resolved_ips: results.find(r => r.success)?.ips || []
+    },
+    tags: buildTags()
+  })
+
+  return true
 }
 ```
 

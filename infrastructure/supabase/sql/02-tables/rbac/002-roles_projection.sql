@@ -17,12 +17,13 @@ CREATE TABLE IF NOT EXISTS roles_projection (
 -- Remove deprecated zitadel_org_id column if it exists
 ALTER TABLE roles_projection DROP COLUMN IF EXISTS zitadel_org_id;
 
--- Update constraint to handle role templates (super_admin, provider_admin, partner_admin)
+-- Update constraint: only super_admin is a system role with NULL org scope
+-- All other roles (including provider_admin, partner_admin, clinician, viewer) MUST have organization_id
 ALTER TABLE roles_projection DROP CONSTRAINT IF EXISTS roles_projection_scope_check;
 ALTER TABLE roles_projection ADD CONSTRAINT roles_projection_scope_check CHECK (
-  (name IN ('super_admin', 'provider_admin', 'partner_admin') AND organization_id IS NULL AND org_hierarchy_scope IS NULL)
+  (name = 'super_admin' AND organization_id IS NULL AND org_hierarchy_scope IS NULL)
   OR
-  (name NOT IN ('super_admin', 'provider_admin', 'partner_admin') AND organization_id IS NOT NULL AND org_hierarchy_scope IS NOT NULL)
+  (name <> 'super_admin' AND organization_id IS NOT NULL AND org_hierarchy_scope IS NOT NULL)
 );
 
 -- Indexes
@@ -34,4 +35,4 @@ CREATE INDEX IF NOT EXISTS idx_roles_hierarchy_scope ON roles_projection USING G
 COMMENT ON TABLE roles_projection IS 'Projection of role.created events - defines collections of permissions';
 COMMENT ON COLUMN roles_projection.organization_id IS 'Internal organization UUID for JOINs (NULL for super_admin with global scope)';
 COMMENT ON COLUMN roles_projection.org_hierarchy_scope IS 'ltree path for hierarchical scoping (NULL for super_admin)';
-COMMENT ON CONSTRAINT roles_projection_scope_check ON roles_projection IS 'Ensures global role templates (super_admin, provider_admin, partner_admin) have NULL org scope, org-specific roles have org scope';
+COMMENT ON CONSTRAINT roles_projection_scope_check ON roles_projection IS 'Ensures only super_admin (system role) has NULL org scope. All other roles (provider_admin, partner_admin, clinician, viewer) MUST have organization_id';
