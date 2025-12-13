@@ -123,6 +123,9 @@ SET search_path = public, extensions, pg_temp;
 -- Queries by stream_id (organization ID) and checks ALL events to determine current stage
 -- Returns additional result data: domain, dns_configured, invitations_sent (P1 #4)
 -- Returns zero rows for non-existent organizations (P0 #3)
+-- Drop first to allow OUT parameter changes (idempotent)
+DROP FUNCTION IF EXISTS get_bootstrap_status(uuid);
+
 CREATE OR REPLACE FUNCTION get_bootstrap_status(
   p_organization_id UUID
 ) RETURNS TABLE (

@@ -7410,6 +7410,9 @@ $$ LANGUAGE plpgsql
 SET search_path = public, extensions, pg_temp;
 
 -- Function to get bootstrap status
+-- Drop first to allow OUT parameter changes (idempotent)
+DROP FUNCTION IF EXISTS get_bootstrap_status(uuid);
+
 CREATE OR REPLACE FUNCTION get_bootstrap_status(
   p_bootstrap_id UUID
 ) RETURNS TABLE (
