@@ -2494,7 +2494,7 @@ COMMENT ON COLUMN permissions_projection.requires_mfa IS 'Whether MFA verificati
 
 CREATE TABLE IF NOT EXISTS roles_projection (
   id UUID PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,  -- NOT globally unique - see composite constraint below
   description TEXT NOT NULL,
   organization_id UUID,  -- Internal UUID for JOINs (NULL for super_admin global scope)
   org_hierarchy_scope LTREE,
@@ -2507,12 +2507,23 @@ CREATE TABLE IF NOT EXISTS roles_projection (
 -- Remove deprecated zitadel_org_id column if it exists
 ALTER TABLE roles_projection DROP COLUMN IF EXISTS zitadel_org_id;
 
--- Update constraint to handle role templates (super_admin, provider_admin, partner_admin)
+-- Remove old global unique constraint on name (if exists)
+-- Role names should be unique per organization, not globally
+ALTER TABLE roles_projection DROP CONSTRAINT IF EXISTS roles_projection_name_key;
+
+-- Add composite unique constraint: role name unique per organization
+-- Note: super_admin (org_id=NULL) is globally unique because PostgreSQL treats each NULL as unique
+ALTER TABLE roles_projection DROP CONSTRAINT IF EXISTS roles_projection_name_org_unique;
+ALTER TABLE roles_projection ADD CONSTRAINT roles_projection_name_org_unique
+  UNIQUE (name, organization_id);
+
+-- Update constraint: only super_admin is a system role with NULL org scope
+-- All other roles (including provider_admin, partner_admin, clinician, viewer) MUST have organization_id
 ALTER TABLE roles_projection DROP CONSTRAINT IF EXISTS roles_projection_scope_check;
 ALTER TABLE roles_projection ADD CONSTRAINT roles_projection_scope_check CHECK (
-  (name IN ('super_admin', 'provider_admin', 'partner_admin') AND organization_id IS NULL AND org_hierarchy_scope IS NULL)
+  (name = 'super_admin' AND organization_id IS NULL AND org_hierarchy_scope IS NULL)
   OR
-  (name NOT IN ('super_admin', 'provider_admin', 'partner_admin') AND organization_id IS NOT NULL AND org_hierarchy_scope IS NOT NULL)
+  (name <> 'super_admin' AND organization_id IS NOT NULL AND org_hierarchy_scope IS NOT NULL)
 );
 
 -- Indexes
@@ -2524,7 +2535,7 @@ CREATE INDEX IF NOT EXISTS idx_roles_hierarchy_scope ON roles_projection USING G
 COMMENT ON TABLE roles_projection IS 'Projection of role.created events - defines collections of permissions';
 COMMENT ON COLUMN roles_projection.organization_id IS 'Internal organization UUID for JOINs (NULL for super_admin with global scope)';
 COMMENT ON COLUMN roles_projection.org_hierarchy_scope IS 'ltree path for hierarchical scoping (NULL for super_admin)';
-COMMENT ON CONSTRAINT roles_projection_scope_check ON roles_projection IS 'Ensures global role templates (super_admin, provider_admin, partner_admin) have NULL org scope, org-specific roles have org scope';
+COMMENT ON CONSTRAINT roles_projection_scope_check ON roles_projection IS 'Ensures only super_admin (system role) has NULL org scope. All other roles (provider_admin, partner_admin, clinician, viewer) MUST have organization_id';
 
 
 -- ----------------------------------------------------------------------------
@@ -7643,6 +7654,174 @@ COMMENT ON FUNCTION enqueue_workflow_from_bootstrap_event() IS
     'Automatically enqueues workflow jobs by emitting workflow.queue.pending event '
     'when organization.bootstrap.initiated event is inserted. '
     'Part of strict CQRS architecture for workflow queue management.';
+
+
+-- ----------------------------------------------------------------------------
+-- Source: sql/04-triggers/process_invitation_accepted.sql
+-- ----------------------------------------------------------------------------
+
+-- ========================================
+-- Process InvitationAccepted Events
+-- ========================================
+-- Event-Driven Trigger: Updates invitations_projection and creates role assignment
+--
+-- Event Source: domain_events table (event_type = 'invitation.accepted')
+-- Event Emitter: accept-invitation Edge Function
+-- Projection Targets: invitations_projection, user_roles_projection
+-- Pattern: CQRS Event Sourcing
+-- ========================================
+
+CREATE OR REPLACE FUNCTION process_invitation_accepted_event()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_role_id UUID;
+  v_org_path LTREE;
+  v_role_name TEXT;
+BEGIN
+  -- Extract role name from event
+  v_role_name := NEW.event_data->>'role';
+
+  -- Mark invitation as accepted
+  UPDATE invitations_projection
+  SET
+    status = 'accepted',
+    accepted_at = (NEW.event_data->>'accepted_at')::TIMESTAMPTZ,
+    updated_at = NEW.created_at
+  WHERE id = (NEW.event_data->>'invitation_id')::UUID
+     OR invitation_id = (NEW.event_data->>'invitation_id')::UUID;
+
+  -- Get organization path for role scope
+  SELECT path INTO v_org_path
+  FROM organizations_projection
+  WHERE id = (NEW.event_data->>'org_id')::UUID;
+
+  -- Look up role by name for this organization
+  -- Note: Only super_admin has NULL org_id. All other roles (provider_admin, etc.) must be org-scoped.
+  IF v_role_name = 'super_admin' THEN
+    -- super_admin is the only system role with NULL org_id
+    SELECT id INTO v_role_id
+    FROM roles_projection
+    WHERE name = 'super_admin'
+      AND organization_id IS NULL;
+  ELSE
+    -- All other roles must be organization-scoped
+    SELECT id INTO v_role_id
+    FROM roles_projection
+    WHERE name = v_role_name
+      AND organization_id = (NEW.event_data->>'org_id')::UUID;
+  END IF;
+
+  -- If role doesn't exist, create it
+  IF v_role_id IS NULL THEN
+    v_role_id := gen_random_uuid();
+
+    IF v_role_name = 'super_admin' THEN
+      -- super_admin should already exist as seed data, but if not, create it as system role
+      -- Note: super_admin has NULL org_id, so we check by name only for system role
+      INSERT INTO roles_projection (
+        id,
+        name,
+        description,
+        organization_id,
+        org_hierarchy_scope,
+        is_active,
+        created_at,
+        updated_at
+      ) VALUES (
+        v_role_id,
+        'super_admin',
+        'Platform super administrator with global access',
+        NULL,  -- System role has NULL org_id
+        NULL,  -- System role has NULL org_hierarchy_scope
+        true,
+        NEW.created_at,
+        NEW.created_at
+      )
+      ON CONFLICT (name, organization_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
+      RETURNING id INTO v_role_id;
+
+      RAISE NOTICE 'Created/found system role super_admin with ID %', v_role_id;
+    ELSE
+      -- All other roles are organization-scoped
+      -- Use composite unique constraint (name, organization_id) for conflict resolution
+      INSERT INTO roles_projection (
+        id,
+        name,
+        description,
+        organization_id,
+        org_hierarchy_scope,
+        is_active,
+        created_at,
+        updated_at
+      ) VALUES (
+        v_role_id,
+        v_role_name,
+        format('%s role for organization', initcap(replace(v_role_name, '_', ' '))),
+        (NEW.event_data->>'org_id')::UUID,
+        v_org_path,
+        true,
+        NEW.created_at,
+        NEW.created_at
+      )
+      ON CONFLICT (name, organization_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
+      RETURNING id INTO v_role_id;
+
+      RAISE NOTICE 'Created/found role % with ID % for org %', v_role_name, v_role_id, NEW.event_data->>'org_id';
+    END IF;
+  END IF;
+
+  -- Create role assignment in user_roles_projection
+  INSERT INTO user_roles_projection (
+    user_id,
+    role_id,
+    org_id,
+    scope_path,
+    assigned_at
+  ) VALUES (
+    (NEW.event_data->>'user_id')::UUID,
+    v_role_id,
+    (NEW.event_data->>'org_id')::UUID,
+    v_org_path,
+    NEW.created_at
+  )
+  ON CONFLICT (user_id, role_id, org_id) DO NOTHING;  -- Idempotent
+
+  -- Update user's roles array in users shadow table
+  UPDATE users
+  SET
+    roles = ARRAY(
+      SELECT DISTINCT unnest(COALESCE(roles, '{}') || ARRAY[v_role_name])
+    ),
+    accessible_organizations = ARRAY(
+      SELECT DISTINCT unnest(COALESCE(accessible_organizations, '{}') || ARRAY[(NEW.event_data->>'org_id')::UUID])
+    ),
+    current_organization_id = COALESCE(current_organization_id, (NEW.event_data->>'org_id')::UUID),
+    updated_at = NEW.created_at
+  WHERE id = (NEW.event_data->>'user_id')::UUID;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
+
+-- ========================================
+-- Register Trigger
+-- ========================================
+-- Fires AFTER INSERT on domain_events for invitation.accepted events only
+
+DROP TRIGGER IF EXISTS process_invitation_accepted_event ON domain_events;
+
+CREATE TRIGGER process_invitation_accepted_event
+AFTER INSERT ON domain_events
+FOR EACH ROW
+WHEN (NEW.event_type = 'invitation.accepted')
+EXECUTE FUNCTION process_invitation_accepted_event();
+
+-- ========================================
+-- Comments for Documentation
+-- ========================================
+COMMENT ON FUNCTION process_invitation_accepted_event() IS
+'Event processor for InvitationAccepted domain events. Updates invitations_projection, creates role assignment in user_roles_projection, and updates users shadow table. Idempotent.';
 
 
 -- ----------------------------------------------------------------------------

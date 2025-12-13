@@ -4,7 +4,7 @@
 
 CREATE TABLE IF NOT EXISTS roles_projection (
   id UUID PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,  -- NOT globally unique - see composite constraint below
   description TEXT NOT NULL,
   organization_id UUID,  -- Internal UUID for JOINs (NULL for super_admin global scope)
   org_hierarchy_scope LTREE,
@@ -16,6 +16,16 @@ CREATE TABLE IF NOT EXISTS roles_projection (
 
 -- Remove deprecated zitadel_org_id column if it exists
 ALTER TABLE roles_projection DROP COLUMN IF EXISTS zitadel_org_id;
+
+-- Remove old global unique constraint on name (if exists)
+-- Role names should be unique per organization, not globally
+ALTER TABLE roles_projection DROP CONSTRAINT IF EXISTS roles_projection_name_key;
+
+-- Add composite unique constraint: role name unique per organization
+-- Note: super_admin (org_id=NULL) is globally unique because PostgreSQL treats each NULL as unique
+ALTER TABLE roles_projection DROP CONSTRAINT IF EXISTS roles_projection_name_org_unique;
+ALTER TABLE roles_projection ADD CONSTRAINT roles_projection_name_org_unique
+  UNIQUE (name, organization_id);
 
 -- Update constraint: only super_admin is a system role with NULL org scope
 -- All other roles (including provider_admin, partner_admin, clinician, viewer) MUST have organization_id

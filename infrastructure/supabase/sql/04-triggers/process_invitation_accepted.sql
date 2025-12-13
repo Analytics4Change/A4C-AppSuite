@@ -55,6 +55,7 @@ BEGIN
 
     IF v_role_name = 'super_admin' THEN
       -- super_admin should already exist as seed data, but if not, create it as system role
+      -- Note: super_admin has NULL org_id, so we check by name only for system role
       INSERT INTO roles_projection (
         id,
         name,
@@ -74,11 +75,13 @@ BEGIN
         NEW.created_at,
         NEW.created_at
       )
-      ON CONFLICT (id) DO NOTHING;
+      ON CONFLICT (name, organization_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
+      RETURNING id INTO v_role_id;
 
-      RAISE NOTICE 'Created system role super_admin with ID %', v_role_id;
+      RAISE NOTICE 'Created/found system role super_admin with ID %', v_role_id;
     ELSE
       -- All other roles are organization-scoped
+      -- Use composite unique constraint (name, organization_id) for conflict resolution
       INSERT INTO roles_projection (
         id,
         name,
@@ -98,9 +101,10 @@ BEGIN
         NEW.created_at,
         NEW.created_at
       )
-      ON CONFLICT (id) DO NOTHING;
+      ON CONFLICT (name, organization_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
+      RETURNING id INTO v_role_id;
 
-      RAISE NOTICE 'Created role % with ID % for org %', v_role_name, v_role_id, NEW.event_data->>'org_id';
+      RAISE NOTICE 'Created/found role % with ID % for org %', v_role_name, v_role_id, NEW.event_data->>'org_id';
     END IF;
   END IF;
 
