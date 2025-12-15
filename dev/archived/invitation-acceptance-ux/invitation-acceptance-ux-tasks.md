@@ -130,13 +130,13 @@
 
 **Phase**: 1 - Research & Analysis ✅ COMPLETE
 **Status**: ✅ Email/Password invitation acceptance flow working end-to-end
-**Last Updated**: 2025-12-14
+**Last Updated**: 2025-12-15
 **Next Step**:
-1. Proceed to Phase 2 UX design for SSO auto-detection
-2. Design SSO provider selector UI with override capability
-3. Design "Login to Accept" flow for existing users
+1. **Phase 2 DEFERRED** - Multi-org user scenario needs more design thought
+2. Consider testing DNS verification fix with new org bootstrap
+3. Or work on different feature
 
-**Note**: All infrastructure/schema fixes complete. Bootstrap and invitation flows tested and verified.
+**Note**: All infrastructure/schema fixes deployed. Phase 2 (SSO auto-detection, existing user handling) deferred - user wants to think through multi-org user scenario more carefully before implementation.
 
 ### Completed Since Last Update (2025-12-13/14)
 
@@ -389,3 +389,42 @@ User noticed bootstrap status page should display DNS verification as a separate
 
 **Key Learning:**
 Bootstrap status UI is event-driven (not activity-driven) for granular progress visibility. One activity can emit multiple events → multiple UI steps.
+
+### 2025-12-15 - Phase 2 Planning Session (DEFERRED)
+
+**Context:**
+Started Phase 2 UX design planning for SSO auto-detection and existing user handling.
+
+**Exploration Completed:**
+- Launched 3 Explore agents to analyze:
+  1. AcceptInvitationPage, ViewModel, Service implementations
+  2. Auth provider patterns (IAuthProvider, OAuth flows, factory pattern)
+  3. Edge Functions (validate-invitation, accept-invitation)
+- Created comprehensive implementation plan
+
+**User Decisions Made:**
+1. **SSO domain detection**: Skip for MVP - show both auth options equally
+2. **Email mismatch**: Reject with error (most secure)
+3. **OAuth scope**: Full implementation
+
+**Plan Created But Deferred:**
+- User asked clarifying question about "existing user" scenario
+- Realized this is for multi-org users (user already in Org A, invited to Org B)
+- User decided this needs more thought before implementation
+- Plan saved to `/home/lars/.claude/plans/cosmic-wishing-jellyfish.md` (marked DEFERRED)
+
+**Key Insight:**
+The "existing user" flow is specifically for multi-organization scenarios where a user with an existing account is invited to join a second (or third) organization. This is not a common first-phase scenario and adds complexity that warrants careful design.
+
+**What Was NOT Implemented:**
+- Email existence check in validate-invitation
+- `user.organization_joined` event and trigger
+- "Login to Accept" UI flow
+- OAuth acceptance flow (still returns 501)
+
+**Current Working State:**
+- ✅ Email/password invitation acceptance: WORKING
+- ✅ DNS verification: DEPLOYED (quorum-based)
+- ✅ Bootstrap status UI: 11 steps with DNS verification
+- ⚠️ Google OAuth acceptance: Returns 501 (deferred)
+- ⚠️ Existing user flow: Not implemented (deferred)

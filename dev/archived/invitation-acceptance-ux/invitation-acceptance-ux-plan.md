@@ -1,5 +1,18 @@
 # Implementation Plan: Invitation Acceptance UX
 
+## Plan Status: PHASE 2+ DEFERRED
+
+**Last Updated**: 2025-12-15
+**Phase 1**: ✅ COMPLETE - Research & bug fixes done
+**Phase 2-5**: ⏸️ DEFERRED - Multi-org user scenario needs more design thought
+
+**Immediate Next Steps** (when resuming):
+1. Design multi-org user flow (user in Org A invited to Org B)
+2. Decide if OAuth acceptance is priority before multi-org support
+3. Consider simpler MVP: Just fix OAuth 501 without existing user detection
+
+---
+
 ## Executive Summary
 
 This feature improves the first-time user experience when accepting an organization invitation. The current implementation requires users to manually select their authentication method (email/password vs Google OAuth). The enhanced UX will auto-detect SSO providers based on email domain while allowing manual override, properly handle existing users (login vs. create account), and ignore any current session state to focus solely on the invited email.
@@ -86,9 +99,9 @@ The goal is to create a frictionless onboarding experience that guides users thr
 ## Success Metrics
 
 ### Immediate
-- [ ] Invitation acceptance works for new users (email/password)
-- [ ] Invitation acceptance works for new users (Google OAuth)
-- [ ] Page ignores current session state
+- [x] Invitation acceptance works for new users (email/password) ✅ DONE
+- [ ] Invitation acceptance works for new users (Google OAuth) - Returns 501
+- [x] Page ignores current session state ✅ DONE (by design)
 
 ### Medium-Term
 - [ ] SSO auto-detection shows correct provider based on email domain

@@ -251,10 +251,11 @@ export interface IInvitationService {
 
 ## Open Questions (To Resolve During Implementation)
 
-1. Where to store SSO domain mappings? (config file vs. database table)
-2. Should we support multiple SSO providers per organization?
-3. How to handle edge case: existing user but different OAuth provider?
-4. Should invitation acceptance send a confirmation email?
+1. Where to store SSO domain mappings? (config file vs. database table) - **ANSWERED 2025-12-15**: Skip for MVP, show both options equally
+2. Should we support multiple SSO providers per organization? - **DEFERRED**: Not needed for MVP
+3. How to handle edge case: existing user but different OAuth provider? - **DEFERRED**: Multi-org scenario needs more design thought
+4. Should invitation acceptance send a confirmation email? - **UNANSWERED**
+5. **NEW**: How should multi-org user flow work? (User in Org A invited to Org B) - **NEEDS DESIGN** - Added 2025-12-15
 
 ## Pre-Requisite Fixes (Must Complete Before Finalizing Plan)
 
@@ -279,4 +280,42 @@ export interface IInvitationService {
   - `documentation/workflows/reference/activities-reference.md` - Updated verifyDNSActivity section
   - `documentation/workflows/architecture/organization-bootstrap-workflow-design.md` - Updated activity contract
   - `documentation/architecture/workflows/organization-onboarding-workflow.md` - Updated Activity 3 section
-- **Status**: ✅ Implemented and documented. Ready for deployment (commit 7239902f)
+- **Status**: ✅ DEPLOYED via GitHub Actions (2025-12-12T19:11 UTC)
+
+## Phase 2 Planning Status (Added 2025-12-15)
+
+### Planning Session Outcome: DEFERRED
+
+**Date**: 2025-12-15
+**Outcome**: Phase 2 planning started but deferred by user decision
+
+**What Was Explored:**
+- AcceptInvitationPage, ViewModel, Service implementations (comprehensive analysis)
+- Auth provider patterns (IAuthProvider, OAuth flows, factory pattern)
+- Edge Functions (validate-invitation v8, accept-invitation v5)
+
+**User Decisions Made:**
+1. **SSO domain detection**: Skip for MVP - show both auth options equally
+2. **Email mismatch on OAuth**: Reject with error (most secure)
+3. **OAuth scope**: Full implementation (when ready)
+
+**Why Deferred:**
+User asked clarifying question about "existing user" scenario. The "existing user" flow is specifically for **multi-organization scenarios**:
+- User accepts invitation to Org A → account created
+- Later, user receives invitation to Org B (same email)
+- System should detect email exists and show "Login to Accept" instead of "Create Account"
+- After login, link existing user to Org B
+
+User decided this multi-org scenario needs more careful design thought before implementation.
+
+**Plan File Location:** `/home/lars/.claude/plans/cosmic-wishing-jellyfish.md` (marked DEFERRED)
+
+### Current Feature State
+
+| Feature | Status |
+|---------|--------|
+| Email/password invitation acceptance | ✅ Working |
+| Google OAuth invitation acceptance | ⚠️ Returns 501 (deferred) |
+| Existing user detection | ❌ Not implemented (deferred) |
+| SSO domain auto-detection | ❌ Skipped for MVP |
+| Multi-org user flow | ❌ Needs design (deferred) |
