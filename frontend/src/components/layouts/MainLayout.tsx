@@ -186,7 +186,7 @@ export const MainLayout: React.FC = () => {
           <img
             src="/logo.png"
             alt="Analytics4Change"
-            className="h-10 w-auto"
+            className="h-24 w-auto"
           />
         </div>
 
