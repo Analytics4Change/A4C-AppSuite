@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, AlertCircle, Info } from 'lucide-react';
+import { AlertCircle, Info } from 'lucide-react';
 import { isMockAuth } from '@/services/auth/AuthProviderFactory';
 
 export const LoginPage: React.FC = () => {
@@ -66,13 +66,11 @@ export const LoginPage: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="w-full max-w-md px-4">
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="p-3 bg-blue-600 rounded-full">
-              <Heart className="w-8 h-8 text-white" />
-            </div>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">A4C Medical</h1>
-          <p className="text-gray-600 mt-2">Medication Management System</p>
+          <img
+            src="/logo.png"
+            alt="Analytics4Change"
+            className="h-16 w-auto mx-auto"
+          />
         </div>
 
         <Card className="glass" style={{

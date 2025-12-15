@@ -7,7 +7,6 @@ import {
   FileText,
   Settings,
   LogOut,
-  Heart,
   Menu,
   X,
   Building,
@@ -183,16 +182,12 @@ export const MainLayout: React.FC = () => {
         `.trim()
       }}>
         {/* Logo */}
-        <div className="p-6 border-b border-gray-200/30">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg">
-              <Heart className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-800">A4C Medical</h1>
-              <p className="text-xs text-gray-600">Medication Management</p>
-            </div>
-          </div>
+        <div className="p-4 border-b border-gray-200/30">
+          <img
+            src="/logo.png"
+            alt="Analytics4Change"
+            className="h-10 w-auto"
+          />
         </div>
 
         {/* Navigation */}
