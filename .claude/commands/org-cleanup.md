@@ -124,34 +124,50 @@ Before proceeding, verify:
 
 ### Phase 4: DNS Cleanup
 
-**Step 4.1: Verify DNS Records Exist**
-- Run: `dig $1` and `nslookup $1`
-- If no DNS records found, skip to Phase 5
+**Step 4.1: Extract Actual FQDN from Domain Events**
+- Query `domain_events` WHERE `stream_id = org_id` AND `event_type = 'organization.subdomain.dns_created'`
+- Extract the actual FQDN from `event_data`:
+  - Try `event_data->>'full_subdomain'` first
+  - Fallback to `event_data->>'fqdn'`
+  - Fallback to `event_data->>'subdomain'`
+- Store as `dns_fqdn`
+- Also store the base subdomain (org name portion) as `dns_subdomain`
+- Log: "Found DNS FQDN from events: {dns_fqdn}"
 
 **Step 4.2: Locate Cloudflare API Token**
 Search in order:
 1. Check environment variables: `CLOUDFLARE_API_TOKEN`, `CF_API_TOKEN`, `CLOUDFLARE_TOKEN`
 2. Search filesystem for `.env.local` files
-3. If K8s cluster exists: `kubectl get secret -n temporal` and extract token
+3. If K8s cluster exists: `kubectl get secret -n temporal workflow-worker-secrets` and extract token
 4. If all fail: STOP and prompt user to provide token manually
 
 **Step 4.3: Connect to Cloudflare**
-- Use either `cloudflared` CLI or Cloudflare REST API
+- Use Cloudflare REST API with Bearer token authentication
 - Authenticate with discovered/provided API token
 
 **Step 4.4: Identify Zone ID**
 - List all zones in Cloudflare account
-- Match zone that would contain records for `$1`
+- Match zone that would contain records (typically `firstovertheline.com`)
 - Store zone_id
 
-**Step 4.5: Delete DNS Records**
-- List all DNS records in zone matching `$1`
-- Delete each record (A, AAAA, CNAME, TXT, MX, etc.)
-- Log each deletion
+**Step 4.5: Search for DNS Records (Comprehensive)**
+- Fetch ALL DNS records from the zone (use `per_page=100` or pagination)
+- Search for records matching ANY of these patterns:
+  1. Exact FQDN match: `dns_fqdn` (from Step 4.1)
+  2. Contains org name: any record where `name` contains `$1` (the org name argument)
+  3. Contains subdomain: any record where `name` contains `dns_subdomain`
+- This catches records regardless of subdomain format (e.g., `{org}.firstovertheline.com` OR `{org}.a4c.firstovertheline.com`)
+- Store all matching record IDs and details
 
-**Step 4.6: Verify DNS Deletion**
-- Run: `dig $1` and `nslookup $1`
-- Confirm no records returned
+**Step 4.6: Delete DNS Records**
+- For each matching record found in Step 4.5:
+  - Delete using: `DELETE /zones/{zone_id}/dns_records/{record_id}`
+  - Log: "Deleted DNS record: {type} {name} -> {content} (ID: {record_id})"
+- If no records found: Log "No DNS records found matching organization"
+
+**Step 4.7: Verify DNS Deletion**
+- For each FQDN that was deleted, run: `dig {fqdn}` and `nslookup {fqdn}`
+- Confirm NXDOMAIN or no records returned
 - May take 30-60 seconds for DNS propagation
 
 ### Phase 5: Summary Report

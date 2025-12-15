@@ -130,15 +130,89 @@
 
 **Phase**: 1 - Research & Analysis ✅ COMPLETE
 **Status**: ✅ Email/Password invitation acceptance flow working end-to-end
-**Last Updated**: 2025-12-12
+**Last Updated**: 2025-12-14
 **Next Step**:
-1. Deploy Temporal worker with DNS verification fix (docker build + kubectl apply)
-2. Test end-to-end organization bootstrap to verify subdomain_status transitions correctly
-3. Proceed to Phase 2 UX design for SSO auto-detection
+1. Proceed to Phase 2 UX design for SSO auto-detection
+2. Design SSO provider selector UI with override capability
+3. Design "Login to Accept" flow for existing users
 
-**Note**: DNS verification bug has been fixed (2025-12-12) - quorum-based multi-server verification now handles Cloudflare proxied records correctly. Worker deployment required to activate the fix.
+**Note**: All infrastructure/schema fixes complete. Bootstrap and invitation flows tested and verified.
+
+### Completed Since Last Update (2025-12-13/14)
+
+1. **Fixed roles_projection constraints** (ce816dfa) - Multi-org support
+   - Changed `UNIQUE(name)` to `UNIQUE(name, organization_id)`
+   - Fixed CHECK constraint for organization-scoped roles
+   - Fixed `process_invitation_accepted_event` trigger ON CONFLICT clause
+
+2. **Fixed CONSOLIDATED_SCHEMA.sql** (fea92366, 02edcf72) - Deployment fixes
+   - Added `DROP FUNCTION IF EXISTS get_bootstrap_status(uuid)` for idempotency
+   - Added 13 missing artifacts:
+     - `process_user_event()` function
+     - 6 OU management functions (`api.get_organization_units`, etc.)
+     - 4 OU RLS policies (`organizations_scope_select`, etc.)
+
+3. **Fixed org-cleanup slash commands** - DNS discovery improvement
+   - Commands now extract actual FQDN from `organization.subdomain.dns_created` event
+   - Search Cloudflare using contains pattern (catches any subdomain format)
+   - Prevents missing DNS records like `{org}.firstovertheline.com` vs `{org}.a4c.firstovertheline.com`
+
+4. **Organization cleanup tested** - `poc-test1-20251213` fully cleaned
+   - Auth user deleted
+   - All database records cleaned
+   - DNS record deleted (was at `poc-test1-20251213.firstovertheline.com`, not `.a4c.`)
 
 ## Session Notes
+
+### 2025-12-13/14 - Schema Fixes & Org Cleanup Testing
+
+**Context:**
+User `johnltice@yahoo.com` for org `poc-test1-20251213` had "viewer" role instead of expected `provider_admin`. Investigation revealed two critical bugs in `roles_projection` table.
+
+**Bug 1: UNIQUE(name) Constraint**
+- `roles_projection.name` had global UNIQUE constraint
+- Should be `UNIQUE(name, organization_id)` for multi-org support
+- When `process_invitation_accepted_event` tried to create `provider_admin` for new org, it failed because `provider_admin` already existed for different org
+- Fix: Changed constraint to composite unique
+
+**Bug 2: CHECK Constraint Mismatch**
+- CONSOLIDATED_SCHEMA.sql had outdated CHECK constraint allowing `provider_admin`/`partner_admin` with NULL org_id
+- Production data (correctly) has these roles with non-NULL org_id
+- Fix: Updated CHECK to only allow `super_admin` with NULL org_id
+
+**Bug 3: Missing Artifacts in CONSOLIDATED_SCHEMA.sql**
+- Audit found 13 artifacts in source SQL files missing from deployment schema
+- GitHub Actions only deploys CONSOLIDATED_SCHEMA.sql, not individual files
+- Fix: Added all missing functions and RLS policies
+
+**Bug 4: org-cleanup DNS Discovery**
+- Cleanup command searched for `{org}.a4c.firstovertheline.com`
+- Actual DNS record was `{org}.firstovertheline.com` (no `.a4c`)
+- Fix: Updated both org-cleanup and org-cleanup-dryrun commands to:
+  1. Extract actual FQDN from `organization.subdomain.dns_created` event
+  2. Search Cloudflare with contains pattern for org name
+
+**Files Modified:**
+- `infrastructure/supabase/sql/02-tables/rbac/002-roles_projection.sql`
+- `infrastructure/supabase/sql/04-triggers/process_invitation_accepted.sql`
+- `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql` (multiple fixes)
+- `.claude/commands/org-cleanup.md`
+- `.claude/commands/org-cleanup-dryrun.md`
+
+**Key Commits:**
+- `ce816dfa` - fix(rbac): Fix roles_projection constraints for multi-org support
+- `02edcf72` - fix(schema): Add DROP FUNCTION for get_bootstrap_status idempotency
+- `fea92366` - fix(schema): Add missing artifacts to CONSOLIDATED_SCHEMA.sql
+
+**Organization Cleaned Up:**
+- Name: `poc-test1-20251213`
+- ID: `78a58df8-0f07-47fc-9e1e-1140061e9c30`
+- User: `johnltice@yahoo.com` (ID: `532bafd4-6152-497b-93fd-242e8114004d`)
+- All database records deleted
+- DNS record `poc-test1-20251213.firstovertheline.com` deleted
+
+**Key Learning:**
+GitHub Actions deployment only uses CONSOLIDATED_SCHEMA.sql. Any new functions/policies in source SQL files MUST be added to consolidated schema or they won't be deployed.
 
 ### 2025-12-10 - Initial Planning & Bug Fixes
 
@@ -260,3 +334,58 @@ Quorum-based multi-server DNS verification:
 - Worker needs rebuild: `docker build -t ghcr.io/analytics4change/a4c-workflows:latest .`
 - Worker needs deploy: `kubectl set image deployment/workflow-worker ...`
 - Test with new organization bootstrap to verify subdomain_status transitions correctly
+
+### 2025-12-12 - Bootstrap Status UI Redesign
+
+**Context:**
+User noticed bootstrap status page should display DNS verification as a separate step. Investigation revealed:
+1. UI showed 10 steps, but workflow actually has 11 stages (including DNS verification)
+2. Event mapping grouped `organization.subdomain.verified` with `organization.subdomain.dns_created`
+3. Step labels were misleading (e.g., "Create Admin Contact" when creating multiple contacts)
+
+**Investigation Findings:**
+- Bootstrap status page route: `/organizations/:organizationId/bootstrap`
+- Edge Function `workflow-status` (v22) queries `get_bootstrap_status()` database function
+- Database function maps domain events to stages using CASE statement
+- UI was driven by events, not workflow activities (intentional for granular progress)
+- `dns_verification` event existed but was grouped under `dns_provisioning` stage
+
+**Changes Implemented:**
+
+1. **Database Function** (`get_bootstrap_status` in `bootstrap-event-listener.sql`):
+   - Split `dns_provisioning` stage
+   - `organization.subdomain.dns_created` → `dns_provisioning`
+   - `organization.subdomain.verified` → `dns_verification` (new)
+
+2. **Edge Function** (`workflow-status/index.ts` v23):
+   - Added `dns_verification` to `stageOrder` array
+   - Added "Verify DNS" stage entry
+   - Updated labels to be generic (pluralized)
+
+3. **Frontend** (`OrganizationBootstrapStatusPage.tsx`):
+   - Compacted layout (p-4→p-3, space-y-4→space-y-2)
+   - All 11 steps fit without scrolling
+
+**New 11-Step Layout:**
+1. Initialize Organization
+2. Create Organization Record
+3. Create Contacts
+4. Create Addresses
+5. Create Phones
+6. Create Program
+7. Configure DNS
+8. **Verify DNS** ← NEW
+9. Assign Admin Role
+10. Send Invitations
+11. Complete Bootstrap
+
+**Commits:**
+- `a96e8bb6` - feat(bootstrap): Add DNS verification as separate step in status UI
+
+**Deployments:**
+- ✅ Database function applied via MCP
+- ✅ Edge Function v23 deployed via Supabase CLI
+- ⏳ Frontend will auto-deploy via GitHub Actions
+
+**Key Learning:**
+Bootstrap status UI is event-driven (not activity-driven) for granular progress visibility. One activity can emit multiple events → multiple UI steps.

@@ -142,29 +142,45 @@ For each table identified:
 
 ### Phase 4: DNS Impact Analysis
 
-**Step 4.1: Check DNS Records**
-- Run: `dig $1` and `nslookup $1`
-- **Report**: Current DNS records found (or "No DNS records found")
-- Display all A, AAAA, CNAME, TXT, MX records discovered
+**Step 4.1: Extract Actual FQDN from Domain Events**
+- Query `domain_events` WHERE `stream_id = org_id` AND `event_type = 'organization.subdomain.dns_created'`
+- Extract the actual FQDN from `event_data`:
+  - Try `event_data->>'full_subdomain'` first
+  - Fallback to `event_data->>'fqdn'`
+  - Fallback to `event_data->>'subdomain'`
+- Store as `dns_fqdn`
+- Also store the base subdomain (org name portion) as `dns_subdomain`
+- **Report**: "Found DNS FQDN from events: {dns_fqdn}" (or "No DNS event found in domain_events")
 
-**Step 4.2: Locate Cloudflare API Token**
+**Step 4.2: Check DNS Records via dig/nslookup**
+- If `dns_fqdn` was found, run: `dig {dns_fqdn}` and `nslookup {dns_fqdn}`
+- Also try common patterns: `dig {org_name}.firstovertheline.com` and `dig {org_name}.a4c.firstovertheline.com`
+- **Report**: Current DNS records found (or "No DNS records found via DNS lookup")
+- Display all A, AAAA, CNAME records discovered
+
+**Step 4.3: Locate Cloudflare API Token**
 Search in order:
 1. Check environment variables: `CLOUDFLARE_API_TOKEN`, `CF_API_TOKEN`, `CLOUDFLARE_TOKEN`
 2. Search filesystem for `.env.local` files
-3. If K8s cluster exists: `kubectl get secret -n temporal` and extract token
+3. If K8s cluster exists: `kubectl get secret -n temporal workflow-worker-secrets` and extract token
 4. If all fail: **Report**: "Cloudflare API token not found - DNS deletion would require manual token"
 
-**Step 4.3: Connect to Cloudflare (Read-Only)**
-- Use either `cloudflared` CLI or Cloudflare REST API
+**Step 4.4: Connect to Cloudflare (Read-Only)**
+- Use Cloudflare REST API with Bearer token authentication
 - Authenticate with discovered/provided API token
 - **Use READ-ONLY operations only**
 
-**Step 4.4: Identify Zone and Records**
+**Step 4.5: Search for DNS Records (Comprehensive)**
 - List all zones in Cloudflare account
-- Match zone that would contain records for `$1`
+- Match zone that would contain records (typically `firstovertheline.com`)
 - **Report**: "Zone ID: {zone_id}"
-- List all DNS records matching `$1`
-- **Report** each record:
+- Fetch ALL DNS records from the zone (use `per_page=100` or pagination)
+- Search for records matching ANY of these patterns:
+  1. Exact FQDN match: `dns_fqdn` (from Step 4.1)
+  2. Contains org name: any record where `name` contains `$1` (the org name argument)
+  3. Contains subdomain: any record where `name` contains `dns_subdomain`
+- This catches records regardless of subdomain format (e.g., `{org}.firstovertheline.com` OR `{org}.a4c.firstovertheline.com`)
+- **Report** each matching record:
   ```
   WOULD DELETE DNS Record:
     - Type: {type}
@@ -173,6 +189,7 @@ Search in order:
     - TTL: {ttl}
     - ID: {record_id}
   ```
+- If no records found: **Report**: "No DNS records found matching organization name '{org_name}'"
 
 ### Phase 5: Dry Run Summary Report
 

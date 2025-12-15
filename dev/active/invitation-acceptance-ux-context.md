@@ -87,6 +87,30 @@ PostgreSQL Triggers → Update projections
 - `documentation/workflows/architecture/organization-bootstrap-workflow-design.md` - Updated activity contract and workflow calls
 - `documentation/architecture/workflows/organization-onboarding-workflow.md` - Updated Activity 3 section
 
+### Files Modified (2025-12-12 - Bootstrap Status UI Redesign)
+
+**Added DNS Verification as separate step in bootstrap status page:**
+
+- `infrastructure/supabase/sql/04-triggers/bootstrap-event-listener.sql` - Updated `get_bootstrap_status()` function
+  - Added `dns_verification` stage between `dns_provisioning` and `role_assignment`
+  - Separated `organization.subdomain.verified` event from `organization.subdomain.dns_created`
+  - Applied to Supabase via MCP
+
+- `infrastructure/supabase/supabase/functions/workflow-status/index.ts` - v23 deployed
+  - Added `dns_verification` to `stageOrder` array (now 11 stages)
+  - Added "Verify DNS" stage entry
+  - Updated step labels to be generic:
+    - "Provision DNS (Subdomain)" → "Configure DNS"
+    - "Create Admin Contact" → "Create Contacts"
+    - "Create Billing Address" → "Create Addresses"
+    - "Create Billing Phone" → "Create Phones"
+    - "Send Invitation Email" → "Send Invitations"
+
+- `frontend/src/pages/organizations/OrganizationBootstrapStatusPage.tsx` - Compact layout
+  - Reduced step item padding from `p-4` to `p-3`
+  - Reduced step spacing from `space-y-4` to `space-y-2`
+  - All 11 steps fit without scrolling
+
 ### Database Functions Created (2025-12-11)
 
 Created SECURITY DEFINER functions in `api` schema to bypass PostgREST schema restriction:
@@ -106,6 +130,24 @@ Created SECURITY DEFINER functions in `api` schema to bypass PostgREST schema re
 
 ### Files Already Modified for Bug Fixes ✅ COMPLETE
 - `workflows/src/activities/organization-bootstrap/verify-dns.ts` - ✅ Fixed 2025-12-12 (quorum-based DNS verification)
+
+### Files Modified (2025-12-13/14) - Schema & Deployment Fixes
+
+**RBAC Schema Fixes:**
+- `infrastructure/supabase/sql/02-tables/rbac/002-roles_projection.sql` - Changed UNIQUE(name) to UNIQUE(name, organization_id), fixed CHECK constraint
+- `infrastructure/supabase/sql/04-triggers/process_invitation_accepted.sql` - Fixed ON CONFLICT clause to use composite unique constraint
+
+**CONSOLIDATED_SCHEMA.sql Updates:**
+- `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql` - Multiple updates:
+  - Fixed roles_projection constraints
+  - Added `DROP FUNCTION IF EXISTS get_bootstrap_status(uuid)` for idempotency
+  - Added `process_user_event()` function
+  - Added 6 OU management functions (`api.get_organization_units`, `api.get_organization_unit_by_id`, `api.get_organization_unit_descendants`, `api.create_organization_unit`, `api.update_organization_unit`, `api.deactivate_organization_unit`)
+  - Added 4 OU RLS policies (`organizations_scope_select`, `organizations_scope_insert`, `organizations_scope_update`, `organizations_scope_delete`)
+
+**Slash Command Fixes:**
+- `.claude/commands/org-cleanup.md` - Improved DNS discovery (extract FQDN from events, search with contains pattern)
+- `.claude/commands/org-cleanup-dryrun.md` - Same DNS discovery improvements
 
 ### New Files to Create
 
@@ -183,6 +225,12 @@ export interface IInvitationService {
 7. **Edge Functions verify_jwt Default**: Supabase Edge Functions default to `verify_jwt: true`. For unauthenticated endpoints (invitation acceptance), must explicitly set `verify_jwt = false` in `config.toml`. - Discovered 2025-12-11
 
 8. **Deno Import Syntax**: In Supabase Edge Functions (Deno runtime), use full URL imports: `import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'`. Node-style imports like `from 'zod'` don't work without import maps. - Discovered 2025-12-11
+
+9. **CONSOLIDATED_SCHEMA.sql is Single Deployment Artifact**: GitHub Actions "Deploy Database Schema" workflow ONLY deploys `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql`. Individual SQL files in `sql/` subdirectories are NOT automatically deployed. Any new functions, triggers, or policies MUST be added to CONSOLIDATED_SCHEMA.sql. - Discovered 2025-12-14
+
+10. **Role Names are Unique Per Organization**: `roles_projection` uses composite unique constraint `UNIQUE(name, organization_id)`. Only `super_admin` has NULL org_id (system role). All other roles (provider_admin, partner_admin, clinician, viewer) MUST have organization_id set. - Fixed 2025-12-13
+
+11. **DNS Subdomain Format Varies**: Organization subdomains may be created as `{org}.firstovertheline.com` OR `{org}.a4c.firstovertheline.com`. Always extract actual FQDN from `organization.subdomain.dns_created` event rather than assuming format. - Discovered 2025-12-14
 
 ## Why This Approach?
 
