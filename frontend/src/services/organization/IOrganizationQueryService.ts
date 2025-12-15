@@ -8,7 +8,12 @@
  * - Regular users: See only their own organization
  */
 
-import type { Organization, OrganizationFilterOptions } from '@/types/organization.types';
+import type {
+  Organization,
+  OrganizationFilterOptions,
+  OrganizationQueryOptions,
+  PaginatedResult,
+} from '@/types/organization.types';
 
 export interface IOrganizationQueryService {
   /**
@@ -60,4 +65,37 @@ export interface IOrganizationQueryService {
    * const partners = await service.getChildOrganizations(providerOrgId);
    */
   getChildOrganizations(parentOrgId: string): Promise<Organization[]>;
+
+  /**
+   * Retrieves organizations with pagination, filtering, and sorting
+   *
+   * Used by OrganizationListPage for displaying paginated organization lists
+   * with search, type/status filters, and sortable columns.
+   *
+   * @param options - Query options including filters, pagination, and sorting
+   * @returns Promise resolving to paginated result with organizations and total count
+   *
+   * @example
+   * // Get first page of active providers sorted by name
+   * const result = await service.getOrganizationsPaginated({
+   *   type: 'provider',
+   *   status: 'active',
+   *   page: 1,
+   *   pageSize: 20,
+   *   sortBy: 'name',
+   *   sortOrder: 'asc'
+   * });
+   * console.log(`Page 1 of ${result.totalPages}, ${result.totalCount} total`);
+   *
+   * @example
+   * // Search organizations by name
+   * const result = await service.getOrganizationsPaginated({
+   *   searchTerm: 'healthcare',
+   *   page: 1,
+   *   pageSize: 10
+   * });
+   */
+  getOrganizationsPaginated(
+    options?: OrganizationQueryOptions
+  ): Promise<PaginatedResult<Organization>>;
 }

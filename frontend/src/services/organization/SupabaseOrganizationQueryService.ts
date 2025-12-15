@@ -10,7 +10,12 @@
 
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/utils/logger';
-import type { Organization, OrganizationFilterOptions } from '@/types/organization.types';
+import type {
+  Organization,
+  OrganizationFilterOptions,
+  OrganizationQueryOptions,
+  PaginatedResult,
+} from '@/types/organization.types';
 import type { IOrganizationQueryService } from './IOrganizationQueryService';
 
 const log = Logger.getLogger('api');
@@ -32,6 +37,14 @@ interface OrganizationRow {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Extended row type for paginated queries that includes total_count
+ * MUST match: infrastructure/supabase/CONSOLIDATED_SCHEMA.sql api.get_organizations_paginated()
+ */
+interface OrganizationPaginatedRow extends OrganizationRow {
+  total_count: number;
 }
 
 export class SupabaseOrganizationQueryService implements IOrganizationQueryService {
@@ -147,6 +160,62 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
       return data.map((row: OrganizationRow) => this.mapRowToOrganization(row));
     } catch (error) {
       log.error('Error in getChildOrganizations', { error, parentOrgId });
+      throw error;
+    }
+  }
+
+  async getOrganizationsPaginated(
+    options?: OrganizationQueryOptions
+  ): Promise<PaginatedResult<Organization>> {
+    try {
+      const page = options?.page ?? 1;
+      const pageSize = options?.pageSize ?? 20;
+
+      log.debug('Fetching paginated organizations', { options });
+
+      // Use API schema RPC function for paginated query
+      const { data, error } = await supabase.schema('api').rpc('get_organizations_paginated', {
+        p_type: options?.type && options.type !== 'all' ? options.type : null,
+        p_is_active:
+          options?.status && options.status !== 'all' ? options.status === 'active' : null,
+        p_search_term: options?.searchTerm || null,
+        p_page: page,
+        p_page_size: pageSize,
+        p_sort_by: options?.sortBy || 'name',
+        p_sort_order: options?.sortOrder || 'asc',
+      });
+
+      if (error) {
+        log.error('Failed to fetch paginated organizations', { error, options });
+        throw new Error(`Failed to fetch organizations: ${error.message}`);
+      }
+
+      if (!data || data.length === 0) {
+        log.debug('No organizations found', { options });
+        return {
+          data: [],
+          totalCount: 0,
+          page,
+          pageSize,
+          totalPages: 0,
+        };
+      }
+
+      // Extract total_count from first row (all rows have same value via window function)
+      const totalCount = (data[0] as OrganizationPaginatedRow).total_count;
+      const totalPages = Math.ceil(totalCount / pageSize);
+
+      log.info(`Fetched page ${page} of ${totalPages} (${totalCount} total)`, { options });
+
+      return {
+        data: data.map((row: OrganizationPaginatedRow) => this.mapRowToOrganization(row)),
+        totalCount,
+        page,
+        pageSize,
+        totalPages,
+      };
+    } catch (error) {
+      log.error('Error in getOrganizationsPaginated', { error, options });
       throw error;
     }
   }

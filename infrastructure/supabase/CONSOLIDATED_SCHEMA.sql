@@ -3098,6 +3098,107 @@ COMMENT ON FUNCTION api.get_organizations IS 'Frontend RPC: Query organizations 
 COMMENT ON FUNCTION api.get_organization_by_id IS 'Frontend RPC: Get single organization by UUID. Returns actual database columns only.';
 COMMENT ON FUNCTION api.get_child_organizations IS 'Frontend RPC: Get child organizations by parent org UUID using ltree hierarchy.';
 
+-- 4. Get organizations with pagination, filtering, and sorting
+-- Maps to: SupabaseOrganizationQueryService.getOrganizationsPaginated()
+-- Frontend usage: OrganizationListPage with search, filters, pagination, sorting
+-- Drop old signature for idempotency
+DROP FUNCTION IF EXISTS api.get_organizations_paginated(TEXT, BOOLEAN, TEXT, INTEGER, INTEGER, TEXT, TEXT);
+
+CREATE OR REPLACE FUNCTION api.get_organizations_paginated(
+  p_type TEXT DEFAULT NULL,              -- Filter by type: 'provider', 'provider_partner', 'platform_owner', or NULL for all
+  p_is_active BOOLEAN DEFAULT NULL,      -- Filter by active status: true, false, or NULL for all
+  p_search_term TEXT DEFAULT NULL,       -- Search by name or slug (case-insensitive)
+  p_page INTEGER DEFAULT 1,              -- Page number (1-indexed)
+  p_page_size INTEGER DEFAULT 20,        -- Results per page (max 100)
+  p_sort_by TEXT DEFAULT 'name',         -- Sort column: 'name', 'type', 'created_at', 'updated_at'
+  p_sort_order TEXT DEFAULT 'asc'        -- Sort direction: 'asc' or 'desc'
+)
+RETURNS TABLE (
+  id UUID,
+  name TEXT,
+  display_name TEXT,
+  slug TEXT,
+  type TEXT,
+  path TEXT,
+  parent_path TEXT,
+  timezone TEXT,
+  is_active BOOLEAN,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ,
+  total_count BIGINT                     -- Total matching rows (for pagination UI)
+)
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_offset INTEGER;
+  v_limit INTEGER;
+  v_sort_column TEXT;
+  v_sort_direction TEXT;
+BEGIN
+  -- Validate and sanitize pagination parameters
+  v_limit := LEAST(GREATEST(p_page_size, 1), 100);  -- Clamp between 1 and 100
+  v_offset := (GREATEST(p_page, 1) - 1) * v_limit;
+
+  -- Validate sort column (whitelist to prevent SQL injection)
+  v_sort_column := CASE p_sort_by
+    WHEN 'name' THEN 'o.name'
+    WHEN 'type' THEN 'o.type'
+    WHEN 'created_at' THEN 'o.created_at'
+    WHEN 'updated_at' THEN 'o.updated_at'
+    ELSE 'o.name'  -- Default fallback
+  END;
+
+  -- Validate sort direction
+  v_sort_direction := CASE WHEN LOWER(p_sort_order) = 'desc' THEN 'DESC' ELSE 'ASC' END;
+
+  -- Execute query with dynamic sorting
+  -- Using window function COUNT(*) OVER() for efficient total count
+  RETURN QUERY EXECUTE format(
+    'SELECT
+      o.id,
+      o.name,
+      o.display_name,
+      o.slug,
+      o.type::TEXT,
+      o.path::TEXT,
+      o.parent_path::TEXT,
+      o.timezone,
+      o.is_active,
+      o.created_at,
+      o.updated_at,
+      COUNT(*) OVER() AS total_count
+    FROM organizations_projection o
+    WHERE
+      -- Exclude soft-deleted organizations
+      o.deleted_at IS NULL
+      -- Filter by organization type (if provided)
+      AND ($1 IS NULL OR o.type::TEXT = $1)
+      -- Filter by active status (if provided)
+      AND ($2 IS NULL OR o.is_active = $2)
+      -- Search by name or slug (if provided)
+      AND (
+        $3 IS NULL
+        OR o.name ILIKE ''%%'' || $3 || ''%%''
+        OR o.slug ILIKE ''%%'' || $3 || ''%%''
+        OR o.display_name ILIKE ''%%'' || $3 || ''%%''
+      )
+    ORDER BY %s %s
+    LIMIT $4 OFFSET $5',
+    v_sort_column,
+    v_sort_direction
+  )
+  USING p_type, p_is_active, p_search_term, v_limit, v_offset;
+END;
+$$;
+
+-- Grant execute to authenticated users (RLS policies on organizations_projection still apply)
+GRANT EXECUTE ON FUNCTION api.get_organizations_paginated TO authenticated, service_role;
+
+-- Documentation
+COMMENT ON FUNCTION api.get_organizations_paginated IS 'Frontend RPC: Query organizations with pagination, filtering, and sorting. Returns total_count for pagination UI. Used by OrganizationListPage.';
+
 
 -- ----------------------------------------------------------------------------
 -- Source: sql/03-functions/api/005-organization-unit-crud.sql

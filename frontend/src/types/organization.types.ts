@@ -331,3 +331,46 @@ export interface OrganizationStatistics {
   totalClients?: number;
   activeStaff?: number;
 }
+
+/**
+ * Paginated result wrapper for list queries
+ * Used by organization list page with pagination controls
+ */
+export interface PaginatedResult<T> {
+  data: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+/**
+ * Query options for paginated organization queries
+ * Used by OrganizationListViewModel for filtering, sorting, and pagination
+ */
+export interface OrganizationQueryOptions {
+  /** Filter by organization type */
+  type?: 'platform_owner' | 'provider' | 'provider_partner' | 'all';
+  /** Filter by active status */
+  status?: 'active' | 'inactive' | 'all';
+  /** Search by name, display_name, or slug */
+  searchTerm?: string;
+  /** Page number (1-indexed) */
+  page?: number;
+  /** Results per page (default: 20, max: 100) */
+  pageSize?: number;
+  /** Sort column */
+  sortBy?: 'name' | 'type' | 'created_at' | 'updated_at';
+  /** Sort direction */
+  sortOrder?: 'asc' | 'desc';
+}
+
+/**
+ * Data for updating an organization via domain events
+ * Used by IOrganizationCommandService.updateOrganization()
+ */
+export interface OrganizationUpdateData {
+  name?: string;
+  display_name?: string;
+  timezone?: string;
+}

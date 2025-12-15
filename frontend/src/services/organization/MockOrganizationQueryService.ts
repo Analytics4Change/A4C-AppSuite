@@ -6,7 +6,12 @@
  */
 
 import { Logger } from '@/utils/logger';
-import type { Organization, OrganizationFilterOptions } from '@/types/organization.types';
+import type {
+  Organization,
+  OrganizationFilterOptions,
+  OrganizationQueryOptions,
+  PaginatedResult,
+} from '@/types/organization.types';
 import type { IOrganizationQueryService } from './IOrganizationQueryService';
 
 const log = Logger.getLogger('api');
@@ -251,14 +256,94 @@ export class MockOrganizationQueryService implements IOrganizationQueryService {
 
     log.debug('Mock: Fetching child organizations', { parentOrgId });
 
-    const children = MOCK_ORGANIZATIONS.filter(
-      org => org.parent_org_id === parentOrgId
-    );
+    const children = MOCK_ORGANIZATIONS.filter(org => org.parent_org_id === parentOrgId);
 
     // Sort alphabetically by name
     children.sort((a, b) => a.name.localeCompare(b.name));
 
     log.info(`Mock: Returning ${children.length} child organizations`, { parentOrgId });
     return children;
+  }
+
+  async getOrganizationsPaginated(
+    options?: OrganizationQueryOptions
+  ): Promise<PaginatedResult<Organization>> {
+    await this.simulateDelay();
+
+    const page = options?.page ?? 1;
+    const pageSize = options?.pageSize ?? 20;
+    const sortBy = options?.sortBy ?? 'name';
+    const sortOrder = options?.sortOrder ?? 'asc';
+
+    log.debug('Mock: Fetching paginated organizations', { options });
+
+    let results = [...MOCK_ORGANIZATIONS];
+
+    // Apply filters
+    if (options?.type && options.type !== 'all') {
+      results = results.filter(org => org.type === options.type);
+    }
+
+    if (options?.status && options.status !== 'all') {
+      results = results.filter(org => org.is_active === (options.status === 'active'));
+    }
+
+    if (options?.searchTerm) {
+      const searchLower = options.searchTerm.toLowerCase();
+      results = results.filter(
+        org =>
+          org.name.toLowerCase().includes(searchLower) ||
+          org.subdomain.toLowerCase().includes(searchLower) ||
+          (org.display_name && org.display_name.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Apply sorting
+    results.sort((a, b) => {
+      let aVal: string | Date;
+      let bVal: string | Date;
+
+      switch (sortBy) {
+        case 'type':
+          aVal = a.type;
+          bVal = b.type;
+          break;
+        case 'created_at':
+          aVal = a.created_at;
+          bVal = b.created_at;
+          break;
+        case 'updated_at':
+          aVal = a.updated_at;
+          bVal = b.updated_at;
+          break;
+        default:
+          aVal = a.name;
+          bVal = b.name;
+      }
+
+      if (aVal instanceof Date && bVal instanceof Date) {
+        return sortOrder === 'asc' ? aVal.getTime() - bVal.getTime() : bVal.getTime() - aVal.getTime();
+      }
+
+      const comparison = String(aVal).localeCompare(String(bVal));
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    const totalCount = results.length;
+    const totalPages = Math.ceil(totalCount / pageSize);
+
+    // Apply pagination
+    const startIndex = (page - 1) * pageSize;
+    const paginatedResults = results.slice(startIndex, startIndex + pageSize);
+
+    log.info(`Mock: Returning page ${page} of ${totalPages} (${totalCount} total)`, { options });
+
+    return {
+      data: paginatedResults,
+      totalCount,
+      page,
+      pageSize,
+      totalPages,
+    };
   }
 }
