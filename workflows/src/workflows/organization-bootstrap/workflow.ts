@@ -220,17 +220,10 @@ export async function organizationBootstrapWorkflow(
             attempts: dnsRetryCount + 1
           });
 
-          // Verify DNS propagation (optional, for production mode)
-          try {
-            await verifyDNS({ orgId: state.orgId!, domain: dnsResult.fqdn });
-            log.info('DNS verified successfully', { fqdn: dnsResult.fqdn });
-          } catch (verifyError) {
-            // DNS verification failed, but we'll continue
-            // DNS may not be propagated yet, but record is created
-            log.warn('DNS verification failed (non-fatal)', {
-              error: verifyError instanceof Error ? verifyError.message : 'Unknown error'
-            });
-          }
+          // Verify DNS propagation - errors propagate to DNS retry loop
+          // This ensures the organization.subdomain.verified event is emitted
+          await verifyDNS({ orgId: state.orgId!, domain: dnsResult.fqdn });
+          log.info('DNS verified successfully', { fqdn: dnsResult.fqdn });
 
         } catch (error) {
           dnsRetryCount++;
