@@ -212,7 +212,6 @@ export async function organizationBootstrapWorkflow(
           state.domain = dnsResult.fqdn;
           state.dnsRecordId = dnsResult.recordId;
           state.dnsConfigured = true;
-          dnsSuccess = true;
 
           log.info('DNS configured successfully', {
             fqdn: dnsResult.fqdn,
@@ -224,6 +223,10 @@ export async function organizationBootstrapWorkflow(
           // This ensures the organization.subdomain.verified event is emitted
           await verifyDNS({ orgId: state.orgId!, domain: dnsResult.fqdn });
           log.info('DNS verified successfully', { fqdn: dnsResult.fqdn });
+
+          // Only set dnsSuccess AFTER verifyDNS succeeds
+          // This ensures the retry loop continues if verification fails
+          dnsSuccess = true;
 
         } catch (error) {
           dnsRetryCount++;
