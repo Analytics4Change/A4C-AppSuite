@@ -47,14 +47,20 @@ Before proceeding, verify:
 - Query `auth.users` WHERE `raw_user_meta_data->>'organization_id' = org_id`
 - Store matching user IDs and emails as `auth_users_by_metadata`
 
-**Step 1.6: Consolidate User List**
-- Merge `user_ids_from_events`, `auth_users_by_email`, and `auth_users_by_metadata`
+**Step 1.6: Find Shadow Users in public.users**
+- Query `public.users` WHERE `email IN (invited_emails)`
+- Store matching user IDs as `shadow_users_by_email`
+- Query `public.users` WHERE `current_organization_id = org_id`
+- Store matching user IDs as `shadow_users_by_org`
+
+**Step 1.7: Consolidate User List**
+- Merge `user_ids_from_events`, `auth_users_by_email`, `auth_users_by_metadata`, `shadow_users_by_email`, `shadow_users_by_org`
 - Remove duplicates
 - Store as `all_user_ids` and `all_auth_users`
 
-**Step 1.7: Display findings and request confirmation**
-- Show: Organization Name, Organization ID, User count, Auth user emails
-- Prompt: "This will DELETE all data for this organization including {count} auth users. Type 'CONFIRM' to proceed."
+**Step 1.8: Display findings and request confirmation**
+- Show: Organization Name, Organization ID, User count, Auth user emails, Shadow user count
+- Prompt: "This will DELETE all data for this organization including {count} auth users and {count} shadow users. Type 'CONFIRM' to proceed."
 - If not confirmed, exit immediately
 
 ### Phase 2: Temporal Workflow Cleanup
@@ -101,20 +107,30 @@ Before proceeding, verify:
 
 ### Phase 3: Database Cleanup
 
-**Step 3.1: Delete Supabase Auth Users**
+**Step 3.1: Delete Shadow Users from public.users**
+- IMPORTANT: This MUST happen BEFORE auth.users deletion
+- For each user_id in `all_user_ids`:
+  - Execute: `DELETE FROM public.users WHERE id = {user_id}`
+  - Log: "Deleted shadow user: {user_email} (ID: {user_id})"
+- Also clean any orphaned shadow users by email:
+  - Execute: `DELETE FROM public.users WHERE email IN ({invited_emails})`
+  - Log orphan count if any deleted
+- If no shadow users found: Log "No shadow users to delete"
+
+**Step 3.2: Delete Supabase Auth Users**
 - For each user in `all_auth_users` (from Phase 1):
   - Execute: `DELETE FROM auth.users WHERE id = {user_id}`
   - Log: "Deleted auth user: {user_email} (ID: {user_id})"
 - Verify all deletions successful
 - If no auth users found: Log "No auth users to delete"
 
-**Step 3.2: Analyze Database Schema**
+**Step 3.3: Analyze Database Schema**
 - Query information_schema to identify all tables with:
   - `user_id` column (any variation)
   - `organization_id` column (any variation)
 - Build dependency graph based on foreign key constraints
 
-**Step 3.3: Execute Cascading Deletions**
+**Step 3.4: Execute Cascading Deletions**
 - Delete records in correct order to avoid foreign key violations:
   1. Child tables first (tables with foreign keys TO other tables)
   2. Parent tables last (tables with foreign keys FROM other tables)
@@ -185,7 +201,8 @@ Temporal Workflows:
 - Workflows terminated: {count}
 
 Database Operations:
-- Auth users deleted: {count}
+- Shadow users deleted (public.users): {count}
+- Auth users deleted (auth.users): {count}
   - {user_email_1} (ID: {user_id_1})
   - {user_email_2} (ID: {user_id_2})
   ...

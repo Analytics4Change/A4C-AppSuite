@@ -53,8 +53,15 @@ Before proceeding, verify:
 - Store matching user IDs and emails as `auth_users_by_metadata`
 - **Report**: "Found {count} auth users with organization in metadata"
 
-**Step 1.6: Consolidate User List**
-- Merge `user_ids_from_events`, `auth_users_by_email`, and `auth_users_by_metadata`
+**Step 1.6: Find Shadow Users in public.users**
+- Query `public.users` WHERE `email IN (invited_emails)`
+- Store matching user IDs as `shadow_users_by_email`
+- Query `public.users` WHERE `current_organization_id = org_id`
+- Store matching user IDs as `shadow_users_by_org`
+- **Report**: "Found {count} shadow users by email, {count} by organization"
+
+**Step 1.7: Consolidate User List**
+- Merge `user_ids_from_events`, `auth_users_by_email`, `auth_users_by_metadata`, `shadow_users_by_email`, `shadow_users_by_org`
 - Remove duplicates
 - Store as `all_user_ids` and `all_auth_users`
 - **Report**: "Total unique users to clean up: {count}"
@@ -101,14 +108,24 @@ Before proceeding, verify:
 
 ### Phase 3: Database Impact Analysis
 
-**Step 3.1: Auth User Analysis**
+**Step 3.1: Shadow User Analysis (public.users)**
+- For each user_id in `all_user_ids`:
+  - Check if exists in `public.users`
+  - **Report**: "WOULD DELETE shadow user: {user_email} (ID: {user_id})"
+  - Note source: "Found via: {email_match|org_match|event_match}"
+- Also check for orphaned shadow users (in public.users but not in auth.users):
+  - **Report**: "WOULD DELETE orphaned shadow user: {email} (ID: {id})"
+- **DO NOT DELETE** - this is dry run mode
+- If no shadow users found: **Report**: "No shadow users found for this organization"
+
+**Step 3.2: Auth User Analysis (auth.users)**
 - For each user in `all_auth_users` (from Phase 1):
   - **Report**: "WOULD DELETE auth user: {user_email} (ID: {user_id})"
   - Note source: "Found via: {email_match|metadata_match|event_match}"
 - **DO NOT DELETE** - this is dry run mode
 - If no auth users found: **Report**: "No auth users found for this organization"
 
-**Step 3.2: Analyze Database Schema**
+**Step 3.3: Analyze Database Schema**
 - Query information_schema to identify all tables with:
   - `user_id` column (any variation)
   - `organization_id` column (any variation)
@@ -116,7 +133,7 @@ Before proceeding, verify:
 - **Report**: "Found {count} tables with user_id references"
 - **Report**: "Found {count} tables with organization_id references"
 
-**Step 3.3: Count Affected Records**
+**Step 3.4: Count Affected Records**
 For each table identified:
 - Execute SELECT COUNT(*) WHERE user_id = {user_id}
 - Execute SELECT COUNT(*) WHERE organization_id = {org_id}
@@ -129,7 +146,7 @@ For each table identified:
     - Deletion order: {order_number}
   ```
 
-**Step 3.4: Calculate Deletion Order**
+**Step 3.5: Calculate Deletion Order**
 - Determine correct deletion order based on foreign key constraints
 - **Report**:
   ```
@@ -208,13 +225,17 @@ Temporal Workflow Impact:
 - Workflows that would be terminated: {count}
 
 Database Impact:
-- Auth users found: {count}
+- Shadow users found (public.users): {count}
+  - By invited email: {count}
+  - By organization: {count}
+  - Orphaned: {count}
+- Auth users found (auth.users): {count}
   - By invited email: {count}
   - By org metadata: {count}
   - By domain events: {count}
-- Auth users that would be deleted:
-  {user_email_1} (ID: {user_id_1})
-  {user_email_2} (ID: {user_id_2})
+- Users that would be deleted:
+  {user_email_1} (ID: {user_id_1}) [shadow + auth]
+  {user_email_2} (ID: {user_id_2}) [shadow only - orphaned]
   ...
 - Total tables affected: {count}
 - Total records that would be deleted: {count}
