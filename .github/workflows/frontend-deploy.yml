@@ -62,6 +62,10 @@ jobs:
         # Backend API (k8s service for Temporal workflow operations)
         VITE_BACKEND_API_URL=https://api-a4c.firstovertheline.com
 
+        # Platform domain for cross-subdomain session sharing
+        # Used for cookie scoping and redirect URL validation
+        VITE_PLATFORM_BASE_DOMAIN=firstovertheline.com
+
         # Medication search (using real RxNorm API)
         VITE_USE_RXNORM_API=true
 
