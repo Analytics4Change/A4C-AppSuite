@@ -25,6 +25,15 @@ interface ImportMetaEnv {
   /** Backend API URL for workflow operations */
   readonly VITE_BACKEND_API_URL?: string;
 
+  // === Platform Domain ===
+  /**
+   * Platform base domain for cross-subdomain session sharing.
+   * Used for cookie scoping and redirect URL validation.
+   * Required in production/integration modes.
+   * Example: 'firstovertheline.com'
+   */
+  readonly VITE_PLATFORM_BASE_DOMAIN?: string;
+
   // === Medication Search ===
   /** Use real RXNorm API instead of mock data ('true'/'false') */
   readonly VITE_USE_RXNORM_API?: string;

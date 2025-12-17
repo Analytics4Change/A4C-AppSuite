@@ -21,34 +21,27 @@ const platformBaseDomain = import.meta.env.VITE_PLATFORM_BASE_DOMAIN;
  * Get cookie domain for cross-subdomain session sharing.
  * Uses VITE_PLATFORM_BASE_DOMAIN as the single source of truth.
  *
- * @returns Cookie domain prefixed with '.' for subdomain scope, or undefined for localhost
+ * FAIL-FAST: In production mode, throws an error if VITE_PLATFORM_BASE_DOMAIN is not set.
+ * This prevents silent failures where cookies are scoped incorrectly.
+ *
+ * @returns Cookie domain prefixed with '.' for subdomain scope, or undefined for localhost/mock
+ * @throws Error if VITE_PLATFORM_BASE_DOMAIN is missing in production mode
  */
 function getCookieDomain(): string | undefined {
-  // In mock mode or localhost, don't set cookie domain (browser default)
+  // In mock mode, don't set cookie domain (browser default for localhost)
   if (isMockMode) return undefined;
 
+  // Production mode: VITE_PLATFORM_BASE_DOMAIN is required
+  if (!platformBaseDomain) {
+    throw new Error(
+      'VITE_PLATFORM_BASE_DOMAIN is required for cross-subdomain session sharing. ' +
+        'Please set this environment variable in .env.production or GitHub Actions secrets. ' +
+        'Example: VITE_PLATFORM_BASE_DOMAIN=firstovertheline.com'
+    );
+  }
+
   // Use configured platform base domain (prefixed with '.' for subdomain cookie scope)
-  if (platformBaseDomain) {
-    return `.${platformBaseDomain}`;
-  }
-
-  // Fallback: Auto-detect from hostname (extract parent domain)
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-
-    // Don't set cookie domain for localhost
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return undefined;
-    }
-
-    // For subdomains like "poc-test1.example.com", extract ".example.com"
-    const parts = hostname.split('.');
-    if (parts.length >= 2) {
-      return `.${parts.slice(-2).join('.')}`;
-    }
-  }
-
-  return undefined;
+  return `.${platformBaseDomain}`;
 }
 
 // Validate environment variables (same logic as original supabase.ts)

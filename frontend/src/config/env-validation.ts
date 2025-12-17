@@ -40,6 +40,11 @@ const frontendEnvSchema = z.object({
   // === Backend API ===
   VITE_BACKEND_API_URL: z.string().url().optional(),
 
+  // === Platform Domain (required for cross-subdomain session sharing) ===
+  // Single source of truth for cookie scoping and redirect URL validation
+  // See: documentation/infrastructure/operations/configuration/ENVIRONMENT_VARIABLES.md
+  VITE_PLATFORM_BASE_DOMAIN: z.string().min(1),
+
   // === Medication Search ===
   VITE_USE_RXNORM_API: booleanString,
   VITE_USE_RXNORM: booleanString,
@@ -92,6 +97,7 @@ const getSchemaForMode = (mode: string) => {
     return frontendEnvSchema.extend({
       VITE_SUPABASE_URL: z.string().url().optional(),
       VITE_SUPABASE_ANON_KEY: z.string().min(1).optional(),
+      VITE_PLATFORM_BASE_DOMAIN: z.string().min(1).optional(),
     });
   }
   return frontendEnvSchema;
@@ -125,6 +131,7 @@ export function validateEnvironment(): FrontendEnv {
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
     VITE_BACKEND_API_URL: import.meta.env.VITE_BACKEND_API_URL,
+    VITE_PLATFORM_BASE_DOMAIN: import.meta.env.VITE_PLATFORM_BASE_DOMAIN,
     VITE_USE_RXNORM_API: import.meta.env.VITE_USE_RXNORM_API,
     VITE_USE_RXNORM: import.meta.env.VITE_USE_RXNORM,
     VITE_RXNORM_BASE_URL: import.meta.env.VITE_RXNORM_BASE_URL,
