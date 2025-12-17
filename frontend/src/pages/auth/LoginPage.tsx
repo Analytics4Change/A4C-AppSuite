@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,11 +7,17 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, Info } from 'lucide-react';
 import { isMockAuth } from '@/services/auth/AuthProviderFactory';
+import { sanitizeRedirectUrl, buildSubdomainUrl } from '@/utils/redirect-validation';
+import { getOrganizationSubdomainInfo } from '@/services/organization/getOrganizationSubdomainInfo';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('component');
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, loginWithOAuth, isAuthenticated, loading, providerType } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { login, loginWithOAuth, isAuthenticated, loading, providerType, session } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,13 +25,73 @@ export const LoginPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const useMockAuth = isMockAuth();
 
+  // Get redirect URL from query param (sanitized for security)
+  const redirectParam = sanitizeRedirectUrl(searchParams.get('redirect'));
+
+  /**
+   * Handle post-login redirect with priority:
+   * 1. Explicit redirect URL (from invitation flow)
+   * 2. Location state (from ProtectedRoute)
+   * 3. Subdomain based on JWT claims (returning user)
+   * 4. Default fallback (/clients)
+   */
+  const handlePostLoginRedirect = async () => {
+    // Priority 1: Explicit redirect URL (from invitation flow)
+    if (redirectParam) {
+      log.info('[LoginPage] Redirecting to explicit URL', { redirectParam });
+      if (redirectParam.startsWith('http')) {
+        window.location.href = redirectParam;
+      } else {
+        navigate(redirectParam, { replace: true });
+      }
+      return;
+    }
+
+    // Priority 2: Location state (from ProtectedRoute)
+    const fromState = (location.state as { from?: { pathname: string } })?.from?.pathname;
+    if (fromState && fromState !== '/login') {
+      log.info('[LoginPage] Redirecting to location state', { fromState });
+      navigate(fromState, { replace: true });
+      return;
+    }
+
+    // Priority 3: Determine from JWT claims (returning user)
+    // Query organizations_projection to get slug and subdomain_status
+    const orgId = session?.claims?.org_id;
+    if (orgId) {
+      try {
+        log.info('[LoginPage] Looking up org subdomain', { orgId });
+        const orgInfo = await getOrganizationSubdomainInfo(orgId);
+        if (orgInfo?.slug && orgInfo.subdomain_status === 'verified') {
+          const subdomainUrl = buildSubdomainUrl(orgInfo.slug, '/dashboard');
+          if (subdomainUrl) {
+            log.info('[LoginPage] Redirecting to org subdomain', { subdomainUrl });
+            window.location.href = subdomainUrl;
+            return;
+          }
+        } else {
+          log.info('[LoginPage] Subdomain not verified, using default', {
+            slug: orgInfo?.slug,
+            status: orgInfo?.subdomain_status
+          });
+        }
+      } catch (err) {
+        log.error('[LoginPage] Failed to get org subdomain info', err);
+      }
+    }
+
+    // Priority 4: Default fallback
+    log.info('[LoginPage] Using default redirect to /clients');
+    navigate('/clients', { replace: true });
+  };
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && !loading) {
-      const from = (location.state as any)?.from?.pathname || '/clients';
-      navigate(from, { replace: true });
+      handlePostLoginRedirect();
     }
-  }, [isAuthenticated, loading, navigate, location]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally excludes handlePostLoginRedirect
+  }, [isAuthenticated, loading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +114,12 @@ export const LoginPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
+      // Store redirect URL before OAuth (OAuth redirects lose query params)
+      if (redirectParam) {
+        log.info('[LoginPage] Storing redirect URL for OAuth', { redirectParam });
+        sessionStorage.setItem('auth_return_to', redirectParam);
+      }
+
       await loginWithOAuth(provider, {
         redirectTo: window.location.origin + '/auth/callback',
       });

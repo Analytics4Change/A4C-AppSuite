@@ -3,14 +3,54 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Logger } from '@/utils/logger';
 import { Loader2 } from 'lucide-react';
+import { sanitizeRedirectUrl, buildSubdomainUrl } from '@/utils/redirect-validation';
+import { getOrganizationSubdomainInfo } from '@/services/organization/getOrganizationSubdomainInfo';
 
 const log = Logger.getLogger('component');
 
 export const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
-  const { handleOAuthCallback } = useAuth();
+  const { handleOAuthCallback, session } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  /**
+   * Determine the best redirect URL after OAuth callback.
+   * Priority: sessionStorage returnTo > org subdomain > /clients
+   */
+  const determineRedirectUrl = async (): Promise<string> => {
+    // Priority 1: Explicit redirect from sessionStorage (from invitation flow)
+    const returnTo = sessionStorage.getItem('auth_return_to');
+    sessionStorage.removeItem('auth_return_to');
+
+    const validRedirect = sanitizeRedirectUrl(returnTo);
+    if (validRedirect) {
+      log.info('[AuthCallback] Using explicit redirect URL', { validRedirect });
+      return validRedirect;
+    }
+
+    // Priority 2: Determine from JWT claims (returning user)
+    const orgId = session?.claims?.org_id;
+    if (orgId) {
+      try {
+        log.info('[AuthCallback] Looking up org subdomain', { orgId });
+        const orgInfo = await getOrganizationSubdomainInfo(orgId);
+        if (orgInfo?.slug && orgInfo.subdomain_status === 'verified') {
+          const subdomainUrl = buildSubdomainUrl(orgInfo.slug, '/dashboard');
+          if (subdomainUrl) {
+            log.info('[AuthCallback] Using org subdomain', { subdomainUrl });
+            return subdomainUrl;
+          }
+        }
+      } catch (err) {
+        log.error('[AuthCallback] Failed to get org subdomain info', err);
+      }
+    }
+
+    // Priority 3: Default fallback
+    log.info('[AuthCallback] Using default redirect to /clients');
+    return '/clients';
+  };
 
   useEffect(() => {
     // Prevent multiple executions
@@ -39,10 +79,17 @@ export const AuthCallback: React.FC = () => {
         // Clear the URL parameters before redirecting
         window.history.replaceState({}, document.title, window.location.pathname);
 
-        // Redirect to the intended page or default to clients
-        const returnTo = sessionStorage.getItem('auth_return_to') || '/clients';
-        sessionStorage.removeItem('auth_return_to');
-        navigate(returnTo, { replace: true });
+        // Determine best redirect URL (explicit > org subdomain > default)
+        const redirectUrl = await determineRedirectUrl();
+
+        // Redirect: use window.location for cross-origin, navigate for same-origin
+        if (redirectUrl.startsWith('http')) {
+          log.info('[AuthCallback] Cross-origin redirect', { redirectUrl });
+          window.location.href = redirectUrl;
+        } else {
+          log.info('[AuthCallback] Same-origin redirect', { redirectUrl });
+          navigate(redirectUrl, { replace: true });
+        }
       } catch (err) {
         log.error('Auth callback failed', err);
         setError(err instanceof Error ? err.message : 'Authentication failed');

@@ -58,17 +58,30 @@ export const AcceptInvitationPage: React.FC = observer(() => {
 
   /**
    * Handle redirect after invitation acceptance.
-   * Uses navigate() for same-origin paths, window.location.href for cross-origin URLs.
+   *
+   * After accepting an invitation, the user needs to log in. The edge function
+   * creates their account but doesn't establish a frontend session.
+   *
+   * Flow:
+   * 1. Pass the redirect URL to the login page via query param
+   * 2. User logs in at /login?redirect=...
+   * 3. After successful login, redirect to the subdomain
+   *
+   * This ensures session is established before redirecting to subdomain,
+   * and the cookie-based session will persist across subdomains.
    */
   const handleRedirect = (redirectUrl: string) => {
     if (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')) {
-      // Cross-origin redirect (tenant subdomain)
-      log.info('Cross-origin redirect to tenant subdomain', { redirectUrl });
-      window.location.href = redirectUrl;
+      // Cross-origin URL: Pass to login via query param
+      // User will be redirected there after authentication
+      const loginUrl = `/login?redirect=${encodeURIComponent(redirectUrl)}`;
+      log.info('Passing subdomain redirect to login', { redirectUrl, loginUrl });
+      navigate(loginUrl);
     } else {
-      // Same-origin relative path
-      log.info('Same-origin redirect', { redirectUrl });
-      navigate(redirectUrl);
+      // Same-origin relative path: Pass to login via query param
+      const loginUrl = `/login?redirect=${encodeURIComponent(redirectUrl)}`;
+      log.info('Passing same-origin redirect to login', { redirectUrl, loginUrl });
+      navigate(loginUrl);
     }
   };
 
