@@ -112,8 +112,8 @@ To archive: `git mv dev/active/subdomain-redirect-fix-*.md dev/archived/subdomai
 - [x] Update `frontend/src/pages/auth/AuthCallback.tsx` for OAuth flow
 - [x] Update `frontend/src/pages/organizations/AcceptInvitationPage.tsx`
 - [x] Update `frontend/.env.example` with `VITE_PLATFORM_BASE_DOMAIN`
-- [ ] Test end-to-end: invitation acceptance → login → subdomain redirect
-- [ ] Test returning user: login → subdomain redirect
+- [x] Test end-to-end: invitation acceptance → login → subdomain redirect
+- [x] Test returning user: login → subdomain redirect
 
 ## Phase 8: Diagnostic Logging ✅ COMPLETE (2025-12-17)
 
@@ -148,13 +148,13 @@ To archive: `git mv dev/active/subdomain-redirect-fix-*.md dev/archived/subdomai
 - [x] Fix `api.get_organization_by_id` to include `subdomain_status TEXT`
 - [x] Apply migration via Supabase MCP
 - [x] Verify fix with SQL query
-- [ ] Test subdomain redirect with new test org
+- [x] Test subdomain redirect with new test org (UAT passed)
 
 ## Current Status
 
-**Phase**: Phase 9 ✅ FIX APPLIED (Ready for Testing)
+**Phase**: ✅ ALL PHASES COMPLETE - ARCHIVED
 **Last Updated**: 2025-12-18
-**Next Step**: Clean up `poc-test1-20251218`, create new org, test subdomain redirect end-to-end
+**Result**: Subdomain redirect feature fully functional and validated via UAT
 
 ### Recent Commits
 - `fb0ab084` - feat(logging): Add diagnostic logging for redirect flow debugging
@@ -180,5 +180,8 @@ The `api.get_organization_by_id` RPC function did NOT return `subdomain_status`,
 - `accept-invitation` at v6 (Supabase version 42)
 - Contains comprehensive logging for redirect debugging
 
-### Deferred Work (Phase 6)
-- accept-invitation edge function fix for existing users - lower priority since session sharing is the root cause of redirect issue
+### Deferred Work (Phase 6) - BACKLOG ITEM
+- accept-invitation edge function fix for existing users
+- Handle `email_exists` error by looking up existing user instead of returning 500
+- Lower priority: only affects edge case of same email accepting invitations to multiple orgs
+- Tracked separately from subdomain redirect feature
