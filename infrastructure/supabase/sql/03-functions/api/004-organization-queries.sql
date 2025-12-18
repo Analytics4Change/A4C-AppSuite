@@ -73,7 +73,7 @@ GRANT EXECUTE ON FUNCTION api.get_organizations TO authenticated, service_role;
 
 -- 2. Get single organization by ID
 -- Maps to: SupabaseOrganizationQueryService.getOrganizationById()
--- Frontend usage: Organization detail pages
+-- Frontend usage: Organization detail pages, invitation acceptance redirect
 CREATE OR REPLACE FUNCTION api.get_organization_by_id(p_org_id UUID)
 RETURNS TABLE (
   id UUID,
@@ -86,7 +86,8 @@ RETURNS TABLE (
   timezone TEXT,
   is_active BOOLEAN,
   created_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ
+  updated_at TIMESTAMPTZ,
+  subdomain_status TEXT
 )
 SECURITY DEFINER
 SET search_path = public, extensions, pg_temp
@@ -105,7 +106,8 @@ BEGIN
     o.timezone,
     o.is_active,
     o.created_at,
-    o.updated_at
+    o.updated_at,
+    o.subdomain_status::TEXT
   FROM organizations_projection o
   WHERE o.id = p_org_id
   LIMIT 1;

@@ -286,3 +286,215 @@ Current Flow (Broken):
 ### Plan File Reference
 
 Full implementation plan: `/home/lars/.claude/plans/humming-petting-lecun.md`
+
+---
+
+## Phase 8: Diagnostic Logging (2025-12-17)
+
+### Issue Discovered
+
+Test with `poc-test2-20251217` showed redirect NOT working despite verified subdomain:
+- User was NOT redirected to subdomain (expected: `https://poc-test2-20251217.firstovertheline.com/dashboard`)
+- User was NOT prompted to re-login (went directly to dashboard)
+- User ended up at fallback URL: `/organizations/{id}/dashboard`
+- `subdomain_status` WAS `'verified'` in database after bootstrap
+
+### Root Cause Hypotheses
+
+1. **Timing**: `subdomain_status` wasn't `'verified'` at invitation acceptance time (async DNS verification)
+2. **Existing session**: Cookie-based session persisted from previous test
+3. **Edge function RPC**: `get_organization_by_id` not returning expected fields (`slug`, `subdomain_status`)
+
+### Diagnostic Logging Added
+
+Comprehensive logging was added to trace the redirect flow end-to-end:
+
+#### Edge Function Logging (`accept-invitation/index.ts`)
+
+```typescript
+// After querying organization (line 237)
+console.log(`[accept-invitation v${DEPLOY_VERSION}] Org query result:`, JSON.stringify({
+  orgId: invitation.organization_id,
+  slug: orgData?.slug,
+  subdomain_status: orgData?.subdomain_status,
+  hasOrgData: !!orgData,
+}));
+
+// Before redirect decision (line 306)
+console.log(`[accept-invitation v${DEPLOY_VERSION}] Redirect decision:`, JSON.stringify({
+  condition: {
+    hasSlug: !!orgData?.slug,
+    slugValue: orgData?.slug,
+    subdomainStatus: orgData?.subdomain_status,
+    isVerified: orgData?.subdomain_status === 'verified',
+    baseDomain: env.PLATFORM_BASE_DOMAIN,
+  },
+  willUseSubdomain: !!(orgData?.slug && orgData?.subdomain_status === 'verified'),
+}));
+```
+
+#### Frontend Service Logging (`SupabaseInvitationService.ts`)
+
+```typescript
+// After receiving edge function response
+log.info('Edge function response received', {
+  success: data.success,
+  userId: data.userId,
+  orgId: data.orgId,
+  redirectUrl: data.redirectUrl,
+  isAbsoluteUrl: data.redirectUrl?.startsWith('http'),
+  isSubdomainRedirect: data.redirectUrl?.includes('.firstovertheline.com'),
+});
+```
+
+#### AcceptInvitationPage Logging
+
+```typescript
+// In handleRedirect
+log.info('handleRedirect called', {
+  redirectUrl,
+  isAbsoluteUrl,
+  loginUrl,
+  currentLocation: window.location.href,
+});
+```
+
+#### LoginPage Logging
+
+```typescript
+// On component mount (one-time)
+log.info('[LoginPage] Component mounted', {
+  isAuthenticated,
+  loading,
+  redirectParam,
+  rawRedirectParam: searchParams.get('redirect'),
+  hasSession: !!session,
+  sessionOrgId: session?.claims?.org_id,
+  locationState: location.state,
+});
+```
+
+### Logging Standards Applied
+
+**Frontend**: Uses `Logger.getLogger('category')` from `@/utils/logger`
+- Category `'invitation'` for `SupabaseInvitationService`
+- Category `'component'` for React components (`AcceptInvitationPage`, `LoginPage`)
+
+**Edge Functions**: Uses `console.log()` with `[function-name vX]` prefix pattern
+- Format: `[accept-invitation v6] Description`
+- JSON.stringify for complex objects
+
+### Files Modified
+
+- `infrastructure/supabase/supabase/functions/accept-invitation/index.ts` - Enhanced logging, version v6
+- `frontend/src/services/invitation/SupabaseInvitationService.ts` - Response logging
+- `frontend/src/pages/organizations/AcceptInvitationPage.tsx` - handleRedirect logging
+- `frontend/src/pages/auth/LoginPage.tsx` - Mount state logging
+
+### Deployment Status
+
+- **Commit**: `fb0ab084` - feat(logging): Add diagnostic logging for redirect flow debugging
+- **Edge Function**: Version v6 (Supabase version 42)
+- **Frontend**: Deployed via GitHub Actions
+
+### Testing Strategy
+
+1. Create new test org: `poc-test3-20251218`
+2. Accept invitation with `johnltice@yahoo.com`
+3. Check console logs in browser for frontend logging
+4. Check Supabase Edge Function logs for redirect decision
+5. Identify exact failure point in the redirect flow
+
+### Expected Log Output
+
+If working correctly:
+```
+[accept-invitation v6] Org query result: {"orgId":"...","slug":"poc-test3-20251218","subdomain_status":"verified","hasOrgData":true}
+[accept-invitation v6] Redirect decision: {"condition":{"hasSlug":true,"slugValue":"poc-test3-20251218","subdomainStatus":"verified","isVerified":true,"baseDomain":"firstovertheline.com"},"willUseSubdomain":true}
+```
+
+If `subdomain_status` not verified:
+```
+[accept-invitation v6] Redirect decision: {"condition":{"hasSlug":true,"slugValue":"poc-test3-20251218","subdomainStatus":"verifying","isVerified":false,...},"willUseSubdomain":false}
+```
+
+---
+
+## Phase 9: RPC Function Missing subdomain_status (2025-12-18)
+
+### Issue Discovered
+
+Testing with `poc-test1-20251218` confirmed `subdomain_status` was `'verified'` (17:08:19) BEFORE invitation acceptance (17:09:46), ruling out timing issues. Further investigation revealed the real issue.
+
+### Root Cause
+
+The `api.get_organization_by_id` RPC function did NOT include `subdomain_status` in its return columns:
+
+```sql
+-- BEFORE (broken) - infrastructure/supabase/sql/03-functions/api/004-organization-queries.sql
+CREATE OR REPLACE FUNCTION api.get_organization_by_id(p_org_id UUID)
+RETURNS TABLE (
+  id UUID,
+  name TEXT,
+  display_name TEXT,
+  slug TEXT,
+  type TEXT,
+  path TEXT,
+  parent_path TEXT,
+  timezone TEXT,
+  is_active BOOLEAN,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+  -- subdomain_status was MISSING!
+)
+```
+
+The edge function at line 318 checked `orgData?.subdomain_status === 'verified'`, but since the RPC didn't return that column, it was always `undefined`.
+
+### Fix Applied
+
+Added `subdomain_status` to the RPC function's return type and SELECT list:
+
+```sql
+-- AFTER (fixed)
+RETURNS TABLE (
+  ...
+  updated_at TIMESTAMPTZ,
+  subdomain_status TEXT  -- Added
+)
+...
+SELECT
+  ...
+  o.subdomain_status::TEXT  -- Added
+FROM organizations_projection o
+```
+
+### Files Modified
+
+- `infrastructure/supabase/sql/03-functions/api/004-organization-queries.sql`
+  - Added `subdomain_status TEXT` to RETURNS TABLE
+  - Added `o.subdomain_status::TEXT` to SELECT
+
+### Migration Applied
+
+```sql
+-- Migration: add_subdomain_status_to_get_organization_by_id
+DROP FUNCTION IF EXISTS api.get_organization_by_id(UUID);
+CREATE OR REPLACE FUNCTION api.get_organization_by_id(p_org_id UUID) ...
+```
+
+### Verification
+
+```sql
+SELECT * FROM api.get_organization_by_id('a73df31a-b897-4563-a068-53c87719452e'::uuid);
+-- Returns: {..., "subdomain_status": "verified"}  ✅
+```
+
+### Key Learning
+
+When debugging data flow issues, check the ENTIRE data path:
+1. Data exists in source table ✅ (`organizations_projection.subdomain_status = 'verified'`)
+2. Data passes through RPC function ❌ (RPC didn't select the column)
+3. Data used in edge function ✅ (correctly checked `subdomain_status`)
+
+The diagnostic logging helped narrow down the issue but wasn't strictly necessary - the RPC return type mismatch could have been found by comparing the function definition to its usage.

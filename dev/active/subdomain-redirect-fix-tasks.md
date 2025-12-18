@@ -115,18 +115,70 @@ To archive: `git mv dev/active/subdomain-redirect-fix-*.md dev/archived/subdomai
 - [ ] Test end-to-end: invitation acceptance → login → subdomain redirect
 - [ ] Test returning user: login → subdomain redirect
 
+## Phase 8: Diagnostic Logging ✅ COMPLETE (2025-12-17)
+
+**Issue**: Test with `poc-test2-20251217` showed redirect NOT working:
+- User was NOT redirected to subdomain
+- User went directly to `/organizations/{id}/dashboard` (fallback path)
+- `subdomain_status` was `'verified'` in database
+
+**Root cause hypotheses**:
+1. `subdomain_status` wasn't `'verified'` at invitation acceptance time (timing issue)
+2. Existing session from previous test persisted in cookies
+3. Edge function RPC `get_organization_by_id` not returning expected fields
+
+**Tasks Completed**:
+- [x] Add enhanced logging to `accept-invitation` edge function (v6)
+  - Log org query result (slug, subdomain_status, hasOrgData)
+  - Log redirect decision conditions and outcome
+- [x] Add logging to `SupabaseInvitationService.ts` - edge function response
+- [x] Add logging to `AcceptInvitationPage.tsx` - handleRedirect with URL analysis
+- [x] Add logging to `LoginPage.tsx` - component mount state (auth, redirect params, session)
+- [x] Commit and push changes (fb0ab084)
+- [x] Deploy edge function via MCP (v6, version 42)
+- [x] Clean up `poc-test2-20251217` organization
+
+## Phase 9: RPC Function Fix ✅ COMPLETE (2025-12-18)
+
+**Issue**: `api.get_organization_by_id` RPC function was missing `subdomain_status` in return columns
+
+- [x] Investigate why `poc-test1-20251218` redirect failed despite `subdomain_status = 'verified'`
+- [x] Compare domain_events timeline (subdomain verified 17:08:19, user created 17:09:46)
+- [x] Discover RPC function missing `subdomain_status` column
+- [x] Fix `api.get_organization_by_id` to include `subdomain_status TEXT`
+- [x] Apply migration via Supabase MCP
+- [x] Verify fix with SQL query
+- [ ] Test subdomain redirect with new test org
+
 ## Current Status
 
-**Phase**: Phase 7 ✅ IMPLEMENTATION COMPLETE (Needs E2E Testing)
-**Last Updated**: 2025-12-16
-**Plan File**: `/home/lars/.claude/plans/humming-petting-lecun.md`
-**Next Step**: Deploy and test with a real organization (bootstrap a test org, accept invitation, verify redirect to subdomain)
+**Phase**: Phase 9 ✅ FIX APPLIED (Ready for Testing)
+**Last Updated**: 2025-12-18
+**Next Step**: Clean up `poc-test1-20251218`, create new org, test subdomain redirect end-to-end
+
+### Recent Commits
+- `fb0ab084` - feat(logging): Add diagnostic logging for redirect flow debugging
+- `cfe58a55` - fix(commands): Add public.users shadow table to org-cleanup
+- (pending) - fix(db): Add subdomain_status to get_organization_by_id RPC
+
+### Root Cause (Phase 9)
+The `api.get_organization_by_id` RPC function did NOT return `subdomain_status`, so the edge function's check `orgData?.subdomain_status === 'verified'` was always `undefined`.
+
+### Fix Applied
+- Added `subdomain_status TEXT` to RPC function's RETURNS TABLE
+- Added `o.subdomain_status::TEXT` to SELECT query
+- Migration applied: `add_subdomain_status_to_get_organization_by_id`
 
 ### Implementation Summary
 - Cookie-based sessions via `@supabase/ssr` with parent domain scope (`.{PLATFORM_BASE_DOMAIN}`)
 - Post-login redirect logic queries `organizations_projection` for subdomain info
 - Redirect URL preservation via `?redirect=` query param (OAuth-style pattern)
 - Open redirect prevention with domain validation
+- **RPC function now returns subdomain_status** for edge function redirect decision
+
+### Edge Function Status
+- `accept-invitation` at v6 (Supabase version 42)
+- Contains comprehensive logging for redirect debugging
 
 ### Deferred Work (Phase 6)
 - accept-invitation edge function fix for existing users - lower priority since session sharing is the root cause of redirect issue
