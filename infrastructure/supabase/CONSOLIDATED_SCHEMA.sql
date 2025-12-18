@@ -2994,7 +2994,7 @@ GRANT EXECUTE ON FUNCTION api.get_organizations TO authenticated, service_role;
 
 -- 2. Get single organization by ID
 -- Maps to: SupabaseOrganizationQueryService.getOrganizationById()
--- Frontend usage: Organization detail pages
+-- Frontend usage: Organization detail pages, invitation acceptance redirect
 CREATE OR REPLACE FUNCTION api.get_organization_by_id(p_org_id UUID)
 RETURNS TABLE (
   id UUID,
@@ -3007,7 +3007,8 @@ RETURNS TABLE (
   timezone TEXT,
   is_active BOOLEAN,
   created_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ
+  updated_at TIMESTAMPTZ,
+  subdomain_status TEXT
 )
 SECURITY DEFINER
 SET search_path = public, extensions, pg_temp
@@ -3026,7 +3027,8 @@ BEGIN
     o.timezone,
     o.is_active,
     o.created_at,
-    o.updated_at
+    o.updated_at,
+    o.subdomain_status::TEXT
   FROM organizations_projection o
   WHERE o.id = p_org_id
   LIMIT 1;
@@ -3095,7 +3097,7 @@ GRANT EXECUTE ON FUNCTION api.get_child_organizations TO authenticated, service_
 
 -- Comment for documentation
 COMMENT ON FUNCTION api.get_organizations IS 'Frontend RPC: Query organizations with optional filters (type, status, search). Returns actual database columns only.';
-COMMENT ON FUNCTION api.get_organization_by_id IS 'Frontend RPC: Get single organization by UUID. Returns actual database columns only.';
+COMMENT ON FUNCTION api.get_organization_by_id IS 'Frontend RPC: Get single organization by UUID. Includes subdomain_status for redirect decisions.';
 COMMENT ON FUNCTION api.get_child_organizations IS 'Frontend RPC: Get child organizations by parent org UUID using ltree hierarchy.';
 
 -- 4. Get organizations with pagination, filtering, and sorting
