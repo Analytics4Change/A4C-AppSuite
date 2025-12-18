@@ -146,9 +146,14 @@ export class SupabaseInvitationService implements IInvitationService {
         throw new Error('Invalid invitation acceptance response');
       }
 
-      log.info('Invitation accepted', {
+      // Enhanced logging for redirect debugging
+      log.info('Edge function response received', {
+        success: data.success,
         userId: data.userId,
-        orgId: data.orgId
+        orgId: data.orgId,
+        redirectUrl: data.redirectUrl,
+        isAbsoluteUrl: data.redirectUrl?.startsWith('http'),
+        isSubdomainRedirect: data.redirectUrl?.includes('.firstovertheline.com'),
       });
 
       return {

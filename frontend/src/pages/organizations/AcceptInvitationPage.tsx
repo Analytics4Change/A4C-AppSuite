@@ -71,18 +71,26 @@ export const AcceptInvitationPage: React.FC = observer(() => {
    * and the cookie-based session will persist across subdomains.
    */
   const handleRedirect = (redirectUrl: string) => {
-    if (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')) {
+    const isAbsoluteUrl = redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://');
+    const loginUrl = `/login?redirect=${encodeURIComponent(redirectUrl)}`;
+
+    log.info('handleRedirect called', {
+      redirectUrl,
+      isAbsoluteUrl,
+      loginUrl,
+      currentLocation: window.location.href,
+    });
+
+    if (isAbsoluteUrl) {
       // Cross-origin URL: Pass to login via query param
       // User will be redirected there after authentication
-      const loginUrl = `/login?redirect=${encodeURIComponent(redirectUrl)}`;
-      log.info('Passing subdomain redirect to login', { redirectUrl, loginUrl });
-      navigate(loginUrl);
+      log.info('Navigating to login with cross-origin redirect', { loginUrl });
     } else {
       // Same-origin relative path: Pass to login via query param
-      const loginUrl = `/login?redirect=${encodeURIComponent(redirectUrl)}`;
-      log.info('Passing same-origin redirect to login', { redirectUrl, loginUrl });
-      navigate(loginUrl);
+      log.info('Navigating to login with same-origin redirect', { loginUrl });
     }
+
+    navigate(loginUrl);
   };
 
   /**

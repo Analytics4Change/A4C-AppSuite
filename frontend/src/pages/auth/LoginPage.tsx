@@ -28,6 +28,19 @@ export const LoginPage: React.FC = () => {
   // Get redirect URL from query param (sanitized for security)
   const redirectParam = sanitizeRedirectUrl(searchParams.get('redirect'));
 
+  // Log initial component state for debugging redirect flow
+  useEffect(() => {
+    log.info('[LoginPage] Component mounted', {
+      isAuthenticated,
+      loading,
+      redirectParam,
+      rawRedirectParam: searchParams.get('redirect'),
+      hasSession: !!session,
+      sessionOrgId: session?.claims?.org_id,
+      locationState: location.state,
+    });
+  }, []); // Only log once on mount
+
   /**
    * Handle post-login redirect with priority:
    * 1. Explicit redirect URL (from invitation flow)

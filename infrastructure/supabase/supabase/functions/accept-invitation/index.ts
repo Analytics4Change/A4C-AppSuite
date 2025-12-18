@@ -233,6 +233,14 @@ serve(async (req) => {
 
     const orgData = orgResults?.[0];
 
+    // Enhanced logging for redirect decision debugging
+    console.log(`[accept-invitation v${DEPLOY_VERSION}] Org query result:`, JSON.stringify({
+      orgId: invitation.organization_id,
+      slug: orgData?.slug,
+      subdomain_status: orgData?.subdomain_status,
+      hasOrgData: !!orgData,
+    }));
+
     // Emit user.created event via API wrapper
     // Client already configured with api schema
     const { data: _eventId, error: eventError } = await supabase
@@ -295,6 +303,17 @@ serve(async (req) => {
     // Build redirect URL based on organization subdomain status
     // If subdomain is verified, redirect to tenant subdomain (cross-origin)
     // Otherwise, fall back to organization ID path (same-origin)
+    console.log(`[accept-invitation v${DEPLOY_VERSION}] Redirect decision:`, JSON.stringify({
+      condition: {
+        hasSlug: !!orgData?.slug,
+        slugValue: orgData?.slug,
+        subdomainStatus: orgData?.subdomain_status,
+        isVerified: orgData?.subdomain_status === 'verified',
+        baseDomain: env.PLATFORM_BASE_DOMAIN,
+      },
+      willUseSubdomain: !!(orgData?.slug && orgData?.subdomain_status === 'verified'),
+    }));
+
     let redirectUrl: string;
     if (orgData?.slug && orgData?.subdomain_status === 'verified') {
       // Tenant subdomain redirect (cross-origin)
