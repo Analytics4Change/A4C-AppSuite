@@ -424,6 +424,7 @@ export class SupabaseAuthProvider implements IAuthProvider {
         aal: decoded.aal,
         session_id: decoded.session_id,
         org_id: decoded.org_id || '',
+        org_type: decoded.org_type || 'provider',
         user_role: decoded.user_role || 'viewer',
         permissions: decoded.permissions || [],
         scope_path: decoded.scope_path || '',

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { OrganizationType } from '@/types/auth.types';
 import {
   Users,
   Pill,
@@ -43,11 +44,21 @@ export const MainLayout: React.FC = () => {
     navigate('/login');
   };
 
-  // Define all possible nav items with their required roles and permissions
-  const allNavItems = [
+  // Nav item definition with optional org type filter
+  interface NavItem {
+    to: string;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    label: string;
+    roles: string[];
+    permission?: string;
+    hideForOrgTypes?: OrganizationType[];
+  }
+
+  // Define all possible nav items with their required roles, permissions, and org type filters
+  const allNavItems: NavItem[] = [
     { to: '/clients', icon: Users, label: 'Clients', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse', 'caregiver'] },
     { to: '/organizations', icon: Building, label: 'Organizations', roles: ['super_admin', 'partner_onboarder'], permission: 'organization.create' },
-    { to: '/organization-units', icon: FolderTree, label: 'Org Units', roles: ['super_admin', 'provider_admin'], permission: 'organization.view_ou' },
+    { to: '/organization-units', icon: FolderTree, label: 'Org Units', roles: ['super_admin', 'provider_admin'], permission: 'organization.view_ou', hideForOrgTypes: ['platform_owner'] },
     { to: '/medications', icon: Pill, label: 'Medications', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse'] },
     { to: '/reports', icon: FileText, label: 'Reports', roles: ['super_admin', 'provider_admin', 'administrator'] },
     { to: '/settings', icon: Settings, label: 'Settings', roles: ['super_admin', 'provider_admin', 'administrator'] },
@@ -58,23 +69,26 @@ export const MainLayout: React.FC = () => {
   const [navItems, setNavItems] = React.useState<typeof allNavItems>([]);
 
   // Debug logging
+  const userOrgType = authSession?.claims.org_type;
   log.debug('Current user', {
     email: user?.email,
     role: authSession?.claims.user_role,
+    orgType: userOrgType,
     userRole: userRole,
     userRoleLowercase: userRole.toLowerCase()
   });
 
-  // Filter nav items by role AND permission (async)
+  // Filter nav items by role, permission, AND org type (async)
   React.useEffect(() => {
     const filterItems = async () => {
       log.debug('Filtering nav items', {
         userRole,
+        userOrgType,
         userPermissions: authSession?.claims.permissions,
         allNavItemsCount: allNavItems.length
       });
 
-      const filtered = [];
+      const filtered: NavItem[] = [];
 
       for (const item of allNavItems) {
         // Check role first
@@ -86,6 +100,15 @@ export const MainLayout: React.FC = () => {
         });
 
         if (!roleMatch) continue;
+
+        // Check org type filter (hideForOrgTypes)
+        if (item.hideForOrgTypes && userOrgType && item.hideForOrgTypes.includes(userOrgType)) {
+          log.debug(`Hiding ${item.label}: org type excluded`, {
+            userOrgType,
+            hideForOrgTypes: item.hideForOrgTypes
+          });
+          continue;
+        }
 
         // If item requires permission, check it
         if ('permission' in item && item.permission) {
@@ -118,7 +141,7 @@ export const MainLayout: React.FC = () => {
 
     filterItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- allNavItems is a module-level constant
-  }, [authSession, userRole, hasPermission]);
+  }, [authSession, userRole, userOrgType, hasPermission]);
 
   return (
     <>

@@ -10,7 +10,7 @@
  * See .plans/supabase-auth-integration/frontend-auth-architecture.md
  */
 
-import { Session, User, JWTClaims, UserRole, Permission } from '@/types/auth.types';
+import { Session, User, JWTClaims, UserRole, Permission, OrganizationType } from '@/types/auth.types';
 import { getRolePermissions } from './roles.config';
 import { PERMISSIONS } from './permissions.config';
 
@@ -118,6 +118,7 @@ export interface DevUserProfile {
   name: string;
   role: UserRole;
   org_id: string;
+  org_type: OrganizationType;
   org_name: string;
   scope_path: string;
   permissions: Permission[];
@@ -146,6 +147,7 @@ export const DEFAULT_DEV_USER: DevUserProfile = {
   name: import.meta.env.VITE_DEV_USER_NAME || 'Dev User (Provider Admin)',
   role: (import.meta.env.VITE_DEV_USER_ROLE as UserRole) || 'provider_admin',
   org_id: import.meta.env.VITE_DEV_ORG_ID || 'dev-org-660e8400-e29b-41d4-a716-446655440000',
+  org_type: 'provider',
   org_name: 'Development Organization',
   scope_path: import.meta.env.VITE_DEV_SCOPE_PATH || 'org_dev_organization',
   permissions: import.meta.env.VITE_DEV_PERMISSIONS
@@ -171,6 +173,7 @@ export const DEV_USER_PROFILES: Record<string, DevUserProfile> = {
     name: 'Dev Super Admin',
     role: 'super_admin',
     org_id: '*', // Wildcard indicates all orgs
+    org_type: 'platform_owner',
     org_name: 'Platform (All Organizations)',
     scope_path: '*', // Global scope
     permissions: getDevProfilePermissions('super_admin'),
@@ -183,10 +186,24 @@ export const DEV_USER_PROFILES: Record<string, DevUserProfile> = {
     name: 'Dev Partner Onboarder',
     role: 'partner_onboarder',
     org_id: '*', // Wildcard indicates all orgs
+    org_type: 'platform_owner',
     org_name: 'Platform (All Organizations)',
     scope_path: '*', // Global scope
     permissions: getDevProfilePermissions('partner_onboarder'),
     picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=partner-onboarder',
+  },
+
+  partner_admin: {
+    id: 'dev-partner-admin-990e8400-e29b-41d4-a716-446655440000',
+    email: 'partner.admin@example.com',
+    name: 'Dev Partner Admin',
+    role: 'partner_admin',
+    org_id: 'dev-partner-org-770e8400-e29b-41d4-a716-446655440000',
+    org_type: 'provider_partner',
+    org_name: 'Development Partner Organization',
+    scope_path: 'org_dev_partner_organization',
+    permissions: getDevProfilePermissions('partner_admin'),
+    picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=partner-admin',
   },
 };
 
@@ -223,6 +240,7 @@ export function createMockJWTClaims(profile: DevUserProfile): JWTClaims {
     aal: 'aal1',
     session_id: `mock-session-${Date.now()}`,
     org_id: profile.org_id,
+    org_type: profile.org_type,
     user_role: profile.role,
     permissions: profile.permissions,
     scope_path: profile.scope_path,

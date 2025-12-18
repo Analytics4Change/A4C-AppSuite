@@ -45,6 +45,16 @@ export type UserRole =
 export type Permission = string;
 
 /**
+ * Organization types for UI feature gating
+ * Used to conditionally show/hide features based on organization type
+ *
+ * - platform_owner: A4C platform organization (manages providers)
+ * - provider: Healthcare provider organization (primary tenant)
+ * - provider_partner: Partner organization associated with a provider
+ */
+export type OrganizationType = 'platform_owner' | 'provider' | 'provider_partner';
+
+/**
  * JWT Custom Claims Structure
  * Added to JWT tokens via Supabase Auth custom claims hook
  * See .plans/supabase-auth-integration/custom-claims-setup.md
@@ -67,6 +77,9 @@ export interface JWTClaims {
 
   /** Organization ID - primary tenant identifier for RLS */
   org_id: string;
+
+  /** Organization type for UI feature gating */
+  org_type: OrganizationType;
 
   /** User's role within the organization */
   user_role: UserRole;

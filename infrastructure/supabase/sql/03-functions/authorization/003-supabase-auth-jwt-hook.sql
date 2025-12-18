@@ -2,7 +2,7 @@
 -- Enriches JWT tokens with custom claims for RBAC and multi-tenant isolation
 --
 -- This hook is called by Supabase Auth when generating access tokens
--- It adds org_id, user_role, permissions, and scope_path to the JWT
+-- It adds org_id, org_type, user_role, permissions, and scope_path to the JWT
 --
 -- Documentation: https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook
 
@@ -23,6 +23,7 @@ DECLARE
   v_user_record record;
   v_claims jsonb;
   v_org_id uuid;
+  v_org_type text;
   v_user_role text;
   v_permissions text[];
   v_scope_path text;
@@ -91,6 +92,16 @@ BEGIN
     INTO v_org_id;
   END IF;
 
+  -- Get organization type for UI feature gating
+  -- Super admins (NULL org_id) default to 'platform_owner' for consistency
+  IF v_org_id IS NULL THEN
+    v_org_type := 'platform_owner';
+  ELSE
+    SELECT o.type::text INTO v_org_type
+    FROM public.organizations_projection o
+    WHERE o.id = v_org_id;
+  END IF;
+
   -- Get user's permissions for the organization
   -- Super admins get all permissions
   IF v_user_role = 'super_admin' THEN
@@ -116,6 +127,7 @@ BEGIN
   -- and add our custom claims (org_id, user_role, permissions, scope_path, claims_version)
   v_claims := COALESCE(event->'claims', '{}'::jsonb) || jsonb_build_object(
     'org_id', v_org_id,
+    'org_type', v_org_type,
     'user_role', v_user_role,
     'permissions', to_jsonb(v_permissions),
     'scope_path', v_scope_path,
@@ -139,6 +151,7 @@ EXCEPTION
       'claims',
       COALESCE(event->'claims', '{}'::jsonb) || jsonb_build_object(
         'org_id', NULL,
+        'org_type', NULL,
         'user_role', 'viewer',
         'permissions', '[]'::jsonb,
         'scope_path', NULL,
@@ -150,7 +163,7 @@ $$
 SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION public.custom_access_token_hook IS
-  'Enriches Supabase Auth JWTs with custom claims: org_id, user_role, permissions, scope_path. Called automatically on token generation.';
+  'Enriches Supabase Auth JWTs with custom claims: org_id, org_type, user_role, permissions, scope_path. Called automatically on token generation.';
 
 
 -- ============================================================================
