@@ -15,8 +15,9 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import type { CreateOrganizationParams } from '@shared/types';
-import { getSupabaseClient } from '@shared/utils/supabase';
-import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
+
+const log = getLogger('CreateOrganization');
 
 /**
  * Create organization activity
@@ -27,7 +28,10 @@ export async function createOrganization(
   params: CreateOrganizationParams
 ): Promise<string> {
   const displayName = params.subdomain || params.name;
-  console.log(`[CreateOrganization] Starting for: ${displayName} with organizationId: ${params.organizationId}`);
+  log.info('Starting organization creation', {
+    displayName,
+    organizationId: params.organizationId
+  });
 
   const supabase = getSupabaseClient();
 
@@ -59,8 +63,11 @@ export async function createOrganization(
   }
 
   if (existing) {
-    console.log(`[CreateOrganization] Organization already exists with slug: ${params.subdomain || params.name}`);
-    console.log(`[CreateOrganization] Existing ID: ${existing.id}, Requested ID: ${params.organizationId}`);
+    log.info('Organization already exists', {
+      slug: params.subdomain || params.name,
+      existingId: existing.id,
+      requestedId: params.organizationId
+    });
     // Return the requested organizationId to maintain unified ID system
     // This ensures status polling works even on activity retries
     return params.organizationId;
@@ -93,7 +100,7 @@ export async function createOrganization(
     tags
   });
 
-  console.log(`[CreateOrganization] Emitted organization.created event for ${orgId}`);
+  log.debug('Emitted organization.created event', { orgId });
 
   // Create contacts and emit events
   const contactIds: string[] = [];
@@ -132,7 +139,7 @@ export async function createOrganization(
     });
   }
 
-  console.log(`[CreateOrganization] Created ${contactIds.length} contacts for ${orgId}`);
+  log.debug('Created contacts', { count: contactIds.length, orgId });
 
   // Create addresses and emit events
   const addressIds: string[] = [];
@@ -171,7 +178,7 @@ export async function createOrganization(
     });
   }
 
-  console.log(`[CreateOrganization] Created ${addressIds.length} addresses for ${orgId}`);
+  log.debug('Created addresses', { count: addressIds.length, orgId });
 
   // Create phones and emit events
   const phoneIds: string[] = [];
@@ -207,8 +214,8 @@ export async function createOrganization(
     });
   }
 
-  console.log(`[CreateOrganization] Created ${phoneIds.length} phones for ${orgId}`);
-  console.log(`[CreateOrganization] Successfully created organization ${orgId} with all related entities`);
+  log.debug('Created phones', { count: phoneIds.length, orgId });
+  log.info('Successfully created organization with all related entities', { orgId });
 
   return orgId;
 }

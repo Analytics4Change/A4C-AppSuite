@@ -7,6 +7,9 @@ import { DosageValidator } from '@/services/validation/DosageValidator';
 import { MedicationManagementViewModel } from '@/viewModels/medication/MedicationManagementViewModel';
 import { ClientSelectionViewModel } from '@/viewModels/client/ClientSelectionViewModel';
 import { serviceFactory } from '@/services/ServiceFactory';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('viewmodel');
 
 // Determine which API to use based on environment
 const USE_RXNORM = import.meta.env.VITE_USE_RXNORM_API === 'true' || import.meta.env.PROD;
@@ -22,7 +25,7 @@ const organizationService = serviceFactory.getOrganizationService();
 
 // Log which API is being used
 if (import.meta.env.DEV) {
-  console.log('[useViewModel] Using', USE_RXNORM ? 'RXNorm' : 'Mock', 'medication API');
+  log.info('Medication API selected', { api: USE_RXNORM ? 'RXNorm' : 'Mock' });
 }
 
 // Store view model instances to reuse them

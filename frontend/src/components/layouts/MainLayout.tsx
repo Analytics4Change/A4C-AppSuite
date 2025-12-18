@@ -17,6 +17,9 @@ import { Button } from '@/components/ui/button';
 import { ImpersonationBanner } from '@/components/auth/ImpersonationBanner';
 import { ImpersonationModal } from '@/components/auth/ImpersonationModal';
 import { useImpersonationUI } from '@/hooks/useImpersonationUI';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('navigation');
 
 export const MainLayout: React.FC = () => {
   const { user, logout, session: authSession, hasPermission } = useAuth();
@@ -55,7 +58,7 @@ export const MainLayout: React.FC = () => {
   const [navItems, setNavItems] = React.useState<typeof allNavItems>([]);
 
   // Debug logging
-  console.log('[MainLayout] Current user:', {
+  log.debug('Current user', {
     email: user?.email,
     role: authSession?.claims.user_role,
     userRole: userRole,
@@ -65,7 +68,7 @@ export const MainLayout: React.FC = () => {
   // Filter nav items by role AND permission (async)
   React.useEffect(() => {
     const filterItems = async () => {
-      console.log('[MainLayout] Filtering nav items:', {
+      log.debug('Filtering nav items', {
         userRole,
         userPermissions: authSession?.claims.permissions,
         allNavItemsCount: allNavItems.length
@@ -76,7 +79,7 @@ export const MainLayout: React.FC = () => {
       for (const item of allNavItems) {
         // Check role first
         const roleMatch = item.roles.includes(userRole.toLowerCase());
-        console.log(`[MainLayout] ${item.label}: role check`, {
+        log.debug(`${item.label}: role check`, {
           userRole: userRole.toLowerCase(),
           requiredRoles: item.roles,
           roleMatch
@@ -87,7 +90,7 @@ export const MainLayout: React.FC = () => {
         // If item requires permission, check it
         if ('permission' in item && item.permission) {
           const allowed = await hasPermission(item.permission);
-          console.log(`[MainLayout] ${item.label}: permission check`, {
+          log.debug(`${item.label}: permission check`, {
             requiredPermission: item.permission,
             userPermissions: authSession?.claims.permissions,
             allowed
@@ -96,16 +99,16 @@ export const MainLayout: React.FC = () => {
           if (allowed) {
             filtered.push(item);
           } else {
-            console.warn(`[MainLayout] ❌ Hiding ${item.label}: missing permission ${item.permission}`);
+            log.warn(`Hiding ${item.label}: missing permission`, { permission: item.permission });
           }
         } else {
           // No permission required, just role
-          console.log(`[MainLayout] ✅ Showing ${item.label}: role match, no permission required`);
+          log.debug(`Showing ${item.label}: role match, no permission required`);
           filtered.push(item);
         }
       }
 
-      console.log('[MainLayout] Final nav items:', {
+      log.debug('Final nav items', {
         count: filtered.length,
         items: filtered.map(i => i.label)
       });

@@ -14,8 +14,9 @@
  */
 
 import type { DeleteAddressesParams } from '@shared/types';
-import { getSupabaseClient } from '@shared/utils/supabase';
-import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
+
+const log = getLogger('DeleteAddresses');
 
 /**
  * Delete addresses compensation activity
@@ -23,7 +24,7 @@ import { emitEvent, buildTags } from '@shared/utils/emit-event';
  * @returns Always true (best-effort)
  */
 export async function deleteAddresses(params: DeleteAddressesParams): Promise<boolean> {
-  console.log(`[DeleteAddresses] Starting for organization: ${params.orgId}`);
+  log.info('Starting address deletion', { orgId: params.orgId });
 
   try {
     const supabase = getSupabaseClient();
@@ -37,10 +38,10 @@ export async function deleteAddresses(params: DeleteAddressesParams): Promise<bo
       });
 
     if (junctionError) {
-      console.error(`[DeleteAddresses] Junction soft-delete failed: ${junctionError.message}`);
+      log.warn('Junction soft-delete failed', { error: junctionError.message });
       // Continue anyway (best-effort)
     } else {
-      console.log(`[DeleteAddresses] Soft-deleted ${junctionCount} junction records`);
+      log.debug('Soft-deleted junction records', { count: junctionCount });
     }
 
     // 2. Query all addresses for organization via RPC (PostgREST only exposes 'api' schema)
@@ -51,12 +52,12 @@ export async function deleteAddresses(params: DeleteAddressesParams): Promise<bo
       });
 
     if (queryError) {
-      console.error(`[DeleteAddresses] Query failed: ${queryError.message}`);
+      log.warn('Query failed', { error: queryError.message });
       return true; // Best-effort: don't fail workflow
     }
 
     if (!addresses || addresses.length === 0) {
-      console.log(`[DeleteAddresses] No addresses found for organization ${params.orgId}`);
+      log.info('No addresses found', { orgId: params.orgId });
       return true;
     }
 
@@ -74,18 +75,18 @@ export async function deleteAddresses(params: DeleteAddressesParams): Promise<bo
           tags
         });
 
-        console.log(`[DeleteAddresses] Emitted address.deleted for ${address.id}`);
+        log.debug('Emitted address.deleted', { addressId: address.id });
       } catch (eventError) {
-        console.error(`[DeleteAddresses] Failed to emit event for ${address.id}:`, eventError);
+        log.error('Failed to emit event', { addressId: address.id, error: eventError instanceof Error ? eventError.message : String(eventError) });
         // Continue with other addresses
       }
     }
 
-    console.log(`[DeleteAddresses] Completed for ${params.orgId} (${addresses.length} addresses)`);
+    log.info('Deletion completed', { orgId: params.orgId, count: addresses.length });
     return true;
 
   } catch (error) {
-    console.error(`[DeleteAddresses] Unexpected error for ${params.orgId}:`, error);
+    log.error('Unexpected error', { orgId: params.orgId, error: error instanceof Error ? error.message : String(error) });
     return true; // Best-effort: don't fail workflow
   }
 }

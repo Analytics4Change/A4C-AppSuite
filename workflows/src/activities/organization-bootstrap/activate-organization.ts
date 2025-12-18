@@ -15,9 +15,10 @@
  */
 
 import type { ActivateOrganizationParams } from '@shared/types';
-import { getSupabaseClient } from '@shared/utils/supabase';
-import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
 import { AGGREGATE_TYPES } from '@shared/constants';
+
+const log = getLogger('ActivateOrganization');
 
 /**
  * Activate organization activity
@@ -27,7 +28,7 @@ import { AGGREGATE_TYPES } from '@shared/constants';
 export async function activateOrganization(
   params: ActivateOrganizationParams
 ): Promise<boolean> {
-  console.log(`[ActivateOrganization] Starting for org: ${params.orgId}`);
+  log.info('Starting organization activation', { orgId: params.orgId });
 
   const supabase = getSupabaseClient();
 
@@ -49,7 +50,7 @@ export async function activateOrganization(
   }
 
   if (org.is_active) {
-    console.log(`[ActivateOrganization] Organization already active: ${params.orgId}`);
+    log.info('Organization already active', { orgId: params.orgId });
 
     // Emit event even if already active (for event replay)
     await emitEvent({
@@ -80,7 +81,7 @@ export async function activateOrganization(
     throw new Error(`Failed to activate organization: ${updateError.message}`);
   }
 
-  console.log(`[ActivateOrganization] Organization activated: ${params.orgId}`);
+  log.info('Organization activated', { orgId: params.orgId });
 
   // Emit OrganizationActivated event
   const activatedAt = new Date().toISOString();
@@ -96,7 +97,7 @@ export async function activateOrganization(
     tags: buildTags()
   });
 
-  console.log(`[ActivateOrganization] Emitted OrganizationActivated event for ${params.orgId}`);
+  log.debug('Emitted organization.activated event', { orgId: params.orgId });
 
   return true;
 }

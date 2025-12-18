@@ -13,6 +13,9 @@
  * - Mock auth + Real organization service (Edge Functions reject mock JWT)
  * - Real auth + Mock organization service (Data inconsistency)
  */
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('config');
 
 export type AppMode = 'mock' | 'integration-auth' | 'production';
 
@@ -67,7 +70,7 @@ export function getDeploymentConfig(): DeploymentConfig {
     );
   }
 
-  console.log(`[Deployment] Mode: ${mode}`, config);
+  log.info('Deployment mode configured', { mode, config });
 
   return config;
 }

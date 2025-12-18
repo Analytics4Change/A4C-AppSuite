@@ -1,6 +1,9 @@
 import { IMedicationApi } from '@/services/api/interfaces/IMedicationApi';
 import { Medication, MedicationHistory, DosageInfo } from '@/types/models';
 import { mockMedicationDatabase } from '@/mocks/data/medications.mock';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('mock');
 
 export class MockMedicationApi implements IMedicationApi {
   private medicationHistory: MedicationHistory[] = [];
@@ -47,7 +50,7 @@ export class MockMedicationApi implements IMedicationApi {
     };
     
     this.medicationHistory.push(history);
-    console.log('Mock: Saved medication', dosageInfo);
+    log.debug('Saved medication', { dosageInfo });
   }
 
   async getMedicationHistory(_clientId: string): Promise<MedicationHistory[]> {
@@ -67,8 +70,8 @@ export class MockMedicationApi implements IMedicationApi {
       ...this.medicationHistory[historyIndex].dosageInfo,
       ...dosageInfo
     };
-    
-    console.log('Mock: Updated medication', id, dosageInfo);
+
+    log.debug('Updated medication', { id, dosageInfo });
   }
 
   async deleteMedication(id: string): Promise<void> {
@@ -81,14 +84,14 @@ export class MockMedicationApi implements IMedicationApi {
     
     this.medicationHistory[historyIndex].status = 'discontinued';
     this.medicationHistory[historyIndex].discontinueDate = new Date();
-    
-    console.log('Mock: Deleted medication', id);
+
+    log.debug('Deleted medication', { id });
   }
 
   async clearCache(): Promise<void> {
     await this.simulateDelay(100);
     // Mock implementation - could clear internal state if needed
-    console.log('Mock: Cache cleared');
+    log.debug('Cache cleared');
   }
 
   async getHealthStatus(): Promise<any> {
@@ -105,7 +108,7 @@ export class MockMedicationApi implements IMedicationApi {
 
   cancelAllRequests(): void {
     // Mock implementation - no actual requests to cancel
-    console.log('Mock: All requests cancelled');
+    log.debug('All requests cancelled');
   }
 
   private simulateDelay(ms: number): Promise<void> {

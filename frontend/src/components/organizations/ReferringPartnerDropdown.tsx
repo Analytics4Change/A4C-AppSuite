@@ -5,6 +5,9 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getOrganizationQueryService } from "@/services/organization/OrganizationQueryServiceFactory";
 import type { Organization } from "@/types/organization.types";
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('organization');
 
 /**
  * ReferringPartnerDropdown - Dropdown for selecting VAR partner who referred this organization
@@ -56,7 +59,7 @@ export const ReferringPartnerDropdown = observer(
 
             setVarPartners(partners);
           } catch (err) {
-            console.error('[ReferringPartnerDropdown] Failed to fetch VAR partners:', err);
+            log.error('Failed to fetch VAR partners', { error: err });
             setError('Failed to load partners');
           } finally {
             setLoading(false);

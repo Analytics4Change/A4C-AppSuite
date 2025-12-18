@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { DynamicAdditionalInputProps, FocusSource } from './metadata-types';
 import { Input } from '@/components/ui/input';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('component');
 
 /**
  * Component that dynamically renders additional input fields based on strategy configuration
@@ -34,16 +37,16 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
   
   // Component lifecycle logging
   useEffect(() => {
-    console.log('[DynamicInput] Component mounted for checkbox:', checkboxId, 'with value:', currentValue);
+    log.debug('DynamicInput mounted', { checkboxId, currentValue });
     return () => {
-      console.log('[DynamicInput] Component unmounting for checkbox:', checkboxId);
+      log.debug('DynamicInput unmounting', { checkboxId });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- currentValue is logged on mount only, changes tracked in separate effect
   }, [checkboxId]);
   
   // Update initial value when it changes externally
   useEffect(() => {
-    console.log('[DynamicInput] Initial value updated:', currentValue, 'for checkbox:', checkboxId);
+    log.debug('DynamicInput value updated', { checkboxId, currentValue });
     initialValueRef.current = currentValue;
     setLocalValue(currentValue);
   }, [currentValue, checkboxId]);
@@ -62,7 +65,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
     );
     
     if (shouldAutoFocus) {
-      console.log('[DynamicInput] Auto-focusing based on intent:', focusIntent?.type);
+      log.debug('DynamicInput auto-focusing', { intent: focusIntent?.type });
       requestAnimationFrame(() => {
         inputRef.current?.focus();
         hasInitiallyFocused.current = true;
@@ -123,7 +126,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
   // Auto-save function
   const handleAutoSave = () => {
     if (localValue !== currentValue) {
-      console.log('[DynamicInput] Auto-saving value:', localValue);
+      log.debug('DynamicInput auto-saving', { localValue });
       onDataChange(localValue);
       setShowSaved(true);
     }
@@ -131,23 +134,16 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
   
   // Enhanced keyboard handler using intentional exit
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    console.log('[DynamicInput] KeyDown:', {
+    log.debug('DynamicInput KeyDown', {
       key: e.key,
-      keyCode: e.keyCode,
-      targetTagName: (e.target as HTMLElement).tagName,
-      targetId: (e.target as HTMLElement).id,
       checkboxId,
-      currentValue,
-      initialValue: initialValueRef.current,
       focusSource,
-      isPrevented: e.defaultPrevented,
-      bubbles: e.bubbles,
       strategy: strategy.componentType
     });
     
     switch (e.key) {
       case 'Tab':
-        console.log('[DynamicInput] Tab pressed - auto-saving and allowing navigation');
+        log.debug('DynamicInput Tab pressed - auto-saving');
         
         // For custom multi-field components (future enhancement)
         if (strategy.componentType === 'custom' && strategy.componentProps.getPeerFields) {
@@ -169,19 +165,19 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
         
         // For Shift+Tab, return to checkbox
         if (e.shiftKey && onIntentionalExit) {
-          console.log('[DynamicInput] Shift+Tab - returning to checkbox');
+          log.debug('DynamicInput Shift+Tab - returning to checkbox');
           e.preventDefault();
           onIntentionalExit(checkboxId, true);
         }
         // Regular Tab - allow natural navigation
         else {
-          console.log('[DynamicInput] Tab - allowing natural navigation');
+          log.debug('DynamicInput Tab - allowing natural navigation');
           // Let Tab work naturally to move to next field
         }
         break;
-        
+
       case 'Enter':
-        console.log('[DynamicInput] Enter pressed - intentional exit with save');
+        log.debug('DynamicInput Enter pressed - intentional exit with save');
         e.preventDefault();
         handleAutoSave();
         if (onIntentionalExit) {
@@ -190,22 +186,17 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
         break;
         
       case 'Escape': {
-        console.log('[DynamicInput] Escape pressed - intentional exit without save');
+        log.debug('DynamicInput Escape pressed - intentional exit without save');
         e.preventDefault();
         const originalValue = initialValueRef.current;
         const isEmpty = !localValue || localValue === '';
         const isRequired = strategy.focusManagement?.requiresInput !== false;
 
-        console.log('[DynamicInput] Escape handler:', {
-          isEmpty,
-          isRequired,
-          localValue,
-          originalValue
-        });
+        log.debug('DynamicInput Escape handler', { isEmpty, isRequired, localValue, originalValue });
 
         if (isEmpty && isRequired) {
           // Deselect the checkbox for empty required fields
-          console.log('[DynamicInput] Deselecting checkbox due to empty required field');
+          log.debug('DynamicInput deselecting checkbox - empty required field');
           if (onSelectionChange) {
             onSelectionChange(checkboxId, false);
           }
@@ -215,7 +206,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
           announceToScreenReader('Selection cancelled, checkbox deselected');
         } else {
           // Restore original value for optional or non-empty fields
-          console.log('[DynamicInput] Restoring from', localValue, 'to', originalValue);
+          log.debug('DynamicInput restoring value', { from: localValue, to: originalValue });
           setLocalValue(originalValue);
           onDataChange(originalValue || null);
         }
@@ -228,7 +219,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
         
       default:
         // All other keys work naturally
-        console.log('[DynamicInput] Other key pressed:', e.key, '- allowing natural behavior');
+        log.debug('DynamicInput key pressed - natural behavior', { key: e.key });
         break;
     }
   };
@@ -238,8 +229,8 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
     const source = e.nativeEvent.detail === 0 ? 'keyboard' : 'mouse';
     setFocusSource(source);
     setIsFocused(true);
-    
-    console.log('[DynamicInput] Focus acquired via:', source);
+
+    log.debug('DynamicInput focus acquired', { source });
     
     // Update intent if user clicked directly on input
     if (source === 'mouse' && focusIntent?.type !== 'input' && onDirectFocus) {
@@ -253,13 +244,8 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
   const handleBlur = (e: React.FocusEvent) => {
     const relatedTarget = e.relatedTarget as HTMLElement;
     setIsFocused(false);
-    
-    console.log('[DynamicInput] Blur event:', {
-      checkboxId,
-      relatedTarget: relatedTarget?.tagName,
-      focusSource,
-      currentIntent: focusIntent?.type
-    });
+
+    log.debug('DynamicInput blur', { checkboxId, relatedTarget: relatedTarget?.tagName, focusSource });
     
     // Auto-save on blur (natural navigation away)
     handleAutoSave();
@@ -386,7 +372,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
         // For custom components, pass all necessary props
         const CustomComponent = componentProps.component;
         if (!CustomComponent) {
-          console.error(`Custom component not provided for checkbox ${checkboxId}`);
+          log.error('Custom component not provided', { checkboxId });
           return null;
         }
         return (
@@ -402,7 +388,7 @@ export const DynamicAdditionalInput: React.FC<DynamicAdditionalInputProps> = obs
       }
         
       default:
-        console.warn(`Unknown component type: ${componentType}`);
+        log.warn('Unknown component type', { componentType });
         return null;
     }
   };

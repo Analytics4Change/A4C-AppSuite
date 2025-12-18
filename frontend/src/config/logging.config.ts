@@ -2,8 +2,9 @@ import type { LogConfig } from '@/utils/logger';
 
 /**
  * Logging configuration for different environments
- * 
+ *
  * Categories:
+ * - main: Application startup and lifecycle
  * - mobx: MobX state management and reactivity
  * - navigation: Keyboard navigation and focus management
  * - api: API calls and service layer
@@ -14,6 +15,12 @@ import type { LogConfig } from '@/utils/logger';
  * - viewmodel: ViewModel operations
  * - ui: UI interactions and events
  * - test: Test-specific logging
+ * - auth: Authentication and authorization
+ * - invitation: Organization invitations
+ * - organization: Organization management
+ * - mock: Mock service layer
+ * - config: Configuration and environment
+ * - diagnostics: Debug tool controls
  */
 
 const developmentConfig: LogConfig = {
@@ -28,14 +35,24 @@ const developmentConfig: LogConfig = {
     'hook': 'info',
     'viewmodel': 'debug',
     'ui': 'info',
-    
+
     // Services and data
     'api': 'info',
     'validation': 'warn',
-    
+
+    // Authentication and authorization
+    'auth': 'debug',
+    'invitation': 'debug',
+    'organization': 'debug',
+
+    // Development utilities
+    'mock': 'debug',
+    'config': 'info',
+    'diagnostics': 'debug',
+
     // Performance and monitoring
     'performance': 'info',
-    
+
     // Default for uncategorized
     'default': 'info'
   },
@@ -45,12 +62,20 @@ const developmentConfig: LogConfig = {
 };
 
 const productionConfig: LogConfig = {
-  enabled: false, // Completely disabled in production for performance
-  level: 'error',
-  categories: {},
-  output: 'none',
-  includeTimestamp: false,
-  includeLocation: false
+  enabled: true, // Enabled for warn+error visibility in production
+  level: 'warn', // Only warn and error levels in production
+  categories: {
+    // Critical categories for production debugging
+    'auth': 'warn',
+    'organization': 'warn',
+    'invitation': 'warn',
+    'api': 'warn',
+    'config': 'warn',
+    'default': 'warn'
+  },
+  output: 'console',
+  includeTimestamp: true,
+  includeLocation: false // Reduced overhead in production
 };
 
 const testConfig: LogConfig = {
@@ -80,10 +105,10 @@ export function getLoggingConfig(): LogConfig {
   if (import.meta.env.MODE === 'test') {
     config = testConfig;
   } else if (import.meta.env.PROD && !debugLogsEnabled) {
-    // Production mode: disabled by default unless VITE_DEBUG_LOGS=true
+    // Production mode: warn+error logging enabled by default
     config = productionConfig;
   } else if (import.meta.env.PROD && debugLogsEnabled) {
-    // Production mode with debug logging enabled
+    // Production mode with debug logging enabled (VITE_DEBUG_LOGS=true)
     config = {
       enabled: true,
       level: 'info',
@@ -92,6 +117,10 @@ export function getLoggingConfig(): LogConfig {
         'viewmodel': 'info',
         'api': 'info',
         'validation': 'warn',
+        'auth': 'info',
+        'organization': 'info',
+        'invitation': 'info',
+        'config': 'info',
         'default': 'info'
       },
       output: 'console',

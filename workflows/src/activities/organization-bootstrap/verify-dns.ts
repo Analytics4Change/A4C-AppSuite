@@ -25,8 +25,10 @@
 
 import { Resolver } from 'dns';
 import type { VerifyDNSParams } from '@shared/types';
-import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { emitEvent, buildTags, getLogger } from '@shared/utils';
 import { AGGREGATE_TYPES } from '@shared/constants';
+
+const log = getLogger('VerifyDNS');
 
 // Public DNS servers to query for propagation verification
 const DNS_SERVERS = [
@@ -104,12 +106,12 @@ async function verifyDnsWithQuorum(
  * @throws Error if DNS not propagated (quorum not reached, workflow will retry)
  */
 export async function verifyDNS(params: VerifyDNSParams): Promise<boolean> {
-  console.log(`[VerifyDNS] Starting for domain: ${params.domain}`);
+  log.info('Starting DNS verification', { domain: params.domain });
 
   // In mock/development mode, skip real DNS verification
   const workflowMode = process.env.WORKFLOW_MODE || 'development';
   if (workflowMode === 'mock' || workflowMode === 'development') {
-    console.log(`[VerifyDNS] Skipping DNS verification (${workflowMode} mode)`);
+    log.info('Skipping DNS verification', { mode: workflowMode });
 
     // Emit DNSVerified event
     await emitEvent({
@@ -130,22 +132,36 @@ export async function verifyDNS(params: VerifyDNSParams): Promise<boolean> {
   }
 
   // Production mode: Perform quorum-based DNS verification
-  console.log(`[VerifyDNS] Performing quorum-based DNS verification for: ${params.domain}`);
-  console.log(`[VerifyDNS] Querying ${DNS_SERVERS.length} DNS servers, quorum required: ${QUORUM_REQUIRED}`);
+  log.info('Performing quorum-based DNS verification', {
+    domain: params.domain,
+    servers: DNS_SERVERS.length,
+    quorumRequired: QUORUM_REQUIRED
+  });
 
   const { verified, results } = await verifyDnsWithQuorum(params.domain);
 
   // Log individual results
   for (const result of results) {
     if (result.success) {
-      console.log(`[VerifyDNS] ✓ ${result.server}: ${params.domain} → [${result.ips?.join(', ')}]`);
+      log.debug('DNS server check passed', {
+        server: result.server,
+        domain: params.domain,
+        ips: result.ips
+      });
     } else {
-      console.log(`[VerifyDNS] ✗ ${result.server}: ${result.error}`);
+      log.debug('DNS server check failed', {
+        server: result.server,
+        error: result.error
+      });
     }
   }
 
   const successCount = results.filter(r => r.success).length;
-  console.log(`[VerifyDNS] Quorum: ${successCount}/${DNS_SERVERS.length} (required: ${QUORUM_REQUIRED})`);
+  log.info('Quorum check', {
+    success: successCount,
+    total: DNS_SERVERS.length,
+    required: QUORUM_REQUIRED
+  });
 
   if (!verified) {
     throw new Error(
@@ -179,6 +195,6 @@ export async function verifyDNS(params: VerifyDNSParams): Promise<boolean> {
     tags: buildTags()
   });
 
-  console.log(`[VerifyDNS] DNS verified successfully via quorum: ${params.domain}`);
+  log.info('DNS verified successfully via quorum', { domain: params.domain });
   return true;
 }

@@ -14,8 +14,9 @@
  */
 
 import type { DeletePhonesParams } from '@shared/types';
-import { getSupabaseClient } from '@shared/utils/supabase';
-import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
+
+const log = getLogger('DeletePhones');
 
 /**
  * Delete phones compensation activity
@@ -23,7 +24,7 @@ import { emitEvent, buildTags } from '@shared/utils/emit-event';
  * @returns Always true (best-effort)
  */
 export async function deletePhones(params: DeletePhonesParams): Promise<boolean> {
-  console.log(`[DeletePhones] Starting for organization: ${params.orgId}`);
+  log.info('Starting phone deletion', { orgId: params.orgId });
 
   try {
     const supabase = getSupabaseClient();
@@ -37,10 +38,10 @@ export async function deletePhones(params: DeletePhonesParams): Promise<boolean>
       });
 
     if (junctionError) {
-      console.error(`[DeletePhones] Junction soft-delete failed: ${junctionError.message}`);
+      log.warn('Junction soft-delete failed', { error: junctionError.message });
       // Continue anyway (best-effort)
     } else {
-      console.log(`[DeletePhones] Soft-deleted ${junctionCount} junction records`);
+      log.debug('Soft-deleted junction records', { count: junctionCount });
     }
 
     // 2. Query all phones for organization via RPC (PostgREST only exposes 'api' schema)
@@ -51,12 +52,12 @@ export async function deletePhones(params: DeletePhonesParams): Promise<boolean>
       });
 
     if (queryError) {
-      console.error(`[DeletePhones] Query failed: ${queryError.message}`);
+      log.warn('Query failed', { error: queryError.message });
       return true; // Best-effort: don't fail workflow
     }
 
     if (!phones || phones.length === 0) {
-      console.log(`[DeletePhones] No phones found for organization ${params.orgId}`);
+      log.info('No phones found', { orgId: params.orgId });
       return true;
     }
 
@@ -74,18 +75,18 @@ export async function deletePhones(params: DeletePhonesParams): Promise<boolean>
           tags
         });
 
-        console.log(`[DeletePhones] Emitted phone.deleted for ${phone.id}`);
+        log.debug('Emitted phone.deleted', { phoneId: phone.id });
       } catch (eventError) {
-        console.error(`[DeletePhones] Failed to emit event for ${phone.id}:`, eventError);
+        log.error('Failed to emit event', { phoneId: phone.id, error: eventError instanceof Error ? eventError.message : String(eventError) });
         // Continue with other phones
       }
     }
 
-    console.log(`[DeletePhones] Completed for ${params.orgId} (${phones.length} phones)`);
+    log.info('Deletion completed', { orgId: params.orgId, count: phones.length });
     return true;
 
   } catch (error) {
-    console.error(`[DeletePhones] Unexpected error for ${params.orgId}:`, error);
+    log.error('Unexpected error', { orgId: params.orgId, error: error instanceof Error ? error.message : String(error) });
     return true; // Best-effort: don't fail workflow
   }
 }

@@ -2,6 +2,9 @@ import React, { useRef, useEffect } from 'react';
 import { observer } from 'mobx-react-lite';
 import { EnhancedFocusTrappedCheckboxGroup } from '@/components/ui/FocusTrappedCheckboxGroup/EnhancedFocusTrappedCheckboxGroup';
 import { FoodConditionsViewModel } from '@/viewModels/medication/FoodConditionsViewModel';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('validation');
 
 interface FoodConditionsInputProps {
   selectedFoodConditions: string[];
@@ -60,9 +63,8 @@ export const FoodConditionsInput: React.FC<FoodConditionsInputProps> = observer(
 
   const handleAdditionalDataChange = (checkboxId: string, data: any) => {
     viewModel.handleAdditionalDataChange(checkboxId, data);
-    
-    // Log the additional data for debugging
-    console.log(`Additional data for ${checkboxId}:`, data);
+
+    log.debug('Additional data changed', { checkboxId, data });
   };
 
   const handleFieldBlur = (checkboxId: string) => {
@@ -91,13 +93,13 @@ export const FoodConditionsInput: React.FC<FoodConditionsInputProps> = observer(
   const handleContinue = (selectedIds: string[], _additionalData: Map<string, unknown>) => {
     // Validate before continuing
     if (!viewModel.isValid) {
-      console.warn('Invalid food conditions configuration');
+      log.warn('Invalid food conditions configuration');
       return;
     }
-    
+
     // Get the complete configuration
     const config = viewModel.getFoodConditionsConfiguration();
-    console.log('Food conditions configuration:', config);
+    log.debug('Food conditions configuration', { config });
     
     // Trigger sorting so selected items appear first next time
     viewModel.triggerSort();

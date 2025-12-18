@@ -27,10 +27,11 @@ import type {
   Invitation
 } from '@shared/types';
 import { createEmailProvider } from '@shared/providers/email/factory';
-import { getSupabaseClient } from '@shared/utils/supabase';
-import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
 import { AGGREGATE_TYPES } from '@shared/constants';
 import { getWorkflowsEnv } from '@shared/config/env-schema';
+
+const log = getLogger('SendInvitationEmails');
 
 /**
  * Build invitation email HTML
@@ -148,8 +149,10 @@ If you didn't expect this invitation, you can safely ignore this email.
 export async function sendInvitationEmails(
   params: SendInvitationEmailsParams
 ): Promise<SendInvitationEmailsResult> {
-  console.log(`[SendInvitationEmails] Starting for org: ${params.orgId}`);
-  console.log(`[SendInvitationEmails] Sending ${params.invitations.length} emails`);
+  log.info('Starting email send', {
+    orgId: params.orgId,
+    count: params.invitations.length
+  });
 
   const supabase = getSupabaseClient();
   const emailProvider = createEmailProvider();
@@ -179,7 +182,7 @@ export async function sendInvitationEmails(
   // Send emails
   for (const invitation of params.invitations) {
     try {
-      console.log(`[SendInvitationEmails] Sending email to: ${invitation.email}`);
+      log.debug('Sending email', { email: invitation.email });
 
       const html = buildInvitationEmailHTML(invitation, orgName, frontendUrl);
       const text = buildInvitationEmailText(invitation, orgName, frontendUrl);
@@ -208,10 +211,10 @@ export async function sendInvitationEmails(
         tags
       });
 
-      console.log(`[SendInvitationEmails] Email sent to: ${invitation.email}`);
+      log.debug('Email sent', { email: invitation.email });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`[SendInvitationEmails] Failed to send email to ${invitation.email}: ${errorMessage}`);
+      log.error('Failed to send email', { email: invitation.email, error: errorMessage });
 
       failures.push({
         email: invitation.email,
@@ -220,7 +223,10 @@ export async function sendInvitationEmails(
     }
   }
 
-  console.log(`[SendInvitationEmails] Completed: ${successCount} sent, ${failures.length} failed`);
+  log.info('Email send completed', {
+    sent: successCount,
+    failed: failures.length
+  });
 
   return {
     successCount,

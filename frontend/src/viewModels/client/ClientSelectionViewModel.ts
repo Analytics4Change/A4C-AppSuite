@@ -1,6 +1,9 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { IClientApi } from '@/services/api/interfaces/IClientApi';
 import { Client } from '@/types/models';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('viewmodel');
 
 export class ClientSelectionViewModel {
   clients: Client[] = [];
@@ -93,7 +96,7 @@ export class ClientSelectionViewModel {
   }
 
   private handleError(message: string, error: any) {
-    console.error(message, error);
+    log.error(message, { error });
     runInAction(() => {
       this.error = message;
     });

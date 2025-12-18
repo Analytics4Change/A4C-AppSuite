@@ -381,12 +381,12 @@ export function useImpersonation() {
     // Register callbacks
     const handleWarning = () => {
       // Could show a notification here
-      console.warn('Impersonation session expiring soon!');
+      log.warn('Impersonation session expiring soon!');
     };
 
     const handleExpiration = () => {
       // Could show a notification here
-      console.warn('Impersonation session expired!');
+      log.warn('Impersonation session expired!');
       setSession(null);
     };
 

@@ -21,8 +21,9 @@
  */
 
 import type { RevokeInvitationsParams } from '@shared/types';
-import { getSupabaseClient } from '@shared/utils/supabase';
-import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
+
+const log = getLogger('RevokeInvitations');
 
 /**
  * Revoke invitations activity (compensation)
@@ -32,7 +33,7 @@ import { emitEvent, buildTags } from '@shared/utils/emit-event';
 export async function revokeInvitations(
   params: RevokeInvitationsParams
 ): Promise<number> {
-  console.log(`[RevokeInvitations] Starting for org: ${params.orgId}`);
+  log.info('Starting invitation revocation', { orgId: params.orgId });
 
   const supabase = getSupabaseClient();
 
@@ -45,16 +46,16 @@ export async function revokeInvitations(
       });
 
     if (fetchError) {
-      console.error(`[RevokeInvitations] Error fetching invitations: ${fetchError.message}`);
+      log.warn('Error fetching invitations', { error: fetchError.message });
       return 0; // Don't fail compensation
     }
 
     if (!invitations || invitations.length === 0) {
-      console.log(`[RevokeInvitations] No pending invitations to revoke`);
+      log.info('No pending invitations to revoke');
       return 0;
     }
 
-    console.log(`[RevokeInvitations] Found ${invitations.length} pending invitations`);
+    log.debug('Found pending invitations', { count: invitations.length });
 
     // Emit InvitationRevoked events for each invitation
     // CQRS pattern: Let the trigger update the projection, not direct UPDATE
@@ -77,13 +78,13 @@ export async function revokeInvitations(
       });
     }
 
-    console.log(`[RevokeInvitations] Emitted ${invitations.length} InvitationRevoked events`);
+    log.info('Emitted invitation.revoked events', { count: invitations.length });
 
     return invitations.length;
   } catch (error) {
     // Log error but don't fail compensation
     if (error instanceof Error) {
-      console.error(`[RevokeInvitations] Error (non-fatal): ${error.message}`);
+      log.error('Non-fatal error revoking invitations', { error: error.message });
     }
     return 0; // Don't fail workflow
   }

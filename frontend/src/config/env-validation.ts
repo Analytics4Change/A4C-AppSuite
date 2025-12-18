@@ -7,6 +7,9 @@
  * Called from main.tsx BEFORE any other initialization.
  */
 import { z } from 'zod';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('config');
 
 // =============================================================================
 // Utility Transformers
@@ -184,7 +187,7 @@ ${errors}
 ╚══════════════════════════════════════════════════════════════════╝
 `;
 
-    console.error(errorMessage);
+    log.error('Environment validation failed', { mode, errors: result.error.issues });
     throw new Error(`Environment validation failed:\n${errors}`);
   }
 

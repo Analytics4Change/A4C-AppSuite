@@ -21,9 +21,11 @@
 
 import type { ConfigureDNSParams, ConfigureDNSResult } from '@shared/types';
 import { createDNSProvider } from '@shared/providers/dns/factory';
-import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { emitEvent, buildTags, getLogger } from '@shared/utils';
 import { AGGREGATE_TYPES } from '@shared/constants';
 import { getWorkflowsEnv } from '@shared/config/env-schema';
+
+const log = getLogger('ConfigureDNS');
 
 /**
  * Configure DNS activity
@@ -33,7 +35,7 @@ import { getWorkflowsEnv } from '@shared/config/env-schema';
 export async function configureDNS(
   params: ConfigureDNSParams
 ): Promise<ConfigureDNSResult> {
-  console.log(`[ConfigureDNS] Starting for subdomain: ${params.subdomain}`);
+  log.info('Starting DNS configuration', { subdomain: params.subdomain });
 
   // Get domain configuration from environment
   const env = getWorkflowsEnv();
@@ -47,7 +49,7 @@ export async function configureDNS(
   const fqdn = `${params.subdomain}.${baseDomain}`;
 
   // Find zone for base domain
-  console.log(`[ConfigureDNS] Finding zone for: ${baseDomain}`);
+  log.debug('Finding zone', { baseDomain });
   const zones = await dnsProvider.listZones(baseDomain);
 
   if (zones.length === 0) {
@@ -58,10 +60,10 @@ export async function configureDNS(
   if (!zone) {
     throw new Error(`Zone list returned empty zone for domain: ${baseDomain}`);
   }
-  console.log(`[ConfigureDNS] Using zone: ${zone.id} (${zone.name})`);
+  log.debug('Using zone', { zoneId: zone.id, zoneName: zone.name });
 
   // Check if record already exists (idempotency)
-  console.log(`[ConfigureDNS] Checking for existing CNAME record: ${fqdn}`);
+  log.debug('Checking for existing CNAME record', { fqdn });
   const existingRecords = await dnsProvider.listRecords(zone.id, {
     name: fqdn,
     type: 'CNAME'
@@ -72,7 +74,7 @@ export async function configureDNS(
     if (!existing) {
       throw new Error(`Existing records list returned empty record`);
     }
-    console.log(`[ConfigureDNS] DNS record already exists: ${existing.id}`);
+    log.info('DNS record already exists', { recordId: existing.id });
 
     // Emit event even if record exists (for event replay)
     // Contract: organization.subdomain.dns_created (AsyncAPI)
@@ -100,7 +102,7 @@ export async function configureDNS(
   }
 
   // Create CNAME record (proxied through Cloudflare for tunnel routing)
-  console.log(`[ConfigureDNS] Creating CNAME record: ${fqdn} → ${cnameTarget}`);
+  log.info('Creating CNAME record', { fqdn, target: cnameTarget });
   const record = await dnsProvider.createRecord(zone.id, {
     type: 'CNAME',
     name: fqdn,
@@ -109,7 +111,7 @@ export async function configureDNS(
     proxied: true  // Required for Cloudflare Tunnel routing
   });
 
-  console.log(`[ConfigureDNS] Created DNS record: ${record.id}`);
+  log.info('Created DNS record', { recordId: record.id });
 
   // Emit organization.subdomain.dns_created event (contract-compliant)
   await emitEvent({
@@ -129,7 +131,7 @@ export async function configureDNS(
     tags: buildTags()
   });
 
-  console.log(`[ConfigureDNS] Emitted organization.subdomain.dns_created event for ${params.orgId}`);
+  log.info('Emitted organization.subdomain.dns_created event', { orgId: params.orgId });
 
   return {
     fqdn,

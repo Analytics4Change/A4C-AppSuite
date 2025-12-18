@@ -5,6 +5,9 @@ import { Button } from '../button';
 import { Checkbox } from '../checkbox';
 import { cn } from '../utils';
 import { FocusTrappedCheckboxGroupProps } from './types';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('component');
 
 /**
  * Focus-Trapped Checkbox Group Component
@@ -77,7 +80,7 @@ export const FocusTrappedCheckboxGroup = observer(({
   const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!isExpanded) return;
     
-    console.log('[FocusTrappedCheckboxGroup] Key pressed:', e.key, 'Current focused element:', focusedElement);
+    log.debug('Key pressed', { key: e.key, focusedElement });
     
     if (e.key === 'Tab') {
       e.preventDefault(); // Always prevent default Tab behavior
@@ -87,7 +90,7 @@ export const FocusTrappedCheckboxGroup = observer(({
         // Shift+Tab: go backwards
         const nextFocus = focusedElement === 0 ? 2 : focusedElement - 1;
         setFocusedElement(nextFocus);
-        console.log('[FocusTrappedCheckboxGroup] Shift+Tab: Moving focus to element', nextFocus);
+        log.debug('Shift+Tab: Moving focus', { nextFocus });
         
         // Focus the appropriate element
         if (nextFocus === 0) {
@@ -101,7 +104,7 @@ export const FocusTrappedCheckboxGroup = observer(({
         // Tab: go forwards
         const nextFocus = (focusedElement + 1) % 3;
         setFocusedElement(nextFocus);
-        console.log('[FocusTrappedCheckboxGroup] Tab: Moving focus to element', nextFocus);
+        log.debug('Tab: Moving focus', { nextFocus });
         
         // Focus the appropriate element
         if (nextFocus === 0) {
@@ -113,7 +116,7 @@ export const FocusTrappedCheckboxGroup = observer(({
         }
       }
     } else if (e.key === 'Escape') {
-      console.log('[FocusTrappedCheckboxGroup] Escape pressed: Cancelling');
+      log.debug('Escape pressed: Cancelling');
       e.preventDefault();
       e.stopPropagation();
       setIsExpanded(false);
@@ -123,7 +126,7 @@ export const FocusTrappedCheckboxGroup = observer(({
         setTimeout(() => {
           const nextElement = document.querySelector(`[tabindex="${nextTabIndex}"]`) as HTMLElement;
           if (nextElement) {
-            console.log('[FocusTrappedCheckboxGroup] Moving focus to next element:', nextTabIndex);
+            log.debug('Moving focus to next element', { nextTabIndex });
             nextElement.focus();
           }
         }, 50);
@@ -143,7 +146,7 @@ export const FocusTrappedCheckboxGroup = observer(({
   const handleCheckboxKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!isExpanded) return;
     
-    console.log('[FocusTrappedCheckboxGroup] Checkbox key:', e.key);
+    log.debug('Checkbox key', { key: e.key });
 
     switch (e.key) {
       case 'ArrowDown':
@@ -209,7 +212,7 @@ export const FocusTrappedCheckboxGroup = observer(({
 
   // Handle cancel
   const handleCancel = useCallback(() => {
-    console.log('[FocusTrappedCheckboxGroup] Cancel pressed, collapsing');
+    log.debug('Cancel pressed, collapsing');
     setIsExpanded(false);
     onCancel();
     // Move focus to the next element in tab order
@@ -217,7 +220,7 @@ export const FocusTrappedCheckboxGroup = observer(({
       setTimeout(() => {
         const nextElement = document.querySelector(`[tabindex="${nextTabIndex}"]`) as HTMLElement;
         if (nextElement) {
-          console.log('[FocusTrappedCheckboxGroup] Moving focus to next element:', nextTabIndex);
+          log.debug('Moving focus to next element', { nextTabIndex });
           nextElement.focus();
         }
       }, 50);
@@ -226,7 +229,7 @@ export const FocusTrappedCheckboxGroup = observer(({
 
   // Handle continue
   const handleContinue = useCallback(() => {
-    console.log('[FocusTrappedCheckboxGroup] Continue pressed, collapsing');
+    log.debug('Continue pressed, collapsing');
     setIsExpanded(false);
     onContinue(selectedIds);
     // Move focus to the next element in tab order
@@ -234,7 +237,7 @@ export const FocusTrappedCheckboxGroup = observer(({
       setTimeout(() => {
         const nextElement = document.querySelector(`[tabindex="${nextTabIndex}"]`) as HTMLElement;
         if (nextElement) {
-          console.log('[FocusTrappedCheckboxGroup] Moving focus to next element:', nextTabIndex);
+          log.debug('Moving focus to next element', { nextTabIndex });
           nextElement.focus();
         }
       }, 50);
@@ -306,7 +309,7 @@ export const FocusTrappedCheckboxGroup = observer(({
           tabIndex={baseTabIndex}
           aria-expanded={isExpanded}
           onFocus={() => {
-            console.log('[FocusTrappedCheckboxGroup] Header received focus, expanding');
+            log.debug('Header received focus, expanding');
             if (!isExpanded) {
               setIsExpanded(true);
               // After expansion, focus should move to checkbox group
@@ -375,7 +378,7 @@ export const FocusTrappedCheckboxGroup = observer(({
             tabIndex={baseTabIndex}
             onKeyDown={handleCheckboxKeyDown}
             onFocus={() => {
-              console.log('[FocusTrappedCheckboxGroup] Checkbox group focused');
+              log.debug('Checkbox group focused');
               setFocusedElement(0);
               if (!isNavigatingWithArrows) {
                 // When tabbing into the group, focus the first selected or first item
@@ -442,7 +445,7 @@ export const FocusTrappedCheckboxGroup = observer(({
               variant="outline"
               onClick={handleCancel}
               onFocus={() => {
-                console.log('[FocusTrappedCheckboxGroup] Cancel button focused');
+                log.debug('Cancel button focused');
                 setFocusedElement(1);
               }}
               tabIndex={-1} // We manage focus manually
@@ -455,7 +458,7 @@ export const FocusTrappedCheckboxGroup = observer(({
               variant="default"
               onClick={handleContinue}
               onFocus={() => {
-                console.log('[FocusTrappedCheckboxGroup] Continue button focused');
+                log.debug('Continue button focused');
                 setFocusedElement(2);
               }}
               tabIndex={-1} // We manage focus manually

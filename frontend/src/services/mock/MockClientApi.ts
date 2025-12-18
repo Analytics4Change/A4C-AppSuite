@@ -1,6 +1,9 @@
 import { IClientApi } from '@/services/api/interfaces/IClientApi';
 import { Client } from '@/types/models';
 import { mockClients } from '@/mocks/data/clients.mock';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('mock');
 
 export class MockClientApi implements IClientApi {
   private clients: Client[] = [...mockClients];
@@ -41,8 +44,8 @@ export class MockClientApi implements IClientApi {
     };
     
     this.clients.push(newClient);
-    console.log('Mock: Created client', newClient);
-    
+    log.debug('Created client', { client: newClient });
+
     return newClient;
   }
 
@@ -59,8 +62,8 @@ export class MockClientApi implements IClientApi {
       ...clientData,
       id // Ensure ID doesn't change
     };
-    
-    console.log('Mock: Updated client', id, clientData);
+
+    log.debug('Updated client', { id, clientData });
     return this.clients[clientIndex];
   }
 
@@ -73,7 +76,7 @@ export class MockClientApi implements IClientApi {
     }
     
     this.clients[clientIndex].status = 'inactive';
-    console.log('Mock: Deleted client', id);
+    log.debug('Deleted client', { id });
   }
 
   private simulateDelay(ms: number): Promise<void> {

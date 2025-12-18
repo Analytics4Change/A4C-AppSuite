@@ -22,9 +22,10 @@
 import { randomBytes } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import type { GenerateInvitationsParams, Invitation } from '@shared/types';
-import { getSupabaseClient } from '@shared/utils/supabase';
-import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
 import { AGGREGATE_TYPES } from '@shared/constants';
+
+const log = getLogger('GenerateInvitations');
 
 /**
  * Generate secure invitation token
@@ -42,8 +43,10 @@ function generateInvitationToken(): string {
 export async function generateInvitations(
   params: GenerateInvitationsParams
 ): Promise<Invitation[]> {
-  console.log(`[GenerateInvitations] Starting for org: ${params.orgId}`);
-  console.log(`[GenerateInvitations] Generating ${params.users.length} invitations`);
+  log.info('Starting invitation generation', {
+    orgId: params.orgId,
+    count: params.users.length
+  });
 
   const supabase = getSupabaseClient();
   const invitations: Invitation[] = [];
@@ -54,7 +57,7 @@ export async function generateInvitations(
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   for (const user of params.users) {
-    console.log(`[GenerateInvitations] Processing invitation for: ${user.email}`);
+    log.debug('Processing invitation', { email: user.email });
 
     // Check if invitation already exists (idempotency) via RPC
     const { data: existingData } = await supabase
@@ -67,7 +70,7 @@ export async function generateInvitations(
     const existing = existingData && existingData.length > 0 ? existingData[0] : null;
 
     if (existing) {
-      console.log(`[GenerateInvitations] Invitation already exists for ${user.email}`);
+      log.debug('Invitation already exists', { email: user.email });
       invitations.push({
         invitationId: existing.invitation_id,
         email: existing.email,
@@ -99,7 +102,7 @@ export async function generateInvitations(
       tags
     });
 
-    console.log(`[GenerateInvitations] Generated invitation for ${user.email}`);
+    log.debug('Generated invitation', { email: user.email });
 
     invitations.push({
       invitationId,
@@ -109,7 +112,7 @@ export async function generateInvitations(
     });
   }
 
-  console.log(`[GenerateInvitations] Generated ${invitations.length} invitations`);
+  log.info('Invitation generation completed', { count: invitations.length });
 
   return invitations;
 }

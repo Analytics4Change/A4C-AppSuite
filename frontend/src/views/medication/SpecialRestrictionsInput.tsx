@@ -2,6 +2,9 @@ import React, { useRef, useEffect } from 'react';
 import { observer } from 'mobx-react-lite';
 import { EnhancedFocusTrappedCheckboxGroup } from '@/components/ui/FocusTrappedCheckboxGroup/EnhancedFocusTrappedCheckboxGroup';
 import { SpecialRestrictionsViewModel } from '@/viewModels/medication/SpecialRestrictionsViewModel';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('validation');
 
 interface SpecialRestrictionsInputProps {
   selectedSpecialRestrictions: string[];
@@ -61,9 +64,8 @@ export const SpecialRestrictionsInput: React.FC<SpecialRestrictionsInputProps> =
 
   const handleAdditionalDataChange = (checkboxId: string, data: any) => {
     viewModel.handleAdditionalDataChange(checkboxId, data);
-    
-    // Log the additional data for debugging
-    console.log(`Additional data for ${checkboxId}:`, data);
+
+    log.debug('Additional data changed', { checkboxId, data });
   };
 
   const handleFieldBlur = (checkboxId: string) => {
@@ -92,13 +94,13 @@ export const SpecialRestrictionsInput: React.FC<SpecialRestrictionsInputProps> =
   const handleContinue = (selectedIds: string[], _additionalData: Map<string, unknown>) => {
     // Validate before continuing
     if (!viewModel.isValid) {
-      console.warn('Invalid special restrictions configuration');
+      log.warn('Invalid special restrictions configuration');
       return;
     }
-    
+
     // Get the complete configuration
     const config = viewModel.getSpecialRestrictionsConfiguration();
-    console.log('Special restrictions configuration:', config);
+    log.debug('Special restrictions configuration', { config });
     
     // Trigger sorting so selected items appear first next time
     viewModel.triggerSort();

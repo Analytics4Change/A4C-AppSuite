@@ -1,5 +1,8 @@
 import { reaction } from 'mobx';
 import { MedicationManagementViewModel } from './MedicationManagementViewModel';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('validation');
 
 export class MedicationManagementValidation {
   private vm: MedicationManagementViewModel;
@@ -189,7 +192,7 @@ export class MedicationManagementValidation {
   }
 
   handleError(message: string, error: any) {
-    console.error(message, error);
+    log.error(message, { error });
     this.setError('general', message);
   }
 }

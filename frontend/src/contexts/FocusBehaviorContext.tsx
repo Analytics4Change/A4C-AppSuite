@@ -1,4 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('navigation');
 
 /**
  * Types of focus behaviors that are mutually exclusive
@@ -41,10 +44,7 @@ export const FocusBehaviorProvider: React.FC<{ children: React.ReactNode }> = ({
         .some(b => b === 'enter-as-tab');
       
       if (hasConflictingBehavior) {
-        console.warn(
-          `[FocusBehavior] Cannot activate 'tab-as-arrows' while 'enter-as-tab' is active. ` +
-          `Component: ${componentId}`
-        );
+        log.warn('Cannot activate tab-as-arrows while enter-as-tab is active', { componentId });
         return false;
       }
     }
@@ -55,10 +55,7 @@ export const FocusBehaviorProvider: React.FC<{ children: React.ReactNode }> = ({
         .some(b => b === 'tab-as-arrows');
       
       if (hasConflictingBehavior) {
-        console.warn(
-          `[FocusBehavior] Cannot activate 'enter-as-tab' while 'tab-as-arrows' is active. ` +
-          `Component: ${componentId}`
-        );
+        log.warn('Cannot activate enter-as-tab while tab-as-arrows is active', { componentId });
         return false;
       }
     }

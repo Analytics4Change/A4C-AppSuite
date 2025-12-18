@@ -20,9 +20,10 @@
  */
 
 import type { DeactivateOrganizationParams } from '@shared/types';
-import { getSupabaseClient } from '@shared/utils/supabase';
-import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
 import { AGGREGATE_TYPES } from '@shared/constants';
+
+const log = getLogger('DeactivateOrganization');
 
 /**
  * Deactivate organization activity (compensation)
@@ -32,7 +33,7 @@ import { AGGREGATE_TYPES } from '@shared/constants';
 export async function deactivateOrganization(
   params: DeactivateOrganizationParams
 ): Promise<boolean> {
-  console.log(`[DeactivateOrganization] Starting for org: ${params.orgId}`);
+  log.info('Starting organization deactivation', { orgId: params.orgId });
 
   const supabase = getSupabaseClient();
 
@@ -45,19 +46,19 @@ export async function deactivateOrganization(
       });
 
     if (checkError) {
-      console.error(`[DeactivateOrganization] Error checking status: ${checkError.message}`);
+      log.warn('Error checking status, continuing', { error: checkError.message });
       // Continue with deactivation attempt
     }
 
     const org = orgData && orgData.length > 0 ? orgData[0] : null;
 
     if (!org) {
-      console.log(`[DeactivateOrganization] Organization not found: ${params.orgId} (skip)`);
+      log.info('Organization not found, skipping', { orgId: params.orgId });
       return true;
     }
 
     if (!org.is_active && org.deleted_at) {
-      console.log(`[DeactivateOrganization] Organization already deactivated: ${params.orgId}`);
+      log.info('Organization already deactivated', { orgId: params.orgId });
 
       // Emit event even if already deactivated (for event replay)
       await emitEvent({
@@ -88,11 +89,11 @@ export async function deactivateOrganization(
       });
 
     if (updateError) {
-      console.error(`[DeactivateOrganization] Error updating status: ${updateError.message}`);
+      log.warn('Error updating status, continuing', { error: updateError.message });
       // Don't fail compensation
     }
 
-    console.log(`[DeactivateOrganization] Organization deactivated: ${params.orgId}`);
+    log.info('Organization deactivated', { orgId: params.orgId });
 
     // Emit OrganizationDeactivated event
     await emitEvent({
@@ -108,13 +109,13 @@ export async function deactivateOrganization(
       tags: buildTags()
     });
 
-    console.log(`[DeactivateOrganization] Emitted OrganizationDeactivated event for ${params.orgId}`);
+    log.debug('Emitted organization.deactivated event', { orgId: params.orgId });
 
     return true;
   } catch (error) {
     // Log error but don't fail compensation
     if (error instanceof Error) {
-      console.error(`[DeactivateOrganization] Error (non-fatal): ${error.message}`);
+      log.error('Non-fatal error during deactivation', { error: error.message });
     }
     return true; // Don't fail workflow
   }

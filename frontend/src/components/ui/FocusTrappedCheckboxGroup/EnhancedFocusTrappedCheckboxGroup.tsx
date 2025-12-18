@@ -7,6 +7,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { DefaultSummaryStrategy } from './summary-strategies';
 import { cn } from '@/components/ui/utils';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('component');
 
 /**
  * Memoized checkbox item to prevent unnecessary re-renders
@@ -57,7 +60,7 @@ const MemoizedCheckboxItem = React.memo<MemoizedCheckboxItemProps>(({
 }) => {
   // Debug logging for optional input rendering
   if (checkbox.id === 'prn') {
-    console.log(`[PRN Checkbox] Rendering - checked: ${checkbox.checked}, hasStrategy: ${!!checkbox.additionalInputStrategy}, requiresInput: ${checkbox.requiresAdditionalInput}`);
+    log.debug('PRN Checkbox rendering', { checked: checkbox.checked, hasStrategy: !!checkbox.additionalInputStrategy, requiresInput: checkbox.requiresAdditionalInput });
   }
   
   return (
@@ -227,7 +230,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
         if (!checkboxRefs.current.has(checkboxId)) {
           checkboxRefs.current.set(checkboxId, el);
           if (DEBUG_REFS) {
-            console.log('[CheckboxGroup] Setting ref for checkbox:', checkboxId);
+            log.debug('Setting ref for checkbox', { checkboxId });
           }
         }
       } else {
@@ -235,7 +238,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
         if (checkboxRefs.current.has(checkboxId)) {
           checkboxRefs.current.delete(checkboxId);
           if (DEBUG_REFS) {
-            console.log('[CheckboxGroup] Removing ref for checkbox:', checkboxId);
+            log.debug('Removing ref for checkbox', { checkboxId });
           }
         }
       }
@@ -283,7 +286,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   
   // Handle intentional exit from input (Enter/Escape keys)
   const handleInputIntentionalExit = useCallback((checkboxId: string, saveValue: boolean) => {
-    console.log('[CheckboxGroup] Intentional exit from input:', checkboxId, 'save:', saveValue);
+    log.debug('Intentional exit from input', { checkboxId, saveValue });
     
     // Set intent BEFORE any focus changes
     setFocusIntent({ type: 'returning-to-checkbox', checkboxId, source: 'keyboard' });
@@ -296,7 +299,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
     queueMicrotask(() => {
       const checkbox = checkboxRefs.current.get(checkboxId);
       if (checkbox) {
-        console.log('[CheckboxGroup] Focusing checkbox after intentional exit');
+        log.debug('Focusing checkbox after intentional exit');
         checkbox.focus();
         const index = checkboxes.findIndex(cb => cb.id === checkboxId);
         setFocusedCheckboxIndex(index);
@@ -321,19 +324,19 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
     
     if (!isInternalNavigation) {
       // External blur - user clicked outside
-      console.log('[CheckboxGroup] Natural blur to external element');
+      log.debug('Natural blur to external element');
       setFocusIntent({ type: 'external-blur', from: 'input' });
       setFocusedCheckboxId(null);
       setFocusRegion('checkbox');
       // Don't force focus back - user intentionally left
     } else {
-      console.log('[CheckboxGroup] Internal navigation within component');
+      log.debug('Internal navigation within component');
     }
   }, [onFieldBlur]);
   
   // Handle direct input focus via mouse click
   const handleDirectInputFocus = useCallback((checkboxId: string) => {
-    console.log('[CheckboxGroup] Direct input focus via mouse');
+    log.debug('Direct input focus via mouse', { checkboxId });
     setFocusIntent({ type: 'input', checkboxId, source: 'mouse' });
     setFocusedCheckboxId(checkboxId);
     setFocusRegion('input');
@@ -341,7 +344,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   
   // Handle checkbox change
   const handleCheckboxChange = useCallback((checkboxId: string, checked: boolean) => {
-    console.log(`[CheckboxGroup] Checkbox ${checkboxId} changed to ${checked}`);
+    log.debug('Checkbox changed', { checkboxId, checked });
     onSelectionChange(checkboxId, checked);
     
     // Clear additional data if unchecked
@@ -403,7 +406,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   const handleBack = useCallback(() => {
     if (onBack) {
       // Don't clear selections - preserve state
-      console.log(`[CheckboxGroup ${id}] Navigating back, preserving selections`);
+      log.debug('Navigating back, preserving selections', { id });
       onBack();
     }
   }, [onBack, id]);
@@ -464,7 +467,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   
   // Enhanced keyboard navigation within the focus trap
   const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
-    console.log('[Container] KeyDown event:', {
+    log.debug('Container KeyDown event', {
       key: e.key,
       focusRegion,
       focusedElement,
@@ -477,7 +480,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
     // Shift+Tab from container goes back if onBack is provided
     if (e.key === 'Tab' && e.shiftKey && focusedElement === 0 && onBack) {
       e.preventDefault();
-      console.log('[Container] Shift+Tab on container - going back');
+      log.debug('Shift+Tab on container - going back');
       handleBack();
       return;
     }
@@ -485,7 +488,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
     // Backspace in checkbox region goes back if onBack is provided
     if (e.key === 'Backspace' && focusRegion === 'checkbox' && onBack) {
       e.preventDefault();
-      console.log('[Container] Backspace in checkbox region - going back');
+      log.debug('Backspace in checkbox region - going back');
       handleBack();
       return;
     }
@@ -493,7 +496,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
     // FIRST: Check for Tab to optional input (must come before general Tab handler)
     if (e.key === 'Tab' && !e.shiftKey && focusRegion === 'checkbox' && focusedElement === 0) {
       const currentCheckbox = checkboxes[focusedCheckboxIndex];
-      console.log('[Container] Checking for optional input navigation:', {
+      log.debug('Checking for optional input navigation', {
         checkboxId: currentCheckbox?.id,
         checked: currentCheckbox?.checked,
         hasStrategy: !!currentCheckbox?.additionalInputStrategy,
@@ -501,11 +504,11 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
       });
       
       // Check if checkbox has an optional input that's checked but not auto-focused
-      if (currentCheckbox?.checked && 
-          currentCheckbox?.additionalInputStrategy && 
+      if (currentCheckbox?.checked &&
+          currentCheckbox?.additionalInputStrategy &&
           !currentCheckbox?.requiresAdditionalInput) {
         e.preventDefault();
-        console.log('[Container] Tab to optional input - preventing default and navigating');
+        log.debug('Tab to optional input - preventing default and navigating');
         // Set intent for Tab navigation to optional input
         setFocusIntent({ type: 'tab-to-input', checkboxId: currentCheckbox.id, source: 'keyboard' as FocusSource });
         setFocusRegion('input');
@@ -516,9 +519,9 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
           const input = document.getElementById(`${currentCheckbox.id}-additional-input`);
           if (input) {
             input.focus();
-            console.log(`[Container] Tab navigated to optional input for ${currentCheckbox.id}`);
+            log.debug('Tab navigated to optional input', { checkboxId: currentCheckbox.id });
           } else {
-            console.log(`[Container] Could not find input element: ${currentCheckbox.id}-additional-input`);
+            log.debug('Could not find input element', { inputId: `${currentCheckbox.id}-additional-input` });
           }
         });
         return; // Exit early to prevent general Tab handler
@@ -527,9 +530,9 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
     
     // THEN: General Tab key handling for section navigation
     if (e.key === 'Tab' && focusRegion !== 'input') {
-      console.log('[Container] Tab key - preventing default (not in input)');
+      log.debug('Tab key - preventing default (not in input)');
       e.preventDefault();
-      console.log('[Container] Tab preventDefault done');
+      log.debug('Tab preventDefault done');
       // 0: checkbox group, 1: back (optional), 2: cancel, 3: continue
       const hasBackButton = showBackButton && onBack;
       const sectionCount = hasBackButton ? 4 : 3;
@@ -556,9 +559,9 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
       // When in input region, ensure Tab doesn't escape
       // The DynamicAdditionalInput should have already prevented it
       // but we add this as a safety net
-      console.log('[Container] Tab key in input region - already prevented by input');
+      log.debug('Tab key in input region - already prevented by input');
       if (!e.defaultPrevented) {
-        console.log('[Container] Tab was not prevented by input - preventing now');
+        log.debug('Tab was not prevented by input - preventing now');
         e.preventDefault();
         e.stopPropagation();
       }
@@ -758,7 +761,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
   useEffect(() => {
     // Log initial setup in debug mode
     if (DEBUG_REFS) {
-      console.log(`[CheckboxGroup ${id}] Component mounted with ${checkboxes.length} checkboxes`);
+      log.debug('Component mounted', { id, checkboxCount: checkboxes.length });
     }
 
     // Capture refs for cleanup
@@ -771,7 +774,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
       currentRefCallbacks.clear();
 
       if (DEBUG_REFS) {
-        console.log(`[CheckboxGroup ${id}] Cleaned up all refs and callbacks`);
+        log.debug('Cleaned up all refs and callbacks', { id });
       }
     };
   }, [id, checkboxes.length, DEBUG_REFS]);
@@ -785,7 +788,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
         checkboxRefs.current.delete(refId);
         refCallbacks.current.delete(refId);
         if (DEBUG_REFS) {
-          console.log(`[CheckboxGroup ${id}] Cleaned up removed checkbox:`, refId);
+          log.debug('Cleaned up removed checkbox', { id, refId });
         }
       }
     });
@@ -808,7 +811,7 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
           if (measures.length > 0) {
             const measure = measures[measures.length - 1];
             if (measure.duration > 16) { // Log slow renders (> 1 frame)
-              console.warn(`[CheckboxGroup ${id}] Slow render: ${measure.duration.toFixed(2)}ms`);
+              log.warn('Slow render detected', { id, duration: `${measure.duration.toFixed(2)}ms` });
             }
           }
           // Clear the measure to prevent memory buildup
@@ -837,22 +840,22 @@ export const EnhancedFocusTrappedCheckboxGroup: React.FC<EnhancedCheckboxGroupPr
         className="focus-trapped-checkbox-group border border-gray-200 rounded-lg transition-all focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 focus:outline-none"
         onKeyDown={handleContainerKeyDown}
         onKeyDownCapture={(e) => {
-          console.log('[Container] KeyDownCapture:', {
+          log.debug('Container KeyDownCapture', {
             key: e.key,
             focusRegion,
             defaultPrevented: e.defaultPrevented,
             target: (e.target as HTMLElement).tagName
           });
-          
+
           // Handle Escape in capture phase only when in checkbox region
           // Let inputs handle Escape naturally (e.g., close autocomplete, clear value)
           if (e.key === 'Escape' && focusRegion === 'checkbox') {
-            console.log('[Container] Escape in checkbox region - closing modal');
+            log.debug('Escape in checkbox region - closing modal');
             e.preventDefault();
             e.stopPropagation();
             handleCancel();
           } else if (e.key === 'Escape') {
-            console.log('[Container] Escape in non-checkbox region (', focusRegion, ') - allowing propagation');
+            log.debug('Escape in non-checkbox region - allowing propagation', { focusRegion });
           }
         }}
         onFocus={handleContainerFocus}

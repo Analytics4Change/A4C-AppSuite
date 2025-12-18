@@ -6,3 +6,11 @@
 
 export { getSupabaseClient, resetSupabaseClient } from './supabase';
 export { emitEvent, getEnvironmentTags, buildTags } from './emit-event';
+export {
+  getLogger,
+  workflowLog,
+  activityLog,
+  apiLog,
+  workerLog,
+  type LogLevel,
+} from './logger';

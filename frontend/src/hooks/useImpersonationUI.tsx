@@ -7,6 +7,9 @@ import { useState, useEffect } from 'react';
 import { impersonationService } from '@/services/auth/impersonation.service';
 import { ImpersonationSession } from '@/services/auth/impersonation.service';
 import { useAuth } from '@/contexts/AuthContext';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('auth');
 
 export function useImpersonationUI() {
   const { session: authSession } = useAuth();
@@ -31,7 +34,7 @@ export function useImpersonationUI() {
     const handleExpiration = () => {
       setSession(null);
       // Could show a notification here
-      console.log('Impersonation session expired');
+      log.info('Impersonation session expired');
     };
 
     impersonationService.onExpiration(handleExpiration);
@@ -39,7 +42,7 @@ export function useImpersonationUI() {
     // Register for warning callback
     const handleWarning = () => {
       // Could show a more prominent warning notification
-      console.warn('Impersonation session expiring soon!');
+      log.warn('Impersonation session expiring soon!');
     };
 
     impersonationService.onWarning(handleWarning);

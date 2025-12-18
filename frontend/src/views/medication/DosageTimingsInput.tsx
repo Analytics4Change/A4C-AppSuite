@@ -2,6 +2,9 @@ import React, { useRef, useEffect } from 'react';
 import { observer } from 'mobx-react-lite';
 import { EnhancedFocusTrappedCheckboxGroup } from '@/components/ui/FocusTrappedCheckboxGroup/EnhancedFocusTrappedCheckboxGroup';
 import { DosageTimingViewModel } from '@/viewModels/medication/DosageTimingViewModel';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('viewmodel');
 
 interface DosageTimingsInputProps {
   selectedTimings: string[];
@@ -69,9 +72,8 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
 
   const handleAdditionalDataChange = (checkboxId: string, data: any) => {
     viewModel.handleAdditionalDataChange(checkboxId, data);
-    
-    // Log the additional data for debugging
-    console.log(`Additional data for ${checkboxId}:`, data);
+
+    log.debug('Additional data changed', { checkboxId, data });
   };
 
   const handleFieldBlur = (checkboxId: string) => {
@@ -98,17 +100,17 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
   };
 
   const handleContinue = (selectedIds: string[], _additionalData: Map<string, unknown>) => {
-    console.log('[DosageTimings] Continue pressed:', { selectedIds, hasPRNSelection });
-    
+    log.debug('Continue pressed', { selectedIds, hasPRNSelection });
+
     // Validate using ViewModel business logic (which now considers PRN context)
     if (!viewModel.isValid) {
-      console.warn('[DosageTimings] Invalid timing configuration - blocking continue');
+      log.warn('Invalid timing configuration - blocking continue');
       return;
     }
-    
+
     // Get the complete configuration
     const config = viewModel.getTimingConfiguration();
-    console.log('[DosageTimings] Configuration:', config);
+    log.debug('Timing configuration', { config });
     
     // Trigger sorting so selected items appear first next time
     viewModel.triggerSort();
@@ -116,8 +118,8 @@ export const DosageTimingsInput: React.FC<DosageTimingsInputProps> = observer(({
     // Update parent
     onTimingsChange(selectedIds);
     onClose?.();
-    
-    console.log('[DosageTimings] Advancing focus to Food Conditions (tabIndex 11)');
+
+    log.debug('Advancing focus to Food Conditions', { targetTabIndex: 11 });
     // Focus should advance to next element (Food Conditions at tabIndex 11)
     const nextElement = document.querySelector('[tabindex="11"]') as HTMLElement;
     nextElement?.focus();

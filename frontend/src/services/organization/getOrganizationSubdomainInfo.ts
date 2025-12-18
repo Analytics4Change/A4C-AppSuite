@@ -5,6 +5,9 @@
  * needed for post-login redirect logic.
  */
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('organization');
 
 /**
  * Organization subdomain information from projection
@@ -41,12 +44,12 @@ export async function getOrganizationSubdomainInfo(
       .single();
 
     if (error) {
-      console.error('[getOrganizationSubdomainInfo] Query error:', error);
+      log.error('Query error', { orgId, error });
       return null;
     }
 
     if (!data) {
-      console.warn('[getOrganizationSubdomainInfo] No data for org:', orgId);
+      log.warn('No data for org', { orgId });
       return null;
     }
 
@@ -55,7 +58,7 @@ export async function getOrganizationSubdomainInfo(
       subdomain_status: data.subdomain_status,
     };
   } catch (err) {
-    console.error('[getOrganizationSubdomainInfo] Unexpected error:', err);
+    log.error('Unexpected error', { orgId, error: err });
     return null;
   }
 }

@@ -4,6 +4,9 @@ import { ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { Button } from './button';
 import { Checkbox } from './checkbox';
 import { cn } from './utils';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('component');
 
 interface MultiSelectDropdownProps {
   options: string[];
@@ -45,19 +48,18 @@ export const MultiSelectDropdown = observer(({
   
   // Debug: Log when selected prop changes
   useEffect(() => {
-    console.log(`[MultiSelectDropdown ${id}] Selected prop changed:`, selected);
+    log.debug('Selected prop changed', { id, selected });
   }, [selected, id]);
 
   // Handle toggling an option
   const handleToggle = useCallback((value: string) => {
-    console.log(`[MultiSelectDropdown ${id}] handleToggle called for:`, value);
-    console.log(`[MultiSelectDropdown ${id}] Current selected:`, selected);
-    
+    log.debug('Toggle option', { id, value, currentSelected: selected });
+
     const newSelected = selected.includes(value)
       ? selected.filter(v => v !== value)
       : [...selected, value];
-    
-    console.log(`[MultiSelectDropdown ${id}] New selected:`, newSelected);
+
+    log.debug('New selection', { id, newSelected });
     onChange(newSelected);
     
     if (closeOnSelect) {

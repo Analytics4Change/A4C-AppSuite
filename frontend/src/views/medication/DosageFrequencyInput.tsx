@@ -2,6 +2,9 @@ import React, { useRef, useEffect } from 'react';
 import { observer } from 'mobx-react-lite';
 import { EnhancedFocusTrappedCheckboxGroup } from '@/components/ui/FocusTrappedCheckboxGroup/EnhancedFocusTrappedCheckboxGroup';
 import { DosageFrequencyViewModel } from '@/viewModels/medication/DosageFrequencyViewModel';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('validation');
 
 interface DosageFrequencyInputProps {
   selectedFrequencies: string[];
@@ -62,9 +65,8 @@ export const DosageFrequencyInput: React.FC<DosageFrequencyInputProps> = observe
 
   const handleAdditionalDataChange = (checkboxId: string, data: any) => {
     viewModel.handleAdditionalDataChange(checkboxId, data);
-    
-    // Log the additional data for debugging
-    console.log(`Additional data for ${checkboxId}:`, data);
+
+    log.debug('Additional data changed', { checkboxId, data });
   };
 
   const handleFieldBlur = (checkboxId: string) => {
@@ -93,13 +95,13 @@ export const DosageFrequencyInput: React.FC<DosageFrequencyInputProps> = observe
   const handleContinue = (selectedIds: string[], _additionalData: Map<string, unknown>) => {
     // Validate before continuing
     if (!viewModel.isValid) {
-      console.warn('Invalid frequency configuration');
+      log.warn('Invalid frequency configuration');
       return;
     }
-    
+
     // Get the complete configuration
     const config = viewModel.getFrequencyConfiguration();
-    console.log('Dosage frequency configuration:', config);
+    log.debug('Dosage frequency configuration', { config });
     
     // Trigger sorting so selected items appear first next time
     viewModel.triggerSort();

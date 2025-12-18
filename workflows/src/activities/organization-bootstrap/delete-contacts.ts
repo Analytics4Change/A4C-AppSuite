@@ -14,8 +14,9 @@
  */
 
 import type { DeleteContactsParams } from '@shared/types';
-import { getSupabaseClient } from '@shared/utils/supabase';
-import { emitEvent, buildTags } from '@shared/utils/emit-event';
+import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
+
+const log = getLogger('DeleteContacts');
 
 /**
  * Delete contacts compensation activity
@@ -23,7 +24,7 @@ import { emitEvent, buildTags } from '@shared/utils/emit-event';
  * @returns Always true (best-effort)
  */
 export async function deleteContacts(params: DeleteContactsParams): Promise<boolean> {
-  console.log(`[DeleteContacts] Starting for organization: ${params.orgId}`);
+  log.info('Starting contact deletion', { orgId: params.orgId });
 
   try {
     const supabase = getSupabaseClient();
@@ -37,10 +38,10 @@ export async function deleteContacts(params: DeleteContactsParams): Promise<bool
       });
 
     if (junctionError) {
-      console.error(`[DeleteContacts] Junction soft-delete failed: ${junctionError.message}`);
+      log.warn('Junction soft-delete failed', { error: junctionError.message });
       // Continue anyway (best-effort)
     } else {
-      console.log(`[DeleteContacts] Soft-deleted ${junctionCount} junction records`);
+      log.debug('Soft-deleted junction records', { count: junctionCount });
     }
 
     // 2. Query all contacts for organization via RPC (PostgREST only exposes 'api' schema)
@@ -51,12 +52,12 @@ export async function deleteContacts(params: DeleteContactsParams): Promise<bool
       });
 
     if (queryError) {
-      console.error(`[DeleteContacts] Query failed: ${queryError.message}`);
+      log.warn('Query failed', { error: queryError.message });
       return true; // Best-effort: don't fail workflow
     }
 
     if (!contacts || contacts.length === 0) {
-      console.log(`[DeleteContacts] No contacts found for organization ${params.orgId}`);
+      log.info('No contacts found', { orgId: params.orgId });
       return true;
     }
 
@@ -74,18 +75,18 @@ export async function deleteContacts(params: DeleteContactsParams): Promise<bool
           tags
         });
 
-        console.log(`[DeleteContacts] Emitted contact.deleted for ${contact.id}`);
+        log.debug('Emitted contact.deleted', { contactId: contact.id });
       } catch (eventError) {
-        console.error(`[DeleteContacts] Failed to emit event for ${contact.id}:`, eventError);
+        log.error('Failed to emit event', { contactId: contact.id, error: eventError instanceof Error ? eventError.message : String(eventError) });
         // Continue with other contacts
       }
     }
 
-    console.log(`[DeleteContacts] Completed for ${params.orgId} (${contacts.length} contacts)`);
+    log.info('Deletion completed', { orgId: params.orgId, count: contacts.length });
     return true;
 
   } catch (error) {
-    console.error(`[DeleteContacts] Unexpected error for ${params.orgId}:`, error);
+    log.error('Unexpected error', { orgId: params.orgId, error: error instanceof Error ? error.message : String(error) });
     return true; // Best-effort: don't fail workflow
   }
 }
