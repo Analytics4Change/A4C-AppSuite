@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { OrganizationType } from '@/types/auth.types';
+import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
+import { BottomNavigation, MoreMenuSheet } from '@/components/navigation';
 import {
   Users,
   Pill,
@@ -25,7 +27,18 @@ const log = Logger.getLogger('navigation');
 export const MainLayout: React.FC = () => {
   const { user, logout, session: authSession, hasPermission } = useAuth();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+
+  // Focus trapping for mobile sidebar
+  useKeyboardNavigation({
+    containerRef: sidebarRef,
+    enabled: sidebarOpen,
+    trapFocus: true,
+    restoreFocus: true,
+    onEscape: () => setSidebarOpen(false)
+  });
 
   // Impersonation UI hook
   const {
@@ -52,14 +65,19 @@ export const MainLayout: React.FC = () => {
     roles: string[];
     permission?: string;
     hideForOrgTypes?: OrganizationType[];
+    showForOrgTypes?: OrganizationType[];  // Only show for these org types (inclusion pattern)
   }
 
   // Define all possible nav items with their required roles, permissions, and org type filters
+  // Org type visibility:
+  // - platform_owner: Organizations, Reports, Settings
+  // - provider: Clients, Organization Units, Medication Management, Reports, Settings
+  // - provider_partner: Clients, Reports, Settings
   const allNavItems: NavItem[] = [
-    { to: '/clients', icon: Users, label: 'Clients', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse', 'caregiver'] },
-    { to: '/organizations', icon: Building, label: 'Organizations', roles: ['super_admin', 'partner_onboarder'], permission: 'organization.create' },
-    { to: '/organization-units', icon: FolderTree, label: 'Org Units', roles: ['super_admin', 'provider_admin'], permission: 'organization.view_ou', hideForOrgTypes: ['platform_owner'] },
-    { to: '/medications', icon: Pill, label: 'Medications', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse'] },
+    { to: '/clients', icon: Users, label: 'Clients', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse', 'caregiver'], hideForOrgTypes: ['platform_owner'] },
+    { to: '/organizations', icon: Building, label: 'Organizations', roles: ['super_admin', 'partner_onboarder'], permission: 'organization.create', showForOrgTypes: ['platform_owner'] },
+    { to: '/organization-units', icon: FolderTree, label: 'Organization Units', roles: ['super_admin', 'provider_admin'], permission: 'organization.view_ou', showForOrgTypes: ['provider'] },
+    { to: '/medications', icon: Pill, label: 'Medication Management', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse'], hideForOrgTypes: ['platform_owner', 'provider_partner'] },
     { to: '/reports', icon: FileText, label: 'Reports', roles: ['super_admin', 'provider_admin', 'administrator'] },
     { to: '/settings', icon: Settings, label: 'Settings', roles: ['super_admin', 'provider_admin', 'administrator'] },
   ];
@@ -101,7 +119,19 @@ export const MainLayout: React.FC = () => {
 
         if (!roleMatch) continue;
 
-        // Check org type filter (hideForOrgTypes)
+        // Check org type filter (showForOrgTypes - inclusion pattern)
+        // If showForOrgTypes is set, item is ONLY visible to those org types
+        if (item.showForOrgTypes && userOrgType) {
+          if (!item.showForOrgTypes.includes(userOrgType)) {
+            log.debug(`Hiding ${item.label}: org type not in showForOrgTypes`, {
+              userOrgType,
+              showForOrgTypes: item.showForOrgTypes
+            });
+            continue;
+          }
+        }
+
+        // Check org type filter (hideForOrgTypes - exclusion pattern)
         if (item.hideForOrgTypes && userOrgType && item.hideForOrgTypes.includes(userOrgType)) {
           log.debug(`Hiding ${item.label}: org type excluded`, {
             userOrgType,
@@ -170,29 +200,39 @@ export const MainLayout: React.FC = () => {
       <div className="min-h-screen flex">
       {/* Mobile menu button */}
       <button
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white/80 backdrop-blur-md rounded-md shadow-md"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white/80 backdrop-blur-md rounded-md shadow-md
+                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
+        aria-expanded={sidebarOpen}
+        aria-controls="mobile-sidebar"
       >
-        {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+        {sidebarOpen ? <X size={24} aria-hidden="true" /> : <Menu size={24} aria-hidden="true" />}
       </button>
 
       {/* Overlay for mobile */}
       {sidebarOpen && (
-        <div 
+        <div
           className="lg:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-30"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
 
       {/* Sidebar with glassmorphism */}
-      <aside className={`
-        fixed lg:static inset-y-0 left-0 z-40
-        w-64 
-        transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0 transition-transform duration-200 ease-in-out
-        flex flex-col
-        glass-sidebar glass-sidebar-borders
-      `}
+      <aside
+        ref={sidebarRef}
+        id="mobile-sidebar"
+        role="navigation"
+        aria-label="Main navigation"
+        className={`
+          fixed lg:static inset-y-0 left-0 z-40
+          w-[280px] sm:w-72 lg:w-64
+          transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0 transition-transform duration-200 ease-in-out
+          flex flex-col
+          glass-sidebar glass-sidebar-borders
+        `}
       style={{
         background: 'rgba(255, 255, 255, 0.75)',
         backdropFilter: 'blur(20px)',
@@ -318,12 +358,22 @@ export const MainLayout: React.FC = () => {
       </aside>
 
       {/* Main Content with subtle gradient background */}
-      <main className="flex-1 lg:ml-0 bg-gradient-to-br from-gray-50 via-white to-blue-50 min-h-screen">
+      {/* pb-20 provides space for bottom nav on mobile */}
+      <main className="flex-1 lg:ml-0 bg-gradient-to-br from-gray-50 via-white to-blue-50 min-h-screen pb-20 lg:pb-0">
         <div className="p-6">
           <Outlet />
         </div>
       </main>
     </div>
+
+    {/* Mobile bottom navigation */}
+    <BottomNavigation onMoreClick={() => setMoreMenuOpen(true)} />
+
+    {/* More menu sheet for overflow items */}
+    <MoreMenuSheet
+      isOpen={moreMenuOpen}
+      onClose={() => setMoreMenuOpen(false)}
+    />
     </>
   );
 };

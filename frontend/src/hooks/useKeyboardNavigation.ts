@@ -6,13 +6,13 @@ import { getAllFocusableElements } from '@/utils/focus-management';
  */
 export interface UseKeyboardNavigationOptions {
   // Container configuration
-  containerRef?: RefObject<HTMLElement>;
+  containerRef?: RefObject<HTMLElement | null>;
   enabled?: boolean;
-  
+
   // Focus trap configuration
   trapFocus?: boolean;
   restoreFocus?: boolean;
-  initialFocusRef?: RefObject<HTMLElement>;
+  initialFocusRef?: RefObject<HTMLElement | null>;
   
   // Navigation configuration
   allowTabNavigation?: boolean;
