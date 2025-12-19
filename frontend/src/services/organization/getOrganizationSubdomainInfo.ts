@@ -1,8 +1,9 @@
 /**
  * Get organization subdomain information for redirect decisions
  *
- * Queries the organizations_projection table to get subdomain information
- * needed for post-login redirect logic.
+ * Uses the api.get_organization_by_id RPC function to get subdomain information
+ * needed for post-login redirect logic. The RPC function has SECURITY DEFINER
+ * which bypasses RLS, avoiding session timing issues with @supabase/ssr.
  */
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/utils/logger';
@@ -33,18 +34,29 @@ export interface OrganizationSubdomainInfo {
  * }
  * ```
  */
+/**
+ * Response type from api.get_organization_by_id RPC function
+ * Only includes the fields we care about for subdomain redirect
+ */
+interface OrganizationRpcResponse {
+  slug: string;
+  subdomain_status: string;
+}
+
 export async function getOrganizationSubdomainInfo(
   orgId: string
 ): Promise<OrganizationSubdomainInfo | null> {
   try {
+    // Use RPC function with SECURITY DEFINER to bypass RLS
+    // This avoids session timing issues where @supabase/ssr may not
+    // have the JWT properly set in the Authorization header yet
     const { data, error } = await supabase
-      .from('organizations_projection')
-      .select('slug, subdomain_status')
-      .eq('id', orgId)
-      .single();
+      .schema('api')
+      .rpc('get_organization_by_id', { p_org_id: orgId })
+      .single<OrganizationRpcResponse>();
 
     if (error) {
-      log.error('Query error', { orgId, error });
+      log.error('RPC error', { orgId, error });
       return null;
     }
 
@@ -53,9 +65,10 @@ export async function getOrganizationSubdomainInfo(
       return null;
     }
 
+    // Extract just the fields we need from the full org response
     return {
       slug: data.slug,
-      subdomain_status: data.subdomain_status,
+      subdomain_status: data.subdomain_status as OrganizationSubdomainInfo['subdomain_status'],
     };
   } catch (err) {
     log.error('Unexpected error', { orgId, error: err });
