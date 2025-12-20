@@ -159,6 +159,29 @@ export const OrganizationCreatePage: React.FC = observer(() => {
     }
   };
 
+  /**
+   * Prevent Enter key from submitting form when in text inputs.
+   * Complex multi-field forms should require explicit Submit button click.
+   * Enter still works for:
+   * - Radix Select dropdowns (item selection)
+   * - Submit button when focused
+   * - Non-text inputs (checkboxes, radios, etc.)
+   */
+  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === 'Enter') {
+      const target = e.target as HTMLElement;
+      const tagName = target.tagName.toLowerCase();
+
+      if (tagName === 'input') {
+        const inputType = (target as HTMLInputElement).type?.toLowerCase();
+        const textTypes = ['text', 'email', 'tel', 'password', 'search', 'url'];
+        if (!inputType || textTypes.includes(inputType)) {
+          e.preventDefault();
+        }
+      }
+    }
+  };
+
   const formData = viewModel.formData;
   const isProvider = formData.type === 'provider';
   const isPartner = formData.type === 'provider_partner';
@@ -166,7 +189,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 p-8">
       <div className="max-w-[130rem] mx-auto">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="space-y-6">
           {/* Page Header */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-gray-900 mb-2">

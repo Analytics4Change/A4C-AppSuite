@@ -16,6 +16,7 @@ data:
   NODE_ENV: "production"
   LOG_LEVEL: "info"
 
-  # CORS configuration (comma-separated list of allowed origins)
-  # Update this with your frontend URL after Cloudflare Tunnel is configured
-  CORS_ORIGINS: "https://app.a4c.firstovertheline.com"
+  # Platform domain configuration
+  # CORS origins are derived dynamically from this base domain
+  # Allows: https://firstovertheline.com and https://*.firstovertheline.com
+  PLATFORM_BASE_DOMAIN: "firstovertheline.com"

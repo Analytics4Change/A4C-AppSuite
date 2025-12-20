@@ -273,6 +273,11 @@ export class OrganizationFormViewModel {
 
   /**
    * Update form field
+   *
+   * Clears validation errors on edit to provide better UX:
+   * - User sees errors after submit attempt
+   * - Errors clear when user starts fixing them
+   * - Errors re-appear on next submit if still invalid
    */
   updateField<K extends keyof OrganizationFormData>(
     field: K,
@@ -281,11 +286,20 @@ export class OrganizationFormViewModel {
     runInAction(() => {
       this.formData[field] = value;
       this.touchedFields.add(field as string);
+      // Clear validation errors when user edits - they'll re-validate on submit
+      if (this.validationErrors.length > 0) {
+        this.validationErrors = [];
+      }
     });
   }
 
   /**
    * Update nested field (e.g., generalAddress.street1)
+   *
+   * Clears validation errors on edit to provide better UX:
+   * - User sees errors after submit attempt
+   * - Errors clear when user starts fixing them
+   * - Errors re-appear on next submit if still invalid
    */
   updateNestedField(path: string, value: any): void {
     runInAction(() => {
@@ -298,6 +312,10 @@ export class OrganizationFormViewModel {
 
       obj[parts[parts.length - 1]] = value;
       this.touchedFields.add(path);
+      // Clear validation errors when user edits - they'll re-validate on submit
+      if (this.validationErrors.length > 0) {
+        this.validationErrors = [];
+      }
     });
   }
 

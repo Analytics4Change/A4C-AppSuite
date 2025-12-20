@@ -14,6 +14,71 @@ import { registerWorkflowRoutes } from './routes/workflows.js';
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 const TEMPORAL_ADDRESS = process.env.TEMPORAL_ADDRESS || 'temporal-frontend.temporal.svc.cluster.local:7233';
+const PLATFORM_BASE_DOMAIN = process.env.PLATFORM_BASE_DOMAIN;
+
+/**
+ * Derive CORS origins from platform base domain
+ * Allows: https://{domain} and https://*.{domain} (all tenant subdomains)
+ *
+ * Uses @fastify/cors OriginFunction signature:
+ * (origin: string | undefined, callback: (err: Error | null, origin: boolean | string | RegExp) => void) => void
+ */
+function getCorsOrigin(): boolean | string | string[] | RegExp | ((origin: string | undefined, callback: (err: Error | null, origin: boolean | string | RegExp) => void) => void) {
+  // If platform domain is configured, use callback-based validation
+  if (PLATFORM_BASE_DOMAIN) {
+    return (origin: string | undefined, callback: (err: Error | null, origin: boolean | string | RegExp) => void) => {
+      // Allow requests with no origin (same-origin, curl, etc.)
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      // Match base domain and any subdomain
+      const escapedDomain = PLATFORM_BASE_DOMAIN.replace(/\./g, '\\.');
+      const regex = new RegExp(`^https://([a-z0-9-]+\\.)?${escapedDomain}$`);
+
+      if (regex.test(origin)) {
+        callback(null, origin); // Return the origin as allowed
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`), false);
+      }
+    };
+  }
+
+  // Fallback to ALLOWED_ORIGINS or wildcard
+  return process.env.ALLOWED_ORIGINS?.split(',') || '*';
+}
+
+/**
+ * Connect to Temporal with retry logic
+ * Uses exponential backoff: 1s, 2s, 4s, 8s, 16s (max 30s)
+ */
+async function connectToTemporal(
+  logger: { info: (obj: object, msg?: string) => void; warn: (obj: object, msg?: string) => void; error: (obj: object, msg?: string) => void },
+  maxRetries = 5
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      logger.info({ address: TEMPORAL_ADDRESS, attempt, maxRetries }, 'Checking Temporal connection...');
+      const connection = await Connection.connect({ address: TEMPORAL_ADDRESS });
+      await connection.close();
+      logger.info({ attempt }, '✅ Temporal connection verified');
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.warn({ error: errorMessage, attempt, maxRetries }, 'Temporal connection attempt failed');
+
+      if (attempt < maxRetries) {
+        // Exponential backoff: 1s, 2s, 4s, 8s, 16s (capped at 30s)
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
+        logger.info({ delay, nextAttempt: attempt + 1 }, `Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  logger.error({ maxRetries }, '❌ Failed to connect to Temporal after all retries');
+  return false;
+}
 
 // Extend FastifyInstance with custom properties
 declare module 'fastify' {
@@ -48,8 +113,9 @@ export async function createServer(): Promise<FastifyInstance> {
   });
 
   // Register CORS middleware
+  // Uses PLATFORM_BASE_DOMAIN for dynamic subdomain support, falls back to ALLOWED_ORIGINS or '*'
   await server.register(cors, {
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+    origin: getCorsOrigin(),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'X-Request-ID']
@@ -65,18 +131,8 @@ export async function createServer(): Promise<FastifyInstance> {
     }
   });
 
-  // Add Temporal connection check to server
-  try {
-    server.log.info({ address: TEMPORAL_ADDRESS }, 'Checking Temporal connection...');
-    const connection = await Connection.connect({ address: TEMPORAL_ADDRESS });
-    await connection.close();
-    server.temporalConnected = true;
-    server.log.info('✅ Temporal connection verified');
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    server.log.error({ error: errorMessage }, '❌ Failed to connect to Temporal');
-    server.temporalConnected = false;
-  }
+  // Add Temporal connection check with retry logic
+  server.temporalConnected = await connectToTemporal(server.log);
 
   // Register routes
   registerHealthRoutes(server);
@@ -121,6 +177,7 @@ Configuration:
   Environment: ${process.env.NODE_ENV || 'development'}
   Temporal Address: ${TEMPORAL_ADDRESS}
   Temporal Connected: ${server.temporalConnected}
+  CORS: ${PLATFORM_BASE_DOMAIN ? `*.${PLATFORM_BASE_DOMAIN}` : (process.env.ALLOWED_ORIGINS || '*')}
 
 Endpoints:
   Health: http://${HOST}:${PORT}/health
