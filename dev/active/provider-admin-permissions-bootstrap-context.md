@@ -22,6 +22,14 @@
 
 7. **Per-Organization Role Scoping** (2025-12-20): Only `super_admin` is global (organization_id=NULL). All other roles (`provider_admin`, `partner_admin`, `clinician`, `viewer`) are per-organization with required `organization_id` and `org_hierarchy_scope` (LTREE path). This aligns with `roles_projection_scope_check` constraint.
 
+8. **Form UX: No Enter Key Submission** (2025-12-20): Complex multi-field forms should NOT submit on Enter key in text inputs. Added `handleFormKeyDown` handler to prevent default browser behavior. Enter still works for dropdown selection and focused submit button.
+
+9. **Clear Validation Errors on Edit** (2025-12-20): Validation errors clear when user starts editing ANY field, rather than persisting stale errors. Errors re-appear on next submit if still invalid. Better UX flow.
+
+10. **Dynamic CORS from Platform Domain** (2025-12-20): Backend API derives CORS origins from `PLATFORM_BASE_DOMAIN` environment variable using regex pattern `^https://([a-z0-9-]+\.)?{domain}$`. This allows all tenant subdomains (*.firstovertheline.com) without hardcoding.
+
+11. **Temporal Connection Retry** (2025-12-20): Backend API now retries Temporal connection 5 times with exponential backoff (1s, 2s, 4s, 8s, 16s max 30s). Prevents permanent failure when Temporal is briefly unavailable at startup.
+
 ## Technical Context
 
 ### Architecture
@@ -100,6 +108,15 @@
 | `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql` | Added templates table, seeds, removed invalid role seeds | ✅ Done |
 | `documentation/architecture/authorization/permissions-reference.md` | Added Permission Templates section with role scoping architecture | ✅ Done |
 | `documentation/architecture/authorization/provider-admin-permissions-architecture.md` | Added Phase 3 implementation status | ✅ Done |
+
+### Phase 10 Files Modified (2025-12-20)
+
+| File | Changes | Status |
+|------|---------|--------|
+| `frontend/src/pages/organizations/OrganizationCreatePage.tsx` | Added `handleFormKeyDown` to prevent Enter key submission in text inputs | ✅ Done |
+| `frontend/src/viewModels/organization/OrganizationFormViewModel.ts` | Clear `validationErrors` array in `updateField()` and `updateNestedField()` | ✅ Done |
+| `workflows/src/api/server.ts` | Added `getCorsOrigin()` with PLATFORM_BASE_DOMAIN regex, `connectToTemporal()` with retry logic | ✅ Done |
+| `infrastructure/k8s/temporal-api/configmap.yaml` | Replaced `CORS_ORIGINS` with `PLATFORM_BASE_DOMAIN: firstovertheline.com` | ✅ Done |
 | `documentation/workflows/reference/activities-reference.md` | Added RBAC Activities section for grantProviderAdminPermissions | ✅ Done |
 
 ## Related Components
@@ -218,6 +235,36 @@ All SQL uses `ON CONFLICT DO NOTHING` for safe re-runs.
 - **Previously**: The `grantProviderAdminPermissions` activity would fail when emitting `role.permission.granted` events
 - **Now**: Fixed by adding missing columns. Event processing works correctly.
 - **Next Step**: Deploy Temporal worker to test new org bootstrap workflow
+
+### Temporal-API 503 Error During UAT (2025-12-20)
+**Problem**: Organization create form returned 503 error when submitting. temporal-api pods were Running but NOT Ready for 10+ days.
+
+**Root Causes**:
+1. **One-time connection check**: `server.ts` checked Temporal connection once at startup with no retry logic. If Temporal was briefly unavailable, `temporalConnected` stayed `false` forever.
+2. **CORS misconfiguration**: ConfigMap used `CORS_ORIGINS` but code checked `ALLOWED_ORIGINS`. Variable name mismatch.
+3. **No CI/CD trigger**: Recent commits modified `workflows/src/activities/**` but temporal-api deployment only triggers on `workflows/src/api/**` changes.
+
+**Solutions Applied**:
+1. Added `connectToTemporal()` with exponential backoff retry (5 attempts, 1s→2s→4s→8s→16s max 30s)
+2. Added `getCorsOrigin()` that derives CORS from `PLATFORM_BASE_DOMAIN` using regex
+3. Updated ConfigMap to use `PLATFORM_BASE_DOMAIN: firstovertheline.com`
+4. Deleted pods to force restart and reconnection
+
+**Files Changed**:
+- `workflows/src/api/server.ts` - Added retry logic and dynamic CORS
+- `infrastructure/k8s/temporal-api/configmap.yaml` - PLATFORM_BASE_DOMAIN
+
+### Form Validation UX Issues (2025-12-20)
+**Problem**: Pressing Enter in text fields triggered premature form submission, causing validation errors to display before user was ready.
+
+**Root Cause**: Default browser behavior - Enter key in `<input>` inside `<form>` submits the form.
+
+**Solution**: Added `handleFormKeyDown` handler that prevents default for Enter key in text-type inputs. Enter still works for:
+- Radix Select dropdowns (item selection)
+- Submit button when focused
+- Non-text inputs (checkboxes, radios)
+
+**Additional Fix**: Clear ALL validation errors when user starts editing ANY field. Better UX than showing stale errors.
 
 ### Role Scoping Fix (2025-12-20)
 **Problem**: The original seed file `002-bootstrap-org-roles.sql` seeded `provider_admin` and `partner_admin` roles as global roles (organization_id=NULL). However, the `roles_projection_scope_check` constraint requires non-super_admin roles to have `organization_id` set.

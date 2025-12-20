@@ -7,26 +7,29 @@
 -- Overview
 -- ==============================================================================
 -- These functions are called by Temporal workflow compensation activities:
--- - delete-contacts.ts → soft_delete_organization_contacts()
--- - delete-addresses.ts → soft_delete_organization_addresses()
--- - delete-phones.ts → soft_delete_organization_phones()
+-- - delete-contacts.ts → api.soft_delete_organization_contacts()
+-- - delete-addresses.ts → api.soft_delete_organization_addresses()
+-- - delete-phones.ts → api.soft_delete_organization_phones()
 --
 -- Pattern:
 -- 1. Activity calls RPC to soft-delete junctions FIRST
 -- 2. Activity queries entities via get_*_by_org()
 -- 3. Activity emits entity.deleted events (audit trail)
+--
+-- NOTE: Functions are in 'api' schema for PostgREST accessibility.
+-- Temporal workers can only call functions exposed via PostgREST.
 
 -- ==============================================================================
--- Function: soft_delete_organization_contacts
+-- Function: api.soft_delete_organization_contacts
 -- ==============================================================================
-CREATE OR REPLACE FUNCTION soft_delete_organization_contacts(
+CREATE OR REPLACE FUNCTION api.soft_delete_organization_contacts(
   p_org_id UUID,
   p_deleted_at TIMESTAMPTZ DEFAULT NOW()
 )
 RETURNS INTEGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
   v_count INTEGER;
@@ -43,19 +46,21 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION soft_delete_organization_contacts IS 'Soft-delete all organization-contact junctions for workflow compensation. Returns count of deleted records.';
+GRANT EXECUTE ON FUNCTION api.soft_delete_organization_contacts TO service_role;
+COMMENT ON FUNCTION api.soft_delete_organization_contacts IS
+  'Soft-delete all organization-contact junctions for workflow compensation. Returns count of deleted records. Called by Temporal activities.';
 
 -- ==============================================================================
--- Function: soft_delete_organization_addresses
+-- Function: api.soft_delete_organization_addresses
 -- ==============================================================================
-CREATE OR REPLACE FUNCTION soft_delete_organization_addresses(
+CREATE OR REPLACE FUNCTION api.soft_delete_organization_addresses(
   p_org_id UUID,
   p_deleted_at TIMESTAMPTZ DEFAULT NOW()
 )
 RETURNS INTEGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
   v_count INTEGER;
@@ -72,19 +77,21 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION soft_delete_organization_addresses IS 'Soft-delete all organization-address junctions for workflow compensation. Returns count of deleted records.';
+GRANT EXECUTE ON FUNCTION api.soft_delete_organization_addresses TO service_role;
+COMMENT ON FUNCTION api.soft_delete_organization_addresses IS
+  'Soft-delete all organization-address junctions for workflow compensation. Returns count of deleted records. Called by Temporal activities.';
 
 -- ==============================================================================
--- Function: soft_delete_organization_phones
+-- Function: api.soft_delete_organization_phones
 -- ==============================================================================
-CREATE OR REPLACE FUNCTION soft_delete_organization_phones(
+CREATE OR REPLACE FUNCTION api.soft_delete_organization_phones(
   p_org_id UUID,
   p_deleted_at TIMESTAMPTZ DEFAULT NOW()
 )
 RETURNS INTEGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
   v_count INTEGER;
@@ -101,7 +108,16 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION soft_delete_organization_phones IS 'Soft-delete all organization-phone junctions for workflow compensation. Returns count of deleted records.';
+GRANT EXECUTE ON FUNCTION api.soft_delete_organization_phones TO service_role;
+COMMENT ON FUNCTION api.soft_delete_organization_phones IS
+  'Soft-delete all organization-phone junctions for workflow compensation. Returns count of deleted records. Called by Temporal activities.';
+
+-- ==============================================================================
+-- Cleanup: Drop old public schema functions if they exist
+-- ==============================================================================
+DROP FUNCTION IF EXISTS public.soft_delete_organization_contacts(UUID, TIMESTAMPTZ);
+DROP FUNCTION IF EXISTS public.soft_delete_organization_addresses(UUID, TIMESTAMPTZ);
+DROP FUNCTION IF EXISTS public.soft_delete_organization_phones(UUID, TIMESTAMPTZ);
 
 -- ==============================================================================
 -- Notes
@@ -111,3 +127,4 @@ COMMENT ON FUNCTION soft_delete_organization_phones IS 'Soft-delete all organiza
 -- - Return count: Workflow activities log count for verification
 -- - No events: Activities emit entity.deleted events separately
 -- - No triggers: Direct UPDATE, no cascade logic
+-- - api schema: Required for PostgREST access from Temporal workers

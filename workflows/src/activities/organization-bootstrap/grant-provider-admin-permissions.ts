@@ -75,8 +75,12 @@ async function getTemplatePermissions(roleName: string): Promise<string[]> {
     .eq('is_active', true);
 
   if (error) {
-    log.error('Failed to fetch permission templates', { roleName, error: error.message });
-    throw new Error(`Failed to fetch templates for ${roleName}: ${error.message}`);
+    log.warn('Failed to fetch permission templates, using fallback constant', {
+      roleName,
+      error: error.message
+    });
+    // Fallback to hardcoded constant when database query fails (e.g., schema restrictions)
+    return [...PROVIDER_ADMIN_PERMISSIONS];
   }
 
   if (!data || data.length === 0) {

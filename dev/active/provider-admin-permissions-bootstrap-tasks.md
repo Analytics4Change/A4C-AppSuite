@@ -138,33 +138,58 @@
 - [x] Updated `documentation/architecture/authorization/provider-admin-permissions-architecture.md` with Phase 3 status
 - [x] Updated `documentation/workflows/reference/activities-reference.md` with RBAC Activities section
 
+## Phase 10: E2E Validation - Form UX + Backend API Fixes ✅ COMPLETE
+
+**Problem Identified During UAT**: Organization create form had UX issues and backend API returned 503.
+
+### 10.1 Form UX Fixes
+- [x] Prevent Enter key from submitting form prematurely in text inputs
+- [x] Clear validation errors when user edits any field (better UX flow)
+- [x] Add `handleFormKeyDown` handler to OrganizationCreatePage.tsx
+- [x] Update `updateField()` and `updateNestedField()` in OrganizationFormViewModel.ts
+
+### 10.2 Backend API Fixes
+- [x] Diagnose temporal-api 503 error (pods Running but NOT Ready for 10+ days)
+- [x] Root cause: One-time Temporal connection check failed at startup, no retry logic
+- [x] Add dynamic CORS derivation from `PLATFORM_BASE_DOMAIN` environment variable
+- [x] Add Temporal connection retry with exponential backoff (5 attempts, max 30s)
+- [x] Update ConfigMap to use `PLATFORM_BASE_DOMAIN: firstovertheline.com`
+- [x] Restart temporal-api pods to force reconnection (now 1/1 Ready)
+- [x] Verify `/health` and `/ready` endpoints return 200
+
+### 10.3 Deployment
+- [x] Commit and push all changes (commit 8419b0b7)
+- [ ] CI/CD rebuilds temporal-api image with new CORS/retry logic
+- [ ] Test end-to-end organization bootstrap from UI
+
 ## Current Status
 
-**Phase**: Phase 9 (Database-Driven Permission Templates)
-**Status**: ✅ COMPLETE
+**Phase**: Phase 10 (E2E Validation - Form UX + Backend API Fixes)
+**Status**: ✅ COMPLETE (code merged, awaiting CI/CD deployment)
 **Last Updated**: 2025-12-20
 **Completed**:
-1. Created `role_permission_templates` table with RLS policies
-2. Seeded 27 templates across 4 role types
-3. Updated Temporal activity to query templates from database (with fallback)
-4. Fixed role scoping: added organization_id and org_hierarchy_scope to role.created events
-5. Added scopePath parameter to activity
-6. Cleaned up invalid seed events in database and SQL
-7. Synced CONSOLIDATED_SCHEMA.sql with all migrations
-8. Updated all relevant documentation
+1. Fixed Enter key prematurely submitting organization create form
+2. Clear validation errors when user edits any field
+3. Added dynamic CORS from PLATFORM_BASE_DOMAIN (supports *.firstovertheline.com)
+4. Added Temporal connection retry with exponential backoff
+5. Restarted temporal-api pods - now Ready (1/1)
+6. Verified API health/ready endpoints return 200
+7. Committed and pushed changes (8419b0b7)
 
 **Remaining**:
-- Deploy Temporal worker to test new org bootstrap workflow
-- Test end-to-end: create new organization → verify provider_admin role created with correct scoping and all 16 permissions
+- Wait for CI/CD to rebuild and deploy temporal-api with new code
+- Test end-to-end organization bootstrap from frontend UI
+- Verify provider_admin role created with correct permissions
 
 **Next Step After /clear**:
-1. Deploy the Temporal worker with updated `grant-provider-admin-permissions.ts` activity
-2. Create a test organization via the bootstrap workflow
-3. Verify the provider_admin role is created with:
-   - `organization_id` set to the new org's UUID
-   - `org_hierarchy_scope` set to the subdomain (LTREE path)
-   - All 16 permissions granted via `role.permission.granted` events
-4. Check `roles_projection` and `role_permissions_projection` tables for correct data
+1. Check GitHub Actions for temporal-api deployment status: `gh run list --workflow=temporal-api-deploy.yml`
+2. Once deployed, navigate to `https://a4c.firstovertheline.com/organizations/create`
+3. Fill in organization form (Enter key should NOT submit prematurely)
+4. Click Submit → workflow should start successfully
+5. Verify in database:
+   - `organizations_projection` has new org
+   - `roles_projection` has provider_admin role with org_id set
+   - `role_permissions_projection` has 16 permissions for that role
 
 ## Files Created/Modified This Session
 
@@ -196,3 +221,11 @@
 | `documentation/architecture/authorization/permissions-reference.md` | Added Permission Templates section, role scoping |
 | `documentation/architecture/authorization/provider-admin-permissions-architecture.md` | Added Phase 3 implementation status |
 | `documentation/workflows/reference/activities-reference.md` | Added RBAC Activities section for grantProviderAdminPermissions |
+
+### Phase 10 Files Modified (2025-12-20)
+| File | Changes |
+|------|---------|
+| `frontend/src/pages/organizations/OrganizationCreatePage.tsx` | Added `handleFormKeyDown` to prevent Enter key submission |
+| `frontend/src/viewModels/organization/OrganizationFormViewModel.ts` | Clear validation errors in `updateField()` and `updateNestedField()` |
+| `workflows/src/api/server.ts` | Added dynamic CORS from PLATFORM_BASE_DOMAIN, Temporal retry logic |
+| `infrastructure/k8s/temporal-api/configmap.yaml` | Changed from CORS_ORIGINS to PLATFORM_BASE_DOMAIN |
