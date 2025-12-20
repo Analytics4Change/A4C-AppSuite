@@ -192,7 +192,7 @@ export async function grantProviderAdminPermissions(
 
   // Build lookup map: permission name -> permission ID
   const permissionLookup = new Map<string, string>();
-  allPermissions?.forEach(p => {
+  (allPermissions as Array<{ id: string; name: string }> | null)?.forEach(p => {
     permissionLookup.set(p.name, p.id);
   });
 
