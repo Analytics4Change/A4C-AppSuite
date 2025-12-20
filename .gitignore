@@ -29,6 +29,12 @@ Temporary Items
 *.swo
 *~
 
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
 # Claude Code
 .claude/tsc-cache/
 
