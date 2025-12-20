@@ -127,23 +127,23 @@ export async function grantProviderAdminPermissions(
   // Load permission templates from database (falls back to PROVIDER_ADMIN_PERMISSIONS if not found)
   const templatePermissions = await getTemplatePermissions('provider_admin');
 
-  // Check if provider_admin role already exists for this org
+  // Check if provider_admin role already exists for this org (via RPC)
   let roleId: string;
   let roleAlreadyExisted = false;
 
-  const { data: existingRole, error: roleQueryError } = await supabase
-    .from('roles_projection')
-    .select('id')
-    .eq('name', 'provider_admin')
-    .eq('organization_id', params.orgId)
-    .maybeSingle();
+  const { data: existingRoleId, error: roleQueryError } = await supabase
+    .schema('api')
+    .rpc('get_role_by_name_and_org', {
+      p_role_name: 'provider_admin',
+      p_organization_id: params.orgId
+    });
 
   if (roleQueryError) {
     throw new Error(`Failed to query existing role: ${roleQueryError.message}`);
   }
 
-  if (existingRole) {
-    roleId = existingRole.id;
+  if (existingRoleId) {
+    roleId = existingRoleId;
     roleAlreadyExisted = true;
     log.info('provider_admin role already exists', { roleId, orgId: params.orgId });
   } else {
@@ -169,30 +169,22 @@ export async function grantProviderAdminPermissions(
     log.info('Created provider_admin role', { roleId, orgId: params.orgId });
   }
 
-  // Get existing permissions for this role
-  const { data: existingPermissions, error: permQueryError } = await supabase
-    .from('role_permissions_projection')
-    .select('permission_id, permissions_projection!inner(name)')
-    .eq('role_id', roleId);
+  // Get existing permissions for this role (via RPC)
+  const { data: existingPermNames, error: permQueryError } = await supabase
+    .schema('api')
+    .rpc('get_role_permission_names', { p_role_id: roleId });
 
   if (permQueryError) {
     throw new Error(`Failed to query existing permissions: ${permQueryError.message}`);
   }
 
   // Build set of already-granted permission names
-  // Note: permissions_projection is returned as an object (not array) when using !inner join
-  const grantedPermissionNames = new Set(
-    existingPermissions?.map(p => {
-      const perm = p.permissions_projection as unknown as { name: string };
-      return perm.name;
-    }) || []
-  );
+  const grantedPermissionNames = new Set<string>(existingPermNames || []);
 
-  // Get all permission IDs from the projection
+  // Get all permission IDs from the projection (via RPC)
   const { data: allPermissions, error: allPermError } = await supabase
-    .from('permissions_projection')
-    .select('id, name')
-    .in('name', templatePermissions);
+    .schema('api')
+    .rpc('get_permission_ids_by_names', { p_names: templatePermissions });
 
   if (allPermError) {
     throw new Error(`Failed to query permissions: ${allPermError.message}`);

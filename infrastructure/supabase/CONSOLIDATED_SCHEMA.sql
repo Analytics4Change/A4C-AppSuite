@@ -8264,6 +8264,81 @@ GRANT EXECUTE ON FUNCTION api.accept_invitation TO service_role;
 COMMENT ON FUNCTION api.accept_invitation IS
   'Mark invitation as accepted. Called by accept-invitation Edge Function.';
 
+-- ==============================================================================
+-- RBAC Lookup RPC Functions (for Temporal activities)
+-- ==============================================================================
+
+-- Get role ID by name and organization (for idempotency check)
+CREATE OR REPLACE FUNCTION api.get_role_by_name_and_org(
+  p_role_name TEXT,
+  p_organization_id UUID
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_role_id UUID;
+BEGIN
+  SELECT id INTO v_role_id
+  FROM public.roles_projection
+  WHERE name = p_role_name
+    AND organization_id = p_organization_id;
+
+  RETURN v_role_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION api.get_role_by_name_and_org TO service_role;
+COMMENT ON FUNCTION api.get_role_by_name_and_org IS
+  'Get role ID by name and organization. Returns NULL if not found. Called by Temporal activities.';
+
+-- Get array of permission names granted to a role
+CREATE OR REPLACE FUNCTION api.get_role_permission_names(p_role_id UUID)
+RETURNS TEXT[]
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_names TEXT[];
+BEGIN
+  SELECT ARRAY_AGG(p.name) INTO v_names
+  FROM public.role_permissions_projection rp
+  JOIN public.permissions_projection p ON p.id = rp.permission_id
+  WHERE rp.role_id = p_role_id;
+
+  RETURN COALESCE(v_names, ARRAY[]::TEXT[]);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION api.get_role_permission_names TO service_role;
+COMMENT ON FUNCTION api.get_role_permission_names IS
+  'Get array of permission names granted to a role. Returns empty array if none. Called by Temporal activities.';
+
+-- Get permission IDs by names array
+CREATE OR REPLACE FUNCTION api.get_permission_ids_by_names(p_names TEXT[])
+RETURNS TABLE (
+  id UUID,
+  name TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT p.id, p.name
+  FROM public.permissions_projection p
+  WHERE p.name = ANY(p_names);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION api.get_permission_ids_by_names TO service_role;
+COMMENT ON FUNCTION api.get_permission_ids_by_names IS
+  'Get permission IDs by names array. Called by Temporal activities for role.permission.granted events.';
+
 -- 3. Get organization status (for activate/deactivate checks)
 -- FIXED: Use is_active (boolean) instead of status (text)
 CREATE OR REPLACE FUNCTION api.get_organization_status(p_org_id UUID)
