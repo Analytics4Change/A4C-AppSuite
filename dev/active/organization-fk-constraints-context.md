@@ -78,11 +78,19 @@
 **Consolidated Schema:**
 - `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql` - Added 6 FK constraint blocks, updated all `ur.org_id` references
 
-### New Files To Create (Phases 6-9)
-- `infrastructure/supabase/sql/06-rls/medication-templates-policies.sql`
-- `infrastructure/supabase/sql/06-rls/domain-events-insert-policy.sql`
-- `infrastructure/supabase/sql/03-functions/api/medication-template-rpc.sql`
-- `infrastructure/supabase/sql/03-functions/api/event-history-rpc.sql`
+### New Files Created (2024-12-20)
+- `infrastructure/supabase/sql/06-rls/005-domain-events-insert-policy.sql` - RLS INSERT + SELECT policies for domain_events
+- `documentation/frontend/architecture/aspirational-features.md` - Documents medication_templates as aspirational feature
+
+### Files Skipped (Phases 6-9 - No Table/Spec)
+- `infrastructure/supabase/sql/06-rls/medication-templates-policies.sql` - **SKIPPED**: Table doesn't exist
+- `infrastructure/supabase/sql/03-functions/api/medication-template-rpc.sql` - **SKIPPED**: Table doesn't exist
+- `infrastructure/supabase/sql/03-functions/api/event-history-rpc.sql` - **SKIPPED**: Table doesn't exist
+
+### Existing Files Modified (Phase 10 - 2024-12-20)
+- `infrastructure/supabase/sql/03-functions/api/004-organization-queries.sql` - 3 functions → INVOKER
+- `infrastructure/supabase/sql/03-functions/api/005-organization-unit-crud.sql` - 3 functions → INVOKER
+- `infrastructure/supabase/sql/03-functions/workflows/003-projection-queries.sql` - 6 functions → INVOKER
 
 ### Files Kept As-Is
 - `frontend/src/lib/events/event-emitter.ts` - Direct INSERT with RLS (per architect)
@@ -109,21 +117,39 @@
 | `api.increment_template_usage()` | Update usage stats |
 | `api.get_event_history()` | Query event history |
 
-### Security Mode Remediation (per architect review)
-**CRITICAL** (2 functions with multi-tenant data leakage risk):
-- `api.get_organizations`, `api.get_organization_by_id`
-
-**HIGH** (10 functions):
-- Authorization: `user_has_permission`, `user_permissions`, `user_organizations`
-- Impersonation: `get_user_active_impersonation_sessions`, `get_org_impersonation_audit`, `get_impersonation_session_details`
-- API: `api.get_child_organizations`, `api.get_pending_invitations_by_org`, `api.get_invitation_by_org_and_email`, `api.get_contacts_by_org`, `api.get_addresses_by_org`, `api.get_phones_by_org`
-
-**MEDIUM** (7 functions):
-- `is_super_admin`, `is_provider_admin`, `switch_organization`, `api.get_organization_status`, `api.get_organization_units`, `api.get_organization_unit_by_id`, `api.get_organization_unit_descendants`
+### Security Mode Remediation - COMPLETED 2024-12-20
+**12 api.* Query Functions Changed to SECURITY INVOKER:**
+1. `api.get_organizations` - CRITICAL: Multi-tenant data query
+2. `api.get_organization_by_id` - CRITICAL: Single org lookup
+3. `api.get_child_organizations` - Organization hierarchy
+4. `api.get_organization_units` - OU listing
+5. `api.get_organization_unit_by_id` - Single OU lookup
+6. `api.get_organization_unit_descendants` - OU hierarchy
+7. `api.get_pending_invitations_by_org` - Invitation queries
+8. `api.get_invitation_by_org_and_email` - Specific invitation lookup
+9. `api.get_organization_status` - Org status check
+10. `api.get_contacts_by_org` - Contact queries
+11. `api.get_addresses_by_org` - Address queries
+12. `api.get_phones_by_org` - Phone queries
 
 ### Functions Keeping SECURITY DEFINER (legitimate reasons)
+**Authorization Functions** (used in RLS policies - must execute with elevated privileges):
+- `user_has_permission` - Called by RLS policies
+- `user_permissions` - Called by RLS policies
+- `user_organizations` - Called by RLS policies
+- `is_super_admin` - Called by RLS policies
+- `is_provider_admin` - Called by RLS policies
+- `switch_organization` - Modifies user context
+
+**Impersonation Functions** (cross-org audit access needed):
+- `get_user_active_impersonation_sessions` - super_admin only
+- `get_org_impersonation_audit` - Audit access
+- `get_impersonation_session_details` - Audit access
+
+**Other DEFINER Functions**:
 - `custom_access_token_hook` - JWT hook, no user context
 - `api.emit_domain_event` - Append-only event store
+- CRUD functions (create/update/deactivate OU) - INSERT into domain_events
 - Workflow idempotency checks
 - Saga compensation functions
 - `get_current_user_id` - Test override support
@@ -170,19 +196,19 @@ LANGUAGE plpgsql STABLE AS $$
 
 ## Session Notes (2024-12-20)
 
-### Orphan Cleanup Discovery
+### Orphan Cleanup Discovery (Phase 1)
 - Found 7 orphaned `roles_projection` records with non-existent `organization_id`
 - Found 112 orphaned `role_permissions_projection` records (children of orphaned roles)
 - **Critical**: Must delete children first due to FK constraints
 - Deletion order: `role_permissions_projection` → `roles_projection`
 
-### FK Verification Results
+### FK Verification Results (Phase 5)
 - **FK count**: 15 tables now linked to `organizations_projection`
   - 8 original + 6 new + 1 self-reference (`referring_partner_id`)
 - **Column rename verified**: `organization_id` (not `org_id`)
 - All 6 new constraints visible in `information_schema.table_constraints`
 
-### Functions Redeployed
+### Functions Redeployed (Phase 5)
 9 functions redeployed with updated `organization_id` references:
 1. `is_org_admin`
 2. `user_has_permission`
@@ -194,11 +220,37 @@ LANGUAGE plpgsql STABLE AS $$
 8. `switch_organization`
 9. `get_user_claims_preview`
 
-### RLS Policies Redeployed
+### RLS Policies Redeployed (Phase 5)
 3 impersonation session policies redeployed:
 1. `impersonation_sessions_super_admin_select`
 2. `impersonation_sessions_provider_admin_select`
 3. `impersonation_sessions_own_sessions_select`
+
+### medication_templates Discovery (Phase 6 - SKIPPED)
+- `medication_templates` table does NOT exist in Supabase database
+- Frontend service exists at `frontend/src/services/medications/template.service.ts`
+- Types defined at `frontend/src/types/medication-template.types.ts`
+- Permission `medication.create_template` is defined
+- **Resolution**: Documented as aspirational feature, skipped Phases 6, 7, 9
+
+### domain_events RLS Policies Added (Phase 8)
+Two new policies applied via MCP:
+1. `domain_events_authenticated_insert` - INSERT policy validating:
+   - User authenticated (`auth.uid() IS NOT NULL`)
+   - org_id matches JWT claim OR is super_admin
+   - reason >= 10 characters
+2. `domain_events_org_select` - SELECT policy for org-scoped read access
+
+### Security Mode Remediation Results (Phase 10)
+- Changed 12 api.* functions from DEFINER to INVOKER
+- Authorization functions kept as DEFINER (used in RLS policies)
+- CRUD functions kept as DEFINER (INSERT into domain_events)
+- Applied via MCP, then updated source SQL files to match
+
+### Final Verification Results (Phase 11)
+- domain_events RLS policies: **3** (super_admin_all + authenticated_insert + org_select)
+- organizations_projection FK constraints: **15** (was 8, added 6, plus 1 self-ref)
+- api.* SECURITY INVOKER functions: **12** (was 0)
 
 ## Why This Approach?
 

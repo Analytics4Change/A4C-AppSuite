@@ -3009,7 +3009,7 @@ RETURNS TABLE (
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 LANGUAGE plpgsql
 AS $$
@@ -3064,7 +3064,7 @@ RETURNS TABLE (
   updated_at TIMESTAMPTZ,
   subdomain_status TEXT
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 LANGUAGE plpgsql
 AS $$
@@ -3109,7 +3109,7 @@ RETURNS TABLE (
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 LANGUAGE plpgsql
 AS $$
@@ -3311,7 +3311,7 @@ RETURNS TABLE (
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 LANGUAGE plpgsql
 AS $$
@@ -3401,7 +3401,7 @@ RETURNS TABLE (
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 LANGUAGE plpgsql
 AS $$
@@ -3464,7 +3464,7 @@ RETURNS TABLE (
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 LANGUAGE plpgsql
 AS $$
@@ -8077,7 +8077,7 @@ RETURNS TABLE (
   invitation_id UUID,
   email TEXT
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public
 LANGUAGE plpgsql
 AS $$
@@ -8101,7 +8101,7 @@ RETURNS TABLE (
   token TEXT,
   expires_at TIMESTAMPTZ
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public
 LANGUAGE plpgsql
 AS $$
@@ -8122,7 +8122,7 @@ RETURNS TABLE (
   is_active BOOLEAN,
   deleted_at TIMESTAMPTZ
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public
 LANGUAGE plpgsql
 AS $$
@@ -8181,7 +8181,7 @@ CREATE OR REPLACE FUNCTION api.get_contacts_by_org(p_org_id UUID)
 RETURNS TABLE (
   id UUID
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public
 LANGUAGE plpgsql
 AS $$
@@ -8198,7 +8198,7 @@ CREATE OR REPLACE FUNCTION api.get_addresses_by_org(p_org_id UUID)
 RETURNS TABLE (
   id UUID
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public
 LANGUAGE plpgsql
 AS $$
@@ -8215,7 +8215,7 @@ CREATE OR REPLACE FUNCTION api.get_phones_by_org(p_org_id UUID)
 RETURNS TABLE (
   id UUID
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public
 LANGUAGE plpgsql
 AS $$
@@ -9814,6 +9814,58 @@ CREATE POLICY domain_events_super_admin_all
 
 COMMENT ON POLICY domain_events_super_admin_all ON domain_events IS
   'Allows super admins full access to domain events for auditing';
+
+-- Authenticated users can INSERT events with validation
+-- Added 2024-12-20 per architect review
+DROP POLICY IF EXISTS domain_events_authenticated_insert ON domain_events;
+CREATE POLICY domain_events_authenticated_insert
+  ON domain_events
+  FOR INSERT
+  WITH CHECK (
+    -- Must be authenticated
+    auth.uid() IS NOT NULL
+    AND (
+      -- Either super_admin (bypass org check)
+      is_super_admin(get_current_user_id())
+      OR (
+        -- Or org_id must match JWT claim
+        (event_metadata->>'organization_id')::uuid = (
+          (current_setting('request.jwt.claims', true)::jsonb)->>'org_id'
+        )::uuid
+      )
+    )
+    AND (
+      -- Reason must be at least 10 characters (defense-in-depth)
+      length(event_metadata->>'reason') >= 10
+    )
+  );
+
+COMMENT ON POLICY domain_events_authenticated_insert ON domain_events IS
+  'Allows authenticated users to INSERT events. Validates org_id matches JWT claim and reason >= 10 chars.';
+
+-- Users can SELECT events for their organization
+-- Added 2024-12-20 per architect review
+DROP POLICY IF EXISTS domain_events_org_select ON domain_events;
+CREATE POLICY domain_events_org_select
+  ON domain_events
+  FOR SELECT
+  USING (
+    -- User authenticated
+    auth.uid() IS NOT NULL
+    AND (
+      -- Either super_admin (already covered by other policy, but explicit here)
+      is_super_admin(get_current_user_id())
+      OR (
+        -- Or event belongs to user's organization
+        (event_metadata->>'organization_id')::uuid = (
+          (current_setting('request.jwt.claims', true)::jsonb)->>'org_id'
+        )::uuid
+      )
+    )
+  );
+
+COMMENT ON POLICY domain_events_org_select ON domain_events IS
+  'Allows users to SELECT events belonging to their organization.';
 
 
 -- ============================================================================

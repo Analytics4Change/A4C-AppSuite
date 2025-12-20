@@ -48,7 +48,7 @@ RETURNS TABLE (
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 LANGUAGE plpgsql
 AS $$
@@ -138,7 +138,7 @@ RETURNS TABLE (
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 LANGUAGE plpgsql
 AS $$
@@ -201,7 +201,7 @@ RETURNS TABLE (
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 LANGUAGE plpgsql
 AS $$

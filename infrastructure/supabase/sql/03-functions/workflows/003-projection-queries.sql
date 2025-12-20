@@ -8,7 +8,7 @@ RETURNS TABLE (
   invitation_id UUID,
   email TEXT
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public
 LANGUAGE plpgsql
 AS $$
@@ -32,7 +32,7 @@ RETURNS TABLE (
   token TEXT,
   expires_at TIMESTAMPTZ
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public
 LANGUAGE plpgsql
 AS $$
@@ -53,7 +53,7 @@ RETURNS TABLE (
   is_active BOOLEAN,
   deleted_at TIMESTAMPTZ
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public
 LANGUAGE plpgsql
 AS $$
@@ -112,7 +112,7 @@ CREATE OR REPLACE FUNCTION api.get_contacts_by_org(p_org_id UUID)
 RETURNS TABLE (
   id UUID
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public
 LANGUAGE plpgsql
 AS $$
@@ -129,7 +129,7 @@ CREATE OR REPLACE FUNCTION api.get_addresses_by_org(p_org_id UUID)
 RETURNS TABLE (
   id UUID
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public
 LANGUAGE plpgsql
 AS $$
@@ -146,7 +146,7 @@ CREATE OR REPLACE FUNCTION api.get_phones_by_org(p_org_id UUID)
 RETURNS TABLE (
   id UUID
 )
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public
 LANGUAGE plpgsql
 AS $$
