@@ -5,6 +5,19 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Analytics4Change - Positive Outcomes</title>
+    <!-- CSP for development mode (Vite dev server)
+         - 'unsafe-eval' required for Vite HMR
+         - ws://localhost:* for WebSocket connections
+         - http://localhost:* for dev server API calls
+         Note: frame-ancestors is not supported in meta tag (nginx header only) -->
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self';
+                   script-src 'self' 'unsafe-eval' https://accounts.google.com https://*.supabase.co;
+                   style-src 'self' 'unsafe-inline';
+                   img-src 'self' data: https: blob:;
+                   font-src 'self' data:;
+                   connect-src 'self' ws://localhost:* http://localhost:* https://*.supabase.co https://accounts.google.com https://api-a4c.firstovertheline.com https://rxnav.nlm.nih.gov;
+                   frame-src https://accounts.google.com https://*.supabase.co;">
   </head>
   <body>
     <div id="root"></div>
