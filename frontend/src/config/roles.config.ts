@@ -35,41 +35,16 @@ export const GLOBAL_ROLES: Record<string, RoleDefinition> = {
       'organization.update',
       'organization.deactivate',
       'organization.delete',
-      'organization.business_profile_create',
-      'organization.business_profile_update',
-      // Global client management
-      'client.create',
-      'client.read',
-      'client.update',
-      'client.delete',
       // Global role management
       'global_roles.create',
       'cross_org.grant',
       'users.impersonate',
-      // Plus all organization permissions when in org context
-      // These are granted dynamically based on context
+      // Note: super_admin accesses client data via impersonation, not direct grants
+      // Plus all organization permissions when in org context (granted dynamically)
     ],
     canCreateRoles: true,
     canGrantCrossOrg: true,
     canImpersonate: true,
-    isSystemRole: true
-  },
-
-  partner_onboarder: {
-    key: 'partner_onboarder',
-    displayName: 'Partner Onboarder',
-    description: 'Can create and manage new provider organizations',
-    scope: 'global',
-    permissions: [
-      'organization.create',
-      'organization.view',
-      'organization.update',
-      'organization.business_profile_create',
-      'organization.business_profile_update'
-    ],
-    canCreateRoles: false,
-    canGrantCrossOrg: false,
-    canImpersonate: false,
     isSystemRole: true
   }
 };
@@ -77,6 +52,15 @@ export const GLOBAL_ROLES: Record<string, RoleDefinition> = {
 /**
  * Organization owner role that is created during bootstrap
  * This is the owner of a root-level organization with full control
+ *
+ * Canonical permissions (16 total) - aligned to database naming:
+ * - Organization (4): view_ou, create_ou, view, update
+ * - Client (4): create, view, update, delete
+ * - Medication (2): create, view
+ * - Role (3): create, assign, view
+ * - User (3): create, view, update
+ *
+ * See: documentation/architecture/authorization/permissions-reference.md
  */
 const PROVIDER_ADMIN_ROLE: RoleDefinition = {
   key: 'provider_admin',
@@ -84,50 +68,27 @@ const PROVIDER_ADMIN_ROLE: RoleDefinition = {
   description: 'Organization owner with full control, created during bootstrap process',
   scope: 'organization',
   permissions: [
-    // Organization management (organizational units, not root creation)
+    // Organization management (4) - OUs within org hierarchy
     'organization.view_ou',
     'organization.create_ou',
     'organization.view',
     'organization.update',
-    'organization.business_profile_update',
-    // All organization-level permissions
+    // Client management (4) - aligned to DB naming
+    'client.create',
+    'client.view',
+    'client.update',
+    'client.delete',
+    // Medication management (2)
     'medication.create',
-    'medication.read',
-    'medication.update',
-    'medication.delete',
-    'medication.create_template',
-    'org_client.create',
-    'org_client.read',
-    'org_client.update',
-    'org_client.delete',
-    'org_client.transfer',
-    'org_roles.create',
-    'org_roles.assign',
-    'reports.view',
-    'reports.create',
-    'reports.export',
-    'settings.view',
-    'settings.manage',
-    'users.invite',
-    'users.manage',
-    'users.deactivate',
-    'appointments.create',
-    'appointments.read',
-    'appointments.update',
-    'appointments.delete',
-    'assessments.create',
-    'assessments.read',
-    'assessments.update',
-    'assessments.approve',
-    'incidents.create',
-    'incidents.read',
-    'incidents.update',
-    'incidents.close',
-    'billing.view',
-    'billing.manage',
-    'billing.export',
-    'audit.view',
-    'audit.export'
+    'medication.view',
+    // Role management (3) - within org
+    'role.create',
+    'role.assign',
+    'role.view',
+    // User management (3)
+    'user.create',
+    'user.view',
+    'user.update',
   ],
   canCreateRoles: true,  // Can create org-specific roles
   canGrantCrossOrg: false,
@@ -299,20 +260,17 @@ export function getMenuItemsForRole(roleKey: string, permissions?: string[]): st
   const menuItems: string[] = [];
   const rolePermissions = permissions || getRolePermissions(roleKey);
 
-  // Map permissions to menu items
-  if (rolePermissions.some(p => p.startsWith('provider.'))) {
-    menuItems.push('/providers');
+  // Map permissions to menu items (aligned to database permission names)
+  if (rolePermissions.some(p => p.startsWith('organization.create'))) {
+    menuItems.push('/organizations');
   }
-  if (rolePermissions.some(p => p.startsWith('org_client.') || p.startsWith('client.'))) {
+  if (rolePermissions.some(p => p.startsWith('client.'))) {
     menuItems.push('/clients');
   }
   if (rolePermissions.some(p => p.startsWith('medication.'))) {
     menuItems.push('/medications');
   }
-  if (rolePermissions.some(p => p.startsWith('reports.'))) {
-    menuItems.push('/reports');
-  }
-  if (rolePermissions.some(p => p.startsWith('settings.') || p.startsWith('org_roles.'))) {
+  if (rolePermissions.some(p => p.startsWith('role.') || p.startsWith('user.'))) {
     menuItems.push('/settings');
   }
   if (rolePermissions.some(p => p.startsWith('global_roles.'))) {

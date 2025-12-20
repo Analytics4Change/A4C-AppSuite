@@ -12,7 +12,6 @@
  *
  * Canonical roles (system-defined):
  * - super_admin: Platform-wide access (all organizations)
- * - partner_onboarder: Can create and manage new provider organizations
  * - provider_admin: Organization owner with full control
  *
  * Custom organization roles (created by provider_admin):
@@ -24,11 +23,10 @@
  * - caregiver: Caregiver role
  * - viewer: Read-only access
  *
- * See .plans/rbac-permissions/architecture.md for complete role definitions
+ * See documentation/architecture/authorization/permissions-reference.md for complete role definitions
  */
 export type UserRole =
   | 'super_admin'           // Canonical: Platform-wide access
-  | 'partner_onboarder'     // Canonical: Create/manage provider organizations
   | 'provider_admin'        // Canonical: Organization owner
   | 'partner_admin'         // Custom: Provider Partner admin
   | 'facility_admin'        // Custom: Facility-scoped admin (future)

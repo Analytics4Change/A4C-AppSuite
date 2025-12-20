@@ -314,6 +314,26 @@ export interface DeletePhonesParams {
   orgId: string;
 }
 
+/**
+ * GrantProviderAdminPermissionsActivity parameters
+ */
+export interface GrantProviderAdminPermissionsParams {
+  /** Organization ID */
+  orgId: string;
+}
+
+/**
+ * GrantProviderAdminPermissionsActivity result
+ */
+export interface GrantProviderAdminPermissionsResult {
+  /** Role ID (UUID) */
+  roleId: string;
+  /** Number of permissions granted (0 if all already existed) */
+  permissionsGranted: number;
+  /** Whether role already existed */
+  roleAlreadyExisted: boolean;
+}
+
 // ========================================
 // Provider Interface Types
 // ========================================

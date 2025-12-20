@@ -15,61 +15,57 @@ import { getRolePermissions } from './roles.config';
 import { PERMISSIONS } from './permissions.config';
 
 /**
- * Complete permission catalog for development testing
- * Based on .plans/rbac-permissions/architecture.md
+ * Permission catalog for development testing
+ * Aligned to database permissions_projection table
+ *
+ * See: documentation/architecture/authorization/permissions-reference.md
  */
 export const DEV_PERMISSIONS: Record<string, Permission[]> = {
-  // Medication Management Applet
-  medication: [
-    'medication.create',
-    'medication.view',
-    'medication.update',
-    'medication.delete',
-    'medication.approve',
-  ],
-
-  // Organization Management Applet
+  // Organization Management (global + org-scoped)
   organization: [
     'organization.create',
     'organization.create_sub',
+    'organization.view_ou',
+    'organization.create_ou',
     'organization.view',
     'organization.update',
     'organization.deactivate',
     'organization.delete',
-    'organization.business_profile_create',
-    'organization.business_profile_update',
   ],
 
-  // Client Management Applet
+  // Client Management (org-scoped)
   client: [
     'client.create',
     'client.view',
     'client.update',
     'client.delete',
-    'client.discharge',
+    'client.transfer',
   ],
 
-  // User Management Applet
+  // Medication Management (org-scoped)
+  medication: [
+    'medication.create',
+    'medication.view',
+    'medication.update',
+    'medication.delete',
+    'medication.create_template',
+  ],
+
+  // Role Management (global + org-scoped)
+  role: [
+    'global_roles.create',
+    'cross_org.grant',
+    'role.create',
+    'role.assign',
+    'role.view',
+  ],
+
+  // User Management (global + org-scoped)
   user: [
+    'users.impersonate',
     'user.create',
     'user.view',
     'user.update',
-    'user.delete',
-    'user.assign_role',
-  ],
-
-  // Access Grant Applet (Cross-Tenant)
-  access_grant: [
-    'access_grant.create',
-    'access_grant.view',
-    'access_grant.revoke',
-    'access_grant.approve',
-  ],
-
-  // Audit Applet
-  audit: [
-    'audit.view',
-    'audit.export',
   ],
 };
 
@@ -178,19 +174,6 @@ export const DEV_USER_PROFILES: Record<string, DevUserProfile> = {
     scope_path: '*', // Global scope
     permissions: getDevProfilePermissions('super_admin'),
     picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=super-admin',
-  },
-
-  partner_onboarder: {
-    id: 'dev-partner-onboarder-880e8400-e29b-41d4-a716-446655440000',
-    email: 'partner.onboarder@example.com',
-    name: 'Dev Partner Onboarder',
-    role: 'partner_onboarder',
-    org_id: '*', // Wildcard indicates all orgs
-    org_type: 'platform_owner',
-    org_name: 'Platform (All Organizations)',
-    scope_path: '*', // Global scope
-    permissions: getDevProfilePermissions('partner_onboarder'),
-    picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=partner-onboarder',
   },
 
   partner_admin: {

@@ -106,9 +106,77 @@ Before proceeding, verify:
   - Workflow IDs: [{list of workflow_ids}]
   ```
 
-### Phase 3: Database Impact Analysis
+### Phase 3: Complete Database Impact Analysis
 
-**Step 3.1: Shadow User Analysis (public.users)**
+**IMPORTANT**: This phase uses GENERIC DISCOVERY to find ALL tables containing organization or user references. This includes junction tables discovered via FK chain traversal. ALL records from ALL discovered tables will be hard-deleted during actual cleanup.
+
+**Step 3.1: Discover FK-Linked Tables (Recursive)**
+Execute this recursive CTE to find ALL tables reachable via foreign key chain from organizations_projection:
+```sql
+WITH RECURSIVE fk_chain AS (
+  -- Base: tables directly referencing organizations_projection
+  SELECT
+    tc.table_name::text as child_table,
+    ccu.table_name::text as parent_table,
+    kcu.column_name::text as fk_column,
+    1 as depth,
+    ARRAY[tc.table_name::text] as path
+  FROM information_schema.table_constraints tc
+  JOIN information_schema.key_column_usage kcu
+    ON tc.constraint_name = kcu.constraint_name
+  JOIN information_schema.constraint_column_usage ccu
+    ON tc.constraint_name = ccu.constraint_name
+  WHERE tc.constraint_type = 'FOREIGN KEY'
+    AND tc.table_schema = 'public'
+    AND ccu.table_name = 'organizations_projection'
+
+  UNION
+
+  -- Recursive: tables referencing tables already in chain
+  SELECT
+    tc.table_name::text,
+    ccu.table_name::text,
+    kcu.column_name::text,
+    fc.depth + 1,
+    fc.path || tc.table_name::text
+  FROM information_schema.table_constraints tc
+  JOIN information_schema.key_column_usage kcu
+    ON tc.constraint_name = kcu.constraint_name
+  JOIN information_schema.constraint_column_usage ccu
+    ON tc.constraint_name = ccu.constraint_name
+  JOIN fk_chain fc
+    ON ccu.table_name = fc.child_table
+  WHERE tc.constraint_type = 'FOREIGN KEY'
+    AND tc.table_schema = 'public'
+    AND NOT tc.table_name::text = ANY(fc.path)
+)
+SELECT DISTINCT child_table, parent_table, fk_column, MAX(depth) as depth
+FROM fk_chain
+GROUP BY child_table, parent_table, fk_column
+ORDER BY depth DESC, child_table;
+```
+- Store results as `fk_linked_tables` with depth
+- **Report**: "Discovered {count} FK-linked tables (including junction tables)"
+- This automatically discovers junction tables like: contact_phones, contact_addresses, phone_addresses, etc.
+
+**Step 3.2: Discover Column-Based Tables (Non-FK)**
+Execute this SQL to find additional tables with organization-related columns but no FK:
+```sql
+SELECT DISTINCT table_name, column_name
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND column_name IN (
+    'organization_id', 'org_id',
+    'provider_org_id', 'consultant_org_id', 'target_org_id',
+    'current_organization_id', 'stream_id'
+  )
+  AND table_name NOT IN (SELECT child_table FROM fk_chain)
+ORDER BY table_name;
+```
+- Store results as `column_based_tables`
+- **Report**: "Found {count} additional tables with org columns (no FK)"
+
+**Step 3.3: Shadow User Analysis (public.users)**
 - For each user_id in `all_user_ids`:
   - Check if exists in `public.users`
   - **Report**: "WOULD DELETE shadow user: {user_email} (ID: {user_id})"
@@ -118,43 +186,78 @@ Before proceeding, verify:
 - **DO NOT DELETE** - this is dry run mode
 - If no shadow users found: **Report**: "No shadow users found for this organization"
 
-**Step 3.2: Auth User Analysis (auth.users)**
+**Step 3.4: Auth User Analysis (auth.users)**
 - For each user in `all_auth_users` (from Phase 1):
   - **Report**: "WOULD DELETE auth user: {user_email} (ID: {user_id})"
   - Note source: "Found via: {email_match|metadata_match|event_match}"
 - **DO NOT DELETE** - this is dry run mode
 - If no auth users found: **Report**: "No auth users found for this organization"
 
-**Step 3.3: Analyze Database Schema**
-- Query information_schema to identify all tables with:
-  - `user_id` column (any variation)
-  - `organization_id` column (any variation)
-- Build dependency graph based on foreign key constraints
-- **Report**: "Found {count} tables with user_id references"
-- **Report**: "Found {count} tables with organization_id references"
+**Step 3.5: Count Affected Records (All Discovered Tables)**
+For each table discovered in Steps 3.1 and 3.2, count affected records:
 
-**Step 3.4: Count Affected Records**
-For each table identified:
-- Execute SELECT COUNT(*) WHERE user_id = {user_id}
-- Execute SELECT COUNT(*) WHERE organization_id = {org_id}
+For FK-linked tables (use parent chain):
+```sql
+-- Example for junction table contact_phones:
+SELECT COUNT(*) FROM contact_phones
+WHERE contact_id IN (
+  SELECT id FROM contacts_projection WHERE organization_id = {org_id}
+);
+```
+
+For column-based tables (direct filter):
+```sql
+-- Example for domain_events:
+SELECT COUNT(*) FROM domain_events WHERE stream_id = {org_id};
+```
+
 - **DO NOT DELETE** - only count
-- **Report** for each table:
+- **Report** for each table with records > 0:
   ```
   Table: {table_name}
-    - Records matching user_id: {count}
-    - Records matching org_id: {count}
-    - Deletion order: {order_number}
+    - Discovery method: {FK-linked|Column-based}
+    - Depth: {depth} (FK tables only)
+    - Records to delete: {count}
   ```
 
-**Step 3.5: Calculate Deletion Order**
-- Determine correct deletion order based on foreign key constraints
+**Step 3.6: Calculate Deletion Order**
+Build the deletion sequence using:
+1. FK-linked tables ordered by depth DESC (deepest first)
+2. Column-based tables (after FK tables)
+3. organizations_projection (last among FK tables)
+4. domain_events (absolute last - audit trail)
+
 - **Report**:
   ```
-  Proposed Deletion Sequence:
-  1. {child_table_1} ({count} records)
-  2. {child_table_2} ({count} records)
-  ...
-  n. {parent_table} ({count} records)
+  Proposed Deletion Sequence (FK-safe order):
+
+  Junction Tables (Depth 3+):
+    1. contact_phones ({count} records)
+    2. contact_addresses ({count} records)
+    3. phone_addresses ({count} records)
+    4. organization_contacts ({count} records)
+    5. organization_addresses ({count} records)
+    6. organization_phones ({count} records)
+
+  Projection Tables (Depth 2):
+    7. contacts_projection ({count} records)
+    8. addresses_projection ({count} records)
+    9. phones_projection ({count} records)
+    10. invitations_projection ({count} records)
+    11. organization_business_profiles_projection ({count} records)
+
+  Non-FK Tables:
+    12. user_roles_projection ({count} records)
+    13. roles_projection ({count} records)
+    14. workflow_queue_projection ({count} records)
+    15. audit_log ({count} records)
+    16. ... (other discovered tables)
+
+  Root Table (Depth 1):
+    N-1. organizations_projection ({count} records)
+
+  Event Store (Last):
+    N. domain_events ({count} records)
   ```
 
 ### Phase 4: DNS Impact Analysis
@@ -218,32 +321,47 @@ DRY RUN SUMMARY - NO DATA WAS DELETED
 
 Organization: $1
 Organization ID: {org_id}
-User ID: {user_id}
+
+Discovery Method: GENERIC (recursive FK + column-based)
+- FK-linked tables discovered: {count}
+- Column-based tables discovered: {count}
+- Total tables to process: {count}
 
 Temporal Workflow Impact:
 - Active workflows found: {count}
 - Workflows that would be terminated: {count}
 
 Database Impact:
-- Shadow users found (public.users): {count}
-  - By invited email: {count}
-  - By organization: {count}
-  - Orphaned: {count}
-- Auth users found (auth.users): {count}
-  - By invited email: {count}
-  - By org metadata: {count}
-  - By domain events: {count}
+ALL records from ALL dynamically discovered tables will be hard-deleted.
+
+User Impact:
+- Shadow users (public.users): {count}
+- Auth users (auth.users): {count}
 - Users that would be deleted:
   {user_email_1} (ID: {user_id_1}) [shadow + auth]
-  {user_email_2} (ID: {user_id_2}) [shadow only - orphaned]
   ...
-- Total tables affected: {count}
-- Total records that would be deleted: {count}
 
-Breakdown by table:
-  {table_1}: {count} records
-  {table_2}: {count} records
-  ...
+Deletion Sequence (auto-generated from FK graph):
+
+  [Depth 3+] Junction Tables:
+    {table_name}: {count} records
+    ...
+
+  [Depth 2] Projection Tables:
+    {table_name}: {count} records
+    ...
+
+  [Non-FK] Column-Based Tables:
+    {table_name}: {count} records
+    ...
+
+  [Depth 1] Root Table:
+    organizations_projection: {count} records
+
+  [Last] Event Store:
+    domain_events: {count} records
+
+Total records that would be deleted: {count}
 
 DNS Impact:
 - Zone: {zone_name} (ID: {zone_id})

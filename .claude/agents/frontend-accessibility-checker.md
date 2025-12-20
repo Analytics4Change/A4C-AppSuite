@@ -1,13 +1,11 @@
-# Frontend Accessibility Checker Agent
+---
+name: frontend-accessibility-checker
+description: Specialized agent for validating React components meet WCAG 2.1 Level AA accessibility standards. Checks keyboard navigation, ARIA attributes, focus management, semantic HTML, and screen reader compatibility.
+tools: Read, Grep, Glob
+model: sonnet
+---
 
----
-description: |
-  Specialized agent for validating React components meet WCAG 2.1 Level AA accessibility standards.
-  Checks keyboard navigation, ARIA attributes, focus management, semantic HTML, and screen reader compatibility.
-agent_type: validation
-context: frontend
-estimated_time: 3-8 minutes per component
----
+# Frontend Accessibility Checker Agent
 
 ## Purpose
 
@@ -663,7 +661,7 @@ echo "Check accessibility: frontend/src/components/MedicationCard.tsx"
 .claude/hooks/check-accessibility.sh frontend/src/components/MedicationCard.tsx
 ```
 
----
+***
 
 **Agent Version**: 1.0.0
 **Last Updated**: 2025-11-10

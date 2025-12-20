@@ -3,8 +3,9 @@
  *
  * Exports all activities for organization provisioning workflow.
  *
- * Forward Activities (6):
+ * Forward Activities (7):
  * - createOrganization: Create organization record with contacts/addresses/phones
+ * - grantProviderAdminPermissions: Create provider_admin role and grant 16 permissions
  * - configureDNS: Create DNS CNAME record (conditional)
  * - verifyDNS: Verify DNS propagation
  * - generateInvitations: Generate invitation tokens
@@ -21,6 +22,7 @@
  */
 
 export { createOrganization } from './create-organization';
+export { grantProviderAdminPermissions } from './grant-provider-admin-permissions';
 export { configureDNS } from './configure-dns';
 export { verifyDNS } from './verify-dns';
 export { generateInvitations } from './generate-invitations';

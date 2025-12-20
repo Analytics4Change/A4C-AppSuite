@@ -12,7 +12,7 @@ CREATE POLICY impersonation_sessions_super_admin_select
       JOIN roles_projection r ON r.id = ur.role_id
       WHERE ur.user_id = current_setting('app.current_user')::UUID
         AND r.name = 'super_admin'
-        AND ur.org_id IS NULL
+        AND ur.organization_id IS NULL
     )
   );
 
@@ -28,7 +28,7 @@ CREATE POLICY impersonation_sessions_provider_admin_select
       JOIN roles_projection r ON r.id = ur.role_id
       WHERE ur.user_id = current_setting('app.current_user')::UUID
         AND r.name = 'provider_admin'
-        AND ur.org_id = target_org_id
+        AND ur.organization_id = target_org_id
     )
   );
 

@@ -1,13 +1,11 @@
-# Supabase Migration Validator Agent
+---
+name: supabase-migration-validator
+description: Specialized agent for validating Supabase SQL migrations for idempotency, safety, and A4C-AppSuite architectural compliance. Checks CREATE/ALTER patterns, RLS policies, foreign keys, event triggers, and multi-tenant isolation.
+tools: Read, Grep, Glob
+model: sonnet
+---
 
----
-description: |
-  Specialized agent for validating Supabase SQL migrations for idempotency, safety, and A4C-AppSuite architectural compliance.
-  Checks CREATE/ALTER patterns, RLS policies, foreign keys, event triggers, and multi-tenant isolation.
-agent_type: validation
-context: infrastructure
-estimated_time: 5-10 minutes per migration
----
+# Supabase Migration Validator Agent
 
 ## Purpose
 
@@ -513,7 +511,7 @@ echo "Validate this migration: infrastructure/supabase/sql/02-tables/medications
 .claude/hooks/validate-migration.sh infrastructure/supabase/sql/02-tables/medications/table.sql
 ```
 
----
+***
 
 **Agent Version**: 1.0.0
 **Last Updated**: 2025-11-10

@@ -75,7 +75,7 @@ export const MainLayout: React.FC = () => {
   // - provider_partner: Clients, Reports, Settings
   const allNavItems: NavItem[] = [
     { to: '/clients', icon: Users, label: 'Clients', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse', 'caregiver'], hideForOrgTypes: ['platform_owner'] },
-    { to: '/organizations', icon: Building, label: 'Organizations', roles: ['super_admin', 'partner_onboarder'], permission: 'organization.create', showForOrgTypes: ['platform_owner'] },
+    { to: '/organizations', icon: Building, label: 'Organizations', roles: ['super_admin'], permission: 'organization.create', showForOrgTypes: ['platform_owner'] },
     { to: '/organization-units', icon: FolderTree, label: 'Organization Units', roles: ['super_admin', 'provider_admin'], permission: 'organization.view_ou', showForOrgTypes: ['provider'] },
     { to: '/medications', icon: Pill, label: 'Medication Management', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse'], hideForOrgTypes: ['platform_owner', 'provider_partner'] },
     { to: '/reports', icon: FileText, label: 'Reports', roles: ['super_admin', 'provider_admin', 'administrator'] },

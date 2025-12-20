@@ -70,7 +70,7 @@ CREATE POLICY users_org_admin_select
       SELECT 1
       FROM user_roles_projection ur
       WHERE ur.user_id = users.id
-        AND is_org_admin(get_current_user_id(), ur.org_id)
+        AND is_org_admin(get_current_user_id(), ur.organization_id)
     )
   );
 
@@ -218,8 +218,8 @@ CREATE POLICY user_roles_org_admin_select
   ON user_roles_projection
   FOR SELECT
   USING (
-    org_id IS NOT NULL
-    AND is_org_admin(get_current_user_id(), org_id)
+    organization_id IS NOT NULL
+    AND is_org_admin(get_current_user_id(), organization_id)
   );
 
 -- Users can view their own role assignments

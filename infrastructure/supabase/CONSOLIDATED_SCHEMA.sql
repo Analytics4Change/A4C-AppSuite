@@ -614,6 +614,15 @@ CREATE TABLE IF NOT EXISTS clients (
 -- Add table comment
 COMMENT ON TABLE clients IS 'Patient/client records with full medical information';
 
+-- FK constraint to organizations_projection (added 2024-12-20)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'fk_clients_organization' AND table_name = 'clients') THEN
+    ALTER TABLE clients ADD CONSTRAINT fk_clients_organization
+    FOREIGN KEY (organization_id) REFERENCES organizations_projection(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
+
 -- ----------------------------------------------------------------------------
 -- Source: sql/02-tables/dosage_info/indexes/idx_dosage_info_administered_by.sql
 -- ----------------------------------------------------------------------------
@@ -715,6 +724,15 @@ CREATE TABLE IF NOT EXISTS dosage_info (
 
 -- Add table comment
 COMMENT ON TABLE dosage_info IS 'Tracks actual medication administration events';
+
+-- FK constraint to organizations_projection (added 2024-12-20)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'fk_dosage_info_organization' AND table_name = 'dosage_info') THEN
+    ALTER TABLE dosage_info ADD CONSTRAINT fk_dosage_info_organization
+    FOREIGN KEY (organization_id) REFERENCES organizations_projection(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
 
 -- ----------------------------------------------------------------------------
 -- Source: sql/02-tables/impersonation/001-impersonation_sessions_projection.sql
@@ -1035,6 +1053,15 @@ CREATE TABLE IF NOT EXISTS medication_history (
 -- Add table comment
 COMMENT ON TABLE medication_history IS 'Tracks all medication prescriptions and administration history';
 
+-- FK constraint to organizations_projection (added 2024-12-20)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'fk_medication_history_organization' AND table_name = 'medication_history') THEN
+    ALTER TABLE medication_history ADD CONSTRAINT fk_medication_history_organization
+    FOREIGN KEY (organization_id) REFERENCES organizations_projection(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
+
 -- ----------------------------------------------------------------------------
 -- Source: sql/02-tables/medications/indexes/idx_medications_generic_name.sql
 -- ----------------------------------------------------------------------------
@@ -1138,6 +1165,15 @@ CREATE TABLE IF NOT EXISTS medications (
 
 -- Add table comment
 COMMENT ON TABLE medications IS 'Medication catalog with comprehensive drug information';
+
+-- FK constraint to organizations_projection (added 2024-12-20)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'fk_medications_organization' AND table_name = 'medications') THEN
+    ALTER TABLE medications ADD CONSTRAINT fk_medications_organization
+    FOREIGN KEY (organization_id) REFERENCES organizations_projection(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
 
 -- ----------------------------------------------------------------------------
 -- Source: sql/02-tables/organizations/001-organizations_projection.sql
@@ -2537,6 +2573,15 @@ COMMENT ON COLUMN roles_projection.organization_id IS 'Internal organization UUI
 COMMENT ON COLUMN roles_projection.org_hierarchy_scope IS 'ltree path for hierarchical scoping (NULL for super_admin)';
 COMMENT ON CONSTRAINT roles_projection_scope_check ON roles_projection IS 'Ensures only super_admin (system role) has NULL org scope. All other roles (provider_admin, partner_admin, clinician, viewer) MUST have organization_id';
 
+-- FK constraint to organizations_projection (added 2024-12-20)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'fk_roles_projection_organization' AND table_name = 'roles_projection') THEN
+    ALTER TABLE roles_projection ADD CONSTRAINT fk_roles_projection_organization
+    FOREIGN KEY (organization_id) REFERENCES organizations_projection(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
+
 
 -- ----------------------------------------------------------------------------
 -- Source: sql/02-tables/rbac/003-role_permissions_projection.sql
@@ -2574,37 +2619,46 @@ COMMENT ON COLUMN role_permissions_projection.granted_at IS 'Timestamp when perm
 CREATE TABLE IF NOT EXISTS user_roles_projection (
   user_id UUID NOT NULL,
   role_id UUID NOT NULL,
-  org_id UUID,  -- NULL for super_admin global access, UUID for org-scoped roles
+  organization_id UUID,  -- NULL for super_admin global access, UUID for org-scoped roles
   scope_path LTREE,
   assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
   -- Unique constraint with NULLS NOT DISTINCT (PostgreSQL 15+)
   -- Treats NULL as a distinct value, so (user, role, NULL) can only exist once
-  -- This allows super_admin (org_id = NULL) to be assigned uniquely per user
-  UNIQUE NULLS NOT DISTINCT (user_id, role_id, org_id),
+  -- This allows super_admin (organization_id = NULL) to be assigned uniquely per user
+  UNIQUE NULLS NOT DISTINCT (user_id, role_id, organization_id),
 
   -- Constraint: global access (NULL org) requires NULL scope_path
   CHECK (
-    (org_id IS NULL AND scope_path IS NULL)
+    (organization_id IS NULL AND scope_path IS NULL)
     OR
-    (org_id IS NOT NULL AND scope_path IS NOT NULL)
+    (organization_id IS NOT NULL AND scope_path IS NOT NULL)
   )
 );
 
 -- Indexes for permission lookups
 CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles_projection(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles_projection(role_id);
-CREATE INDEX IF NOT EXISTS idx_user_roles_org ON user_roles_projection(org_id) WHERE org_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_user_roles_org ON user_roles_projection(organization_id) WHERE organization_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_user_roles_scope_path ON user_roles_projection USING GIST(scope_path) WHERE scope_path IS NOT NULL;
 
 -- Composite index for common authorization query pattern
-CREATE INDEX IF NOT EXISTS idx_user_roles_auth_lookup ON user_roles_projection(user_id, org_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_auth_lookup ON user_roles_projection(user_id, organization_id);
 
 -- Comments
 COMMENT ON TABLE user_roles_projection IS 'Projection of user.role.* events - assigns roles to users with org scoping';
-COMMENT ON COLUMN user_roles_projection.org_id IS 'Organization UUID (NULL for super_admin global access, specific UUID for scoped roles)';
+COMMENT ON COLUMN user_roles_projection.organization_id IS 'Organization UUID (NULL for super_admin global access, specific UUID for scoped roles)';
 COMMENT ON COLUMN user_roles_projection.scope_path IS 'ltree hierarchy path for granular scoping (NULL for global access)';
 COMMENT ON COLUMN user_roles_projection.assigned_at IS 'Timestamp when role was assigned to user';
+
+-- FK constraint to organizations_projection (added 2024-12-20)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'fk_user_roles_projection_organization' AND table_name = 'user_roles_projection') THEN
+    ALTER TABLE user_roles_projection ADD CONSTRAINT fk_user_roles_projection_organization
+    FOREIGN KEY (organization_id) REFERENCES organizations_projection(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
 
 
 -- ----------------------------------------------------------------------------
@@ -4211,11 +4265,11 @@ BEGIN
       AND p.name = p_permission_name
       AND (
         -- Super admin: NULL org_id means global scope
-        ur.org_id IS NULL
+        ur.organization_id IS NULL
         OR
         -- Org-scoped: exact org match + hierarchical scope check
         (
-          ur.org_id = p_org_id
+          ur.organization_id = p_org_id
           AND (
             -- No scope constraint specified
             p_scope_path IS NULL
@@ -4268,8 +4322,8 @@ BEGIN
   JOIN permissions_projection p ON p.id = rp.permission_id
   WHERE ur.user_id = p_user_id
     AND (
-      ur.org_id IS NULL  -- Super admin sees all
-      OR ur.org_id = p_org_id
+      ur.organization_id IS NULL  -- Super admin sees all
+      OR ur.organization_id = p_org_id
     )
   ORDER BY p.applet, p.action;
 END;
@@ -4290,7 +4344,7 @@ BEGIN
     JOIN roles_projection r ON r.id = ur.role_id
     WHERE ur.user_id = p_user_id
       AND r.name = 'super_admin'
-      AND ur.org_id IS NULL
+      AND ur.organization_id IS NULL
   );
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -4311,7 +4365,7 @@ BEGIN
     JOIN roles_projection r ON r.id = ur.role_id
     WHERE ur.user_id = p_user_id
       AND r.name = 'provider_admin'
-      AND ur.org_id = p_org_id
+      AND ur.organization_id = p_org_id
   );
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -4331,13 +4385,13 @@ CREATE OR REPLACE FUNCTION user_organizations(
 BEGIN
   RETURN QUERY
   SELECT
-    ur.org_id,
+    ur.organization_id,
     r.name AS role_name,
     ur.scope_path
   FROM user_roles_projection ur
   JOIN roles_projection r ON r.id = ur.role_id
   WHERE ur.user_id = p_user_id
-  ORDER BY ur.org_id, r.name;
+  ORDER BY ur.organization_id, r.name;
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = public, extensions, pg_temp;
@@ -4495,7 +4549,7 @@ AS $$
     JOIN roles_projection r ON r.id = ur.role_id
     WHERE ur.user_id = p_user_id
       AND r.name IN ('provider_admin', 'partner_admin')
-      AND ur.org_id = p_org_id
+      AND ur.organization_id = p_org_id
       AND r.deleted_at IS NULL
   );
 $$
@@ -4591,7 +4645,7 @@ BEGIN
           JOIN public.roles_projection r ON r.id = ur.role_id
           WHERE ur.user_id = v_user_id
             AND r.name = 'super_admin'
-            AND ur.org_id IS NULL
+            AND ur.organization_id IS NULL
         ) THEN NULL  -- Super admin has NULL org_id (global scope)
         ELSE (
           SELECT o.id
@@ -4627,7 +4681,7 @@ BEGIN
     JOIN public.role_permissions_projection rp ON rp.role_id = ur.role_id
     JOIN public.permissions_projection p ON p.id = rp.permission_id
     WHERE ur.user_id = v_user_id
-      AND (ur.org_id = v_org_id OR ur.org_id IS NULL);
+      AND (ur.organization_id = v_org_id OR ur.organization_id IS NULL);
   END IF;
 
   -- Default to empty array if no permissions
@@ -4705,7 +4759,7 @@ BEGIN
     SELECT 1
     FROM public.user_roles_projection ur
     WHERE ur.user_id = v_user_id
-      AND (ur.org_id = p_new_org_id OR ur.org_id IS NULL)  -- NULL for super_admin
+      AND (ur.organization_id = p_new_org_id OR ur.organization_id IS NULL)  -- NULL for super_admin
   ) INTO v_has_access;
 
   IF NOT v_has_access THEN
@@ -8610,7 +8664,7 @@ BEGIN
         JOIN roles_projection r ON r.id = ur.role_id
         WHERE ur.user_id = v_user_id
           AND r.name = 'super_admin'
-          AND ur.org_id IS NULL
+          AND ur.organization_id IS NULL
       )
       OR
       -- User has role in the organization being queried
@@ -9576,7 +9630,7 @@ CREATE POLICY users_org_admin_select
       SELECT 1
       FROM user_roles_projection ur
       WHERE ur.user_id = users.id
-        AND is_org_admin(get_current_user_id(), ur.org_id)
+        AND is_org_admin(get_current_user_id(), ur.organization_id)
     )
   );
 
@@ -10768,7 +10822,7 @@ CREATE POLICY impersonation_sessions_super_admin_select
       JOIN roles_projection r ON r.id = ur.role_id
       WHERE ur.user_id = current_setting('app.current_user')::UUID
         AND r.name = 'super_admin'
-        AND ur.org_id IS NULL
+        AND ur.organization_id IS NULL
     )
   );
 
@@ -10784,7 +10838,7 @@ CREATE POLICY impersonation_sessions_provider_admin_select
       JOIN roles_projection r ON r.id = ur.role_id
       WHERE ur.user_id = current_setting('app.current_user')::UUID
         AND r.name = 'provider_admin'
-        AND ur.org_id = target_org_id
+        AND ur.organization_id = target_org_id
     )
   );
 

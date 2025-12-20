@@ -105,9 +105,77 @@ Before proceeding, verify:
   - Status: {success/failed/skipped}
   ```
 
-### Phase 3: Database Cleanup
+### Phase 3: Complete Database Cleanup
 
-**Step 3.1: Delete Shadow Users from public.users**
+**IMPORTANT**: This phase uses GENERIC DISCOVERY to find and delete ALL records from ALL tables containing organization or user references. This includes junction tables discovered via FK chain traversal.
+
+**Step 3.1: Discover FK-Linked Tables (Recursive)**
+Execute this recursive CTE to find ALL tables reachable via foreign key chain from organizations_projection:
+```sql
+WITH RECURSIVE fk_chain AS (
+  -- Base: tables directly referencing organizations_projection
+  SELECT
+    tc.table_name::text as child_table,
+    ccu.table_name::text as parent_table,
+    kcu.column_name::text as fk_column,
+    1 as depth,
+    ARRAY[tc.table_name::text] as path
+  FROM information_schema.table_constraints tc
+  JOIN information_schema.key_column_usage kcu
+    ON tc.constraint_name = kcu.constraint_name
+  JOIN information_schema.constraint_column_usage ccu
+    ON tc.constraint_name = ccu.constraint_name
+  WHERE tc.constraint_type = 'FOREIGN KEY'
+    AND tc.table_schema = 'public'
+    AND ccu.table_name = 'organizations_projection'
+
+  UNION
+
+  -- Recursive: tables referencing tables already in chain
+  SELECT
+    tc.table_name::text,
+    ccu.table_name::text,
+    kcu.column_name::text,
+    fc.depth + 1,
+    fc.path || tc.table_name::text
+  FROM information_schema.table_constraints tc
+  JOIN information_schema.key_column_usage kcu
+    ON tc.constraint_name = kcu.constraint_name
+  JOIN information_schema.constraint_column_usage ccu
+    ON tc.constraint_name = ccu.constraint_name
+  JOIN fk_chain fc
+    ON ccu.table_name = fc.child_table
+  WHERE tc.constraint_type = 'FOREIGN KEY'
+    AND tc.table_schema = 'public'
+    AND NOT tc.table_name::text = ANY(fc.path)
+)
+SELECT DISTINCT child_table, parent_table, fk_column, MAX(depth) as depth
+FROM fk_chain
+GROUP BY child_table, parent_table, fk_column
+ORDER BY depth DESC, child_table;
+```
+- Store results as `fk_linked_tables` with depth
+- Log: "Discovered {count} FK-linked tables (including junction tables)"
+- This automatically discovers junction tables like: contact_phones, contact_addresses, phone_addresses, etc.
+
+**Step 3.2: Discover Column-Based Tables (Non-FK)**
+Execute this SQL to find additional tables with organization-related columns but no FK:
+```sql
+SELECT DISTINCT table_name, column_name
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND column_name IN (
+    'organization_id', 'org_id',
+    'provider_org_id', 'consultant_org_id', 'target_org_id',
+    'current_organization_id', 'stream_id'
+  )
+  AND table_name NOT IN (SELECT child_table FROM fk_chain)
+ORDER BY table_name;
+```
+- Store results as `column_based_tables`
+- Log: "Found {count} additional tables with org columns (no FK)"
+
+**Step 3.3: Delete Shadow Users from public.users**
 - IMPORTANT: This MUST happen BEFORE auth.users deletion
 - For each user_id in `all_user_ids`:
   - Execute: `DELETE FROM public.users WHERE id = {user_id}`
@@ -117,26 +185,55 @@ Before proceeding, verify:
   - Log orphan count if any deleted
 - If no shadow users found: Log "No shadow users to delete"
 
-**Step 3.2: Delete Supabase Auth Users**
+**Step 3.4: Delete Supabase Auth Users**
 - For each user in `all_auth_users` (from Phase 1):
   - Execute: `DELETE FROM auth.users WHERE id = {user_id}`
   - Log: "Deleted auth user: {user_email} (ID: {user_id})"
 - Verify all deletions successful
 - If no auth users found: Log "No auth users to delete"
 
-**Step 3.3: Analyze Database Schema**
-- Query information_schema to identify all tables with:
-  - `user_id` column (any variation)
-  - `organization_id` column (any variation)
-- Build dependency graph based on foreign key constraints
+**Step 3.5: Execute Cascading Deletions (FK-Linked Tables)**
+Delete from FK-linked tables in depth order (deepest first):
 
-**Step 3.4: Execute Cascading Deletions**
-- Delete records in correct order to avoid foreign key violations:
-  1. Child tables first (tables with foreign keys TO other tables)
-  2. Parent tables last (tables with foreign keys FROM other tables)
-- For User ID: Delete all records where user_id matches
-- For Organization ID: Delete all records where organization_id matches
-- Log all deletions with table name and row count
+For each table in `fk_linked_tables` ordered by depth DESC:
+- If table has organization_id column:
+  ```sql
+  DELETE FROM {table_name} WHERE organization_id = {org_id};
+  ```
+- If table is a junction table (no org column, has FK to org-related table):
+  ```sql
+  -- Example: contact_phones references contacts_projection
+  DELETE FROM contact_phones
+  WHERE contact_id IN (
+    SELECT id FROM contacts_projection WHERE organization_id = {org_id}
+  );
+  ```
+- Log: "Deleted {count} records from {table_name}"
+
+**Step 3.6: Execute Deletions (Column-Based Tables)**
+Delete from non-FK tables that have org-related columns:
+
+For each table in `column_based_tables`:
+- Use the discovered column name for the WHERE clause:
+  ```sql
+  DELETE FROM {table_name} WHERE {column_name} = {org_id};
+  ```
+- Special cases:
+  - `cross_tenant_access_grants_projection`: Delete WHERE provider_org_id = {org_id} OR consultant_org_id = {org_id}
+  - `domain_events`: Delete WHERE stream_id = {org_id}
+  - `workflow_queue_projection`: Delete WHERE stream_id = {org_id}
+- Log: "Deleted {count} records from {table_name}"
+
+**Step 3.7: Delete Root Organization**
+- Execute: `DELETE FROM organizations_projection WHERE id = {org_id}`
+- Log: "Deleted organization: {org_name} (ID: {org_id})"
+
+**Step 3.8: Delete Event Store (Last)**
+- Execute: `DELETE FROM domain_events WHERE stream_id = {org_id}`
+- Also delete user events: `DELETE FROM domain_events WHERE stream_id IN ({user_ids})`
+- Log: "Deleted {count} domain events"
+
+Log all deletions with table name and row count
 
 ### Phase 4: DNS Cleanup
 
@@ -201,6 +298,8 @@ Temporal Workflows:
 - Workflows terminated: {count}
 
 Database Operations:
+ALL records from ALL tables with organization/user references were deleted.
+
 - Shadow users deleted (public.users): {count}
 - Auth users deleted (auth.users): {count}
   - {user_email_1} (ID: {user_id_1})
@@ -208,6 +307,15 @@ Database Operations:
   ...
 - Tables processed: {count}
 - Total records deleted: {count}
+
+Breakdown by table category:
+  Core projections: {count} records
+  Contact/Location: {count} records
+  Role/Permission: {count} records
+  Access Control: {count} records
+  Audit Logs: {count} records
+  Clinical Data: {count} records
+  Event Store: {count} records
 
 DNS Operations:
 - Zone ID: {zone_id}

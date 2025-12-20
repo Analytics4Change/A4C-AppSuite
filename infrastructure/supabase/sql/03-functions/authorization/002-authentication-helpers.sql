@@ -144,7 +144,7 @@ AS $$
     JOIN roles_projection r ON r.id = ur.role_id
     WHERE ur.user_id = p_user_id
       AND r.name IN ('provider_admin', 'partner_admin')
-      AND ur.org_id = p_org_id
+      AND ur.organization_id = p_org_id
       AND r.deleted_at IS NULL
   );
 $$

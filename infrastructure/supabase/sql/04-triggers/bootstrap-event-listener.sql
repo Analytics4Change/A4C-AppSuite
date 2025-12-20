@@ -267,14 +267,14 @@ BEGIN
         JOIN roles_projection r ON r.id = ur.role_id
         WHERE ur.user_id = v_user_id
           AND r.name = 'super_admin'
-          AND ur.org_id IS NULL
+          AND ur.organization_id IS NULL
       )
       OR
       -- User has role in the organization being queried
       EXISTS (
         SELECT 1 FROM user_roles_projection
         WHERE user_id = v_user_id
-          AND org_id = p_bootstrap_id
+          AND organization_id = p_bootstrap_id
       )
       OR
       -- User initiated the bootstrap (check event metadata)

@@ -80,8 +80,8 @@ BEGIN
           JOIN public.roles_projection r ON r.id = ur.role_id
           WHERE ur.user_id = v_user_id
             AND r.name = 'super_admin'
-            AND ur.org_id IS NULL
-        ) THEN NULL  -- Super admin has NULL org_id (global scope)
+            AND ur.organization_id IS NULL
+        ) THEN NULL  -- Super admin has NULL organization_id (global scope)
         ELSE (
           SELECT o.id
           FROM public.organizations_projection o
@@ -116,7 +116,7 @@ BEGIN
     JOIN public.role_permissions_projection rp ON rp.role_id = ur.role_id
     JOIN public.permissions_projection p ON p.id = rp.permission_id
     WHERE ur.user_id = v_user_id
-      AND (ur.org_id = v_org_id OR ur.org_id IS NULL);
+      AND (ur.organization_id = v_org_id OR ur.organization_id IS NULL);
   END IF;
 
   -- Default to empty array if no permissions
@@ -194,7 +194,7 @@ BEGIN
     SELECT 1
     FROM public.user_roles_projection ur
     WHERE ur.user_id = v_user_id
-      AND (ur.org_id = p_new_org_id OR ur.org_id IS NULL)  -- NULL for super_admin
+      AND (ur.organization_id = p_new_org_id OR ur.organization_id IS NULL)  -- NULL for super_admin
   ) INTO v_has_access;
 
   IF NOT v_has_access THEN

@@ -3,7 +3,7 @@
 -- Supports both super_admin (global) and org-scoped permissions
 --
 -- Permission Grant Strategy:
--- 1. super_admin: Global scope (org_id IS NULL) - has all permissions everywhere
+-- 1. super_admin: Global scope (organization_id IS NULL) - has all permissions everywhere
 -- 2. provider_admin: Implicit full control within their organization
 --    (all organization-scoped permissions granted implicitly)
 -- 3. Other roles: Only explicitly granted permissions via role_permissions_projection
@@ -26,7 +26,7 @@ BEGIN
     JOIN roles_projection r ON r.id = ur.role_id
     WHERE ur.user_id = p_user_id
       AND r.name = 'provider_admin'
-      AND ur.org_id = p_org_id
+      AND ur.organization_id = p_org_id
       AND r.deleted_at IS NULL
   ) THEN
     -- Verify the permission is organization-scoped (not global-only)
@@ -49,12 +49,12 @@ BEGIN
     WHERE ur.user_id = p_user_id
       AND p.name = p_permission_name
       AND (
-        -- Super admin: NULL org_id means global scope
-        ur.org_id IS NULL
+        -- Super admin: NULL organization_id means global scope
+        ur.organization_id IS NULL
         OR
         -- Org-scoped: exact org match + hierarchical scope check
         (
-          ur.org_id = p_org_id
+          ur.organization_id = p_org_id
           AND (
             -- No scope constraint specified
             p_scope_path IS NULL
@@ -107,8 +107,8 @@ BEGIN
   JOIN permissions_projection p ON p.id = rp.permission_id
   WHERE ur.user_id = p_user_id
     AND (
-      ur.org_id IS NULL  -- Super admin sees all
-      OR ur.org_id = p_org_id
+      ur.organization_id IS NULL  -- Super admin sees all
+      OR ur.organization_id = p_org_id
     )
   ORDER BY p.applet, p.action;
 END;
@@ -129,7 +129,7 @@ BEGIN
     JOIN roles_projection r ON r.id = ur.role_id
     WHERE ur.user_id = p_user_id
       AND r.name = 'super_admin'
-      AND ur.org_id IS NULL
+      AND ur.organization_id IS NULL
   );
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -150,7 +150,7 @@ BEGIN
     JOIN roles_projection r ON r.id = ur.role_id
     WHERE ur.user_id = p_user_id
       AND r.name = 'provider_admin'
-      AND ur.org_id = p_org_id
+      AND ur.organization_id = p_org_id
   );
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -170,13 +170,13 @@ CREATE OR REPLACE FUNCTION user_organizations(
 BEGIN
   RETURN QUERY
   SELECT
-    ur.org_id,
+    ur.organization_id,
     r.name AS role_name,
     ur.scope_path
   FROM user_roles_projection ur
   JOIN roles_projection r ON r.id = ur.role_id
   WHERE ur.user_id = p_user_id
-  ORDER BY ur.org_id, r.name;
+  ORDER BY ur.organization_id, r.name;
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = public, extensions, pg_temp;

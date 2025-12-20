@@ -1,5 +1,25 @@
 # Provider Admin Permissions Architecture
 
+## Implementation Status
+
+| Phase | Status | Date |
+|-------|--------|------|
+| Phase 1: Parallel Operation | Complete | 2024-12-08 |
+| Phase 2: Event-Driven Grants | **Complete** | 2024-12-19 |
+| Phase 3: Cutover | Pending | - |
+
+### What's Implemented (2024-12-19)
+
+- **`grantProviderAdminPermissions` activity**: Created at `workflows/src/activities/organization-bootstrap/grant-provider-admin-permissions.ts`
+- **Bootstrap workflow updated**: Now grants 16 canonical permissions after organization creation
+- **Canonical permissions defined**: See [permissions-reference.md](./permissions-reference.md) for the 16 provider_admin permissions
+- **Backfill SQL scripts**: Created for existing provider_admin roles (`sql/99-seeds/010-add-ou-permissions.sql`, `sql/99-seeds/011-grant-provider-admin-permissions.sql`)
+
+### What's Remaining
+
+- [ ] Remove implicit grant from `user_has_permission()` SQL function (Phase 3)
+- [ ] Run backfill scripts in production Supabase
+
 ## Overview
 
 This document describes the architecture for granting permissions to `provider_admin` users during organization bootstrap. It covers the current short-term implementation and the planned long-term solution.

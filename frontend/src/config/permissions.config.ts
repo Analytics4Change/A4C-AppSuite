@@ -1,6 +1,18 @@
 /**
  * Data-driven permission system configuration
  * All permissions are defined here and stored in the database
+ *
+ * IMPORTANT: This file is aligned to the database permissions_projection table.
+ * Do NOT add permissions here that don't exist in the database.
+ *
+ * Canonical permissions (34 total):
+ * - Organization (9): create, view_ou, create_ou, view, update, create_sub, deactivate, delete
+ * - Client (5): create, view, update, delete, transfer
+ * - Medication (5): create, view, update, delete, create_template
+ * - Role (5): global_roles.create, cross_org.grant, role.create, role.assign, role.view
+ * - User (4): users.impersonate, user.create, user.view, user.update
+ *
+ * See: documentation/architecture/authorization/permissions-reference.md
  */
 
 export interface Permission {
@@ -23,7 +35,7 @@ export interface PermissionGroup {
 }
 
 /**
- * All system permissions
+ * All system permissions - aligned to database permissions_projection
  * These are stored in the database and used for authorization
  */
 export const PERMISSIONS: Record<string, Permission> = {
@@ -31,7 +43,7 @@ export const PERMISSIONS: Record<string, Permission> = {
   // Global Level Permissions (Platform-wide)
   // ============================================
 
-  // Organization Management
+  // Organization Management (Global)
   'organization.create': {
     id: 'organization.create',
     category: 'Organization Management',
@@ -42,45 +54,15 @@ export const PERMISSIONS: Record<string, Permission> = {
     scope: 'global',
     riskLevel: 'high'
   },
-  'organization.view_ou': {
-    id: 'organization.view_ou',
+  'organization.create_sub': {
+    id: 'organization.create_sub',
     category: 'Organization Management',
     resource: 'organization',
-    action: 'view_ou',
-    displayName: 'View Organizational Units',
-    description: 'View organizational unit hierarchy (departments, locations, campuses)',
-    scope: 'organization',
-    riskLevel: 'low'
-  },
-  'organization.create_ou': {
-    id: 'organization.create_ou',
-    category: 'Organization Management',
-    resource: 'organization',
-    action: 'create_ou',
-    displayName: 'Create Organizational Unit',
-    description: 'Create organizational units (departments, locations, campuses) within hierarchy',
-    scope: 'organization',
-    riskLevel: 'medium'
-  },
-  'organization.view': {
-    id: 'organization.view',
-    category: 'Organization Management',
-    resource: 'organization',
-    action: 'view',
-    displayName: 'View Organizations',
-    description: 'View organization information',
+    action: 'create_sub',
+    displayName: 'Create Sub-Organization',
+    description: 'Create sub-organizations under existing organizations',
     scope: 'global',
-    riskLevel: 'low'
-  },
-  'organization.update': {
-    id: 'organization.update',
-    category: 'Organization Management',
-    resource: 'organization',
-    action: 'update',
-    displayName: 'Update Organization',
-    description: 'Modify organization information',
-    scope: 'organization',
-    riskLevel: 'medium'
+    riskLevel: 'high'
   },
   'organization.deactivate': {
     id: 'organization.deactivate',
@@ -99,68 +81,6 @@ export const PERMISSIONS: Record<string, Permission> = {
     action: 'delete',
     displayName: 'Delete Organization',
     description: 'Permanently delete organizations',
-    scope: 'global',
-    riskLevel: 'critical'
-  },
-  'organization.business_profile_create': {
-    id: 'organization.business_profile_create',
-    category: 'Organization Management',
-    resource: 'organization',
-    action: 'business_profile_create',
-    displayName: 'Create Business Profile',
-    description: 'Create business profiles for organizations',
-    scope: 'organization',
-    riskLevel: 'medium'
-  },
-  'organization.business_profile_update': {
-    id: 'organization.business_profile_update',
-    category: 'Organization Management',
-    resource: 'organization',
-    action: 'business_profile_update',
-    displayName: 'Update Business Profile',
-    description: 'Modify business profiles',
-    scope: 'organization',
-    riskLevel: 'medium'
-  },
-
-  // Client Management (Global)
-  'client.create': {
-    id: 'client.create',
-    category: 'Client Management',
-    resource: 'client',
-    action: 'create',
-    displayName: 'Create Client (Global)',
-    description: 'Create clients across any provider',
-    scope: 'global',
-    riskLevel: 'high'
-  },
-  'client.read': {
-    id: 'client.read',
-    category: 'Client Management',
-    resource: 'client',
-    action: 'read',
-    displayName: 'View Clients (Global)',
-    description: 'View clients across all providers',
-    scope: 'global',
-    riskLevel: 'medium'
-  },
-  'client.update': {
-    id: 'client.update',
-    category: 'Client Management',
-    resource: 'client',
-    action: 'update',
-    displayName: 'Update Client (Global)',
-    description: 'Modify client information across providers',
-    scope: 'global',
-    riskLevel: 'high'
-  },
-  'client.delete': {
-    id: 'client.delete',
-    category: 'Client Management',
-    resource: 'client',
-    action: 'delete',
-    displayName: 'Delete Client (Global)',
-    description: 'Remove clients from any provider',
     scope: 'global',
     riskLevel: 'critical'
   },
@@ -203,7 +123,101 @@ export const PERMISSIONS: Record<string, Permission> = {
   // Organization Level Permissions
   // ============================================
 
-  // Medication Management
+  // Organization Management (Org-scoped)
+  'organization.view_ou': {
+    id: 'organization.view_ou',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'view_ou',
+    displayName: 'View Organizational Units',
+    description: 'View organizational unit hierarchy (departments, locations, campuses)',
+    scope: 'organization',
+    riskLevel: 'low'
+  },
+  'organization.create_ou': {
+    id: 'organization.create_ou',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'create_ou',
+    displayName: 'Create Organizational Unit',
+    description: 'Create organizational units (departments, locations, campuses) within hierarchy',
+    scope: 'organization',
+    riskLevel: 'medium'
+  },
+  'organization.view': {
+    id: 'organization.view',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'view',
+    displayName: 'View Organization',
+    description: 'View organization information',
+    scope: 'organization',
+    riskLevel: 'low'
+  },
+  'organization.update': {
+    id: 'organization.update',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'update',
+    displayName: 'Update Organization',
+    description: 'Modify organization information and business profile',
+    scope: 'organization',
+    riskLevel: 'medium'
+  },
+
+  // Client Management (Org-scoped) - aligned to database naming
+  'client.create': {
+    id: 'client.create',
+    category: 'Client Management',
+    resource: 'client',
+    action: 'create',
+    displayName: 'Create Client',
+    description: 'Add new clients to the organization',
+    scope: 'organization',
+    riskLevel: 'medium'
+  },
+  'client.view': {
+    id: 'client.view',
+    category: 'Client Management',
+    resource: 'client',
+    action: 'view',
+    displayName: 'View Clients',
+    description: 'View client information',
+    scope: 'organization',
+    riskLevel: 'low'
+  },
+  'client.update': {
+    id: 'client.update',
+    category: 'Client Management',
+    resource: 'client',
+    action: 'update',
+    displayName: 'Update Client',
+    description: 'Modify client information',
+    scope: 'organization',
+    riskLevel: 'medium'
+  },
+  'client.delete': {
+    id: 'client.delete',
+    category: 'Client Management',
+    resource: 'client',
+    action: 'delete',
+    displayName: 'Delete Client',
+    description: 'Remove clients from organization',
+    scope: 'organization',
+    riskLevel: 'high'
+  },
+  'client.transfer': {
+    id: 'client.transfer',
+    category: 'Client Management',
+    resource: 'client',
+    action: 'transfer',
+    displayName: 'Transfer Client',
+    description: 'Transfer clients between sub-providers',
+    scope: 'organization',
+    riskLevel: 'medium'
+  },
+
+  // Medication Management (Org-scoped) - aligned to database naming
   'medication.create': {
     id: 'medication.create',
     category: 'Medication Management',
@@ -214,11 +228,11 @@ export const PERMISSIONS: Record<string, Permission> = {
     scope: 'organization',
     riskLevel: 'medium'
   },
-  'medication.read': {
-    id: 'medication.read',
+  'medication.view': {
+    id: 'medication.view',
     category: 'Medication Management',
     resource: 'medication',
-    action: 'read',
+    action: 'view',
     displayName: 'View Medications',
     description: 'View client medications',
     scope: 'organization',
@@ -255,349 +269,74 @@ export const PERMISSIONS: Record<string, Permission> = {
     riskLevel: 'low'
   },
 
-  // Client Management (Organization)
-  'org_client.create': {
-    id: 'org_client.create',
-    category: 'Client Management',
-    resource: 'org_client',
-    action: 'create',
-    displayName: 'Create Client',
-    description: 'Add new clients to the organization',
-    scope: 'organization',
-    riskLevel: 'medium'
-  },
-  'org_client.read': {
-    id: 'org_client.read',
-    category: 'Client Management',
-    resource: 'org_client',
-    action: 'read',
-    displayName: 'View Clients',
-    description: 'View client information',
-    scope: 'organization',
-    riskLevel: 'low'
-  },
-  'org_client.update': {
-    id: 'org_client.update',
-    category: 'Client Management',
-    resource: 'org_client',
-    action: 'update',
-    displayName: 'Update Client',
-    description: 'Modify client information',
-    scope: 'organization',
-    riskLevel: 'medium'
-  },
-  'org_client.delete': {
-    id: 'org_client.delete',
-    category: 'Client Management',
-    resource: 'org_client',
-    action: 'delete',
-    displayName: 'Delete Client',
-    description: 'Remove clients from organization',
-    scope: 'organization',
-    riskLevel: 'high'
-  },
-  'org_client.transfer': {
-    id: 'org_client.transfer',
-    category: 'Client Management',
-    resource: 'org_client',
-    action: 'transfer',
-    displayName: 'Transfer Client',
-    description: 'Transfer clients between sub-providers',
-    scope: 'organization',
-    riskLevel: 'medium'
-  },
-
-  // Organization Role Management
-  'org_roles.create': {
-    id: 'org_roles.create',
+  // Role Management (Org-scoped) - aligned to database naming
+  'role.create': {
+    id: 'role.create',
     category: 'Role Management',
-    resource: 'org_roles',
+    resource: 'role',
     action: 'create',
     displayName: 'Create Organization Roles',
     description: 'Create custom roles for the organization',
     scope: 'organization',
     riskLevel: 'high'
   },
-  'org_roles.assign': {
-    id: 'org_roles.assign',
+  'role.assign': {
+    id: 'role.assign',
     category: 'Role Management',
-    resource: 'org_roles',
+    resource: 'role',
     action: 'assign',
     displayName: 'Assign Roles',
     description: 'Assign roles to users within organization',
     scope: 'organization',
     riskLevel: 'medium'
   },
-
-  // Reports
-  'reports.view': {
-    id: 'reports.view',
-    category: 'Reports',
-    resource: 'reports',
+  'role.view': {
+    id: 'role.view',
+    category: 'Role Management',
+    resource: 'role',
     action: 'view',
-    displayName: 'View Reports',
-    description: 'Access organization reports',
+    displayName: 'View Roles',
+    description: 'View roles within organization',
     scope: 'organization',
     riskLevel: 'low'
-  },
-  'reports.create': {
-    id: 'reports.create',
-    category: 'Reports',
-    resource: 'reports',
-    action: 'create',
-    displayName: 'Create Reports',
-    description: 'Generate new reports',
-    scope: 'organization',
-    riskLevel: 'low'
-  },
-  'reports.export': {
-    id: 'reports.export',
-    category: 'Reports',
-    resource: 'reports',
-    action: 'export',
-    displayName: 'Export Reports',
-    description: 'Export reports to external formats',
-    scope: 'organization',
-    riskLevel: 'medium'
   },
 
-  // Settings
-  'settings.view': {
-    id: 'settings.view',
-    category: 'Settings',
-    resource: 'settings',
-    action: 'view',
-    displayName: 'View Settings',
-    description: 'View organization settings',
-    scope: 'organization',
-    riskLevel: 'low'
-  },
-  'settings.manage': {
-    id: 'settings.manage',
-    category: 'Settings',
-    resource: 'settings',
-    action: 'manage',
-    displayName: 'Manage Settings',
-    description: 'Modify organization settings',
-    scope: 'organization',
-    riskLevel: 'high'
-  },
-
-  // User Management (Organization)
-  'users.invite': {
-    id: 'users.invite',
+  // User Management (Org-scoped) - aligned to database naming
+  'user.create': {
+    id: 'user.create',
     category: 'User Management',
-    resource: 'users',
-    action: 'invite',
-    displayName: 'Invite Users',
-    description: 'Invite new users to organization',
+    resource: 'user',
+    action: 'create',
+    displayName: 'Create Users',
+    description: 'Create new users in the organization',
     scope: 'organization',
     riskLevel: 'medium'
   },
-  'users.manage': {
-    id: 'users.manage',
+  'user.view': {
+    id: 'user.view',
     category: 'User Management',
-    resource: 'users',
-    action: 'manage',
-    displayName: 'Manage Users',
-    description: 'Manage user accounts within organization',
+    resource: 'user',
+    action: 'view',
+    displayName: 'View Users',
+    description: 'View users within organization',
     scope: 'organization',
-    riskLevel: 'medium'
+    riskLevel: 'low'
   },
-  'users.deactivate': {
-    id: 'users.deactivate',
+  'user.update': {
+    id: 'user.update',
     category: 'User Management',
-    resource: 'users',
-    action: 'deactivate',
-    displayName: 'Deactivate Users',
-    description: 'Deactivate user accounts',
-    scope: 'organization',
-    riskLevel: 'high'
-  },
-
-  // Clinical Operations
-  'appointments.create': {
-    id: 'appointments.create',
-    category: 'Clinical Operations',
-    resource: 'appointments',
-    action: 'create',
-    displayName: 'Create Appointments',
-    description: 'Schedule new appointments',
-    scope: 'organization',
-    riskLevel: 'low'
-  },
-  'appointments.read': {
-    id: 'appointments.read',
-    category: 'Clinical Operations',
-    resource: 'appointments',
-    action: 'read',
-    displayName: 'View Appointments',
-    description: 'View appointment schedules',
-    scope: 'organization',
-    riskLevel: 'low'
-  },
-  'appointments.update': {
-    id: 'appointments.update',
-    category: 'Clinical Operations',
-    resource: 'appointments',
+    resource: 'user',
     action: 'update',
-    displayName: 'Update Appointments',
-    description: 'Modify appointment details',
-    scope: 'organization',
-    riskLevel: 'low'
-  },
-  'appointments.delete': {
-    id: 'appointments.delete',
-    category: 'Clinical Operations',
-    resource: 'appointments',
-    action: 'delete',
-    displayName: 'Cancel Appointments',
-    description: 'Cancel scheduled appointments',
+    displayName: 'Update Users',
+    description: 'Modify user information within organization',
     scope: 'organization',
     riskLevel: 'medium'
-  },
-
-  // Assessments
-  'assessments.create': {
-    id: 'assessments.create',
-    category: 'Clinical Operations',
-    resource: 'assessments',
-    action: 'create',
-    displayName: 'Create Assessments',
-    description: 'Create client assessments',
-    scope: 'organization',
-    riskLevel: 'medium'
-  },
-  'assessments.read': {
-    id: 'assessments.read',
-    category: 'Clinical Operations',
-    resource: 'assessments',
-    action: 'read',
-    displayName: 'View Assessments',
-    description: 'View client assessments',
-    scope: 'organization',
-    riskLevel: 'low'
-  },
-  'assessments.update': {
-    id: 'assessments.update',
-    category: 'Clinical Operations',
-    resource: 'assessments',
-    action: 'update',
-    displayName: 'Update Assessments',
-    description: 'Modify assessment information',
-    scope: 'organization',
-    riskLevel: 'medium'
-  },
-  'assessments.approve': {
-    id: 'assessments.approve',
-    category: 'Clinical Operations',
-    resource: 'assessments',
-    action: 'approve',
-    displayName: 'Approve Assessments',
-    description: 'Approve or reject assessments',
-    scope: 'organization',
-    riskLevel: 'high'
-  },
-
-  // Incidents
-  'incidents.create': {
-    id: 'incidents.create',
-    category: 'Clinical Operations',
-    resource: 'incidents',
-    action: 'create',
-    displayName: 'Report Incidents',
-    description: 'Create incident reports',
-    scope: 'organization',
-    riskLevel: 'medium'
-  },
-  'incidents.read': {
-    id: 'incidents.read',
-    category: 'Clinical Operations',
-    resource: 'incidents',
-    action: 'read',
-    displayName: 'View Incidents',
-    description: 'View incident reports',
-    scope: 'organization',
-    riskLevel: 'low'
-  },
-  'incidents.update': {
-    id: 'incidents.update',
-    category: 'Clinical Operations',
-    resource: 'incidents',
-    action: 'update',
-    displayName: 'Update Incidents',
-    description: 'Modify incident reports',
-    scope: 'organization',
-    riskLevel: 'medium'
-  },
-  'incidents.close': {
-    id: 'incidents.close',
-    category: 'Clinical Operations',
-    resource: 'incidents',
-    action: 'close',
-    displayName: 'Close Incidents',
-    description: 'Close or resolve incident reports',
-    scope: 'organization',
-    riskLevel: 'high'
-  },
-
-  // Billing
-  'billing.view': {
-    id: 'billing.view',
-    category: 'Billing',
-    resource: 'billing',
-    action: 'view',
-    displayName: 'View Billing',
-    description: 'View billing information',
-    scope: 'organization',
-    riskLevel: 'medium'
-  },
-  'billing.manage': {
-    id: 'billing.manage',
-    category: 'Billing',
-    resource: 'billing',
-    action: 'manage',
-    displayName: 'Manage Billing',
-    description: 'Manage billing and payments',
-    scope: 'organization',
-    riskLevel: 'high'
-  },
-  'billing.export': {
-    id: 'billing.export',
-    category: 'Billing',
-    resource: 'billing',
-    action: 'export',
-    displayName: 'Export Billing',
-    description: 'Export billing data',
-    scope: 'organization',
-    riskLevel: 'medium'
-  },
-
-  // Audit
-  'audit.view': {
-    id: 'audit.view',
-    category: 'Audit',
-    resource: 'audit',
-    action: 'view',
-    displayName: 'View Audit Logs',
-    description: 'View system audit logs',
-    scope: 'organization',
-    riskLevel: 'medium'
-  },
-  'audit.export': {
-    id: 'audit.export',
-    category: 'Audit',
-    resource: 'audit',
-    action: 'export',
-    displayName: 'Export Audit Logs',
-    description: 'Export audit log data',
-    scope: 'organization',
-    riskLevel: 'high'
   }
 };
 
 /**
  * Permission groups for easier role assignment
+ * Updated to use database-aligned permission names
  */
 export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
   'clinical_basic': {
@@ -605,14 +344,10 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
     displayName: 'Basic Clinical',
     description: 'View and document basic client care',
     permissions: [
-      'org_client.read',
-      'medication.read',
-      'appointments.read',
-      'assessments.read',
-      'incidents.create',
-      'incidents.read'
+      'client.view',
+      'medication.view'
     ],
-    suggestedFor: ['caregiver', 'aide']
+    suggestedFor: ['caregiver', 'viewer']
   },
 
   'clinical_full': {
@@ -620,66 +355,42 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
     displayName: 'Full Clinical',
     description: 'Complete clinical management capabilities',
     permissions: [
-      'org_client.create',
-      'org_client.read',
-      'org_client.update',
+      'client.create',
+      'client.view',
+      'client.update',
       'medication.create',
-      'medication.read',
+      'medication.view',
       'medication.update',
-      'medication.create_template',
-      'appointments.create',
-      'appointments.read',
-      'appointments.update',
-      'assessments.create',
-      'assessments.read',
-      'assessments.update',
-      'assessments.approve',
-      'incidents.create',
-      'incidents.read',
-      'incidents.update',
-      'incidents.close'
+      'medication.create_template'
     ],
-    suggestedFor: ['nurse', 'nurse_supervisor', 'clinical_director']
-  },
-
-  'administrative': {
-    id: 'administrative',
-    displayName: 'Administrative',
-    description: 'Non-clinical administrative functions',
-    permissions: [
-      'users.invite',
-      'users.manage',
-      'reports.view',
-      'reports.create',
-      'reports.export',
-      'billing.view',
-      'settings.view',
-      'audit.view'
-    ],
-    suggestedFor: ['office_manager', 'billing_specialist']
+    suggestedFor: ['nurse', 'clinician']
   },
 
   'management': {
     id: 'management',
     displayName: 'Management',
-    description: 'Full management capabilities',
+    description: 'Full organization management capabilities',
     permissions: [
-      'org_roles.create',
-      'org_roles.assign',
-      'users.invite',
-      'users.manage',
-      'users.deactivate',
-      'settings.view',
-      'settings.manage',
-      'reports.view',
-      'reports.create',
-      'reports.export',
-      'billing.view',
-      'billing.manage',
-      'audit.view',
-      'audit.export'
+      'organization.view_ou',
+      'organization.create_ou',
+      'organization.view',
+      'organization.update',
+      'client.create',
+      'client.view',
+      'client.update',
+      'client.delete',
+      'medication.create',
+      'medication.view',
+      'medication.update',
+      'medication.delete',
+      'role.create',
+      'role.assign',
+      'role.view',
+      'user.create',
+      'user.view',
+      'user.update'
     ],
-    suggestedFor: ['administrator', 'director', 'executive']
+    suggestedFor: ['provider_admin']
   }
 };
 

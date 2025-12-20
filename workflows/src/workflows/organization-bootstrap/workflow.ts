@@ -5,6 +5,7 @@
  *
  * Flow:
  * 1. Create organization record with contacts, addresses, phones (emits domain events)
+ * 1.5. Grant provider_admin permissions (creates role, grants 16 canonical permissions)
  * 2. Configure DNS (conditional - only if subdomain provided, with 7 retry attempts)
  * 3. Generate user invitations
  * 4. Send invitation emails
@@ -48,6 +49,7 @@ import type {
 // Configure activity options
 const {
   createOrganization,
+  grantProviderAdminPermissions,
   configureDNS,
   verifyDNS,
   generateInvitations,
@@ -185,6 +187,22 @@ export async function organizationBootstrapWorkflow(
       contactCount: params.orgData.contacts.length,
       addressCount: params.orgData.addresses.length,
       phoneCount: params.orgData.phones.length
+    });
+
+    // ========================================
+    // Step 1.5: Grant provider_admin Permissions
+    // ========================================
+    // Creates provider_admin role and grants 16 canonical permissions
+    // This ensures the initial admin user has proper access
+    log.info('Step 1.5: Granting provider_admin permissions', { orgId: state.orgId });
+
+    const permResult = await grantProviderAdminPermissions({ orgId: state.orgId! });
+
+    log.info('Provider admin permissions granted', {
+      orgId: state.orgId,
+      roleId: permResult.roleId,
+      permissionsGranted: permResult.permissionsGranted,
+      roleAlreadyExisted: permResult.roleAlreadyExisted
     });
 
     // ========================================
