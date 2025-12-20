@@ -540,6 +540,33 @@ CREATE TABLE IF NOT EXISTS audit_log (
 COMMENT ON TABLE audit_log IS 'CQRS projection for audit trail - General system audit trail for all data changes';
 
 -- ----------------------------------------------------------------------------
+-- Source: sql/02-tables/audit_log/002-add-missing-columns.sql
+-- ----------------------------------------------------------------------------
+
+-- Add Missing Columns to audit_log Table
+-- Migration: Fix schema drift between git and production
+-- Issue: production audit_log has 15 columns, git defines 25+
+-- Pattern: Same fix as session_id column (commit b1829c62)
+
+-- Add event_name column
+ALTER TABLE audit_log
+ADD COLUMN IF NOT EXISTS event_name TEXT;
+
+-- Backfill existing rows with event_type value
+UPDATE audit_log SET event_name = event_type WHERE event_name IS NULL;
+
+-- Add NOT NULL constraint after backfill
+ALTER TABLE audit_log ALTER COLUMN event_name SET NOT NULL;
+
+-- Add event_description column (nullable)
+ALTER TABLE audit_log
+ADD COLUMN IF NOT EXISTS event_description TEXT;
+
+-- Add comment for documentation
+COMMENT ON COLUMN audit_log.event_name IS 'Event name for audit trail (typically same as event_type)';
+COMMENT ON COLUMN audit_log.event_description IS 'Description/reason from event metadata for audit context';
+
+-- ----------------------------------------------------------------------------
 -- Source: sql/02-tables/clients/indexes/idx_clients_dob.sql
 -- ----------------------------------------------------------------------------
 
@@ -2762,6 +2789,71 @@ COMMENT ON COLUMN cross_tenant_access_grants_projection.status IS 'Current grant
 COMMENT ON COLUMN cross_tenant_access_grants_projection.expires_at IS 'Expiration timestamp for time-limited access (NULL for indefinite)';
 COMMENT ON COLUMN cross_tenant_access_grants_projection.revoked_at IS 'Timestamp when grant was permanently revoked';
 COMMENT ON COLUMN cross_tenant_access_grants_projection.suspended_at IS 'Timestamp when grant was temporarily suspended (can be reactivated)';
+
+-- ----------------------------------------------------------------------------
+-- Source: sql/02-tables/rbac/006-role_permission_templates.sql
+-- ----------------------------------------------------------------------------
+
+-- Role Permission Templates
+-- Defines canonical permissions for each role type
+-- Used during org bootstrap to grant permissions to new roles
+--
+-- This is NOT a CQRS projection - it's a configuration table that
+-- platform owners can modify to control which permissions are
+-- granted to specific role types during organization bootstrap.
+
+CREATE TABLE IF NOT EXISTS role_permission_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- Role identification
+  role_name TEXT NOT NULL,  -- 'provider_admin', 'partner_admin', 'clinician', 'viewer'
+
+  -- Permission reference
+  permission_name TEXT NOT NULL,  -- 'organization.view_ou', 'client.create', etc.
+
+  -- Metadata
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_by UUID,  -- Platform owner who added this
+
+  -- Constraints
+  CONSTRAINT role_permission_templates_unique UNIQUE (role_name, permission_name)
+);
+
+-- Indexes for fast lookup during org bootstrap
+CREATE INDEX IF NOT EXISTS idx_role_permission_templates_role
+  ON role_permission_templates(role_name) WHERE is_active = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_role_permission_templates_active
+  ON role_permission_templates(is_active) WHERE is_active = TRUE;
+
+-- RLS (platform owners only can write, anyone can read)
+ALTER TABLE role_permission_templates ENABLE ROW LEVEL SECURITY;
+
+-- Anyone can read templates (needed for Temporal workers with service role)
+DROP POLICY IF EXISTS role_permission_templates_read ON role_permission_templates;
+CREATE POLICY role_permission_templates_read ON role_permission_templates
+  FOR SELECT USING (TRUE);
+
+-- Only super_admin can modify templates
+DROP POLICY IF EXISTS role_permission_templates_write ON role_permission_templates;
+CREATE POLICY role_permission_templates_write ON role_permission_templates
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM user_roles_projection ur
+      JOIN roles_projection r ON r.id = ur.role_id
+      WHERE ur.user_id = auth.uid()
+        AND r.name = 'super_admin'
+    )
+  );
+
+-- Comments
+COMMENT ON TABLE role_permission_templates IS 'Canonical permission templates for role types. Used during org bootstrap to grant permissions to new provider_admin/partner_admin roles.';
+COMMENT ON COLUMN role_permission_templates.role_name IS 'Role type name (provider_admin, partner_admin, clinician, viewer)';
+COMMENT ON COLUMN role_permission_templates.permission_name IS 'Permission identifier in format: applet.action (e.g., organization.view_ou)';
+COMMENT ON COLUMN role_permission_templates.is_active IS 'Soft delete flag - FALSE removes permission from future bootstraps without affecting existing grants';
+COMMENT ON COLUMN role_permission_templates.created_by IS 'Platform owner (super_admin) who added this template entry';
 
 
 -- ----------------------------------------------------------------------------
@@ -11570,6 +11662,7 @@ ON CONFLICT (id) DO NOTHING;
 -- ============================================================================
 
 -- Super Admin Role (global scope, NULL org_id for platform-wide access)
+-- This is the ONLY role seeded as global - all other roles are per-organization
 INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
   ('11111111-1111-1111-1111-111111111111', 'role', 1, 'role.created',
    '{
@@ -11582,42 +11675,31 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
    }'::jsonb)
 ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
 
--- Provider Admin Role Template (permissions granted per organization during provisioning)
-INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
-  ('22222222-2222-2222-2222-222222222222', 'role', 1, 'role.created',
-   '{
-     "name": "provider_admin",
-     "description": "Organization administrator who manages their provider organization (permissions granted during org provisioning)"
-   }'::jsonb,
-   '{
-     "user_id": "00000000-0000-0000-0000-000000000000",
-     "reason": "Bootstrap: Creating provider_admin role template"
-   }'::jsonb)
-ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
-
--- Partner Admin Role Template (permissions granted per organization during provisioning)
-INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
-  ('33333333-3333-3333-3333-333333333333', 'role', 1, 'role.created',
-   '{
-     "name": "partner_admin",
-     "description": "Provider partner administrator who manages cross-tenant access (permissions granted during org provisioning)"
-   }'::jsonb,
-   '{
-     "user_id": "00000000-0000-0000-0000-000000000000",
-     "reason": "Bootstrap: Creating partner_admin role template"
-   }'::jsonb)
-ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
+-- NOTE: provider_admin and partner_admin roles are NOT seeded as global roles
+-- They are created per-organization during the organization bootstrap workflow
+-- with proper organization_id and org_hierarchy_scope set.
+-- See: workflows/src/activities/organization-bootstrap/grant-provider-admin-permissions.ts
+-- Template permissions for these roles are defined in: role_permission_templates table
 
 
 -- ============================================================================
 -- Notes
 -- ============================================================================
 
--- Provider Admin and Partner Admin roles have NO permissions at this stage
--- Permissions are granted during organization provisioning workflows
--- This ensures proper scoping: provider_admin manages their org, not others
+-- Role Scoping Architecture:
+-- - super_admin: Global scope (organization_id=NULL, org_hierarchy_scope=NULL)
+--   Created once at platform bootstrap, assigned all permissions globally
 --
--- Super Admin is assigned all 22 permissions in the next seed file
+-- - provider_admin, partner_admin, clinician, viewer: Per-organization scope
+--   Created during organization bootstrap workflow with organization_id and
+--   org_hierarchy_scope set. This ensures proper multi-tenant isolation.
+--
+-- Permission Templates:
+-- - Templates for each role type are stored in role_permission_templates table
+-- - Bootstrap workflow queries templates and grants permissions to new roles
+-- - Platform owners can modify templates to customize future org bootstraps
+--
+-- Super Admin is assigned all permissions in the next seed file
 
 
 -- ----------------------------------------------------------------------------
@@ -12481,6 +12563,75 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+
+-- ----------------------------------------------------------------------------
+-- Source: sql/99-seeds/012-role-permission-templates.sql
+-- ----------------------------------------------------------------------------
+
+-- Seed Role Permission Templates
+-- These templates define which permissions are granted to each role type
+-- during organization bootstrap. Platform owners can modify these to
+-- customize permission assignments for new organizations.
+--
+-- NOTE: This seeds the templates table, NOT the actual permission grants.
+-- Actual grants are created during org bootstrap via Temporal workflow.
+
+-- Seed provider_admin template (16 permissions)
+-- These are the canonical permissions for provider organization admins
+INSERT INTO role_permission_templates (role_name, permission_name) VALUES
+  -- Organization (4)
+  ('provider_admin', 'organization.view_ou'),
+  ('provider_admin', 'organization.create_ou'),
+  ('provider_admin', 'organization.view'),
+  ('provider_admin', 'organization.update'),
+  -- Client (4)
+  ('provider_admin', 'client.create'),
+  ('provider_admin', 'client.view'),
+  ('provider_admin', 'client.update'),
+  ('provider_admin', 'client.delete'),
+  -- Medication (2)
+  ('provider_admin', 'medication.create'),
+  ('provider_admin', 'medication.view'),
+  -- Role (3)
+  ('provider_admin', 'role.create'),
+  ('provider_admin', 'role.assign'),
+  ('provider_admin', 'role.view'),
+  -- User (3)
+  ('provider_admin', 'user.create'),
+  ('provider_admin', 'user.view'),
+  ('provider_admin', 'user.update')
+ON CONFLICT (role_name, permission_name) DO NOTHING;
+
+-- Seed partner_admin template (4 permissions - read-only subset)
+-- Partners have limited visibility into provider data
+INSERT INTO role_permission_templates (role_name, permission_name) VALUES
+  ('partner_admin', 'organization.view'),
+  ('partner_admin', 'client.view'),
+  ('partner_admin', 'medication.view'),
+  ('partner_admin', 'user.view')
+ON CONFLICT (role_name, permission_name) DO NOTHING;
+
+-- Seed clinician template (core clinical permissions)
+-- Clinicians can view/manage clients and medications
+INSERT INTO role_permission_templates (role_name, permission_name) VALUES
+  ('clinician', 'client.view'),
+  ('clinician', 'client.update'),
+  ('clinician', 'medication.view'),
+  ('clinician', 'medication.create')
+ON CONFLICT (role_name, permission_name) DO NOTHING;
+
+-- Seed viewer template (read-only access)
+INSERT INTO role_permission_templates (role_name, permission_name) VALUES
+  ('viewer', 'client.view'),
+  ('viewer', 'medication.view'),
+  ('viewer', 'user.view')
+ON CONFLICT (role_name, permission_name) DO NOTHING;
+
+-- Comments for future reference
+COMMENT ON TABLE role_permission_templates IS
+  'Seeded with canonical permissions for provider_admin (16), partner_admin (4), clinician (4), viewer (3). '
+  'Platform owners can modify via SQL or future Admin UI.';
 
 
 COMMIT;

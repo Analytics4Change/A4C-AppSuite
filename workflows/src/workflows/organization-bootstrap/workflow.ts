@@ -192,11 +192,13 @@ export async function organizationBootstrapWorkflow(
     // ========================================
     // Step 1.5: Grant provider_admin Permissions
     // ========================================
-    // Creates provider_admin role and grants 16 canonical permissions
+    // Creates provider_admin role and grants canonical permissions (from database templates)
     // This ensures the initial admin user has proper access
-    log.info('Step 1.5: Granting provider_admin permissions', { orgId: state.orgId });
+    // scopePath uses subdomain if available, otherwise the org name (sanitized)
+    const scopePath = params.subdomain || params.orgData.name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    log.info('Step 1.5: Granting provider_admin permissions', { orgId: state.orgId, scopePath });
 
-    const permResult = await grantProviderAdminPermissions({ orgId: state.orgId! });
+    const permResult = await grantProviderAdminPermissions({ orgId: state.orgId!, scopePath });
 
     log.info('Provider admin permissions granted', {
       orgId: state.orgId,

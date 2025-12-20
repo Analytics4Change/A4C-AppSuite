@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-12
+last_updated: 2025-12-20
 ---
 
 # Temporal Activities Reference
@@ -18,8 +18,9 @@ last_updated: 2025-12-12
 3. [Organization Activities](#organization-activities)
 4. [DNS Activities](#dns-activities)
 5. [User Invitation Activities](#user-invitation-activities)
-6. [Compensation Activities](#compensation-activities)
-7. [Activity Design Patterns](#activity-design-patterns)
+6. [RBAC Activities](#rbac-activities)
+7. [Compensation Activities](#compensation-activities)
+8. [Activity Design Patterns](#activity-design-patterns)
 
 ---
 
@@ -43,6 +44,7 @@ Activities in Temporal perform side effects: API calls, database operations, ext
 | **Organization** | Organization lifecycle | `createOrganizationActivity`, `activateOrganizationActivity` |
 | **DNS** | Subdomain provisioning | `configureDNSActivity`, `verifyDNSActivity` |
 | **Invitations** | User invitations | `generateInvitationsActivity`, `sendInvitationEmailsActivity` |
+| **RBAC** | Role & permission provisioning | `grantProviderAdminPermissions` |
 | **Compensation** | Rollback on failures | `removeDNSActivity`, `deactivateOrganizationActivity` |
 
 ---
@@ -539,6 +541,124 @@ interface SendInvitationEmailsResult {
 
 ---
 
+## RBAC Activities
+
+### `grantProviderAdminPermissions`
+
+Creates a `provider_admin` role for an organization and grants all template-defined permissions. This activity is called during organization bootstrap to ensure the initial admin user has the correct role and permissions.
+
+**Signature**:
+```typescript
+export async function grantProviderAdminPermissions(
+  params: GrantProviderAdminPermissionsParams
+): Promise<GrantProviderAdminPermissionsResult>
+```
+
+**Parameters**:
+```typescript
+interface GrantProviderAdminPermissionsParams {
+  orgId: string      // Organization UUID
+  scopePath: string  // Scope path for the role (e.g., subdomain like 'acme-health')
+}
+```
+
+**Returns**:
+```typescript
+interface GrantProviderAdminPermissionsResult {
+  roleId: string              // Role UUID (new or existing)
+  permissionsGranted: number  // Count of permissions granted (0 if all already existed)
+  roleAlreadyExisted: boolean // Whether role already existed
+}
+```
+
+**Permission Source**: Database-driven via `role_permission_templates` table
+
+The activity queries the `role_permission_templates` table for active templates matching the role type. This enables platform owners to manage permission templates without code changes:
+
+```typescript
+// Query template permissions from database
+const { data } = await supabase
+  .from('role_permission_templates')
+  .select('permission_name')
+  .eq('role_name', 'provider_admin')
+  .eq('is_active', true);
+```
+
+**Fallback Behavior**: If no templates are found in the database (e.g., during bootstrap before seeds run), the activity falls back to a hardcoded `PROVIDER_ADMIN_PERMISSIONS` constant with 16 canonical permissions.
+
+**Events Emitted**:
+- `role.created` → Creates record in `roles_projection` (if role doesn't exist)
+- `role.permission.granted` → Creates records in `role_permissions_projection` (for each missing permission)
+
+**Event Data (role.created)**:
+```typescript
+{
+  event_type: 'role.created',
+  aggregate_type: 'role',
+  aggregate_id: roleId,
+  event_data: {
+    name: 'provider_admin',
+    display_name: 'Provider Administrator',
+    description: 'Organization owner with full control within the organization',
+    organization_id: string,       // ✅ Required for non-super_admin roles
+    org_hierarchy_scope: string,   // ✅ LTREE path (e.g., 'acme_health')
+    scope: 'organization',
+    is_system_role: true
+  },
+  metadata: {
+    workflow_id: string,
+    workflow_run_id: string,
+    workflow_type: string
+  }
+}
+```
+
+**Event Data (role.permission.granted)**:
+```typescript
+{
+  event_type: 'role.permission.granted',
+  aggregate_type: 'role',
+  aggregate_id: roleId,
+  event_data: {
+    permission_id: string,   // UUID from permissions_projection
+    permission_name: string  // e.g., 'organization.view_ou'
+  },
+  metadata: { ... }
+}
+```
+
+**Role Scoping Architecture**:
+- `super_admin`: Global scope (organization_id = NULL)
+- `provider_admin`, `partner_admin`, etc.: Per-organization scope (organization_id = org UUID)
+
+Only `super_admin` is seeded as a global role. All other roles are created per-organization during bootstrap with proper `organization_id` and `org_hierarchy_scope` set.
+
+**Error Conditions**:
+- Failed to fetch permission templates from database
+- Failed to query existing role
+- Failed to query existing permissions
+- Permission not found in `permissions_projection`
+- Database event insertion failure
+
+**Retry Policy**: Default (3 attempts, exponential backoff)
+
+**Idempotency**: Fully idempotent via three-layer check:
+1. Checks if `provider_admin` role already exists for the organization
+2. Checks which permissions are already granted
+3. Only emits events for missing role/permissions
+
+**Related Files**:
+- **Activity**: `workflows/src/activities/organization-bootstrap/grant-provider-admin-permissions.ts`
+- **Templates Table**: `infrastructure/supabase/sql/02-tables/rbac/006-role_permission_templates.sql`
+- **Template Seeds**: `infrastructure/supabase/sql/99-seeds/012-role-permission-templates.sql`
+
+**Related Documentation**:
+- [Permissions Reference](../../../architecture/authorization/permissions-reference.md)
+- [Provider Admin Permissions Architecture](../../../architecture/authorization/provider-admin-permissions-architecture.md)
+- [role_permission_templates Table Reference](../../../infrastructure/reference/database/tables/role_permission_templates.md)
+
+---
+
 ## Compensation Activities
 
 Compensation activities rollback state changes when workflows fail.
@@ -860,6 +980,6 @@ alerts:
 
 ---
 
-**Document Version**: 1.1
-**Last Updated**: 2025-12-12
+**Document Version**: 1.2
+**Last Updated**: 2025-12-20
 **Status**: Complete Reference

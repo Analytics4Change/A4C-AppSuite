@@ -320,6 +320,8 @@ export interface DeletePhonesParams {
 export interface GrantProviderAdminPermissionsParams {
   /** Organization ID */
   orgId: string;
+  /** Scope path for the role (e.g., subdomain like 'acme-health') */
+  scopePath: string;
 }
 
 /**

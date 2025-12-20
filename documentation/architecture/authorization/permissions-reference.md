@@ -4,7 +4,7 @@
 
 This document defines the canonical permissions used in the A4C-AppSuite platform. All permissions follow the `resource.action` naming convention and are organized by scope type.
 
-**Last Updated**: 2024-12-19
+**Last Updated**: 2025-12-20
 **Total Permissions**: 34 (7 global + 27 organization-scoped)
 
 ## Permission Naming Convention
@@ -170,6 +170,60 @@ To grant permissions to existing provider_admin roles that were created before t
 -- Run sql/99-seeds/011-grant-provider-admin-permissions.sql (grants all 16 permissions)
 ```
 
+## Permission Templates
+
+Permission assignments for new organizations are managed via the `role_permission_templates` table. This provides a database-driven, platform-owner-configurable approach to permission management.
+
+### Role Scoping Architecture
+
+| Role Type | Scope | organization_id | org_hierarchy_scope |
+|-----------|-------|-----------------|---------------------|
+| `super_admin` | Global | NULL | NULL |
+| `provider_admin` | Per-Organization | Required | Required |
+| `partner_admin` | Per-Organization | Required | Required |
+| `clinician` | Per-Organization | Required | Required |
+| `viewer` | Per-Organization | Required | Required |
+
+**Key Constraint**: Only `super_admin` is global. All other roles are created per-organization during the bootstrap workflow with proper `organization_id` and `org_hierarchy_scope` set.
+
+### Viewing Templates
+
+```sql
+SELECT role_name, permission_name, is_active
+FROM role_permission_templates
+ORDER BY role_name, permission_name;
+```
+
+### Adding Permissions to a Role Type
+
+```sql
+INSERT INTO role_permission_templates (role_name, permission_name)
+VALUES ('provider_admin', 'new.permission')
+ON CONFLICT DO NOTHING;
+```
+
+### Removing Permissions from a Role Type
+
+```sql
+-- Soft delete (recommended) - affects future bootstraps only
+UPDATE role_permission_templates
+SET is_active = FALSE
+WHERE role_name = 'provider_admin' AND permission_name = 'old.permission';
+
+-- Hard delete (affects future bootstraps only)
+DELETE FROM role_permission_templates
+WHERE role_name = 'provider_admin' AND permission_name = 'old.permission';
+```
+
+### Current Template Counts
+
+| Role | Permission Count |
+|------|------------------|
+| `provider_admin` | 16 |
+| `partner_admin` | 4 |
+| `clinician` | 4 |
+| `viewer` | 3 |
+
 ## Frontend Permission Configuration
 
 Frontend permissions are defined in `frontend/src/config/permissions.config.ts`:
@@ -223,6 +277,8 @@ Maps roles to their granted permissions.
 
 | Date | Change | Author |
 |------|--------|--------|
+| 2025-12-20 | Added Permission Templates section with role scoping architecture | Claude |
+| 2025-12-20 | Added `role_permission_templates` table for database-driven templates | Claude |
 | 2024-12-19 | Added `organization.view_ou` and `organization.create_ou` | Claude |
 | 2024-12-19 | Created canonical 16-permission set for provider_admin | Claude |
 | 2024-12-19 | Aligned frontend permissions to database naming | Claude |

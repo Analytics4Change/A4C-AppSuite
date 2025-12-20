@@ -53,6 +53,7 @@ ON CONFLICT (id) DO NOTHING;
 -- ============================================================================
 
 -- Super Admin Role (global scope, NULL org_id for platform-wide access)
+-- This is the ONLY role seeded as global - all other roles are per-organization
 INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
   ('11111111-1111-1111-1111-111111111111', 'role', 1, 'role.created',
    '{
@@ -65,39 +66,28 @@ INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, e
    }'::jsonb)
 ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
 
--- Provider Admin Role Template (permissions granted per organization during provisioning)
-INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
-  ('22222222-2222-2222-2222-222222222222', 'role', 1, 'role.created',
-   '{
-     "name": "provider_admin",
-     "description": "Organization administrator who manages their provider organization (permissions granted during org provisioning)"
-   }'::jsonb,
-   '{
-     "user_id": "00000000-0000-0000-0000-000000000000",
-     "reason": "Bootstrap: Creating provider_admin role template"
-   }'::jsonb)
-ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
-
--- Partner Admin Role Template (permissions granted per organization during provisioning)
-INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata) VALUES
-  ('33333333-3333-3333-3333-333333333333', 'role', 1, 'role.created',
-   '{
-     "name": "partner_admin",
-     "description": "Provider partner administrator who manages cross-tenant access (permissions granted during org provisioning)"
-   }'::jsonb,
-   '{
-     "user_id": "00000000-0000-0000-0000-000000000000",
-     "reason": "Bootstrap: Creating partner_admin role template"
-   }'::jsonb)
-ON CONFLICT (stream_id, stream_type, stream_version) DO NOTHING;
+-- NOTE: provider_admin and partner_admin roles are NOT seeded as global roles
+-- They are created per-organization during the organization bootstrap workflow
+-- with proper organization_id and org_hierarchy_scope set.
+-- See: workflows/src/activities/organization-bootstrap/grant-provider-admin-permissions.ts
+-- Template permissions for these roles are defined in: role_permission_templates table
 
 
 -- ============================================================================
 -- Notes
 -- ============================================================================
 
--- Provider Admin and Partner Admin roles have NO permissions at this stage
--- Permissions are granted during organization provisioning workflows
--- This ensures proper scoping: provider_admin manages their org, not others
+-- Role Scoping Architecture:
+-- - super_admin: Global scope (organization_id=NULL, org_hierarchy_scope=NULL)
+--   Created once at platform bootstrap, assigned all permissions globally
 --
--- Super Admin is assigned all 22 permissions in the next seed file
+-- - provider_admin, partner_admin, clinician, viewer: Per-organization scope
+--   Created during organization bootstrap workflow with organization_id and
+--   org_hierarchy_scope set. This ensures proper multi-tenant isolation.
+--
+-- Permission Templates:
+-- - Templates for each role type are stored in role_permission_templates table
+-- - Bootstrap workflow queries templates and grants permissions to new roles
+-- - Platform owners can modify templates to customize future org bootstraps
+--
+-- Super Admin is assigned all permissions in the next seed file

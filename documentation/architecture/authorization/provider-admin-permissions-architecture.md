@@ -5,20 +5,28 @@
 | Phase | Status | Date |
 |-------|--------|------|
 | Phase 1: Parallel Operation | Complete | 2024-12-08 |
-| Phase 2: Event-Driven Grants | **Complete** | 2024-12-19 |
-| Phase 3: Cutover | Pending | - |
+| Phase 2: Event-Driven Grants | Complete | 2024-12-19 |
+| Phase 3: Database-Driven Templates | **Complete** | 2025-12-20 |
+| Phase 4: Cutover | Pending | - |
+
+### What's Implemented (2025-12-20)
+
+- **Database-driven permission templates**: New `role_permission_templates` table stores canonical permissions per role type
+- **Activity queries templates at runtime**: `grantProviderAdminPermissions` activity now queries templates from database
+- **Role scoping fixed**: Non-super_admin roles now require `organization_id` and `org_hierarchy_scope`
+- **scopePath parameter added**: Workflow passes subdomain as scopePath for proper LTREE hierarchy
 
 ### What's Implemented (2024-12-19)
 
 - **`grantProviderAdminPermissions` activity**: Created at `workflows/src/activities/organization-bootstrap/grant-provider-admin-permissions.ts`
-- **Bootstrap workflow updated**: Now grants 16 canonical permissions after organization creation
+- **Bootstrap workflow updated**: Now grants canonical permissions after organization creation (Step 1.5)
 - **Canonical permissions defined**: See [permissions-reference.md](./permissions-reference.md) for the 16 provider_admin permissions
-- **Backfill SQL scripts**: Created for existing provider_admin roles (`sql/99-seeds/010-add-ou-permissions.sql`, `sql/99-seeds/011-grant-provider-admin-permissions.sql`)
+- **Backfill SQL scripts**: Created for existing provider_admin roles
 
 ### What's Remaining
 
-- [ ] Remove implicit grant from `user_has_permission()` SQL function (Phase 3)
-- [ ] Run backfill scripts in production Supabase
+- [ ] Remove implicit grant from `user_has_permission()` SQL function (Phase 4)
+- [ ] Admin UI for managing permission templates (future enhancement)
 
 ## Overview
 

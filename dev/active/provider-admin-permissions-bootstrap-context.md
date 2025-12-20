@@ -18,6 +18,10 @@
 
 5. **Implicit Grant Deprecation**: The `user_has_permission()` SQL function has an implicit grant for provider_admin (short-term hack). This will be removed once all roles have explicit permissions in `role_permissions_projection`.
 
+6. **Database-Driven Permission Templates** (2025-12-20): Permission templates stored in `role_permission_templates` table instead of hardcoded TypeScript. Enables platform owners to modify templates via SQL without code changes. Activity queries database with fallback to hardcoded constant.
+
+7. **Per-Organization Role Scoping** (2025-12-20): Only `super_admin` is global (organization_id=NULL). All other roles (`provider_admin`, `partner_admin`, `clinician`, `viewer`) are per-organization with required `organization_id` and `org_hierarchy_scope` (LTREE path). This aligns with `roles_projection_scope_check` constraint.
+
 ## Technical Context
 
 ### Architecture
@@ -74,21 +78,29 @@
 | `infrastructure/supabase/sql/99-seeds/010-add-ou-permissions.sql` | Add view_ou and create_ou permissions | ✅ Created |
 | `infrastructure/supabase/sql/99-seeds/011-grant-provider-admin-permissions.sql` | Backfill 9 existing roles with 16 permissions | ✅ Created |
 | `workflows/src/activities/organization-bootstrap/grant-provider-admin-permissions.ts` | Temporal activity for new orgs | ✅ Created |
+| `infrastructure/supabase/sql/02-tables/rbac/006-role_permission_templates.sql` | Permission templates table for database-driven role permissions | ✅ Created |
+| `infrastructure/supabase/sql/99-seeds/012-role-permission-templates.sql` | Seed templates: 27 total (16 provider_admin, 4 partner_admin, 4 clinician, 3 viewer) | ✅ Created |
+| `documentation/infrastructure/reference/database/tables/role_permission_templates.md` | Table schema reference documentation | ✅ Created |
+| `infrastructure/supabase/sql/02-tables/audit_log/002-add-missing-columns.sql` | Add missing event_name, event_description columns to audit_log | ✅ Created |
 
 ### Existing Files Modified (2025-12-20)
 
 | File | Changes | Status |
 |------|---------|--------|
-| `workflows/src/workflows/organization-bootstrap/workflow.ts` | Added Step 1.5 to call grantProviderAdminPermissions after org creation | ✅ Done |
+| `workflows/src/workflows/organization-bootstrap/workflow.ts` | Added Step 1.5 to call grantProviderAdminPermissions, pass scopePath | ✅ Done |
 | `workflows/src/activities/organization-bootstrap/index.ts` | Export new activity | ✅ Done |
-| `workflows/src/shared/types/index.ts` | Added GrantProviderAdminPermissions types | ✅ Done |
+| `workflows/src/shared/types/index.ts` | Added GrantProviderAdminPermissions types with scopePath parameter | ✅ Done |
+| `workflows/src/activities/organization-bootstrap/grant-provider-admin-permissions.ts` | Query templates from DB, fix org_id→organization_id, add org_hierarchy_scope | ✅ Done |
 | `frontend/src/types/auth.types.ts` | Removed partner_onboarder from UserRole type | ✅ Done |
 | `frontend/src/config/permissions.config.ts` | Reduced 73→28 permissions, aligned naming to DB | ✅ Done |
 | `frontend/src/config/roles.config.ts` | Removed partner_onboarder, updated getMenuItemsForRole | ✅ Done |
 | `frontend/src/config/dev-auth.config.ts` | Updated DEV_PERMISSIONS to match database naming | ✅ Done |
 | `frontend/src/components/layouts/MainLayout.tsx` | Removed partner_onboarder from nav items | ✅ Done |
-| `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql` | Added both seed SQL files before COMMIT | ✅ Done |
-| `documentation/architecture/authorization/provider-admin-permissions-architecture.md` | Added implementation status header | ✅ Done |
+| `infrastructure/supabase/sql/99-seeds/002-bootstrap-org-roles.sql` | Removed global provider_admin/partner_admin seeds (only super_admin is global) | ✅ Done |
+| `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql` | Added templates table, seeds, removed invalid role seeds | ✅ Done |
+| `documentation/architecture/authorization/permissions-reference.md` | Added Permission Templates section with role scoping architecture | ✅ Done |
+| `documentation/architecture/authorization/provider-admin-permissions-architecture.md` | Added Phase 3 implementation status | ✅ Done |
+| `documentation/workflows/reference/activities-reference.md` | Added RBAC Activities section for grantProviderAdminPermissions | ✅ Done |
 
 ## Related Components
 
@@ -161,9 +173,11 @@ All SQL uses `ON CONFLICT DO NOTHING` for safe re-runs.
 
 1. **Database has 32 permissions, frontend defines 73** - ✅ RESOLVED: Frontend reduced to 28 permissions aligned to DB
 2. **Permission names differ** - ✅ RESOLVED: Frontend renamed to match database (`client.create` not `org_client.create`)
-3. **9 existing provider_admin roles** - SQL backfill created, awaiting execution
+3. **9 existing provider_admin roles** - ✅ RESOLVED: SQL backfill applied, permissions granted via workaround
 4. **User johnltice@yahoo.com** - Test user for UAT validation
 5. **Organization: poc-test2-20251218** - Test org with `type: 'provider'`
+6. **Role Scoping Check Constraint** (2025-12-20) - ✅ RESOLVED: The `roles_projection_scope_check` constraint requires non-super_admin roles to have `organization_id` set. Fixed by adding `organization_id` and `org_hierarchy_scope` to role.created events.
+7. **Invalid Seed Events** (2025-12-20) - ✅ RESOLVED: Deleted 3 invalid events from domain_events that had NULL organization_id for non-super_admin roles. Updated 002-bootstrap-org-roles.sql to only seed super_admin as global.
 
 ## Technical Issues Encountered (2025-12-20)
 
@@ -187,26 +201,35 @@ All SQL uses `ON CONFLICT DO NOTHING` for safe re-runs.
 - **Fix Required**: Update `process_rbac_event()` function to use correct `audit_log` column names or add missing columns to `audit_log` table
 - **Location**: `infrastructure/supabase/sql/03-functions/event-processing/004-process-rbac-events.sql`
 
-### Proposed Fix for process_rbac_event (2025-12-20)
-The fix involves updating the audit_log INSERT statement in `process_rbac_event()`:
+### Fix Applied for process_rbac_event (2025-12-20)
+**Root Cause**: Schema drift - production `audit_log` table had only 15 columns, git defines 25+. Missing `event_name` and `event_description` columns caused all RBAC event processing to fail.
 
-**Column Mapping:**
-| Old (broken) | New (correct) | Notes |
-|--------------|---------------|-------|
-| `event_name` | Remove | Already captured in `event_type` |
-| `event_description` | Remove | Move to `metadata` JSONB |
-| (missing) | `operation` | Set to `p_event.event_type` |
+**Solution**: Added missing columns via ALTER TABLE migration (same pattern as `session_id` fix in commit `b1829c62`).
 
-**Files to Update (BOTH required):**
-1. `infrastructure/supabase/sql/03-functions/event-processing/004-process-rbac-events.sql` (source)
-2. `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql` (must stay in sync)
+**Files Created/Modified:**
+1. `infrastructure/supabase/sql/02-tables/audit_log/002-add-missing-columns.sql` (new migration)
+2. `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql` (added migration after table definition)
 
-**User Preference**: User wants to see and approve plan/diff before any changes are applied.
+**Deployed via**: MCP `apply_migration` tool
 
-### Impact on Temporal Activity
-- **Problem**: The new `grantProviderAdminPermissions` activity we created will ALSO fail when it emits `role.permission.granted` events
-- **Why**: It inserts events into `domain_events`, which triggers `process_domain_event` → `process_rbac_event` → FAILS on audit_log insert
-- **Temporary State**: The manual backfill works, but new org creation via Temporal will not grant permissions until the trigger is fixed
+**Result**: 11 failed events re-processed successfully, audit_log now has entries with new columns populated.
+
+### Impact on Temporal Activity - RESOLVED
+- **Previously**: The `grantProviderAdminPermissions` activity would fail when emitting `role.permission.granted` events
+- **Now**: Fixed by adding missing columns. Event processing works correctly.
+- **Next Step**: Deploy Temporal worker to test new org bootstrap workflow
+
+### Role Scoping Fix (2025-12-20)
+**Problem**: The original seed file `002-bootstrap-org-roles.sql` seeded `provider_admin` and `partner_admin` roles as global roles (organization_id=NULL). However, the `roles_projection_scope_check` constraint requires non-super_admin roles to have `organization_id` set.
+
+**Solution Applied**:
+1. Deleted 3 invalid seed events from `domain_events` that could never be processed
+2. Updated `002-bootstrap-org-roles.sql` to only seed `super_admin` (the only legitimate global role)
+3. Added `organization_id` and `org_hierarchy_scope` to the `role.created` event_data in the Temporal activity
+4. Added `scopePath` parameter to `GrantProviderAdminPermissionsParams` interface
+5. Updated workflow to pass `scopePath` (subdomain or sanitized org name)
+
+**Key Insight**: Roles like `provider_admin` are created **per-organization** during bootstrap, not as global templates. Each organization gets its own `provider_admin` role instance with proper org scoping.
 
 ### Canonical provider_admin Permissions (16 total)
 ```typescript

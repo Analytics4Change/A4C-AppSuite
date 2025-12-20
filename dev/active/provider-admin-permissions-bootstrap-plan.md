@@ -10,9 +10,18 @@
 | Phase 4: Temporal Workflow | ✅ Complete | 2025-12-20 |
 | Phase 5: Frontend Cleanup | ✅ Complete | 2025-12-20 |
 | Phase 6: UAT Validation | ⚠️ Workaround | Manual inserts (trigger broken) |
-| Phase 7: Fix process_rbac_event | ⏸️ Pending | CRITICAL BLOCKER |
+| Phase 7: Fix process_rbac_event | ✅ Complete | 2025-12-20 |
+| Phase 8: Fix process_rbac_event | ✅ Complete | 2025-12-20 |
+| Phase 9: Database-Driven Templates | ✅ Complete | 2025-12-20 |
 
-**CRITICAL BUG DISCOVERED**: The `process_rbac_event()` trigger function has a schema mismatch with the `audit_log` table. It tries to insert columns `event_name` and `event_description` which don't exist. This breaks ALL RBAC event processing and will cause the Temporal activity to fail.
+**BUG FIXED** (2025-12-20): The `process_rbac_event()` trigger was failing due to schema drift - production `audit_log` was missing `event_name` and `event_description` columns. Fixed by adding columns via migration `002-add-missing-columns.sql`. All 11 previously failed events now processed successfully.
+
+**ROLE SCOPING FIXED** (2025-12-20): Invalid seed events with NULL organization_id for non-super_admin roles. Fixed by:
+1. Creating `role_permission_templates` table for database-driven templates
+2. Seeding 27 templates across 4 role types
+3. Updating Temporal activity to query templates + add `organization_id` and `org_hierarchy_scope` to role.created events
+4. Removing invalid global role seeds from `002-bootstrap-org-roles.sql`
+5. Deleting 3 invalid events from `domain_events`
 
 ## Executive Summary
 

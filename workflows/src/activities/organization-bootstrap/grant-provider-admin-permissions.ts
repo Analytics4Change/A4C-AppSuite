@@ -58,9 +58,42 @@ export const PROVIDER_ADMIN_PERMISSIONS = [
   'user.update',
 ] as const;
 
+/**
+ * Query permission templates from the database for a given role type.
+ * Falls back to hardcoded PROVIDER_ADMIN_PERMISSIONS if no templates found.
+ *
+ * @param roleName - The role type name (e.g., 'provider_admin', 'partner_admin')
+ * @returns Array of permission names from the database templates
+ */
+async function getTemplatePermissions(roleName: string): Promise<string[]> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase
+    .from('role_permission_templates')
+    .select('permission_name')
+    .eq('role_name', roleName)
+    .eq('is_active', true);
+
+  if (error) {
+    log.error('Failed to fetch permission templates', { roleName, error: error.message });
+    throw new Error(`Failed to fetch templates for ${roleName}: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) {
+    log.warn('No templates found for role, using fallback constant', { roleName });
+    // Fallback to hardcoded constant for safety
+    return [...PROVIDER_ADMIN_PERMISSIONS];
+  }
+
+  log.info('Loaded permission templates from database', { roleName, count: data.length });
+  return data.map(row => row.permission_name);
+}
+
 export interface GrantProviderAdminPermissionsParams {
   /** Organization ID */
   orgId: string;
+  /** Scope path for the role (e.g., subdomain like 'acme-health') */
+  scopePath: string;
 }
 
 export interface GrantProviderAdminPermissionsResult {
@@ -82,10 +115,13 @@ export interface GrantProviderAdminPermissionsResult {
 export async function grantProviderAdminPermissions(
   params: GrantProviderAdminPermissionsParams
 ): Promise<GrantProviderAdminPermissionsResult> {
-  log.info('Starting provider_admin permission grant', { orgId: params.orgId });
+  log.info('Starting provider_admin permission grant', { orgId: params.orgId, scopePath: params.scopePath });
 
   const supabase = getSupabaseClient();
   const tags = buildTags();
+
+  // Load permission templates from database (falls back to PROVIDER_ADMIN_PERMISSIONS if not found)
+  const templatePermissions = await getTemplatePermissions('provider_admin');
 
   // Check if provider_admin role already exists for this org
   let roleId: string;
@@ -95,7 +131,7 @@ export async function grantProviderAdminPermissions(
     .from('roles_projection')
     .select('id')
     .eq('name', 'provider_admin')
-    .eq('org_id', params.orgId)
+    .eq('organization_id', params.orgId)
     .maybeSingle();
 
   if (roleQueryError) {
@@ -118,7 +154,8 @@ export async function grantProviderAdminPermissions(
         name: 'provider_admin',
         display_name: 'Provider Administrator',
         description: 'Organization owner with full control within the organization',
-        org_id: params.orgId,
+        organization_id: params.orgId,
+        org_hierarchy_scope: params.scopePath,
         scope: 'organization',
         is_system_role: true
       },
@@ -151,7 +188,7 @@ export async function grantProviderAdminPermissions(
   const { data: allPermissions, error: allPermError } = await supabase
     .from('permissions_projection')
     .select('id, name')
-    .in('name', PROVIDER_ADMIN_PERMISSIONS);
+    .in('name', templatePermissions);
 
   if (allPermError) {
     throw new Error(`Failed to query permissions: ${allPermError.message}`);
@@ -166,7 +203,7 @@ export async function grantProviderAdminPermissions(
   // Grant missing permissions
   let permissionsGranted = 0;
 
-  for (const permName of PROVIDER_ADMIN_PERMISSIONS) {
+  for (const permName of templatePermissions) {
     // Skip if already granted
     if (grantedPermissionNames.has(permName)) {
       log.debug('Permission already granted', { roleId, permission: permName });
@@ -200,7 +237,7 @@ export async function grantProviderAdminPermissions(
     roleId,
     roleAlreadyExisted,
     permissionsGranted,
-    totalPermissions: PROVIDER_ADMIN_PERMISSIONS.length
+    totalPermissions: templatePermissions.length
   });
 
   return {
