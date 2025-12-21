@@ -3031,8 +3031,9 @@ END $$;
 -- Grant necessary permissions
 GRANT SELECT ON workflow_queue_projection TO service_role;
 
--- Service role SELECT grants for projection tables
--- (RLS policies in 05-policies section control row-level access)
+-- -----------------------------------------------------------------------------
+-- service_role grants (Temporal workers)
+-- -----------------------------------------------------------------------------
 GRANT SELECT ON organizations_projection TO service_role;
 GRANT SELECT ON roles_projection TO service_role;
 GRANT SELECT ON role_permissions_projection TO service_role;
@@ -3041,7 +3042,33 @@ GRANT SELECT ON contacts_projection TO service_role;
 GRANT SELECT ON addresses_projection TO service_role;
 GRANT SELECT ON phones_projection TO service_role;
 GRANT SELECT ON invitations_projection TO service_role;
+GRANT SELECT ON user_roles_projection TO service_role;
+GRANT SELECT ON cross_tenant_access_grants_projection TO service_role;
+GRANT SELECT ON impersonation_sessions_projection TO service_role;
+GRANT SELECT ON organization_business_profiles_projection TO service_role;
+GRANT SELECT ON workflow_queue_projection TO service_role;
 GRANT SELECT ON role_permission_templates TO service_role;
+
+-- -----------------------------------------------------------------------------
+-- authenticated grants (Frontend users via PostgREST)
+-- -----------------------------------------------------------------------------
+-- Required for RLS policies to be evaluated. PostgreSQL checks GRANT before RLS.
+-- Without these grants, authenticated users get "permission denied" before
+-- RLS policies can filter rows.
+GRANT SELECT ON addresses_projection TO authenticated;
+GRANT SELECT ON contacts_projection TO authenticated;
+GRANT SELECT ON cross_tenant_access_grants_projection TO authenticated;
+GRANT SELECT ON impersonation_sessions_projection TO authenticated;
+GRANT SELECT ON invitations_projection TO authenticated;
+GRANT SELECT ON organization_business_profiles_projection TO authenticated;
+GRANT SELECT ON organizations_projection TO authenticated;
+GRANT SELECT ON permissions_projection TO authenticated;
+GRANT SELECT ON phones_projection TO authenticated;
+GRANT SELECT ON role_permissions_projection TO authenticated;
+GRANT SELECT ON roles_projection TO authenticated;
+GRANT SELECT ON user_roles_projection TO authenticated;
+GRANT SELECT ON workflow_queue_projection TO authenticated;
+GRANT SELECT ON role_permission_templates TO authenticated;
 
 -- Create updated_at trigger function (idempotent)
 CREATE OR REPLACE FUNCTION update_workflow_queue_projection_updated_at()

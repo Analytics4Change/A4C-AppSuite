@@ -1,16 +1,20 @@
 -- ==============================================================================
--- Service Role Projection Access Policies
+-- Projection Table Access Policies
 -- ==============================================================================
 --
--- Purpose: Grant service_role SELECT access to projection tables
+-- Purpose: Grant SELECT access to projection tables for service_role and
+-- authenticated roles.
 --
--- Context: Temporal workers use the Supabase service_role key. When api.*
--- functions use SECURITY INVOKER (per architect review), they run with the
--- caller's permissions. Without these policies, service_role cannot read
--- projection tables.
+-- Context:
+--   - service_role: Used by Temporal workers with SUPABASE_SERVICE_ROLE_KEY.
+--     Bypasses RLS entirely. Needs GRANT for SECURITY INVOKER functions.
+--   - authenticated: Used by frontend users via PostgREST with JWT tokens.
+--     RLS policies filter which rows they can see, but GRANT is required
+--     first for PostgreSQL to allow table access.
 --
--- Pattern: Same pattern as workflow_queue_projection (the only projection
--- table that previously had service_role access).
+-- Pattern: GRANT controls table-level access. RLS controls row-level access.
+-- PostgreSQL evaluates GRANT before RLS - without GRANT, "permission denied"
+-- occurs before RLS policies are even checked.
 --
 -- Reference: documentation/retrospectives/2025-11-temporal-worker-migration.md
 -- Section: "Service Account RLS Pattern"
@@ -24,10 +28,14 @@
 --   - addresses_projection
 --   - phones_projection
 --   - invitations_projection
+--   - user_roles_projection
+--   - cross_tenant_access_grants_projection
+--   - impersonation_sessions_projection
+--   - organization_business_profiles_projection
+--   - workflow_queue_projection
 --   - role_permission_templates (configuration table, not projection)
 --
--- Note: These are SELECT-only policies. Temporal workers emit events for
--- state changes; they do not write to projections directly.
+-- Note: These are SELECT-only grants. State changes happen via domain events.
 -- ==============================================================================
 
 -- ==============================================================================
@@ -36,6 +44,9 @@
 -- PostgreSQL requires GRANT for table access, independent of RLS.
 -- RLS policies control which rows; GRANT controls table-level access.
 -- ==============================================================================
+-- -----------------------------------------------------------------------------
+-- service_role grants (Temporal workers)
+-- -----------------------------------------------------------------------------
 GRANT SELECT ON organizations_projection TO service_role;
 GRANT SELECT ON roles_projection TO service_role;
 GRANT SELECT ON role_permissions_projection TO service_role;
@@ -44,10 +55,36 @@ GRANT SELECT ON contacts_projection TO service_role;
 GRANT SELECT ON addresses_projection TO service_role;
 GRANT SELECT ON phones_projection TO service_role;
 GRANT SELECT ON invitations_projection TO service_role;
+GRANT SELECT ON user_roles_projection TO service_role;
+GRANT SELECT ON cross_tenant_access_grants_projection TO service_role;
+GRANT SELECT ON impersonation_sessions_projection TO service_role;
+GRANT SELECT ON organization_business_profiles_projection TO service_role;
+GRANT SELECT ON workflow_queue_projection TO service_role;
 GRANT SELECT ON role_permission_templates TO service_role;
 
+-- -----------------------------------------------------------------------------
+-- authenticated grants (Frontend users via PostgREST)
+-- -----------------------------------------------------------------------------
+-- Required for RLS policies to be evaluated. PostgreSQL checks GRANT before RLS.
+-- Without these grants, authenticated users get "permission denied" before
+-- RLS policies can filter rows.
+GRANT SELECT ON addresses_projection TO authenticated;
+GRANT SELECT ON contacts_projection TO authenticated;
+GRANT SELECT ON cross_tenant_access_grants_projection TO authenticated;
+GRANT SELECT ON impersonation_sessions_projection TO authenticated;
+GRANT SELECT ON invitations_projection TO authenticated;
+GRANT SELECT ON organization_business_profiles_projection TO authenticated;
+GRANT SELECT ON organizations_projection TO authenticated;
+GRANT SELECT ON permissions_projection TO authenticated;
+GRANT SELECT ON phones_projection TO authenticated;
+GRANT SELECT ON role_permissions_projection TO authenticated;
+GRANT SELECT ON roles_projection TO authenticated;
+GRANT SELECT ON user_roles_projection TO authenticated;
+GRANT SELECT ON workflow_queue_projection TO authenticated;
+GRANT SELECT ON role_permission_templates TO authenticated;
+
 -- ==============================================================================
--- RLS Policies
+-- RLS Policies for service_role
 -- ==============================================================================
 
 -- organizations_projection
