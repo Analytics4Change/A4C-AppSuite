@@ -15,20 +15,14 @@
 -- ============================================================================
 
 -- VAR partners can view organizations they referred
+-- Uses is_var_partner() helper function (SECURITY DEFINER) to avoid infinite recursion
 DROP POLICY IF EXISTS organizations_var_partner_referrals ON organizations_projection;
 CREATE POLICY organizations_var_partner_referrals
   ON organizations_projection
   FOR SELECT
   USING (
-    -- Check if current user's organization is a VAR partner
-    EXISTS (
-      SELECT 1
-      FROM organizations_projection var_org
-      WHERE var_org.id = get_current_org_id()
-        AND var_org.type = 'provider_partner'
-        AND var_org.partner_type = 'var'
-        AND var_org.is_active = true
-    )
+    -- Check if current user's organization is a VAR partner (via helper function)
+    is_var_partner()
     -- Allow access to organizations where this VAR partner is the referring partner
     AND referring_partner_id = get_current_org_id()
   );

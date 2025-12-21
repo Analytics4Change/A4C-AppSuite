@@ -162,33 +162,58 @@
 - [ ] CI/CD rebuilds temporal-api image with new CORS/retry logic
 - [ ] Test end-to-end organization bootstrap from UI
 
+## Phase 11: Fix Missing GRANT SELECT for service_role ✅ COMPLETE
+
+**Problem Identified**: Workflow failed at `grantProviderAdminPermissions` with `permission denied for table role_permission_templates` despite RLS policies existing.
+
+**Root Cause**: PostgreSQL permission model has two layers:
+1. GRANT (base privilege) - Missing! Required to access table at all
+2. RLS policy - Existed but couldn't help without GRANT
+
+### 11.1 Add Missing GRANT SELECT Statements
+- [x] Identify missing GRANTs by comparing with `workflow_queue_projection` (the only projection that worked)
+- [x] Add `GRANT SELECT ON <table> TO service_role` for 9 projection tables
+- [x] Update `infrastructure/supabase/sql/05-policies/011-service-role-projection-access.sql`
+- [x] Sync with `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql`
+- [x] Deploy via MCP `execute_sql`
+- [x] Verify all 9 GRANTs exist in database
+
+### 11.2 Cleanup Failed Organization
+- [x] Executed `/org-cleanup poc-test1-20251221`
+- [x] Verified 0 records remain in all 23 FK-linked tables
+- [x] Verified no DNS records exist (workflow failed before DNS creation)
+
+### 11.3 Commit and Push
+- [x] Committed changes (commit `42a349a6`)
+- [x] Pushed to remote
+
 ## Current Status
 
-**Phase**: Phase 10 (E2E Validation - Form UX + Backend API Fixes)
-**Status**: ✅ COMPLETE (code merged, awaiting CI/CD deployment)
-**Last Updated**: 2025-12-20
+**Phase**: Phase 11 (Fix Missing GRANT SELECT for service_role)
+**Status**: ✅ COMPLETE (awaiting user to create new test organization)
+**Last Updated**: 2025-12-21
 **Completed**:
-1. Fixed Enter key prematurely submitting organization create form
-2. Clear validation errors when user edits any field
-3. Added dynamic CORS from PLATFORM_BASE_DOMAIN (supports *.firstovertheline.com)
-4. Added Temporal connection retry with exponential backoff
-5. Restarted temporal-api pods - now Ready (1/1)
-6. Verified API health/ready endpoints return 200
-7. Committed and pushed changes (8419b0b7)
+1. Discovered root cause: GRANT (base privilege) vs RLS (row-level security) are independent
+2. Added GRANT SELECT for all 9 projection tables to service_role
+3. Updated migration file and CONSOLIDATED_SCHEMA.sql
+4. Deployed to production via MCP
+5. Cleaned up failed organization `poc-test1-20251221` (org_id: `b53574e1-a65d-4d9f-8d9d-fac255f0654d`)
+6. Verified all 23 tables have 0 orphan records
+7. Committed and pushed (commit `42a349a6`)
 
 **Remaining**:
-- Wait for CI/CD to rebuild and deploy temporal-api with new code
-- Test end-to-end organization bootstrap from frontend UI
-- Verify provider_admin role created with correct permissions
+- User creates new test organization via frontend
+- Verify workflow completes to "active" status
+- Verify provider_admin role created with 16 permissions
 
 **Next Step After /clear**:
-1. Check GitHub Actions for temporal-api deployment status: `gh run list --workflow=temporal-api-deploy.yml`
-2. Once deployed, navigate to `https://a4c.firstovertheline.com/organizations/create`
-3. Fill in organization form (Enter key should NOT submit prematurely)
-4. Click Submit → workflow should start successfully
+1. Navigate to `https://a4c.firstovertheline.com/organizations/create`
+2. Fill in organization form and submit
+3. Monitor worker logs: `kubectl logs -n temporal -l app=workflow-worker --tail=100 -f`
+4. Verify workflow completes without "permission denied" errors
 5. Verify in database:
-   - `organizations_projection` has new org
-   - `roles_projection` has provider_admin role with org_id set
+   - `organizations_projection` has new org with status='active'
+   - `roles_projection` has provider_admin role with organization_id set
    - `role_permissions_projection` has 16 permissions for that role
 
 ## Files Created/Modified This Session
@@ -229,3 +254,9 @@
 | `frontend/src/viewModels/organization/OrganizationFormViewModel.ts` | Clear validation errors in `updateField()` and `updateNestedField()` |
 | `workflows/src/api/server.ts` | Added dynamic CORS from PLATFORM_BASE_DOMAIN, Temporal retry logic |
 | `infrastructure/k8s/temporal-api/configmap.yaml` | Changed from CORS_ORIGINS to PLATFORM_BASE_DOMAIN |
+
+### Phase 11 Files Modified (2025-12-21)
+| File | Changes | Commit |
+|------|---------|--------|
+| `infrastructure/supabase/sql/05-policies/011-service-role-projection-access.sql` | Added GRANT SELECT for 9 projection tables to service_role | `42a349a6` |
+| `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql` | Added GRANT SELECT statements near line 3032 (after workflow_queue_projection) | `42a349a6` |

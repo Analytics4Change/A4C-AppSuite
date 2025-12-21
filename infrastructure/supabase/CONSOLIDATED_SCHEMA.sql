@@ -4664,7 +4664,42 @@ COMMENT ON FUNCTION is_org_admin IS
 
 
 -- ----------------------------------------------------------------------------
--- Source: sql/03-functions/authorization/003-supabase-auth-jwt-hook.sql
+-- Source: sql/03-functions/authorization/003-var-partner-helpers.sql
+-- ----------------------------------------------------------------------------
+
+-- VAR Partner Helper Functions
+-- Provides VAR partner detection for RLS policies
+
+-- ============================================================================
+-- VAR Partner Detection
+-- ============================================================================
+
+-- Check if current user's organization is a VAR partner
+-- Uses SECURITY DEFINER to bypass RLS and avoid infinite recursion
+-- when used in RLS policies on organizations_projection
+CREATE OR REPLACE FUNCTION is_var_partner()
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM organizations_projection
+    WHERE id = get_current_org_id()
+      AND type = 'provider_partner'
+      AND partner_type = 'var'
+      AND is_active = true
+  );
+$$
+SET search_path = public, extensions, pg_temp;
+
+COMMENT ON FUNCTION is_var_partner IS
+  'Checks if current user''s organization is an active VAR partner. Uses SECURITY DEFINER to bypass RLS and prevent infinite recursion.';
+
+
+-- ----------------------------------------------------------------------------
+-- Source: sql/03-functions/authorization/004-supabase-auth-jwt-hook.sql
 -- ----------------------------------------------------------------------------
 
 -- Supabase Auth JWT Custom Access Token Hook
@@ -10610,20 +10645,14 @@ COMMENT ON POLICY dosage_info_delete ON dosage_info IS
 -- ============================================================================
 
 -- VAR partners can view organizations they referred
+-- Uses is_var_partner() helper function (SECURITY DEFINER) to avoid infinite recursion
 DROP POLICY IF EXISTS organizations_var_partner_referrals ON organizations_projection;
 CREATE POLICY organizations_var_partner_referrals
   ON organizations_projection
   FOR SELECT
   USING (
-    -- Check if current user's organization is a VAR partner
-    EXISTS (
-      SELECT 1
-      FROM organizations_projection var_org
-      WHERE var_org.id = get_current_org_id()
-        AND var_org.type = 'provider_partner'
-        AND var_org.partner_type = 'var'
-        AND var_org.is_active = true
-    )
+    -- Check if current user's organization is a VAR partner (via helper function)
+    is_var_partner()
     -- Allow access to organizations where this VAR partner is the referring partner
     AND referring_partner_id = get_current_org_id()
   );

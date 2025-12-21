@@ -278,6 +278,36 @@ All SQL uses `ON CONFLICT DO NOTHING` for safe re-runs.
 
 **Key Insight**: Roles like `provider_admin` are created **per-organization** during bootstrap, not as global templates. Each organization gets its own `provider_admin` role instance with proper org scoping.
 
+### PostgreSQL Permission Model: GRANT vs RLS (2025-12-21)
+**Problem**: Organization bootstrap workflow failed with `permission denied for table role_permission_templates` even though RLS policies existed for `service_role`.
+
+**Root Cause Discovery**: PostgreSQL permission model has **two independent layers**:
+1. **Base privilege** (`GRANT SELECT ON table TO role`) - Required to access the table at all
+2. **RLS policy** (`CREATE POLICY ... USING (...)`) - Controls *which rows* can be accessed if RLS is enabled
+
+**Key Insight**: The error message "permission denied for table" indicates missing GRANT (base privilege). "permission denied by RLS" would indicate missing/failing policy. These are independent - a blanket `GRANT SELECT` still respects RLS policies.
+
+**Solution Applied**:
+1. Added `GRANT SELECT ON <table> TO service_role` for all 9 projection tables
+2. Updated `infrastructure/supabase/sql/05-policies/011-service-role-projection-access.sql`
+3. Synced with `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql` near line 3032
+4. Deployed via MCP `execute_sql`
+
+**Files Modified** (commit `42a349a6`):
+- `infrastructure/supabase/sql/05-policies/011-service-role-projection-access.sql` - Added GRANT SELECT section
+- `infrastructure/supabase/CONSOLIDATED_SCHEMA.sql` - Added GRANT SELECT statements
+
+**Tables Requiring GRANT SELECT to service_role**:
+- organizations_projection
+- roles_projection
+- role_permissions_projection
+- permissions_projection
+- contacts_projection
+- addresses_projection
+- phones_projection
+- invitations_projection
+- role_permission_templates
+
 ### Canonical provider_admin Permissions (16 total)
 ```typescript
 const PROVIDER_ADMIN_PERMISSIONS = [
