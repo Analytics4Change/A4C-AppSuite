@@ -30,9 +30,12 @@ import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/util
 const log = getLogger('GrantProviderAdminPermissions');
 
 /**
- * Canonical provider_admin permissions
- * These 16 permissions are granted to every provider_admin role
- * Aligned to database permissions_projection table
+ * Reference: Canonical provider_admin permissions
+ *
+ * Note: The source of truth is the role_permission_templates table in the database.
+ * This constant is kept for documentation reference only.
+ *
+ * See: infrastructure/supabase/sql/99-seeds/012-role-permission-templates.sql
  */
 export const PROVIDER_ADMIN_PERMISSIONS = [
   // Organization (4) - OUs and org management within hierarchy
@@ -60,37 +63,30 @@ export const PROVIDER_ADMIN_PERMISSIONS = [
 
 /**
  * Query permission templates from the database for a given role type.
- * Falls back to hardcoded PROVIDER_ADMIN_PERMISSIONS if no templates found.
+ * Uses api.get_role_permission_templates RPC to access the role_permission_templates table.
  *
  * @param roleName - The role type name (e.g., 'provider_admin', 'partner_admin')
  * @returns Array of permission names from the database templates
+ * @throws Error if query fails or no templates are found (required for role bootstrap)
  */
 async function getTemplatePermissions(roleName: string): Promise<string[]> {
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase
-    .from('role_permission_templates')
-    .select('permission_name')
-    .eq('role_name', roleName)
-    .eq('is_active', true);
+    .schema('api')
+    .rpc('get_role_permission_templates', { p_role_name: roleName });
 
   if (error) {
-    log.warn('Failed to fetch permission templates, using fallback constant', {
-      roleName,
-      error: error.message
-    });
-    // Fallback to hardcoded constant when database query fails (e.g., schema restrictions)
-    return [...PROVIDER_ADMIN_PERMISSIONS];
+    throw new Error(`Failed to fetch permission templates for ${roleName}: ${error.message}`);
   }
 
   if (!data || data.length === 0) {
-    log.warn('No templates found for role, using fallback constant', { roleName });
-    // Fallback to hardcoded constant for safety
-    return [...PROVIDER_ADMIN_PERMISSIONS];
+    throw new Error(`No permission templates found for role: ${roleName}. ` +
+      `Ensure role_permission_templates table is seeded with templates for this role type.`);
   }
 
   log.info('Loaded permission templates from database', { roleName, count: data.length });
-  return data.map(row => row.permission_name);
+  return (data as Array<{ permission_name: string }>).map(row => row.permission_name);
 }
 
 export interface GrantProviderAdminPermissionsParams {

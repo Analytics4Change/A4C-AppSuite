@@ -7,10 +7,21 @@
 -- Required because PostgREST only exposes the 'api' schema, but projection
 -- tables are in 'public' schema.
 --
+-- Security Model (per architect review 2024-12-20):
+-- - Functions use SECURITY INVOKER (runs with caller's permissions)
+-- - service_role has SELECT policies on projection tables
+-- - This approach maintains RLS enforcement while allowing worker access
+--
 -- Functions:
 -- 1. api.get_role_by_name_and_org - Find role ID for idempotency check
 -- 2. api.get_role_permission_names - Get granted permission names for a role
 -- 3. api.get_permission_ids_by_names - Get permission IDs for granting
+-- 4. api.get_role_permission_templates - Get canonical permissions for a role type
+--
+-- Prerequisites:
+-- - service_role SELECT policies on: roles_projection, role_permissions_projection,
+--   permissions_projection, role_permission_templates
+-- - See: 05-policies/011-service-role-projection-access.sql
 
 -- ==============================================================================
 -- Function: api.get_role_by_name_and_org
@@ -23,7 +34,7 @@ CREATE OR REPLACE FUNCTION api.get_role_by_name_and_org(
 )
 RETURNS UUID
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
@@ -50,7 +61,7 @@ COMMENT ON FUNCTION api.get_role_by_name_and_org IS
 CREATE OR REPLACE FUNCTION api.get_role_permission_names(p_role_id UUID)
 RETURNS TEXT[]
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
@@ -80,7 +91,7 @@ RETURNS TABLE (
   name TEXT
 )
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 AS $$
 BEGIN
@@ -96,9 +107,37 @@ COMMENT ON FUNCTION api.get_permission_ids_by_names IS
   'Get permission IDs by names array. Called by Temporal activities for role.permission.granted events.';
 
 -- ==============================================================================
+-- Function: api.get_role_permission_templates
+-- ==============================================================================
+-- Returns canonical permission names for a role type (e.g., 'provider_admin')
+-- Used by GrantProviderAdminPermissions to determine which permissions to grant
+CREATE OR REPLACE FUNCTION api.get_role_permission_templates(p_role_name TEXT)
+RETURNS TABLE (
+  permission_name TEXT
+)
+LANGUAGE plpgsql
+SECURITY INVOKER  -- Per architect review (2024-12-20)
+SET search_path = public, extensions, pg_temp
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT rpt.permission_name
+  FROM public.role_permission_templates rpt
+  WHERE rpt.role_name = p_role_name
+    AND rpt.is_active = TRUE;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION api.get_role_permission_templates TO service_role;
+COMMENT ON FUNCTION api.get_role_permission_templates IS
+  'Get canonical permission names for a role type. Used during org bootstrap to grant permissions.';
+
+-- ==============================================================================
 -- Notes
 -- ==============================================================================
--- - SECURITY DEFINER: Allows service role to access public schema tables
+-- - SECURITY INVOKER: Functions run with caller's permissions (service_role)
+-- - service_role has SELECT policies on projection tables (see 05-policies/)
+-- - This approach maintains RLS enforcement while allowing worker access
 -- - All functions return data, no side effects
 -- - Used by GrantProviderAdminPermissions activity during organization bootstrap
 -- - Required because PostgREST only exposes api schema, not public schema

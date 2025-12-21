@@ -8275,7 +8275,7 @@ CREATE OR REPLACE FUNCTION api.get_role_by_name_and_org(
 )
 RETURNS UUID
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
@@ -8298,7 +8298,7 @@ COMMENT ON FUNCTION api.get_role_by_name_and_org IS
 CREATE OR REPLACE FUNCTION api.get_role_permission_names(p_role_id UUID)
 RETURNS TEXT[]
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
@@ -8324,7 +8324,7 @@ RETURNS TABLE (
   name TEXT
 )
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from DEFINER per architect review (2024-12-20)
 SET search_path = public, extensions, pg_temp
 AS $$
 BEGIN
@@ -8338,6 +8338,28 @@ $$;
 GRANT EXECUTE ON FUNCTION api.get_permission_ids_by_names TO service_role;
 COMMENT ON FUNCTION api.get_permission_ids_by_names IS
   'Get permission IDs by names array. Called by Temporal activities for role.permission.granted events.';
+
+-- Get canonical permission names for a role type (e.g., 'provider_admin')
+CREATE OR REPLACE FUNCTION api.get_role_permission_templates(p_role_name TEXT)
+RETURNS TABLE (
+  permission_name TEXT
+)
+LANGUAGE plpgsql
+SECURITY INVOKER  -- Per architect review (2024-12-20)
+SET search_path = public, extensions, pg_temp
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT rpt.permission_name
+  FROM public.role_permission_templates rpt
+  WHERE rpt.role_name = p_role_name
+    AND rpt.is_active = TRUE;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION api.get_role_permission_templates TO service_role;
+COMMENT ON FUNCTION api.get_role_permission_templates IS
+  'Get canonical permission names for a role type. Used during org bootstrap to grant permissions.';
 
 -- 3. Get organization status (for activate/deactivate checks)
 -- FIXED: Use is_active (boolean) instead of status (text)
@@ -11293,6 +11315,89 @@ COMMENT ON INDEX idx_domain_events_activity_id IS
 -- ORDER BY de.created_at ASC;
 
 -- =====================================================
+
+
+-- ----------------------------------------------------------------------------
+-- Source: sql/05-policies/011-service-role-projection-access.sql
+-- ----------------------------------------------------------------------------
+
+-- Service Role Projection Access Policies
+-- Grant service_role SELECT access to projection tables for Temporal workers.
+-- These policies enable SECURITY INVOKER functions to work correctly.
+-- See: documentation/retrospectives/2025-11-temporal-worker-migration.md
+
+-- organizations_projection
+DROP POLICY IF EXISTS organizations_projection_service_role_select ON organizations_projection;
+CREATE POLICY organizations_projection_service_role_select ON organizations_projection
+  FOR SELECT TO service_role
+  USING (TRUE);
+
+-- roles_projection
+DROP POLICY IF EXISTS roles_projection_service_role_select ON roles_projection;
+CREATE POLICY roles_projection_service_role_select ON roles_projection
+  FOR SELECT TO service_role
+  USING (TRUE);
+
+-- role_permissions_projection
+DROP POLICY IF EXISTS role_permissions_projection_service_role_select ON role_permissions_projection;
+CREATE POLICY role_permissions_projection_service_role_select ON role_permissions_projection
+  FOR SELECT TO service_role
+  USING (TRUE);
+
+-- permissions_projection
+DROP POLICY IF EXISTS permissions_projection_service_role_select ON permissions_projection;
+CREATE POLICY permissions_projection_service_role_select ON permissions_projection
+  FOR SELECT TO service_role
+  USING (TRUE);
+
+-- contacts_projection
+DROP POLICY IF EXISTS contacts_projection_service_role_select ON contacts_projection;
+CREATE POLICY contacts_projection_service_role_select ON contacts_projection
+  FOR SELECT TO service_role
+  USING (TRUE);
+
+-- addresses_projection
+DROP POLICY IF EXISTS addresses_projection_service_role_select ON addresses_projection;
+CREATE POLICY addresses_projection_service_role_select ON addresses_projection
+  FOR SELECT TO service_role
+  USING (TRUE);
+
+-- phones_projection
+DROP POLICY IF EXISTS phones_projection_service_role_select ON phones_projection;
+CREATE POLICY phones_projection_service_role_select ON phones_projection
+  FOR SELECT TO service_role
+  USING (TRUE);
+
+-- invitations_projection
+DROP POLICY IF EXISTS invitations_projection_service_role_select ON invitations_projection;
+CREATE POLICY invitations_projection_service_role_select ON invitations_projection
+  FOR SELECT TO service_role
+  USING (TRUE);
+
+-- role_permission_templates (configuration table)
+DROP POLICY IF EXISTS role_permission_templates_service_role_select ON role_permission_templates;
+CREATE POLICY role_permission_templates_service_role_select ON role_permission_templates
+  FOR SELECT TO service_role
+  USING (TRUE);
+
+COMMENT ON POLICY organizations_projection_service_role_select ON organizations_projection IS
+  'Allows Temporal workers (service_role) to read organization data for workflow activities';
+COMMENT ON POLICY roles_projection_service_role_select ON roles_projection IS
+  'Allows Temporal workers (service_role) to read role data for RBAC lookups';
+COMMENT ON POLICY role_permissions_projection_service_role_select ON role_permissions_projection IS
+  'Allows Temporal workers (service_role) to read role-permission mappings';
+COMMENT ON POLICY permissions_projection_service_role_select ON permissions_projection IS
+  'Allows Temporal workers (service_role) to read permission definitions';
+COMMENT ON POLICY contacts_projection_service_role_select ON contacts_projection IS
+  'Allows Temporal workers (service_role) to read contact data for cleanup activities';
+COMMENT ON POLICY addresses_projection_service_role_select ON addresses_projection IS
+  'Allows Temporal workers (service_role) to read address data for cleanup activities';
+COMMENT ON POLICY phones_projection_service_role_select ON phones_projection IS
+  'Allows Temporal workers (service_role) to read phone data for cleanup activities';
+COMMENT ON POLICY invitations_projection_service_role_select ON invitations_projection IS
+  'Allows Temporal workers (service_role) to read invitation data for email activities';
+COMMENT ON POLICY role_permission_templates_service_role_select ON role_permission_templates IS
+  'Allows Temporal workers (service_role) to read permission templates for role bootstrap';
 
 
 -- ============================================================================
