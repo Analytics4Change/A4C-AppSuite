@@ -264,7 +264,12 @@ Search in order:
 - Store zone_id
 
 **Step 4.5: Search for DNS Records (Comprehensive)**
-- Fetch ALL DNS records from the zone (use `per_page=100` or pagination)
+- Fetch ALL DNS records from the zone and filter for matching records using this exact syntax:
+  ```bash
+  curl -s "https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records?per_page=100" \
+       -H "Authorization: Bearer {api_token}" \
+       -H "Content-Type: application/json" | jq '.result[] | select(.name | contains("{subdomain_name}")) | {id, type, name, content}'
+  ```
 - Search for records matching ANY of these patterns:
   1. Exact FQDN match: `dns_fqdn` (from Step 4.1)
   2. Contains org name: any record where `name` contains `$1` (the org name argument)
@@ -274,7 +279,12 @@ Search in order:
 
 **Step 4.6: Delete DNS Records**
 - For each matching record found in Step 4.5:
-  - Delete using: `DELETE /zones/{zone_id}/dns_records/{record_id}`
+  - Delete using this exact syntax:
+    ```bash
+    curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records/{record_id}" \
+         -H "Authorization: Bearer {api_token}" \
+         -H "Content-Type: application/json" | jq '{success, result_id: .result.id}'
+    ```
   - Log: "Deleted DNS record: {type} {name} -> {content} (ID: {record_id})"
 - If no records found: Log "No DNS records found matching organization"
 

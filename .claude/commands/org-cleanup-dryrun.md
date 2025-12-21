@@ -294,7 +294,12 @@ Search in order:
 - List all zones in Cloudflare account
 - Match zone that would contain records (typically `firstovertheline.com`)
 - **Report**: "Zone ID: {zone_id}"
-- Fetch ALL DNS records from the zone (use `per_page=100` or pagination)
+- Fetch ALL DNS records from the zone and filter for matching records using this exact syntax:
+  ```bash
+  curl -s "https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records?per_page=100" \
+       -H "Authorization: Bearer {api_token}" \
+       -H "Content-Type: application/json" | jq '.result[] | select(.name | contains("{subdomain_name}")) | {id, type, name, content}'
+  ```
 - Search for records matching ANY of these patterns:
   1. Exact FQDN match: `dns_fqdn` (from Step 4.1)
   2. Contains org name: any record where `name` contains `$1` (the org name argument)
