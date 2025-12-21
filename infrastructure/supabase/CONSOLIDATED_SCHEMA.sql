@@ -3031,6 +3031,18 @@ END $$;
 -- Grant necessary permissions
 GRANT SELECT ON workflow_queue_projection TO service_role;
 
+-- Service role SELECT grants for projection tables
+-- (RLS policies in 05-policies section control row-level access)
+GRANT SELECT ON organizations_projection TO service_role;
+GRANT SELECT ON roles_projection TO service_role;
+GRANT SELECT ON role_permissions_projection TO service_role;
+GRANT SELECT ON permissions_projection TO service_role;
+GRANT SELECT ON contacts_projection TO service_role;
+GRANT SELECT ON addresses_projection TO service_role;
+GRANT SELECT ON phones_projection TO service_role;
+GRANT SELECT ON invitations_projection TO service_role;
+GRANT SELECT ON role_permission_templates TO service_role;
+
 -- Create updated_at trigger function (idempotent)
 CREATE OR REPLACE FUNCTION update_workflow_queue_projection_updated_at()
 RETURNS TRIGGER AS $$

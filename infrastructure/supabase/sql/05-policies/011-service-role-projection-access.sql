@@ -30,6 +30,26 @@
 -- state changes; they do not write to projections directly.
 -- ==============================================================================
 
+-- ==============================================================================
+-- Base Table Privileges
+-- ==============================================================================
+-- PostgreSQL requires GRANT for table access, independent of RLS.
+-- RLS policies control which rows; GRANT controls table-level access.
+-- ==============================================================================
+GRANT SELECT ON organizations_projection TO service_role;
+GRANT SELECT ON roles_projection TO service_role;
+GRANT SELECT ON role_permissions_projection TO service_role;
+GRANT SELECT ON permissions_projection TO service_role;
+GRANT SELECT ON contacts_projection TO service_role;
+GRANT SELECT ON addresses_projection TO service_role;
+GRANT SELECT ON phones_projection TO service_role;
+GRANT SELECT ON invitations_projection TO service_role;
+GRANT SELECT ON role_permission_templates TO service_role;
+
+-- ==============================================================================
+-- RLS Policies
+-- ==============================================================================
+
 -- organizations_projection
 DROP POLICY IF EXISTS organizations_projection_service_role_select ON organizations_projection;
 CREATE POLICY organizations_projection_service_role_select ON organizations_projection
