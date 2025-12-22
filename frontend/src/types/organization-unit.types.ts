@@ -123,6 +123,11 @@ export interface CreateOrganizationUnitRequest {
 
 /**
  * Request payload for updating an existing organizational unit
+ *
+ * Note: Active status is NOT updated via this request.
+ * Use deactivateUnit() to freeze an OU (roles frozen but visible)
+ * Use reactivateUnit() to unfreeze an OU
+ * Use deleteUnit() to soft-delete an OU (hidden, requires zero roles)
  */
 export interface UpdateOrganizationUnitRequest {
   /** ID of the unit to update */
@@ -136,16 +141,32 @@ export interface UpdateOrganizationUnitRequest {
 
   /** Updated timezone (optional) */
   timeZone?: string;
-
-  /** Updated active status (optional) */
-  isActive?: boolean;
 }
 
 /**
  * Request payload for deactivating an organizational unit
+ * Deactivation freezes the OU: is_active = false, roles frozen, but still visible
  */
 export interface DeactivateOrganizationUnitRequest {
   /** ID of the unit to deactivate */
+  id: string;
+}
+
+/**
+ * Request payload for reactivating a deactivated organizational unit
+ * Reactivation unfreezes the OU: is_active = true, roles can be assigned again
+ */
+export interface ReactivateOrganizationUnitRequest {
+  /** ID of the unit to reactivate */
+  id: string;
+}
+
+/**
+ * Request payload for soft-deleting an organizational unit
+ * Deletion requires zero role references and sets deleted_at (OU becomes hidden)
+ */
+export interface DeleteOrganizationUnitRequest {
+  /** ID of the unit to delete */
   id: string;
 }
 
@@ -165,7 +186,7 @@ export interface OrganizationUnitOperationResult {
   /** Detailed error information (if failed) */
   errorDetails?: {
     /** Error code for programmatic handling */
-    code: 'HAS_CHILDREN' | 'HAS_ROLES' | 'NOT_FOUND' | 'PERMISSION_DENIED' | 'IS_ROOT_ORGANIZATION' | 'UNKNOWN';
+    code: 'HAS_CHILDREN' | 'HAS_ROLES' | 'NOT_FOUND' | 'PERMISSION_DENIED' | 'IS_ROOT_ORGANIZATION' | 'ALREADY_ACTIVE' | 'ALREADY_INACTIVE' | 'UNKNOWN';
     /** Count of blocking items (children, roles, etc.) */
     count?: number;
     /** Human-readable message */

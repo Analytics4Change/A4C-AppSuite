@@ -471,11 +471,10 @@ export class MockOrganizationUnitService implements IOrganizationUnitService {
       }
     }
 
-    // Apply updates
+    // Apply updates (metadata only - use deactivateUnit/reactivateUnit for status)
     if (request.name !== undefined) unit.name = request.name;
     if (request.displayName !== undefined) unit.displayName = request.displayName;
     if (request.timeZone !== undefined) unit.timeZone = request.timeZone;
-    if (request.isActive !== undefined) unit.isActive = request.isActive;
     unit.updatedAt = new Date();
 
     this.updateChildCounts();
@@ -489,6 +488,10 @@ export class MockOrganizationUnitService implements IOrganizationUnitService {
     };
   }
 
+  /**
+   * Deactivates (freezes) an organizational unit
+   * Sets is_active=false. The OU remains visible but roles are frozen.
+   */
   async deactivateUnit(unitId: string): Promise<OrganizationUnitOperationResult> {
     await this.simulateDelay();
 
@@ -506,7 +509,7 @@ export class MockOrganizationUnitService implements IOrganizationUnitService {
       };
     }
 
-    // Check if this is the root organization (cannot be deleted by provider admin)
+    // Check if this is the root organization (cannot be deactivated by provider admin)
     if (unit.isRootOrganization) {
       return {
         success: false,
@@ -518,28 +521,137 @@ export class MockOrganizationUnitService implements IOrganizationUnitService {
       };
     }
 
-    // Check for active children
-    const activeChildren = this.units.filter(
-      (u) => u.parentId === unitId && u.isActive
-    );
-    if (activeChildren.length > 0) {
+    // Check if already inactive
+    if (!unit.isActive) {
       return {
         success: false,
-        error: `Cannot deactivate: ${activeChildren.length} child units exist`,
+        error: 'Unit is already deactivated',
         errorDetails: {
-          code: 'HAS_CHILDREN',
-          count: activeChildren.length,
-          message: `This unit has ${activeChildren.length} active child unit(s). Deactivate or remove them first.`,
+          code: 'ALREADY_INACTIVE',
+          message: 'This unit is already deactivated.',
         },
       };
     }
 
-    // Mock: Simulate role check (in production, this queries roles_projection)
+    // Freeze the unit (roles frozen but visible)
+    unit.isActive = false;
+    unit.updatedAt = new Date();
+
+    this.updateChildCounts();
+    this.saveToStorage();
+
+    log.info('Mock: Deactivated organizational unit', { id: unit.id, name: unit.name });
+
+    return {
+      success: true,
+      unit,
+    };
+  }
+
+  /**
+   * Reactivates a previously deactivated organizational unit
+   * Sets is_active=true. Roles can be assigned again.
+   */
+  async reactivateUnit(unitId: string): Promise<OrganizationUnitOperationResult> {
+    await this.simulateDelay();
+
+    log.debug('Mock: Reactivating organizational unit', { unitId });
+
+    const unit = this.units.find((u) => u.id === unitId);
+    if (!unit) {
+      return {
+        success: false,
+        error: 'Unit not found',
+        errorDetails: {
+          code: 'NOT_FOUND',
+          message: `Unit with ID ${unitId} does not exist`,
+        },
+      };
+    }
+
+    // Check if already active
+    if (unit.isActive) {
+      return {
+        success: false,
+        error: 'Unit is already active',
+        errorDetails: {
+          code: 'ALREADY_ACTIVE',
+          message: 'This unit is already active.',
+        },
+      };
+    }
+
+    // Reactivate the unit
+    unit.isActive = true;
+    unit.updatedAt = new Date();
+
+    this.updateChildCounts();
+    this.saveToStorage();
+
+    log.info('Mock: Reactivated organizational unit', { id: unit.id, name: unit.name });
+
+    return {
+      success: true,
+      unit,
+    };
+  }
+
+  /**
+   * Soft-deletes an organizational unit
+   * In a real implementation, this sets deleted_at and hides the unit.
+   * For mock, we remove it from the list.
+   */
+  async deleteUnit(unitId: string): Promise<OrganizationUnitOperationResult> {
+    await this.simulateDelay();
+
+    log.debug('Mock: Deleting organizational unit', { unitId });
+
+    const unitIndex = this.units.findIndex((u) => u.id === unitId);
+    if (unitIndex === -1) {
+      return {
+        success: false,
+        error: 'Unit not found',
+        errorDetails: {
+          code: 'NOT_FOUND',
+          message: `Unit with ID ${unitId} does not exist`,
+        },
+      };
+    }
+
+    const unit = this.units[unitIndex];
+
+    // Check if this is the root organization (cannot be deleted by provider admin)
+    if (unit.isRootOrganization) {
+      return {
+        success: false,
+        error: 'Cannot delete: this is the root organization',
+        errorDetails: {
+          code: 'IS_ROOT_ORGANIZATION',
+          message: 'The root organization cannot be deleted. Contact platform administrators if you need to close this organization.',
+        },
+      };
+    }
+
+    // Check for children (active or inactive)
+    const children = this.units.filter((u) => u.parentId === unitId);
+    if (children.length > 0) {
+      return {
+        success: false,
+        error: `Cannot delete: ${children.length} child units exist`,
+        errorDetails: {
+          code: 'HAS_CHILDREN',
+          count: children.length,
+          message: `This unit has ${children.length} child unit(s). Delete them first.`,
+        },
+      };
+    }
+
+    // Mock: Simulate role check (in production, this queries user_roles_projection)
     // For testing, we'll say units with "Main" in the name have roles assigned
     if (unit.name.includes('Main') && unit.id === 'ou-main-campus') {
       return {
         success: false,
-        error: 'Cannot deactivate: roles are assigned to this unit',
+        error: 'Cannot delete: roles are assigned to this unit',
         errorDetails: {
           code: 'HAS_ROLES',
           count: 3,
@@ -548,14 +660,13 @@ export class MockOrganizationUnitService implements IOrganizationUnitService {
       };
     }
 
-    // Perform soft delete
-    unit.isActive = false;
-    unit.updatedAt = new Date();
+    // Remove from list (simulating soft delete where unit becomes hidden)
+    this.units.splice(unitIndex, 1);
 
     this.updateChildCounts();
     this.saveToStorage();
 
-    log.info('Mock: Deactivated organizational unit', { id: unit.id, name: unit.name });
+    log.info('Mock: Deleted organizational unit', { id: unit.id, name: unit.name });
 
     return {
       success: true,

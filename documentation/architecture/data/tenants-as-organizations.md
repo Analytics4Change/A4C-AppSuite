@@ -69,13 +69,20 @@ Each Provider organization is represented as **database records** in the `organi
 ### Sub-Provider Implementation (Unchanged)
 
 Sub-providers (e.g., group homes within a larger organization) are implemented as:
-- **Database records** in a hierarchical structure (`organizations_projection.path`)
-- **Maximum depth**: 3 levels
-  - Level 1: Provider (e.g., "Sunshine Youth Services")
-  - Level 2: Region/Division (e.g., "Northern Region")
-  - Level 3: Location (e.g., "Oak Street Group Home")
-- **Permission inheritance**: From parent provider organization
-- **ltree paths**: Hierarchical queries using PostgreSQL ltree extension
+- **Database records** in a hierarchical structure using `organization_units_projection` table (separate from root orgs)
+- **No enforced depth limit**: ltree supports unlimited nesting levels
+  - Level 1: Provider root org (e.g., "Sunshine Youth Services") - stored in `organizations_projection`
+  - Level 2+: Organization units (e.g., "Northern Region", "Oak Street Group Home") - stored in `organization_units_projection`
+- **Example hierarchy** (5 levels):
+  ```
+  root.sunshine_youth_services                          (Provider - organizations_projection)
+  └── root.sunshine_youth_services.northern_region      (Region - organization_units_projection)
+      └── root.sunshine_youth_services.northern_region.residential  (Division)
+          └── root.sunshine_youth_services.northern_region.residential.oak_street  (Location)
+              └── root.sunshine_youth_services.northern_region.residential.oak_street.unit_a  (Unit)
+  ```
+- **Permission inheritance**: From parent provider organization via scope_path containment
+- **ltree paths**: Hierarchical queries using PostgreSQL ltree extension (`path @> scope_path`)
 
 ## Organizational Hierarchy
 

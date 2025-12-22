@@ -419,12 +419,12 @@ export class OrganizationUnitFormViewModel {
           throw new Error('No unit ID for edit mode');
         }
 
+        // Note: isActive is not updated here - use deactivateUnit/reactivateUnit instead
         const request: UpdateOrganizationUnitRequest = {
           id: this.editingUnitId,
           name: this.formData.name.trim(),
           displayName: this.formData.displayName.trim(),
           timeZone: this.formData.timeZone,
-          isActive: this.formData.isActive,
         };
 
         log.debug('Submitting update request', { request });

@@ -1,0 +1,382 @@
+# Organization Unit Domain Events
+# These events represent sub-organization lifecycle changes (depth > 2 in hierarchy)
+# Separate from organization.* events which apply to root organizations only
+
+components:
+  messages:
+    OrganizationUnitCreated:
+      name: organization_unit.created
+      title: Organization Unit Created
+      summary: A new organization unit has been created within a provider hierarchy
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationUnitCreatedEvent'
+
+    OrganizationUnitUpdated:
+      name: organization_unit.updated
+      title: Organization Unit Updated
+      summary: Organization unit information has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationUnitUpdatedEvent'
+
+    OrganizationUnitDeactivated:
+      name: organization_unit.deactivated
+      title: Organization Unit Deactivated
+      summary: Organization unit has been frozen - no role assignments allowed
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationUnitDeactivatedEvent'
+
+    OrganizationUnitReactivated:
+      name: organization_unit.reactivated
+      title: Organization Unit Reactivated
+      summary: Organization unit has been unfrozen - role assignments allowed again
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationUnitReactivatedEvent'
+
+    OrganizationUnitDeleted:
+      name: organization_unit.deleted
+      title: Organization Unit Deleted
+      summary: Organization unit has been soft-deleted (requires zero role references)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationUnitDeletedEvent'
+
+    OrganizationUnitMoved:
+      name: organization_unit.moved
+      title: Organization Unit Moved
+      summary: Organization unit has been reparented to a different parent (future capability)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationUnitMovedEvent'
+
+  schemas:
+    # Base event structure for organization units
+    OrganizationUnitCreatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization Unit UUID
+        stream_type:
+          type: string
+          enum: [organization_unit]
+        event_type:
+          type: string
+          enum: [organization_unit.created]
+        event_data:
+          $ref: '#/components/schemas/OrganizationUnitCreationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationUnitCreationData:
+      type: object
+      required:
+        - organization_id
+        - name
+        - slug
+        - path
+        - parent_path
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: UUID of the root organization (provider) this unit belongs to
+        name:
+          type: string
+          maxLength: 200
+          description: Human-readable organization unit name
+          examples:
+            - "Northern Region"
+            - "Oak Street Group Home"
+            - "Pediatrics Department"
+        display_name:
+          type: string
+          maxLength: 200
+          description: Display name for UI (may differ from name)
+        slug:
+          type: string
+          maxLength: 100
+          pattern: '^[a-z0-9_]+$'
+          description: URL-friendly identifier (ltree-safe, underscores only for PG15 compatibility)
+          examples:
+            - "northern_region"
+            - "oak_street"
+            - "pediatrics"
+        path:
+          type: string
+          description: Full ltree hierarchical path (nlevel > 2)
+          examples:
+            - "root.org_acme_healthcare.northern_region"
+            - "root.org_acme_healthcare.northern_region.oak_street"
+        parent_path:
+          type: string
+          description: Parent organization/unit ltree path
+          examples:
+            - "root.org_acme_healthcare"
+            - "root.org_acme_healthcare.northern_region"
+        timezone:
+          type: string
+          default: "America/New_York"
+          description: Organization unit timezone
+          examples:
+            - "America/New_York"
+            - "America/Chicago"
+            - "America/Los_Angeles"
+
+    OrganizationUnitUpdatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization Unit UUID
+        stream_type:
+          type: string
+          enum: [organization_unit]
+        event_type:
+          type: string
+          enum: [organization_unit.updated]
+        event_data:
+          $ref: '#/components/schemas/OrganizationUnitUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationUnitUpdateData:
+      type: object
+      required:
+        - organization_unit_id
+        - updated_fields
+      properties:
+        organization_unit_id:
+          type: string
+          format: uuid
+          description: UUID of the organization unit being updated
+        name:
+          type: string
+          maxLength: 200
+          description: Updated organization unit name (only present if changed)
+        display_name:
+          type: string
+          maxLength: 200
+          description: Updated display name (only present if changed)
+        timezone:
+          type: string
+          description: Updated timezone (only present if changed)
+        updated_fields:
+          type: array
+          items:
+            type: string
+            enum: [name, display_name, timezone]
+          description: List of fields that were updated in this event
+          examples:
+            - ["name", "display_name"]
+            - ["timezone"]
+        previous_values:
+          type: object
+          description: Previous values of updated fields (for audit trail)
+          additionalProperties: true
+
+    OrganizationUnitDeactivatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [organization_unit]
+        event_type:
+          type: string
+          enum: [organization_unit.deactivated]
+        event_data:
+          $ref: '#/components/schemas/OrganizationUnitDeactivationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationUnitDeactivationData:
+      type: object
+      required:
+        - organization_unit_id
+        - path
+      properties:
+        organization_unit_id:
+          type: string
+          format: uuid
+        path:
+          type: string
+          description: ltree path of deactivated unit
+          examples:
+            - "root.org_acme_healthcare.northern_region"
+        cascade_effect:
+          type: string
+          enum: [role_assignment_blocked]
+          default: role_assignment_blocked
+          description: |
+            Effect of deactivation:
+            - role_assignment_blocked: New role assignments to this OU and descendants are blocked
+        descendants_affected:
+          type: boolean
+          default: true
+          description: Whether descendant OUs are also affected (always true via cascade)
+
+    OrganizationUnitReactivatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [organization_unit]
+        event_type:
+          type: string
+          enum: [organization_unit.reactivated]
+        event_data:
+          $ref: '#/components/schemas/OrganizationUnitReactivationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationUnitReactivationData:
+      type: object
+      required:
+        - organization_unit_id
+        - path
+      properties:
+        organization_unit_id:
+          type: string
+          format: uuid
+        path:
+          type: string
+          description: ltree path of reactivated unit
+
+    OrganizationUnitDeletedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [organization_unit]
+        event_type:
+          type: string
+          enum: [organization_unit.deleted]
+        event_data:
+          $ref: '#/components/schemas/OrganizationUnitDeletionData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationUnitDeletionData:
+      type: object
+      required:
+        - organization_unit_id
+        - deleted_path
+        - had_role_references
+      properties:
+        organization_unit_id:
+          type: string
+          format: uuid
+        deleted_path:
+          type: string
+          description: ltree path being soft-deleted
+          examples:
+            - "root.org_acme_healthcare.northern_region.oak_street"
+        had_role_references:
+          type: boolean
+          description: Whether any role references existed (must be false to delete)
+          default: false
+        deletion_type:
+          type: string
+          enum: [soft_delete]
+          default: soft_delete
+          description: Always soft_delete (sets deleted_at timestamp)
+
+    OrganizationUnitMovedEvent:
+      type: object
+      description: Future capability - organization unit reparented to different parent
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          enum: [organization_unit]
+        event_type:
+          type: string
+          enum: [organization_unit.moved]
+        event_data:
+          $ref: '#/components/schemas/OrganizationUnitMoveData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationUnitMoveData:
+      type: object
+      required:
+        - organization_unit_id
+        - old_path
+        - new_path
+        - old_parent_path
+        - new_parent_path
+      properties:
+        organization_unit_id:
+          type: string
+          format: uuid
+        old_path:
+          type: string
+          description: Previous ltree path
+          examples:
+            - "root.org_acme_healthcare.northern_region.oak_street"
+        new_path:
+          type: string
+          description: New ltree path after move
+          examples:
+            - "root.org_acme_healthcare.southern_region.oak_street"
+        old_parent_path:
+          type: string
+          description: Previous parent ltree path
+        new_parent_path:
+          type: string
+          description: New parent ltree path
+        descendants_moved:
+          type: integer
+          description: Number of descendant OUs that had their paths updated

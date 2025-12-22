@@ -39,6 +39,9 @@ BEGIN
         WHEN 'organization' THEN
           PERFORM process_organization_event(NEW);
 
+        WHEN 'organization_unit' THEN
+          PERFORM process_organization_unit_event(NEW);
+
         -- Organization child entities
         WHEN 'contact' THEN
           PERFORM process_contact_event(NEW);

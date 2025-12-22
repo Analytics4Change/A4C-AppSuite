@@ -14,8 +14,10 @@
  * - get_organization_unit_by_id: Get single unit by ID
  * - get_organization_unit_descendants: Get all descendants of a unit
  * - create_organization_unit: Create new sub-organization
- * - update_organization_unit: Update existing unit
- * - deactivate_organization_unit: Soft delete unit
+ * - update_organization_unit: Update unit metadata (name, display_name, timezone)
+ * - deactivate_organization_unit: Freeze unit (is_active=false, roles frozen)
+ * - reactivate_organization_unit: Unfreeze unit (is_active=true)
+ * - delete_organization_unit: Soft delete (deleted_at set, requires zero roles)
  *
  * @see infrastructure/supabase/sql/03-functions/api/005-organization-unit-crud.sql
  * @see documentation/architecture/data/multi-tenancy-architecture.md
@@ -151,6 +153,14 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
       },
       IS_ROOT_ORGANIZATION: {
         code: 'IS_ROOT_ORGANIZATION',
+        message: errorDetails.message,
+      },
+      ALREADY_ACTIVE: {
+        code: 'ALREADY_ACTIVE',
+        message: errorDetails.message,
+      },
+      ALREADY_INACTIVE: {
+        code: 'ALREADY_INACTIVE',
         message: errorDetails.message,
       },
       DUPLICATE_NAME: {
@@ -312,7 +322,10 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
   }
 
   /**
-   * Updates an existing organizational unit
+   * Updates an existing organizational unit (metadata only)
+   *
+   * Note: Active status is not updated via this method.
+   * Use deactivateUnit() to freeze, reactivateUnit() to unfreeze.
    */
   async updateUnit(request: UpdateOrganizationUnitRequest): Promise<OrganizationUnitOperationResult> {
     log.debug('updateUnit called', { request });
@@ -325,7 +338,6 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
           p_name: request.name || null,
           p_display_name: request.displayName || null,
           p_timezone: request.timeZone || null,
-          p_is_active: request.isActive ?? null,
         });
 
       if (error) {
@@ -370,7 +382,10 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
   }
 
   /**
-   * Deactivates an organizational unit (soft delete)
+   * Deactivates (freezes) an organizational unit
+   *
+   * Sets is_active=false. The OU remains visible but roles are frozen.
+   * Use reactivateUnit() to unfreeze.
    */
   async deactivateUnit(unitId: string): Promise<OrganizationUnitOperationResult> {
     log.debug('deactivateUnit called', { unitId });
@@ -412,6 +427,119 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
       };
     } catch (err) {
       log.error('Exception in deactivateUnit', err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown error',
+        errorDetails: {
+          code: 'UNKNOWN',
+          message: err instanceof Error ? err.message : 'Unknown error',
+        },
+      };
+    }
+  }
+
+  /**
+   * Reactivates a previously deactivated organizational unit
+   *
+   * Sets is_active=true. Roles can be assigned again.
+   */
+  async reactivateUnit(unitId: string): Promise<OrganizationUnitOperationResult> {
+    log.debug('reactivateUnit called', { unitId });
+
+    try {
+      const { data, error } = await supabase
+        .schema('api')
+        .rpc('reactivate_organization_unit', {
+          p_unit_id: unitId,
+        });
+
+      if (error) {
+        log.error('Error reactivating organization unit', error);
+        return {
+          success: false,
+          error: error.message,
+          errorDetails: {
+            code: 'UNKNOWN',
+            message: error.message,
+          },
+        };
+      }
+
+      const response = data as MutationResponse;
+
+      if (!response.success) {
+        log.warn('Reactivate unit failed', { response });
+        return {
+          success: false,
+          error: response.error,
+          errorDetails: this.mapErrorDetails(response.errorDetails),
+        };
+      }
+
+      log.info('Organization unit reactivated', { unitId });
+      return {
+        success: true,
+        unit: this.mapResponseToUnit(response.unit),
+      };
+    } catch (err) {
+      log.error('Exception in reactivateUnit', err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown error',
+        errorDetails: {
+          code: 'UNKNOWN',
+          message: err instanceof Error ? err.message : 'Unknown error',
+        },
+      };
+    }
+  }
+
+  /**
+   * Soft-deletes an organizational unit
+   *
+   * Sets deleted_at timestamp. Unit becomes hidden from queries.
+   * Requires the unit to have no role assignments.
+   */
+  async deleteUnit(unitId: string): Promise<OrganizationUnitOperationResult> {
+    log.debug('deleteUnit called', { unitId });
+
+    try {
+      const { data, error } = await supabase
+        .schema('api')
+        .rpc('delete_organization_unit', {
+          p_unit_id: unitId,
+        });
+
+      if (error) {
+        log.error('Error deleting organization unit', error);
+        return {
+          success: false,
+          error: error.message,
+          errorDetails: {
+            code: 'UNKNOWN',
+            message: error.message,
+          },
+        };
+      }
+
+      const response = data as MutationResponse;
+
+      if (!response.success) {
+        log.warn('Delete unit failed', { response });
+        return {
+          success: false,
+          error: response.error,
+          errorDetails: this.mapErrorDetails(response.errorDetails),
+        };
+      }
+
+      log.info('Organization unit deleted', { unitId });
+      return {
+        success: true,
+        unit: this.mapResponseToUnit(response.unit),
+      };
+    } catch (err) {
+      log.error('Exception in deleteUnit', err);
       return {
         success: false,
         error: err instanceof Error ? err.message : 'Unknown error',

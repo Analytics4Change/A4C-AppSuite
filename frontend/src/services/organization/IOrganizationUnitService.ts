@@ -130,22 +130,62 @@ export interface IOrganizationUnitService {
   updateUnit(request: UpdateOrganizationUnitRequest): Promise<OrganizationUnitOperationResult>;
 
   /**
-   * Deactivates an organizational unit
+   * Deactivates (freezes) an organizational unit
    *
-   * Performs a soft delete by setting is_active=false and deleted_at=NOW().
-   * The unit remains in the database for audit purposes but is hidden from
-   * normal queries.
+   * Freezes the OU by setting is_active=false. The OU remains visible
+   * but roles cannot be assigned to it or its descendants until reactivated.
+   * Existing role assignments remain but are effectively frozen.
    *
-   * Validation (Option A - Simple Blocking):
-   * - Fails if the unit has any active child units
-   * - Fails if any roles are scoped to this unit
-   * - Returns detailed error with count of blocking items
+   * This is a reversible operation - use reactivateUnit() to unfreeze.
    *
    * @param unitId - ID of the unit to deactivate
    * @returns Promise resolving to operation result
    *
    * @example
    * const result = await service.deactivateUnit(unitId);
+   * if (!result.success) {
+   *   if (result.errorDetails?.code === 'ALREADY_INACTIVE') {
+   *     alert('Unit is already deactivated');
+   *   }
+   * }
+   */
+  deactivateUnit(unitId: string): Promise<OrganizationUnitOperationResult>;
+
+  /**
+   * Reactivates a previously deactivated organizational unit
+   *
+   * Unfreezes the OU by setting is_active=true. Roles can be assigned again
+   * to this unit and its descendants.
+   *
+   * @param unitId - ID of the unit to reactivate
+   * @returns Promise resolving to operation result
+   *
+   * @example
+   * const result = await service.reactivateUnit(unitId);
+   * if (!result.success) {
+   *   if (result.errorDetails?.code === 'ALREADY_ACTIVE') {
+   *     alert('Unit is already active');
+   *   }
+   * }
+   */
+  reactivateUnit(unitId: string): Promise<OrganizationUnitOperationResult>;
+
+  /**
+   * Soft-deletes an organizational unit
+   *
+   * Sets deleted_at timestamp making the OU hidden from normal queries.
+   * This is an irreversible operation in the current implementation.
+   *
+   * Prerequisites:
+   * - Unit must have no active child units (HAS_CHILDREN error)
+   * - Unit must have no role assignments (HAS_ROLES error)
+   * - Unit should be deactivated first (is_active = false)
+   *
+   * @param unitId - ID of the unit to delete
+   * @returns Promise resolving to operation result
+   *
+   * @example
+   * const result = await service.deleteUnit(unitId);
    * if (!result.success) {
    *   if (result.errorDetails?.code === 'HAS_CHILDREN') {
    *     alert(`Cannot delete: ${result.errorDetails.count} child units exist`);
@@ -154,5 +194,5 @@ export interface IOrganizationUnitService {
    *   }
    * }
    */
-  deactivateUnit(unitId: string): Promise<OrganizationUnitOperationResult>;
+  deleteUnit(unitId: string): Promise<OrganizationUnitOperationResult>;
 }
