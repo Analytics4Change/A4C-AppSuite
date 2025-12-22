@@ -5080,6 +5080,10 @@ BEGIN
         WHEN 'phone' THEN
           PERFORM process_phone_event(NEW);
 
+        -- Invitation stream type
+        WHEN 'invitation' THEN
+          PERFORM process_invitation_event(NEW);
+
         -- RBAC stream types
         WHEN 'permission' THEN
           PERFORM process_rbac_event(NEW);
@@ -5773,8 +5777,8 @@ BEGIN
       -- Bootstrap cancellation: Final cleanup completed
       -- For cancelled bootstraps, organization may not exist in projection yet
       IF EXISTS (SELECT 1 FROM organizations_projection WHERE id = p_event.stream_id) THEN
-        UPDATE organizations_projection 
-        SET 
+        UPDATE organizations_projection
+        SET
           deleted_at = p_event.created_at,
           deletion_reason = 'bootstrap_cancelled',
           is_active = false,
@@ -5790,6 +5794,46 @@ BEGIN
           updated_at = p_event.created_at
         WHERE id = p_event.stream_id;
       END IF;
+
+    -- ========================================
+    -- user.invited
+    -- ========================================
+    -- User invited to organization (emitted by GenerateInvitationsActivity)
+    -- Creates invitation record in invitations_projection
+    -- NOTE: This event has stream_type='organization' because the invitation
+    --       is conceptually part of the organization's bootstrap process
+    WHEN 'user.invited' THEN
+      INSERT INTO invitations_projection (
+        invitation_id,
+        organization_id,
+        email,
+        first_name,
+        last_name,
+        role,
+        token,
+        expires_at,
+        status,
+        tags,
+        created_at,
+        updated_at
+      ) VALUES (
+        safe_jsonb_extract_uuid(p_event.event_data, 'invitation_id'),
+        safe_jsonb_extract_uuid(p_event.event_data, 'org_id'),
+        safe_jsonb_extract_text(p_event.event_data, 'email'),
+        safe_jsonb_extract_text(p_event.event_data, 'first_name'),
+        safe_jsonb_extract_text(p_event.event_data, 'last_name'),
+        safe_jsonb_extract_text(p_event.event_data, 'role'),
+        safe_jsonb_extract_text(p_event.event_data, 'token'),
+        safe_jsonb_extract_timestamp(p_event.event_data, 'expires_at'),
+        'pending',
+        COALESCE(
+          ARRAY(SELECT jsonb_array_elements_text(p_event.event_data->'tags')),
+          '{}'::TEXT[]
+        ),
+        p_event.created_at,
+        p_event.created_at
+      )
+      ON CONFLICT (invitation_id) DO NOTHING;  -- Idempotent
 
     ELSE
       RAISE WARNING 'Unknown organization event type: %', p_event.event_type;
@@ -6387,13 +6431,13 @@ BEGIN
       INSERT INTO user_roles_projection (
         user_id,
         role_id,
-        org_id,
+        organization_id,
         scope_path,
         assigned_at
       ) VALUES (
         p_event.stream_id,
         safe_jsonb_extract_uuid(p_event.event_data, 'role_id'),
-        -- Convert org_id: '*' becomes NULL, otherwise resolve to UUID
+        -- Convert org_id from event: '*' becomes NULL, otherwise resolve to UUID
         CASE
           WHEN safe_jsonb_extract_text(p_event.event_data, 'org_id') = '*' THEN NULL
           WHEN safe_jsonb_extract_text(p_event.event_data, 'org_id') IS NOT NULL
@@ -6408,20 +6452,21 @@ BEGIN
         END,
         p_event.created_at
       )
-      ON CONFLICT (user_id, role_id, COALESCE(org_id, '00000000-0000-0000-0000-000000000000'::UUID)) DO NOTHING;  -- Idempotent
+      ON CONFLICT ON CONSTRAINT user_roles_projection_user_id_role_id_org_id_key DO NOTHING;  -- Idempotent (NULLS NOT DISTINCT)
 
     WHEN 'user.role.revoked' THEN
       DELETE FROM user_roles_projection
       WHERE user_id = p_event.stream_id
         AND role_id = safe_jsonb_extract_uuid(p_event.event_data, 'role_id')
-        AND COALESCE(org_id, '00000000-0000-0000-0000-000000000000'::UUID) = COALESCE(
-          CASE
-            WHEN safe_jsonb_extract_text(p_event.event_data, 'org_id') = '*' THEN NULL
-            WHEN safe_jsonb_extract_text(p_event.event_data, 'org_id') IS NOT NULL
-            THEN safe_jsonb_extract_uuid(p_event.event_data, 'org_id')
-            ELSE NULL
-          END,
-          '00000000-0000-0000-0000-000000000000'::UUID
+        AND (
+          -- Handle NULL organization_id matching (for global roles like super_admin)
+          (organization_id IS NULL AND (
+            safe_jsonb_extract_text(p_event.event_data, 'org_id') IS NULL
+            OR safe_jsonb_extract_text(p_event.event_data, 'org_id') = '*'
+          ))
+          OR
+          -- Handle org-scoped role matching
+          (organization_id = safe_jsonb_extract_uuid(p_event.event_data, 'org_id'))
         );
 
     -- ========================================
@@ -6516,6 +6561,186 @@ $$ LANGUAGE plpgsql
 SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION process_rbac_event IS 'Projects RBAC events to permission, role, user_role, and access_grant projection tables with full audit trail';
+
+
+-- ----------------------------------------------------------------------------
+-- Source: sql/03-functions/event-processing/013-process-invitation-events.sql
+-- ----------------------------------------------------------------------------
+
+-- ========================================
+-- Process Invitation Events
+-- ========================================
+-- Router-based event processor for invitation lifecycle events
+--
+-- Event Types Handled:
+--   - invitation.accepted: User accepted invitation, assign role
+--   - invitation.revoked: Invitation revoked (compensation/admin action)
+--   - invitation.expired: Invitation expired without being accepted
+--
+-- NOTE: user.invited events have stream_type='organization' and are
+--       handled by process_organization_event()
+--
+-- Security: SECURITY INVOKER (default) - runs with caller's privileges.
+--           In the trigger chain, the caller is `postgres` via the
+--           SECURITY DEFINER `api.emit_domain_event()` function.
+--
+-- Pattern: CQRS Event Sourcing with Router-based Processing
+-- ========================================
+
+CREATE OR REPLACE FUNCTION process_invitation_event(
+  p_event RECORD
+) RETURNS VOID AS $$
+DECLARE
+  v_role_id UUID;
+  v_org_path LTREE;
+  v_role_name TEXT;
+BEGIN
+  CASE p_event.event_type
+
+    -- ========================================
+    -- invitation.accepted
+    -- ========================================
+    -- User accepted invitation via Edge Function
+    -- Updates invitation status and assigns role to user
+    WHEN 'invitation.accepted' THEN
+      -- Extract role name from event
+      v_role_name := p_event.event_data->>'role';
+
+      -- Mark invitation as accepted
+      UPDATE invitations_projection
+      SET
+        status = 'accepted',
+        accepted_at = (p_event.event_data->>'accepted_at')::TIMESTAMPTZ,
+        updated_at = p_event.created_at
+      WHERE invitation_id = (p_event.event_data->>'invitation_id')::UUID;
+
+      -- Get organization path for role scope
+      SELECT path INTO v_org_path
+      FROM organizations_projection
+      WHERE id = (p_event.event_data->>'org_id')::UUID;
+
+      -- Look up role by name for this organization
+      -- Note: Only super_admin has NULL org_id. All other roles must be org-scoped.
+      IF v_role_name = 'super_admin' THEN
+        SELECT id INTO v_role_id
+        FROM roles_projection
+        WHERE name = 'super_admin'
+          AND organization_id IS NULL;
+      ELSE
+        SELECT id INTO v_role_id
+        FROM roles_projection
+        WHERE name = v_role_name
+          AND organization_id = (p_event.event_data->>'org_id')::UUID;
+      END IF;
+
+      -- If role doesn't exist, create it
+      IF v_role_id IS NULL THEN
+        v_role_id := gen_random_uuid();
+
+        IF v_role_name = 'super_admin' THEN
+          INSERT INTO roles_projection (
+            id, name, description, organization_id, org_hierarchy_scope,
+            is_active, created_at, updated_at
+          ) VALUES (
+            v_role_id,
+            'super_admin',
+            'Platform super administrator with global access',
+            NULL,
+            NULL,
+            true,
+            p_event.created_at,
+            p_event.created_at
+          )
+          ON CONFLICT (name, organization_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
+          RETURNING id INTO v_role_id;
+
+          RAISE NOTICE 'Created/found system role super_admin with ID %', v_role_id;
+        ELSE
+          INSERT INTO roles_projection (
+            id, name, description, organization_id, org_hierarchy_scope,
+            is_active, created_at, updated_at
+          ) VALUES (
+            v_role_id,
+            v_role_name,
+            format('%s role for organization', initcap(replace(v_role_name, '_', ' '))),
+            (p_event.event_data->>'org_id')::UUID,
+            v_org_path,
+            true,
+            p_event.created_at,
+            p_event.created_at
+          )
+          ON CONFLICT (name, organization_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
+          RETURNING id INTO v_role_id;
+
+          RAISE NOTICE 'Created/found role % with ID % for org %', v_role_name, v_role_id, p_event.event_data->>'org_id';
+        END IF;
+      END IF;
+
+      -- Create role assignment in user_roles_projection
+      INSERT INTO user_roles_projection (
+        user_id,
+        role_id,
+        organization_id,
+        scope_path,
+        assigned_at
+      ) VALUES (
+        (p_event.event_data->>'user_id')::UUID,
+        v_role_id,
+        (p_event.event_data->>'org_id')::UUID,
+        v_org_path,
+        p_event.created_at
+      )
+      ON CONFLICT ON CONSTRAINT user_roles_projection_user_id_role_id_org_id_key DO NOTHING;
+
+      -- Update user's roles array in users shadow table
+      UPDATE users
+      SET
+        roles = ARRAY(
+          SELECT DISTINCT unnest(COALESCE(roles, '{}') || ARRAY[v_role_name])
+        ),
+        accessible_organizations = ARRAY(
+          SELECT DISTINCT unnest(COALESCE(accessible_organizations, '{}') || ARRAY[(p_event.event_data->>'org_id')::UUID])
+        ),
+        current_organization_id = COALESCE(current_organization_id, (p_event.event_data->>'org_id')::UUID),
+        updated_at = p_event.created_at
+      WHERE id = (p_event.event_data->>'user_id')::UUID;
+
+    -- ========================================
+    -- invitation.revoked
+    -- ========================================
+    -- Invitation revoked (workflow compensation or admin action)
+    -- Updates invitation status to deleted
+    WHEN 'invitation.revoked' THEN
+      UPDATE invitations_projection
+      SET
+        status = 'deleted',
+        updated_at = (p_event.event_data->>'revoked_at')::TIMESTAMPTZ
+      WHERE invitation_id = (p_event.event_data->>'invitation_id')::UUID
+        AND status = 'pending';  -- Only revoke pending invitations (idempotent)
+
+    -- ========================================
+    -- invitation.expired
+    -- ========================================
+    -- Invitation expired without being accepted
+    -- Updates invitation status to expired
+    WHEN 'invitation.expired' THEN
+      UPDATE invitations_projection
+      SET
+        status = 'expired',
+        updated_at = (p_event.event_data->>'expired_at')::TIMESTAMPTZ
+      WHERE invitation_id = (p_event.event_data->>'invitation_id')::UUID
+        AND status = 'pending';  -- Only expire pending invitations (idempotent)
+
+    ELSE
+      RAISE WARNING 'Unknown invitation event type: %', p_event.event_type;
+  END CASE;
+
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp;
+
+COMMENT ON FUNCTION process_invitation_event IS
+  'Router-based processor for invitation lifecycle events (accepted, revoked, expired). Handles role assignment on acceptance. Runs via trigger chain with postgres privileges.';
 
 
 -- ----------------------------------------------------------------------------
@@ -9226,165 +9451,13 @@ COMMENT ON FUNCTION enqueue_workflow_from_bootstrap_event() IS
 -- ========================================
 -- Process InvitationAccepted Events
 -- ========================================
--- Event-Driven Trigger: Updates invitations_projection and creates role assignment
---
--- Event Source: domain_events table (event_type = 'invitation.accepted')
--- Event Emitter: accept-invitation Edge Function
--- Projection Targets: invitations_projection, user_roles_projection
--- Pattern: CQRS Event Sourcing
+-- DEPRECATED: Replaced by router-based processing
+-- See: 001-main-event-router.sql → 013-process-invitation-events.sql
 -- ========================================
 
-CREATE OR REPLACE FUNCTION process_invitation_accepted_event()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_role_id UUID;
-  v_org_path LTREE;
-  v_role_name TEXT;
-BEGIN
-  -- Extract role name from event
-  v_role_name := NEW.event_data->>'role';
-
-  -- Mark invitation as accepted
-  UPDATE invitations_projection
-  SET
-    status = 'accepted',
-    accepted_at = (NEW.event_data->>'accepted_at')::TIMESTAMPTZ,
-    updated_at = NEW.created_at
-  WHERE id = (NEW.event_data->>'invitation_id')::UUID
-     OR invitation_id = (NEW.event_data->>'invitation_id')::UUID;
-
-  -- Get organization path for role scope
-  SELECT path INTO v_org_path
-  FROM organizations_projection
-  WHERE id = (NEW.event_data->>'org_id')::UUID;
-
-  -- Look up role by name for this organization
-  -- Note: Only super_admin has NULL org_id. All other roles (provider_admin, etc.) must be org-scoped.
-  IF v_role_name = 'super_admin' THEN
-    -- super_admin is the only system role with NULL org_id
-    SELECT id INTO v_role_id
-    FROM roles_projection
-    WHERE name = 'super_admin'
-      AND organization_id IS NULL;
-  ELSE
-    -- All other roles must be organization-scoped
-    SELECT id INTO v_role_id
-    FROM roles_projection
-    WHERE name = v_role_name
-      AND organization_id = (NEW.event_data->>'org_id')::UUID;
-  END IF;
-
-  -- If role doesn't exist, create it
-  IF v_role_id IS NULL THEN
-    v_role_id := gen_random_uuid();
-
-    IF v_role_name = 'super_admin' THEN
-      -- super_admin should already exist as seed data, but if not, create it as system role
-      -- Note: super_admin has NULL org_id, so we check by name only for system role
-      INSERT INTO roles_projection (
-        id,
-        name,
-        description,
-        organization_id,
-        org_hierarchy_scope,
-        is_active,
-        created_at,
-        updated_at
-      ) VALUES (
-        v_role_id,
-        'super_admin',
-        'Platform super administrator with global access',
-        NULL,  -- System role has NULL org_id
-        NULL,  -- System role has NULL org_hierarchy_scope
-        true,
-        NEW.created_at,
-        NEW.created_at
-      )
-      ON CONFLICT (name, organization_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
-      RETURNING id INTO v_role_id;
-
-      RAISE NOTICE 'Created/found system role super_admin with ID %', v_role_id;
-    ELSE
-      -- All other roles are organization-scoped
-      -- Use composite unique constraint (name, organization_id) for conflict resolution
-      INSERT INTO roles_projection (
-        id,
-        name,
-        description,
-        organization_id,
-        org_hierarchy_scope,
-        is_active,
-        created_at,
-        updated_at
-      ) VALUES (
-        v_role_id,
-        v_role_name,
-        format('%s role for organization', initcap(replace(v_role_name, '_', ' '))),
-        (NEW.event_data->>'org_id')::UUID,
-        v_org_path,
-        true,
-        NEW.created_at,
-        NEW.created_at
-      )
-      ON CONFLICT (name, organization_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
-      RETURNING id INTO v_role_id;
-
-      RAISE NOTICE 'Created/found role % with ID % for org %', v_role_name, v_role_id, NEW.event_data->>'org_id';
-    END IF;
-  END IF;
-
-  -- Create role assignment in user_roles_projection
-  INSERT INTO user_roles_projection (
-    user_id,
-    role_id,
-    org_id,
-    scope_path,
-    assigned_at
-  ) VALUES (
-    (NEW.event_data->>'user_id')::UUID,
-    v_role_id,
-    (NEW.event_data->>'org_id')::UUID,
-    v_org_path,
-    NEW.created_at
-  )
-  ON CONFLICT (user_id, role_id, org_id) DO NOTHING;  -- Idempotent
-
-  -- Update user's roles array in users shadow table
-  UPDATE users
-  SET
-    roles = ARRAY(
-      SELECT DISTINCT unnest(COALESCE(roles, '{}') || ARRAY[v_role_name])
-    ),
-    accessible_organizations = ARRAY(
-      SELECT DISTINCT unnest(COALESCE(accessible_organizations, '{}') || ARRAY[(NEW.event_data->>'org_id')::UUID])
-    ),
-    current_organization_id = COALESCE(current_organization_id, (NEW.event_data->>'org_id')::UUID),
-    updated_at = NEW.created_at
-  WHERE id = (NEW.event_data->>'user_id')::UUID;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql
-SET search_path = public, extensions, pg_temp;
-
--- ========================================
--- Register Trigger
--- ========================================
--- Fires AFTER INSERT on domain_events for invitation.accepted events only
-
+-- Drop deprecated trigger and function
 DROP TRIGGER IF EXISTS process_invitation_accepted_event ON domain_events;
-
-CREATE TRIGGER process_invitation_accepted_event
-AFTER INSERT ON domain_events
-FOR EACH ROW
-WHEN (NEW.event_type = 'invitation.accepted')
-EXECUTE FUNCTION process_invitation_accepted_event();
-
--- ========================================
--- Comments for Documentation
--- ========================================
-COMMENT ON FUNCTION process_invitation_accepted_event() IS
-'Event processor for InvitationAccepted domain events. Updates invitations_projection, creates role assignment in user_roles_projection, and updates users shadow table. Idempotent.';
+DROP FUNCTION IF EXISTS process_invitation_accepted_event();
 
 
 -- ----------------------------------------------------------------------------
@@ -9394,50 +9467,13 @@ COMMENT ON FUNCTION process_invitation_accepted_event() IS
 -- ========================================
 -- Process InvitationRevoked Events
 -- ========================================
--- Event-Driven Trigger: Updates invitations_projection when InvitationRevoked events are emitted
---
--- Event Source: domain_events table (event_type = 'InvitationRevoked')
--- Event Emitter: RevokeInvitationsActivity (Temporal workflow compensation)
--- Projection Target: invitations_projection
--- Pattern: CQRS Event Sourcing
+-- DEPRECATED: Replaced by router-based processing
+-- See: 001-main-event-router.sql → 013-process-invitation-events.sql
 -- ========================================
 
-CREATE OR REPLACE FUNCTION process_invitation_revoked_event()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- Update invitation status to 'deleted' based on event data
-  UPDATE invitations_projection
-  SET
-    status = 'deleted',
-    updated_at = (NEW.event_data->>'revoked_at')::TIMESTAMPTZ
-  WHERE invitation_id = (NEW.event_data->>'invitation_id')::UUID
-    AND status = 'pending';  -- Only revoke pending invitations (idempotent)
-
-  -- Return NEW to continue trigger chain
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql
-SET search_path = public, extensions, pg_temp;
-
--- ========================================
--- Register Trigger
--- ========================================
--- Fires AFTER INSERT on domain_events for InvitationRevoked events only
-
--- Drop trigger if exists (idempotency)
+-- Drop deprecated trigger and function
 DROP TRIGGER IF EXISTS process_invitation_revoked_event ON domain_events;
-
-CREATE TRIGGER process_invitation_revoked_event
-AFTER INSERT ON domain_events
-FOR EACH ROW
-WHEN (NEW.event_type = 'invitation.revoked')
-EXECUTE FUNCTION process_invitation_revoked_event();
-
--- ========================================
--- Comments for Documentation
--- ========================================
-COMMENT ON FUNCTION process_invitation_revoked_event() IS
-'Event processor for InvitationRevoked domain events. Updates invitations_projection status to deleted when workflow compensation revokes pending invitations. Idempotent (only updates pending invitations).';
+DROP FUNCTION IF EXISTS process_invitation_revoked_event();
 
 
 -- ----------------------------------------------------------------------------
@@ -9632,74 +9668,14 @@ GRANT EXECUTE ON FUNCTION notify_workflow_worker_bootstrap() TO postgres;
 -- ========================================
 -- Process UserInvited Events
 -- ========================================
--- Event-Driven Trigger: Updates invitations_projection when UserInvited events are emitted
---
--- Event Source: domain_events table (event_type = 'UserInvited')
--- Event Emitter: GenerateInvitationsActivity (Temporal workflow)
--- Projection Target: invitations_projection
--- Pattern: CQRS Event Sourcing
+-- DEPRECATED: Replaced by router-based processing
+-- user.invited events are now handled by process_organization_event()
+-- See: 001-main-event-router.sql → 002-process-organization-events.sql
 -- ========================================
 
-CREATE OR REPLACE FUNCTION process_user_invited_event()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- Extract event data and insert/update invitation projection
-  INSERT INTO invitations_projection (
-    invitation_id,
-    organization_id,
-    email,
-    first_name,
-    last_name,
-    role,
-    token,
-    expires_at,
-    tags
-  )
-  VALUES (
-    -- Extract from event_data (JSONB)
-    (NEW.event_data->>'invitation_id')::UUID,
-    (NEW.event_data->>'org_id')::UUID,
-    NEW.event_data->>'email',
-    NEW.event_data->>'first_name',
-    NEW.event_data->>'last_name',
-    NEW.event_data->>'role',
-    NEW.event_data->>'token',
-    (NEW.event_data->>'expires_at')::TIMESTAMPTZ,
-
-    -- Extract tags from event_metadata (JSONB array)
-    -- Coalesce to empty array if tags not present
-    COALESCE(
-      ARRAY(SELECT jsonb_array_elements_text(NEW.event_metadata->'tags')),
-      '{}'::TEXT[]
-    )
-  )
-  ON CONFLICT (invitation_id) DO NOTHING;  -- Idempotency: ignore duplicate events
-
-  -- Return NEW to continue trigger chain
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql
-SET search_path = public, extensions, pg_temp;
-
--- ========================================
--- Register Trigger
--- ========================================
--- Fires AFTER INSERT on domain_events for UserInvited events only
-
--- Drop trigger if exists (idempotency)
+-- Drop deprecated trigger and function
 DROP TRIGGER IF EXISTS process_user_invited_event ON domain_events;
-
-CREATE TRIGGER process_user_invited_event
-AFTER INSERT ON domain_events
-FOR EACH ROW
-WHEN (NEW.event_type = 'user.invited')
-EXECUTE FUNCTION process_user_invited_event();
-
--- ========================================
--- Comments for Documentation
--- ========================================
-COMMENT ON FUNCTION process_user_invited_event() IS
-'Event processor for UserInvited domain events. Updates invitations_projection with invitation data from Temporal workflows. Idempotent (ON CONFLICT DO NOTHING).';
+DROP FUNCTION IF EXISTS process_user_invited_event();
 
 
 -- ----------------------------------------------------------------------------

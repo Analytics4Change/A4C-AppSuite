@@ -98,13 +98,13 @@ BEGIN
       INSERT INTO user_roles_projection (
         user_id,
         role_id,
-        org_id,
+        organization_id,
         scope_path,
         assigned_at
       ) VALUES (
         p_event.stream_id,
         safe_jsonb_extract_uuid(p_event.event_data, 'role_id'),
-        -- Convert org_id: '*' becomes NULL, otherwise resolve to UUID
+        -- Convert org_id from event: '*' becomes NULL, otherwise resolve to UUID
         CASE
           WHEN safe_jsonb_extract_text(p_event.event_data, 'org_id') = '*' THEN NULL
           WHEN safe_jsonb_extract_text(p_event.event_data, 'org_id') IS NOT NULL
@@ -119,20 +119,21 @@ BEGIN
         END,
         p_event.created_at
       )
-      ON CONFLICT (user_id, role_id, COALESCE(org_id, '00000000-0000-0000-0000-000000000000'::UUID)) DO NOTHING;  -- Idempotent
+      ON CONFLICT ON CONSTRAINT user_roles_projection_user_id_role_id_org_id_key DO NOTHING;  -- Idempotent (NULLS NOT DISTINCT)
 
     WHEN 'user.role.revoked' THEN
       DELETE FROM user_roles_projection
       WHERE user_id = p_event.stream_id
         AND role_id = safe_jsonb_extract_uuid(p_event.event_data, 'role_id')
-        AND COALESCE(org_id, '00000000-0000-0000-0000-000000000000'::UUID) = COALESCE(
-          CASE
-            WHEN safe_jsonb_extract_text(p_event.event_data, 'org_id') = '*' THEN NULL
-            WHEN safe_jsonb_extract_text(p_event.event_data, 'org_id') IS NOT NULL
-            THEN safe_jsonb_extract_uuid(p_event.event_data, 'org_id')
-            ELSE NULL
-          END,
-          '00000000-0000-0000-0000-000000000000'::UUID
+        AND (
+          -- Handle NULL organization_id matching (for global roles like super_admin)
+          (organization_id IS NULL AND (
+            safe_jsonb_extract_text(p_event.event_data, 'org_id') IS NULL
+            OR safe_jsonb_extract_text(p_event.event_data, 'org_id') = '*'
+          ))
+          OR
+          -- Handle org-scoped role matching
+          (organization_id = safe_jsonb_extract_uuid(p_event.event_data, 'org_id'))
         );
 
     -- ========================================

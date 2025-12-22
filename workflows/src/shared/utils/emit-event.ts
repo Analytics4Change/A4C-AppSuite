@@ -41,10 +41,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { getSupabaseClient } from './supabase';
 
 interface EmitEventParams {
-  /** Event type (e.g., 'OrganizationCreated', 'UserInvited') */
+  /** Event type in dot-notation (e.g., 'organization.created', 'user.invited', 'invitation.accepted') */
   event_type: string;
 
-  /** Aggregate type (e.g., 'Organization', 'User') */
+  /** Aggregate type (e.g., 'organization', 'invitation', 'user') - maps to stream_type */
   aggregate_type: string;
 
   /** Aggregate ID (UUID) */

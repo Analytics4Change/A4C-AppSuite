@@ -32,43 +32,46 @@ BEGIN
   v_user_id := (event->>'user_id')::uuid;
 
   -- Get user's current organization and role information
+  -- NOTE: No COALESCE fallback - missing role is a bug that must be fixed, not masked
   SELECT
     u.current_organization_id,
-    COALESCE(
-      (SELECT r.name
-       FROM public.user_roles_projection ur
-       JOIN public.roles_projection r ON r.id = ur.role_id
-       WHERE ur.user_id = u.id
-       ORDER BY
-         CASE
-           WHEN r.name = 'super_admin' THEN 1
-           WHEN r.name = 'provider_admin' THEN 2
-           WHEN r.name = 'partner_admin' THEN 3
-           ELSE 4
-         END
-       LIMIT 1
-      ),
-      'viewer'
+    (SELECT r.name
+     FROM public.user_roles_projection ur
+     JOIN public.roles_projection r ON r.id = ur.role_id
+     WHERE ur.user_id = u.id
+     ORDER BY
+       CASE
+         WHEN r.name = 'super_admin' THEN 1
+         WHEN r.name = 'provider_admin' THEN 2
+         WHEN r.name = 'partner_admin' THEN 3
+         ELSE 4
+       END
+     LIMIT 1
     ) as role,
-    COALESCE(
-      (SELECT ur.scope_path::text
-       FROM public.user_roles_projection ur
-       JOIN public.roles_projection r ON r.id = ur.role_id
-       WHERE ur.user_id = u.id
-       ORDER BY
-         CASE
-           WHEN r.name = 'super_admin' THEN 1
-           WHEN r.name = 'provider_admin' THEN 2
-           WHEN r.name = 'partner_admin' THEN 3
-           ELSE 4
-         END
-       LIMIT 1
-      ),
-      NULL
+    (SELECT ur.scope_path::text
+     FROM public.user_roles_projection ur
+     JOIN public.roles_projection r ON r.id = ur.role_id
+     WHERE ur.user_id = u.id
+     ORDER BY
+       CASE
+         WHEN r.name = 'super_admin' THEN 1
+         WHEN r.name = 'provider_admin' THEN 2
+         WHEN r.name = 'partner_admin' THEN 3
+         ELSE 4
+       END
+     LIMIT 1
     ) as scope
   INTO v_org_id, v_user_role, v_scope_path
   FROM public.users u
   WHERE u.id = v_user_id;
+
+  -- FAIL FAST: No role found indicates broken user journey (invitation processing failed)
+  -- This should NEVER happen in a correctly implemented system
+  -- Throwing exception makes the bug visible so it gets fixed
+  IF v_user_role IS NULL THEN
+    RAISE EXCEPTION 'JWT_HOOK_NO_ROLE: User % has no role assigned. This indicates failed invitation processing or missing role assignment. Check domain_events for invitation.accepted and user_roles_projection for this user.', v_user_id
+      USING ERRCODE = 'P0001';  -- raise_exception error code
+  END IF;
 
   -- If no organization context, check for super_admin role
   IF v_org_id IS NULL THEN
@@ -139,14 +142,20 @@ BEGIN
   RETURN jsonb_build_object('claims', v_claims);
 
 EXCEPTION
+  WHEN raise_exception THEN
+    -- Re-raise intentional exceptions (like JWT_HOOK_NO_ROLE)
+    -- These indicate bugs that must be fixed, not masked
+    RAISE;
   WHEN OTHERS THEN
-    -- Log error but don't fail authentication
-    RAISE WARNING 'JWT hook error for user %: % %',
+    -- Log unexpected errors but don't fail authentication for non-critical issues
+    -- These are things like network errors, temporary DB issues, etc.
+    RAISE WARNING 'JWT hook unexpected error for user %: % %',
       v_user_id,
       SQLERRM,
       SQLSTATE;
 
-    -- Return minimal claims on error, preserving standard JWT fields
+    -- Return minimal claims on unexpected error, preserving standard JWT fields
+    -- Note: This is for unexpected errors only, NOT for missing roles
     RETURN jsonb_build_object(
       'claims',
       COALESCE(event->'claims', '{}'::jsonb) || jsonb_build_object(

@@ -336,8 +336,8 @@ BEGIN
       -- Bootstrap cancellation: Final cleanup completed
       -- For cancelled bootstraps, organization may not exist in projection yet
       IF EXISTS (SELECT 1 FROM organizations_projection WHERE id = p_event.stream_id) THEN
-        UPDATE organizations_projection 
-        SET 
+        UPDATE organizations_projection
+        SET
           deleted_at = p_event.created_at,
           deletion_reason = 'bootstrap_cancelled',
           is_active = false,
@@ -353,6 +353,46 @@ BEGIN
           updated_at = p_event.created_at
         WHERE id = p_event.stream_id;
       END IF;
+
+    -- ========================================
+    -- user.invited
+    -- ========================================
+    -- User invited to organization (emitted by GenerateInvitationsActivity)
+    -- Creates invitation record in invitations_projection
+    -- NOTE: This event has stream_type='organization' because the invitation
+    --       is conceptually part of the organization's bootstrap process
+    WHEN 'user.invited' THEN
+      INSERT INTO invitations_projection (
+        invitation_id,
+        organization_id,
+        email,
+        first_name,
+        last_name,
+        role,
+        token,
+        expires_at,
+        status,
+        tags,
+        created_at,
+        updated_at
+      ) VALUES (
+        safe_jsonb_extract_uuid(p_event.event_data, 'invitation_id'),
+        safe_jsonb_extract_uuid(p_event.event_data, 'org_id'),
+        safe_jsonb_extract_text(p_event.event_data, 'email'),
+        safe_jsonb_extract_text(p_event.event_data, 'first_name'),
+        safe_jsonb_extract_text(p_event.event_data, 'last_name'),
+        safe_jsonb_extract_text(p_event.event_data, 'role'),
+        safe_jsonb_extract_text(p_event.event_data, 'token'),
+        safe_jsonb_extract_timestamp(p_event.event_data, 'expires_at'),
+        'pending',
+        COALESCE(
+          ARRAY(SELECT jsonb_array_elements_text(p_event.event_data->'tags')),
+          '{}'::TEXT[]
+        ),
+        p_event.created_at,
+        p_event.created_at
+      )
+      ON CONFLICT (invitation_id) DO NOTHING;  -- Idempotent
 
     ELSE
       RAISE WARNING 'Unknown organization event type: %', p_event.event_type;

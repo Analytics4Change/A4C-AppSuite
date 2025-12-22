@@ -1,7 +1,7 @@
 components:
   messages:
     UserInvited:
-      name: invitation.user_invited
+      name: user.invited
       title: User Invited
       summary: An invitation has been sent to a user to join an organization
       contentType: application/json
@@ -48,11 +48,11 @@ components:
           description: Organization UUID (invitation belongs to organization aggregate)
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
           description: Events emitted on organization aggregate
         event_type:
           type: string
-          enum: [UserInvited]
+          const: user.invited
         event_data:
           $ref: '#/components/schemas/UserInvitedData'
         event_metadata:
@@ -129,11 +129,11 @@ components:
           description: Invitation UUID being revoked
         stream_type:
           type: string
-          enum: [invitation]
+          const: invitation
           description: Events emitted on invitation aggregate
         event_type:
           type: string
-          enum: [InvitationRevoked]
+          const: invitation.revoked
         event_data:
           $ref: '#/components/schemas/InvitationRevokedData'
         event_metadata:
@@ -188,10 +188,10 @@ components:
           description: Invitation UUID that was accepted
         stream_type:
           type: string
-          enum: [invitation]
+          const: invitation
         event_type:
           type: string
-          enum: [InvitationAccepted]
+          const: invitation.accepted
         event_data:
           $ref: '#/components/schemas/InvitationAcceptedData'
         event_metadata:
@@ -241,10 +241,10 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [invitation]
+          const: invitation
         event_type:
           type: string
-          enum: [InvitationExpired]
+          const: invitation.expired
         event_data:
           $ref: '#/components/schemas/InvitationExpiredData'
         event_metadata:

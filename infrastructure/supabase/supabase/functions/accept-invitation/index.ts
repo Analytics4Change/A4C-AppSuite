@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v5';
+const DEPLOY_VERSION = 'v6';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -266,11 +266,18 @@ serve(async (req) => {
 
     if (eventError) {
       console.error('Failed to emit user.created event:', eventError);
-      // Note: This function continues even if event emission fails
-      // Consider returning error response for consistency with organization-bootstrap
-    } else {
-      console.log(`User created event emitted successfully: event_id=${_eventId}, user_id=${userId}, org_id=${invitation.organization_id}`);
+      // CRITICAL: Event emission failure means role assignment won't happen
+      // User account exists but has no role - return error to prevent silent failure
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to emit user.created event',
+          details: eventError.message,
+          userId, // Include for debugging - user was created but event failed
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+    console.log(`User created event emitted successfully: event_id=${_eventId}, user_id=${userId}, org_id=${invitation.organization_id}`);
 
     // Emit invitation.accepted event per AsyncAPI contract
     const { data: _acceptedEventId, error: acceptedEventError } = await supabase
@@ -296,9 +303,19 @@ serve(async (req) => {
 
     if (acceptedEventError) {
       console.error('Failed to emit invitation.accepted event:', acceptedEventError);
-    } else {
-      console.log(`Invitation accepted event emitted: event_id=${_acceptedEventId}, invitation_id=${invitation.id}`);
+      // CRITICAL: This event triggers role assignment via database trigger
+      // Without it, user has no role and will default to 'viewer' in JWT hook
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to emit invitation.accepted event',
+          details: acceptedEventError.message,
+          userId, // User was created
+          invitationId: invitation.id,
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+    console.log(`Invitation accepted event emitted: event_id=${_acceptedEventId}, invitation_id=${invitation.id}`);
 
     // Build redirect URL based on organization subdomain status
     // If subdomain is verified, redirect to tenant subdomain (cross-origin)

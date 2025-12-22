@@ -88,17 +88,17 @@ BEGIN
     INSERT INTO user_roles_projection (
       user_id,
       role_id,
-      org_id,
+      organization_id,
       scope_path,
       assigned_at
     ) VALUES (
       user_record.auth_user_id,
       '11111111-1111-1111-1111-111111111111'::UUID,  -- super_admin role
       'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID,  -- A4C organization
-      'a4c'::ltree,  -- scope_path required when org_id is set (CHECK constraint)
+      'a4c'::ltree,  -- scope_path required when organization_id is set (CHECK constraint)
       NOW()
     )
-    ON CONFLICT (user_id, role_id, org_id) DO NOTHING;
+    ON CONFLICT ON CONSTRAINT user_roles_projection_user_id_role_id_org_id_key DO NOTHING;
 
     RAISE NOTICE 'Created platform admin: % (%) with super_admin role', user_record.full_name, user_record.auth_user_id;
   END LOOP;

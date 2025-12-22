@@ -49,6 +49,10 @@ BEGIN
         WHEN 'phone' THEN
           PERFORM process_phone_event(NEW);
 
+        -- Invitation stream type
+        WHEN 'invitation' THEN
+          PERFORM process_invitation_event(NEW);
+
         -- RBAC stream types
         WHEN 'permission' THEN
           PERFORM process_rbac_event(NEW);
