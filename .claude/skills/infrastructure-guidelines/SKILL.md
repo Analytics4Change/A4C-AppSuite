@@ -232,7 +232,34 @@ Read:  PostgreSQL Trigger → projection tables (derived state)
 
 **Why**: Separating writes from reads allows independent scaling, provides event audit trail, and enables time-travel debugging.
 
-### 5. SQL-First Infrastructure
+### 5. Event Metadata as Audit Trail
+
+The `domain_events` table is the SOLE audit trail - there is no separate audit table.
+
+All events MUST include audit context in metadata:
+
+| Field | When Required | Description |
+|-------|---------------|-------------|
+| `user_id` | Always | UUID of user who initiated the action |
+| `reason` | When meaningful | Human-readable justification |
+| `ip_address` | Edge Functions | Client IP from request headers |
+| `user_agent` | Edge Functions | Client info from request headers |
+| `request_id` | When available | Correlation with API logs |
+
+```sql
+-- ✅ GOOD: Query audit trail directly from domain_events
+SELECT event_type, event_metadata->>'user_id' as actor,
+       event_metadata->>'reason' as reason, created_at
+FROM domain_events WHERE stream_id = '<resource_id>'
+ORDER BY created_at DESC;
+
+-- ❌ BAD: Creating a separate audit table
+-- Duplicates data, requires synchronization, adds complexity
+```
+
+**Why**: The event store already captures every state change with full context. A separate audit table is redundant and creates maintenance burden.
+
+### 6. SQL-First Infrastructure
 
 All infrastructure changes go through SQL migrations, never manual changes in Supabase dashboard.
 
@@ -248,7 +275,7 @@ cd infrastructure/supabase/sql/02-tables/medications/
 
 **Why**: SQL migrations provide version control, code review, rollback capability, and documentation of schema changes.
 
-### 6. Local Testing Before Deployment
+### 7. Local Testing Before Deployment
 
 Test all migrations and infrastructure changes locally first.
 
@@ -264,7 +291,7 @@ Test all migrations and infrastructure changes locally first.
 
 **Why**: Catch migration errors early, validate idempotency, and test RLS policies before affecting shared environments.
 
-### 7. Projection Triggers Are Idempotent
+### 8. Projection Triggers Are Idempotent
 
 CQRS projection triggers must handle duplicate events gracefully.
 
@@ -280,7 +307,7 @@ DO UPDATE SET
 
 **Why**: Events may be replayed or delivered multiple times. Idempotent triggers prevent data corruption.
 
-### 8. Kubernetes Declarative Configuration
+### 9. Kubernetes Declarative Configuration
 
 All K8s resources defined as YAML, managed via git and kubectl apply.
 

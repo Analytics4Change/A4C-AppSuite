@@ -344,8 +344,31 @@ kubectl logs -n temporal -l app=workflow-worker | grep "sendInvitationEmails"
 2. **Zero Downtime**: All schema changes must maintain service availability
 3. **RLS First**: All tables must have Row-Level Security policies
 4. **Event-Driven**: All state changes emit domain events for CQRS projections
-5. **Local Testing**: Test migrations locally before deploying to production
-6. **Email Provider**: Resend (primary), SMTP (fallback) - workers require `RESEND_API_KEY` in Kubernetes secrets
+5. **Event Metadata for Audit**: The `domain_events` table is the SOLE audit trail - no separate audit table
+6. **Local Testing**: Test migrations locally before deploying to production
+7. **Email Provider**: Resend (primary), SMTP (fallback) - workers require `RESEND_API_KEY` in Kubernetes secrets
+
+### Event Metadata Requirements
+
+All domain events emitted via `api.emit_domain_event()` must include audit context in metadata:
+
+| Field | When Required | Description |
+|-------|---------------|-------------|
+| `user_id` | Always (who initiated) | UUID of user who triggered the action |
+| `reason` | When action has business context | Human-readable justification |
+| `ip_address` | Edge Functions only | From request headers |
+| `user_agent` | Edge Functions only | From request headers |
+| `request_id` | When available from API | Correlation with API logs |
+
+This metadata enables audit queries directly against `domain_events` without a separate audit table:
+
+```sql
+-- Example: Who changed this resource?
+SELECT event_type, event_metadata->>'user_id' as actor,
+       event_metadata->>'reason' as reason, created_at
+FROM domain_events WHERE stream_id = '<resource_id>'
+ORDER BY created_at DESC;
+```
 
 ## Deployment Runbook
 

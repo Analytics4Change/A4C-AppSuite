@@ -1,6 +1,6 @@
 -- Programs Projection Table
 -- CQRS projection maintained by program.* event processors
--- Source of truth: program.* events in audit_log/domain_events table
+-- Source of truth: program.* events in domain_events table
 
 CREATE TABLE IF NOT EXISTS programs_projection (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

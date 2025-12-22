@@ -62,11 +62,37 @@ Application emits event → domain_events table → Database trigger fires → E
 ### Audit Logging
 
 **Event-Sourced Audit Trail:**
-- **Primary Source**: The `domain_events` table IS the audit log (immutable, append-only)
+- **Single Source of Truth**: The `domain_events` table IS the audit log (immutable, append-only)
+- **No Separate Audit Table**: All audit queries go directly against `domain_events`
 - Healthcare compliance (HIPAA/state regulations) requires immutable audit trails
 - Every state change captured: user actions, data access, authentication events, permission changes
 - **Retention**: 7 years (typical healthcare requirement)
-- **Query Pattern**: Filter `domain_events` by `stream_type`, `event_type`, `event_metadata->>'user_id'`
+
+**Audit Query Patterns:**
+
+```sql
+-- Who changed this resource?
+SELECT
+  event_type,
+  event_metadata->>'user_id' as actor,
+  event_metadata->>'reason' as reason,
+  created_at
+FROM domain_events
+WHERE stream_id = '<resource_id>'
+ORDER BY created_at DESC;
+
+-- What did user X do?
+SELECT *
+FROM domain_events
+WHERE event_metadata->>'user_id' = '<user_id>'
+ORDER BY created_at DESC;
+
+-- Trace a complete workflow execution
+SELECT *
+FROM domain_events
+WHERE event_metadata->>'workflow_id' = '<workflow_id>'
+ORDER BY created_at;
+```
 
 **Cross-Tenant Disclosure Tracking:**
 - **HIPAA Requirement**: All Provider Partner access to Provider data must be logged (45 CFR § 164.528)
@@ -78,7 +104,16 @@ Application emits event → domain_events table → Database trigger fires → E
 - All impersonation lifecycle events (started, renewed, ended)
 - All user actions during impersonation include metadata (original user, session ID)
 - Query pattern: "Show all actions by Super Admin X while impersonating in org Y"
-- Immutable audit log with 7-year retention for compliance
+- Immutable event log with 7-year retention for compliance
+
+**Compliance Considerations:**
+If future compliance requirements need specialized audit views:
+1. **DO NOT** create a parallel audit table
+2. **DO** create a CQRS projection derived from `domain_events`
+3. **DO** implement specific retention policies on the projection
+4. **DO** add indexes optimized for compliance queries
+
+The projection can always be rebuilt from `domain_events` since events are immutable.
 
 ### Performance & Caching
 
@@ -120,16 +155,42 @@ CREATE INDEX idx_domain_events_created ON domain_events(created_at);
 
 ### Event Metadata Structure
 
-All events include standardized metadata:
+All events include standardized metadata for audit trail and traceability:
 
+**Required Fields** (automatically added by Temporal workflows):
 ```json
 {
-  "user_id": "uuid",
-  "org_id": "uuid",
-  "reason": "Human-readable justification for change",
   "timestamp": "2025-01-12T00:00:00Z",
-  "automated": false,
-  "triggered_by_event_id": "optional-uuid"
+  "workflow_id": "org-bootstrap-abc123",
+  "workflow_run_id": "uuid",
+  "workflow_type": "organizationBootstrapWorkflow",
+  "activity_id": "createOrganizationActivity"
+}
+```
+
+**Audit Context Fields** (recommended for all events):
+| Field | Type | Purpose |
+|-------|------|---------|
+| `user_id` | UUID | Who initiated the action |
+| `reason` | string | Human-readable justification for the action |
+| `ip_address` | string | Client IP address (security audit) |
+| `user_agent` | string | Client info (debugging) |
+| `request_id` | string | Correlation with API logs |
+| `correlation_id` | UUID | Trace related events across workflows |
+| `causation_id` | UUID | Event that caused this event |
+
+**Example Event Metadata**:
+```json
+{
+  "timestamp": "2025-01-12T00:00:00Z",
+  "workflow_id": "org-bootstrap-abc123",
+  "workflow_run_id": "550e8400-e29b-41d4-a716-446655440000",
+  "workflow_type": "organizationBootstrapWorkflow",
+  "activity_id": "createOrganizationActivity",
+  "user_id": "d3f4a5b6-c7e8-9012-3456-789abcdef012",
+  "reason": "Organization bootstrap initiated by super admin",
+  "ip_address": "192.168.1.100",
+  "request_id": "req-abc123"
 }
 ```
 
@@ -180,7 +241,7 @@ CREATE TRIGGER trigger_process_domain_events
   - [users.md](../../infrastructure/reference/database/tables/users.md) - User read model
   - [permissions_projection.md](../../infrastructure/reference/database/tables/permissions_projection.md) - Permissions read model
   - [roles_projection.md](../../infrastructure/reference/database/tables/roles_projection.md) - Roles read model
-  - [audit_log_projection.md](../../infrastructure/reference/database/tables/audit_log_projection.md) - Audit trail projection
+  - [domain_events](../../infrastructure/reference/database/tables/domain_events.md) - Event store (audit trail)
 - **[SQL Idempotency Audit](../../infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md)** - Idempotent trigger patterns
 
 ### Authentication & Authorization

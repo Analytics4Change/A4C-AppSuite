@@ -38,12 +38,14 @@ BEGIN
       v_role_name := p_event.event_data->>'role';
 
       -- Mark invitation as accepted
+      -- NOTE: Use stream_id (the invitation row id) not event_data.invitation_id
+      -- The Edge Function uses the projection row id as the event stream_id
       UPDATE invitations_projection
       SET
         status = 'accepted',
         accepted_at = (p_event.event_data->>'accepted_at')::TIMESTAMPTZ,
         updated_at = p_event.created_at
-      WHERE invitation_id = (p_event.event_data->>'invitation_id')::UUID;
+      WHERE id = p_event.stream_id;
 
       -- Get organization path for role scope
       SELECT path INTO v_org_path
@@ -146,7 +148,7 @@ BEGIN
       SET
         status = 'deleted',
         updated_at = (p_event.event_data->>'revoked_at')::TIMESTAMPTZ
-      WHERE invitation_id = (p_event.event_data->>'invitation_id')::UUID
+      WHERE id = p_event.stream_id
         AND status = 'pending';  -- Only revoke pending invitations (idempotent)
 
     -- ========================================
@@ -159,7 +161,7 @@ BEGIN
       SET
         status = 'expired',
         updated_at = (p_event.event_data->>'expired_at')::TIMESTAMPTZ
-      WHERE invitation_id = (p_event.event_data->>'invitation_id')::UUID
+      WHERE id = p_event.stream_id
         AND status = 'pending';  -- Only expire pending invitations (idempotent)
 
     ELSE

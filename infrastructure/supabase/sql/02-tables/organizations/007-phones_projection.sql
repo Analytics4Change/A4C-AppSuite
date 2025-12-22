@@ -1,6 +1,6 @@
 -- Phones Projection Table
 -- CQRS projection maintained by phone.* event processors
--- Source of truth: phone.* events in audit_log/domain_events table
+-- Source of truth: phone.* events in domain_events table
 
 CREATE TABLE IF NOT EXISTS phones_projection (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

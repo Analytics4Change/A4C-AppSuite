@@ -293,23 +293,79 @@
 
 ---
 
+## Phase 8: Post-Deployment Fixes (2025-12-22) ✅ COMPLETE
+
+**Status**: COMPLETED (2025-12-22)
+**Issue**: Invitation status not updating to 'accepted' after acceptance
+
+### 8.1 Fix Invitation Status Update - COMPLETED
+
+| Issue | Root Cause | Fix | Status |
+|-------|------------|-----|--------|
+| Status stays 'pending' | `process_invitation_event()` used wrong WHERE clause | Changed to `WHERE id = p_event.stream_id` | COMPLETED |
+| Dual-write pattern | `api.accept_invitation()` RPC duplicated logic | Removed RPC call from Edge Function | COMPLETED |
+
+**Tasks**:
+- [x] Fix WHERE clause in `process_invitation_event()` (lines 46, 149, 162)
+- [x] Remove legacy RPC call from accept-invitation Edge Function
+- [x] Deprecate `api.accept_invitation()` function
+- [x] Redeploy accept-invitation Edge Function (v47)
+- [x] Manually fix existing invitation status
+
+### 8.2 Remove Redundant Audit Tables - COMPLETED
+
+| Table | Status | Reason |
+|-------|--------|--------|
+| `audit_log` | DROPPED | Redundant with domain_events |
+| `api_audit_log` | DROPPED | Never used (0 rows, 0 writers) |
+
+**Tasks**:
+- [x] Delete audit_log directory (8 files)
+- [x] Delete api_audit_log directory (8 files)
+- [x] Remove audit_log INSERT from 3 event processors
+- [x] Remove audit_log RLS policies
+- [x] Update event_types_table.sql
+- [x] Deploy migration to drop tables
+- [x] Verify tables removed
+
+### 8.3 Strengthen Event Metadata for Audit - COMPLETED
+
+**Tasks**:
+- [x] Add audit context fields to EmitEventParams in emit-event.ts
+- [x] Update event-sourcing-overview.md with audit query patterns
+- [x] Update workflows/CLAUDE.md with audit context section
+- [x] Update infrastructure/CLAUDE.md with event metadata requirements
+- [x] Update infrastructure-guidelines skill with audit principle
+
+---
+
 ## Current Status
 
-**Phase**: All Phases Complete
+**Phase**: All Phases Complete (including post-deployment fixes)
 **Status**: ✅ COMPLETE
-**Last Updated**: 2025-12-21
-**Git Commit**: `685d36de fix(rbac): Correct role assignment for users accepting invitations`
+**Last Updated**: 2025-12-22
+**Git Commits**:
+- `685d36de fix(rbac): Correct role assignment for users accepting invitations`
+- Pending: Post-deployment fixes (audit tables, event metadata)
 
-## Next Steps (Post-Completion)
+## Next Steps
 
-If role assignment issues persist:
-1. Check Supabase logs for `JWT_HOOK_NO_ROLE` exceptions
-2. Query `user_roles_projection` for user's role assignment
-3. Query `domain_events` for `invitation.accepted` event
-4. Check Edge Function logs for event emission errors
+**Immediate**: Commit current changes
+```bash
+git add -A
+git commit -m "chore: Remove redundant audit tables, strengthen event metadata
 
-To test the fix:
+- Drop audit_log and api_audit_log tables (domain_events is sole audit trail)
+- Fix invitation status update (WHERE id = stream_id)
+- Remove legacy api.accept_invitation() RPC from Edge Function (v7)
+- Add audit context fields to EmitEventParams (user_id, reason, ip_address, etc.)
+- Update documentation for event metadata as audit trail"
+```
+
+**Testing**: Verify end-to-end flow
 1. Run `/org-cleanup` to remove test data
 2. Create new organization via bootstrap workflow
 3. Accept invitation as invited user
-4. Verify JWT claims show correct role (e.g., `provider_admin`)
+4. Verify: JWT claims show correct role, invitation status = 'accepted'
+
+**Deferred**: Investigation of JavaScript eval CSP issue (see plan Issue 3)

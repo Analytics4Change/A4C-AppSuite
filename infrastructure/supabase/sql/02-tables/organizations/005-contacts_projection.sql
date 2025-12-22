@@ -1,6 +1,6 @@
 -- Contacts Projection Table
 -- CQRS projection maintained by contact.* event processors
--- Source of truth: contact.* events in audit_log/domain_events table
+-- Source of truth: contact.* events in domain_events table
 
 CREATE TABLE IF NOT EXISTS contacts_projection (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

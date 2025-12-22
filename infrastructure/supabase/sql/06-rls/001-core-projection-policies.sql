@@ -325,57 +325,10 @@ COMMENT ON POLICY invitations_user_own_select ON invitations_projection IS
 
 
 -- ============================================================================
--- Audit Log
+-- NOTE: audit_log and api_audit_log tables removed (2025-12-22)
+-- domain_events table serves as the authoritative audit trail
+-- See: documentation/architecture/data/event-sourcing-overview.md
 -- ============================================================================
-
--- Super admins can view all audit log entries
-DROP POLICY IF EXISTS audit_log_super_admin_all ON audit_log;
-CREATE POLICY audit_log_super_admin_all
-  ON audit_log
-  FOR ALL
-  USING (is_super_admin(get_current_user_id()));
-
--- Organization admins can view their organization's audit entries
-DROP POLICY IF EXISTS audit_log_org_admin_select ON audit_log;
-CREATE POLICY audit_log_org_admin_select
-  ON audit_log
-  FOR SELECT
-  USING (
-    organization_id IS NOT NULL
-    AND is_org_admin(get_current_user_id(), organization_id)
-  );
-
-COMMENT ON POLICY audit_log_super_admin_all ON audit_log IS
-  'Allows super admins full access to all audit log entries';
-COMMENT ON POLICY audit_log_org_admin_select ON audit_log IS
-  'Allows organization admins to view audit entries for their organization';
-
-
--- ============================================================================
--- API Audit Log
--- ============================================================================
-
--- Super admins can view all API audit log entries
-DROP POLICY IF EXISTS api_audit_log_super_admin_all ON api_audit_log;
-CREATE POLICY api_audit_log_super_admin_all
-  ON api_audit_log
-  FOR ALL
-  USING (is_super_admin(get_current_user_id()));
-
--- Organization admins can view their organization's API audit entries
-DROP POLICY IF EXISTS api_audit_log_org_admin_select ON api_audit_log;
-CREATE POLICY api_audit_log_org_admin_select
-  ON api_audit_log
-  FOR SELECT
-  USING (
-    organization_id IS NOT NULL
-    AND is_org_admin(get_current_user_id(), organization_id)
-  );
-
-COMMENT ON POLICY api_audit_log_super_admin_all ON api_audit_log IS
-  'Allows super admins full access to all API audit log entries';
-COMMENT ON POLICY api_audit_log_org_admin_select ON api_audit_log IS
-  'Allows organization admins to view API audit entries for their organization';
 
 
 -- ============================================================================

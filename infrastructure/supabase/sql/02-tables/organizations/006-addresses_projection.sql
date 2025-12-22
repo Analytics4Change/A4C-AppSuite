@@ -1,6 +1,6 @@
 -- Addresses Projection Table
 -- CQRS projection maintained by address.* event processors
--- Source of truth: address.* events in audit_log/domain_events table
+-- Source of truth: address.* events in domain_events table
 
 CREATE TABLE IF NOT EXISTS addresses_projection (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

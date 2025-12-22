@@ -188,43 +188,10 @@ BEGIN
       RAISE WARNING 'Unknown RBAC event type: %', p_event.event_type;
   END CASE;
 
-  -- Also record in audit log (with the reason!)
-  INSERT INTO audit_log (
-    organization_id,
-    event_type,
-    event_category,
-    event_name,
-    event_description,
-    user_id,
-    user_email,
-    resource_type,
-    resource_id,
-    old_values,
-    new_values,
-    metadata
-  ) VALUES (
-    CASE
-      WHEN p_event.event_type LIKE 'access_grant.%' THEN
-        safe_jsonb_extract_uuid(p_event.event_data, 'provider_org_id')
-      WHEN p_event.event_type LIKE 'user.role.%' THEN
-        safe_jsonb_extract_uuid(p_event.event_data, 'org_id')
-      ELSE
-        NULL  -- Permissions and roles are global
-    END,
-    p_event.event_type,
-    'authorization_change',
-    p_event.event_type,
-    safe_jsonb_extract_text(p_event.event_metadata, 'reason'),
-    safe_jsonb_extract_uuid(p_event.event_metadata, 'user_id'),
-    safe_jsonb_extract_text(p_event.event_metadata, 'user_email'),
-    p_event.stream_type,
-    p_event.stream_id,
-    NULL,  -- Could extract from previous events if needed
-    p_event.event_data,
-    p_event.event_metadata
-  );
+  -- NOTE: audit_log INSERT removed (2025-12-22)
+  -- domain_events table serves as the authoritative audit trail
 END;
 $$ LANGUAGE plpgsql
 SET search_path = public, extensions, pg_temp;
 
-COMMENT ON FUNCTION process_rbac_event IS 'Projects RBAC events to permission, role, user_role, and access_grant projection tables with full audit trail';
+COMMENT ON FUNCTION process_rbac_event IS 'Projects RBAC events to permission, role, user_role, and access_grant projection tables. Audit trail is in domain_events.';

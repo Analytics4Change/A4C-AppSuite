@@ -273,7 +273,7 @@ const config = validateConfig(process.env);
 **All activities that modify state MUST emit domain events**:
 
 ```typescript
-import { emitEvent } from '../shared/utils/event-emitter';
+import { emitEvent } from '../shared/utils/emit-event';
 
 async function createOrganizationActivity(input: OrgInput): Promise<string> {
   // 1. Perform state change
@@ -283,7 +283,7 @@ async function createOrganizationActivity(input: OrgInput): Promise<string> {
     .select()
     .single();
 
-  // 2. Emit domain event
+  // 2. Emit domain event with audit context
   await emitEvent({
     event_type: 'organization.created',
     aggregate_type: 'organization',
@@ -292,11 +292,63 @@ async function createOrganizationActivity(input: OrgInput): Promise<string> {
       name: data.name,
       slug: data.slug,
       created_by: input.created_by
-    }
+    },
+    // RECOMMENDED: Audit context fields (for audit trail)
+    user_id: input.initiated_by_user_id,
+    reason: 'Organization bootstrap workflow'
   });
 
   return data.id;
 }
+```
+
+### Audit Context in Events
+
+**The `domain_events` table is the SINGLE SOURCE OF TRUTH for all audit queries.**
+There is no separate audit table - all audit context goes in event metadata.
+
+**All activities that emit events SHOULD include audit context:**
+
+| Field | When to Include | Example |
+|-------|-----------------|---------|
+| `user_id` | Always (who initiated) | UUID of initiating user |
+| `reason` | When action has business context | `"Organization bootstrap workflow"` |
+| `ip_address` | Edge Functions only | From request headers |
+| `user_agent` | Edge Functions only | From request headers |
+| `request_id` | When available from API layer | Correlation with API logs |
+
+**Workflow Input Pattern** - Accept audit context from callers:
+```typescript
+interface OrganizationBootstrapInput {
+  // Business fields
+  name: string;
+  subdomain: string;
+  admin_email: string;
+
+  // Audit context (passed from API caller)
+  initiated_by_user_id?: string;
+  initiated_reason?: string;
+  request_context?: {
+    ip_address?: string;
+    user_agent?: string;
+    request_id?: string;
+  };
+}
+```
+
+**Audit Query Examples:**
+```sql
+-- Who changed this organization?
+SELECT event_type, event_metadata->>'user_id' as actor,
+       event_metadata->>'reason' as reason, created_at
+FROM domain_events
+WHERE stream_id = '<org_id>'
+ORDER BY created_at DESC;
+
+-- Trace a workflow execution
+SELECT * FROM domain_events
+WHERE event_metadata->>'workflow_id' = '<workflow_id>'
+ORDER BY created_at;
 ```
 
 **Event Schema Validation** (AsyncAPI):

@@ -77,7 +77,7 @@ INSERT INTO event_types (event_type, stream_type, description, event_schema, pro
 
 ('user.organization_switched', 'user', 'User switched organization context',
   '{"type": "object", "required": ["user_id", "from_organization_id", "to_organization_id"]}',
-  ARRAY['users', 'audit_log'])
+  ARRAY['users'])
 ON CONFLICT (event_type) DO NOTHING;
 
 -- Index for lookups

@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v6';
+const DEPLOY_VERSION = 'v7';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -215,13 +215,9 @@ serve(async (req) => {
       );
     }
 
-    // Mark invitation as accepted via RPC
-    const { error: updateError } = await supabase
-      .rpc('accept_invitation', { p_invitation_id: invitation.id });
-
-    if (updateError) {
-      console.error('Failed to mark invitation as accepted:', updateError);
-    }
+    // NOTE: Legacy RPC removed (2025-12-22)
+    // The invitation.accepted event now handles all projection updates
+    // via process_invitation_event() trigger. This removes dual-write pattern.
 
     // Query organization data for tenant redirect via RPC
     const { data: orgResults, error: orgError } = await supabase

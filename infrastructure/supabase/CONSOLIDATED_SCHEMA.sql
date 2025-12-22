@@ -6607,12 +6607,14 @@ BEGIN
       v_role_name := p_event.event_data->>'role';
 
       -- Mark invitation as accepted
+      -- NOTE: Use stream_id (the invitation row id) not event_data.invitation_id
+      -- The Edge Function uses the projection row id as the event stream_id
       UPDATE invitations_projection
       SET
         status = 'accepted',
         accepted_at = (p_event.event_data->>'accepted_at')::TIMESTAMPTZ,
         updated_at = p_event.created_at
-      WHERE invitation_id = (p_event.event_data->>'invitation_id')::UUID;
+      WHERE id = p_event.stream_id;
 
       -- Get organization path for role scope
       SELECT path INTO v_org_path
@@ -6715,7 +6717,7 @@ BEGIN
       SET
         status = 'deleted',
         updated_at = (p_event.event_data->>'revoked_at')::TIMESTAMPTZ
-      WHERE invitation_id = (p_event.event_data->>'invitation_id')::UUID
+      WHERE id = p_event.stream_id
         AND status = 'pending';  -- Only revoke pending invitations (idempotent)
 
     -- ========================================
@@ -6728,7 +6730,7 @@ BEGIN
       SET
         status = 'expired',
         updated_at = (p_event.event_data->>'expired_at')::TIMESTAMPTZ
-      WHERE invitation_id = (p_event.event_data->>'invitation_id')::UUID
+      WHERE id = p_event.stream_id
         AND status = 'pending';  -- Only expire pending invitations (idempotent)
 
     ELSE
@@ -8545,7 +8547,10 @@ GRANT EXECUTE ON FUNCTION api.get_invitation_by_token TO service_role;
 COMMENT ON FUNCTION api.get_invitation_by_token IS
   'Get invitation details by token for validation. Called by accept-invitation Edge Function.';
 
--- 2c. Accept invitation (for accept-invitation Edge Function)
+-- 2c. Accept invitation (DEPRECATED - for reference only)
+-- DEPRECATED (2025-12-22): This function is no longer called.
+-- The invitation.accepted event now handles all projection updates via
+-- process_invitation_event() trigger.
 CREATE OR REPLACE FUNCTION api.accept_invitation(p_invitation_id UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -8553,6 +8558,9 @@ SECURITY DEFINER
 SET search_path = public, extensions, pg_temp
 AS $$
 BEGIN
+  -- DEPRECATED: No longer called. Event processor handles updates.
+  RAISE WARNING 'api.accept_invitation is deprecated. Use invitation.accepted event instead.';
+
   UPDATE public.invitations_projection
   SET accepted_at = NOW()
   WHERE id = p_invitation_id;
@@ -8561,7 +8569,7 @@ $$;
 
 GRANT EXECUTE ON FUNCTION api.accept_invitation TO service_role;
 COMMENT ON FUNCTION api.accept_invitation IS
-  'Mark invitation as accepted. Called by accept-invitation Edge Function.';
+  'DEPRECATED (2025-12-22): No longer called. The invitation.accepted event now handles all projection updates via process_invitation_event().';
 
 -- ==============================================================================
 -- RBAC Lookup RPC Functions (for Temporal activities)

@@ -323,3 +323,90 @@ Main router (`001-main-event-router.sql`) handles:
 - All code uses dot-notation despite contracts saying PascalCase
 
 **Next Step**: Begin Phase 1 implementation (per user direction)
+
+### 2025-12-21: Phases 1-7 Implementation & Deployment
+
+**Completed**:
+1. Fixed all column name mismatches (`org_id` → `organization_id`)
+2. Added error handling to accept-invitation Edge Function (v6)
+3. Added fail-fast exception to JWT hook
+4. Created router-based `process_invitation_event()` function
+5. Updated main event router with `invitation` stream type
+6. Deprecated and dropped direct triggers
+7. Fixed invitation.yaml AsyncAPI contract (dot-notation + const)
+8. Added EVENT_TYPES constants to workflows
+9. Synced CONSOLIDATED_SCHEMA.sql
+10. Deployed all SQL functions to production
+11. Deployed accept-invitation v43
+12. Verified deployment with security advisors
+13. Committed and pushed: `685d36de fix(rbac): Correct role assignment for users accepting invitations`
+
+### 2025-12-22: Post-Deployment Fixes (Invitation Status)
+
+**Issue Found**: Invitation status not updating to 'accepted' after acceptance
+
+**Root Cause**: Dual-write pattern - `api.accept_invitation()` RPC used `WHERE id = ...` but `process_invitation_event()` used `WHERE invitation_id = ...`. These referenced different columns.
+
+**Solution Applied**: Pure event-driven approach
+1. Fixed `process_invitation_event()` to use `WHERE id = p_event.stream_id`
+2. Removed legacy RPC call from accept-invitation Edge Function (v7)
+3. Deprecated `api.accept_invitation()` function
+4. Redeployed accept-invitation Edge Function (v47)
+5. Manually fixed existing invitation status
+
+**Architectural Cleanup**: Removed redundant audit tables
+1. Dropped `audit_log` and `api_audit_log` tables (16 files deleted)
+2. Removed audit_log INSERT statements from 3 event processors
+3. Updated RLS policies and references
+4. `domain_events` is now the SOLE audit trail
+
+**Event Metadata Strengthening**:
+1. Added audit context fields to `EmitEventParams` in emit-event.ts:
+   - `user_id`, `reason`, `ip_address`, `user_agent`, `request_id`
+2. Updated documentation in 4 files:
+   - `documentation/architecture/data/event-sourcing-overview.md`
+   - `workflows/CLAUDE.md`
+   - `infrastructure/CLAUDE.md`
+   - `.claude/skills/infrastructure-guidelines/SKILL.md`
+
+---
+
+## Files Changed Since Last Commit (2025-12-22)
+
+### SQL Files (Modified)
+| File | Changes |
+|------|---------|
+| `03-functions/event-processing/013-process-invitation-events.sql` | Fixed WHERE clause: `invitation_id` → `id = stream_id` |
+| `03-functions/api/006-invitation-functions.sql` | Deprecated `api.accept_invitation()` |
+| `03-functions/event-processing/002-process-client-events.sql` | Removed audit_log INSERT |
+| `03-functions/event-processing/003-process-medication-events.sql` | Removed audit_log INSERT |
+| `03-functions/event-processing/004-process-rbac-events.sql` | Removed audit_log INSERT |
+| `06-rls/001-core-projection-policies.sql` | Removed audit_log RLS policies |
+| `06-rls/enable_rls_all_tables.sql` | Removed audit_log references |
+| `01-events/002-event-types-table.sql` | Removed 'audit_log' from affected_tables array |
+| `02-tables/organizations/*.sql` (4 files) | Updated comments to reference domain_events |
+| `CONSOLIDATED_SCHEMA.sql` | Synced all changes |
+
+### SQL Files (Deleted - 16 files)
+| Directory | Files |
+|-----------|-------|
+| `02-tables/audit_log/` | table.sql, 002-add-missing-columns.sql, 6 index files |
+| `02-tables/api_audit_log/` | table.sql, 7 index files |
+
+### Edge Function (Modified)
+| File | Changes |
+|------|---------|
+| `supabase/functions/accept-invitation/index.ts` | Removed legacy RPC call, bumped to v7 |
+
+### Workflows (Modified)
+| File | Changes |
+|------|---------|
+| `workflows/src/shared/utils/emit-event.ts` | Added audit context fields to EmitEventParams |
+
+### Documentation (Modified)
+| File | Changes |
+|------|---------|
+| `documentation/architecture/data/event-sourcing-overview.md` | Added audit query patterns, event metadata table |
+| `workflows/CLAUDE.md` | Added "Audit Context in Events" section |
+| `infrastructure/CLAUDE.md` | Added "Event Metadata Requirements" section |
+| `.claude/skills/infrastructure-guidelines/SKILL.md` | Added principle 5: Event Metadata as Audit Trail |

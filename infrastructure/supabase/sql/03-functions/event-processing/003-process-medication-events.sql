@@ -269,30 +269,8 @@ BEGIN
       RAISE WARNING 'Unknown medication history event type: %', p_event.event_type;
   END CASE;
 
-  -- Record in audit log
-  INSERT INTO audit_log (
-    organization_id,
-    event_type,
-    event_category,
-    event_name,
-    event_description,
-    user_id,
-    resource_type,
-    resource_id,
-    new_values,
-    metadata
-  ) VALUES (
-    safe_jsonb_extract_organization_id(p_event.event_data),
-    p_event.event_type,
-    'medication_management',
-    p_event.event_type,
-    safe_jsonb_extract_text(p_event.event_metadata, 'reason'),
-    safe_jsonb_extract_uuid(p_event.event_metadata, 'user_id'),
-    'medication_history',
-    p_event.stream_id,
-    p_event.event_data,
-    p_event.event_metadata
-  );
+  -- NOTE: audit_log INSERT removed (2025-12-22)
+  -- domain_events table serves as the authoritative audit trail
 END;
 $$ LANGUAGE plpgsql
 SET search_path = public, extensions, pg_temp;
