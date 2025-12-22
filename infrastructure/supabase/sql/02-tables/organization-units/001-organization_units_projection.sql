@@ -2,8 +2,8 @@
 -- CQRS projection maintained by organization_unit event processors
 -- Source of truth: organization_unit.* events in domain_events table
 --
--- NOTE: This table stores organization units (nlevel > 2) separately from
--- organizations_projection which stores root organizations (nlevel = 2).
+-- NOTE: This table stores organization units (nlevel > 1) separately from
+-- organizations_projection which stores root organizations (nlevel = 1).
 -- Different access patterns by actor type:
 --   - Platform owners query organizations_projection (root orgs)
 --   - Providers query organization_units_projection (their internal hierarchy)
@@ -34,8 +34,8 @@ CREATE TABLE IF NOT EXISTS organization_units_projection (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
   -- Constraints ensuring data integrity
-  -- 1. Must be sub-organization (depth > 2)
-  CONSTRAINT valid_ou_depth CHECK (nlevel(path) > 2),
+  -- 1. Must be sub-organization (depth > 1, since root orgs are depth 1)
+  CONSTRAINT valid_ou_depth CHECK (nlevel(path) > 1),
 
   -- 2. Slug must be ltree-safe (PG15 compatible - no hyphens)
   CONSTRAINT valid_slug CHECK (slug ~ '^[a-z0-9_]+$'),

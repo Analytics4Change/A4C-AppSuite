@@ -16,8 +16,8 @@
 -- - NO direct INSERT/UPDATE to projections from RPC functions
 --
 -- Data Model:
--- - Root organizations (nlevel = 2): stored in organizations_projection
--- - Sub-organizations (nlevel > 2): stored in organization_units_projection
+-- - Root organizations (nlevel = 1): stored in organizations_projection
+-- - Sub-organizations (nlevel > 1): stored in organization_units_projection
 -- - Read functions query BOTH tables for complete hierarchy view
 --
 -- Contract: infrastructure/supabase/contracts/asyncapi/domains/organization-unit.yaml
@@ -87,11 +87,11 @@ BEGIN
       o.created_at,
       o.updated_at
     FROM organizations_projection o
-    WHERE nlevel(o.path) = 2
+    WHERE nlevel(o.path) = 1  -- Root orgs are depth 1 (e.g., 'poc-test3-20251222')
       AND v_scope_path @> o.path
       AND o.deleted_at IS NULL
     UNION ALL
-    -- Sub-organizations from organization_units_projection (depth > 2)
+    -- Sub-organizations from organization_units_projection (depth > 1)
     SELECT
       ou.id,
       ou.name,
@@ -110,7 +110,7 @@ BEGIN
   unit_children AS (
     -- Pre-calculate child counts for performance
     SELECT
-      au.path AS parent,
+      au.parent_path AS parent,
       COUNT(*) AS cnt
     FROM all_units au
     WHERE au.parent_path IS NOT NULL
@@ -208,7 +208,7 @@ BEGIN
     o.updated_at
   FROM organizations_projection o
   WHERE o.id = p_unit_id
-    AND nlevel(o.path) = 2
+    AND nlevel(o.path) = 1  -- Root orgs are depth 1
     AND o.deleted_at IS NULL
     AND v_scope_path @> o.path
   LIMIT 1;
