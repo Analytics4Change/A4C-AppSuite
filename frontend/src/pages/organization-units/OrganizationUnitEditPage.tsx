@@ -190,6 +190,10 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
   const [showReactivateDialog, setShowReactivateDialog] = useState(false);
   const [isReactivating, setIsReactivating] = useState(false);
 
+  // Deactivate dialog state
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
+
   // Load units for tree view
   useEffect(() => {
     treeViewModel.loadUnits();
@@ -203,44 +207,45 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
     }
   }, [unitId, treeViewModel.unitCount, treeViewModel]);
 
-  // Load the unit for editing
-  useEffect(() => {
-    const loadUnit = async () => {
-      if (!unitId) {
-        setLoadError('No unit ID provided');
+  // Load the unit for editing - extracted as useCallback so it can be called after API operations
+  const loadUnit = useCallback(async () => {
+    if (!unitId) {
+      setLoadError('No unit ID provided');
+      setIsLoading(false);
+      return;
+    }
+
+    log.debug('Loading unit for editing', { unitId });
+    setIsLoading(true);
+    setLoadError(null);
+
+    try {
+      const service = getOrganizationUnitService();
+      const loadedUnit = await service.getUnitById(unitId);
+
+      if (!loadedUnit) {
+        setLoadError('Unit not found');
         setIsLoading(false);
         return;
       }
 
-      log.debug('Loading unit for editing', { unitId });
-      setIsLoading(true);
-      setLoadError(null);
-
-      try {
-        const service = getOrganizationUnitService();
-        const loadedUnit = await service.getUnitById(unitId);
-
-        if (!loadedUnit) {
-          setLoadError('Unit not found');
-          setIsLoading(false);
-          return;
-        }
-
-        setUnit(loadedUnit);
-        setFormViewModel(new OrganizationUnitFormViewModel(service, 'edit', loadedUnit));
-        setIsLoading(false);
-        log.debug('Unit loaded for editing', { unit: loadedUnit });
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Failed to load unit';
-        setLoadError(errorMessage);
-        setIsLoading(false);
-        log.error('Failed to load unit', error);
-      }
-    };
-
-    loadUnit();
+      setUnit(loadedUnit);
+      setFormViewModel(new OrganizationUnitFormViewModel(service, 'edit', loadedUnit));
+      setIsLoading(false);
+      log.debug('Unit loaded for editing', { unit: loadedUnit });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to load unit';
+      setLoadError(errorMessage);
+      setIsLoading(false);
+      log.error('Failed to load unit', error);
+    }
   }, [unitId]);
+
+  // Initial load
+  useEffect(() => {
+    loadUnit();
+  }, [loadUnit]);
 
   // Navigation handlers
   const handleCancel = useCallback(() => {
@@ -348,12 +353,12 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
     setShowDeleteDialog(false);
   }, []);
 
-  // Handle active warning dialog - proceed to deactivate first
-  const handleDeactivateFirst = useCallback(() => {
+  // Handle active warning dialog - proceed to deactivate via API
+  const handleDeactivateFirst = useCallback(async () => {
     setShowActiveWarningDialog(false);
-    // Toggle the active checkbox (this will trigger the form dirty state)
-    formViewModel?.toggleActive();
-  }, [formViewModel]);
+    // Show the deactivate dialog to confirm and call API
+    setShowDeactivateDialog(true);
+  }, []);
 
   // Handle active warning dialog cancel
   const handleActiveWarningCancel = useCallback(() => {
@@ -379,21 +384,55 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
       if (result.success) {
         setShowReactivateDialog(false);
         log.info('Unit reactivated successfully', { unitId: unit.id });
-        // Reload the tree and current unit
-        treeViewModel.loadUnits();
-        // Trigger a page refresh to get updated unit data
-        window.location.reload();
+        // Reload tree and unit (no full page refresh)
+        await treeViewModel.loadUnits();
+        await loadUnit();
       } else {
         log.warn('Reactivation failed', { error: result.error });
       }
     } finally {
       setIsReactivating(false);
     }
-  }, [unit, treeViewModel]);
+  }, [unit, treeViewModel, loadUnit]);
 
   // Handle reactivate dialog cancel
   const handleReactivateCancel = useCallback(() => {
     setShowReactivateDialog(false);
+  }, []);
+
+  // Handle deactivate button/checkbox click
+  const handleDeactivateClick = useCallback(() => {
+    if (unit && unit.isActive) {
+      setShowDeactivateDialog(true);
+    }
+  }, [unit]);
+
+  // Handle deactivate confirmation
+  const handleDeactivateConfirm = useCallback(async () => {
+    if (!unit) return;
+
+    setIsDeactivating(true);
+    try {
+      const service = getOrganizationUnitService();
+      const result = await service.deactivateUnit(unit.id);
+
+      if (result.success) {
+        setShowDeactivateDialog(false);
+        log.info('Unit deactivated successfully', { unitId: unit.id });
+        // Reload tree and unit (no full page refresh)
+        await treeViewModel.loadUnits();
+        await loadUnit();
+      } else {
+        log.warn('Deactivation failed', { error: result.error });
+      }
+    } finally {
+      setIsDeactivating(false);
+    }
+  }, [unit, treeViewModel, loadUnit]);
+
+  // Handle deactivate dialog cancel
+  const handleDeactivateCancel = useCallback(() => {
+    setShowDeactivateDialog(false);
   }, []);
 
   // Loading state
@@ -754,9 +793,16 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
                     <div className="flex items-start gap-2 p-3 rounded-lg bg-gray-50 border border-gray-200">
                       <Checkbox
                         id="is-active"
-                        checked={formViewModel.formData.isActive}
-                        onCheckedChange={() => formViewModel.toggleActive()}
-                        className="mt-0.5"
+                        checked={unit.isActive}
+                        onCheckedChange={() => {
+                          if (unit.isActive) {
+                            handleDeactivateClick();
+                          } else {
+                            handleReactivateClick();
+                          }
+                        }}
+                        disabled={isDeactivating || isReactivating || formViewModel.isSubmitting}
+                        className="mt-0.5 shadow-sm ring-1 ring-gray-300 bg-white/80 backdrop-blur-sm"
                       />
                       <div>
                         <Label
@@ -767,9 +813,14 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
                         </Label>
                         <p className="text-xs text-gray-500 mt-0.5">
                           Inactive units are hidden from most views.
-                          {unit.childCount > 0 && (
+                          {unit.isActive && unit.childCount > 0 && (
                             <span className="block text-orange-600 mt-1 font-medium">
                               Warning: Deactivating will also deactivate all {unit.childCount} child unit(s).
+                            </span>
+                          )}
+                          {!unit.isActive && unit.childCount > 0 && (
+                            <span className="block text-green-600 mt-1 font-medium">
+                              Note: Reactivating will also reactivate all {unit.childCount} child unit(s).
                             </span>
                           )}
                         </p>
@@ -976,6 +1027,23 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
         onCancel={handleReactivateCancel}
         isLoading={isReactivating}
         variant="success"
+      />
+
+      {/* Deactivate Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeactivateDialog}
+        title="Deactivate Organization Unit"
+        message={`Are you sure you want to deactivate "${unit?.displayName || unit?.name}"?${
+          unit?.childCount && unit.childCount > 0
+            ? ` This will also deactivate all ${unit.childCount} child unit(s).`
+            : ''
+        } Inactive units cannot have new role assignments.`}
+        confirmLabel="Deactivate"
+        cancelLabel="Cancel"
+        onConfirm={handleDeactivateConfirm}
+        onCancel={handleDeactivateCancel}
+        isLoading={isDeactivating}
+        variant="warning"
       />
     </div>
   );
