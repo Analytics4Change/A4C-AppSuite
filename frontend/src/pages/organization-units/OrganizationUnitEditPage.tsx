@@ -194,6 +194,10 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
 
+  // Error state for reactivate/deactivate operations
+  const [reactivateError, setReactivateError] = useState<string | null>(null);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
+
   // Load units for tree view
   useEffect(() => {
     treeViewModel.loadUnits();
@@ -368,6 +372,7 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
   // Handle reactivate button click
   const handleReactivateClick = useCallback(() => {
     if (unit && !unit.isActive) {
+      setReactivateError(null);  // Clear previous error
       setShowReactivateDialog(true);
     }
   }, [unit]);
@@ -377,6 +382,7 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
     if (!unit) return;
 
     setIsReactivating(true);
+    setReactivateError(null);
     try {
       const service = getOrganizationUnitService();
       const result = await service.reactivateUnit(unit.id);
@@ -388,8 +394,17 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
         await treeViewModel.loadUnits();
         await loadUnit();
       } else {
+        // Close dialog and show error
+        setShowReactivateDialog(false);
+        setReactivateError(result.error || 'Failed to reactivate unit');
         log.warn('Reactivation failed', { error: result.error });
       }
+    } catch (error) {
+      // Handle exceptions
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reactivate unit';
+      setShowReactivateDialog(false);
+      setReactivateError(errorMessage);
+      log.error('Reactivation error', error);
     } finally {
       setIsReactivating(false);
     }
@@ -403,6 +418,7 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
   // Handle deactivate button/checkbox click
   const handleDeactivateClick = useCallback(() => {
     if (unit && unit.isActive) {
+      setDeactivateError(null);  // Clear previous error
       setShowDeactivateDialog(true);
     }
   }, [unit]);
@@ -412,6 +428,7 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
     if (!unit) return;
 
     setIsDeactivating(true);
+    setDeactivateError(null);
     try {
       const service = getOrganizationUnitService();
       const result = await service.deactivateUnit(unit.id);
@@ -423,8 +440,17 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
         await treeViewModel.loadUnits();
         await loadUnit();
       } else {
+        // Close dialog and show error
+        setShowDeactivateDialog(false);
+        setDeactivateError(result.error || 'Failed to deactivate unit');
         log.warn('Deactivation failed', { error: result.error });
       }
+    } catch (error) {
+      // Handle exceptions
+      const errorMessage = error instanceof Error ? error.message : 'Failed to deactivate unit';
+      setShowDeactivateDialog(false);
+      setDeactivateError(errorMessage);
+      log.error('Deactivation error', error);
     } finally {
       setIsDeactivating(false);
     }
@@ -790,42 +816,71 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
 
                   {/* Active Status Toggle (not for root org) */}
                   {!unit.isRootOrganization && (
-                    <div className="flex items-start gap-2 p-3 rounded-lg bg-gray-50 border border-gray-200">
-                      <Checkbox
-                        id="is-active"
-                        checked={unit.isActive}
-                        onCheckedChange={() => {
-                          if (unit.isActive) {
-                            handleDeactivateClick();
-                          } else {
-                            handleReactivateClick();
-                          }
-                        }}
-                        disabled={isDeactivating || isReactivating || formViewModel.isSubmitting}
-                        className="mt-0.5 shadow-sm ring-1 ring-gray-300 bg-white/80 backdrop-blur-sm"
-                      />
-                      <div>
-                        <Label
-                          htmlFor="is-active"
-                          className="text-xs font-medium text-gray-900 cursor-pointer"
-                        >
-                          Unit is Active
-                        </Label>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          Inactive units are hidden from most views.
-                          {unit.isActive && unit.childCount > 0 && (
-                            <span className="block text-orange-600 mt-1 font-medium">
-                              Warning: Deactivating will also deactivate all {unit.childCount} child unit(s).
-                            </span>
-                          )}
-                          {!unit.isActive && unit.childCount > 0 && (
-                            <span className="block text-green-600 mt-1 font-medium">
-                              Note: Reactivating will also reactivate all {unit.childCount} child unit(s).
-                            </span>
-                          )}
-                        </p>
+                    <>
+                      {/* Deactivate/Reactivate Error */}
+                      {(deactivateError || reactivateError) && (
+                        <div className="p-3 rounded-lg border border-red-300 bg-red-50" role="alert">
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1">
+                              <h4 className="text-red-800 font-semibold text-xs">
+                                {deactivateError ? 'Failed to deactivate unit' : 'Failed to reactivate unit'}
+                              </h4>
+                              <p className="text-red-700 text-xs mt-1">
+                                {deactivateError || reactivateError}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeactivateError(null);
+                                setReactivateError(null);
+                              }}
+                              className="text-red-600 hover:text-red-800"
+                              aria-label="Dismiss error"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-start gap-2 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                        <Checkbox
+                          id="is-active"
+                          checked={unit.isActive}
+                          onCheckedChange={() => {
+                            if (unit.isActive) {
+                              handleDeactivateClick();
+                            } else {
+                              handleReactivateClick();
+                            }
+                          }}
+                          disabled={isDeactivating || isReactivating || formViewModel.isSubmitting}
+                          className="mt-0.5 shadow-sm ring-1 ring-gray-300 bg-white/80 backdrop-blur-sm"
+                        />
+                        <div>
+                          <Label
+                            htmlFor="is-active"
+                            className="text-xs font-medium text-gray-900 cursor-pointer"
+                          >
+                            Unit is Active
+                          </Label>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Inactive units are hidden from most views.
+                            {unit.isActive && unit.childCount > 0 && (
+                              <span className="block text-orange-600 mt-1 font-medium">
+                                Warning: Deactivating will also deactivate all {unit.childCount} child unit(s).
+                              </span>
+                            )}
+                            {!unit.isActive && unit.childCount > 0 && (
+                              <span className="block text-green-600 mt-1 font-medium">
+                                Note: Reactivating will also reactivate all {unit.childCount} child unit(s).
+                              </span>
+                            )}
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    </>
                   )}
 
                   {/* Form Actions */}
