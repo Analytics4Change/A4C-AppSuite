@@ -18,6 +18,20 @@ Infrastructure patterns for the A4C-AppSuite monorepo. This skill covers:
 
 ### Creating a New Database Migration
 
+> **CRITICAL: Always use `supabase migration new` - NEVER manually create migration files**
+>
+> The Supabase CLI automatically generates the correct UTC timestamp. Manually creating
+> files with hand-typed timestamps causes migration ordering errors that break CI/CD.
+>
+> ```bash
+> # ✅ CORRECT: CLI generates timestamp (e.g., 20251223193037_feature_name.sql)
+> supabase migration new feature_name
+>
+> # ❌ WRONG: Manual file creation with invented timestamp
+> touch supabase/migrations/20251223120000_feature_name.sql
+> # This WILL break if timestamp is earlier than already-deployed migrations
+> ```
+
 ```bash
 # Create a new migration file via Supabase CLI
 cd infrastructure/supabase
@@ -264,20 +278,29 @@ ORDER BY created_at DESC;
 
 ### 6. Supabase CLI Migrations
 
-All infrastructure changes go through Supabase CLI migrations, never manual changes in Supabase dashboard.
+All infrastructure changes go through Supabase CLI migrations. **ALWAYS use the CLI to create migration files.**
 
 ```bash
-# ✅ GOOD: Supabase CLI migration
+# ✅ GOOD: Use CLI to create migration (generates correct timestamp)
 cd infrastructure/supabase
 supabase migration new add_medications_table
+# Creates: supabase/migrations/YYYYMMDDHHMMSS_add_medications_table.sql
 # Edit the generated file with idempotent SQL
 # Commit to git, deploy via CI/CD (supabase db push)
+
+# ❌ BAD: Manually create migration file with hand-typed timestamp
+touch supabase/migrations/20251223120000_feature.sql
+# Timestamp may be out-of-order with already-deployed migrations!
+# CI/CD will FAIL with: "Found local migration files to be inserted before the last migration"
 
 # ❌ BAD: Manual changes in Supabase dashboard
 # Creates drift between code and reality
 ```
 
-**Why**: SQL migrations via Supabase CLI provide version control, code review, rollback capability, and documentation of schema changes.
+**Why**:
+1. CLI generates correct UTC timestamp based on current time
+2. Migrations must be in chronological order - manual timestamps easily break this
+3. Version control and code review require file-based migrations
 
 ### 7. Dry-Run Before Deployment
 
