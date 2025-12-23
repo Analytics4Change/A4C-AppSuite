@@ -11,7 +11,9 @@
 
 1. **SQL Array Conversion**: Use `to_jsonb()` wrapper for TEXT[] arrays in `jsonb_build_object()` calls. PostgreSQL requires explicit conversion to embed arrays in JSONB.
 
-2. **Cascade Deactivation Strategy**: Single event with descendant metadata, batch update in processor using ltree path containment (`<@`). No cascade on reactivation - each child reactivated individually for more control.
+2. **Cascade Deactivation Strategy**: Single event with descendant metadata, batch update in processor using ltree path containment (`<@`).
+
+7. **Cascade Reactivation** (Updated 2025-12-23): User changed mind from "no cascade" to full cascade. Reactivating parent now reactivates all inactive descendants. Mirrors deactivation behavior for symmetry. Both use ltree containment for efficient batch updates.
 
 3. **Tree View Reuse**: Exact same `OrganizationTree` component on Edit page as Manage page. Interactive - clicking another unit navigates to its edit page.
 
@@ -20,6 +22,8 @@
 5. **Accessibility**: Maintain existing WCAG 2.1 Level AA compliance. New dialogs use `role="alertdialog"` for destructive actions. Added `role="alert"` to field-level error messages.
 
 6. **Migration Strategy**: Created new migration file `20251223182421_ou_cascade_deactivation_fix.sql` rather than modifying baseline directly for production deployment. Baseline also updated to keep source of truth consistent.
+
+8. **RootPath Auto-Detection** (Added 2025-12-23): Never hardcode paths like `root.provider.acme_healthcare`. Production subdomains vary (e.g., `poc-test1-20251223`). ViewModel now auto-detects rootPath from root organization's actual path in the database.
 
 ## Technical Context
 
@@ -86,11 +90,59 @@ Organization Units use CQRS/Event Sourcing pattern:
 - `dev/active/ou-fixes-plan.md` - Implementation plan
 - `dev/active/ou-fixes-tasks.md` - Task tracking
 
+### Files Modified - 2025-12-23 (Phase 6: Tree UI Improvements)
+
+- `frontend/src/components/organization-units/OrganizationTree.tsx`
+  - Added `isLastChild` prop to root-level nodes
+
+- `frontend/src/components/organization-units/OrganizationTreeNode.tsx`
+  - Added `isLastChild` prop to interface
+  - Replaced `paddingLeft` with dedicated spacer element (fixes indentation layout)
+  - Added tree connector lines (vertical + horizontal) for non-root nodes
+  - L-shape for last child, continuing line for others
+
+- `frontend/src/viewModels/organization/OrganizationUnitsViewModel.ts`
+  - Added `reactivateUnit(unitId: string)` method
+  - Added `canReactivate` computed property
+  - Fixed cascade deactivation UI refresh: added `loadUnits()` after deactivation
+
+- `frontend/src/pages/organization-units/OrganizationUnitsManagePage.tsx`
+  - Added conditional Deactivate/Reactivate button (green styling for reactivate)
+  - Added `success` variant to ConfirmDialog with green styling
+  - Added reactivate confirmation dialog
+
+- `frontend/src/pages/organization-units/OrganizationUnitEditPage.tsx`
+  - Added Reactivate section in Danger Zone (for inactive units)
+  - Added `success` variant to ConfirmDialog
+  - Added reactivate confirmation dialog
+
+- `.claude/skills/infrastructure-guidelines/SKILL.md`
+  - Added CRITICAL warning about using `supabase migration new`
+  - Updated section 6 with explicit guidance against manual migration creation
+
+### New Files Created - 2025-12-23 (Phase 6)
+
+- `infrastructure/supabase/supabase/migrations/20251223193037_ou_cascade_reactivation.sql`
+  - Cascade reactivation for Organization Units
+  - Modified `api.reactivate_organization_unit` to collect inactive descendants
+  - Modified `process_organization_unit_event` for cascade update via ltree
+
 ### Existing Files (No Changes Needed)
 
-- `frontend/src/components/organization-units/OrganizationTree.tsx` - Reused as-is
-- `frontend/src/components/organization-units/OrganizationTreeNode.tsx` - Reused as-is
-- `frontend/src/services/organization/SupabaseOrganizationUnitService.ts` - deleteUnit already existed
+- `frontend/src/services/organization/SupabaseOrganizationUnitService.ts` - reactivateUnit already existed
+
+### Files Modified - 2025-12-23 (Phase 7: Tree Indentation Fix)
+
+- `frontend/src/components/organization-units/OrganizationTreeNode.tsx`
+  - Changed `<li>` to use `marginLeft: depth * INDENT_SIZE` instead of internal spacer
+  - Positioned badges absolutely at right edge with `absolute right-2 top-1/2 -translate-y-1/2`
+  - Fixed connector lines: use explicit `height` instead of `top/bottom` positioning
+  - Added `pr-40` to node row for badge space reservation
+
+- `frontend/src/viewModels/organization/OrganizationUnitsViewModel.ts`
+  - CRITICAL FIX: Removed hardcoded `DEFAULT_ROOT_PATH = 'root.provider.acme_healthcare'`
+  - Added auto-detection: `loadUnits()` now finds root org and uses its path as rootPath
+  - This fixes depth calculation for any subdomain format (e.g., `poc-test1-20251223`)
 
 ## Related Components
 
@@ -165,7 +217,56 @@ WHERE path <@ (p_event.event_data->>'path')::ltree  -- Parent + all descendants
 | Commit | Description | Status |
 |--------|-------------|--------|
 | `4ae185e2` | feat(ou): Fix edit bug, add cascade deactivation, and improve UI | ✅ Deployed |
+| `caf08dbb` | feat(ou): Add tree connector lines, cascade reactivation, and UI fixes | ✅ Deployed |
+| `efda39d9` | fix(infra): Recreate migration with correct CLI-generated timestamp | ✅ Deployed |
+| `f6fb43f3` | fix(ou): Fix tree indentation, connector lines, and badge alignment | ✅ Deployed |
+| `1bdc158f` | fix(ou): Auto-detect root path for tree depth calculation | ✅ Deployed |
 
-- **Migration**: `20251223182421_ou_cascade_deactivation_fix.sql` applied
+- **Migrations Applied**:
+  - `20251223182421_ou_cascade_deactivation_fix.sql`
+  - `20251223193037_ou_cascade_reactivation.sql`
 - **Frontend**: Deployed via GitHub Actions
 - **Database**: Migrations workflow passed
+
+## Lessons Learned - 2025-12-23
+
+### Migration Timestamp Issue
+
+**Problem**: Migration `20251223120146_ou_cascade_reactivation.sql` was manually created with a timestamp earlier than already-deployed migration `20251223182421`, causing CI/CD failure.
+
+**Root Cause**: Agent manually created the file instead of using `supabase migration new` command.
+
+**Fix**:
+1. Deleted manually-created migration
+2. Created new migration with `supabase migration new ou_cascade_reactivation`
+3. CLI generated correct timestamp: `20251223193037`
+
+**Process Improvement**: Updated `infrastructure-guidelines` skill with explicit warnings:
+- ALWAYS use `supabase migration new <name>` to create migrations
+- NEVER manually create files with hand-typed timestamps
+- CLI generates correct UTC timestamp automatically
+
+### RootPath Mismatch Issue
+
+**Problem**: Tree indentation and connector lines were not visible despite code being deployed correctly.
+
+**Root Cause**: ViewModel had hardcoded `rootPath = "root.provider.acme_healthcare"` (3 segments), but production paths used actual subdomain format (e.g., `poc-test1-20251223` - 1 segment).
+
+**Depth Calculation Bug**:
+```typescript
+// calculateDepth returns: unitSegments - rootSegments
+// With hardcoded 3-segment rootPath:
+// - "poc-test1-20251223.aspen" (2 segments): 2 - 3 = -1 ❌
+// - "poc-test1-20251223.aspen.downstairs" (3 segments): 3 - 3 = 0 ❌
+// All depths were 0 or negative = no margin-left applied!
+```
+
+**Fix**: Auto-detect rootPath from the actual root organization's path in `loadUnits()`:
+```typescript
+const rootOrg = units.find((u) => u.isRootOrganization);
+if (rootOrg) {
+  this.rootPath = rootOrg.path;  // Uses actual path from database
+}
+```
+
+**Lesson**: Never hardcode paths that are environment-specific. Always derive them from actual data.

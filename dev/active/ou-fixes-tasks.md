@@ -72,11 +72,25 @@
 
 ## Deployment
 
+### Initial Deployment (2025-12-23 18:31)
 - [x] Migration deployed to Supabase production
 - [x] Commit created: `4ae185e2`
 - [x] Pushed to GitHub main branch
 - [x] Frontend deploy workflow passed
 - [x] Database migrations workflow passed
+
+### Phase 6 Deployment (2025-12-23 19:35)
+- [x] Commit `caf08dbb`: Tree UI improvements + cascade reactivation
+- [x] Commit `efda39d9`: Fix migration timestamp (recreated with CLI)
+- [x] Frontend deploy workflow passed
+- [x] Database migrations workflow passed
+- [x] Process improvement: Updated infrastructure-guidelines skill with migration creation warnings
+
+### Phase 7 Deployment (2025-12-23 20:30)
+- [x] Commit `f6fb43f3`: Fix tree indentation, connector lines, and badge alignment
+- [x] Commit `1bdc158f`: Auto-detect root path for tree depth calculation
+- [x] Frontend deploy workflow passed
+- [x] User verified: Tree now displays correctly with indentation and connector lines
 
 ## Phase 6: Tree UI Improvements ✅ COMPLETE
 
@@ -93,7 +107,7 @@
 - [x] Issue 4 Backend: Cascade reactivation SQL
   - Modified `api.reactivate_organization_unit` to collect inactive descendants
   - Modified `process_organization_unit_event` for cascade reactivation
-  - Created migration `20251223120146_ou_cascade_reactivation.sql`
+  - Created migration `20251223193037_ou_cascade_reactivation.sql` (recreated with CLI for correct timestamp)
 - [x] Issue 4 Frontend: Reactivate button on ManagePage
   - Added conditional Deactivate/Reactivate button
   - Green styling (text-green-600, border-green-300)
@@ -102,9 +116,24 @@
   - Added Reactivate section in Danger Zone (for inactive units)
   - Added Reactivate confirmation dialog
 
+## Phase 7: Tree Indentation Final Fix ✅ COMPLETE
+
+- [x] Issue: Tree showing no visible indentation or connector lines despite code deployment
+- [x] Investigation: Queried database to check actual organization paths
+- [x] Root cause: Hardcoded `rootPath = "root.provider.acme_healthcare"` (3 segments) didn't match production paths (1 segment: `poc-test1-20251223`)
+- [x] Fix OrganizationTreeNode.tsx: Changed `<li>` to use `marginLeft: depth * INDENT_SIZE`
+- [x] Fix OrganizationTreeNode.tsx: Position badges absolutely at right edge
+- [x] Fix OrganizationTreeNode.tsx: Connector lines use explicit `height` instead of `top/bottom`
+- [x] Fix OrganizationUnitsViewModel.ts: Auto-detect rootPath from root org's actual path
+- [x] Deploy commit `f6fb43f3` (CSS/layout fixes)
+- [x] Deploy commit `1bdc158f` (rootPath auto-detection)
+- [x] Verify: Tree now shows proper indentation based on hierarchy depth
+- [x] Verify: Badges right-aligned at fixed vertical line
+- [x] Verify: Connector lines visible (├── and └── style)
+
 ## Current Status
 
-**Phase**: ALL PHASES COMPLETE (including Tree UI Improvements)
+**Phase**: ALL PHASES COMPLETE (including Tree Indentation Final Fix)
 **Status**: ✅ COMPLETE
 **Last Updated**: 2025-12-23
 **Next Step**: Archive dev-docs to `dev/archived/ou-fixes/` and optionally run axe-core audit
