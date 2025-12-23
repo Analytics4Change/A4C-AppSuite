@@ -13,20 +13,31 @@ This is the infrastructure repository for Analytics4Change (A4C) platform, manag
 
 ## Commands
 
-### Supabase SQL Migrations
+### Supabase CLI Migrations
 ```bash
-# Run migrations locally (idempotent)
+# Deploy migrations to production
 cd infrastructure/supabase
-./local-tests/start-local.sh
-./local-tests/run-migrations.sh
-./local-tests/verify-idempotency.sh  # Test by running twice
-./local-tests/stop-local.sh
+export SUPABASE_ACCESS_TOKEN="your-access-token"
+supabase link --project-ref "your-project-ref"
 
-# Deploy to production via psql
-export PROJECT_REF="your-project-ref"
-psql -h "db.${PROJECT_REF}.supabase.co" -U postgres -d postgres \
-  -f sql/02-tables/organizations/table.sql
+# Preview pending migrations (dry-run)
+supabase db push --linked --dry-run
+
+# Apply migrations
+supabase db push --linked
+
+# Check migration status
+supabase migration list --linked
+
+# Create a new migration (for future schema changes)
+supabase migration new my_new_feature
+
+# Repair migration history (if needed)
+supabase migration repair --status applied <version>
+supabase migration repair --status reverted <version>
 ```
+
+**Note**: Docker/Podman is required for some Supabase CLI commands. Set `DOCKER_HOST=unix:///run/user/1000/podman/podman.sock` if using Podman.
 
 ### Kubernetes Commands
 ```bash
@@ -81,21 +92,15 @@ node test-google-oauth.js
 ```
 infrastructure/
 ├── supabase/            # Supabase database schema and migrations
-│   ├── sql/            # SQL migrations (event-driven schema)
-│   │   ├── 01-extensions/       # PostgreSQL extensions (ltree, uuid)
-│   │   ├── 02-tables/          # Table definitions (CQRS projections)
-│   │   ├── 03-functions/       # Database functions (JWT claims, etc.)
-│   │   ├── 04-triggers/        # Event processors
-│   │   ├── 05-policies/        # RLS policies
-│   │   └── 99-seeds/           # Seed data
+│   ├── supabase/       # Supabase CLI project directory
+│   │   ├── migrations/ # SQL migrations (Supabase CLI managed)
+│   │   │   └── 20240101000000_baseline.sql  # Day 0 baseline migration
+│   │   ├── functions/  # Edge Functions (Deno)
+│   │   └── config.toml # Supabase CLI configuration
+│   ├── sql.archived/   # Archived granular SQL files (reference only)
 │   ├── contracts/      # AsyncAPI event schemas
 │   │   └── asyncapi.yaml       # Event contract definitions
-│   ├── local-tests/    # Local testing scripts
-│   │   ├── start-local.sh      # Start local Supabase
-│   │   ├── run-migrations.sh   # Run all migrations
-│   │   ├── verify-idempotency.sh  # Test idempotency
-│   │   └── stop-local.sh       # Stop local Supabase
-│   └── DEPLOY_TO_SUPABASE_STUDIO.sql  # Deployment script
+│   └── scripts/        # Deployment scripts (OAuth setup, etc.)
 └── k8s/                 # Kubernetes deployments
     ├── rbac/           # RBAC for GitHub Actions
     └── temporal/       # Temporal.io cluster and workers
@@ -340,13 +345,14 @@ kubectl logs -n temporal -l app=workflow-worker | grep "sendInvitationEmails"
 
 ## Key Considerations
 
-1. **SQL Idempotency**: All migrations must be idempotent (IF NOT EXISTS, OR REPLACE, DROP IF EXISTS)
-2. **Zero Downtime**: All schema changes must maintain service availability
-3. **RLS First**: All tables must have Row-Level Security policies
-4. **Event-Driven**: All state changes emit domain events for CQRS projections
-5. **Event Metadata for Audit**: The `domain_events` table is the SOLE audit trail - no separate audit table
-6. **Local Testing**: Test migrations locally before deploying to production
-7. **Email Provider**: Resend (primary), SMTP (fallback) - workers require `RESEND_API_KEY` in Kubernetes secrets
+1. **Supabase CLI Migrations**: Schema changes via `supabase db push --linked` (no more manual SQL execution)
+2. **Day 0 Baseline**: Production schema captured as `20240101000000_baseline.sql` - all future changes as incremental migrations
+3. **SQL Idempotency**: All migrations must be idempotent (IF NOT EXISTS, OR REPLACE, DROP IF EXISTS)
+4. **Zero Downtime**: All schema changes must maintain service availability
+5. **RLS First**: All tables must have Row-Level Security policies
+6. **Event-Driven**: All state changes emit domain events for CQRS projections
+7. **Event Metadata for Audit**: The `domain_events` table is the SOLE audit trail - no separate audit table
+8. **Email Provider**: Resend (primary), SMTP (fallback) - workers require `RESEND_API_KEY` in Kubernetes secrets
 
 ### Event Metadata Requirements
 
@@ -500,54 +506,53 @@ kubectl rollout undo deployment/workflow-worker -n temporal
 
 #### 3. Supabase Database Migrations
 
-**Trigger:** Push to `main` branch with changes in `infrastructure/supabase/sql/**`
+**Trigger:** Push to `main` branch with changes in `infrastructure/supabase/supabase/migrations/**`
 
 **Process:**
-1. Validate SQL syntax
-2. Check for idempotency patterns
-3. Connect to Supabase PostgreSQL
-4. Create migration tracking table
-5. Execute migrations in order (00-extensions → 06-rls)
-6. Skip already-applied migrations (checksum validation)
-7. Record execution in `_migrations_applied` table
+1. Link Supabase CLI to project
+2. Show current migration status
+3. Dry-run to preview pending migrations
+4. Apply migrations via `supabase db push --linked`
+5. Verify migration status after apply
 
 **Manual Migration:**
 ```bash
 # Connect to Supabase
-export SUPABASE_URL="https://yourproject.supabase.co"
-export SUPABASE_SERVICE_ROLE_KEY="your-key"
-export PGPASSWORD="$SUPABASE_SERVICE_ROLE_KEY"
+cd infrastructure/supabase
+export SUPABASE_ACCESS_TOKEN="your-access-token"
+supabase link --project-ref "your-project-ref"
 
-# Get database host
-PROJECT_REF=$(echo "$SUPABASE_URL" | sed 's|https://\([^.]*\).*|\1|')
-DB_HOST="db.${PROJECT_REF}.supabase.co"
+# Check migration status
+supabase migration list --linked
 
-# Run specific migration
-psql -h "$DB_HOST" -U postgres -d postgres \
-  -f infrastructure/supabase/sql/03-functions/authorization/001-user_has_permission.sql
+# Dry-run (preview changes)
+supabase db push --linked --dry-run
 
-# Run all migrations in order
-for dir in 00-extensions 01-events 02-tables 03-functions 04-triggers 05-views 06-rls; do
-  for file in infrastructure/supabase/sql/$dir/**/*.sql; do
-    echo "Running: $file"
-    psql -h "$DB_HOST" -U postgres -d postgres -f "$file"
-  done
-done
+# Apply migrations
+supabase db push --linked
+
+# Create a new migration file
+supabase migration new add_new_feature
+# Edit the generated file in supabase/migrations/
 ```
 
 **Migration History:**
 ```bash
-# View applied migrations
-psql -h "$DB_HOST" -U postgres -d postgres <<'SQL'
-SELECT migration_name, applied_at, execution_time_ms
-FROM _migrations_applied
-ORDER BY applied_at DESC
+# View migration status via CLI
+supabase migration list --linked
+
+# Or query the database directly
+psql -h "db.PROJECT_REF.supabase.co" -U postgres -d postgres <<'SQL'
+SELECT version, name, statements
+FROM supabase_migrations.schema_migrations
+ORDER BY version DESC
 LIMIT 20;
 SQL
 ```
 
 **Rollback Strategy:**
 - Migrations are **forward-only** (no automated rollback)
+- Use `supabase migration repair --status reverted <version>` to mark as reverted
 - Create reverse migration files manually if needed
 - Test rollback migrations on staging first
 - Never rollback in production without stakeholder approval
@@ -601,24 +606,31 @@ SQL
 **Issue:** Migration SQL syntax error
 
 **Solution:**
-1. Test migration locally with `psql`
+1. Review the migration SQL in `supabase/migrations/`
 2. Check migration file for typos
-3. Validate against PostgreSQL version in Supabase
+3. Test locally with Supabase CLI: `supabase db push --linked --dry-run`
 
 **Issue:** Migration not idempotent
 
 **Solution:**
 1. Review `../documentation/infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md`
 2. Add `IF NOT EXISTS`, `OR REPLACE`, `DROP ... IF EXISTS`
-3. Test by running migration twice locally
+3. Test idempotency: run `supabase db push --linked` twice
 
-**Issue:** Cannot connect to database
+**Issue:** Cannot connect to Supabase
 
 **Solution:**
-1. Verify SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY secrets
-2. Check Supabase project status in dashboard
-3. Verify network connectivity to Supabase
-4. Check IP allowlist in Supabase settings (if configured)
+1. Verify `SUPABASE_ACCESS_TOKEN` secret is valid (Management API token)
+2. Verify `SUPABASE_PROJECT_REF` matches the target project
+3. Check Supabase project status in dashboard
+4. Run `supabase link` to verify connectivity
+
+**Issue:** Migration history conflict
+
+**Solution:**
+1. Check status: `supabase migration list --linked`
+2. Mark superseded migrations as reverted: `supabase migration repair --status reverted <version>`
+3. See `../documentation/infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md`
 
 ### Monitoring
 
@@ -775,4 +787,4 @@ kubectl get deployment workflow-worker -n temporal
 
 #### Testing & Scripts
 - **Connectivity Testing**: `infrastructure/test-k8s-connectivity.sh`
-- **Local Supabase**: `infrastructure/supabase/local-tests/` (start, migrate, verify, stop)
+- **OAuth Scripts**: `infrastructure/supabase/scripts/` (OAuth configuration and verification)

@@ -101,6 +101,8 @@ For detailed guidance on each component, refer to their respective CLAUDE.md fil
 - **[Frontend Event-Driven Guide](documentation/frontend/guides/EVENT-DRIVEN-GUIDE.md)** - CQRS patterns in React
 - **[JWT Custom Claims Setup](documentation/infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md)** - Database hooks
 - **[OAuth Testing Guide](documentation/infrastructure/guides/supabase/OAUTH-TESTING.md)** - Test Google OAuth
+- **[OAuth Manual Setup](documentation/infrastructure/guides/supabase/OAUTH-MANUAL-SETUP.md)** - Configure Google OAuth
+- **[Day 0 Migration Guide](documentation/infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md)** - Supabase CLI migrations
 - **[SQL Idempotency](documentation/infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md)** - Migration patterns
 - **[Deployment Instructions](documentation/infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md)** - Production deployment
 
@@ -115,8 +117,8 @@ For detailed guidance on each component, refer to their respective CLAUDE.md fil
 When making changes that affect multiple components:
 
 1. **Infrastructure first**: Database schema, API contracts, event definitions
-   - Update Supabase SQL schema (`infrastructure/supabase/sql/`)
-   - Deploy migrations to development environment
+   - Create Supabase migration: `supabase migration new feature_name`
+   - Deploy via `supabase db push --linked`
 2. **Workflow orchestration**: Temporal workflow logic and event emission
    - Create/update workflows (`workflows/src/workflows/`)
    - Create/update activities with event emission (`workflows/src/activities/`)
@@ -197,7 +199,7 @@ The frontend supports three authentication modes for different development needs
 1. Frontend React app (`frontend/`)
 2. Supabase Auth for authentication (`infrastructure/supabase/`)
 3. Temporal workflows for orchestration (`workflows/`)
-4. PostgreSQL with RLS and CQRS projections (`infrastructure/supabase/sql/`)
+4. PostgreSQL with RLS and CQRS projections (`infrastructure/supabase/supabase/migrations/`)
 
 ### Event-Driven Architecture
 - **Domain events**: All state changes recorded as immutable events

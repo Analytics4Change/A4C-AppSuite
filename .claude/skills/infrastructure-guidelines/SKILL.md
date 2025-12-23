@@ -19,10 +19,13 @@ Infrastructure patterns for the A4C-AppSuite monorepo. This skill covers:
 ### Creating a New Database Migration
 
 ```bash
-# Create idempotent migration
-cd infrastructure/supabase/sql
-mkdir -p 02-tables/my_table
-cat > 02-tables/my_table/table.sql <<'EOF'
+# Create a new migration file via Supabase CLI
+cd infrastructure/supabase
+supabase migration new add_my_table
+
+# Edit the generated file: supabase/migrations/YYYYMMDDHHMMSS_add_my_table.sql
+# Write idempotent SQL:
+
 -- Create table with idempotent pattern
 CREATE TABLE IF NOT EXISTS my_table (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -31,21 +34,21 @@ CREATE TABLE IF NOT EXISTS my_table (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Create RLS policy using JWT claims
-CREATE POLICY IF NOT EXISTS my_table_tenant_isolation
+-- Create RLS policy using JWT claims (drop first for idempotency)
+DROP POLICY IF EXISTS my_table_tenant_isolation ON my_table;
+CREATE POLICY my_table_tenant_isolation
   ON my_table
   FOR ALL
   USING (org_id = (current_setting('request.jwt.claims', true)::json->>'org_id')::uuid);
 
 -- Enable RLS
 ALTER TABLE my_table ENABLE ROW LEVEL SECURITY;
-EOF
 
-# Test migration locally
-./local-tests/start-local.sh
-./local-tests/run-migrations.sh
-./local-tests/verify-idempotency.sh
-./local-tests/stop-local.sh
+# Test and deploy
+export SUPABASE_ACCESS_TOKEN="your-token"
+supabase link --project-ref "your-project-ref"
+supabase db push --linked --dry-run  # Preview
+supabase db push --linked            # Apply
 ```
 
 ### Creating an Event Contract
@@ -259,37 +262,36 @@ ORDER BY created_at DESC;
 
 **Why**: The event store already captures every state change with full context. A separate audit table is redundant and creates maintenance burden.
 
-### 6. SQL-First Infrastructure
+### 6. Supabase CLI Migrations
 
-All infrastructure changes go through SQL migrations, never manual changes in Supabase dashboard.
+All infrastructure changes go through Supabase CLI migrations, never manual changes in Supabase dashboard.
 
 ```bash
-# ✅ GOOD: SQL migration files
-cd infrastructure/supabase/sql/02-tables/medications/
-# Create table.sql with idempotent patterns
-# Test locally, commit to git, deploy via CI/CD
+# ✅ GOOD: Supabase CLI migration
+cd infrastructure/supabase
+supabase migration new add_medications_table
+# Edit the generated file with idempotent SQL
+# Commit to git, deploy via CI/CD (supabase db push)
 
 # ❌ BAD: Manual changes in Supabase dashboard
 # Creates drift between code and reality
 ```
 
-**Why**: SQL migrations provide version control, code review, rollback capability, and documentation of schema changes.
+**Why**: SQL migrations via Supabase CLI provide version control, code review, rollback capability, and documentation of schema changes.
 
-### 7. Local Testing Before Deployment
+### 7. Dry-Run Before Deployment
 
-Test all migrations and infrastructure changes locally first.
+Preview all migrations before applying to production.
 
 ```bash
-# ✅ GOOD: Local testing workflow
-./local-tests/start-local.sh       # Start local Supabase
-./local-tests/run-migrations.sh    # Apply migrations
-./local-tests/verify-idempotency.sh # Test idempotency
-./local-tests/stop-local.sh        # Cleanup
-
-# Then deploy to dev environment
+# ✅ GOOD: Supabase CLI dry-run workflow
+cd infrastructure/supabase
+supabase link --project-ref "your-project-ref"
+supabase db push --linked --dry-run   # Preview changes
+supabase db push --linked             # Apply if preview looks correct
 ```
 
-**Why**: Catch migration errors early, validate idempotency, and test RLS policies before affecting shared environments.
+**Why**: Catch migration errors early, validate changes, and ensure migrations are correct before affecting shared environments.
 
 ### 8. Projection Triggers Are Idempotent
 
@@ -392,15 +394,16 @@ CREATE TRIGGER organization_projection_trigger
 # No code review, no version control, no teammate awareness
 ```
 
-**✅ SOLUTION**: Always use SQL migration files
+**✅ SOLUTION**: Always use Supabase CLI migrations
 
 ```bash
-# ✅ GOOD: SQL migration workflow
-# 1. Create migration file in infrastructure/supabase/sql/
-# 2. Test locally with ./local-tests/run-migrations.sh
-# 3. Commit to git
-# 4. Code review
-# 5. Deploy via CI/CD
+# ✅ GOOD: Supabase CLI migration workflow
+# 1. Create migration: supabase migration new feature_name
+# 2. Write idempotent SQL in the generated file
+# 3. Preview: supabase db push --linked --dry-run
+# 4. Commit to git
+# 5. Code review
+# 6. Deploy via CI/CD (GitHub Actions runs supabase db push)
 ```
 
 ## Quick Reference
@@ -410,15 +413,14 @@ CREATE TRIGGER organization_projection_trigger
 ```
 infrastructure/
 ├── supabase/
-│   ├── sql/
-│   │   ├── 01-extensions/       # PostgreSQL extensions (uuid, ltree)
-│   │   ├── 02-tables/          # Table definitions
-│   │   ├── 03-functions/       # Database functions
-│   │   ├── 04-projections/     # CQRS projection tables
-│   │   ├── 05-triggers/        # Event processing triggers
-│   │   └── 06-rls/             # RLS policies
+│   ├── supabase/               # Supabase CLI project directory
+│   │   ├── migrations/         # SQL migrations (Supabase CLI managed)
+│   │   │   └── 20240101000000_baseline.sql  # Day 0 baseline
+│   │   ├── functions/          # Edge Functions (Deno)
+│   │   └── config.toml         # Supabase CLI configuration
+│   ├── sql.archived/           # Archived granular SQL files (reference only)
 │   ├── contracts/              # AsyncAPI event schemas
-│   └── local-tests/            # Local testing scripts
+│   └── scripts/                # OAuth setup, verification scripts
 └── k8s/
     └── temporal/               # Temporal worker deployments
         ├── worker-deployment.yaml
@@ -429,13 +431,13 @@ infrastructure/
 ### Testing Commands
 
 ```bash
-# Local Supabase testing
+# Supabase CLI migration workflow
 cd infrastructure/supabase
-./local-tests/start-local.sh       # Start local instance
-./local-tests/run-migrations.sh    # Apply migrations
-./local-tests/verify-idempotency.sh # Test idempotency (2x apply)
-./local-tests/status-local.sh      # Check status
-./local-tests/stop-local.sh        # Stop and cleanup
+export SUPABASE_ACCESS_TOKEN="your-token"
+supabase link --project-ref "your-project-ref"
+supabase migration list --linked      # Check migration status
+supabase db push --linked --dry-run   # Preview pending migrations
+supabase db push --linked             # Apply migrations
 
 # Kubernetes validation
 kubectl config use-context k3s-a4c

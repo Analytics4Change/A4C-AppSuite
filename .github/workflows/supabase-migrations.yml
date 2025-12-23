@@ -1,0 +1,89 @@
+name: Deploy Database Migrations
+
+# This workflow deploys Supabase database migrations using the Supabase CLI.
+# Migrations are tracked in supabase/migrations/ and applied via `supabase db push`.
+#
+# Prerequisites:
+#   - SUPABASE_ACCESS_TOKEN secret (Management API token)
+#   - SUPABASE_PROJECT_REF secret (e.g., "tmrjlswbsxmbglmaclxu")
+#
+# Day 0 Migration:
+#   - 20240101000000_baseline.sql represents the complete schema as of 2024-12-22
+#   - All previous migrations were consolidated into this baseline
+#   - Future schema changes should be added as new migration files
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infrastructure/supabase/supabase/migrations/**'
+      - '.github/workflows/supabase-migrations.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-migrations:
+    name: Deploy Migrations to Supabase
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link to Supabase project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          cd infrastructure/supabase
+          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          echo "✅ Linked to Supabase project"
+
+      - name: Show current migration status
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          cd infrastructure/supabase
+          echo "📋 Current migration status:"
+          supabase migration list --linked
+
+      - name: Dry-run migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          cd infrastructure/supabase
+          echo "🔍 Checking for pending migrations (dry-run)..."
+          supabase db push --linked --dry-run
+
+      - name: Apply migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          cd infrastructure/supabase
+          echo "🚀 Applying migrations..."
+          supabase db push --linked
+          echo "✅ Migrations applied successfully"
+
+      - name: Verify migration status
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          cd infrastructure/supabase
+          echo "📋 Updated migration status:"
+          supabase migration list --linked
+
+      - name: Report deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "🎉 Database migrations deployed successfully!"
+            echo ""
+            echo "📍 Project: ${{ secrets.SUPABASE_PROJECT_REF }}"
+            echo "🔗 Dashboard: https://supabase.com/dashboard/project/${{ secrets.SUPABASE_PROJECT_REF }}"
+          else
+            echo "❌ Migration deployment failed. Check logs above for details."
+          fi
