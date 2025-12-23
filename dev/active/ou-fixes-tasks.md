@@ -131,9 +131,29 @@
 - [x] Verify: Badges right-aligned at fixed vertical line
 - [x] Verify: Connector lines visible (├── and └── style)
 
+## Phase 8: Checkbox Active State Fix ✅ COMPLETE
+
+- [x] Issue: Checkbox showed local form state that never persisted to backend
+  - Tree showed "Inactive" badge while checkbox showed "checked" (active)
+  - Root cause: Two independent data sources that don't sync
+- [x] Change checkbox to read from `unit.isActive` (database state)
+- [x] Extract `loadUnit()` as reusable `useCallback` for post-operation refresh
+- [x] Add deactivate handler state and confirmation dialog
+- [x] Update reactivate handler to use `loadUnit()` instead of `window.location.reload()`
+- [x] Wire checkbox `onCheckedChange` to trigger appropriate confirmation dialogs
+- [x] Add disabled state during API operations to prevent double-clicks
+- [x] Add glassmorphic styling (shadow-sm, ring-1, bg-white/80, backdrop-blur-sm)
+- [x] Deploy commit `09f7e91e`: Wire active checkbox to API with confirmation dialogs
+- [x] Frontend deploy workflow passed
+
+### Phase 8 Deployment (2025-12-23 20:55)
+- [x] Commit `09f7e91e`: Wire active checkbox to API with confirmation dialogs
+- [x] Frontend deploy workflow passed
+- [x] User can verify: Checkbox now shows correct state matching tree
+
 ## Current Status
 
-**Phase**: ALL PHASES COMPLETE (including Tree Indentation Final Fix)
+**Phase**: ALL PHASES COMPLETE (including Checkbox Active State Fix)
 **Status**: ✅ COMPLETE
 **Last Updated**: 2025-12-23
 **Next Step**: Archive dev-docs to `dev/archived/ou-fixes/` and optionally run axe-core audit

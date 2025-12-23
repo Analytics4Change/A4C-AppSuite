@@ -144,6 +144,19 @@ Organization Units use CQRS/Event Sourcing pattern:
   - Added auto-detection: `loadUnits()` now finds root org and uses its path as rootPath
   - This fixes depth calculation for any subdomain format (e.g., `poc-test1-20251223`)
 
+### Files Modified - 2025-12-23 (Phase 8: Checkbox Active State Fix)
+
+- `frontend/src/pages/organization-units/OrganizationUnitEditPage.tsx`
+  - Changed checkbox to read from `unit.isActive` (database state) instead of `formViewModel.formData.isActive` (local state)
+  - Extracted `loadUnit()` as reusable `useCallback` for post-operation refresh
+  - Added deactivate dialog state (`showDeactivateDialog`, `isDeactivating`)
+  - Added `handleDeactivateClick`, `handleDeactivateConfirm`, `handleDeactivateCancel` handlers
+  - Updated `handleReactivateConfirm` to use `loadUnit()` + `treeViewModel.loadUnits()` instead of `window.location.reload()`
+  - Wire checkbox `onCheckedChange` to trigger appropriate confirmation dialogs based on current state
+  - Added disabled state during API operations to prevent double-clicks
+  - Added glassmorphic styling to checkbox: `shadow-sm ring-1 ring-gray-300 bg-white/80 backdrop-blur-sm`
+  - Added deactivate confirmation dialog with cascade warning for units with children
+
 ## Related Components
 
 - `OrganizationTree` - WAI-ARIA compliant tree with full keyboard navigation
@@ -221,6 +234,7 @@ WHERE path <@ (p_event.event_data->>'path')::ltree  -- Parent + all descendants
 | `efda39d9` | fix(infra): Recreate migration with correct CLI-generated timestamp | ✅ Deployed |
 | `f6fb43f3` | fix(ou): Fix tree indentation, connector lines, and badge alignment | ✅ Deployed |
 | `1bdc158f` | fix(ou): Auto-detect root path for tree depth calculation | ✅ Deployed |
+| `09f7e91e` | fix(ou): Wire active checkbox to API with confirmation dialogs | ✅ Deployed |
 
 - **Migrations Applied**:
   - `20251223182421_ou_cascade_deactivation_fix.sql`
@@ -270,3 +284,19 @@ if (rootOrg) {
 ```
 
 **Lesson**: Never hardcode paths that are environment-specific. Always derive them from actual data.
+
+### Checkbox State Mismatch Issue
+
+**Problem**: Checkbox showed "checked" (active) while tree showed "Inactive" badge - confusing UI discrepancy.
+
+**Root Cause**: Two independent data sources that don't sync:
+- Tree reads from `OrganizationUnitsViewModel.rawUnits` → `node.isActive` (database state)
+- Checkbox read from `OrganizationUnitFormViewModel.formData.isActive` (local form state)
+- The `toggleActive()` method only updated local state that was never persisted
+
+**Fix**:
+1. Changed checkbox to read from `unit.isActive` (database state via loaded unit)
+2. Wired `onCheckedChange` to call `deactivateUnit()`/`reactivateUnit()` APIs with confirmation dialogs
+3. After API success, reload both tree (`treeViewModel.loadUnits()`) and unit (`loadUnit()`) without full page refresh
+
+**Lesson**: For state that persists to backend, always read from the source of truth (loaded entity) not local form state, and always use API calls with proper refresh instead of local state toggles.
