@@ -5,6 +5,7 @@
 **Date**: 2025-12-23
 **Feature**: Organization Unit UI and Backend Fixes
 **Goal**: Fix edit bug, add cascade deactivation, add tree view to Edit page, add delete functionality
+**Status**: ✅ COMPLETE - All 4 issues resolved and deployed
 
 ### Key Decisions
 
@@ -16,7 +17,9 @@
 
 4. **Delete Flow**: Require deactivation before deletion. Two different dialogs based on active status. Parent selection after deletion on both pages.
 
-5. **Accessibility**: Maintain existing WCAG 2.1 Level AA compliance. New dialogs use `role="alertdialog"` for destructive actions.
+5. **Accessibility**: Maintain existing WCAG 2.1 Level AA compliance. New dialogs use `role="alertdialog"` for destructive actions. Added `role="alert"` to field-level error messages.
+
+6. **Migration Strategy**: Created new migration file `20251223182421_ou_cascade_deactivation_fix.sql` rather than modifying baseline directly for production deployment. Baseline also updated to keep source of truth consistent.
 
 ## Technical Context
 
@@ -42,33 +45,52 @@ Organization Units use CQRS/Event Sourcing pattern:
 
 ## File Structure
 
-### Files to Modify
+### Files Modified - 2025-12-23
 
 - `infrastructure/supabase/supabase/migrations/20240101000000_baseline.sql`
-  - Line 1996: Add `to_jsonb(v_updated_fields)`
-  - Line 2934: Add `to_jsonb(ARRAY['partial_resource_cleanup'])`
-  - Lines 486-519: Add descendant collection to deactivate RPC
-  - Lines 5097-5107: Batch update in event processor
+  - Line ~2014: Added `to_jsonb(v_updated_fields)` in update_organization_unit
+  - Line ~2952: Added `to_jsonb(ARRAY['partial_resource_cleanup'])` in handle_bootstrap_workflow
+  - Lines ~488-501: Added descendant collection to deactivate RPC
+  - Lines ~5115-5131: Batch cascade update in event processor using ltree
 
 - `frontend/src/pages/organization-units/OrganizationUnitsManagePage.tsx`
-  - Add delete button in actions panel
-  - Add delete confirmation dialog
-  - Update deactivation dialog message for cascade
+  - Added delete button in actions panel (enabled only for inactive units)
+  - Added delete confirmation dialog with ConfirmDialog component
+  - Changed deactivate dialog variant from "danger" to "warning" (orange color)
+  - Updated deactivation dialog message to mention cascade behavior
+  - Added `aria-describedby` to dialog for accessibility
 
 - `frontend/src/pages/organization-units/OrganizationUnitEditPage.tsx`
-  - Convert to split layout (grid cols-3)
-  - Add OrganizationTree on left panel
-  - Add Danger Zone section with delete button
-  - Add unsaved changes confirmation dialog
+  - Major refactor: converted to split layout (grid cols-3)
+  - Left panel (col-span-2): OrganizationTree with current unit highlighted
+  - Right panel (col-span-1): Edit form card
+  - Added tree ViewModel and tree loading state
+  - Added unsaved changes confirmation dialog
+  - Added Danger Zone section at bottom (only for non-root orgs)
+  - Implemented two-step delete flow (active vs inactive dialogs)
+  - Navigate to Manage page with parent selected after delete
+  - Added `role="alert"` to field-level error messages
 
 - `frontend/src/viewModels/organization/OrganizationUnitsViewModel.ts`
-  - Add `deleteUnit(unitId: string)` method
+  - Added `deleteUnit(unitId: string)` method (lines ~280-310)
+  - Tracks parent ID before delete operation
+  - On success: Reloads tree and selects parent node
+
+### New Files Created - 2025-12-23
+
+- `infrastructure/supabase/supabase/migrations/20251223182421_ou_cascade_deactivation_fix.sql`
+  - Contains `CREATE OR REPLACE FUNCTION` statements for all 4 modified functions
+  - Idempotent migration for production deployment
+
+- `dev/active/ou-fixes-context.md` - This file
+- `dev/active/ou-fixes-plan.md` - Implementation plan
+- `dev/active/ou-fixes-tasks.md` - Task tracking
 
 ### Existing Files (No Changes Needed)
 
-- `frontend/src/components/organization-units/OrganizationTree.tsx` - Reuse as-is
-- `frontend/src/components/organization-units/OrganizationTreeNode.tsx` - Reuse as-is
-- `frontend/src/services/organization/SupabaseOrganizationUnitService.ts` - deleteUnit exists
+- `frontend/src/components/organization-units/OrganizationTree.tsx` - Reused as-is
+- `frontend/src/components/organization-units/OrganizationTreeNode.tsx` - Reused as-is
+- `frontend/src/services/organization/SupabaseOrganizationUnitService.ts` - deleteUnit already existed
 
 ## Related Components
 
@@ -94,12 +116,24 @@ VALUES ('organization_unit.updated', 'organization_unit', p_unit_id, jsonb_build
 - `role="dialog"` or `role="alertdialog"` (destructive)
 - `aria-modal="true"`
 - `aria-labelledby` pointing to title
+- `aria-describedby` pointing to description
+
+### Cascade Deactivation SQL Pattern
+```sql
+-- In event processor: batch update using ltree containment
+UPDATE organization_units_projection
+SET is_active = false, deactivated_at = p_event.created_at
+WHERE path <@ (p_event.event_data->>'path')::ltree  -- Parent + all descendants
+  AND is_active = true
+  AND deleted_at IS NULL;
+```
 
 ## Reference Materials
 
 - Plan file: `/home/lars/.claude/plans/foamy-orbiting-lampson.md`
 - WAI-ARIA Tree Pattern: https://www.w3.org/WAI/ARIA/apg/patterns/treeview/
 - Existing Tree implementation: `frontend/src/components/organization-units/`
+- Supabase migration docs: `documentation/infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md`
 
 ## Important Constraints
 
@@ -107,6 +141,7 @@ VALUES ('organization_unit.updated', 'organization_unit', p_unit_id, jsonb_build
 2. **Children Block Delete**: Cannot delete OU with active children (HAS_CHILDREN error)
 3. **Roles Block Delete**: Cannot delete OU with role assignments (HAS_ROLES error)
 4. **RLS Scope**: All operations scoped to user's JWT scope_path claim
+5. **Migration Naming**: Supabase CLI uses `YYYYMMDDHHMMSS` timestamp format
 
 ## Why This Approach?
 
@@ -124,3 +159,13 @@ VALUES ('organization_unit.updated', 'organization_unit', p_unit_id, jsonb_build
 - Quick editing workflow across multiple OUs
 - Unsaved changes dialog prevents data loss
 - Consistent with Manage page behavior
+
+## Deployment Summary
+
+| Commit | Description | Status |
+|--------|-------------|--------|
+| `4ae185e2` | feat(ou): Fix edit bug, add cascade deactivation, and improve UI | ✅ Deployed |
+
+- **Migration**: `20251223182421_ou_cascade_deactivation_fix.sql` applied
+- **Frontend**: Deployed via GitHub Actions
+- **Database**: Migrations workflow passed

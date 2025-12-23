@@ -43,6 +43,8 @@ import {
   RefreshCw,
   AlertTriangle,
   Trash2,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
 import { cn } from '@/components/ui/utils';
@@ -63,7 +65,7 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   isLoading?: boolean;
-  variant?: 'danger' | 'warning' | 'default';
+  variant?: 'danger' | 'warning' | 'success' | 'default';
 }
 
 /**
@@ -85,6 +87,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const variantStyles = {
     danger: 'bg-red-600 hover:bg-red-700',
     warning: 'bg-orange-600 hover:bg-orange-700',
+    success: 'bg-green-600 hover:bg-green-700',
     default: 'bg-blue-600 hover:bg-blue-700',
   };
 
@@ -102,14 +105,19 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
             variant === 'danger' && 'bg-red-100',
             variant === 'warning' && 'bg-orange-100',
+            variant === 'success' && 'bg-green-100',
             variant === 'default' && 'bg-blue-100'
           )}>
-            <AlertTriangle className={cn(
-              'w-5 h-5',
-              variant === 'danger' && 'text-red-600',
-              variant === 'warning' && 'text-orange-600',
-              variant === 'default' && 'text-blue-600'
-            )} />
+            {variant === 'success' ? (
+              <CheckCircle className="w-5 h-5 text-green-600" />
+            ) : (
+              <AlertTriangle className={cn(
+                'w-5 h-5',
+                variant === 'danger' && 'text-red-600',
+                variant === 'warning' && 'text-orange-600',
+                variant === 'default' && 'text-blue-600'
+              )} />
+            )}
           </div>
           <div className="flex-1">
             <h3 id="confirm-dialog-title" className="text-lg font-semibold text-gray-900">
@@ -177,6 +185,10 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
   const [showActiveWarningDialog, setShowActiveWarningDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Reactivate dialog state
+  const [showReactivateDialog, setShowReactivateDialog] = useState(false);
+  const [isReactivating, setIsReactivating] = useState(false);
 
   // Load units for tree view
   useEffect(() => {
@@ -346,6 +358,42 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
   // Handle active warning dialog cancel
   const handleActiveWarningCancel = useCallback(() => {
     setShowActiveWarningDialog(false);
+  }, []);
+
+  // Handle reactivate button click
+  const handleReactivateClick = useCallback(() => {
+    if (unit && !unit.isActive) {
+      setShowReactivateDialog(true);
+    }
+  }, [unit]);
+
+  // Handle reactivate confirmation
+  const handleReactivateConfirm = useCallback(async () => {
+    if (!unit) return;
+
+    setIsReactivating(true);
+    try {
+      const service = getOrganizationUnitService();
+      const result = await service.reactivateUnit(unit.id);
+
+      if (result.success) {
+        setShowReactivateDialog(false);
+        log.info('Unit reactivated successfully', { unitId: unit.id });
+        // Reload the tree and current unit
+        treeViewModel.loadUnits();
+        // Trigger a page refresh to get updated unit data
+        window.location.reload();
+      } else {
+        log.warn('Reactivation failed', { error: result.error });
+      }
+    } finally {
+      setIsReactivating(false);
+    }
+  }, [unit, treeViewModel]);
+
+  // Handle reactivate dialog cancel
+  const handleReactivateCancel = useCallback(() => {
+    setShowReactivateDialog(false);
   }, []);
 
   // Loading state
@@ -779,7 +827,39 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4">
-                    <div className="space-y-3">
+                    <div className="space-y-4">
+                      {/* Reactivate Section - Only for inactive units */}
+                      {!unit.isActive && (
+                        <div className="pb-4 border-b border-gray-200">
+                          <h4 className="text-sm font-medium text-gray-900">
+                            Reactivate this organization unit
+                          </h4>
+                          <p className="text-xs text-gray-600 mt-1">
+                            Reactivating this unit will allow new role assignments and make it visible in most views.
+                            {unit.childCount > 0 && (
+                              <span className="block text-green-600 mt-1">
+                                This will also reactivate all {unit.childCount} child unit(s).
+                              </span>
+                            )}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleReactivateClick}
+                            disabled={formViewModel.isSubmitting || isReactivating}
+                            className="mt-2 text-green-600 border-green-300 hover:bg-green-50 hover:border-green-400"
+                            aria-describedby="reactivate-description"
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            {isReactivating ? 'Reactivating...' : 'Reactivate Unit'}
+                          </Button>
+                          <p id="reactivate-description" className="sr-only">
+                            Reactivate this organization unit and all its descendants. Role assignments will be allowed again.
+                          </p>
+                        </div>
+                      )}
+
                       {/* Delete Error */}
                       {deleteError && (
                         <div
@@ -879,6 +959,23 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
         onCancel={handleDeleteCancel}
         isLoading={isDeleting}
         variant="danger"
+      />
+
+      {/* Reactivate Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showReactivateDialog}
+        title="Reactivate Organization Unit"
+        message={`Are you sure you want to reactivate "${unit?.displayName || unit?.name}"?${
+          unit?.childCount && unit.childCount > 0
+            ? ` This will also reactivate all ${unit.childCount} child unit(s).`
+            : ''
+        } Role assignments will be allowed again for this unit and its descendants.`}
+        confirmLabel="Reactivate"
+        cancelLabel="Cancel"
+        onConfirm={handleReactivateConfirm}
+        onCancel={handleReactivateCancel}
+        isLoading={isReactivating}
+        variant="success"
       />
     </div>
   );

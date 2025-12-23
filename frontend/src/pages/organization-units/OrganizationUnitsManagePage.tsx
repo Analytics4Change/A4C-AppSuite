@@ -35,6 +35,8 @@ import {
   MapPin,
   AlertTriangle,
   X,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
 import { cn } from '@/components/ui/utils';
@@ -53,7 +55,7 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   isLoading?: boolean;
-  variant?: 'danger' | 'warning' | 'default';
+  variant?: 'danger' | 'warning' | 'success' | 'default';
 }
 
 /**
@@ -75,6 +77,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const variantStyles = {
     danger: 'bg-red-600 hover:bg-red-700',
     warning: 'bg-orange-600 hover:bg-orange-700',
+    success: 'bg-green-600 hover:bg-green-700',
     default: 'bg-blue-600 hover:bg-blue-700',
   };
 
@@ -92,14 +95,19 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
             variant === 'danger' && 'bg-red-100',
             variant === 'warning' && 'bg-orange-100',
+            variant === 'success' && 'bg-green-100',
             variant === 'default' && 'bg-blue-100'
           )}>
-            <AlertTriangle className={cn(
-              'w-5 h-5',
-              variant === 'danger' && 'text-red-600',
-              variant === 'warning' && 'text-orange-600',
-              variant === 'default' && 'text-blue-600'
-            )} />
+            {variant === 'success' ? (
+              <CheckCircle className="w-5 h-5 text-green-600" />
+            ) : (
+              <AlertTriangle className={cn(
+                'w-5 h-5',
+                variant === 'danger' && 'text-red-600',
+                variant === 'warning' && 'text-orange-600',
+                variant === 'default' && 'text-blue-600'
+              )} />
+            )}
           </div>
           <div className="flex-1">
             <h3 id="confirm-dialog-title" className="text-lg font-semibold text-gray-900">
@@ -147,6 +155,8 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
   const [viewModel] = useState(() => new OrganizationUnitsViewModel());
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
+  const [showReactivateDialog, setShowReactivateDialog] = useState(false);
+  const [isReactivating, setIsReactivating] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -234,6 +244,34 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
 
   const handleDeactivateCancel = () => {
     setShowDeactivateDialog(false);
+  };
+
+  const handleReactivateClick = () => {
+    if (viewModel.canReactivate) {
+      setShowReactivateDialog(true);
+    }
+  };
+
+  const handleReactivateConfirm = useCallback(async () => {
+    if (!viewModel.selectedUnitId) return;
+
+    setIsReactivating(true);
+    try {
+      const result = await viewModel.reactivateUnit(viewModel.selectedUnitId);
+      if (result.success) {
+        setShowReactivateDialog(false);
+        log.info('Unit reactivated successfully');
+      } else {
+        // Error is displayed in viewModel.error
+        log.warn('Reactivation failed', { error: result.error });
+      }
+    } finally {
+      setIsReactivating(false);
+    }
+  }, [viewModel]);
+
+  const handleReactivateCancel = () => {
+    setShowReactivateDialog(false);
   };
 
   const handleDeleteClick = () => {
@@ -432,15 +470,28 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     Edit Selected Unit
                   </Button>
 
-                  <Button
-                    variant="outline"
-                    onClick={handleDeactivateClick}
-                    disabled={!viewModel.canDeactivate || viewModel.isLoading}
-                    className="w-full justify-start text-orange-600 border-orange-200 hover:bg-orange-50 hover:border-orange-300"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Deactivate Unit
-                  </Button>
+                  {/* Deactivate/Reactivate Button - shows based on unit's active state */}
+                  {selectedUnit?.isActive ? (
+                    <Button
+                      variant="outline"
+                      onClick={handleDeactivateClick}
+                      disabled={!viewModel.canDeactivate || viewModel.isLoading}
+                      className="w-full justify-start text-orange-600 border-orange-200 hover:bg-orange-50 hover:border-orange-300"
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Deactivate Unit
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={handleReactivateClick}
+                      disabled={!viewModel.canReactivate || viewModel.isLoading}
+                      className="w-full justify-start text-green-600 border-green-200 hover:bg-green-50 hover:border-green-300"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Reactivate Unit
+                    </Button>
+                  )}
 
                   <Button
                     variant="outline"
@@ -572,8 +623,8 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         title="Deactivate Unit"
         message={
           selectedUnit?.childCount && selectedUnit.childCount > 0
-            ? `Are you sure you want to deactivate "${selectedUnit?.displayName || selectedUnit?.name}" and all ${selectedUnit.childCount} of its child unit(s)? Each child must be reactivated individually later.`
-            : `Are you sure you want to deactivate "${selectedUnit?.displayName || selectedUnit?.name}"? This action can be reversed by reactivating the unit later.`
+            ? `Are you sure you want to deactivate "${selectedUnit?.displayName || selectedUnit?.name}" and all ${selectedUnit.childCount} of its child unit(s)? All children will be deactivated automatically.`
+            : `Are you sure you want to deactivate "${selectedUnit?.displayName || selectedUnit?.name}"? This action can be reversed by reactivating the unit.`
         }
         confirmLabel="Deactivate"
         cancelLabel="Cancel"
@@ -581,6 +632,23 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         onCancel={handleDeactivateCancel}
         isLoading={isDeactivating}
         variant="warning"
+      />
+
+      {/* Reactivate Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showReactivateDialog}
+        title="Reactivate Unit"
+        message={
+          selectedUnit?.childCount && selectedUnit.childCount > 0
+            ? `Are you sure you want to reactivate "${selectedUnit?.displayName || selectedUnit?.name}" and all ${selectedUnit.childCount} of its inactive child unit(s)? All descendants will be reactivated automatically.`
+            : `Are you sure you want to reactivate "${selectedUnit?.displayName || selectedUnit?.name}"? Role assignments will be allowed again for this unit.`
+        }
+        confirmLabel="Reactivate"
+        cancelLabel="Cancel"
+        onConfirm={handleReactivateConfirm}
+        onCancel={handleReactivateCancel}
+        isLoading={isReactivating}
+        variant="success"
       />
 
       {/* Delete Confirmation Dialog */}

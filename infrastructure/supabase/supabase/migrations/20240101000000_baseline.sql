@@ -1676,6 +1676,8 @@ DECLARE
   v_stream_version INTEGER;
   v_result RECORD;
   v_inactive_ancestor_path LTREE;
+  v_affected_descendants JSONB;
+  v_descendant_count INTEGER;
 BEGIN
   -- Get user's scope_path
   v_scope_path := get_current_scope_path();
@@ -1744,6 +1746,21 @@ BEGIN
     );
   END IF;
 
+  -- Collect all inactive descendants that will be affected by cascade reactivation
+  SELECT
+    COALESCE(jsonb_agg(jsonb_build_object(
+      'id', ou.id,
+      'path', ou.path::TEXT,
+      'name', ou.name
+    )), '[]'::jsonb),
+    COUNT(*)::INTEGER
+  INTO v_affected_descendants, v_descendant_count
+  FROM organization_units_projection ou
+  WHERE ou.path <@ v_existing.path    -- Descendants of this OU (ltree containment)
+    AND ou.id != p_unit_id            -- Exclude self
+    AND ou.is_active = false          -- Only currently inactive ones
+    AND ou.deleted_at IS NULL;
+
   -- CQRS: Emit organization_unit.reactivated event (no direct projection write)
   v_event_id := gen_random_uuid();
 
@@ -1767,12 +1784,15 @@ BEGIN
     'organization_unit.reactivated',
     jsonb_build_object(
       'organization_unit_id', p_unit_id,
-      'path', v_existing.path::TEXT
+      'path', v_existing.path::TEXT,
+      'cascade_effect', 'role_assignment_allowed',
+      'affected_descendants', v_affected_descendants,
+      'total_descendants_affected', COALESCE(v_descendant_count, 0)
     ),
     jsonb_build_object(
       'source', 'api.reactivate_organization_unit',
       'user_id', get_current_user_id(),
-      'reason', format('Reactivated organization unit "%s" - role assignments now allowed', v_existing.name),
+      'reason', format('Reactivated organization unit "%s" and %s descendant(s) - role assignments now allowed', v_existing.name, COALESCE(v_descendant_count, 0)),
       'timestamp', now()
     )
   );
@@ -1796,6 +1816,9 @@ BEGIN
       'isRootOrganization', false,
       'createdAt', COALESCE(v_result.created_at, v_existing.created_at),
       'updatedAt', COALESCE(v_result.updated_at, now())
+    ),
+    'cascadeResult', jsonb_build_object(
+      'descendantsReactivated', COALESCE(v_descendant_count, 0)
     )
   );
 END;
@@ -5128,19 +5151,23 @@ BEGIN
       END IF;
 
       -- Note: Cascade deactivation applies to all descendants via ltree containment
-      -- Reactivation does NOT cascade - each child must be reactivated individually
+      -- Cascade reactivation also applies to all descendants via ltree containment
 
     -- ========================================
     -- organization_unit.reactivated
     -- ========================================
     -- Organization unit unfrozen - role assignments allowed again
+    -- CASCADE: Uses ltree containment to batch update parent AND all descendants
     WHEN 'organization_unit.reactivated' THEN
+      -- Cascade reactivate: Update parent OU AND all its descendants in one UPDATE
       UPDATE organization_units_projection
       SET
         is_active = true,
         deactivated_at = NULL,
         updated_at = p_event.created_at
-      WHERE id = p_event.stream_id;
+      WHERE path <@ (p_event.event_data->>'path')::ltree  -- Parent + all descendants via ltree containment
+        AND is_active = false
+        AND deleted_at IS NULL;
 
       IF NOT FOUND THEN
         RAISE WARNING 'Organization unit % not found for reactivation event', p_event.stream_id;

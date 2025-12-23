@@ -53,6 +53,9 @@ export interface OrganizationTreeNodeProps {
 
   /** Whether tree is in read-only mode */
   readOnly?: boolean;
+
+  /** Whether this node is the last child in its parent (for tree connector lines) */
+  isLastChild?: boolean;
 }
 
 /**
@@ -79,6 +82,7 @@ export const OrganizationTreeNode = observer(
         setSize,
         nodeRefs,
         readOnly = false,
+        isLastChild = false,
       },
       ref
     ) => {
@@ -133,12 +137,38 @@ export const OrganizationTreeNode = observer(
           aria-setsize={setSize}
           aria-label={`${node.displayName || node.name}${node.isRootOrganization ? ' (Root Organization)' : ''}${!node.isActive ? ' (Inactive)' : ''}`}
           tabIndex={isSelected ? 0 : -1}
-          className="outline-none list-none"
+          className="outline-none list-none relative"
           data-node-id={node.id}
           data-testid="ou-tree-node"
           data-root={node.isRootOrganization ? 'true' : undefined}
           data-inactive={!node.isActive ? 'true' : undefined}
         >
+          {/* Tree Connector Lines (for non-root nodes) */}
+          {depth > 0 && (
+            <>
+              {/* Vertical line from parent */}
+              <span
+                className="absolute border-l border-gray-300"
+                style={{
+                  left: `${(depth - 1) * INDENT_SIZE + 20}px`,
+                  top: 0,
+                  bottom: isLastChild ? '50%' : 0,
+                }}
+                aria-hidden="true"
+              />
+              {/* Horizontal line to node */}
+              <span
+                className="absolute border-t border-gray-300"
+                style={{
+                  left: `${(depth - 1) * INDENT_SIZE + 20}px`,
+                  width: `${INDENT_SIZE - 8}px`,
+                  top: '50%',
+                }}
+                aria-hidden="true"
+              />
+            </>
+          )}
+
           {/* Node Row */}
           <div
             onClick={handleNodeClick}
@@ -149,8 +179,16 @@ export const OrganizationTreeNode = observer(
               !isSelected && 'hover:bg-gray-50',
               !node.isActive && 'opacity-60'
             )}
-            style={{ paddingLeft: `${depth * INDENT_SIZE + 8}px` }}
           >
+            {/* Indent Spacer (for hierarchy visualization) */}
+            {depth > 0 && (
+              <span
+                className="flex-shrink-0"
+                style={{ width: `${depth * INDENT_SIZE}px` }}
+                aria-hidden="true"
+              />
+            )}
+
             {/* Expand/Collapse Toggle */}
             {hasChildren ? (
               <button
@@ -239,6 +277,7 @@ export const OrganizationTreeNode = observer(
                   setSize={node.children.length}
                   nodeRefs={nodeRefs}
                   readOnly={readOnly}
+                  isLastChild={index === node.children.length - 1}
                 />
               ))}
             </ul>

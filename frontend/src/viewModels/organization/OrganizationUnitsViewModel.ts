@@ -173,6 +173,20 @@ export class OrganizationUnitsViewModel {
   }
 
   /**
+   * Whether the selected unit can be reactivated
+   * - Must have a selection
+   * - Cannot be the root organization
+   * - Must be currently inactive
+   */
+  get canReactivate(): boolean {
+    const unit = this.selectedUnit;
+    if (!unit) return false;
+    if (unit.isRootOrganization) return false;
+    if (unit.isActive) return false; // Already active
+    return true;
+  }
+
+  /**
    * Whether the selected unit can be edited
    * - Must have a selection
    */
@@ -536,17 +550,10 @@ export class OrganizationUnitsViewModel {
       const result = await this.service.deactivateUnit(unitId);
 
       if (result.success && result.unit) {
+        // Reload full tree to capture cascade deactivation of descendants
+        await this.loadUnits();
+
         runInAction(() => {
-          // Update unit in raw data
-          const index = this.rawUnits.findIndex((u) => u.id === unitId);
-          if (index !== -1) {
-            this.rawUnits = [
-              ...this.rawUnits.slice(0, index),
-              result.unit!,
-              ...this.rawUnits.slice(index + 1),
-            ];
-          }
-          this.updateChildCounts();
           // Clear selection if deactivated unit was selected
           if (this.selectedUnitId === unitId) {
             this.selectedUnitId = null;
@@ -572,6 +579,64 @@ export class OrganizationUnitsViewModel {
       });
 
       log.error('Error deactivating unit', error);
+
+      return {
+        success: false,
+        error: errorMessage,
+        errorDetails: {
+          code: 'UNKNOWN',
+          message: errorMessage,
+        },
+      };
+    }
+  }
+
+  /**
+   * Reactivate an organizational unit
+   *
+   * Cascade behavior: Reactivating a parent OU also reactivates all its inactive descendants.
+   * This mirrors the cascade deactivation behavior.
+   *
+   * @param unitId - ID of unit to reactivate
+   * @returns Operation result or error
+   */
+  async reactivateUnit(unitId: string): Promise<OrganizationUnitOperationResult> {
+    log.debug('Reactivating organizational unit', { unitId });
+
+    runInAction(() => {
+      this.isLoading = true;
+      this.error = null;
+    });
+
+    try {
+      const result = await this.service.reactivateUnit(unitId);
+
+      if (result.success && result.unit) {
+        // Reload full tree to capture cascade reactivation of descendants
+        await this.loadUnits();
+
+        runInAction(() => {
+          this.isLoading = false;
+        });
+        log.info('Reactivated organizational unit', { id: result.unit.id });
+      } else {
+        runInAction(() => {
+          this.error = result.error ?? 'Failed to reactivate unit';
+          this.isLoading = false;
+        });
+        log.warn('Failed to reactivate unit', { error: result.error, errorDetails: result.errorDetails });
+      }
+
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reactivate unit';
+
+      runInAction(() => {
+        this.error = errorMessage;
+        this.isLoading = false;
+      });
+
+      log.error('Error reactivating unit', error);
 
       return {
         success: false,
