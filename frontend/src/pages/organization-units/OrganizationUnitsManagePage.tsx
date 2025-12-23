@@ -81,9 +81,10 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      role="dialog"
+      role="alertdialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
+      aria-describedby="confirm-dialog-description"
     >
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <div className="flex items-start gap-4">
@@ -104,7 +105,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             <h3 id="confirm-dialog-title" className="text-lg font-semibold text-gray-900">
               {title}
             </h3>
-            <p className="mt-2 text-gray-600">
+            <p id="confirm-dialog-description" className="mt-2 text-gray-600">
               {message}
             </p>
           </div>
@@ -146,6 +147,8 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
   const [viewModel] = useState(() => new OrganizationUnitsViewModel());
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Load units on mount
   useEffect(() => {
@@ -231,6 +234,34 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
 
   const handleDeactivateCancel = () => {
     setShowDeactivateDialog(false);
+  };
+
+  const handleDeleteClick = () => {
+    if (viewModel.canDelete) {
+      setShowDeleteDialog(true);
+    }
+  };
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!viewModel.selectedUnitId) return;
+
+    setIsDeleting(true);
+    try {
+      const result = await viewModel.deleteUnit(viewModel.selectedUnitId);
+      if (result.success) {
+        setShowDeleteDialog(false);
+        log.info('Unit deleted successfully');
+      } else {
+        // Error is displayed in viewModel.error
+        log.warn('Delete failed', { error: result.error });
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [viewModel]);
+
+  const handleDeleteCancel = () => {
+    setShowDeleteDialog(false);
   };
 
   const handleRefresh = async () => {
@@ -405,11 +436,27 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     variant="outline"
                     onClick={handleDeactivateClick}
                     disabled={!viewModel.canDeactivate || viewModel.isLoading}
-                    className="w-full justify-start text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+                    className="w-full justify-start text-orange-600 border-orange-200 hover:bg-orange-50 hover:border-orange-300"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Deactivate Unit
                   </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={handleDeleteClick}
+                    disabled={!viewModel.canDelete || viewModel.isLoading}
+                    className="w-full justify-start text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+                    aria-describedby={!viewModel.canDelete && selectedUnit && !selectedUnit.isRootOrganization ? 'delete-hint' : undefined}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Unit
+                  </Button>
+                  {!viewModel.canDelete && selectedUnit && !selectedUnit.isRootOrganization && selectedUnit.isActive && (
+                    <p id="delete-hint" className="text-xs text-gray-500 mt-1 px-1">
+                      Deactivate the unit first before deleting
+                    </p>
+                  )}
                 </div>
 
                 {/* Selected Unit Details */}
@@ -523,12 +570,29 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
       <ConfirmDialog
         isOpen={showDeactivateDialog}
         title="Deactivate Unit"
-        message={`Are you sure you want to deactivate "${selectedUnit?.displayName || selectedUnit?.name}"? This action can be reversed by editing the unit later.`}
+        message={
+          selectedUnit?.childCount && selectedUnit.childCount > 0
+            ? `Are you sure you want to deactivate "${selectedUnit?.displayName || selectedUnit?.name}" and all ${selectedUnit.childCount} of its child unit(s)? Each child must be reactivated individually later.`
+            : `Are you sure you want to deactivate "${selectedUnit?.displayName || selectedUnit?.name}"? This action can be reversed by reactivating the unit later.`
+        }
         confirmLabel="Deactivate"
         cancelLabel="Cancel"
         onConfirm={handleDeactivateConfirm}
         onCancel={handleDeactivateCancel}
         isLoading={isDeactivating}
+        variant="warning"
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        title="Delete Organization Unit"
+        message={`Are you sure you want to delete "${selectedUnit?.displayName || selectedUnit?.name}"? This action is permanent and cannot be undone. The unit will be removed from the organization hierarchy.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        isLoading={isDeleting}
         variant="danger"
       />
     </div>

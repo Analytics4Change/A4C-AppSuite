@@ -189,6 +189,21 @@ export class OrganizationUnitsViewModel {
   }
 
   /**
+   * Whether the selected unit can be deleted
+   * - Must have a selection
+   * - Cannot be the root organization
+   * - Must be inactive (deactivated first)
+   * - Cannot have active children (service enforces this too)
+   */
+  get canDelete(): boolean {
+    const unit = this.selectedUnit;
+    if (!unit) return false;
+    if (unit.isRootOrganization) return false;
+    if (unit.isActive) return false; // Must be deactivated first
+    return true;
+  }
+
+  /**
    * Total number of units
    */
   get unitCount(): number {
@@ -557,6 +572,84 @@ export class OrganizationUnitsViewModel {
       });
 
       log.error('Error deactivating unit', error);
+
+      return {
+        success: false,
+        error: errorMessage,
+        errorDetails: {
+          code: 'UNKNOWN',
+          message: errorMessage,
+        },
+      };
+    }
+  }
+
+  /**
+   * Delete an organizational unit (soft delete)
+   *
+   * Prerequisites:
+   * - Unit must be deactivated first (is_active = false)
+   * - Unit must have no active children
+   * - Unit must have no role assignments
+   *
+   * After successful deletion:
+   * - Reloads the tree
+   * - Selects the parent unit
+   *
+   * @param unitId - ID of unit to delete
+   * @returns Operation result or error
+   */
+  async deleteUnit(unitId: string): Promise<OrganizationUnitOperationResult> {
+    log.debug('Deleting organizational unit', { unitId });
+
+    // Store parent ID before deletion for selection after
+    const unitToDelete = this.rawUnits.find((u) => u.id === unitId);
+    const parentId = unitToDelete?.parentId ?? null;
+
+    runInAction(() => {
+      this.isLoading = true;
+      this.error = null;
+    });
+
+    try {
+      const result = await this.service.deleteUnit(unitId);
+
+      if (result.success) {
+        // Reload the tree to get fresh data
+        await this.loadUnits();
+
+        runInAction(() => {
+          // Select parent unit after deletion
+          if (parentId && this.rawUnits.find((u) => u.id === parentId)) {
+            this.selectedUnitId = parentId;
+            // Ensure parent is visible (expanded)
+            this.expandToNode(parentId);
+          } else {
+            // Fallback: select root organization
+            const rootOrg = this.rawUnits.find((u) => u.isRootOrganization);
+            this.selectedUnitId = rootOrg?.id ?? null;
+          }
+          this.isLoading = false;
+        });
+        log.info('Deleted organizational unit', { id: unitId, selectedParent: parentId });
+      } else {
+        runInAction(() => {
+          this.error = result.error ?? 'Failed to delete unit';
+          this.isLoading = false;
+        });
+        log.warn('Failed to delete unit', { error: result.error, errorDetails: result.errorDetails });
+      }
+
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete unit';
+
+      runInAction(() => {
+        this.error = errorMessage;
+        this.isLoading = false;
+      });
+
+      log.error('Error deleting unit', error);
 
       return {
         success: false,

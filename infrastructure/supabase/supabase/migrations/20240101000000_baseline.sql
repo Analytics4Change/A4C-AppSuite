@@ -436,6 +436,8 @@ DECLARE
   v_event_id UUID;
   v_stream_version INTEGER;
   v_result RECORD;
+  v_affected_descendants JSONB;
+  v_descendant_count INTEGER;
 BEGIN
   -- Get user's scope_path
   v_scope_path := get_current_scope_path();
@@ -483,6 +485,21 @@ BEGIN
     );
   END IF;
 
+  -- Collect all active descendants that will be affected by cascade deactivation
+  SELECT
+    COALESCE(jsonb_agg(jsonb_build_object(
+      'id', ou.id,
+      'path', ou.path::TEXT,
+      'name', ou.name
+    )), '[]'::jsonb),
+    COUNT(*)::INTEGER
+  INTO v_affected_descendants, v_descendant_count
+  FROM organization_units_projection ou
+  WHERE ou.path <@ v_existing.path    -- Descendants of this OU (ltree containment)
+    AND ou.id != p_unit_id            -- Exclude self
+    AND ou.is_active = true           -- Only currently active ones
+    AND ou.deleted_at IS NULL;
+
   -- CQRS: Emit organization_unit.deactivated event (no direct projection write)
   v_event_id := gen_random_uuid();
 
@@ -508,7 +525,8 @@ BEGIN
       'organization_unit_id', p_unit_id,
       'path', v_existing.path::TEXT,
       'cascade_effect', 'role_assignment_blocked',
-      'descendants_affected', true
+      'affected_descendants', v_affected_descendants,
+      'total_descendants_affected', COALESCE(v_descendant_count, 0)
     ),
     jsonb_build_object(
       'source', 'api.deactivate_organization_unit',
@@ -1993,7 +2011,7 @@ BEGIN
       'name', COALESCE(p_name, v_existing.name),
       'display_name', COALESCE(p_display_name, v_existing.display_name),
       'timezone', COALESCE(p_timezone, v_existing.timezone),
-      'updated_fields', v_updated_fields,
+      'updated_fields', to_jsonb(v_updated_fields),
       'previous_values', v_previous_values
     ),
     jsonb_build_object(
@@ -2931,7 +2949,7 @@ BEGIN
               jsonb_build_object(
                 'bootstrap_id', NEW.event_data->>'bootstrap_id',
                 'cleanup_completed', TRUE,
-                'cleanup_actions', ARRAY['partial_resource_cleanup'],
+                'cleanup_actions', to_jsonb(ARRAY['partial_resource_cleanup']),
                 'original_failure_stage', NEW.event_data->>'failure_stage'
               ),
               jsonb_build_object(
@@ -5093,22 +5111,24 @@ BEGIN
     -- organization_unit.deactivated
     -- ========================================
     -- Organization unit frozen - role assignments to this OU and descendants are blocked
-    -- Deactivation cascades to children via RPC validation (not direct DB update)
+    -- Cascade deactivation: updates parent AND all descendants using ltree path containment
     WHEN 'organization_unit.deactivated' THEN
+      -- Batch update: deactivated OU + all active descendants
       UPDATE organization_units_projection
       SET
         is_active = false,
         deactivated_at = p_event.created_at,
         updated_at = p_event.created_at
-      WHERE id = p_event.stream_id;
+      WHERE path <@ (p_event.event_data->>'path')::ltree  -- Parent + all descendants
+        AND is_active = true                              -- Only currently active
+        AND deleted_at IS NULL;
 
       IF NOT FOUND THEN
         RAISE WARNING 'Organization unit % not found for deactivation event', p_event.stream_id;
       END IF;
 
-      -- Note: Cascade effect is enforced at RPC level by checking for inactive ancestors
-      -- This event processor only updates the deactivated OU itself
-      -- Descendants remain "is_active = true" but role assignments are blocked via validation
+      -- Note: Cascade deactivation applies to all descendants via ltree containment
+      -- Reactivation does NOT cascade - each child must be reactivated individually
 
     -- ========================================
     -- organization_unit.reactivated
