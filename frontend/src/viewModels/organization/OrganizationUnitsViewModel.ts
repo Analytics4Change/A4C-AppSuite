@@ -46,11 +46,10 @@ import {
 const log = Logger.getLogger('viewmodel');
 
 /**
- * Root path for the current user's organization scope.
- * In production, this comes from JWT claims (scope_path).
- * For mock mode, this matches the mock auth provider's scope_path.
+ * Fallback root path for edge cases where no root organization is found.
+ * This should rarely be used since loadUnits() auto-detects the root path.
  */
-const DEFAULT_ROOT_PATH = 'root.provider.acme_healthcare';
+const FALLBACK_ROOT_PATH = '';
 
 /**
  * Organization Units ViewModel
@@ -92,16 +91,16 @@ export class OrganizationUnitsViewModel {
    * Constructor with dependency injection
    *
    * @param service - Organization unit service (defaults to factory-created instance)
-   * @param rootPath - Root path for tree building (defaults to mock path, use JWT claims in production)
+   * @param rootPath - Root path for tree building (auto-detected from loaded data if not provided)
    */
   constructor(
     private service: IOrganizationUnitService = getOrganizationUnitService(),
-    rootPath: string = DEFAULT_ROOT_PATH
+    rootPath: string = FALLBACK_ROOT_PATH
   ) {
     this.rootPath = rootPath;
     makeAutoObservable(this);
 
-    log.debug('OrganizationUnitsViewModel initialized', { rootPath });
+    log.debug('OrganizationUnitsViewModel initialized', { rootPath: rootPath || '(will auto-detect)' });
   }
 
   // ============================================
@@ -258,13 +257,20 @@ export class OrganizationUnitsViewModel {
         this.rawUnits = units;
         this.isLoading = false;
 
-        // Auto-expand root organization if present
+        // Auto-detect root path from the root organization
         const rootOrg = units.find((u) => u.isRootOrganization);
-        if (rootOrg && !this.expandedNodeIds.has(rootOrg.id)) {
-          this.expandedNodeIds.add(rootOrg.id);
+        if (rootOrg) {
+          // Use the root organization's path for depth calculations
+          this.rootPath = rootOrg.path;
+          log.debug('Auto-detected root path', { rootPath: this.rootPath });
+
+          // Auto-expand root organization
+          if (!this.expandedNodeIds.has(rootOrg.id)) {
+            this.expandedNodeIds.add(rootOrg.id);
+          }
         }
 
-        log.info('Loaded organizational units', { count: units.length });
+        log.info('Loaded organizational units', { count: units.length, rootPath: this.rootPath });
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to load units';
