@@ -222,6 +222,10 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
     log.debug('Loading unit for editing', { unitId });
     setIsLoading(true);
     setLoadError(null);
+    // Clear any previous operation errors when loading a new unit
+    setReactivateError(null);
+    setDeactivateError(null);
+    setDeleteError(null);
 
     try {
       const service = getOrganizationUnitService();
