@@ -138,6 +138,7 @@ export const OrganizationTreeNode = observer(
           aria-label={`${node.displayName || node.name}${node.isRootOrganization ? ' (Root Organization)' : ''}${!node.isActive ? ' (Inactive)' : ''}`}
           tabIndex={isSelected ? 0 : -1}
           className="outline-none list-none relative"
+          style={depth > 0 ? { marginLeft: `${depth * INDENT_SIZE}px` } : undefined}
           data-node-id={node.id}
           data-testid="ou-tree-node"
           data-root={node.isRootOrganization ? 'true' : undefined}
@@ -146,13 +147,13 @@ export const OrganizationTreeNode = observer(
           {/* Tree Connector Lines (for non-root nodes) */}
           {depth > 0 && (
             <>
-              {/* Vertical line from parent */}
+              {/* Vertical line from parent - positioned relative to indented li */}
               <span
                 className="absolute border-l border-gray-300"
                 style={{
-                  left: `${(depth - 1) * INDENT_SIZE + 20}px`,
+                  left: `-${INDENT_SIZE - 12}px`,
                   top: 0,
-                  bottom: isLastChild ? '50%' : 0,
+                  height: isLastChild ? '50%' : '100%',
                 }}
                 aria-hidden="true"
               />
@@ -160,8 +161,8 @@ export const OrganizationTreeNode = observer(
               <span
                 className="absolute border-t border-gray-300"
                 style={{
-                  left: `${(depth - 1) * INDENT_SIZE + 20}px`,
-                  width: `${INDENT_SIZE - 8}px`,
+                  left: `-${INDENT_SIZE - 12}px`,
+                  width: `${INDENT_SIZE - 12}px`,
                   top: '50%',
                 }}
                 aria-hidden="true"
@@ -169,26 +170,17 @@ export const OrganizationTreeNode = observer(
             </>
           )}
 
-          {/* Node Row */}
+          {/* Node Row - relative positioning for badge container */}
           <div
             onClick={handleNodeClick}
             className={cn(
-              'flex items-center py-2 px-2 rounded-md cursor-pointer transition-colors',
+              'relative flex items-center py-2 px-2 pr-40 rounded-md cursor-pointer transition-colors',
               'focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-1',
               isSelected && 'bg-blue-100 border border-blue-300',
               !isSelected && 'hover:bg-gray-50',
               !node.isActive && 'opacity-60'
             )}
           >
-            {/* Indent Spacer (for hierarchy visualization) */}
-            {depth > 0 && (
-              <span
-                className="flex-shrink-0"
-                style={{ width: `${depth * INDENT_SIZE}px` }}
-                aria-hidden="true"
-              />
-            )}
-
             {/* Expand/Collapse Toggle */}
             {hasChildren ? (
               <button
@@ -235,8 +227,8 @@ export const OrganizationTreeNode = observer(
               {node.displayName || node.name}
             </span>
 
-            {/* Status Indicators */}
-            <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+            {/* Status Indicators - absolutely positioned at right edge */}
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
               {/* Root Organization Badge */}
               {node.isRootOrganization && (
                 <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
