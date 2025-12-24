@@ -52,6 +52,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   variant = 'default',
 }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Focus trap and keyboard navigation (WCAG 2.1 AA requirement)
   // Pattern from MedicationSearchModal - proven implementation
@@ -62,6 +63,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     restoreFocus: true,     // Return focus to trigger element on close
     onEscape: onCancel,     // ESC key closes dialog
     wrapAround: true,       // Tab from last element goes to first
+    initialFocusRef: cancelButtonRef as RefObject<HTMLElement>, // Focus Cancel (safe option) by default
   });
 
   if (!isOpen) return null;
@@ -141,7 +143,12 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </button>
         </div>
         <div className="mt-6 flex justify-end gap-3">
-          <Button variant="outline" onClick={onCancel} disabled={isLoading}>
+          <Button
+            ref={cancelButtonRef}
+            variant="outline"
+            onClick={onCancel}
+            disabled={isLoading}
+          >
             {cancelLabel}
           </Button>
           <Button
