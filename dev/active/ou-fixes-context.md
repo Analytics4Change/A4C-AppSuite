@@ -5,7 +5,7 @@
 **Date**: 2025-12-23
 **Feature**: Organization Unit UI and Backend Fixes
 **Goal**: Fix edit bug, add cascade deactivation, add tree view to Edit page, add delete functionality
-**Status**: ✅ COMPLETE - All issues resolved including page consolidation refactor (2025-12-24)
+**Status**: ✅ COMPLETE - All issues resolved including page consolidation and delete bug fix (2025-12-24)
 
 ### Key Decisions
 
@@ -33,6 +33,11 @@
    - ManagePage now has 3 panel modes: `empty`, `edit`, `create`
    - Unsaved changes warning when switching between units
    - Extracted `ConfirmDialog` to shared component
+
+11. **Hard-Delete vs Soft-Delete Semantics** (Added 2025-12-24): Different projection tables use different deletion strategies:
+   - `organization_units_projection`: **Soft-delete** with `deleted_at` column (organizations never physically deleted)
+   - `user_roles_projection`: **Hard-delete** (row removal on revocation, no `deleted_at` column)
+   - When checking for role assignments, don't filter by `deleted_at` - if role is revoked, row is gone
 
 ## Technical Context
 
@@ -284,14 +289,30 @@ WHERE path <@ (p_event.event_data->>'path')::ltree  -- Parent + all descendants
 | `f6fb43f3` | fix(ou): Fix tree indentation, connector lines, and badge alignment | ✅ Deployed |
 | `1bdc158f` | fix(ou): Auto-detect root path for tree depth calculation | ✅ Deployed |
 | `09f7e91e` | fix(ou): Wire active checkbox to API with confirmation dialogs | ✅ Deployed |
+| `014003bd` | refactor(ou): Consolidate Edit page into ManagePage | ✅ Deployed |
+| `fdfc7d99` | fix(ou): Remove invalid deleted_at check on user_roles_projection | ✅ Deployed |
 
 - **Migrations Applied**:
   - `20251223182421_ou_cascade_deactivation_fix.sql`
   - `20251223193037_ou_cascade_reactivation.sql`
   - `20251223213418_ou_update_diagnostic_logging.sql` - Diagnostic logging (superseded by fix)
   - `20251224164206_ou_array_append_fix.sql` - **THE ACTUAL FIX** - Uses `array_append()` instead of `||`
+  - `20251224180351_ou_delete_fix_user_roles_check.sql` - Remove invalid `deleted_at` check on `user_roles_projection`
 - **Frontend**: Deployed via GitHub Actions
 - **Database**: Migrations workflow passed
+
+### Files Modified - 2025-12-24 (Phase 12: OU Delete Bug Fix)
+
+- `infrastructure/supabase/supabase/migrations/20240101000000_baseline.sql`
+  - Line ~627-632: Removed `AND ur.deleted_at IS NULL` from role assignment check
+  - Added comment explaining `user_roles_projection` uses hard-delete
+
+### Files Created - 2025-12-24 (Phase 12: OU Delete Bug Fix)
+
+- `infrastructure/supabase/supabase/migrations/20251224180351_ou_delete_fix_user_roles_check.sql`
+  - Fixes `api.delete_organization_unit()` function
+  - Removes invalid `ur.deleted_at IS NULL` condition
+  - References documentation citations for hard-delete vs soft-delete patterns
 
 ## Lessons Learned - 2025-12-23
 
@@ -380,3 +401,28 @@ PostgreSQL error message "malformed array literal: display_name" means it tried 
 - User verified: OU update now works correctly
 
 **Lesson**: When appending to TEXT[] arrays in PL/pgSQL, ALWAYS use `array_append(array, element)` instead of `array || 'element'`. The `||` operator is ambiguous and PostgreSQL may interpret the string as an array literal.
+
+### Hard-Delete vs Soft-Delete Mismatch Bug - RESOLVED (2025-12-24)
+
+**Problem**: Deleting an OU failed with `column ur.deleted_at does not exist`
+
+**Root Cause**: `api.delete_organization_unit()` assumed all projection tables use soft-delete with `deleted_at` column. But `user_roles_projection` uses **hard-delete** - when a role is revoked, the row is physically removed.
+
+**SQL with bug**:
+```sql
+SELECT COUNT(*) INTO v_role_count
+FROM user_roles_projection ur
+WHERE ur.scope_path IS NOT NULL
+  AND ur.scope_path <@ v_existing.path
+  AND ur.deleted_at IS NULL;  -- ERROR: column doesn't exist!
+```
+
+**Documentation Citations**:
+- `user_roles_projection.md` line 811: "Revoked roles removed from projection (not soft deleted)"
+- `organizations_projection.md` line 106: "Organizations never physically deleted" (soft-delete)
+
+**Fix**: Remove the invalid `AND ur.deleted_at IS NULL` condition. If a role is revoked, the row is gone - no need to filter by deletion timestamp.
+
+**Lesson**: Different projection tables may use different deletion semantics. Always check the table documentation before assuming `deleted_at` exists. In this codebase:
+- Organizations/OUs: soft-delete (`deleted_at` column)
+- Role assignments: hard-delete (row removal)

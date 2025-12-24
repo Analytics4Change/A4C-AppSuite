@@ -223,11 +223,38 @@
 - [x] TypeScript check passed
 
 ### Phase 11 Deployment (2025-12-24)
-- [x] Commit pending: Consolidate Edit page into ManagePage
+- [x] Commit `014003bd`: Consolidate Edit page into ManagePage
+- [x] Frontend deploy workflow passed
+- [x] User verified: Unified ManagePage works correctly
+
+## Phase 12: OU Delete Bug Fix ✅ COMPLETE
+
+**Problem**: Deleting an OU failed with `column ur.deleted_at does not exist`
+
+**Root Cause**: `api.delete_organization_unit()` checked `ur.deleted_at IS NULL` on `user_roles_projection`, but that table uses hard-delete (no `deleted_at` column).
+
+**Documentation Citations**:
+- `user_roles_projection.md` line 811: "Revoked roles removed from projection (not soft deleted)"
+- `organizations_projection.md` line 106: "Organizations never physically deleted" (soft-delete)
+
+### Implementation
+- [x] Investigate error source - found in baseline line ~627-632
+- [x] Research documentation for deletion patterns
+- [x] Create migration: `20251224180351_ou_delete_fix_user_roles_check.sql`
+- [x] Remove `AND ur.deleted_at IS NULL` condition from role check
+- [x] Update baseline for consistency
+- [x] Deploy migration with `supabase db push --linked`
+- [x] Verify fix: `ur.deleted_at` no longer in function source
+- [x] Commit and push: `fdfc7d99`
+
+### Phase 12 Deployment (2025-12-24)
+- [x] Migration `20251224180351_ou_delete_fix_user_roles_check.sql` deployed
+- [x] Commit `fdfc7d99`: fix(ou): Remove invalid deleted_at check on user_roles_projection
+- [x] User can verify: OU deletion now works
 
 ## Current Status
 
-**Phase**: ALL PHASES COMPLETE (including page consolidation)
+**Phase**: ALL PHASES COMPLETE (including Phase 12 delete bug fix)
 **Status**: ✅ COMPLETE
 **Last Updated**: 2025-12-24
 **Next Step**: Archive dev-docs to `dev/archived/ou-fixes/` - feature is complete
