@@ -625,11 +625,11 @@ BEGIN
   END IF;
 
   -- Check for role assignments at or below this OU's scope
+  -- Note: user_roles_projection uses hard-delete (no deleted_at column)
   SELECT COUNT(*) INTO v_role_count
   FROM user_roles_projection ur
   WHERE ur.scope_path IS NOT NULL
-    AND ur.scope_path <@ v_existing.path
-    AND ur.deleted_at IS NULL;
+    AND ur.scope_path <@ v_existing.path;
 
   IF v_role_count > 0 THEN
     RETURN jsonb_build_object(
