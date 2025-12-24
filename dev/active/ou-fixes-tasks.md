@@ -252,9 +252,31 @@
 - [x] Commit `fdfc7d99`: fix(ou): Remove invalid deleted_at check on user_roles_projection
 - [x] User can verify: OU deletion now works
 
+## Phase 13: Display Name Auto-Populate Fix ✅ COMPLETE
+
+**Problem**: When creating a new OU, tabbing from "Unit Name" to "Display Name" only copied the first letter instead of the full name.
+
+**Root Cause**: In `OrganizationUnitFormViewModel.updateName()`, the condition checked if `displayName === originalData.name`, but in create mode `originalData.name` is always `''`. After the first character, displayName no longer matched `''` so auto-populate stopped.
+
+### Implementation
+- [x] Analyze bug: condition designed for edit mode broke in create mode
+- [x] Fix `updateName()` method in OrganizationUnitFormViewModel.ts
+- [x] Use different logic per mode:
+  - Create: sync until `touchedFields.has('displayName')` (user manually edited)
+  - Edit: sync if displayName still matches original (unchanged)
+- [x] TypeScript check passed
+- [x] Commit and push: `2904e0d5`
+- [x] Frontend deploy workflow passed
+- [x] User verified: Display name now auto-populates correctly
+
+### Phase 13 Deployment (2025-12-24)
+- [x] Commit `2904e0d5`: fix(ou): Fix display name auto-populate in create mode
+- [x] Frontend deploy workflow passed
+- [x] User verified: Works correctly
+
 ## Current Status
 
-**Phase**: ALL PHASES COMPLETE (including Phase 12 delete bug fix)
+**Phase**: ALL PHASES COMPLETE (including Phase 13 display name fix)
 **Status**: ✅ COMPLETE
 **Last Updated**: 2025-12-24
 **Next Step**: Archive dev-docs to `dev/archived/ou-fixes/` - feature is complete

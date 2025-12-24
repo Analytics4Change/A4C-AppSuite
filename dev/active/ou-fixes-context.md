@@ -39,6 +39,11 @@
    - `user_roles_projection`: **Hard-delete** (row removal on revocation, no `deleted_at` column)
    - When checking for role assignments, don't filter by `deleted_at` - if role is revoked, row is gone
 
+12. **Display Name Auto-Populate Logic** (Added 2025-12-24): Different logic per form mode:
+   - **Create mode**: Sync displayName with name until user manually touches displayName field (uses `touchedFields.has('displayName')`)
+   - **Edit mode**: Sync displayName only if it still matches originalData.name (user hasn't customized it)
+   - This distinction is necessary because in create mode, `originalData.name` is always `''`
+
 ## Technical Context
 
 ### Architecture
