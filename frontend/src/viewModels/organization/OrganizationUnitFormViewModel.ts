@@ -254,11 +254,15 @@ export class OrganizationUnitFormViewModel {
       this.formData.name = value;
       this.touchedFields.add('name');
 
-      // Auto-generate display name if it's empty or matches previous name
-      if (
-        !this.formData.displayName ||
-        this.formData.displayName === this.originalData.name
-      ) {
+      // Auto-generate display name if:
+      // - Create mode: displayName hasn't been manually edited (tracked by touchedFields)
+      // - Edit mode: displayName still matches original name (user hasn't customized it)
+      const shouldAutoPopulate =
+        this.mode === 'create'
+          ? !this.touchedFields.has('displayName') // Create: sync until user edits displayName
+          : this.formData.displayName === this.originalData.name; // Edit: sync if unchanged
+
+      if (!this.formData.displayName || shouldAutoPopulate) {
         this.formData.displayName = value;
       }
 
