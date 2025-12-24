@@ -55,6 +55,13 @@ channels:
           - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapFailed'
           - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapCancelled'
           - $ref: './domains/program.yaml#/components/messages/ProgramCreated'
+          # Organization Unit events (sub-organizations within provider hierarchy)
+          - $ref: './domains/organization-unit.yaml#/components/messages/OrganizationUnitCreated'
+          - $ref: './domains/organization-unit.yaml#/components/messages/OrganizationUnitUpdated'
+          - $ref: './domains/organization-unit.yaml#/components/messages/OrganizationUnitDeactivated'
+          - $ref: './domains/organization-unit.yaml#/components/messages/OrganizationUnitReactivated'
+          - $ref: './domains/organization-unit.yaml#/components/messages/OrganizationUnitDeleted'
+          - $ref: './domains/organization-unit.yaml#/components/messages/OrganizationUnitMoved'
     subscribe:
       summary: Subscribe to domain events
       operationId: onDomainEvent
@@ -92,6 +99,7 @@ components:
             - dosage
             - user
             - organization
+            - organization_unit
             - invitation
             - program
           description: Type of entity this event affects

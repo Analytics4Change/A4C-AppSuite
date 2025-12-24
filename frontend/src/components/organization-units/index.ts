@@ -10,3 +10,6 @@ export type { OrganizationTreeProps } from './OrganizationTree';
 
 export { OrganizationTreeNode } from './OrganizationTreeNode';
 export type { OrganizationTreeNodeProps } from './OrganizationTreeNode';
+
+export { OrganizationUnitFormFields } from './OrganizationUnitFormFields';
+export type { OrganizationUnitFormFieldsProps } from './OrganizationUnitFormFields';

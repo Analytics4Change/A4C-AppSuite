@@ -9,6 +9,7 @@
  * - WAI-ARIA tree pattern compliance
  * - Focus management
  * - Expand/collapse all functionality
+ * - Type-ahead search (per WAI-ARIA APG spec)
  *
  * Keyboard Navigation:
  * - Arrow Down: Move to next visible node
@@ -18,12 +19,13 @@
  * - Home: Move to first node
  * - End: Move to last visible node
  * - Enter/Space: Toggle selection or expand/collapse
+ * - Type characters: Focus moves to next node matching typed prefix
  *
  * @see https://www.w3.org/WAI/ARIA/apg/patterns/treeview/
  * @see OrganizationTreeNode for individual node rendering
  */
 
-import React, { useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { cn } from '@/components/ui/utils';
 import { OrganizationTreeNode } from './OrganizationTreeNode';
@@ -110,6 +112,109 @@ export const OrganizationTree = observer(
     const nodeRefs = useRef<Map<string, HTMLLIElement | null>>(new Map());
     const treeRef = useRef<HTMLUListElement>(null);
 
+    // Type-ahead state: buffer of typed characters and timeout for clearing
+    const [typeAheadBuffer, setTypeAheadBuffer] = useState('');
+    const typeAheadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    /** Type-ahead timeout in milliseconds (per WAI-ARIA recommendation) */
+    const TYPE_AHEAD_TIMEOUT = 500;
+
+    /**
+     * Flatten visible nodes (respecting expanded state) for type-ahead search.
+     * Returns nodes in display order (depth-first, only including visible nodes).
+     */
+    const getVisibleNodes = useCallback(
+      (nodeList: OrganizationUnitNode[]): OrganizationUnitNode[] => {
+        const result: OrganizationUnitNode[] = [];
+        const traverse = (nodes: OrganizationUnitNode[]) => {
+          for (const node of nodes) {
+            result.push(node);
+            // Only include children if node is expanded
+            if (node.children.length > 0 && expandedIds.has(node.id)) {
+              traverse(node.children);
+            }
+          }
+        };
+        traverse(nodeList);
+        return result;
+      },
+      [expandedIds]
+    );
+
+    /**
+     * Find the next node matching the type-ahead prefix, starting after current selection.
+     * Wraps around to the beginning if no match found after current position.
+     */
+    const findMatchingNode = useCallback(
+      (prefix: string): string | null => {
+        if (!prefix) return null;
+
+        const visibleNodes = getVisibleNodes(nodes);
+        if (visibleNodes.length === 0) return null;
+
+        const lowerPrefix = prefix.toLowerCase();
+
+        // Find current index
+        const currentIndex = selectedId
+          ? visibleNodes.findIndex((n) => n.id === selectedId)
+          : -1;
+
+        // Search from current position + 1 to end, then wrap to beginning
+        for (let offset = 1; offset <= visibleNodes.length; offset++) {
+          const index = (currentIndex + offset) % visibleNodes.length;
+          const node = visibleNodes[index];
+          const nodeName = (node.displayName || node.name).toLowerCase();
+
+          if (nodeName.startsWith(lowerPrefix)) {
+            return node.id;
+          }
+        }
+
+        return null;
+      },
+      [nodes, selectedId, getVisibleNodes]
+    );
+
+    /**
+     * Handle type-ahead character input.
+     * Appends to buffer and finds matching node.
+     */
+    const handleTypeAhead = useCallback(
+      (char: string) => {
+        // Clear existing timeout
+        if (typeAheadTimeoutRef.current) {
+          clearTimeout(typeAheadTimeoutRef.current);
+        }
+
+        // Append character to buffer
+        const newBuffer = typeAheadBuffer + char;
+        setTypeAheadBuffer(newBuffer);
+
+        // Find matching node
+        const matchId = findMatchingNode(newBuffer);
+        if (matchId) {
+          onSelect(matchId);
+          log.debug('Type-ahead matched', { buffer: newBuffer, matchId });
+        }
+
+        // Set timeout to clear buffer
+        typeAheadTimeoutRef.current = setTimeout(() => {
+          setTypeAheadBuffer('');
+          log.debug('Type-ahead buffer cleared');
+        }, TYPE_AHEAD_TIMEOUT);
+      },
+      [typeAheadBuffer, findMatchingNode, onSelect]
+    );
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+      return () => {
+        if (typeAheadTimeoutRef.current) {
+          clearTimeout(typeAheadTimeoutRef.current);
+        }
+      };
+    }, []);
+
     // Focus the selected node when selection changes
     useEffect(() => {
       if (selectedId) {
@@ -180,7 +285,18 @@ export const OrganizationTree = observer(
             break;
 
           default:
-            // Type-ahead search could be implemented here
+            // Type-ahead search: handle printable characters
+            // Single character, not a modifier key, and printable
+            if (
+              e.key.length === 1 &&
+              !e.ctrlKey &&
+              !e.altKey &&
+              !e.metaKey &&
+              /^[a-zA-Z0-9 ]$/.test(e.key)
+            ) {
+              e.preventDefault();
+              handleTypeAhead(e.key);
+            }
             break;
         }
       },
@@ -194,6 +310,7 @@ export const OrganizationTree = observer(
         onSelectLast,
         onToggle,
         onActivate,
+        handleTypeAhead,
       ]
     );
 

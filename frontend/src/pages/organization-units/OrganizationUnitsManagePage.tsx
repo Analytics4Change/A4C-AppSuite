@@ -26,12 +26,9 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { OrganizationTree } from '@/components/organization-units';
+import { OrganizationTree, OrganizationUnitFormFields } from '@/components/organization-units';
 import { OrganizationUnitsViewModel } from '@/viewModels/organization/OrganizationUnitsViewModel';
-import {
-  OrganizationUnitFormViewModel,
-  COMMON_TIMEZONES,
-} from '@/viewModels/organization/OrganizationUnitFormViewModel';
+import { OrganizationUnitFormViewModel } from '@/viewModels/organization/OrganizationUnitFormViewModel';
 import { getOrganizationUnitService } from '@/services/organization/OrganizationUnitServiceFactory';
 import {
   Plus,
@@ -59,6 +56,19 @@ const log = Logger.getLogger('component');
 type PanelMode = 'empty' | 'edit' | 'create';
 
 /**
+ * Discriminated union for dialog state.
+ * Consolidates multiple boolean states into a single, type-safe state machine.
+ * Only one dialog can be open at a time.
+ */
+type DialogState =
+  | { type: 'none' }
+  | { type: 'discard' }
+  | { type: 'deactivate'; isLoading: boolean }
+  | { type: 'reactivate'; isLoading: boolean }
+  | { type: 'delete'; isLoading: boolean }
+  | { type: 'activeWarning' };
+
+/**
  * Organization Units Management Page Component
  */
 export const OrganizationUnitsManagePage: React.FC = observer(() => {
@@ -78,18 +88,9 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
   const [formViewModel, setFormViewModel] =
     useState<OrganizationUnitFormViewModel | null>(null);
 
-  // Unsaved changes dialog state
-  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  // Dialog state - discriminated union for type-safe dialog management
+  const [dialogState, setDialogState] = useState<DialogState>({ type: 'none' });
   const pendingActionRef = useRef<{ type: 'select' | 'create'; unitId?: string } | null>(null);
-
-  // Operation dialog states
-  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
-  const [isDeactivating, setIsDeactivating] = useState(false);
-  const [showReactivateDialog, setShowReactivateDialog] = useState(false);
-  const [isReactivating, setIsReactivating] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showActiveWarningDialog, setShowActiveWarningDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // Error states
   const [operationError, setOperationError] = useState<string | null>(null);
@@ -168,7 +169,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
       // Check for unsaved changes
       if (formViewModel?.isDirty) {
         pendingActionRef.current = { type: 'select', unitId: selectedId };
-        setShowDiscardDialog(true);
+        setDialogState({ type: 'discard' });
       } else {
         selectAndLoadUnit(selectedId);
       }
@@ -179,7 +180,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
   // Handle discard changes - proceed with pending action
   const handleDiscardChanges = useCallback(() => {
     const pending = pendingActionRef.current;
-    setShowDiscardDialog(false);
+    setDialogState({ type: 'none' });
     pendingActionRef.current = null;
 
     if (pending?.type === 'select' && pending.unitId) {
@@ -191,7 +192,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
 
   // Handle cancel discard - stay on current unit
   const handleCancelDiscard = useCallback(() => {
-    setShowDiscardDialog(false);
+    setDialogState({ type: 'none' });
     pendingActionRef.current = null;
   }, []);
 
@@ -219,7 +220,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
   const handleCreateClick = useCallback(() => {
     if (formViewModel?.isDirty) {
       pendingActionRef.current = { type: 'create' };
-      setShowDiscardDialog(true);
+      setDialogState({ type: 'discard' });
     } else {
       enterCreateMode();
     }
@@ -281,33 +282,31 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
   const handleDeactivateClick = useCallback(() => {
     if (currentUnit && currentUnit.isActive && !currentUnit.isRootOrganization) {
       setOperationError(null);
-      setShowDeactivateDialog(true);
+      setDialogState({ type: 'deactivate', isLoading: false });
     }
   }, [currentUnit]);
 
   const handleDeactivateConfirm = useCallback(async () => {
     if (!currentUnit) return;
 
-    setIsDeactivating(true);
+    setDialogState({ type: 'deactivate', isLoading: true });
     setOperationError(null);
     try {
       const service = getOrganizationUnitService();
       const result = await service.deactivateUnit(currentUnit.id);
 
       if (result.success) {
-        setShowDeactivateDialog(false);
+        setDialogState({ type: 'none' });
         log.info('Unit deactivated successfully', { unitId: currentUnit.id });
         await viewModel.loadUnits();
         await selectAndLoadUnit(currentUnit.id);
       } else {
-        setShowDeactivateDialog(false);
+        setDialogState({ type: 'none' });
         setOperationError(result.error || 'Failed to deactivate unit');
       }
     } catch (error) {
-      setShowDeactivateDialog(false);
+      setDialogState({ type: 'none' });
       setOperationError(error instanceof Error ? error.message : 'Failed to deactivate unit');
-    } finally {
-      setIsDeactivating(false);
     }
   }, [currentUnit, viewModel, selectAndLoadUnit]);
 
@@ -315,33 +314,31 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
   const handleReactivateClick = useCallback(() => {
     if (currentUnit && !currentUnit.isActive) {
       setOperationError(null);
-      setShowReactivateDialog(true);
+      setDialogState({ type: 'reactivate', isLoading: false });
     }
   }, [currentUnit]);
 
   const handleReactivateConfirm = useCallback(async () => {
     if (!currentUnit) return;
 
-    setIsReactivating(true);
+    setDialogState({ type: 'reactivate', isLoading: true });
     setOperationError(null);
     try {
       const service = getOrganizationUnitService();
       const result = await service.reactivateUnit(currentUnit.id);
 
       if (result.success) {
-        setShowReactivateDialog(false);
+        setDialogState({ type: 'none' });
         log.info('Unit reactivated successfully', { unitId: currentUnit.id });
         await viewModel.loadUnits();
         await selectAndLoadUnit(currentUnit.id);
       } else {
-        setShowReactivateDialog(false);
+        setDialogState({ type: 'none' });
         setOperationError(result.error || 'Failed to reactivate unit');
       }
     } catch (error) {
-      setShowReactivateDialog(false);
+      setDialogState({ type: 'none' });
       setOperationError(error instanceof Error ? error.message : 'Failed to reactivate unit');
-    } finally {
-      setIsReactivating(false);
     }
   }, [currentUnit, viewModel, selectAndLoadUnit]);
 
@@ -351,24 +348,24 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
 
     if (currentUnit.isActive) {
       // Show warning that unit must be deactivated first
-      setShowActiveWarningDialog(true);
+      setDialogState({ type: 'activeWarning' });
     } else {
       setOperationError(null);
-      setShowDeleteDialog(true);
+      setDialogState({ type: 'delete', isLoading: false });
     }
   }, [currentUnit]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!currentUnit) return;
 
-    setIsDeleting(true);
+    setDialogState({ type: 'delete', isLoading: true });
     setOperationError(null);
     try {
       const service = getOrganizationUnitService();
       const result = await service.deleteUnit(currentUnit.id);
 
       if (result.success) {
-        setShowDeleteDialog(false);
+        setDialogState({ type: 'none' });
         log.info('Unit deleted successfully', { unitId: currentUnit.id });
 
         const parentId = currentUnit.parentId;
@@ -383,21 +380,18 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
           setCurrentUnit(null);
         }
       } else {
-        setShowDeleteDialog(false);
+        setDialogState({ type: 'none' });
         setOperationError(result.error || 'Failed to delete unit');
       }
     } catch (error) {
-      setShowDeleteDialog(false);
+      setDialogState({ type: 'none' });
       setOperationError(error instanceof Error ? error.message : 'Failed to delete unit');
-    } finally {
-      setIsDeleting(false);
     }
   }, [currentUnit, viewModel, selectAndLoadUnit]);
 
   // Handle "deactivate first" flow from active warning dialog
   const handleDeactivateFirst = useCallback(() => {
-    setShowActiveWarningDialog(false);
-    setShowDeactivateDialog(true);
+    setDialogState({ type: 'deactivate', isLoading: false });
   }, []);
 
   // Get available parents for create mode
@@ -666,106 +660,11 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                       </Select.Root>
                     </div>
 
-                    {/* Name Input */}
-                    <div>
-                      <Label htmlFor="unit-name" className="block text-xs font-medium text-gray-700 mb-1">
-                        Unit Name <span className="text-red-500">*</span>
-                      </Label>
-                      <input
-                        type="text"
-                        id="unit-name"
-                        value={formViewModel.formData.name}
-                        onChange={(e) => formViewModel.updateName(e.target.value)}
-                        onBlur={() => formViewModel.touchField('name')}
-                        className={cn(
-                          'w-full px-2 py-1.5 text-sm rounded-md border shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors',
-                          formViewModel.hasFieldError('name')
-                            ? 'border-red-300 bg-red-50'
-                            : 'border-gray-300 bg-white'
-                        )}
-                        placeholder="e.g., Main Campus"
-                        aria-required="true"
-                        aria-invalid={formViewModel.hasFieldError('name')}
-                      />
-                      {formViewModel.hasFieldError('name') && (
-                        <p className="text-red-600 text-xs mt-1" role="alert">
-                          {formViewModel.getFieldError('name')}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Display Name Input */}
-                    <div>
-                      <Label htmlFor="display-name" className="block text-xs font-medium text-gray-700 mb-1">
-                        Display Name <span className="text-red-500">*</span>
-                      </Label>
-                      <input
-                        type="text"
-                        id="display-name"
-                        value={formViewModel.formData.displayName}
-                        onChange={(e) => formViewModel.updateField('displayName', e.target.value)}
-                        onBlur={() => formViewModel.touchField('displayName')}
-                        className={cn(
-                          'w-full px-2 py-1.5 text-sm rounded-md border shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors',
-                          formViewModel.hasFieldError('displayName')
-                            ? 'border-red-300 bg-red-50'
-                            : 'border-gray-300 bg-white'
-                        )}
-                        placeholder="e.g., Main Campus - Building A"
-                        aria-required="true"
-                        aria-invalid={formViewModel.hasFieldError('displayName')}
-                      />
-                      {formViewModel.hasFieldError('displayName') && (
-                        <p className="text-red-600 text-xs mt-1" role="alert">
-                          {formViewModel.getFieldError('displayName')}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Timezone Dropdown */}
-                    <div>
-                      <Label className="block text-xs font-medium text-gray-700 mb-1">
-                        Time Zone <span className="text-red-500">*</span>
-                      </Label>
-                      <Select.Root
-                        value={formViewModel.formData.timeZone}
-                        onValueChange={(value) => formViewModel.setTimeZone(value)}
-                      >
-                        <Select.Trigger
-                          className={cn(
-                            'w-full px-2 py-1.5 text-sm rounded-md border shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500',
-                            formViewModel.hasFieldError('timeZone')
-                              ? 'border-red-300 bg-red-50'
-                              : 'border-gray-300'
-                          )}
-                          aria-label="Time Zone"
-                        >
-                          <Select.Value>
-                            {COMMON_TIMEZONES.find(
-                              (tz) => tz.value === formViewModel.formData.timeZone
-                            )?.label ?? formViewModel.formData.timeZone}
-                          </Select.Value>
-                          <Select.Icon>
-                            <ChevronDown className="h-4 w-4 text-gray-400" />
-                          </Select.Icon>
-                        </Select.Trigger>
-                        <Select.Portal>
-                          <Select.Content className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50">
-                            <Select.Viewport className="p-1">
-                              {COMMON_TIMEZONES.map((tz) => (
-                                <Select.Item
-                                  key={tz.value}
-                                  value={tz.value}
-                                  className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
-                                >
-                                  <Select.ItemText>{tz.label}</Select.ItemText>
-                                </Select.Item>
-                              ))}
-                            </Select.Viewport>
-                          </Select.Content>
-                        </Select.Portal>
-                      </Select.Root>
-                    </div>
+                    {/* Shared Form Fields: Name, Display Name, Timezone */}
+                    <OrganizationUnitFormFields
+                      formViewModel={formViewModel}
+                      idPrefix="create"
+                    />
 
                     {/* Form Actions */}
                     <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-200">
@@ -855,104 +754,11 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                         </p>
                       </div>
 
-                      {/* Name Input */}
-                      <div>
-                        <Label htmlFor="edit-unit-name" className="block text-xs font-medium text-gray-700 mb-1">
-                          Unit Name <span className="text-red-500">*</span>
-                        </Label>
-                        <input
-                          type="text"
-                          id="edit-unit-name"
-                          value={formViewModel.formData.name}
-                          onChange={(e) => formViewModel.updateName(e.target.value)}
-                          onBlur={() => formViewModel.touchField('name')}
-                          className={cn(
-                            'w-full px-2 py-1.5 text-sm rounded-md border shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors',
-                            formViewModel.hasFieldError('name')
-                              ? 'border-red-300 bg-red-50'
-                              : 'border-gray-300 bg-white'
-                          )}
-                          aria-required="true"
-                          aria-invalid={formViewModel.hasFieldError('name')}
-                        />
-                        {formViewModel.hasFieldError('name') && (
-                          <p className="text-red-600 text-xs mt-1" role="alert">
-                            {formViewModel.getFieldError('name')}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Display Name Input */}
-                      <div>
-                        <Label htmlFor="edit-display-name" className="block text-xs font-medium text-gray-700 mb-1">
-                          Display Name <span className="text-red-500">*</span>
-                        </Label>
-                        <input
-                          type="text"
-                          id="edit-display-name"
-                          value={formViewModel.formData.displayName}
-                          onChange={(e) => formViewModel.updateField('displayName', e.target.value)}
-                          onBlur={() => formViewModel.touchField('displayName')}
-                          className={cn(
-                            'w-full px-2 py-1.5 text-sm rounded-md border shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors',
-                            formViewModel.hasFieldError('displayName')
-                              ? 'border-red-300 bg-red-50'
-                              : 'border-gray-300 bg-white'
-                          )}
-                          aria-required="true"
-                          aria-invalid={formViewModel.hasFieldError('displayName')}
-                        />
-                        {formViewModel.hasFieldError('displayName') && (
-                          <p className="text-red-600 text-xs mt-1" role="alert">
-                            {formViewModel.getFieldError('displayName')}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Timezone Dropdown */}
-                      <div>
-                        <Label className="block text-xs font-medium text-gray-700 mb-1">
-                          Time Zone <span className="text-red-500">*</span>
-                        </Label>
-                        <Select.Root
-                          value={formViewModel.formData.timeZone}
-                          onValueChange={(value) => formViewModel.setTimeZone(value)}
-                        >
-                          <Select.Trigger
-                            className={cn(
-                              'w-full px-2 py-1.5 text-sm rounded-md border shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500',
-                              formViewModel.hasFieldError('timeZone')
-                                ? 'border-red-300 bg-red-50'
-                                : 'border-gray-300'
-                            )}
-                            aria-label="Time Zone"
-                          >
-                            <Select.Value>
-                              {COMMON_TIMEZONES.find(
-                                (tz) => tz.value === formViewModel.formData.timeZone
-                              )?.label ?? formViewModel.formData.timeZone}
-                            </Select.Value>
-                            <Select.Icon>
-                              <ChevronDown className="h-4 w-4 text-gray-400" />
-                            </Select.Icon>
-                          </Select.Trigger>
-                          <Select.Portal>
-                            <Select.Content className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50">
-                              <Select.Viewport className="p-1">
-                                {COMMON_TIMEZONES.map((tz) => (
-                                  <Select.Item
-                                    key={tz.value}
-                                    value={tz.value}
-                                    className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
-                                  >
-                                    <Select.ItemText>{tz.label}</Select.ItemText>
-                                  </Select.Item>
-                                ))}
-                              </Select.Viewport>
-                            </Select.Content>
-                          </Select.Portal>
-                        </Select.Root>
-                      </div>
+                      {/* Shared Form Fields: Name, Display Name, Timezone */}
+                      <OrganizationUnitFormFields
+                        formViewModel={formViewModel}
+                        idPrefix="edit"
+                      />
 
                       {/* Active Status Toggle (not for root org) */}
                       {!currentUnit.isRootOrganization && (
@@ -967,7 +773,11 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                                 handleReactivateClick();
                               }
                             }}
-                            disabled={isDeactivating || isReactivating || formViewModel.isSubmitting}
+                            disabled={
+                              dialogState.type === 'deactivate' ||
+                              dialogState.type === 'reactivate' ||
+                              formViewModel.isSubmitting
+                            }
                             className="mt-0.5 shadow-sm ring-1 ring-gray-300 bg-white/80 backdrop-blur-sm"
                           />
                           <div>
@@ -1041,11 +851,16 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                               variant="outline"
                               size="sm"
                               onClick={handleReactivateClick}
-                              disabled={formViewModel.isSubmitting || isReactivating}
+                              disabled={
+                                formViewModel.isSubmitting ||
+                                (dialogState.type === 'reactivate' && dialogState.isLoading)
+                              }
                               className="mt-2 text-green-600 border-green-300 hover:bg-green-50"
                             >
                               <CheckCircle className="w-3 h-3 mr-1" />
-                              {isReactivating ? 'Reactivating...' : 'Reactivate Unit'}
+                              {dialogState.type === 'reactivate' && dialogState.isLoading
+                                ? 'Reactivating...'
+                                : 'Reactivate Unit'}
                             </Button>
                           </div>
                         )}
@@ -1066,11 +881,16 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                             variant="outline"
                             size="sm"
                             onClick={handleDeleteClick}
-                            disabled={formViewModel.isSubmitting || isDeleting}
+                            disabled={
+                              formViewModel.isSubmitting ||
+                              (dialogState.type === 'delete' && dialogState.isLoading)
+                            }
                             className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
                           >
                             <Trash2 className="w-3 h-3 mr-1" />
-                            {isDeleting ? 'Deleting...' : 'Delete Unit'}
+                            {dialogState.type === 'delete' && dialogState.isLoading
+                              ? 'Deleting...'
+                              : 'Delete Unit'}
                           </Button>
                         </div>
                       </CardContent>
@@ -1085,7 +905,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
 
       {/* Unsaved Changes Dialog */}
       <ConfirmDialog
-        isOpen={showDiscardDialog}
+        isOpen={dialogState.type === 'discard'}
         title="Unsaved Changes"
         message="You have unsaved changes. Do you want to discard them?"
         confirmLabel="Discard Changes"
@@ -1097,7 +917,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
 
       {/* Deactivate Confirmation Dialog */}
       <ConfirmDialog
-        isOpen={showDeactivateDialog}
+        isOpen={dialogState.type === 'deactivate'}
         title="Deactivate Unit"
         message={
           currentUnit?.childCount && currentUnit.childCount > 0
@@ -1107,14 +927,14 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         confirmLabel="Deactivate"
         cancelLabel="Cancel"
         onConfirm={handleDeactivateConfirm}
-        onCancel={() => setShowDeactivateDialog(false)}
-        isLoading={isDeactivating}
+        onCancel={() => setDialogState({ type: 'none' })}
+        isLoading={dialogState.type === 'deactivate' && dialogState.isLoading}
         variant="warning"
       />
 
       {/* Reactivate Confirmation Dialog */}
       <ConfirmDialog
-        isOpen={showReactivateDialog}
+        isOpen={dialogState.type === 'reactivate'}
         title="Reactivate Unit"
         message={
           currentUnit?.childCount && currentUnit.childCount > 0
@@ -1124,33 +944,33 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         confirmLabel="Reactivate"
         cancelLabel="Cancel"
         onConfirm={handleReactivateConfirm}
-        onCancel={() => setShowReactivateDialog(false)}
-        isLoading={isReactivating}
+        onCancel={() => setDialogState({ type: 'none' })}
+        isLoading={dialogState.type === 'reactivate' && dialogState.isLoading}
         variant="success"
       />
 
       {/* Active Warning Dialog */}
       <ConfirmDialog
-        isOpen={showActiveWarningDialog}
+        isOpen={dialogState.type === 'activeWarning'}
         title="Cannot Delete Active Unit"
         message={`"${currentUnit?.displayName || currentUnit?.name}" must be deactivated before it can be deleted. Would you like to deactivate it now?`}
         confirmLabel="Deactivate First"
         cancelLabel="Cancel"
         onConfirm={handleDeactivateFirst}
-        onCancel={() => setShowActiveWarningDialog(false)}
+        onCancel={() => setDialogState({ type: 'none' })}
         variant="warning"
       />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
-        isOpen={showDeleteDialog}
+        isOpen={dialogState.type === 'delete'}
         title="Delete Organization Unit"
         message={`Are you sure you want to delete "${currentUnit?.displayName || currentUnit?.name}"? This action is permanent and cannot be undone.`}
         confirmLabel="Delete"
         cancelLabel="Cancel"
         onConfirm={handleDeleteConfirm}
-        onCancel={() => setShowDeleteDialog(false)}
-        isLoading={isDeleting}
+        onCancel={() => setDialogState({ type: 'none' })}
+        isLoading={dialogState.type === 'delete' && dialogState.isLoading}
         variant="danger"
       />
     </div>

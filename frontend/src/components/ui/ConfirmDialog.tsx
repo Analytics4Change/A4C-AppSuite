@@ -10,16 +10,23 @@
  * - success: Green styling for positive actions (reactivate)
  * - default: Blue styling for neutral actions
  *
- * Accessibility:
+ * Accessibility (WCAG 2.1 Level AA + WAI-ARIA APG Dialog Pattern):
  * - Uses role="alertdialog" for screen reader announcement
- * - aria-modal="true" for focus trap indication
+ * - aria-modal="true" for modal indication
  * - aria-labelledby/describedby for content association
+ * - Focus trap: Tab/Shift+Tab contained within dialog
+ * - Escape key: Closes dialog and returns focus
+ * - Focus restoration: Returns focus to trigger element on close
+ * - Initial focus: Sets focus to first focusable element
+ * - Backdrop click: Closes dialog (optional dismissal)
+ * - Color contrast: Icons meet WCAG AA 3:1 minimum for graphical objects
  */
 
-import React from 'react';
+import React, { useRef, RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, CheckCircle, X } from 'lucide-react';
 import { cn } from '@/components/ui/utils';
+import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
@@ -44,6 +51,19 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isLoading = false,
   variant = 'default',
 }) => {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+
+  // Focus trap and keyboard navigation (WCAG 2.1 AA requirement)
+  // Pattern from MedicationSearchModal - proven implementation
+  useKeyboardNavigation({
+    containerRef: dialogRef as RefObject<HTMLElement>,
+    enabled: isOpen,
+    trapFocus: true,        // Tab/Shift+Tab contained within dialog
+    restoreFocus: true,     // Return focus to trigger element on close
+    onEscape: onCancel,     // ESC key closes dialog
+    wrapAround: true,       // Tab from last element goes to first
+  });
+
   if (!isOpen) return null;
 
   const variantStyles = {
@@ -53,36 +73,52 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     default: 'bg-blue-600 hover:bg-blue-700',
   };
 
+  // Icon background colors adjusted for WCAG AA 3:1 contrast ratio
+  // Using 200-level backgrounds with 700-level icons for sufficient contrast
+  const iconBackgroundStyles = {
+    danger: 'bg-red-200',
+    warning: 'bg-orange-200',
+    success: 'bg-green-200',
+    default: 'bg-blue-200',
+  };
+
+  const iconColorStyles = {
+    danger: 'text-red-700',
+    warning: 'text-orange-700',
+    success: 'text-green-700',
+    default: 'text-blue-700',
+  };
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      ref={dialogRef}
+      className="fixed inset-0 z-50 flex items-center justify-center"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
       aria-describedby="confirm-dialog-description"
+      data-focus-context="modal"
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+      {/* Backdrop - click to dismiss */}
+      <div
+        className="absolute inset-0 bg-black/50"
+        onClick={onCancel}
+        aria-hidden="true"
+      />
+      {/* Dialog panel - relative to sit above backdrop */}
+      <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <div className="flex items-start gap-4">
+          {/* Icon with WCAG AA compliant contrast (3:1 minimum for graphical objects) */}
           <div
             className={cn(
               'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
-              variant === 'danger' && 'bg-red-100',
-              variant === 'warning' && 'bg-orange-100',
-              variant === 'success' && 'bg-green-100',
-              variant === 'default' && 'bg-blue-100'
+              iconBackgroundStyles[variant]
             )}
           >
             {variant === 'success' ? (
-              <CheckCircle className="w-5 h-5 text-green-600" />
+              <CheckCircle className={cn('w-5 h-5', iconColorStyles[variant])} />
             ) : (
-              <AlertTriangle
-                className={cn(
-                  'w-5 h-5',
-                  variant === 'danger' && 'text-red-600',
-                  variant === 'warning' && 'text-orange-600',
-                  variant === 'default' && 'text-blue-600'
-                )}
-              />
+              <AlertTriangle className={cn('w-5 h-5', iconColorStyles[variant])} />
             )}
           </div>
           <div className="flex-1">
