@@ -20,7 +20,6 @@ import {
   OrganizationUnitsListPage,
   OrganizationUnitsManagePage,
   OrganizationUnitCreatePage,
-  OrganizationUnitEditPage,
 } from '@/pages/organization-units';
 import { DebugControlPanel } from '@/components/debug/DebugControlPanel';
 import { LogOverlay } from '@/components/debug/LogOverlay';
@@ -115,11 +114,7 @@ function App() {
                     <OrganizationUnitCreatePage />
                   </RequirePermission>
                 } />
-                <Route path="/organization-units/:unitId/edit" element={
-                  <RequirePermission permission="organization.create_ou" fallback="/clients">
-                    <OrganizationUnitEditPage />
-                  </RequirePermission>
-                } />
+                {/* Edit route removed - functionality consolidated into ManagePage */}
 
                 {/* Other main sections */}
                 <Route path="/medications" element={<MedicationsPage />} />

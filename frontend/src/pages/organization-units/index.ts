@@ -7,4 +7,4 @@
 export { OrganizationUnitsListPage } from './OrganizationUnitsListPage';
 export { OrganizationUnitsManagePage } from './OrganizationUnitsManagePage';
 export { OrganizationUnitCreatePage } from './OrganizationUnitCreatePage';
-export { OrganizationUnitEditPage } from './OrganizationUnitEditPage';
+// OrganizationUnitEditPage removed - functionality consolidated into ManagePage

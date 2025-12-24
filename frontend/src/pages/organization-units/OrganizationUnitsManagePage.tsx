@@ -1,31 +1,40 @@
 /**
- * Organization Units Management Page
+ * Organization Units Management Page (Unified)
  *
- * CRUD interface for managing organizational units with split view layout.
- * Left panel: Tree view with selection
- * Right panel: Action buttons and selected unit details
+ * Single-page interface for managing organizational units with split view layout.
+ * Left panel: Interactive tree view with selection
+ * Right panel: Always-editable form for selected unit OR create form
  *
  * Features:
- * - Split view layout (tree + action panel)
- * - Create, Edit, Deactivate actions based on selection
- * - Confirmation dialog for deactivate action
- * - Breadcrumb showing selected unit path
- * - Loading and error states
+ * - Split view layout (tree + editable form panel)
+ * - Select unit → immediately shows editable form (no separate edit page)
+ * - Inline create mode (form clears for new unit creation)
+ * - Unsaved changes warning when switching units
+ * - Deactivate/Reactivate with cascade to children
+ * - Delete (requires deactivation first)
+ * - Query parameter support: ?select=uuid for deep links
  *
  * Route: /organization-units/manage
  * Permission: organization.create_ou
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { OrganizationTree } from '@/components/organization-units';
 import { OrganizationUnitsViewModel } from '@/viewModels/organization/OrganizationUnitsViewModel';
 import {
+  OrganizationUnitFormViewModel,
+  COMMON_TIMEZONES,
+} from '@/viewModels/organization/OrganizationUnitFormViewModel';
+import { getOrganizationUnitService } from '@/services/organization/OrganizationUnitServiceFactory';
+import {
   Plus,
-  Edit,
   Trash2,
   ChevronDown,
   ChevronUp,
@@ -37,114 +46,17 @@ import {
   X,
   CheckCircle,
   XCircle,
+  Save,
 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
 import { cn } from '@/components/ui/utils';
+import * as Select from '@radix-ui/react-select';
+import type { OrganizationUnit } from '@/types/organization-unit.types';
 
 const log = Logger.getLogger('component');
 
-/**
- * Confirmation Dialog Props
- */
-interface ConfirmDialogProps {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  confirmLabel: string;
-  cancelLabel: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  isLoading?: boolean;
-  variant?: 'danger' | 'warning' | 'success' | 'default';
-}
-
-/**
- * Simple Confirmation Dialog Component
- */
-const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
-  isOpen,
-  title,
-  message,
-  confirmLabel,
-  cancelLabel,
-  onConfirm,
-  onCancel,
-  isLoading = false,
-  variant = 'default',
-}) => {
-  if (!isOpen) return null;
-
-  const variantStyles = {
-    danger: 'bg-red-600 hover:bg-red-700',
-    warning: 'bg-orange-600 hover:bg-orange-700',
-    success: 'bg-green-600 hover:bg-green-700',
-    default: 'bg-blue-600 hover:bg-blue-700',
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      role="alertdialog"
-      aria-modal="true"
-      aria-labelledby="confirm-dialog-title"
-      aria-describedby="confirm-dialog-description"
-    >
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-        <div className="flex items-start gap-4">
-          <div className={cn(
-            'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
-            variant === 'danger' && 'bg-red-100',
-            variant === 'warning' && 'bg-orange-100',
-            variant === 'success' && 'bg-green-100',
-            variant === 'default' && 'bg-blue-100'
-          )}>
-            {variant === 'success' ? (
-              <CheckCircle className="w-5 h-5 text-green-600" />
-            ) : (
-              <AlertTriangle className={cn(
-                'w-5 h-5',
-                variant === 'danger' && 'text-red-600',
-                variant === 'warning' && 'text-orange-600',
-                variant === 'default' && 'text-blue-600'
-              )} />
-            )}
-          </div>
-          <div className="flex-1">
-            <h3 id="confirm-dialog-title" className="text-lg font-semibold text-gray-900">
-              {title}
-            </h3>
-            <p id="confirm-dialog-description" className="mt-2 text-gray-600">
-              {message}
-            </p>
-          </div>
-          <button
-            onClick={onCancel}
-            className="flex-shrink-0 text-gray-400 hover:text-gray-600"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="mt-6 flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={onCancel}
-            disabled={isLoading}
-          >
-            {cancelLabel}
-          </Button>
-          <Button
-            className={cn('text-white', variantStyles[variant])}
-            onClick={onConfirm}
-            disabled={isLoading}
-          >
-            {isLoading ? 'Processing...' : confirmLabel}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-};
+/** Panel mode: empty (no selection), edit (unit selected), create (creating new unit) */
+type PanelMode = 'empty' | 'edit' | 'create';
 
 /**
  * Organization Units Management Page Component
@@ -152,13 +64,35 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 export const OrganizationUnitsManagePage: React.FC = observer(() => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Tree ViewModel - manages tree state, selection, expansion
   const [viewModel] = useState(() => new OrganizationUnitsViewModel());
+
+  // Panel mode: empty, edit, or create
+  const [panelMode, setPanelMode] = useState<PanelMode>('empty');
+
+  // Current unit being edited (for edit mode)
+  const [currentUnit, setCurrentUnit] = useState<OrganizationUnit | null>(null);
+
+  // Form ViewModel (for edit and create modes)
+  const [formViewModel, setFormViewModel] =
+    useState<OrganizationUnitFormViewModel | null>(null);
+
+  // Unsaved changes dialog state
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  const pendingActionRef = useRef<{ type: 'select' | 'create'; unitId?: string } | null>(null);
+
+  // Operation dialog states
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [showReactivateDialog, setShowReactivateDialog] = useState(false);
   const [isReactivating, setIsReactivating] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showActiveWarningDialog, setShowActiveWarningDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Error states
+  const [operationError, setOperationError] = useState<string | null>(null);
 
   // Load units on mount
   useEffect(() => {
@@ -166,148 +100,311 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
     viewModel.loadUnits();
   }, [viewModel]);
 
-  // Auto-expand parent node if specified in URL (e.g., after creating a new unit)
+  // Handle query parameters for deep linking and auto-expand
   useEffect(() => {
+    const selectId = searchParams.get('select');
     const expandParentId = searchParams.get('expandParent');
 
-    log.debug('Auto-expand effect triggered', {
-      expandParentId,
-      unitCount: viewModel.unitCount,
-      hasExpandParam: !!expandParentId
-    });
+    if (viewModel.unitCount === 0) return; // Wait for units to load
 
-    if (expandParentId && viewModel.unitCount > 0) {
-      // Verify the parent exists
+    if (selectId) {
+      // Deep link: auto-select and expand to the specified unit
+      const unit = viewModel.getUnitById(selectId);
+      if (unit) {
+        viewModel.expandToNode(selectId);
+        viewModel.selectNode(selectId);
+        selectAndLoadUnit(selectId);
+        log.info('Auto-selected unit from URL', { unitId: selectId });
+      }
+      setSearchParams({}, { replace: true });
+    } else if (expandParentId) {
+      // After creating a new unit, expand to parent
       const parent = viewModel.getUnitById(expandParentId);
       if (parent) {
-        // Expand to reveal the parent node
         viewModel.expandToNode(expandParentId);
-        log.info('✅ Auto-expanded parent node from URL', {
-          parentId: expandParentId,
-          parentName: parent.name
-        });
-
-        // Clean up the URL parameter
-        setSearchParams({});
-      } else {
-        log.warn('⚠️ Parent node not found for auto-expand', { parentId: expandParentId });
+        log.info('Auto-expanded parent node from URL', { parentId: expandParentId });
       }
-    } else if (expandParentId && viewModel.unitCount === 0) {
-      log.debug('Waiting for units to load before expanding...', { expandParentId });
+      setSearchParams({}, { replace: true });
     }
   }, [searchParams, viewModel.unitCount, viewModel, setSearchParams]);
+
+  // Select and load a unit for editing
+  const selectAndLoadUnit = useCallback(
+    async (unitId: string) => {
+      setOperationError(null);
+      const unit = viewModel.getUnitById(unitId);
+      if (!unit) {
+        log.warn('Unit not found', { unitId });
+        return;
+      }
+
+      // Fetch full unit details from service
+      try {
+        const service = getOrganizationUnitService();
+        const fullUnit = await service.getUnitById(unitId);
+        if (fullUnit) {
+          setCurrentUnit(fullUnit);
+          setFormViewModel(new OrganizationUnitFormViewModel(service, 'edit', fullUnit));
+          setPanelMode('edit');
+          viewModel.selectNode(unitId);
+          log.debug('Unit loaded for editing', { unitId, name: fullUnit.name });
+        }
+      } catch (error) {
+        log.error('Failed to load unit', error);
+        setOperationError('Failed to load unit details');
+      }
+    },
+    [viewModel]
+  );
+
+  // Handle tree node selection with dirty check
+  const handleTreeSelect = useCallback(
+    (selectedId: string) => {
+      // If clicking the same unit, do nothing
+      if (selectedId === viewModel.selectedUnitId && panelMode === 'edit') {
+        return;
+      }
+
+      // Check for unsaved changes
+      if (formViewModel?.isDirty) {
+        pendingActionRef.current = { type: 'select', unitId: selectedId };
+        setShowDiscardDialog(true);
+      } else {
+        selectAndLoadUnit(selectedId);
+      }
+    },
+    [viewModel.selectedUnitId, panelMode, formViewModel, selectAndLoadUnit]
+  );
+
+  // Handle discard changes - proceed with pending action
+  const handleDiscardChanges = useCallback(() => {
+    const pending = pendingActionRef.current;
+    setShowDiscardDialog(false);
+    pendingActionRef.current = null;
+
+    if (pending?.type === 'select' && pending.unitId) {
+      selectAndLoadUnit(pending.unitId);
+    } else if (pending?.type === 'create') {
+      enterCreateMode();
+    }
+  }, [selectAndLoadUnit]);
+
+  // Handle cancel discard - stay on current unit
+  const handleCancelDiscard = useCallback(() => {
+    setShowDiscardDialog(false);
+    pendingActionRef.current = null;
+  }, []);
+
+  // Enter create mode
+  const enterCreateMode = useCallback(() => {
+    setOperationError(null);
+    const service = getOrganizationUnitService();
+    const vm = new OrganizationUnitFormViewModel(service, 'create');
+
+    // Pre-select parent if a unit is currently selected
+    if (viewModel.selectedUnitId) {
+      const parent = viewModel.getUnitById(viewModel.selectedUnitId);
+      if (parent && parent.isActive) {
+        vm.setParent(viewModel.selectedUnitId);
+      }
+    }
+
+    setFormViewModel(vm);
+    setCurrentUnit(null);
+    setPanelMode('create');
+    log.debug('Entered create mode', { parentId: viewModel.selectedUnitId });
+  }, [viewModel]);
+
+  // Handle create button click with dirty check
+  const handleCreateClick = useCallback(() => {
+    if (formViewModel?.isDirty) {
+      pendingActionRef.current = { type: 'create' };
+      setShowDiscardDialog(true);
+    } else {
+      enterCreateMode();
+    }
+  }, [formViewModel, enterCreateMode]);
+
+  // Handle form submission (both edit and create)
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!formViewModel) return;
+
+      const result = await formViewModel.submit();
+
+      if (result.success && result.unit) {
+        log.info('Form submitted successfully', {
+          mode: panelMode,
+          unitId: result.unit.id,
+        });
+
+        // Reload tree to reflect changes
+        await viewModel.loadUnits();
+
+        if (panelMode === 'create') {
+          // After create: expand to parent, select new unit, switch to edit mode
+          const parentId = formViewModel.formData.parentId;
+          if (parentId) {
+            viewModel.expandToNode(parentId);
+          }
+          await selectAndLoadUnit(result.unit.id);
+        } else {
+          // After edit: stay on same unit, reload its data
+          await selectAndLoadUnit(result.unit.id);
+        }
+      }
+    },
+    [formViewModel, panelMode, viewModel, selectAndLoadUnit]
+  );
+
+  // Handle cancel in form
+  const handleCancel = useCallback(() => {
+    if (panelMode === 'create') {
+      // Return to previous selection or empty state
+      if (viewModel.selectedUnitId) {
+        selectAndLoadUnit(viewModel.selectedUnitId);
+      } else {
+        setPanelMode('empty');
+        setFormViewModel(null);
+        setCurrentUnit(null);
+      }
+    }
+  }, [panelMode, viewModel.selectedUnitId, selectAndLoadUnit]);
 
   // Navigation handlers
   const handleBackClick = () => {
     navigate('/organization-units');
   };
 
-  const handleCreateClick = () => {
-    // Pass the selected unit ID as parent if one is selected
-    const parentId = viewModel.selectedUnitId;
-    if (parentId) {
-      navigate(`/organization-units/create?parentId=${parentId}`);
-    } else {
-      navigate('/organization-units/create');
-    }
-  };
-
-  const handleEditClick = () => {
-    if (viewModel.selectedUnitId) {
-      navigate(`/organization-units/${viewModel.selectedUnitId}/edit`);
-    }
-  };
-
-  const handleDeactivateClick = () => {
-    if (viewModel.canDeactivate) {
+  // Deactivate handlers
+  const handleDeactivateClick = useCallback(() => {
+    if (currentUnit && currentUnit.isActive && !currentUnit.isRootOrganization) {
+      setOperationError(null);
       setShowDeactivateDialog(true);
     }
-  };
+  }, [currentUnit]);
 
   const handleDeactivateConfirm = useCallback(async () => {
-    if (!viewModel.selectedUnitId) return;
+    if (!currentUnit) return;
 
     setIsDeactivating(true);
+    setOperationError(null);
     try {
-      const result = await viewModel.deactivateUnit(viewModel.selectedUnitId);
+      const service = getOrganizationUnitService();
+      const result = await service.deactivateUnit(currentUnit.id);
+
       if (result.success) {
         setShowDeactivateDialog(false);
-        log.info('Unit deactivated successfully');
+        log.info('Unit deactivated successfully', { unitId: currentUnit.id });
+        await viewModel.loadUnits();
+        await selectAndLoadUnit(currentUnit.id);
       } else {
-        // Error is displayed in viewModel.error
-        log.warn('Deactivation failed', { error: result.error });
+        setShowDeactivateDialog(false);
+        setOperationError(result.error || 'Failed to deactivate unit');
       }
+    } catch (error) {
+      setShowDeactivateDialog(false);
+      setOperationError(error instanceof Error ? error.message : 'Failed to deactivate unit');
     } finally {
       setIsDeactivating(false);
     }
-  }, [viewModel]);
+  }, [currentUnit, viewModel, selectAndLoadUnit]);
 
-  const handleDeactivateCancel = () => {
-    setShowDeactivateDialog(false);
-  };
-
-  const handleReactivateClick = () => {
-    if (viewModel.canReactivate) {
+  // Reactivate handlers
+  const handleReactivateClick = useCallback(() => {
+    if (currentUnit && !currentUnit.isActive) {
+      setOperationError(null);
       setShowReactivateDialog(true);
     }
-  };
+  }, [currentUnit]);
 
   const handleReactivateConfirm = useCallback(async () => {
-    if (!viewModel.selectedUnitId) return;
+    if (!currentUnit) return;
 
     setIsReactivating(true);
+    setOperationError(null);
     try {
-      const result = await viewModel.reactivateUnit(viewModel.selectedUnitId);
+      const service = getOrganizationUnitService();
+      const result = await service.reactivateUnit(currentUnit.id);
+
       if (result.success) {
         setShowReactivateDialog(false);
-        log.info('Unit reactivated successfully');
+        log.info('Unit reactivated successfully', { unitId: currentUnit.id });
+        await viewModel.loadUnits();
+        await selectAndLoadUnit(currentUnit.id);
       } else {
-        // Error is displayed in viewModel.error
-        log.warn('Reactivation failed', { error: result.error });
+        setShowReactivateDialog(false);
+        setOperationError(result.error || 'Failed to reactivate unit');
       }
+    } catch (error) {
+      setShowReactivateDialog(false);
+      setOperationError(error instanceof Error ? error.message : 'Failed to reactivate unit');
     } finally {
       setIsReactivating(false);
     }
-  }, [viewModel]);
+  }, [currentUnit, viewModel, selectAndLoadUnit]);
 
-  const handleReactivateCancel = () => {
-    setShowReactivateDialog(false);
-  };
+  // Delete handlers
+  const handleDeleteClick = useCallback(() => {
+    if (!currentUnit || currentUnit.isRootOrganization) return;
 
-  const handleDeleteClick = () => {
-    if (viewModel.canDelete) {
+    if (currentUnit.isActive) {
+      // Show warning that unit must be deactivated first
+      setShowActiveWarningDialog(true);
+    } else {
+      setOperationError(null);
       setShowDeleteDialog(true);
     }
-  };
+  }, [currentUnit]);
 
   const handleDeleteConfirm = useCallback(async () => {
-    if (!viewModel.selectedUnitId) return;
+    if (!currentUnit) return;
 
     setIsDeleting(true);
+    setOperationError(null);
     try {
-      const result = await viewModel.deleteUnit(viewModel.selectedUnitId);
+      const service = getOrganizationUnitService();
+      const result = await service.deleteUnit(currentUnit.id);
+
       if (result.success) {
         setShowDeleteDialog(false);
-        log.info('Unit deleted successfully');
+        log.info('Unit deleted successfully', { unitId: currentUnit.id });
+
+        const parentId = currentUnit.parentId;
+        await viewModel.loadUnits();
+
+        // Select parent or reset to empty
+        if (parentId) {
+          await selectAndLoadUnit(parentId);
+        } else {
+          setPanelMode('empty');
+          setFormViewModel(null);
+          setCurrentUnit(null);
+        }
       } else {
-        // Error is displayed in viewModel.error
-        log.warn('Delete failed', { error: result.error });
+        setShowDeleteDialog(false);
+        setOperationError(result.error || 'Failed to delete unit');
       }
+    } catch (error) {
+      setShowDeleteDialog(false);
+      setOperationError(error instanceof Error ? error.message : 'Failed to delete unit');
     } finally {
       setIsDeleting(false);
     }
-  }, [viewModel]);
+  }, [currentUnit, viewModel, selectAndLoadUnit]);
 
-  const handleDeleteCancel = () => {
-    setShowDeleteDialog(false);
-  };
+  // Handle "deactivate first" flow from active warning dialog
+  const handleDeactivateFirst = useCallback(() => {
+    setShowActiveWarningDialog(false);
+    setShowDeactivateDialog(true);
+  }, []);
 
-  const handleRefresh = async () => {
-    await viewModel.refresh();
-  };
-
-  // Get selected unit details
-  const selectedUnit = viewModel.selectedUnit;
+  // Get available parents for create mode
+  const availableParents = viewModel.getAvailableParents();
+  const selectedParentInCreate = formViewModel?.formData.parentId
+    ? viewModel.getUnitById(formViewModel.formData.parentId)
+    : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 p-8">
@@ -339,7 +436,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         </div>
 
         {/* Error Banner */}
-        {viewModel.error && (
+        {(viewModel.error || operationError) && (
           <div
             className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50"
             role="alert"
@@ -348,12 +445,17 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
               <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-red-800 font-semibold">Error</h3>
-                <p className="text-red-700 text-sm mt-1">{viewModel.error}</p>
+                <p className="text-red-700 text-sm mt-1">
+                  {viewModel.error || operationError}
+                </p>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => viewModel.clearError()}
+                onClick={() => {
+                  viewModel.clearError();
+                  setOperationError(null);
+                }}
                 className="text-red-600 border-red-300"
               >
                 Dismiss
@@ -394,10 +496,12 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={handleRefresh}
+                      onClick={() => viewModel.refresh()}
                       disabled={viewModel.isLoading}
                     >
-                      <RefreshCw className={`w-4 h-4 ${viewModel.isLoading ? 'animate-spin' : ''}`} />
+                      <RefreshCw
+                        className={`w-4 h-4 ${viewModel.isLoading ? 'animate-spin' : ''}`}
+                      />
                     </Button>
                   </div>
                 </div>
@@ -414,12 +518,12 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                 )}
 
                 {/* Tree View */}
-                {!viewModel.isLoading || viewModel.unitCount > 0 ? (
+                {(!viewModel.isLoading || viewModel.unitCount > 0) && (
                   <OrganizationTree
                     nodes={viewModel.treeNodes}
                     selectedId={viewModel.selectedUnitId}
                     expandedIds={viewModel.expandedNodeIds}
-                    onSelect={viewModel.selectNode.bind(viewModel)}
+                    onSelect={handleTreeSelect}
                     onToggle={viewModel.toggleNode.bind(viewModel)}
                     onMoveDown={viewModel.moveSelectionDown.bind(viewModel)}
                     onMoveUp={viewModel.moveSelectionUp.bind(viewModel)}
@@ -427,209 +531,583 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     onArrowLeft={viewModel.handleArrowLeft.bind(viewModel)}
                     onSelectFirst={viewModel.selectFirst.bind(viewModel)}
                     onSelectLast={viewModel.selectLast.bind(viewModel)}
-                    ariaLabel="Organization hierarchy - select a unit to manage"
+                    ariaLabel="Organization hierarchy - select a unit to edit"
                     className="border rounded-lg p-4 bg-white min-h-[400px]"
                   />
-                ) : null}
+                )}
+
+                {/* Help text */}
+                <p className="mt-4 text-sm text-gray-500 text-center">
+                  Click a unit to edit • Arrow keys to navigate • Enter to expand/collapse
+                </p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Right Panel: Action Panel */}
+          {/* Right Panel: Form Panel */}
           <div className="lg:col-span-1">
-            <Card className="shadow-lg sticky top-8">
-              <CardHeader className="border-b border-gray-200">
-                <CardTitle className="text-lg font-semibold text-gray-900">
-                  Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                {/* Action Buttons */}
-                <div className="space-y-3">
-                  <Button
-                    onClick={handleCreateClick}
-                    disabled={viewModel.isLoading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white justify-start"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
+            {/* Create Button - Always visible at top */}
+            <Button
+              onClick={handleCreateClick}
+              disabled={viewModel.isLoading}
+              className="w-full mb-4 bg-blue-600 hover:bg-blue-700 text-white justify-start"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create New Unit
+              {panelMode === 'edit' && currentUnit && !currentUnit.isRootOrganization && (
+                <span className="ml-auto text-xs opacity-75">(under selected)</span>
+              )}
+            </Button>
+
+            {/* Empty State */}
+            {panelMode === 'empty' && (
+              <Card className="shadow-lg">
+                <CardContent className="p-8 text-center">
+                  <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No Unit Selected
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    Select a unit from the tree to view and edit its details, or click
+                    "Create New Unit" to add a new one.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Create Mode */}
+            {panelMode === 'create' && formViewModel && (
+              <Card className="shadow-lg">
+                <CardHeader className="border-b border-gray-200">
+                  <CardTitle className="text-lg font-semibold text-gray-900">
                     Create New Unit
-                    {selectedUnit && !selectedUnit.isRootOrganization && (
-                      <span className="ml-auto text-xs opacity-75">
-                        (under selected)
-                      </span>
-                    )}
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    onClick={handleEditClick}
-                    disabled={!viewModel.canEdit || viewModel.isLoading}
-                    className="w-full justify-start"
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Selected Unit
-                  </Button>
-
-                  {/* Deactivate/Reactivate Button - shows based on unit's active state */}
-                  {selectedUnit?.isActive ? (
-                    <Button
-                      variant="outline"
-                      onClick={handleDeactivateClick}
-                      disabled={!viewModel.canDeactivate || viewModel.isLoading}
-                      className="w-full justify-start text-orange-600 border-orange-200 hover:bg-orange-50 hover:border-orange-300"
-                    >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Deactivate Unit
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      onClick={handleReactivateClick}
-                      disabled={!viewModel.canReactivate || viewModel.isLoading}
-                      className="w-full justify-start text-green-600 border-green-200 hover:bg-green-50 hover:border-green-300"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Reactivate Unit
-                    </Button>
-                  )}
-
-                  <Button
-                    variant="outline"
-                    onClick={handleDeleteClick}
-                    disabled={!viewModel.canDelete || viewModel.isLoading}
-                    className="w-full justify-start text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
-                    aria-describedby={!viewModel.canDelete && selectedUnit && !selectedUnit.isRootOrganization ? 'delete-hint' : undefined}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Unit
-                  </Button>
-                  {!viewModel.canDelete && selectedUnit && !selectedUnit.isRootOrganization && selectedUnit.isActive && (
-                    <p id="delete-hint" className="text-xs text-gray-500 mt-1 px-1">
-                      Deactivate the unit first before deleting
-                    </p>
-                  )}
-                </div>
-
-                {/* Selected Unit Details */}
-                {selectedUnit && (
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                      Selected Unit
-                    </h4>
-                    <div className="space-y-3">
-                      {/* Unit Name */}
-                      <div className="flex items-start gap-2">
-                        {selectedUnit.isRootOrganization ? (
-                          <Building2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                        ) : (
-                          <MapPin className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
-                        )}
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {selectedUnit.displayName || selectedUnit.name}
-                          </p>
-                          {selectedUnit.isRootOrganization && (
-                            <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                              Root Organization
-                            </span>
-                          )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Submission Error */}
+                    {formViewModel.submissionError && (
+                      <div className="p-3 rounded-lg border border-red-300 bg-red-50" role="alert">
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1">
+                            <h4 className="text-red-800 font-semibold text-sm">
+                              Failed to create unit
+                            </h4>
+                            <p className="text-red-700 text-xs mt-1">
+                              {formViewModel.submissionError}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => formViewModel.clearSubmissionError()}
+                            className="text-red-600 hover:text-red-800"
+                            aria-label="Dismiss error"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
+                    )}
 
-                      {/* Path Breadcrumb */}
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Path</p>
-                        <p className="text-sm text-gray-700 font-mono bg-gray-50 px-2 py-1 rounded break-all">
-                          {selectedUnit.path}
+                    {/* Parent Unit Dropdown */}
+                    <div>
+                      <Label className="block text-xs font-medium text-gray-700 mb-1">
+                        Parent Unit
+                      </Label>
+                      <Select.Root
+                        value={formViewModel.formData.parentId ?? 'root'}
+                        onValueChange={(value) =>
+                          formViewModel.setParent(value === 'root' ? null : value)
+                        }
+                      >
+                        <Select.Trigger
+                          className="w-full px-2 py-1.5 text-sm rounded-md border border-gray-300 shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          aria-label="Parent Unit"
+                        >
+                          <Select.Value>
+                            {selectedParentInCreate
+                              ? selectedParentInCreate.displayName || selectedParentInCreate.name
+                              : 'Root Organization (direct child)'}
+                          </Select.Value>
+                          <Select.Icon>
+                            <ChevronDown className="h-4 w-4 text-gray-400" />
+                          </Select.Icon>
+                        </Select.Trigger>
+                        <Select.Portal>
+                          <Select.Content className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50 max-h-[300px]">
+                            <Select.Viewport className="p-1">
+                              <Select.Item
+                                value="root"
+                                className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
+                              >
+                                <Select.ItemText>Root Organization (direct child)</Select.ItemText>
+                              </Select.Item>
+                              {availableParents.map((unit) => (
+                                <Select.Item
+                                  key={unit.id}
+                                  value={unit.id}
+                                  className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
+                                >
+                                  <Select.ItemText>
+                                    <span
+                                      className="inline-block"
+                                      style={{
+                                        marginLeft: `${(unit.path.split('.').length - 2) * 12}px`,
+                                      }}
+                                    >
+                                      {unit.displayName || unit.name}
+                                    </span>
+                                  </Select.ItemText>
+                                </Select.Item>
+                              ))}
+                            </Select.Viewport>
+                          </Select.Content>
+                        </Select.Portal>
+                      </Select.Root>
+                    </div>
+
+                    {/* Name Input */}
+                    <div>
+                      <Label htmlFor="unit-name" className="block text-xs font-medium text-gray-700 mb-1">
+                        Unit Name <span className="text-red-500">*</span>
+                      </Label>
+                      <input
+                        type="text"
+                        id="unit-name"
+                        value={formViewModel.formData.name}
+                        onChange={(e) => formViewModel.updateName(e.target.value)}
+                        onBlur={() => formViewModel.touchField('name')}
+                        className={cn(
+                          'w-full px-2 py-1.5 text-sm rounded-md border shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors',
+                          formViewModel.hasFieldError('name')
+                            ? 'border-red-300 bg-red-50'
+                            : 'border-gray-300 bg-white'
+                        )}
+                        placeholder="e.g., Main Campus"
+                        aria-required="true"
+                        aria-invalid={formViewModel.hasFieldError('name')}
+                      />
+                      {formViewModel.hasFieldError('name') && (
+                        <p className="text-red-600 text-xs mt-1" role="alert">
+                          {formViewModel.getFieldError('name')}
                         </p>
-                      </div>
+                      )}
+                    </div>
 
-                      {/* Status */}
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Status</p>
-                        <span className={cn(
-                          'text-sm px-2 py-0.5 rounded-full',
-                          selectedUnit.isActive
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-orange-100 text-orange-700'
-                        )}>
-                          {selectedUnit.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-
-                      {/* Child Count */}
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Direct Children</p>
-                        <p className="text-sm text-gray-700">
-                          {selectedUnit.childCount} unit{selectedUnit.childCount !== 1 ? 's' : ''}
+                    {/* Display Name Input */}
+                    <div>
+                      <Label htmlFor="display-name" className="block text-xs font-medium text-gray-700 mb-1">
+                        Display Name <span className="text-red-500">*</span>
+                      </Label>
+                      <input
+                        type="text"
+                        id="display-name"
+                        value={formViewModel.formData.displayName}
+                        onChange={(e) => formViewModel.updateField('displayName', e.target.value)}
+                        onBlur={() => formViewModel.touchField('displayName')}
+                        className={cn(
+                          'w-full px-2 py-1.5 text-sm rounded-md border shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors',
+                          formViewModel.hasFieldError('displayName')
+                            ? 'border-red-300 bg-red-50'
+                            : 'border-gray-300 bg-white'
+                        )}
+                        placeholder="e.g., Main Campus - Building A"
+                        aria-required="true"
+                        aria-invalid={formViewModel.hasFieldError('displayName')}
+                      />
+                      {formViewModel.hasFieldError('displayName') && (
+                        <p className="text-red-600 text-xs mt-1" role="alert">
+                          {formViewModel.getFieldError('displayName')}
                         </p>
-                      </div>
+                      )}
+                    </div>
 
-                      {/* Timezone */}
+                    {/* Timezone Dropdown */}
+                    <div>
+                      <Label className="block text-xs font-medium text-gray-700 mb-1">
+                        Time Zone <span className="text-red-500">*</span>
+                      </Label>
+                      <Select.Root
+                        value={formViewModel.formData.timeZone}
+                        onValueChange={(value) => formViewModel.setTimeZone(value)}
+                      >
+                        <Select.Trigger
+                          className={cn(
+                            'w-full px-2 py-1.5 text-sm rounded-md border shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500',
+                            formViewModel.hasFieldError('timeZone')
+                              ? 'border-red-300 bg-red-50'
+                              : 'border-gray-300'
+                          )}
+                          aria-label="Time Zone"
+                        >
+                          <Select.Value>
+                            {COMMON_TIMEZONES.find(
+                              (tz) => tz.value === formViewModel.formData.timeZone
+                            )?.label ?? formViewModel.formData.timeZone}
+                          </Select.Value>
+                          <Select.Icon>
+                            <ChevronDown className="h-4 w-4 text-gray-400" />
+                          </Select.Icon>
+                        </Select.Trigger>
+                        <Select.Portal>
+                          <Select.Content className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50">
+                            <Select.Viewport className="p-1">
+                              {COMMON_TIMEZONES.map((tz) => (
+                                <Select.Item
+                                  key={tz.value}
+                                  value={tz.value}
+                                  className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
+                                >
+                                  <Select.ItemText>{tz.label}</Select.ItemText>
+                                </Select.Item>
+                              ))}
+                            </Select.Viewport>
+                          </Select.Content>
+                        </Select.Portal>
+                      </Select.Root>
+                    </div>
+
+                    {/* Form Actions */}
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-200">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancel}
+                        disabled={formViewModel.isSubmitting}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={!formViewModel.canSubmit}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        {formViewModel.isSubmitting ? 'Creating...' : 'Create'}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Edit Mode */}
+            {panelMode === 'edit' && currentUnit && formViewModel && (
+              <>
+                {/* Root Organization Warning */}
+                {currentUnit.isRootOrganization && (
+                  <div className="mb-4 p-4 rounded-lg border border-blue-300 bg-blue-50">
+                    <div className="flex items-start gap-3">
+                      <Building2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-xs text-gray-500 mb-1">Time Zone</p>
-                        <p className="text-sm text-gray-700">
-                          {selectedUnit.timeZone}
+                        <h3 className="text-blue-800 font-semibold text-sm">Root Organization</h3>
+                        <p className="text-blue-700 text-xs mt-1">
+                          This is your root organization. You can edit its name and display name,
+                          but it cannot be deactivated or deleted.
                         </p>
                       </div>
                     </div>
-
-                    {/* Deactivate Warning */}
-                    {!viewModel.canDeactivate && selectedUnit && !selectedUnit.isRootOrganization && selectedUnit.isActive && (
-                      <div className="mt-4 p-3 rounded-lg bg-orange-50 border border-orange-200">
-                        <p className="text-xs text-orange-700">
-                          {selectedUnit.childCount > 0
-                            ? 'Cannot deactivate: This unit has child units. Remove or move them first.'
-                            : 'Cannot deactivate this unit.'}
-                        </p>
-                      </div>
-                    )}
-
-                    {selectedUnit.isRootOrganization && (
-                      <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
-                        <p className="text-xs text-blue-700">
-                          The root organization cannot be deactivated. It represents your entire organization.
-                        </p>
-                      </div>
-                    )}
                   </div>
                 )}
 
-                {/* No Selection State */}
-                {!selectedUnit && (
-                  <div className="mt-6 pt-6 border-t border-gray-200 text-center">
-                    <MapPin className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">
-                      Select a unit from the tree to view details and enable actions.
-                    </p>
-                  </div>
+                {/* Form Card */}
+                <Card className="shadow-lg">
+                  <CardHeader className="border-b border-gray-200">
+                    <CardTitle className="text-lg font-semibold text-gray-900">
+                      Unit Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                      {/* Submission Error */}
+                      {formViewModel.submissionError && (
+                        <div className="p-3 rounded-lg border border-red-300 bg-red-50" role="alert">
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1">
+                              <h4 className="text-red-800 font-semibold text-sm">
+                                Failed to update unit
+                              </h4>
+                              <p className="text-red-700 text-xs mt-1">
+                                {formViewModel.submissionError}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => formViewModel.clearSubmissionError()}
+                              className="text-red-600 hover:text-red-800"
+                              aria-label="Dismiss error"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Path Display (read-only) */}
+                      <div>
+                        <Label className="block text-xs font-medium text-gray-700 mb-1">
+                          Hierarchy Path
+                        </Label>
+                        <p className="text-xs text-gray-700 font-mono bg-gray-50 px-2 py-1.5 rounded-md border border-gray-200 break-all">
+                          {currentUnit.path}
+                        </p>
+                      </div>
+
+                      {/* Name Input */}
+                      <div>
+                        <Label htmlFor="edit-unit-name" className="block text-xs font-medium text-gray-700 mb-1">
+                          Unit Name <span className="text-red-500">*</span>
+                        </Label>
+                        <input
+                          type="text"
+                          id="edit-unit-name"
+                          value={formViewModel.formData.name}
+                          onChange={(e) => formViewModel.updateName(e.target.value)}
+                          onBlur={() => formViewModel.touchField('name')}
+                          className={cn(
+                            'w-full px-2 py-1.5 text-sm rounded-md border shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors',
+                            formViewModel.hasFieldError('name')
+                              ? 'border-red-300 bg-red-50'
+                              : 'border-gray-300 bg-white'
+                          )}
+                          aria-required="true"
+                          aria-invalid={formViewModel.hasFieldError('name')}
+                        />
+                        {formViewModel.hasFieldError('name') && (
+                          <p className="text-red-600 text-xs mt-1" role="alert">
+                            {formViewModel.getFieldError('name')}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Display Name Input */}
+                      <div>
+                        <Label htmlFor="edit-display-name" className="block text-xs font-medium text-gray-700 mb-1">
+                          Display Name <span className="text-red-500">*</span>
+                        </Label>
+                        <input
+                          type="text"
+                          id="edit-display-name"
+                          value={formViewModel.formData.displayName}
+                          onChange={(e) => formViewModel.updateField('displayName', e.target.value)}
+                          onBlur={() => formViewModel.touchField('displayName')}
+                          className={cn(
+                            'w-full px-2 py-1.5 text-sm rounded-md border shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors',
+                            formViewModel.hasFieldError('displayName')
+                              ? 'border-red-300 bg-red-50'
+                              : 'border-gray-300 bg-white'
+                          )}
+                          aria-required="true"
+                          aria-invalid={formViewModel.hasFieldError('displayName')}
+                        />
+                        {formViewModel.hasFieldError('displayName') && (
+                          <p className="text-red-600 text-xs mt-1" role="alert">
+                            {formViewModel.getFieldError('displayName')}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Timezone Dropdown */}
+                      <div>
+                        <Label className="block text-xs font-medium text-gray-700 mb-1">
+                          Time Zone <span className="text-red-500">*</span>
+                        </Label>
+                        <Select.Root
+                          value={formViewModel.formData.timeZone}
+                          onValueChange={(value) => formViewModel.setTimeZone(value)}
+                        >
+                          <Select.Trigger
+                            className={cn(
+                              'w-full px-2 py-1.5 text-sm rounded-md border shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500',
+                              formViewModel.hasFieldError('timeZone')
+                                ? 'border-red-300 bg-red-50'
+                                : 'border-gray-300'
+                            )}
+                            aria-label="Time Zone"
+                          >
+                            <Select.Value>
+                              {COMMON_TIMEZONES.find(
+                                (tz) => tz.value === formViewModel.formData.timeZone
+                              )?.label ?? formViewModel.formData.timeZone}
+                            </Select.Value>
+                            <Select.Icon>
+                              <ChevronDown className="h-4 w-4 text-gray-400" />
+                            </Select.Icon>
+                          </Select.Trigger>
+                          <Select.Portal>
+                            <Select.Content className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50">
+                              <Select.Viewport className="p-1">
+                                {COMMON_TIMEZONES.map((tz) => (
+                                  <Select.Item
+                                    key={tz.value}
+                                    value={tz.value}
+                                    className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
+                                  >
+                                    <Select.ItemText>{tz.label}</Select.ItemText>
+                                  </Select.Item>
+                                ))}
+                              </Select.Viewport>
+                            </Select.Content>
+                          </Select.Portal>
+                        </Select.Root>
+                      </div>
+
+                      {/* Active Status Toggle (not for root org) */}
+                      {!currentUnit.isRootOrganization && (
+                        <div className="flex items-start gap-2 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                          <Checkbox
+                            id="is-active"
+                            checked={currentUnit.isActive}
+                            onCheckedChange={() => {
+                              if (currentUnit.isActive) {
+                                handleDeactivateClick();
+                              } else {
+                                handleReactivateClick();
+                              }
+                            }}
+                            disabled={isDeactivating || isReactivating || formViewModel.isSubmitting}
+                            className="mt-0.5 shadow-sm ring-1 ring-gray-300 bg-white/80 backdrop-blur-sm"
+                          />
+                          <div>
+                            <Label htmlFor="is-active" className="text-xs font-medium text-gray-900 cursor-pointer">
+                              Unit is Active
+                            </Label>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              Inactive units are hidden from most views.
+                              {currentUnit.isActive && currentUnit.childCount > 0 && (
+                                <span className="block text-orange-600 mt-1 font-medium">
+                                  Warning: Deactivating will also deactivate all {currentUnit.childCount} child
+                                  unit(s).
+                                </span>
+                              )}
+                              {!currentUnit.isActive && currentUnit.childCount > 0 && (
+                                <span className="block text-green-600 mt-1 font-medium">
+                                  Note: Reactivating will also reactivate all {currentUnit.childCount} child
+                                  unit(s).
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Form Actions */}
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                        <div>
+                          {formViewModel.isDirty && (
+                            <span className="text-xs text-amber-600">Unsaved changes</span>
+                          )}
+                        </div>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={!formViewModel.canSubmit}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          <Save className="w-3 h-3 mr-1" />
+                          {formViewModel.isSubmitting ? 'Saving...' : 'Save'}
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+
+                {/* Danger Zone - only for non-root orgs */}
+                {!currentUnit.isRootOrganization && (
+                  <section className="mt-4" aria-labelledby="danger-zone-heading">
+                    <Card className="shadow-lg border-red-200">
+                      <CardHeader className="border-b border-red-200 bg-red-50 py-3">
+                        <CardTitle id="danger-zone-heading" className="text-sm font-semibold text-red-800">
+                          Danger Zone
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 space-y-4">
+                        {/* Reactivate Section - Only for inactive units */}
+                        {!currentUnit.isActive && (
+                          <div className="pb-4 border-b border-gray-200">
+                            <h4 className="text-sm font-medium text-gray-900">Reactivate this unit</h4>
+                            <p className="text-xs text-gray-600 mt-1">
+                              Reactivating allows new role assignments.
+                              {currentUnit.childCount > 0 && (
+                                <span className="block text-green-600 mt-1">
+                                  This will also reactivate all {currentUnit.childCount} child unit(s).
+                                </span>
+                              )}
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleReactivateClick}
+                              disabled={formViewModel.isSubmitting || isReactivating}
+                              className="mt-2 text-green-600 border-green-300 hover:bg-green-50"
+                            >
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              {isReactivating ? 'Reactivating...' : 'Reactivate Unit'}
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Delete Section */}
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-900">Delete this unit</h4>
+                          <p className="text-xs text-gray-600 mt-1">
+                            Permanently remove from the organization hierarchy.
+                            {currentUnit.isActive && (
+                              <span className="block text-orange-600 mt-1">
+                                Must be deactivated before deletion.
+                              </span>
+                            )}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleDeleteClick}
+                            disabled={formViewModel.isSubmitting || isDeleting}
+                            className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            {isDeleting ? 'Deleting...' : 'Delete Unit'}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </section>
                 )}
-              </CardContent>
-            </Card>
+              </>
+            )}
           </div>
         </div>
-
-        {/* Help Text */}
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <p>
-            Click on a unit to select it. Use arrow keys to navigate, Enter to expand/collapse.
-          </p>
-        </div>
       </div>
+
+      {/* Unsaved Changes Dialog */}
+      <ConfirmDialog
+        isOpen={showDiscardDialog}
+        title="Unsaved Changes"
+        message="You have unsaved changes. Do you want to discard them?"
+        confirmLabel="Discard Changes"
+        cancelLabel="Stay Here"
+        onConfirm={handleDiscardChanges}
+        onCancel={handleCancelDiscard}
+        variant="warning"
+      />
 
       {/* Deactivate Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showDeactivateDialog}
         title="Deactivate Unit"
         message={
-          selectedUnit?.childCount && selectedUnit.childCount > 0
-            ? `Are you sure you want to deactivate "${selectedUnit?.displayName || selectedUnit?.name}" and all ${selectedUnit.childCount} of its child unit(s)? All children will be deactivated automatically.`
-            : `Are you sure you want to deactivate "${selectedUnit?.displayName || selectedUnit?.name}"? This action can be reversed by reactivating the unit.`
+          currentUnit?.childCount && currentUnit.childCount > 0
+            ? `Are you sure you want to deactivate "${currentUnit?.displayName || currentUnit?.name}" and all ${currentUnit.childCount} of its child unit(s)?`
+            : `Are you sure you want to deactivate "${currentUnit?.displayName || currentUnit?.name}"?`
         }
         confirmLabel="Deactivate"
         cancelLabel="Cancel"
         onConfirm={handleDeactivateConfirm}
-        onCancel={handleDeactivateCancel}
+        onCancel={() => setShowDeactivateDialog(false)}
         isLoading={isDeactivating}
         variant="warning"
       />
@@ -639,27 +1117,39 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         isOpen={showReactivateDialog}
         title="Reactivate Unit"
         message={
-          selectedUnit?.childCount && selectedUnit.childCount > 0
-            ? `Are you sure you want to reactivate "${selectedUnit?.displayName || selectedUnit?.name}" and all ${selectedUnit.childCount} of its inactive child unit(s)? All descendants will be reactivated automatically.`
-            : `Are you sure you want to reactivate "${selectedUnit?.displayName || selectedUnit?.name}"? Role assignments will be allowed again for this unit.`
+          currentUnit?.childCount && currentUnit.childCount > 0
+            ? `Are you sure you want to reactivate "${currentUnit?.displayName || currentUnit?.name}" and all ${currentUnit.childCount} child unit(s)?`
+            : `Are you sure you want to reactivate "${currentUnit?.displayName || currentUnit?.name}"?`
         }
         confirmLabel="Reactivate"
         cancelLabel="Cancel"
         onConfirm={handleReactivateConfirm}
-        onCancel={handleReactivateCancel}
+        onCancel={() => setShowReactivateDialog(false)}
         isLoading={isReactivating}
         variant="success"
+      />
+
+      {/* Active Warning Dialog */}
+      <ConfirmDialog
+        isOpen={showActiveWarningDialog}
+        title="Cannot Delete Active Unit"
+        message={`"${currentUnit?.displayName || currentUnit?.name}" must be deactivated before it can be deleted. Would you like to deactivate it now?`}
+        confirmLabel="Deactivate First"
+        cancelLabel="Cancel"
+        onConfirm={handleDeactivateFirst}
+        onCancel={() => setShowActiveWarningDialog(false)}
+        variant="warning"
       />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showDeleteDialog}
         title="Delete Organization Unit"
-        message={`Are you sure you want to delete "${selectedUnit?.displayName || selectedUnit?.name}"? This action is permanent and cannot be undone. The unit will be removed from the organization hierarchy.`}
+        message={`Are you sure you want to delete "${currentUnit?.displayName || currentUnit?.name}"? This action is permanent and cannot be undone.`}
         confirmLabel="Delete"
         cancelLabel="Cancel"
         onConfirm={handleDeleteConfirm}
-        onCancel={handleDeleteCancel}
+        onCancel={() => setShowDeleteDialog(false)}
         isLoading={isDeleting}
         variant="danger"
       />

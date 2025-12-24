@@ -5,7 +5,7 @@
 **Date**: 2025-12-23
 **Feature**: Organization Unit UI and Backend Fixes
 **Goal**: Fix edit bug, add cascade deactivation, add tree view to Edit page, add delete functionality
-**Status**: ✅ COMPLETE - All issues resolved including array_append fix and stay-on-page UX (2025-12-24)
+**Status**: ✅ COMPLETE - All issues resolved including page consolidation refactor (2025-12-24)
 
 ### Key Decisions
 
@@ -26,6 +26,13 @@
 8. **RootPath Auto-Detection** (Added 2025-12-23): Never hardcode paths like `root.provider.acme_healthcare`. Production subdomains vary (e.g., `poc-test1-20251223`). ViewModel now auto-detects rootPath from root organization's actual path in the database.
 
 9. **Stay on Edit Page After Save** (Added 2025-12-24): After saving changes, stay on the edit page instead of redirecting to manage page. Reload tree and unit data to reflect changes (name, parent), expand tree to show the edited OU.
+
+10. **Page Consolidation Refactor** (Added 2025-12-24): Merged Edit page functionality into Manage page for unified single-page interface. Select unit → immediately editable form. Create also inline. No separate edit route.
+   - Deleted `OrganizationUnitEditPage.tsx`
+   - Removed `/organization-units/:unitId/edit` route
+   - ManagePage now has 3 panel modes: `empty`, `edit`, `create`
+   - Unsaved changes warning when switching between units
+   - Extracted `ConfirmDialog` to shared component
 
 ## Technical Context
 
@@ -146,12 +153,45 @@ Organization Units use CQRS/Event Sourcing pattern:
   - Added auto-detection: `loadUnits()` now finds root org and uses its path as rootPath
   - This fixes depth calculation for any subdomain format (e.g., `poc-test1-20251223`)
 
-### Files Modified - 2025-12-24 (Phase 10: Stay on Edit Page After Save)
+### Files Modified - 2025-12-24 (Phase 11: Page Consolidation Refactor)
+
+- `frontend/src/pages/organization-units/OrganizationUnitsManagePage.tsx`
+  - Complete rewrite: merged Edit page functionality into Manage page (1161 lines)
+  - Added `panelMode` state: `'empty' | 'edit' | 'create'`
+  - Added `formViewModel` for form state management
+  - Added `handleTreeSelect` with dirty check and unsaved changes dialog
+  - Added inline create mode with parent pre-selection
+  - Added all edit form fields: name, display name, timezone, active status
+  - Added danger zone section for non-root units
+  - Added query parameter support: `?select=uuid` for deep links
+  - Replaced ConfirmDialog with extracted shared component
+
+- `frontend/src/App.tsx`
+  - Removed `OrganizationUnitEditPage` import
+  - Removed `/organization-units/:unitId/edit` route
+
+- `frontend/src/pages/organization-units/index.ts`
+  - Removed `OrganizationUnitEditPage` export
+
+### Files Created - 2025-12-24 (Phase 11: Page Consolidation Refactor)
+
+- `frontend/src/components/ui/ConfirmDialog.tsx`
+  - Extracted shared ConfirmDialog component (110 lines)
+  - Supports variants: danger, warning, success, default
+  - ARIA accessible with alertdialog role
+
+### Files Deleted - 2025-12-24 (Phase 11: Page Consolidation Refactor)
+
+- `frontend/src/pages/organization-units/OrganizationUnitEditPage.tsx`
+  - Functionality merged into ManagePage
+
+### Files Modified - 2025-12-24 (Phase 10: Stay on Edit Page After Save) - SUPERSEDED
 
 - `frontend/src/pages/organization-units/OrganizationUnitEditPage.tsx`
   - Modified `handleSubmit` (lines 263-285) to stay on edit page after save
   - Replaced `navigate('/organization-units/manage')` with tree/unit reload and expand
   - Updated dependency array with `treeViewModel`, `loadUnit`, `unitId`
+  - **Note**: This phase was superseded by Phase 11 page consolidation
 
 ### Files Modified - 2025-12-23 (Phase 8: Checkbox Active State Fix)
 

@@ -200,11 +200,34 @@
 - [x] TypeScript check passed
 
 ### Phase 10 Deployment (2025-12-24)
-- [x] Commit pending: Stay on edit page after save
+- [x] Commit `c2174e08`: Stay on edit page after save
+- [x] Frontend deploy workflow passed
+- **Note**: Phase 10 was superseded by Phase 11 page consolidation
+
+## Phase 11: Page Consolidation Refactor ✅ COMPLETE
+
+**Goal**: Consolidate Edit page functionality into Manage page for unified single-page interface.
+
+### Implementation
+- [x] Extract `ConfirmDialog` to shared component `frontend/src/components/ui/ConfirmDialog.tsx`
+- [x] Rewrite `OrganizationUnitsManagePage.tsx` with 3 panel modes: `empty`, `edit`, `create`
+- [x] Add `formViewModel` for form state management with dirty tracking
+- [x] Add `handleTreeSelect` with unsaved changes dialog
+- [x] Add inline create mode with parent pre-selection from selected unit
+- [x] Add all edit form fields: name, display name, timezone, active status toggle
+- [x] Add danger zone section for non-root units (delete, reactivate)
+- [x] Add query parameter support: `?select=uuid` for deep links
+- [x] Remove edit route from `App.tsx`
+- [x] Remove `OrganizationUnitEditPage` export from `index.ts`
+- [x] Delete `OrganizationUnitEditPage.tsx`
+- [x] TypeScript check passed
+
+### Phase 11 Deployment (2025-12-24)
+- [x] Commit pending: Consolidate Edit page into ManagePage
 
 ## Current Status
 
-**Phase**: ALL PHASES COMPLETE
+**Phase**: ALL PHASES COMPLETE (including page consolidation)
 **Status**: ✅ COMPLETE
 **Last Updated**: 2025-12-24
 **Next Step**: Archive dev-docs to `dev/archived/ou-fixes/` - feature is complete
