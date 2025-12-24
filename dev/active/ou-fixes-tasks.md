@@ -189,6 +189,19 @@
 - [x] Migration `20251224164206_ou_array_append_fix.sql` deployed
 - [x] User verified: OU field updates work correctly
 
+## Phase 10: Stay on Edit Page After Save ✅ COMPLETE
+
+- [x] Issue: After save, page redirected to manage page instead of staying on edit page
+- [x] Changed `handleSubmit` to stay on edit page after successful save
+- [x] Reload tree data (`treeViewModel.loadUnits()`) to reflect name/parent changes
+- [x] Reload unit data (`loadUnit()`) to get fresh form data
+- [x] Expand tree to show edited OU (`expandToNode` + `selectNode`)
+- [x] Updated dependency array with `treeViewModel`, `loadUnit`, `unitId`
+- [x] TypeScript check passed
+
+### Phase 10 Deployment (2025-12-24)
+- [x] Commit pending: Stay on edit page after save
+
 ## Current Status
 
 **Phase**: ALL PHASES COMPLETE

@@ -5,7 +5,7 @@
 **Date**: 2025-12-23
 **Feature**: Organization Unit UI and Backend Fixes
 **Goal**: Fix edit bug, add cascade deactivation, add tree view to Edit page, add delete functionality
-**Status**: ✅ COMPLETE - All issues resolved including array_append fix (2025-12-24)
+**Status**: ✅ COMPLETE - All issues resolved including array_append fix and stay-on-page UX (2025-12-24)
 
 ### Key Decisions
 
@@ -24,6 +24,8 @@
 6. **Migration Strategy**: Created new migration file `20251223182421_ou_cascade_deactivation_fix.sql` rather than modifying baseline directly for production deployment. Baseline also updated to keep source of truth consistent.
 
 8. **RootPath Auto-Detection** (Added 2025-12-23): Never hardcode paths like `root.provider.acme_healthcare`. Production subdomains vary (e.g., `poc-test1-20251223`). ViewModel now auto-detects rootPath from root organization's actual path in the database.
+
+9. **Stay on Edit Page After Save** (Added 2025-12-24): After saving changes, stay on the edit page instead of redirecting to manage page. Reload tree and unit data to reflect changes (name, parent), expand tree to show the edited OU.
 
 ## Technical Context
 
@@ -143,6 +145,13 @@ Organization Units use CQRS/Event Sourcing pattern:
   - CRITICAL FIX: Removed hardcoded `DEFAULT_ROOT_PATH = 'root.provider.acme_healthcare'`
   - Added auto-detection: `loadUnits()` now finds root org and uses its path as rootPath
   - This fixes depth calculation for any subdomain format (e.g., `poc-test1-20251223`)
+
+### Files Modified - 2025-12-24 (Phase 10: Stay on Edit Page After Save)
+
+- `frontend/src/pages/organization-units/OrganizationUnitEditPage.tsx`
+  - Modified `handleSubmit` (lines 263-285) to stay on edit page after save
+  - Replaced `navigate('/organization-units/manage')` with tree/unit reload and expand
+  - Updated dependency array with `treeViewModel`, `loadUnit`, `unitId`
 
 ### Files Modified - 2025-12-23 (Phase 8: Checkbox Active State Fix)
 

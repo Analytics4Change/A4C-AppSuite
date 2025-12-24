@@ -270,10 +270,18 @@ export const OrganizationUnitEditPage: React.FC = observer(() => {
 
       if (result.success) {
         log.info('Unit updated successfully', { unitId: result.unit?.id });
-        navigate('/organization-units/manage');
+        // Reload tree to reflect any changes (name, parent)
+        await treeViewModel.loadUnits();
+        // Reload the unit to get fresh data
+        await loadUnit();
+        // Expand tree to show the edited OU
+        if (unitId) {
+          treeViewModel.expandToNode(unitId);
+          treeViewModel.selectNode(unitId);
+        }
       }
     },
-    [formViewModel, navigate]
+    [formViewModel, treeViewModel, loadUnit, unitId]
   );
 
   // Handle tree node selection - navigate to edit that unit
