@@ -5,7 +5,7 @@
 **Date**: 2025-12-23
 **Feature**: Organization Unit UI and Backend Fixes
 **Goal**: Fix edit bug, add cascade deactivation, add tree view to Edit page, add delete functionality
-**Status**: ✅ COMPLETE - All 4 issues resolved and deployed
+**Status**: ✅ COMPLETE - All issues resolved including array_append fix (2025-12-24)
 
 ### Key Decisions
 
@@ -239,6 +239,8 @@ WHERE path <@ (p_event.event_data->>'path')::ltree  -- Parent + all descendants
 - **Migrations Applied**:
   - `20251223182421_ou_cascade_deactivation_fix.sql`
   - `20251223193037_ou_cascade_reactivation.sql`
+  - `20251223213418_ou_update_diagnostic_logging.sql` - Diagnostic logging (superseded by fix)
+  - `20251224164206_ou_array_append_fix.sql` - **THE ACTUAL FIX** - Uses `array_append()` instead of `||`
 - **Frontend**: Deployed via GitHub Actions
 - **Database**: Migrations workflow passed
 
@@ -300,3 +302,32 @@ if (rootOrg) {
 3. After API success, reload both tree (`treeViewModel.loadUnits()`) and unit (`loadUnit()`) without full page refresh
 
 **Lesson**: For state that persists to backend, always read from the source of truth (loaded entity) not local form state, and always use API calls with proper refresh instead of local state toggles.
+
+### Malformed Array Literal Bug - RESOLVED (2025-12-24)
+
+**Problem**: "malformed array literal" error when saving OU field changes (name, display_name, timezone).
+
+**Root Cause**: The `||` operator for TEXT[] concatenation is **ambiguous**.
+
+```sql
+-- This FAILS - PostgreSQL tries to parse 'display_name' as array literal '{display_name}'
+v_updated_fields := v_updated_fields || 'display_name';
+
+-- This WORKS - Explicit single-element append
+v_updated_fields := array_append(v_updated_fields, 'display_name');
+```
+
+PostgreSQL error message "malformed array literal: display_name" means it tried to parse `'display_name'` as `'{display_name}'` array syntax, which failed because it doesn't start with `{`.
+
+**Why `to_jsonb()` wasn't the issue**: The error occurred BEFORE the INSERT statement, during the array concatenation step. The `to_jsonb()` fix was correct for embedding TEXT[] in JSONB, but the array was never successfully built.
+
+**Investigation Path**:
+1. Deployed diagnostic logging migration - no `[OU_UPDATE]` logs appeared
+2. Realized error occurred before function's first RAISE NOTICE
+3. Tested array patterns in isolation: `TEXT[] || 'string'` fails, `array_append()` works
+
+**Fix Applied**: Migration `20251224164206_ou_array_append_fix.sql`
+- Changed all `v_updated_fields := v_updated_fields || 'field'` to `array_append()`
+- User verified: OU update now works correctly
+
+**Lesson**: When appending to TEXT[] arrays in PL/pgSQL, ALWAYS use `array_append(array, element)` instead of `array || 'element'`. The `||` operator is ambiguous and PostgreSQL may interpret the string as an array literal.

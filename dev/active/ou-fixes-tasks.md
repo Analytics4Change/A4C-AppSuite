@@ -151,9 +151,47 @@
 - [x] Frontend deploy workflow passed
 - [x] User can verify: Checkbox now shows correct state matching tree
 
+## Phase 9: Malformed Array Literal Fix ✅ COMPLETE
+
+**Problem**: "Malformed array literal" error persists despite `to_jsonb()` fix being deployed.
+
+**Root Cause**: The `||` operator for TEXT[] concatenation is ambiguous. PostgreSQL interprets `'display_name'` as an array literal `'{display_name}'` which fails parsing.
+
+### Investigation Completed
+- [x] Verify migration `20251223182421` is applied in `supabase_migrations.schema_migrations`
+- [x] Query `pg_proc.prosrc` to confirm function has `to_jsonb(v_updated_fields)`
+- [x] Check for duplicate `update_organization_unit` functions in other schemas
+- [x] Verify no custom `to_jsonb` function override
+- [x] Simulate `jsonb_build_object('x', to_jsonb(ARRAY['timezone']))` - works
+- [x] Check for triggers/constraints/generated columns on `domain_events`
+- [x] Confirm frontend calls function correctly
+- [x] Test with fresh browser session - error persists
+
+### Diagnostic Logging Deployed
+- [x] Create migration via Supabase CLI: `supabase migration new ou_update_diagnostic_logging`
+- [x] Add RAISE NOTICE statements at key execution points
+- [x] Deploy migration `20251223213418_ou_update_diagnostic_logging.sql`
+- [x] Test OU update - no `[OU_UPDATE]` logs appeared (error before first RAISE NOTICE!)
+
+### Root Cause Identified
+- [x] Tested array patterns in isolation via `mcp__supabase__execute_sql`
+- [x] Confirmed: `TEXT[] || 'string'` FAILS with "malformed array literal"
+- [x] Confirmed: `array_append(TEXT[], 'string')` WORKS
+
+### Fix Applied
+- [x] Create migration via Supabase CLI: `supabase migration new ou_array_append_fix`
+- [x] Change all `v_updated_fields := v_updated_fields || 'field'` to `array_append()`
+- [x] Deploy migration `20251224164206_ou_array_append_fix.sql`
+- [x] Verify function now uses `array_append` (position > 0 in prosrc)
+- [x] User tested: OU update now works correctly!
+
+### Phase 9 Deployment (2025-12-24)
+- [x] Migration `20251224164206_ou_array_append_fix.sql` deployed
+- [x] User verified: OU field updates work correctly
+
 ## Current Status
 
-**Phase**: ALL PHASES COMPLETE (including Checkbox Active State Fix)
+**Phase**: ALL PHASES COMPLETE
 **Status**: ✅ COMPLETE
-**Last Updated**: 2025-12-23
-**Next Step**: Archive dev-docs to `dev/archived/ou-fixes/` and optionally run axe-core audit
+**Last Updated**: 2025-12-24
+**Next Step**: Archive dev-docs to `dev/archived/ou-fixes/` - feature is complete
