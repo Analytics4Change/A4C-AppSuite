@@ -32,6 +32,38 @@ components:
       payload:
         $ref: '#/components/schemas/RolePermissionRevokedEvent'
 
+    RoleUpdated:
+      name: role.updated
+      title: Role Updated
+      summary: A role's name or description has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/RoleUpdatedEvent'
+
+    RoleDeactivated:
+      name: role.deactivated
+      title: Role Deactivated
+      summary: A role has been deactivated (frozen)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/RoleDeactivatedEvent'
+
+    RoleReactivated:
+      name: role.reactivated
+      title: Role Reactivated
+      summary: A role has been reactivated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/RoleReactivatedEvent'
+
+    RoleDeleted:
+      name: role.deleted
+      title: Role Deleted
+      summary: A role has been soft-deleted
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/RoleDeletedEvent'
+
     UserRoleAssigned:
       name: user.role.assigned
       title: User Role Assigned
@@ -291,6 +323,165 @@ components:
                   examples:
                     - Removing impersonation permission from provider_admin due to security policy change
                     - Revoking delete permission from role per compliance requirement
+
+    RoleUpdatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Role UUID
+        stream_type:
+          type: string
+          const: role
+        event_type:
+          type: string
+          const: role.updated
+        event_data:
+          type: object
+          properties:
+            name:
+              type: string
+              description: Updated role name (if changed)
+              examples:
+                - provider_admin
+                - facility_admin
+                - custom_clinician
+            description:
+              type: string
+              description: Updated role description (if changed)
+              examples:
+                - Organization administrator with org-scoped permissions
+                - Facility-specific administrative role
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - properties:
+                reason:
+                  examples:
+                    - Updating role description for clarity
+                    - Renaming role to match organizational structure
+
+    RoleDeactivatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Role UUID
+        stream_type:
+          type: string
+          const: role
+        event_type:
+          type: string
+          const: role.deactivated
+        event_data:
+          type: object
+          required:
+            - reason
+          properties:
+            reason:
+              type: string
+              description: Reason for deactivation
+              examples:
+                - Role no longer needed for current organizational structure
+                - Temporarily freezing role for security review
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - properties:
+                reason:
+                  examples:
+                    - Deactivating role per administrator request
+                    - Role deprecated in favor of new role structure
+
+    RoleReactivatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Role UUID
+        stream_type:
+          type: string
+          const: role
+        event_type:
+          type: string
+          const: role.reactivated
+        event_data:
+          type: object
+          properties:
+            reason:
+              type: string
+              description: Reason for reactivation
+              examples:
+                - Security review completed, role reinstated
+                - Role needed again for new hire onboarding
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - properties:
+                reason:
+                  examples:
+                    - Reactivating role after security review
+                    - Role restored per administrator request
+
+    RoleDeletedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Role UUID
+        stream_type:
+          type: string
+          const: role
+        event_type:
+          type: string
+          const: role.deleted
+        event_data:
+          type: object
+          required:
+            - reason
+          properties:
+            reason:
+              type: string
+              description: Reason for deletion
+              examples:
+                - Role permanently removed after deprecation period
+                - Custom role no longer needed
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - properties:
+                reason:
+                  examples:
+                    - Deleting deprecated role per administrator request
+                    - Role cleanup after organizational restructure
 
     UserRoleAssignedEvent:
       type: object

@@ -21,6 +21,7 @@ import {
   OrganizationUnitsManagePage,
   OrganizationUnitCreatePage,
 } from '@/pages/organization-units';
+import { RolesManagePage } from '@/pages/roles';
 import { DebugControlPanel } from '@/components/debug/DebugControlPanel';
 import { LogOverlay } from '@/components/debug/LogOverlay';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -115,6 +116,13 @@ function App() {
                   </RequirePermission>
                 } />
                 {/* Edit route removed - functionality consolidated into ManagePage */}
+
+                {/* Role Management routes */}
+                <Route path="/roles/manage" element={
+                  <RequirePermission permission="role.create" fallback="/clients">
+                    <RolesManagePage />
+                  </RequirePermission>
+                } />
 
                 {/* Other main sections */}
                 <Route path="/medications" element={<MedicationsPage />} />
