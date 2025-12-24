@@ -274,9 +274,66 @@
 - [x] Frontend deploy workflow passed
 - [x] User verified: Works correctly
 
+## Phase 14: Architect Recommendations ✅ COMPLETE
+
+**Goal**: Implement all architect review recommendations for OU management.
+
+### Phase 14.1: WCAG 2.1 AA + ARIA Dialog Compliance
+- [x] Add `useKeyboardNavigation` hook to ConfirmDialog.tsx
+- [x] Implement focus trap, Escape key handler, focus restoration
+- [x] Fix color contrast (200-level backgrounds, 700-level icons for 3:1 ratio)
+
+### Phase 14.2: AsyncAPI Contract Integration
+- [x] Add `organization_unit` to `stream_type` enum in asyncapi.yaml
+- [x] Integrate 6 OU event message references in main contract
+
+### Phase 14.3: OU Projection Table Documentation
+- [x] Create `documentation/infrastructure/reference/database/tables/organization_units_projection.md`
+- [x] Complete schema docs with RLS policies, indexes, constraints, usage examples
+
+### Phase 14.4: Form Extraction
+- [x] Extract `OrganizationUnitFormFields.tsx` component
+- [x] Reduce ManagePage from ~1160 to ~980 lines
+
+### Phase 14.5: Dialog State Consolidation
+- [x] Replace 5 boolean states + 3 loading states with `DialogState` discriminated union
+- [x] Update all handlers and ConfirmDialog components to use type-safe pattern
+
+### Phase 14.6: Component Documentation
+- [x] Create `documentation/frontend/reference/components/organization-units.md`
+- [x] Document OrganizationTree, OrganizationTreeNode, OrganizationUnitFormFields
+
+### Phase 14.7: Type-Ahead Search in Tree
+- [x] Implement WAI-ARIA type-ahead pattern in OrganizationTree.tsx
+- [x] 500ms buffer timeout, wrapping search, visible-nodes-only
+
+### Phase 14 Deployment (2025-12-24)
+- [x] Commit `b69fcb41`: feat(ou): Implement architect recommendations for OU management
+- [x] Frontend deploy workflow passed
+- [x] All 7 sub-phases complete
+
+## Phase 15: Dialog Initial Focus Fix ✅ COMPLETE
+
+**Problem**: ConfirmDialog focused the X close button (first focusable element) instead of Cancel button.
+
+**WCAG/ARIA Requirement**: Destructive dialogs should focus the safest option (Cancel) by default to prevent accidental confirmation via Enter key.
+
+### Implementation
+- [x] Investigate `useKeyboardNavigation` hook behavior (lines 159-163)
+- [x] Root cause: `trapFocus: true` without `initialFocusRef` focuses first element (X button)
+- [x] Add `cancelButtonRef` to reference Cancel button
+- [x] Pass `initialFocusRef: cancelButtonRef` to `useKeyboardNavigation`
+- [x] Add `ref={cancelButtonRef}` to Cancel button
+- [x] TypeScript check passed
+
+### Phase 15 Deployment (2025-12-24)
+- [x] Commit `3a573a2f`: fix(a11y): Set initial focus to Cancel button in ConfirmDialog
+- [x] Frontend deploy workflow passed
+- [x] User can verify: Dialog now focuses Cancel button when opened
+
 ## Current Status
 
-**Phase**: ALL PHASES COMPLETE (including Phase 13 display name fix)
+**Phase**: ALL PHASES COMPLETE (including Phase 15 dialog focus fix)
 **Status**: ✅ COMPLETE
 **Last Updated**: 2025-12-24
 **Next Step**: Archive dev-docs to `dev/archived/ou-fixes/` - feature is complete

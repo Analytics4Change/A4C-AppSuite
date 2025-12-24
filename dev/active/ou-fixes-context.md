@@ -44,6 +44,8 @@
    - **Edit mode**: Sync displayName only if it still matches originalData.name (user hasn't customized it)
    - This distinction is necessary because in create mode, `originalData.name` is always `''`
 
+13. **Dialog Initial Focus on Cancel Button** (Added 2025-12-24): Per WCAG/ARIA best practices, destructive dialogs should focus the safest option (Cancel) by default. This prevents accidental confirmation via Enter key. The `useKeyboardNavigation` hook supports `initialFocusRef` prop - pass a ref to the Cancel button.
+
 ## Technical Context
 
 ### Architecture
@@ -189,6 +191,13 @@ Organization Units use CQRS/Event Sourcing pattern:
   - Extracted shared ConfirmDialog component (110 lines)
   - Supports variants: danger, warning, success, default
   - ARIA accessible with alertdialog role
+
+### Files Modified - 2025-12-24 (Phase 15: Dialog Initial Focus Fix)
+
+- `frontend/src/components/ui/ConfirmDialog.tsx`
+  - Added `cancelButtonRef` to reference Cancel button
+  - Added `initialFocusRef: cancelButtonRef` to `useKeyboardNavigation` hook
+  - Cancel button now receives focus when dialog opens (prevents accidental confirmation)
 
 ### Files Deleted - 2025-12-24 (Phase 11: Page Consolidation Refactor)
 
