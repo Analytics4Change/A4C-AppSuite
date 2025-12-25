@@ -4,8 +4,10 @@
  * Re-exports all role management UI components.
  *
  * @example
- * import { RoleList, PermissionSelector, RoleFormFields } from '@/components/roles';
+ * import { RoleList, PermissionSelector, RoleFormFields, RoleCard } from '@/components/roles';
  */
+
+export { RoleCard } from './RoleCard';
 
 export { RoleList } from './RoleList';
 export type { RoleListProps } from './RoleList';
