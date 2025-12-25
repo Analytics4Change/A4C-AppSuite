@@ -4,8 +4,9 @@
 
 **Phase**: 8 - Testing
 **Status**: ✅ COMPLETE
-**Last Updated**: 2024-12-24
+**Last Updated**: 2024-12-25
 **Completed**: All unit tests, E2E tests, and accessibility tests
+**Final Commit**: `df6de3c7` - Deployed and verified via GitHub Actions
 
 ---
 
@@ -91,6 +92,46 @@
 
 ## Deployment Status
 
-- **Commit**: `164d325b` - feat(rbac): Implement role management UI and API
-- **Deployed**: 2024-12-24
-- **Workflows**: All passed (Database Migrations, Frontend, Documentation)
+| Commit | Description | Date | Status |
+|--------|-------------|------|--------|
+| `164d325b` | feat(rbac): Implement role management UI and API | 2024-12-24 | ✅ Deployed |
+| `df6de3c7` | feat(rbac): Add role card page, unit tests, and E2E tests | 2024-12-25 | ✅ Deployed |
+
+All GitHub Actions workflows passed:
+- Deploy Frontend: Build + Docker push + k8s rollout
+- Validate Frontend Documentation: Passed
+
+## Feature Complete Summary
+
+The Role Management feature is **100% complete**:
+- ✅ 8 phases implemented
+- ✅ 148 unit tests passing
+- ✅ 189 E2E tests passing (27 tests × 7 browser configs)
+- ✅ TypeScript compilation passes
+- ✅ Deployed to production
+
+### Remaining Work (Deferred)
+- [x] Manual testing with real Supabase data (integration testing) - Discovered 2 bugs, fixed below
+- [ ] User documentation / help text
+
+---
+
+## Phase 9: Bug Fixes ✅ COMPLETE
+
+**Date**: 2024-12-24
+**Status**: ✅ COMPLETE
+
+### Bug 1: Missing Navigation Item
+- [x] Add Roles nav item to `MainLayout.tsx` allNavItems array
+- [x] Import Shield icon from lucide-react
+- [x] Configure: `roles: ['super_admin', 'provider_admin'], permission: 'role.create', showForOrgTypes: ['provider']`
+
+### Bug 2: api.get_roles Statement Timeout
+- [x] Create migration `20251224192708_fix_get_roles_performance.sql`
+- [x] Add index: `CREATE INDEX IF NOT EXISTS idx_role_permissions_role_id ON role_permissions_projection(role_id)`
+- [x] Rewrite `api.get_roles` to use LEFT JOINs with pre-aggregated counts instead of correlated subqueries
+- [x] Deploy migration to Supabase
+
+**Files Modified**:
+- `frontend/src/components/layouts/MainLayout.tsx` (import + nav item)
+- `infrastructure/supabase/supabase/migrations/20251224192708_fix_get_roles_performance.sql` (new)
