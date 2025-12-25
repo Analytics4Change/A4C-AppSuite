@@ -27,7 +27,10 @@ import { RoleList, RoleFormFields, PermissionSelector } from '@/components/roles
 import { RolesViewModel } from '@/viewModels/roles/RolesViewModel';
 import { RoleFormViewModel } from '@/viewModels/roles/RoleFormViewModel';
 import { getRoleService } from '@/services/roles';
+import { getOrganizationUnitService } from '@/services/organization/OrganizationUnitServiceFactory';
 import type { RoleWithPermissions } from '@/types/role.types';
+import type { OrganizationUnitNode } from '@/types/organization-unit.types';
+import { buildOrganizationUnitTree } from '@/types/organization-unit.types';
 import {
   Plus,
   Trash2,
@@ -84,11 +87,39 @@ export const RolesManagePage: React.FC = observer(() => {
   // Error states
   const [operationError, setOperationError] = useState<string | null>(null);
 
+  // OU tree nodes for scope selection
+  const [ouNodes, setOuNodes] = useState<OrganizationUnitNode[]>([]);
+
   // Load roles and permissions on mount
   useEffect(() => {
     log.debug('RolesManagePage mounted, loading data');
     viewModel.loadAll();
   }, [viewModel]);
+
+  // Load OU tree data on mount
+  useEffect(() => {
+    const loadOUData = async () => {
+      try {
+        const service = getOrganizationUnitService();
+        const units = await service.getUnits({ status: 'active' });
+        // Find root path (shortest path in the set)
+        const rootPath = units.length > 0
+          ? units.reduce(
+              (shortest: string, unit) =>
+                unit.path.length < shortest.length ? unit.path : shortest,
+              units[0].path
+            )
+          : '';
+        const tree = buildOrganizationUnitTree(units, rootPath);
+        setOuNodes(tree);
+        log.debug('OU tree loaded for role scope selection', { nodeCount: units.length });
+      } catch (error) {
+        log.error('Failed to load OU tree for scope selection', error);
+        // Don't set error state - scope selection is optional
+      }
+    };
+    loadOUData();
+  }, []);
 
   // Select and load a role for editing
   const selectAndLoadRole = useCallback(
@@ -510,6 +541,7 @@ export const RolesManagePage: React.FC = observer(() => {
                       onFieldChange={formViewModel.updateField.bind(formViewModel)}
                       onFieldBlur={formViewModel.touchField.bind(formViewModel)}
                       getFieldError={formViewModel.getFieldError.bind(formViewModel)}
+                      ouNodes={ouNodes}
                       disabled={formViewModel.isSubmitting}
                     />
 
@@ -624,6 +656,7 @@ export const RolesManagePage: React.FC = observer(() => {
                         onFieldChange={formViewModel.updateField.bind(formViewModel)}
                         onFieldBlur={formViewModel.touchField.bind(formViewModel)}
                         getFieldError={formViewModel.getFieldError.bind(formViewModel)}
+                        ouNodes={ouNodes}
                         disabled={formViewModel.isSubmitting || !currentRole.isActive}
                         isEditMode
                         roleId={currentRole.id}

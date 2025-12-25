@@ -18,8 +18,10 @@ import { observer } from 'mobx-react-lite';
 import { cn } from '@/components/ui/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { TreeSelectDropdown } from '@/components/ui/TreeSelectDropdown';
 import { AlertCircle } from 'lucide-react';
 import type { RoleFormData } from '@/types/role.types';
+import type { OrganizationUnitNode } from '@/types/organization-unit.types';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('component');
@@ -39,6 +41,9 @@ export interface RoleFormFieldsProps {
 
   /** Get error message for a field */
   getFieldError: (field: keyof RoleFormData) => string | null;
+
+  /** Organization unit tree nodes for scope selection */
+  ouNodes?: OrganizationUnitNode[];
 
   /** Whether the form is disabled (e.g., during submission) */
   disabled?: boolean;
@@ -108,6 +113,7 @@ export const RoleFormFields = observer(
     onFieldChange,
     onFieldBlur,
     getFieldError,
+    ouNodes = [],
     disabled = false,
     isEditMode = false,
     roleId,
@@ -134,9 +140,9 @@ export const RoleFormFields = observer(
       [onFieldChange]
     );
 
-    const handleScopeChange = useCallback(
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        onFieldChange('orgHierarchyScope', e.target.value || null);
+    const handleScopeSelect = useCallback(
+      (path: string | null) => {
+        onFieldChange('orgHierarchyScope', path);
       },
       [onFieldChange]
     );
@@ -149,9 +155,7 @@ export const RoleFormFields = observer(
       onFieldBlur('description');
     }, [onFieldBlur]);
 
-    const handleScopeBlur = useCallback(() => {
-      onFieldBlur('orgHierarchyScope');
-    }, [onFieldBlur]);
+    // Note: TreeSelectDropdown handles blur internally
 
     const nameError = getFieldError('name');
     const descriptionError = getFieldError('description');
@@ -224,27 +228,17 @@ export const RoleFormFields = observer(
         </FieldWrapper>
 
         {/* Organizational Unit Scope field */}
-        <FieldWrapper
+        <TreeSelectDropdown
           id={scopeId}
           label="Organizational Unit Scope"
-          error={scopeError}
-        >
-          <Input
-            id={scopeId}
-            type="text"
-            value={formData.orgHierarchyScope || ''}
-            onChange={handleScopeChange}
-            onBlur={handleScopeBlur}
-            disabled={disabled}
-            placeholder="e.g., org.facility.department (optional)"
-            aria-describedby={scopeError ? `${scopeId}-error` : `${scopeId}-help`}
-            aria-invalid={!!scopeError}
-            className={cn(scopeError && 'border-red-500 focus:ring-red-500')}
-          />
-          <p id={`${scopeId}-help`} className="text-xs text-gray-500 mt-1">
-            Leave empty for organization-wide scope. Use ltree path to limit to specific unit.
-          </p>
-        </FieldWrapper>
+          nodes={ouNodes}
+          selectedPath={formData.orgHierarchyScope}
+          onSelect={handleScopeSelect}
+          placeholder="Organization-wide (no restriction)"
+          disabled={disabled}
+          error={scopeError ?? undefined}
+          helpText="Select a unit to restrict this role's scope, or leave empty for organization-wide access."
+        />
       </div>
     );
   }
