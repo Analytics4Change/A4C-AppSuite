@@ -8,6 +8,7 @@ import { RoleCard } from '@/components/roles/RoleCard';
 import { RolesViewModel } from '@/viewModels/roles/RolesViewModel';
 import { Plus, Search, Shield } from 'lucide-react';
 import { Logger } from '@/utils/logger';
+import { isCanonicalRole } from '@/config/roles.config';
 
 const log = Logger.getLogger('component');
 
@@ -52,7 +53,8 @@ export const RolesPage: React.FC = observer(() => {
 
   // Filter roles by search term (client-side for responsiveness)
   const filteredRoles = useMemo(() => {
-    let roles = viewModel.roles;
+    // First, filter out canonical/system roles (defense in depth - also filtered in ViewModel)
+    let roles = viewModel.roles.filter((r) => !isCanonicalRole(r.name));
 
     // Apply status filter
     if (statusFilter === 'active') {

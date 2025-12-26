@@ -28,6 +28,7 @@
 
 import { makeAutoObservable, runInAction } from 'mobx';
 import { Logger } from '@/utils/logger';
+import { isCanonicalRole } from '@/config/roles.config';
 import type { IRoleService } from '@/services/roles/IRoleService';
 import { getRoleService } from '@/services/roles/RoleServiceFactory';
 import type {
@@ -206,9 +207,15 @@ export class RolesViewModel {
       const roles = await this.service.getRoles(this.filters);
 
       runInAction(() => {
-        this.rawRoles = roles;
+        // Filter out canonical/system roles - they should not be visible in Role Management UI
+        const visibleRoles = roles.filter((role) => !isCanonicalRole(role.name));
+        this.rawRoles = visibleRoles;
         this.isLoading = false;
-        log.info('Loaded roles', { count: roles.length });
+        log.info('Loaded roles', {
+          totalFromApi: roles.length,
+          visibleCount: visibleRoles.length,
+          hiddenCanonicalRoles: roles.length - visibleRoles.length,
+        });
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to load roles';

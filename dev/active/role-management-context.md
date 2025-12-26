@@ -5,8 +5,8 @@
 Role management UI for CRUD operations on roles and their permissions. Follows the Organization Units pattern with split-view layout and MVVM architecture.
 
 **Created**: 2024-12-24
-**Last Updated**: 2024-12-25
-**Status**: ✅ COMPLETE - All phases implemented, tested, deployed, bug fixes applied, and UX enhancements added
+**Last Updated**: 2024-12-26
+**Status**: ✅ COMPLETE - All phases implemented, tested, deployed, bug fixes applied, and UX enhancements added. Now serves as canonical UI pattern reference.
 
 ## Key Decisions
 
@@ -194,3 +194,44 @@ AND (
 - Clear button to remove selection (organization-wide access)
 **Accessibility**: WCAG 2.1 Level AA compliant - full keyboard navigation, proper ARIA attributes
 **Commit**: `b89b9bf6`
+
+## UI Pattern Standardization (2024-12-26)
+
+### Roles as Canonical UI Pattern
+**Context**: The roles UI patterns have been established as the canonical reference for all admin management pages.
+
+**Organization-units routes aligned to roles pattern** (`57196ae9`):
+- Removed standalone `/organization-units/create` route (inline create in ManagePage)
+- Added status filter tabs with counts (All/Active/Inactive)
+- Added search bar with icon
+- Updated form field styling (labels: `text-sm font-medium`, errors: icon + text)
+- Updated spacing (forms: `space-y-6`, actions: `gap-3 pt-4`)
+- Updated empty state (icon: `w-16 h-16`, padding: `p-12`)
+- Fixed height for list panels (`h-[calc(100vh-280px)]`)
+
+**Pattern Reference Files** (use for future admin pages):
+- `frontend/src/pages/roles/RolesPage.tsx` - Card-based list page
+- `frontend/src/pages/roles/RolesManagePage.tsx` - Split-view manage page
+- `frontend/src/components/roles/RoleFormFields.tsx` - Form field styling with FieldWrapper
+- `frontend/src/components/roles/RoleList.tsx` - Filterable list with search
+
+## Canonical Roles Protection (2024-12-26)
+
+### Hide System Roles from Management UI
+**Problem**: Navigating to `/roles/manage?roleId=<canonical-role-id>` showed "Failed to load role details". Canonical roles (`super_admin`, `provider_admin`) should never be visible or manageable through the UI.
+
+**Solution**: Frontend-only filtering using existing `roles.config.ts` `isSystemRole` flag.
+
+**Implementation**:
+- Added `isCanonicalRole(roleName)` helper in `roles.config.ts`
+- Filter canonical roles in `RolesViewModel.loadRoles()` - primary filtering point
+- Added guard in `RolesManagePage.selectAndLoadRole()` with clear error message
+- Defense-in-depth filter in `RolesPage.filteredRoles`
+- Renamed mock role from "Provider Administrator" to "Organization Admin" to avoid confusion
+
+**Files Modified**:
+- `frontend/src/config/roles.config.ts` - Added `isCanonicalRole()` helper
+- `frontend/src/viewModels/roles/RolesViewModel.ts` - Filter in `loadRoles()`
+- `frontend/src/pages/roles/RolesManagePage.tsx` - Guard in `selectAndLoadRole()`
+- `frontend/src/pages/roles/RolesPage.tsx` - Filter in `filteredRoles`
+- `frontend/src/services/roles/MockRoleService.ts` - Renamed mock role

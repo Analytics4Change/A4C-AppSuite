@@ -108,6 +108,22 @@ export const CANONICAL_ROLES: Record<string, RoleDefinition> = {
 };
 
 /**
+ * Check if a role name is a canonical (system) role.
+ *
+ * Canonical roles are system-defined roles that should not be
+ * visible in the Role Management UI since they:
+ * - Cannot be modified by users
+ * - Are managed by the system/bootstrap process
+ * - Have special platform-level significance
+ *
+ * @param roleName - The role name to check (e.g., 'super_admin', 'provider_admin')
+ * @returns true if the role is canonical, false otherwise
+ */
+export function isCanonicalRole(roleName: string): boolean {
+  return roleName in CANONICAL_ROLES;
+}
+
+/**
  * Role hierarchy for permission inheritance
  * Higher levels inherit permissions from lower levels
  */

@@ -91,9 +91,9 @@ function getInitialMockRoles(): { roles: Role[]; rolePermissions: Map<string, st
 
   const roles: Role[] = [
     {
-      id: 'role-provider-admin',
-      name: 'Provider Administrator',
-      description: 'Full administrative access to the provider organization',
+      id: 'role-org-admin',
+      name: 'Organization Admin',
+      description: 'Full administrative access to the organization',
       organizationId: 'org-acme-healthcare',
       orgHierarchyScope: 'root.provider.acme_healthcare',
       isActive: true,
@@ -141,7 +141,7 @@ function getInitialMockRoles(): { roles: Role[]; rolePermissions: Map<string, st
   ];
 
   const rolePermissions = new Map<string, string[]>([
-    ['role-provider-admin', MOCK_PERMISSIONS.map((p) => p.id)], // All permissions
+    ['role-org-admin', MOCK_PERMISSIONS.map((p) => p.id)], // All permissions
     ['role-clinician', [
       'perm-client-view', 'perm-client-update',
       'perm-med-create', 'perm-med-view', 'perm-med-update',

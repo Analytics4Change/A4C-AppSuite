@@ -45,6 +45,7 @@ import {
 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
 import { cn } from '@/components/ui/utils';
+import { isCanonicalRole } from '@/config/roles.config';
 
 const log = Logger.getLogger('component');
 
@@ -129,6 +130,13 @@ export const RolesManagePage: React.FC = observer(() => {
         const service = getRoleService();
         const fullRole = await service.getRoleById(roleId);
         if (fullRole) {
+          // Guard: Reject selection of canonical roles
+          if (isCanonicalRole(fullRole.name)) {
+            log.warn('Attempted to select canonical role', { roleId, name: fullRole.name });
+            setOperationError('System roles cannot be managed through this interface.');
+            return;
+          }
+
           setCurrentRole(fullRole);
           setFormViewModel(
             new RoleFormViewModel(
