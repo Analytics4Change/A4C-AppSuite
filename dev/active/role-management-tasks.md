@@ -2,11 +2,11 @@
 
 ## Current Status
 
-**Phase**: 8 - Testing
+**Phase**: 10 - UX Enhancements
 **Status**: ✅ COMPLETE
 **Last Updated**: 2024-12-25
-**Completed**: All unit tests, E2E tests, and accessibility tests
-**Final Commit**: `df6de3c7` - Deployed and verified via GitHub Actions
+**Completed**: OU scope tree dropdown, statement timeout fix, global roles visibility fix
+**Final Commit**: `474afe1c` - All fixes deployed and verified
 
 ---
 
@@ -104,14 +104,16 @@ All GitHub Actions workflows passed:
 ## Feature Complete Summary
 
 The Role Management feature is **100% complete**:
-- ✅ 8 phases implemented
+- ✅ 10 phases implemented
 - ✅ 148 unit tests passing
 - ✅ 189 E2E tests passing (27 tests × 7 browser configs)
 - ✅ TypeScript compilation passes
 - ✅ Deployed to production
+- ✅ Statement timeout issues resolved
+- ✅ OU scope tree dropdown implemented
 
 ### Remaining Work (Deferred)
-- [x] Manual testing with real Supabase data (integration testing) - Discovered 2 bugs, fixed below
+- [x] Manual testing with real Supabase data (integration testing) - Discovered bugs, all fixed
 - [ ] User documentation / help text
 
 ---
@@ -126,12 +128,56 @@ The Role Management feature is **100% complete**:
 - [x] Import Shield icon from lucide-react
 - [x] Configure: `roles: ['super_admin', 'provider_admin'], permission: 'role.create', showForOrgTypes: ['provider']`
 
-### Bug 2: api.get_roles Statement Timeout
+### Bug 2: api.get_roles Statement Timeout (First Attempt)
 - [x] Create migration `20251224192708_fix_get_roles_performance.sql`
 - [x] Add index: `CREATE INDEX IF NOT EXISTS idx_role_permissions_role_id ON role_permissions_projection(role_id)`
 - [x] Rewrite `api.get_roles` to use LEFT JOINs with pre-aggregated counts instead of correlated subqueries
 - [x] Deploy migration to Supabase
+- Note: This fix was insufficient - RLS per-row overhead was the real problem
 
 **Files Modified**:
 - `frontend/src/components/layouts/MainLayout.tsx` (import + nav item)
 - `infrastructure/supabase/supabase/migrations/20251224192708_fix_get_roles_performance.sql` (new)
+
+---
+
+## Phase 10: Performance & UX Enhancements ✅ COMPLETE
+
+**Date**: 2024-12-25
+**Status**: ✅ COMPLETE
+
+### Bug 3: api.get_roles Statement Timeout (Root Cause Fix)
+- [x] Analyze HAR file - identified TWO functions timing out: `api.get_roles` and `api.get_user_permissions`
+- [x] Identify root cause: RLS policies calling `is_org_admin()`, `is_super_admin()` per row
+- [x] Convert `api.get_user_permissions` to SECURITY DEFINER
+- [x] Convert `api.get_roles` to SECURITY DEFINER
+- [x] Move authorization logic inside functions (checked once, not per row)
+- [x] Create migration `20251225120000_fix_role_api_security_definer.sql`
+- [x] Deploy and verify
+
+### Bug 4: Global Roles Visible to All Organizations
+- [x] Identify bug: provider org users could see `super_admin` role
+- [x] Add `org_type` check - global roles only visible to `platform_owner`
+- [x] Create migration `20251225130000_fix_global_roles_visibility.sql`
+- [x] Deploy and verify
+
+### UX Enhancement: OU Scope Tree Dropdown
+- [x] Create `TreeSelectDropdown.tsx` component
+- [x] Embed OrganizationTree for hierarchy display
+- [x] Add full keyboard navigation (Arrow keys, Enter, Escape)
+- [x] Update `RoleFormFields.tsx` to use TreeSelectDropdown
+- [x] Update `RolesManagePage.tsx` to load OU tree data on mount
+- [x] WCAG 2.1 Level AA compliance verified
+
+**Files Added**:
+- `frontend/src/components/ui/TreeSelectDropdown.tsx`
+- `infrastructure/supabase/supabase/migrations/20251225120000_fix_role_api_security_definer.sql`
+- `infrastructure/supabase/supabase/migrations/20251225130000_fix_global_roles_visibility.sql`
+
+**Files Modified**:
+- `frontend/src/components/roles/RoleFormFields.tsx`
+- `frontend/src/pages/roles/RolesManagePage.tsx`
+
+**Commits**:
+- `b89b9bf6` - feat(rbac): Add OU scope tree dropdown for role management
+- `474afe1c` - fix(rbac): Resolve statement timeout and global roles visibility

@@ -5,18 +5,19 @@
 Role management UI for CRUD operations on roles and their permissions. Follows the Organization Units pattern with split-view layout and MVVM architecture.
 
 **Created**: 2024-12-24
-**Last Updated**: 2024-12-24
-**Status**: ✅ COMPLETE - All phases implemented, tested, deployed, and bug fixes applied
+**Last Updated**: 2024-12-25
+**Status**: ✅ COMPLETE - All phases implemented, tested, deployed, bug fixes applied, and UX enhancements added
 
 ## Key Decisions
 
 1. **Split-view Layout**: List panel (1/3) + form panel (2/3) - permission selector needs more space than tree view
 2. **Permission UI**: Grouped checkboxes by applet with "Select All" per group
 3. **Subset-only Delegation**: Users can only grant permissions they possess - enforced in both API and UI
-4. **SECURITY INVOKER Pattern**: API functions use RLS for authorization, emit events via SECURITY DEFINER function
-5. **Scope Field**: Optional ltree path for organizational unit scope - text input for now, could be dropdown later
+4. **SECURITY DEFINER Pattern**: API functions `api.get_roles` and `api.get_user_permissions` use SECURITY DEFINER to bypass RLS per-row overhead, with authorization logic inside the function (checked once, not per row) - Updated 2024-12-25
+5. **Scope Field**: Optional ltree path for organizational unit scope - TreeSelectDropdown with OU hierarchy tree - Updated 2024-12-25
 6. **Card-based Listing Page**: Added `/roles` route with card grid layout matching `/clients` pattern - Added 2024-12-25
 7. **Comprehensive Testing**: 148 unit tests (ViewModels + types) + 189 E2E tests (27 tests × 7 browser configs) - Added 2024-12-25
+8. **Global Roles Visibility**: Global roles (organization_id IS NULL) only visible to platform_owner org type, not all authenticated users - Added 2024-12-25
 
 ## Architecture
 
@@ -40,6 +41,8 @@ frontend/src/
 │   ├── RoleFormFields.tsx                 # Name, description, scope fields
 │   ├── RoleCard.tsx                       # Glass-morphism card with quick actions - Added 2024-12-25
 │   └── index.ts                           # Exports
+├── components/ui/
+│   └── TreeSelectDropdown.tsx             # Dropdown with embedded OrganizationTree - Added 2024-12-25
 ├── pages/roles/
 │   ├── RolesManagePage.tsx                # Main split-view page
 │   ├── RolesPage.tsx                      # Card-based listing page (/roles) - Added 2024-12-25
@@ -60,7 +63,9 @@ infrastructure/supabase/
 ├── contracts/asyncapi/domains/rbac.yaml   # Added 4 new events
 └── supabase/migrations/
     ├── 20251224220822_role_management_api.sql     # API functions + event processor
-    └── 20251224192708_fix_get_roles_performance.sql  # Bug fix: N+1 query + missing index
+    ├── 20251224192708_fix_get_roles_performance.sql  # Bug fix: N+1 query + missing index
+    ├── 20251225120000_fix_role_api_security_definer.sql  # SECURITY DEFINER fix for timeout - Added 2024-12-25
+    └── 20251225130000_fix_global_roles_visibility.sql    # org_type check for global roles - Added 2024-12-25
 ```
 
 ### API Functions (api schema)
@@ -120,16 +125,19 @@ infrastructure/supabase/
 |--------|-------------|------|
 | `164d325b` | Initial UI and API implementation (Phases 1-7) | 2024-12-24 |
 | `df6de3c7` | Card page, unit tests, E2E tests (Phase 8) | 2024-12-25 |
-| TBD | Bug fixes: Nav item + api.get_roles performance | 2024-12-24 |
+| `ca67664b` | Bug fixes: Nav item + api.get_roles performance | 2024-12-25 |
+| `b89b9bf6` | OU scope tree dropdown for role management | 2024-12-25 |
+| `474afe1c` | SECURITY DEFINER + global roles visibility fix | 2024-12-25 |
 
-## Bug Fixes (2024-12-24)
+## Bug Fixes (2024-12-24 - 2024-12-25)
 
 ### Issue 1: Roles not in navigation
 **Problem**: The `/roles` route was accessible but no navigation item existed in the sidebar.
 **Fix**: Added Roles nav item to `MainLayout.tsx` with Shield icon, `role.create` permission, and `showForOrgTypes: ['provider']`.
+**Commit**: `ca67664b`
 
-### Issue 2: api.get_roles statement timeout
-**Problem**: Correlated subqueries for `permission_count` and `user_count` caused N+1 query pattern. Combined with RLS policy overhead, this triggered statement timeouts.
+### Issue 2: api.get_roles statement timeout (First Attempt)
+**Problem**: Correlated subqueries for `permission_count` and `user_count` caused N+1 query pattern.
 **Root cause**:
 - Missing index on `role_permissions_projection.role_id`
 - Correlated subqueries executed per row instead of using JOINs
@@ -137,3 +145,52 @@ infrastructure/supabase/
 - Created `idx_role_permissions_role_id` index
 - Rewrote `api.get_roles` to use LEFT JOIN with pre-aggregated counts
 - Migration: `20251224192708_fix_get_roles_performance.sql`
+**Result**: Still timed out - RLS per-row overhead was the real problem.
+
+### Issue 3: api.get_roles statement timeout (Root Cause Fix)
+**Problem**: Even with index + JOINs, statement timeout persisted. HAR analysis showed TWO functions timing out: `api.get_roles` (13.3s) and `api.get_user_permissions` (15.3s).
+**Root cause**: RLS policies call expensive functions (`is_org_admin()`, `is_super_admin()`) for EVERY ROW:
+- Each function executes 2-3 JOINs per call
+- N rows = N function calls = 2N-3N extra JOINs
+- Combined with 8s statement_timeout = TIMEOUT
+**Fix**: Convert to SECURITY DEFINER to bypass RLS, implement authorization logic inside function (checked once, not per row):
+```sql
+-- Before: SECURITY INVOKER → RLS evaluated per row
+-- After: SECURITY DEFINER → Authorization inside function (O(1))
+v_user_id := public.get_current_user_id();
+v_org_id := public.get_current_org_id();
+v_is_super_admin := public.is_super_admin(v_user_id);
+-- Filter in WHERE clause, not via RLS
+```
+**Migration**: `20251225120000_fix_role_api_security_definer.sql`
+**Commit**: `474afe1c`
+
+### Issue 4: Global roles visible to all organizations
+**Problem**: After SECURITY DEFINER fix, provider org users could see global roles like `super_admin`.
+**Root cause**: Authorization logic allowed `organization_id IS NULL` for all authenticated users.
+**Fix**: Add `org_type` check - global roles only visible to `platform_owner` org type:
+```sql
+v_org_type := (auth.jwt()->>'org_type')::text;
+AND (
+  (r.organization_id IS NULL AND v_org_type = 'platform_owner')
+  OR r.organization_id = v_org_id
+  OR v_is_super_admin
+)
+```
+**Migration**: `20251225130000_fix_global_roles_visibility.sql`
+**Commit**: `474afe1c`
+
+## UX Enhancements (2024-12-25)
+
+### OU Scope Tree Dropdown
+**Feature**: Replace text input for "Organizational Unit Scope" with dropdown showing OU hierarchy tree.
+**Implementation**:
+- Created `TreeSelectDropdown.tsx` - reusable dropdown with embedded OrganizationTree
+- Updated `RoleFormFields.tsx` to use TreeSelectDropdown instead of text input
+- Updated `RolesManagePage.tsx` to load OU tree data on mount
+**UX Behavior**:
+- Collapsed: Shows selected OU display name or placeholder
+- Expanded: Full OrganizationTree with expand/collapse, keyboard navigation
+- Clear button to remove selection (organization-wide access)
+**Accessibility**: WCAG 2.1 Level AA compliant - full keyboard navigation, proper ARIA attributes
+**Commit**: `b89b9bf6`
