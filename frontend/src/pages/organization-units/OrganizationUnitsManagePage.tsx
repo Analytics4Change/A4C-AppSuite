@@ -462,8 +462,8 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Panel: Tree View */}
           <div className="lg:col-span-2">
-            <Card className="shadow-lg h-full">
-              <CardHeader className="border-b border-gray-200">
+            <Card className="shadow-lg h-[calc(100vh-280px)]">
+              <CardHeader className="border-b border-gray-200 pb-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-xl font-semibold text-gray-900">
                     Organization Hierarchy
@@ -556,12 +556,12 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
             {/* Empty State */}
             {panelMode === 'empty' && (
               <Card className="shadow-lg">
-                <CardContent className="p-8 text-center">
-                  <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <CardContent className="p-12 text-center">
+                  <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">
                     No Unit Selected
                   </h3>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-gray-500 max-w-md mx-auto">
                     Select a unit from the tree to view and edit its details, or click
                     "Create New Unit" to add a new one.
                   </p>
@@ -573,21 +573,22 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
             {panelMode === 'create' && formViewModel && (
               <Card className="shadow-lg">
                 <CardHeader className="border-b border-gray-200">
-                  <CardTitle className="text-lg font-semibold text-gray-900">
+                  <CardTitle className="text-xl font-semibold text-gray-900">
                     Create New Unit
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-4">
-                  <form onSubmit={handleSubmit} className="space-y-4">
+                <CardContent className="p-6">
+                  <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Submission Error */}
                     {formViewModel.submissionError && (
-                      <div className="p-3 rounded-lg border border-red-300 bg-red-50" role="alert">
+                      <div className="p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
                         <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                           <div className="flex-1">
-                            <h4 className="text-red-800 font-semibold text-sm">
+                            <h4 className="text-red-800 font-semibold">
                               Failed to create unit
                             </h4>
-                            <p className="text-red-700 text-xs mt-1">
+                            <p className="text-red-700 text-sm mt-1">
                               {formViewModel.submissionError}
                             </p>
                           </div>
@@ -604,8 +605,8 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     )}
 
                     {/* Parent Unit Dropdown */}
-                    <div>
-                      <Label className="block text-xs font-medium text-gray-700 mb-1">
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-medium text-gray-700">
                         Parent Unit
                       </Label>
                       <Select.Root
@@ -615,7 +616,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                         }
                       >
                         <Select.Trigger
-                          className="w-full px-2 py-1.5 text-sm rounded-md border border-gray-300 shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           aria-label="Parent Unit"
                         >
                           <Select.Value>
@@ -667,11 +668,10 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     />
 
                     {/* Form Actions */}
-                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-200">
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
                         onClick={handleCancel}
                         disabled={formViewModel.isSubmitting}
                       >
@@ -679,12 +679,11 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                       </Button>
                       <Button
                         type="submit"
-                        size="sm"
                         disabled={!formViewModel.canSubmit}
                         className="bg-blue-600 hover:bg-blue-700 text-white"
                       >
-                        <Plus className="w-3 h-3 mr-1" />
-                        {formViewModel.isSubmitting ? 'Creating...' : 'Create'}
+                        <Plus className="w-4 h-4 mr-1" />
+                        {formViewModel.isSubmitting ? 'Creating...' : 'Create Unit'}
                       </Button>
                     </div>
                   </form>
@@ -714,21 +713,22 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                 {/* Form Card */}
                 <Card className="shadow-lg">
                   <CardHeader className="border-b border-gray-200">
-                    <CardTitle className="text-lg font-semibold text-gray-900">
+                    <CardTitle className="text-xl font-semibold text-gray-900">
                       Unit Details
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-4">
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                  <CardContent className="p-6">
+                    <form onSubmit={handleSubmit} className="space-y-6">
                       {/* Submission Error */}
                       {formViewModel.submissionError && (
-                        <div className="p-3 rounded-lg border border-red-300 bg-red-50" role="alert">
+                        <div className="p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
                           <div className="flex items-start gap-2">
+                            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                             <div className="flex-1">
-                              <h4 className="text-red-800 font-semibold text-sm">
+                              <h4 className="text-red-800 font-semibold">
                                 Failed to update unit
                               </h4>
-                              <p className="text-red-700 text-xs mt-1">
+                              <p className="text-red-700 text-sm mt-1">
                                 {formViewModel.submissionError}
                               </p>
                             </div>
@@ -745,11 +745,11 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                       )}
 
                       {/* Path Display (read-only) */}
-                      <div>
-                        <Label className="block text-xs font-medium text-gray-700 mb-1">
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium text-gray-700">
                           Hierarchy Path
                         </Label>
-                        <p className="text-xs text-gray-700 font-mono bg-gray-50 px-2 py-1.5 rounded-md border border-gray-200 break-all">
+                        <p className="text-sm text-gray-700 font-mono bg-gray-50 px-3 py-2 rounded-md border border-gray-200 break-all">
                           {currentUnit.path}
                         </p>
                       </div>
@@ -804,20 +804,19 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                       )}
 
                       {/* Form Actions */}
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                         <div>
                           {formViewModel.isDirty && (
-                            <span className="text-xs text-amber-600">Unsaved changes</span>
+                            <span className="text-sm text-amber-600">Unsaved changes</span>
                           )}
                         </div>
                         <Button
                           type="submit"
-                          size="sm"
                           disabled={!formViewModel.canSubmit}
                           className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
-                          <Save className="w-3 h-3 mr-1" />
-                          {formViewModel.isSubmitting ? 'Saving...' : 'Save'}
+                          <Save className="w-4 h-4 mr-1" />
+                          {formViewModel.isSubmitting ? 'Saving...' : 'Save Changes'}
                         </Button>
                       </div>
                     </form>

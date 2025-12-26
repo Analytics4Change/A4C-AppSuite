@@ -19,7 +19,6 @@ import { AcceptInvitationPage } from '@/pages/organizations/AcceptInvitationPage
 import {
   OrganizationUnitsListPage,
   OrganizationUnitsManagePage,
-  OrganizationUnitCreatePage,
 } from '@/pages/organization-units';
 import { RolesPage, RolesManagePage } from '@/pages/roles';
 import { DebugControlPanel } from '@/components/debug/DebugControlPanel';
@@ -110,12 +109,7 @@ function App() {
                     <OrganizationUnitsManagePage />
                   </RequirePermission>
                 } />
-                <Route path="/organization-units/create" element={
-                  <RequirePermission permission="organization.create_ou" fallback="/clients">
-                    <OrganizationUnitCreatePage />
-                  </RequirePermission>
-                } />
-                {/* Edit route removed - functionality consolidated into ManagePage */}
+                {/* Create and Edit routes removed - functionality consolidated into ManagePage */}
 
                 {/* Role Management routes */}
                 <Route path="/roles" element={

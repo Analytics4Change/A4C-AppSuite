@@ -1,27 +1,37 @@
 /**
  * Organization Units List Page
  *
- * Read-only view of the organization hierarchy tree.
+ * Read-only view of the organization hierarchy tree with search and filtering.
  * Provides navigation to the management page for CRUD operations.
  *
  * Features:
+ * - Status filter tabs (All / Active / Inactive)
+ * - Search input for filtering by name
  * - Tree visualization of organizational units
  * - Expand/collapse all functionality
  * - Navigation to management page
  * - Loading and error states
  *
  * Route: /organization-units
- * Permission: organization.create_ou (view requires this permission)
+ * Permission: organization.view_ou
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { OrganizationTree } from '@/components/organization-units';
 import { OrganizationUnitsViewModel } from '@/viewModels/organization/OrganizationUnitsViewModel';
-import { Settings, ChevronDown, ChevronUp, RefreshCw, Building2 } from 'lucide-react';
+import {
+  Settings,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  Building2,
+  Search,
+} from 'lucide-react';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('component');
@@ -29,17 +39,55 @@ const log = Logger.getLogger('component');
 /**
  * Organization Units List Page Component
  *
- * Displays a read-only tree view of organizational units.
+ * Displays a read-only tree view of organizational units with search and filtering.
  */
 export const OrganizationUnitsListPage: React.FC = observer(() => {
   const navigate = useNavigate();
   const [viewModel] = useState(() => new OrganizationUnitsViewModel());
+
+  // Local state for search and filter
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   // Load units on mount
   useEffect(() => {
     log.debug('OrganizationUnitsListPage mounted, loading units');
     viewModel.loadUnits();
   }, [viewModel]);
+
+  // Filter tree nodes based on search and status
+  const filteredTreeNodes = useMemo(() => {
+    let nodes = viewModel.treeNodes;
+
+    // Apply status filter at the node level
+    const filterNodes = (nodeList: typeof nodes): typeof nodes => {
+      return nodeList
+        .filter((node) => {
+          // Status filter
+          if (statusFilter === 'active' && !node.isActive) return false;
+          if (statusFilter === 'inactive' && node.isActive) return false;
+
+          // Search filter (check name and displayName)
+          if (searchTerm.trim()) {
+            const term = searchTerm.toLowerCase();
+            const nameMatch = node.name.toLowerCase().includes(term);
+            const displayNameMatch = node.displayName?.toLowerCase().includes(term);
+            const hasMatchingChild = node.children.some((child) =>
+              filterNodes([child]).length > 0
+            );
+            return nameMatch || displayNameMatch || hasMatchingChild;
+          }
+
+          return true;
+        })
+        .map((node) => ({
+          ...node,
+          children: filterNodes(node.children),
+        }));
+    };
+
+    return filterNodes(nodes);
+  }, [viewModel.treeNodes, statusFilter, searchTerm]);
 
   // Navigation handlers
   const handleManageClick = () => {
@@ -50,42 +98,119 @@ export const OrganizationUnitsListPage: React.FC = observer(() => {
     await viewModel.refresh();
   };
 
+  // Calculate counts for filter tabs
+  const activeCount = viewModel.activeUnitCount;
+  const totalCount = viewModel.unitCount;
+  const inactiveCount = totalCount - activeCount;
+
+  log.debug('OrganizationUnitsListPage rendering', {
+    unitCount: totalCount,
+    filteredCount: filteredTreeNodes.length,
+    statusFilter,
+    searchTerm,
+  });
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 p-8">
-      <div className="max-w-4xl mx-auto">
-        {/* Page Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Building2 className="w-8 h-8 text-blue-600" />
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  Organization Structure
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  View your organization's departments and locations
-                </p>
-              </div>
-            </div>
-            <Button
-              onClick={handleManageClick}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              Manage Units
-            </Button>
+    <div>
+      {/* Page Header - Responsive like Roles */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Organization Structure</h1>
+          <p className="text-gray-600 mt-1">
+            View your organization's departments and locations
+          </p>
+        </div>
+        <Button
+          className="flex items-center gap-2"
+          onClick={handleManageClick}
+          disabled={viewModel.isLoading}
+        >
+          <Settings size={20} />
+          Manage Units
+        </Button>
+      </div>
+
+      {/* Status Filter Tabs */}
+      <div className="flex gap-2 mb-4">
+        <Button
+          variant={statusFilter === 'all' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setStatusFilter('all')}
+          aria-pressed={statusFilter === 'all'}
+        >
+          All ({totalCount})
+        </Button>
+        <Button
+          variant={statusFilter === 'active' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setStatusFilter('active')}
+          aria-pressed={statusFilter === 'active'}
+        >
+          Active ({activeCount})
+        </Button>
+        <Button
+          variant={statusFilter === 'inactive' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setStatusFilter('inactive')}
+          aria-pressed={statusFilter === 'inactive'}
+        >
+          Inactive ({inactiveCount})
+        </Button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative mb-6">
+        <Search
+          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+          size={20}
+        />
+        <Input
+          type="search"
+          placeholder="Search by name..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 max-w-md"
+          aria-label="Search organization units"
+        />
+      </div>
+
+      {/* Error Display */}
+      {viewModel.error && (
+        <div
+          className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700"
+          role="alert"
+        >
+          {viewModel.error}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-4 text-red-600 hover:text-red-800"
+            onClick={() => viewModel.clearError()}
+          >
+            Dismiss
+          </Button>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {viewModel.isLoading && viewModel.unitCount === 0 && (
+        <div className="flex items-center justify-center py-12">
+          <div className="flex items-center gap-3 text-gray-500">
+            <Building2 className="w-6 h-6 animate-pulse" />
+            <span>Loading organization structure...</span>
           </div>
         </div>
+      )}
 
-        {/* Main Content Card */}
+      {/* Tree Card */}
+      {!viewModel.isLoading && !viewModel.error && (
         <Card className="shadow-lg">
-          <CardHeader className="border-b border-gray-200">
+          <CardHeader className="border-b border-gray-200 pb-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xl font-semibold text-gray-900">
+              <CardTitle className="text-lg font-semibold text-gray-900">
                 Organization Hierarchy
               </CardTitle>
               <div className="flex items-center gap-2">
-                {/* Expand/Collapse All */}
                 <Button
                   variant="outline"
                   size="sm"
@@ -110,94 +235,61 @@ export const OrganizationUnitsListPage: React.FC = observer(() => {
                   onClick={handleRefresh}
                   disabled={viewModel.isLoading}
                 >
-                  <RefreshCw className={`w-4 h-4 ${viewModel.isLoading ? 'animate-spin' : ''}`} />
+                  <RefreshCw
+                    className={`w-4 h-4 ${viewModel.isLoading ? 'animate-spin' : ''}`}
+                  />
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-6">
-            {/* Loading State */}
-            {viewModel.isLoading && viewModel.unitCount === 0 && (
-              <div className="flex items-center justify-center py-12">
-                <div className="flex flex-col items-center gap-3">
-                  <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
-                  <p className="text-gray-600">Loading organization structure...</p>
-                </div>
-              </div>
-            )}
-
-            {/* Error State */}
-            {viewModel.error && (
-              <div
-                className="p-4 rounded-lg border border-red-300 bg-red-50 mb-4"
-                role="alert"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex-1">
-                    <h3 className="text-red-800 font-semibold">
-                      Failed to load organization structure
-                    </h3>
-                    <p className="text-red-700 text-sm mt-1">
-                      {viewModel.error}
-                    </p>
+          <CardContent className="p-4">
+            {/* Empty State */}
+            {filteredTreeNodes.length === 0 ? (
+              <div className="text-center py-12">
+                {viewModel.unitCount === 0 ? (
+                  <div>
+                    <Building2 className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-500 mb-4">No organization units defined yet.</p>
+                    <Button onClick={handleManageClick}>
+                      <Settings size={16} className="mr-2" />
+                      Create Your First Unit
+                    </Button>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleRefresh}
-                    className="text-red-600 border-red-300 hover:bg-red-50"
-                  >
-                    Retry
-                  </Button>
-                </div>
+                ) : (
+                  <p className="text-gray-500">No units found matching your search.</p>
+                )}
               </div>
-            )}
-
-            {/* Tree View */}
-            {!viewModel.isLoading && !viewModel.error && (
-              <>
-                {/* Stats Bar */}
-                <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
-                  <span>
-                    <strong>{viewModel.unitCount}</strong> total units
-                  </span>
-                  <span className="text-gray-300">|</span>
-                  <span>
-                    <strong>{viewModel.activeUnitCount}</strong> active
-                  </span>
-                </div>
-
-                {/* Organization Tree */}
-                <OrganizationTree
-                  nodes={viewModel.treeNodes}
-                  selectedId={viewModel.selectedUnitId}
-                  expandedIds={viewModel.expandedNodeIds}
-                  onSelect={viewModel.selectNode.bind(viewModel)}
-                  onToggle={viewModel.toggleNode.bind(viewModel)}
-                  onMoveDown={viewModel.moveSelectionDown.bind(viewModel)}
-                  onMoveUp={viewModel.moveSelectionUp.bind(viewModel)}
-                  onArrowRight={viewModel.handleArrowRight.bind(viewModel)}
-                  onArrowLeft={viewModel.handleArrowLeft.bind(viewModel)}
-                  onSelectFirst={viewModel.selectFirst.bind(viewModel)}
-                  onSelectLast={viewModel.selectLast.bind(viewModel)}
-                  ariaLabel="Organization hierarchy (read-only)"
-                  readOnly
-                  className="border rounded-lg p-4 bg-white"
-                />
-              </>
+            ) : (
+              <OrganizationTree
+                nodes={filteredTreeNodes}
+                selectedId={viewModel.selectedUnitId}
+                expandedIds={viewModel.expandedNodeIds}
+                onSelect={viewModel.selectNode.bind(viewModel)}
+                onToggle={viewModel.toggleNode.bind(viewModel)}
+                onMoveDown={viewModel.moveSelectionDown.bind(viewModel)}
+                onMoveUp={viewModel.moveSelectionUp.bind(viewModel)}
+                onArrowRight={viewModel.handleArrowRight.bind(viewModel)}
+                onArrowLeft={viewModel.handleArrowLeft.bind(viewModel)}
+                onSelectFirst={viewModel.selectFirst.bind(viewModel)}
+                onSelectLast={viewModel.selectLast.bind(viewModel)}
+                ariaLabel="Organization hierarchy (read-only)"
+                readOnly
+                className="border rounded-lg p-4 bg-white"
+              />
             )}
           </CardContent>
         </Card>
+      )}
 
-        {/* Help Text */}
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <p>
-            Use arrow keys to navigate the tree. Press Enter or Space to expand/collapse nodes.
-          </p>
-          <p className="mt-1">
-            Click "Manage Units" to create, edit, or deactivate organizational units.
-          </p>
-        </div>
+      {/* Help Text */}
+      <div className="mt-6 text-center text-sm text-gray-500">
+        <p>
+          Use arrow keys to navigate the tree. Press Enter or Space to expand/collapse
+          nodes.
+        </p>
+        <p className="mt-1">
+          Click "Manage Units" to create, edit, or deactivate organizational units.
+        </p>
       </div>
     </div>
   );
