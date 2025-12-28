@@ -5,8 +5,8 @@
 Role management UI for CRUD operations on roles and their permissions. Follows the Organization Units pattern with split-view layout and MVVM architecture.
 
 **Created**: 2024-12-24
-**Last Updated**: 2024-12-26
-**Status**: ✅ COMPLETE - All phases implemented, tested, deployed, bug fixes applied, and UX enhancements added. Now serves as canonical UI pattern reference.
+**Last Updated**: 2024-12-28
+**Status**: ✅ COMPLETE - All 12 phases implemented, tested, deployed. Canonical roles hidden from UI. Serves as canonical UI pattern reference.
 
 ## Key Decisions
 
@@ -18,6 +18,7 @@ Role management UI for CRUD operations on roles and their permissions. Follows t
 6. **Card-based Listing Page**: Added `/roles` route with card grid layout matching `/clients` pattern - Added 2024-12-25
 7. **Comprehensive Testing**: 148 unit tests (ViewModels + types) + 189 E2E tests (27 tests × 7 browser configs) - Added 2024-12-25
 8. **Global Roles Visibility**: Global roles (organization_id IS NULL) only visible to platform_owner org type, not all authenticated users - Added 2024-12-25
+9. **Canonical Roles Hidden**: System roles (`super_admin`, `provider_admin`) completely hidden from Role Management UI using `isCanonicalRole()` helper - Added 2024-12-28
 
 ## Architecture
 
