@@ -42,6 +42,7 @@ import {
   CheckCircle,
   XCircle,
   Save,
+  Copy,
 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
 import { cn } from '@/components/ui/utils';
@@ -222,6 +223,27 @@ export const RolesManagePage: React.FC = observer(() => {
       enterCreateMode();
     }
   }, [formViewModel, enterCreateMode]);
+
+  // Handle duplicate role
+  const handleDuplicateRole = useCallback(() => {
+    if (!currentRole) return;
+
+    setOperationError(null);
+    const service = getRoleService();
+    const newFormViewModel = new RoleFormViewModel(
+      service,
+      'create',
+      viewModel.allPermissions,
+      viewModel.userPermissionIds
+    );
+    // Initialize with cloned data
+    newFormViewModel.initializeFromRole(currentRole);
+    setFormViewModel(newFormViewModel);
+    setCurrentRole(null);
+    setPanelMode('create');
+    viewModel.clearSelection();
+    log.debug('Duplicating role', { sourceRoleId: currentRole.id, sourceRoleName: currentRole.name });
+  }, [currentRole, viewModel]);
 
   // Handle form submission
   const handleSubmit = useCallback(
@@ -509,9 +531,19 @@ export const RolesManagePage: React.FC = observer(() => {
             {panelMode === 'create' && formViewModel && (
               <Card className="shadow-lg">
                 <CardHeader className="border-b border-gray-200">
-                  <CardTitle className="text-xl font-semibold text-gray-900">
-                    Create New Role
-                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    {formViewModel.clonedFromRoleId && (
+                      <Copy className="w-5 h-5 text-blue-600" />
+                    )}
+                    <CardTitle className="text-xl font-semibold text-gray-900">
+                      {formViewModel.clonedFromRoleId ? 'Duplicate Role' : 'Create New Role'}
+                    </CardTitle>
+                  </div>
+                  {formViewModel.clonedFromRoleId && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Creating a copy with the same permissions
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-6">
@@ -555,7 +587,7 @@ export const RolesManagePage: React.FC = observer(() => {
 
                     {/* Permission Selector */}
                     <PermissionSelector
-                      permissionGroups={formViewModel.permissionGroups}
+                      permissionGroups={formViewModel.filteredPermissionGroups}
                       selectedIds={formViewModel.selectedPermissionIds}
                       userPermissionIds={formViewModel.userPermissionIds}
                       onTogglePermission={formViewModel.togglePermission.bind(formViewModel)}
@@ -564,6 +596,14 @@ export const RolesManagePage: React.FC = observer(() => {
                       isAppletPartiallySelected={formViewModel.isAppletPartiallySelected.bind(formViewModel)}
                       canGrant={formViewModel.canGrant.bind(formViewModel)}
                       disabled={formViewModel.isSubmitting}
+                      showOnlyGrantable={formViewModel.showOnlyGrantable}
+                      onToggleShowOnlyGrantable={formViewModel.toggleShowOnlyGrantable.bind(formViewModel)}
+                      searchTerm={formViewModel.permissionSearchTerm}
+                      onSearchChange={formViewModel.setPermissionSearchTerm.bind(formViewModel)}
+                      isAppletCollapsed={formViewModel.isAppletCollapsed.bind(formViewModel)}
+                      onToggleAppletCollapsed={formViewModel.toggleAppletCollapsed.bind(formViewModel)}
+                      onExpandAll={formViewModel.expandAllApplets.bind(formViewModel)}
+                      onCollapseAll={formViewModel.collapseAllApplets.bind(formViewModel)}
                     />
 
                     {/* Form Actions */}
@@ -593,18 +633,33 @@ export const RolesManagePage: React.FC = observer(() => {
             {/* Edit Mode */}
             {panelMode === 'edit' && currentRole && formViewModel && (
               <div className="space-y-4">
-                {/* Inactive Warning */}
+                {/* Inactive Warning Banner with Quick Reactivate */}
                 {!currentRole.isActive && (
                   <div className="p-4 rounded-lg border border-amber-300 bg-amber-50">
                     <div className="flex items-start gap-3">
-                      <XCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-                      <div>
-                        <h3 className="text-amber-800 font-semibold">Inactive Role</h3>
+                      <XCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <h3 className="text-amber-800 font-semibold">Inactive Role - Editing Disabled</h3>
                         <p className="text-amber-700 text-sm mt-1">
-                          This role is deactivated. Users with this role cannot perform any
-                          actions. Reactivate the role to restore functionality.
+                          This role is deactivated. The form is read-only until the role is reactivated.
+                          Users with this role cannot perform any actions.
                         </p>
                       </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleReactivateClick}
+                        disabled={
+                          formViewModel.isSubmitting ||
+                          (dialogState.type === 'reactivate' && dialogState.isLoading)
+                        }
+                        className="bg-green-600 hover:bg-green-700 text-white flex-shrink-0"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        {dialogState.type === 'reactivate' && dialogState.isLoading
+                          ? 'Reactivating...'
+                          : 'Reactivate'}
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -616,16 +671,28 @@ export const RolesManagePage: React.FC = observer(() => {
                       <CardTitle className="text-xl font-semibold text-gray-900">
                         Edit Role
                       </CardTitle>
-                      <span
-                        className={cn(
-                          'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                          currentRole.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-600'
-                        )}
-                      >
-                        {currentRole.isActive ? 'Active' : 'Inactive'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDuplicateRole}
+                          disabled={formViewModel.isSubmitting}
+                          className="text-gray-600"
+                        >
+                          <Copy className="w-4 h-4 mr-1" />
+                          Duplicate
+                        </Button>
+                        <span
+                          className={cn(
+                            'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+                            currentRole.isActive
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-600'
+                          )}
+                        >
+                          {currentRole.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="p-6">
@@ -672,7 +739,7 @@ export const RolesManagePage: React.FC = observer(() => {
 
                       {/* Permission Selector */}
                       <PermissionSelector
-                        permissionGroups={formViewModel.permissionGroups}
+                        permissionGroups={formViewModel.filteredPermissionGroups}
                         selectedIds={formViewModel.selectedPermissionIds}
                         userPermissionIds={formViewModel.userPermissionIds}
                         onTogglePermission={formViewModel.togglePermission.bind(formViewModel)}
@@ -681,6 +748,14 @@ export const RolesManagePage: React.FC = observer(() => {
                         isAppletPartiallySelected={formViewModel.isAppletPartiallySelected.bind(formViewModel)}
                         canGrant={formViewModel.canGrant.bind(formViewModel)}
                         disabled={formViewModel.isSubmitting || !currentRole.isActive}
+                        showOnlyGrantable={formViewModel.showOnlyGrantable}
+                        onToggleShowOnlyGrantable={formViewModel.toggleShowOnlyGrantable.bind(formViewModel)}
+                        searchTerm={formViewModel.permissionSearchTerm}
+                        onSearchChange={formViewModel.setPermissionSearchTerm.bind(formViewModel)}
+                        isAppletCollapsed={formViewModel.isAppletCollapsed.bind(formViewModel)}
+                        onToggleAppletCollapsed={formViewModel.toggleAppletCollapsed.bind(formViewModel)}
+                        onExpandAll={formViewModel.expandAllApplets.bind(formViewModel)}
+                        onCollapseAll={formViewModel.collapseAllApplets.bind(formViewModel)}
                       />
 
                       {/* Form Actions */}

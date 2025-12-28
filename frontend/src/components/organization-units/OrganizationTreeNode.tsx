@@ -56,6 +56,12 @@ export interface OrganizationTreeNodeProps {
 
   /** Whether this node is the last child in its parent (for tree connector lines) */
   isLastChild?: boolean;
+
+  /** Set of expanded node IDs (for recursive children to check expansion state) */
+  expandedIds?: Set<string>;
+
+  /** Currently selected node ID (for recursive children to check selection state) */
+  selectedId?: string | null;
 }
 
 /**
@@ -83,6 +89,8 @@ export const OrganizationTreeNode = observer(
         nodeRefs,
         readOnly = false,
         isLastChild = false,
+        expandedIds,
+        selectedId,
       },
       ref
     ) => {
@@ -260,8 +268,8 @@ export const OrganizationTreeNode = observer(
                 <OrganizationTreeNode
                   key={childNode.id}
                   node={childNode}
-                  isSelected={childNode.isSelected ?? false}
-                  isExpanded={childNode.isExpanded ?? false}
+                  isSelected={selectedId ? childNode.id === selectedId : (childNode.isSelected ?? false)}
+                  isExpanded={expandedIds ? expandedIds.has(childNode.id) : (childNode.isExpanded ?? false)}
                   onSelect={onSelect}
                   onToggle={onToggle}
                   depth={depth + 1}
@@ -270,6 +278,8 @@ export const OrganizationTreeNode = observer(
                   nodeRefs={nodeRefs}
                   readOnly={readOnly}
                   isLastChild={index === node.children.length - 1}
+                  expandedIds={expandedIds}
+                  selectedId={selectedId}
                 />
               ))}
             </ul>

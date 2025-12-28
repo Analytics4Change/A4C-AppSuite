@@ -90,6 +90,22 @@ export class RoleFormViewModel {
   /** Error message from last submission attempt */
   submissionError: string | null = null;
 
+  // ============================================
+  // Permission Filter State
+  // ============================================
+
+  /** Show only permissions the user can grant (default: ON) */
+  showOnlyGrantable = true;
+
+  /** Search term for filtering permissions */
+  permissionSearchTerm = '';
+
+  /** Set of collapsed applet groups */
+  collapsedApplets: Set<string> = new Set();
+
+  /** ID of role this was cloned from (for audit trail) */
+  clonedFromRoleId: string | null = null;
+
   /** Form mode (create or edit) */
   readonly mode: FormMode;
 
@@ -162,10 +178,51 @@ export class RoleFormViewModel {
   // ============================================
 
   /**
-   * Permissions grouped by applet for UI display
+   * Permissions grouped by applet for UI display (unfiltered)
    */
   get permissionGroups(): PermissionGroup[] {
     return groupPermissionsByApplet(this.allPermissions);
+  }
+
+  /**
+   * Filtered permissions based on search term and grantable toggle
+   */
+  get filteredPermissions(): Permission[] {
+    let permissions = this.allPermissions;
+
+    // Filter by grantable if toggle is ON
+    if (this.showOnlyGrantable) {
+      permissions = permissions.filter((p) => this.canGrant(p.id));
+    }
+
+    // Filter by search term
+    if (this.permissionSearchTerm.trim()) {
+      const searchLower = this.permissionSearchTerm.toLowerCase().trim();
+      permissions = permissions.filter(
+        (p) =>
+          p.name.toLowerCase().includes(searchLower) ||
+          (p.displayName?.toLowerCase().includes(searchLower) ?? false) ||
+          p.description.toLowerCase().includes(searchLower) ||
+          p.applet.toLowerCase().includes(searchLower) ||
+          p.action.toLowerCase().includes(searchLower)
+      );
+    }
+
+    return permissions;
+  }
+
+  /**
+   * Filtered permissions grouped by applet for UI display
+   */
+  get filteredPermissionGroups(): PermissionGroup[] {
+    return groupPermissionsByApplet(this.filteredPermissions);
+  }
+
+  /**
+   * Check if an applet group is collapsed
+   */
+  isAppletCollapsed(applet: string): boolean {
+    return this.collapsedApplets.has(applet);
   }
 
   /**
@@ -406,6 +463,69 @@ export class RoleFormViewModel {
   }
 
   // ============================================
+  // Actions - Permission Filters
+  // ============================================
+
+  /**
+   * Toggle "show only grantable" filter
+   */
+  toggleShowOnlyGrantable(): void {
+    runInAction(() => {
+      this.showOnlyGrantable = !this.showOnlyGrantable;
+      log.debug('Toggled showOnlyGrantable', { showOnlyGrantable: this.showOnlyGrantable });
+    });
+  }
+
+  /**
+   * Set permission search term
+   */
+  setPermissionSearchTerm(term: string): void {
+    runInAction(() => {
+      this.permissionSearchTerm = term;
+    });
+  }
+
+  /**
+   * Toggle collapse state for an applet group
+   */
+  toggleAppletCollapsed(applet: string): void {
+    runInAction(() => {
+      if (this.collapsedApplets.has(applet)) {
+        this.collapsedApplets.delete(applet);
+      } else {
+        this.collapsedApplets.add(applet);
+      }
+      // Create new Set to trigger MobX reactivity
+      this.collapsedApplets = new Set(this.collapsedApplets);
+      log.debug('Toggled applet collapsed', {
+        applet,
+        collapsed: this.collapsedApplets.has(applet),
+      });
+    });
+  }
+
+  /**
+   * Expand all applet groups
+   */
+  expandAllApplets(): void {
+    runInAction(() => {
+      this.collapsedApplets = new Set();
+      log.debug('Expanded all applets');
+    });
+  }
+
+  /**
+   * Collapse all applet groups
+   */
+  collapseAllApplets(): void {
+    runInAction(() => {
+      const allApplets = this.filteredPermissionGroups.map((g) => g.applet);
+      this.collapsedApplets = new Set(allApplets);
+      log.debug('Collapsed all applets');
+    });
+  }
+
+  // ============================================
   // Actions - Field Updates
   // ============================================
 
@@ -530,6 +650,7 @@ export class RoleFormViewModel {
           description: this.formData.description.trim(),
           orgHierarchyScope: this.formData.orgHierarchyScope || undefined,
           permissionIds,
+          clonedFromRoleId: this.clonedFromRoleId || undefined,
         };
 
         log.debug('Submitting create request', { request });
@@ -619,5 +740,52 @@ export class RoleFormViewModel {
    */
   setScope(scope: string | null): void {
     this.updateField('orgHierarchyScope', scope);
+  }
+
+  // ============================================
+  // Actions - Role Duplication
+  // ============================================
+
+  /**
+   * Initialize form from an existing role for duplication
+   *
+   * Pre-fills form data and permissions from the source role,
+   * with name suffixed with "(Copy)".
+   *
+   * @param role - The role to duplicate
+   */
+  initializeFromRole(role: RoleWithPermissions): void {
+    runInAction(() => {
+      // Set cloned from ID for audit trail
+      this.clonedFromRoleId = role.id;
+
+      // Update form data with suffixed name
+      this.formData = {
+        name: `${role.name} (Copy)`,
+        description: role.description,
+        orgHierarchyScope: role.orgHierarchyScope,
+      };
+
+      // Copy permissions (only those user can grant)
+      const grantablePermissionIds = role.permissions
+        .filter((p) => this.canGrant(p.id))
+        .map((p) => p.id);
+      this.selectedPermissionIds = new Set(grantablePermissionIds);
+
+      // Store originals for dirty tracking (form is dirty immediately since it's a new role)
+      this.originalData = { name: '', description: '', orgHierarchyScope: null };
+      this.originalPermissionIds = new Set();
+
+      // Clear errors and touched state
+      this.errors.clear();
+      this.touchedFields.clear();
+      this.submissionError = null;
+
+      log.debug('Initialized form from role for duplication', {
+        sourceRoleId: role.id,
+        sourceRoleName: role.name,
+        permissionCount: grantablePermissionIds.length,
+      });
+    });
   }
 }

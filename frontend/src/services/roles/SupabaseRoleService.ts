@@ -82,6 +82,7 @@ interface PermissionJson {
   name: string;
   applet: string;
   action: string;
+  display_name: string | null;
   description: string;
   scope_type: string;
 }
@@ -95,6 +96,7 @@ interface PermissionRow {
   name: string;
   applet: string;
   action: string;
+  display_name: string | null;
   description: string;
   scope_type: string;
   requires_mfa: boolean;
@@ -174,6 +176,7 @@ export class SupabaseRoleService implements IRoleService {
         name: p.name,
         applet: p.applet,
         action: p.action,
+        displayName: p.display_name || undefined,
         description: p.description,
         scopeType: p.scope_type as Permission['scopeType'],
       })),
@@ -189,6 +192,7 @@ export class SupabaseRoleService implements IRoleService {
       name: row.name,
       applet: row.applet,
       action: row.action,
+      displayName: row.display_name || undefined,
       description: row.description,
       scopeType: row.scope_type as Permission['scopeType'],
       requiresMfa: row.requires_mfa,
@@ -341,6 +345,7 @@ export class SupabaseRoleService implements IRoleService {
         p_description: request.description,
         p_org_hierarchy_scope: request.orgHierarchyScope || null,
         p_permission_ids: request.permissionIds,
+        p_cloned_from_role_id: request.clonedFromRoleId || null,
       });
 
       if (error) {

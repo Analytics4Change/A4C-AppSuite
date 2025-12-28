@@ -361,6 +361,8 @@ export const OrganizationTree = observer(
             nodeRefs={nodeRefs}
             readOnly={readOnly}
             isLastChild={index === nodes.length - 1}
+            expandedIds={expandedIds}
+            selectedId={selectedId}
           />
         ))}
       </ul>

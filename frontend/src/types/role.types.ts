@@ -42,6 +42,12 @@ export interface Permission {
    */
   action: string;
 
+  /**
+   * Human-readable display name for UI
+   * Example: "Create Organization" instead of "organization.create"
+   */
+  displayName?: string;
+
   /** Human-readable description of what this permission allows */
   description: string;
 
@@ -149,6 +155,12 @@ export interface CreateRoleRequest {
 
   /** Permission IDs to grant to this role (subject to subset-only rule) */
   permissionIds: string[];
+
+  /**
+   * ID of role this was cloned from (for audit trail)
+   * Set when duplicating an existing role
+   */
+  clonedFromRoleId?: string;
 }
 
 /**
@@ -263,6 +275,47 @@ export function groupPermissionsByApplet(permissions: Permission[]): PermissionG
       permissions: perms.sort((a, b) => a.action.localeCompare(b.action)),
     }))
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
+/**
+ * Scope-based grouping result for platform_owner users
+ */
+export interface ScopedPermissionGroups {
+  /** Global-scope permissions (Organization Management - platform_owner only) */
+  globalGroups: PermissionGroup[];
+
+  /** Non-global permissions (Organization Unit Management - all org_types) */
+  orgGroups: PermissionGroup[];
+
+  /** Whether there are any global permissions (indicates platform_owner context) */
+  hasGlobalPermissions: boolean;
+}
+
+/**
+ * Group permissions by scope type, then by applet
+ *
+ * For platform_owner users, separates global-scope permissions from org-scope.
+ * This creates two sections in the UI:
+ * - "Organization Management (Global)" - permissions with scope_type='global'
+ * - "Organization Unit Management" - permissions with scope_type in org/facility/program/client
+ *
+ * @param permissions - Flat array of permissions
+ * @returns Object with globalGroups and orgGroups, each containing applet groups
+ */
+export function groupPermissionsByScopeAndApplet(permissions: Permission[]): ScopedPermissionGroups {
+  // Separate by scope type
+  const globalPerms = permissions.filter((p) => p.scopeType === 'global');
+  const orgPerms = permissions.filter((p) => p.scopeType !== 'global');
+
+  // Group each section by applet
+  const globalGroups = groupPermissionsByApplet(globalPerms);
+  const orgGroups = groupPermissionsByApplet(orgPerms);
+
+  return {
+    globalGroups,
+    orgGroups,
+    hasGlobalPermissions: globalPerms.length > 0,
+  };
 }
 
 /**

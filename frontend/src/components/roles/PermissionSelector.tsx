@@ -55,6 +55,31 @@ export interface PermissionSelectorProps {
 
   /** Additional CSS classes */
   className?: string;
+
+  // Filter props
+  /** Whether to show only grantable permissions */
+  showOnlyGrantable?: boolean;
+
+  /** Callback to toggle showOnlyGrantable filter */
+  onToggleShowOnlyGrantable?: () => void;
+
+  /** Current search term */
+  searchTerm?: string;
+
+  /** Callback when search term changes */
+  onSearchChange?: (term: string) => void;
+
+  /** Check if an applet group is collapsed */
+  isAppletCollapsed?: (applet: string) => boolean;
+
+  /** Callback to toggle applet collapsed state */
+  onToggleAppletCollapsed?: (applet: string) => void;
+
+  /** Callback to expand all applets */
+  onExpandAll?: () => void;
+
+  /** Callback to collapse all applets */
+  onCollapseAll?: () => void;
 }
 
 /**
@@ -103,6 +128,11 @@ const PermissionRow: React.FC<PermissionRowProps> = React.memo(
       }
     }, [isDisabled, onToggle, permission.id]);
 
+    // Use displayName if available, otherwise format the action name
+    const displayLabel =
+      permission.displayName ||
+      permission.action.charAt(0).toUpperCase() + permission.action.slice(1).replace(/_/g, ' ');
+
     return (
       <div
         className={cn(
@@ -127,7 +157,7 @@ const PermissionRow: React.FC<PermissionRowProps> = React.memo(
               isDisabled ? 'text-gray-400 cursor-not-allowed' : 'text-gray-900 cursor-pointer'
             )}
           >
-            {permission.action.charAt(0).toUpperCase() + permission.action.slice(1)}
+            {displayLabel}
           </label>
           <p
             id={`${checkboxId}-description`}
@@ -161,6 +191,8 @@ interface AppletGroupProps {
   disabled: boolean;
   onTogglePermission: (permissionId: string) => void;
   onToggleApplet: (applet: string) => void;
+  isCollapsed: boolean;
+  onToggleCollapsed: () => void;
 }
 
 const AppletGroup: React.FC<AppletGroupProps> = React.memo(
@@ -173,6 +205,8 @@ const AppletGroup: React.FC<AppletGroupProps> = React.memo(
     disabled,
     onTogglePermission,
     onToggleApplet,
+    isCollapsed,
+    onToggleCollapsed,
   }) => {
     const groupId = useId();
     const selectAllId = `${groupId}-select-all`;
@@ -196,10 +230,30 @@ const AppletGroup: React.FC<AppletGroupProps> = React.memo(
         role="group"
         aria-labelledby={groupId}
       >
-        {/* Applet header with "Select All" */}
+        {/* Applet header with "Select All" and collapse toggle */}
         <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
+              {/* Collapse/Expand toggle */}
+              <button
+                type="button"
+                onClick={onToggleCollapsed}
+                className="p-1 rounded hover:bg-gray-200 transition-colors"
+                aria-expanded={!isCollapsed}
+                aria-label={isCollapsed ? `Expand ${displayName}` : `Collapse ${displayName}`}
+              >
+                <svg
+                  className={cn(
+                    'w-4 h-4 text-gray-500 transition-transform',
+                    isCollapsed ? '' : 'rotate-90'
+                  )}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
               <Checkbox
                 id={selectAllId}
                 checked={isFullySelected}
@@ -228,19 +282,21 @@ const AppletGroup: React.FC<AppletGroupProps> = React.memo(
           </div>
         </div>
 
-        {/* Permission list */}
-        <div className="p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
-          {group.permissions.map((permission) => (
-            <PermissionRow
-              key={permission.id}
-              permission={permission}
-              isSelected={selectedIds.has(permission.id)}
-              canGrant={canGrant(permission.id)}
-              disabled={disabled}
-              onToggle={onTogglePermission}
-            />
-          ))}
-        </div>
+        {/* Permission list (collapsible) */}
+        {!isCollapsed && (
+          <div className="p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
+            {group.permissions.map((permission) => (
+              <PermissionRow
+                key={permission.id}
+                permission={permission}
+                isSelected={selectedIds.has(permission.id)}
+                canGrant={canGrant(permission.id)}
+                disabled={disabled}
+                onToggle={onTogglePermission}
+              />
+            ))}
+          </div>
+        )}
       </fieldset>
     );
   }
@@ -253,6 +309,10 @@ AppletGroup.displayName = 'AppletGroup';
  *
  * Renders a grouped permission selector with subset-only enforcement.
  * Permissions the user doesn't possess are visually disabled.
+ *
+ * For platform_owner users with global permissions, displays two sections:
+ * - "Organization Management (Global)" for global-scope permissions
+ * - "Organization Unit Management" for org/facility/program/client scope
  */
 export const PermissionSelector = observer(
   ({
@@ -266,7 +326,18 @@ export const PermissionSelector = observer(
     canGrant,
     disabled = false,
     className,
+    // Filter props with defaults for backward compatibility
+    showOnlyGrantable = true,
+    onToggleShowOnlyGrantable,
+    searchTerm = '',
+    onSearchChange,
+    isAppletCollapsed,
+    onToggleAppletCollapsed,
+    onExpandAll,
+    onCollapseAll,
   }: PermissionSelectorProps) => {
+    const searchInputId = useId();
+
     log.debug('PermissionSelector render', {
       groupCount: permissionGroups.length,
       selectedCount: selectedIds.size,
@@ -280,6 +351,34 @@ export const PermissionSelector = observer(
     );
     const totalSelected = selectedIds.size;
 
+    // Check if there are any global-scope permissions (indicates platform_owner)
+    const hasGlobalPermissions = permissionGroups.some((g) =>
+      g.permissions.some((p) => p.scopeType === 'global')
+    );
+
+    // Separate groups by scope if global permissions exist
+    const globalGroups = hasGlobalPermissions
+      ? permissionGroups
+          .map((g) => ({
+            ...g,
+            permissions: g.permissions.filter((p) => p.scopeType === 'global'),
+          }))
+          .filter((g) => g.permissions.length > 0)
+      : [];
+
+    const orgGroups = hasGlobalPermissions
+      ? permissionGroups
+          .map((g) => ({
+            ...g,
+            permissions: g.permissions.filter((p) => p.scopeType !== 'global'),
+          }))
+          .filter((g) => g.permissions.length > 0)
+      : permissionGroups;
+
+    // Check if filtering features are available
+    const hasFilterControls = onToggleShowOnlyGrantable || onSearchChange;
+    const hasCollapseControls = onToggleAppletCollapsed && isAppletCollapsed;
+
     if (permissionGroups.length === 0) {
       return (
         <div
@@ -292,6 +391,24 @@ export const PermissionSelector = observer(
         </div>
       );
     }
+
+    const renderGroups = (groups: typeof permissionGroups) =>
+      groups.map((group) => (
+        <AppletGroup
+          key={group.applet}
+          group={group}
+          selectedIds={selectedIds}
+          userPermissionIds={userPermissionIds}
+          isFullySelected={isAppletFullySelected(group.applet)}
+          isPartiallySelected={isAppletPartiallySelected(group.applet)}
+          canGrant={canGrant}
+          disabled={disabled}
+          onTogglePermission={onTogglePermission}
+          onToggleApplet={onToggleApplet}
+          isCollapsed={isAppletCollapsed ? isAppletCollapsed(group.applet) : false}
+          onToggleCollapsed={() => onToggleAppletCollapsed?.(group.applet)}
+        />
+      ));
 
     return (
       <div className={cn('space-y-4', className)}>
@@ -308,23 +425,160 @@ export const PermissionSelector = observer(
           </span>
         </div>
 
-        {/* Permission groups */}
-        <div className="space-y-4">
-          {permissionGroups.map((group) => (
-            <AppletGroup
-              key={group.applet}
-              group={group}
-              selectedIds={selectedIds}
-              userPermissionIds={userPermissionIds}
-              isFullySelected={isAppletFullySelected(group.applet)}
-              isPartiallySelected={isAppletPartiallySelected(group.applet)}
-              canGrant={canGrant}
-              disabled={disabled}
-              onTogglePermission={onTogglePermission}
-              onToggleApplet={onToggleApplet}
-            />
-          ))}
-        </div>
+        {/* Filter toolbar */}
+        {hasFilterControls && (
+          <div className="bg-gray-50 rounded-lg p-3 space-y-3">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Search input */}
+              {onSearchChange && (
+                <div className="flex-1 min-w-[200px]">
+                  <label htmlFor={searchInputId} className="sr-only">
+                    Search permissions
+                  </label>
+                  <div className="relative">
+                    <svg
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                    <input
+                      id={searchInputId}
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => onSearchChange(e.target.value)}
+                      placeholder="Search permissions..."
+                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      aria-label="Search permissions by name or description"
+                    />
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => onSearchChange('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                        aria-label="Clear search"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Show only grantable toggle */}
+              {onToggleShowOnlyGrantable && (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="show-grantable-only"
+                    checked={showOnlyGrantable}
+                    onCheckedChange={onToggleShowOnlyGrantable}
+                    aria-describedby="show-grantable-description"
+                  />
+                  <label
+                    htmlFor="show-grantable-only"
+                    className="text-sm text-gray-700 cursor-pointer"
+                  >
+                    Show only grantable
+                  </label>
+                  <span id="show-grantable-description" className="sr-only">
+                    When enabled, only shows permissions you can grant to this role
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Expand/Collapse all buttons */}
+            {hasCollapseControls && (onExpandAll || onCollapseAll) && (
+              <div className="flex items-center gap-2 text-sm">
+                {onExpandAll && (
+                  <button
+                    type="button"
+                    onClick={onExpandAll}
+                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    Expand all
+                  </button>
+                )}
+                {onExpandAll && onCollapseAll && (
+                  <span className="text-gray-300">|</span>
+                )}
+                {onCollapseAll && (
+                  <button
+                    type="button"
+                    onClick={onCollapseAll}
+                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    Collapse all
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* No results message */}
+        {permissionGroups.length === 0 && searchTerm && (
+          <div className="text-center py-8 text-gray-500">
+            <p>No permissions match "{searchTerm}"</p>
+            <button
+              type="button"
+              onClick={() => onSearchChange?.('')}
+              className="mt-2 text-blue-600 hover:underline"
+            >
+              Clear search
+            </button>
+          </div>
+        )}
+
+        {/* Scope-based sections for platform_owner, or simple groups for others */}
+        {hasGlobalPermissions ? (
+          <>
+            {/* Global-scope permissions section (platform_owner only) */}
+            {globalGroups.length > 0 && (
+              <div className="space-y-3">
+                <div className="border-b border-gray-200 pb-2">
+                  <h4 className="text-sm font-semibold text-purple-700">
+                    Organization Management (Global)
+                  </h4>
+                  <p className="text-xs text-gray-500">
+                    Platform-wide permissions for managing organizations
+                  </p>
+                </div>
+                <div className="space-y-4 pl-0">{renderGroups(globalGroups)}</div>
+              </div>
+            )}
+
+            {/* Non-global permissions section */}
+            {orgGroups.length > 0 && (
+              <div className="space-y-3">
+                <div className="border-b border-gray-200 pb-2">
+                  <h4 className="text-sm font-semibold text-blue-700">Organization Unit Management</h4>
+                  <p className="text-xs text-gray-500">
+                    Permissions for managing units within organizations
+                  </p>
+                </div>
+                <div className="space-y-4 pl-0">{renderGroups(orgGroups)}</div>
+              </div>
+            )}
+          </>
+        ) : (
+          /* Standard groups for non-platform_owner users */
+          <div className="space-y-4">{renderGroups(orgGroups)}</div>
+        )}
       </div>
     );
   }
