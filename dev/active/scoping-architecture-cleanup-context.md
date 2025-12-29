@@ -24,7 +24,9 @@
 
 8. **Provider Admin Backfill (Phase 6)**: Fixed template to have all 23 permissions (was missing 4). Backfilled existing provider_admin roles. For NEW databases, the Temporal workflow handles this correctly via event emission. - Added 2025-12-29
 
-9. **emit_domain_event Fix**: Added new function overload that auto-calculates stream_version. This fixed "stack depth limit exceeded" error when creating roles via UI. The error was actually a function signature mismatch, not recursion. - Added 2025-12-29
+9. **emit_domain_event Fix**: Added new function overload that auto-calculates stream_version. This partially helped role creation but wasn't the root cause. - Added 2025-12-29
+
+10. **RLS Recursion Fix (CRITICAL)**: The actual "stack depth limit exceeded" root cause was circular RLS recursion: `domain_events` RLS calls `is_super_admin()` → queries `user_roles_projection` → RLS calls `is_super_admin()` → infinite loop. Fixed by making `is_super_admin()` and `is_org_admin()` SECURITY DEFINER to bypass RLS. - Added 2025-12-29
 
 ## Technical Context
 
@@ -77,6 +79,8 @@ The RBAC system uses three scoping mechanisms that work together:
 - `infrastructure/supabase/supabase/migrations/20251229184955_permission_cleanup.sql` - Delete 13 unused, add 2 new
 - `infrastructure/supabase/supabase/migrations/20251229195740_backfill_provider_admin_permissions.sql` - Backfill 23 perms to existing provider_admin
 - `infrastructure/supabase/supabase/migrations/20251229201217_fix_emit_domain_event_overload.sql` - Add auto-version overload
+- `infrastructure/supabase/supabase/migrations/20251229220540_stub_unused_overloads.sql` - Diagnostic stubs for function overloads (helped rule out overload ambiguity)
+- `infrastructure/supabase/supabase/migrations/20251229221456_fix_rls_recursion.sql` - **THE FIX**: SECURITY DEFINER on is_super_admin/is_org_admin
 
 **Seed File (Updated 2025-12-29):**
 - `infrastructure/supabase/sql/99-seeds/001-permissions-seed.sql` - Now 31 permissions (was 42)
@@ -158,6 +162,10 @@ IDs don't match - projection was directly inserted from pg_dump, not derived fro
 6. **role_permission_templates vs Temporal activity**: The template table is the source of truth for NEW organizations. The `PROVIDER_ADMIN_PERMISSIONS` constant in Temporal is for documentation only - the activity reads from the database. Both must stay in sync. - Added 2025-12-29
 
 7. **AsyncAPI Contract Compliance**: The backfill migration directly inserts into projections without emitting events. This is acceptable for one-time fixes. For NEW databases, the Temporal workflow emits proper `role.permission.granted` events which is contract-compliant. - Added 2025-12-29
+
+8. **SECURITY DEFINER for Permission Check Functions**: Functions that check permissions (`is_super_admin`, `is_org_admin`) MUST be SECURITY DEFINER to avoid circular RLS recursion. They query projection tables that have RLS policies that call these same functions. - Added 2025-12-29
+
+9. **PostgreSQL Function Overload Resolution**: When PostgreSQL has multiple function overloads, the one with DEFAULT values will be preferred if fewer arguments are passed. Stubbing unused overloads with diagnostic exceptions is an effective debugging technique. - Added 2025-12-29
 
 ## Why This Approach?
 

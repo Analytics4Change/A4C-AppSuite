@@ -2,10 +2,10 @@
 
 ## Current Status
 
-**Phase**: 6 - Provider Admin Permission Backfill ✅ COMPLETE
-**Status**: ✅ COMPLETE (Phases 1-3, 5-6 done; Phase 4 optional)
+**Phase**: 8 - RLS Recursion Fix ✅ COMPLETE
+**Status**: ✅ COMPLETE (Phases 1-3, 5-6, 8 done; Phase 4 optional; Phase 7 pending)
 **Last Updated**: 2025-12-29
-**Next Step**: Bootstrap new organization to test NEW org workflow grants all 23 permissions
+**Next Step**: Bootstrap new organization to test NEW org workflow grants all 23 permissions AND verify role creation works end-to-end
 
 ---
 
@@ -158,6 +158,31 @@
 
 ---
 
+## Phase 8: RLS Recursion Fix ✅ COMPLETE
+
+### 8.1 Diagnose "stack depth limit exceeded" Error
+- [x] Reproduce error: create new role at OU hierarchy level fails with ~9 second delay
+- [x] Deploy diagnostic stubs for function overloads (`20251229220540_stub_unused_overloads.sql`)
+- [x] Confirm stubs didn't fire → rule out function overload ambiguity
+
+### 8.2 Identify Root Cause
+- [x] Trace RLS policy chain: `domain_events` RLS → `is_super_admin()` → `user_roles_projection` RLS → `is_super_admin()` → infinite recursion
+- [x] Confirm circular dependency: permission check functions query tables that have RLS calling those same functions
+
+### 8.3 Implement Fix
+- [x] Create migration `20251229221456_fix_rls_recursion.sql`
+- [x] Make `is_super_admin()` SECURITY DEFINER (bypasses RLS)
+- [x] Make `is_org_admin()` SECURITY DEFINER (bypasses RLS)
+- [x] Fix column name error (`ur.org_id` → `ur.organization_id`)
+- [x] Test role creation via UI - SUCCESS
+
+### 8.4 Commit and Push
+- [x] Commit both diagnostic and fix migrations
+- [x] Push to main branch
+- [x] Verify CI/CD pipeline succeeds
+
+---
+
 ## Success Validation Checkpoints
 
 ### After Phase 1 ✅
@@ -203,6 +228,12 @@
 - [ ] role.permission.granted events emitted for new orgs
 - [ ] End-to-end flow verified
 
+### After Phase 8 ✅
+- [x] `is_super_admin()` is SECURITY DEFINER
+- [x] `is_org_admin()` is SECURITY DEFINER
+- [x] Role creation via UI works (no more "stack depth limit exceeded")
+- [x] RLS policies still function correctly for tenant isolation
+
 ---
 
 ## Completed Migrations
@@ -215,22 +246,26 @@
 | `20251229184955_permission_cleanup.sql` | Delete 13 unused permissions, add 2 new ones | ✅ Applied |
 | `20251229195740_backfill_provider_admin_permissions.sql` | Backfill 23 permissions to existing provider_admin roles | ✅ Applied |
 | `20251229201217_fix_emit_domain_event_overload.sql` | Add function overload that auto-calculates stream_version | ✅ Applied |
+| `20251229220540_stub_unused_overloads.sql` | Diagnostic stubs for function overloads (ruled out ambiguity) | ✅ Applied |
+| `20251229221456_fix_rls_recursion.sql` | **FIX**: SECURITY DEFINER on is_super_admin/is_org_admin | ✅ Applied |
 
 ---
 
 ## Audit Results (Final)
 
-| Metric | Before | After Phase 3 | After Phase 6 |
-|--------|--------|---------------|---------------|
-| Orphaned permissions | 19 | 0 | 0 |
-| Orphaned users | 5 | 0 | 0 |
-| Orphaned invitations | 2 | 0 | 0 |
-| Test data (fake org_id) | 3 rows | 0 | 0 |
-| `role.create` scope_type | global (BUG) | org (FIXED) | org |
-| scope_type values | 5 | 2 (global, org) | 2 |
-| Total permissions | 42 | 42 | **31** |
-| provider_admin template permissions | ? | 19 | **23** |
-| emit_domain_event overloads | 2 | 2 | **3** |
+| Metric | Before | After Phase 3 | After Phase 6 | After Phase 8 |
+|--------|--------|---------------|---------------|---------------|
+| Orphaned permissions | 19 | 0 | 0 | 0 |
+| Orphaned users | 5 | 0 | 0 | 0 |
+| Orphaned invitations | 2 | 0 | 0 | 0 |
+| Test data (fake org_id) | 3 rows | 0 | 0 | 0 |
+| `role.create` scope_type | global (BUG) | org (FIXED) | org | org |
+| scope_type values | 5 | 2 (global, org) | 2 | 2 |
+| Total permissions | 42 | 42 | **31** | 31 |
+| provider_admin template permissions | ? | 19 | **23** | 23 |
+| emit_domain_event overloads | 2 | 2 | **3** | 3 |
+| is_super_admin/is_org_admin | SECURITY INVOKER (BUG) | - | - | **SECURITY DEFINER** |
+| Role creation via UI | ❌ stack overflow | - | ❌ stack overflow | **✅ Working** |
 
 ---
 
@@ -263,3 +298,41 @@ User (6): create, view, update, delete, role_assign, role_revoke
 - **New database deployments**: COMPLIANT - Temporal workflow emits `role.permission.granted` events
 - **Backfill migration**: Non-compliant (direct INSERT) - acceptable for one-time fix
 - **Contract file**: `infrastructure/supabase/contracts/asyncapi/domains/rbac.yaml`
+
+### RLS Recursion Fix (Phase 8)
+**Root Cause**: Circular RLS policy recursion
+```
+domain_events INSERT
+  → RLS policy checks is_super_admin(get_current_user_id())
+    → queries user_roles_projection
+      → RLS policy checks is_super_admin(get_current_user_id())
+        → infinite recursion until PostgreSQL stack exhausted (~9 seconds)
+```
+
+**Fix**: Make permission check functions SECURITY DEFINER
+- `is_super_admin(UUID)` - bypasses RLS on user_roles_projection
+- `is_org_admin(UUID, UUID)` - bypasses RLS on user_roles_projection
+
+**Why SECURITY DEFINER is safe here**:
+1. These functions only return BOOLEAN - no data leakage
+2. They check if the GIVEN user_id has admin role - no privilege escalation
+3. The function owner (postgres) has full table access anyway
+
+---
+
+## Future Tasks (Low Priority)
+
+### Add WHEN Clauses to Bootstrap Triggers
+Two BEFORE triggers on `domain_events` fire on ALL inserts without WHEN clauses:
+- `trigger_notify_bootstrap_initiated` - should only fire for `organization.bootstrap.initiated`
+- `bootstrap_workflow_trigger` - should only fire for `organization.bootstrap.*`
+
+These add unnecessary overhead for non-bootstrap events. Fix:
+```sql
+DROP TRIGGER IF EXISTS trigger_notify_bootstrap_initiated ON domain_events;
+CREATE TRIGGER trigger_notify_bootstrap_initiated
+  BEFORE INSERT ON domain_events
+  FOR EACH ROW
+  WHEN (NEW.event_type = 'organization.bootstrap.initiated')
+  EXECUTE FUNCTION notify_workflow_worker_bootstrap();
+```
