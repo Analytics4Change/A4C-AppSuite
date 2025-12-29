@@ -5,8 +5,8 @@
 Role management UI for CRUD operations on roles and their permissions. Follows the Organization Units pattern with split-view layout and MVVM architecture.
 
 **Created**: 2024-12-24
-**Last Updated**: 2024-12-28
-**Status**: ✅ COMPLETE - All 13 phases implemented, tested, deployed. Full UX improvements including permission filtering, role duplication, display names, org_type filtering, and tree expansion fix.
+**Last Updated**: 2024-12-29
+**Status**: ✅ COMPLETE - All 14 phases implemented, tested, deployed. Full UX improvements including permission filtering, role duplication, display names, org_type filtering, tree expansion fix, and visual hierarchy bug fix.
 
 ## Key Decisions
 
@@ -24,6 +24,7 @@ Role management UI for CRUD operations on roles and their permissions. Follows t
 12. **Permission Selector Filtering**: "Show only grantable" toggle (default ON), search input, collapse/expand per applet - Added 2024-12-28
 13. **Role Duplication**: "Duplicate" button clones role with "(Copy)" suffix, `clonedFromRoleId` in event metadata for audit trail - Added 2024-12-28
 14. **Tree Expansion Fix**: OrganizationTreeNode accepts `expandedIds` Set prop for proper recursive expansion - Added 2024-12-28
+15. **Section Dividers Not Collapsible**: Permission scope sections (Global/Organization) use horizontal dividers with centered labels, NOT h4 headers, to avoid visual confusion with collapsible AppletGroups - Added 2024-12-29
 
 ## Architecture
 
@@ -140,6 +141,7 @@ infrastructure/supabase/
 | `57196ae9` | Align organization-units UI with roles pattern | 2024-12-26 |
 | `78a6a1c9` | Hide canonical roles from Role Management UI | 2024-12-26 |
 | `65051ba6` | UX improvements (Phase 13) - filtering, duplication, display names | 2024-12-28 |
+| `4bab347e` | Visual hierarchy bug fix (Phase 14) - section dividers | 2024-12-29 |
 
 ## Bug Fixes (2024-12-24 - 2024-12-25)
 
@@ -322,3 +324,40 @@ AND (
 - `frontend/src/components/organization-units/OrganizationTreeNode.tsx` - Accept expandedIds prop
 
 **Commit**: `65051ba6` - feat(rbac): Role management UX improvements
+
+## Phase 14 Visual Hierarchy Bug Fix (2024-12-29)
+
+### Permission Grouping False Hierarchy
+**Problem**: Permission selector showed false nested hierarchy where "Organization Unit Management" appeared as a collapsible parent container wrapping Client, Medication, Organization, Role, and User applet groups. Screenshot analysis revealed:
+```
+▶ Organization Management (Global)    0/1 selected
+▶ Role Management                     0/1 selected
+▼ Organization Unit Management                     ← Bug: Looked like parent!
+  ├── Client Records                  0/3 selected
+  ├── Medication Management           0/2 selected
+  ...
+```
+
+**Root Cause**: h4-based section headers in `PermissionSelector.tsx` (lines 548-581) visually merged with AppletGroup components, creating the illusion of nested hierarchy when all groups should be FLAT.
+
+**Solution**: Replaced h4 headers with horizontal divider pattern:
+```tsx
+<div className="flex items-center gap-3 py-1" role="separator" aria-label="Global scope permissions">
+  <div className="h-px flex-1 bg-purple-200"></div>
+  <span className="text-xs font-semibold uppercase tracking-wider text-purple-600 whitespace-nowrap">
+    Global Scope
+  </span>
+  <div className="h-px flex-1 bg-purple-200"></div>
+</div>
+```
+
+**Changes**:
+- Renamed sections: "Organization Management (Global)" → "Global Scope", "Organization Unit Management" → "Organization Scope"
+- Removed confusing subtitle text
+- Added ARIA attributes for accessibility (`role="separator"`, `aria-label`)
+- Purple styling for global scope, blue styling for organization scope
+
+**Files Modified**:
+- `frontend/src/components/roles/PermissionSelector.tsx`
+
+**Commit**: `4bab347e` - fix(rbac): Fix permission grouping visual hierarchy bug

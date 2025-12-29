@@ -2,13 +2,13 @@
 
 ## Current Status
 
-**Phase**: 13 - UX Improvements
+**Phase**: 14 - Visual Hierarchy Bug Fix
 **Status**: ✅ COMPLETE
-**Last Updated**: 2024-12-28
-**Completed**: 6 UX improvements - permission filtering, inactive role banner, display names, org_type filtering, role duplication, tree expansion fix
-**Final Commit**: `65051ba6` - feat(rbac): Role management UX improvements
+**Last Updated**: 2024-12-29
+**Completed**: Fixed permission selector visual hierarchy bug - replaced h4 section headers with horizontal dividers
+**Final Commit**: `4bab347e` - fix(rbac): Fix permission grouping visual hierarchy bug
 
-**Feature Status**: Role Management is fully complete and deployed. All 13 phases implemented.
+**Feature Status**: Role Management is fully complete and deployed. All 14 phases implemented.
 
 ---
 
@@ -103,6 +103,7 @@
 | `57196ae9` | refactor(ou): Align organization-units UI with roles pattern | 2024-12-26 | ✅ Deployed |
 | `78a6a1c9` | fix(rbac): Hide canonical roles from Role Management UI | 2024-12-26 | ✅ Deployed |
 | `65051ba6` | feat(rbac): Role management UX improvements | 2024-12-28 | ✅ Deployed |
+| `4bab347e` | fix(rbac): Fix permission grouping visual hierarchy bug | 2024-12-29 | ✅ Deployed |
 
 All GitHub Actions workflows passed:
 - Deploy Frontend: Build + Docker push + k8s rollout
@@ -111,7 +112,7 @@ All GitHub Actions workflows passed:
 ## Feature Complete Summary
 
 The Role Management feature is **100% complete**:
-- ✅ 13 phases implemented
+- ✅ 14 phases implemented
 - ✅ 148 unit tests passing
 - ✅ 189 E2E tests passing (27 tests × 7 browser configs)
 - ✅ TypeScript compilation passes
@@ -302,3 +303,63 @@ The Role Management feature is **100% complete**:
 - `frontend/src/components/organization-units/OrganizationTreeNode.tsx` - Accept expandedIds prop
 
 **Commit**: `65051ba6` - feat(rbac): Role management UX improvements
+
+---
+
+## Phase 14: Visual Hierarchy Bug Fix ✅ COMPLETE
+
+**Date**: 2024-12-29
+**Status**: ✅ COMPLETE
+
+### Issue: False Nested Hierarchy in Permission Selector
+- [x] Investigate bug: "Organization Unit Management" appeared as parent container wrapping child applet groups
+- [x] Identify root cause: h4-based section headers visually merged with AppletGroup components
+- [x] Replace h4 section headers with horizontal divider pattern
+- [x] Rename sections: "Organization Management (Global)" → "Global Scope", "Organization Unit Management" → "Organization Scope"
+- [x] Remove confusing subtitle text below section headers
+- [x] Add ARIA attributes (`role="separator"`, `aria-label`) for accessibility
+- [x] TypeScript compilation passes
+- [x] Production build succeeds
+- [x] Deploy and verify
+
+**Root Cause**: Section headers using `<h4>` tags looked like collapsible AppletGroups, creating the illusion that "Organization Unit Management" was a parent group containing Client, Medication, Organization, Role, and User applet groups.
+
+**Solution**: Horizontal dividers with centered label:
+```tsx
+<div className="flex items-center gap-3 py-1" role="separator" aria-label="Global scope permissions">
+  <div className="h-px flex-1 bg-purple-200"></div>
+  <span className="text-xs font-semibold uppercase tracking-wider text-purple-600 whitespace-nowrap">
+    Global Scope
+  </span>
+  <div className="h-px flex-1 bg-purple-200"></div>
+</div>
+```
+
+**Visual Before (Bug)**:
+```
+▶ Organization Management (Global)    0/1 selected
+▶ Role Management                     0/1 selected
+▼ Organization Unit Management                     ← Looked like collapsible parent!
+  ├── Client Records                  0/3 selected
+  ├── Medication Management           0/2 selected
+  └── ...
+```
+
+**Visual After (Fixed)**:
+```
+────────── GLOBAL SCOPE ──────────
+▶ Organization Management             0/1 selected
+▶ Role Management                     0/1 selected
+
+────────── ORGANIZATION SCOPE ──────────
+▶ Client Records                      0/3 selected
+▶ Medication Management               0/2 selected
+▶ Organization Management             0/2 selected
+▶ Role Management                     0/2 selected
+▶ User Management                     0/2 selected
+```
+
+**Files Modified**:
+- `frontend/src/components/roles/PermissionSelector.tsx` - Replaced section headers with horizontal dividers
+
+**Commit**: `4bab347e` - fix(rbac): Fix permission grouping visual hierarchy bug
