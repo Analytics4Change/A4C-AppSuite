@@ -10,9 +10,14 @@
  */
 
 /**
- * Permission scope types that define where a permission can be applied
+ * Permission scope types that control visibility based on org_type JWT claim.
+ *
+ * - 'global': Visible only to platform_owner org_type (A4C organization)
+ * - 'org': Visible to all org_types (providers, provider partners, platform owner)
+ *
+ * @see documentation/architecture/authorization/scoping-architecture.md
  */
-export type PermissionScopeType = 'global' | 'org' | 'facility' | 'program' | 'client';
+export type PermissionScopeType = 'global' | 'org';
 
 /**
  * A single permission definition from the permissions_projection table

@@ -72,14 +72,11 @@ The `permissions_projection` table is a **CQRS read model** that stores atomic a
 - **Type**: `text`
 - **Purpose**: Defines hierarchical level where permission applies
 - **Valid Values**:
-  - `'global'` - Platform-wide access (super_admin only)
-  - `'org'` - Organization-level access
-  - `'facility'` - Facility-level access
-  - `'program'` - Program-level access
-  - `'client'` - Individual client-level access
+  - `'global'` - Platform-wide access (visible only to platform_owner org_type)
+  - `'org'` - Organization-level access (visible to all org types)
 - **Constraints**: CHECK constraint enforces enum values
 - **Index**: `idx_permissions_scope_type` (BTREE) for scope-based filtering
-- **Usage**: JWT custom claims include `scope_path` for hierarchical permission checking
+- **Usage**: Used by `api.get_permissions()` to filter permissions based on user's `org_type` JWT claim
 
 #### requires_mfa
 - **Type**: `boolean`
@@ -285,12 +282,14 @@ UNIQUE (applet, action)
 
 ### Check Constraint: scope_type
 ```sql
-CHECK (scope_type IN ('global', 'org', 'facility', 'program', 'client'))
+CHECK (scope_type IN ('global', 'org'))
 ```
-- **Purpose**: Enforces valid hierarchical scope levels
+- **Purpose**: Enforces valid scope levels
 - **Validation**: Prevents typos like 'organisation' or 'global_scope'
-- **Hierarchy**: global > org > facility > program > client
-- **Usage**: JWT custom claims include matching `scope_path` (ltree) for permission checks
+- **Semantics**:
+  - `global` = Platform-level (permission.*, organization.create/delete/activate/etc.)
+  - `org` = Organization-level (role.*, user.*, client.*, medication.*, etc.)
+- **Usage**: `api.get_permissions()` filters based on user's `org_type` JWT claim
 
 ## Common Queries
 
@@ -354,15 +353,20 @@ WHERE name = 'clients.delete';
 ### Filter Permissions by Scope Type
 
 ```sql
-SELECT
-  name,
-  description
+-- Get global permissions (platform_owner only)
+SELECT name, description
 FROM permissions_projection
-WHERE scope_type = 'client'
+WHERE scope_type = 'global'
+ORDER BY applet, action;
+
+-- Get org-scoped permissions (all org types)
+SELECT name, description
+FROM permissions_projection
+WHERE scope_type = 'org'
 ORDER BY applet, action;
 ```
 
-**Use Case**: Show permissions available at specific hierarchy level
+**Use Case**: Show permissions available at specific scope level
 
 ### Count Permissions by Applet
 
@@ -389,7 +393,7 @@ async function definePermission(params: {
   applet: string;
   action: string;
   description: string;
-  scope_type: 'global' | 'org' | 'facility' | 'program' | 'client';
+  scope_type: 'global' | 'org';
   requires_mfa: boolean;
 }) {
   const permissionId = uuidv4();
@@ -422,7 +426,7 @@ await definePermission({
   applet: 'medications',
   action: 'approve_refill',
   description: 'Approve medication refill requests',
-  scope_type: 'facility',
+  scope_type: 'org',
   requires_mfa: true
 });
 ```

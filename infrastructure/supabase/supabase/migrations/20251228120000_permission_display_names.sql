@@ -20,6 +20,9 @@ COMMENT ON COLUMN public.permissions_projection.display_name IS 'Human-readable 
 -- ============================================================================
 -- Step 2: Update api.get_permissions() to return display_name
 -- ============================================================================
+-- Must drop and recreate because return type is changing
+DROP FUNCTION IF EXISTS api.get_permissions();
+
 CREATE OR REPLACE FUNCTION api.get_permissions()
 RETURNS TABLE (
   id UUID,

@@ -54,16 +54,16 @@ const MOCK_PERMISSIONS: Permission[] = [
 
   // Client Records
   { id: 'perm-client-create', name: 'client.create', applet: 'client', action: 'create', displayName: 'Create Client', description: 'Add new client records to the system', scopeType: 'org' },
-  { id: 'perm-client-view', name: 'client.view', applet: 'client', action: 'view', displayName: 'View Clients', description: 'View client information and records', scopeType: 'client' },
-  { id: 'perm-client-update', name: 'client.update', applet: 'client', action: 'update', displayName: 'Update Client', description: 'Modify client information and records', scopeType: 'client' },
-  { id: 'perm-client-delete', name: 'client.delete', applet: 'client', action: 'delete', displayName: 'Delete Client', description: 'Remove client records from the system', scopeType: 'client' },
+  { id: 'perm-client-view', name: 'client.view', applet: 'client', action: 'view', displayName: 'View Clients', description: 'View client information and records', scopeType: 'org' },
+  { id: 'perm-client-update', name: 'client.update', applet: 'client', action: 'update', displayName: 'Update Client', description: 'Modify client information and records', scopeType: 'org' },
+  { id: 'perm-client-delete', name: 'client.delete', applet: 'client', action: 'delete', displayName: 'Delete Client', description: 'Remove client records from the system', scopeType: 'org' },
 
   // Medication Management
-  { id: 'perm-med-create', name: 'medication.create', applet: 'medication', action: 'create', displayName: 'Add Medication', description: 'Add new medication entries for clients', scopeType: 'client' },
-  { id: 'perm-med-view', name: 'medication.view', applet: 'medication', action: 'view', displayName: 'View Medications', description: 'View medication records and history', scopeType: 'client' },
-  { id: 'perm-med-update', name: 'medication.update', applet: 'medication', action: 'update', displayName: 'Update Medication', description: 'Modify medication entries', scopeType: 'client' },
-  { id: 'perm-med-delete', name: 'medication.delete', applet: 'medication', action: 'delete', displayName: 'Delete Medication', description: 'Remove medication entries from records', scopeType: 'client' },
-  { id: 'perm-med-approve', name: 'medication.approve', applet: 'medication', action: 'approve', displayName: 'Approve Medication', description: 'Approve medication requests or changes', scopeType: 'client', requiresMfa: true },
+  { id: 'perm-med-create', name: 'medication.create', applet: 'medication', action: 'create', displayName: 'Add Medication', description: 'Add new medication entries for clients', scopeType: 'org' },
+  { id: 'perm-med-view', name: 'medication.view', applet: 'medication', action: 'view', displayName: 'View Medications', description: 'View medication records and history', scopeType: 'org' },
+  { id: 'perm-med-update', name: 'medication.update', applet: 'medication', action: 'update', displayName: 'Update Medication', description: 'Modify medication entries', scopeType: 'org' },
+  { id: 'perm-med-delete', name: 'medication.delete', applet: 'medication', action: 'delete', displayName: 'Delete Medication', description: 'Remove medication entries from records', scopeType: 'org' },
+  { id: 'perm-med-approve', name: 'medication.approve', applet: 'medication', action: 'approve', displayName: 'Approve Medication', description: 'Approve medication requests or changes', scopeType: 'org', requiresMfa: true },
 
   // User Management
   { id: 'perm-user-create', name: 'user.create', applet: 'user', action: 'create', displayName: 'Create User', description: 'Invite new users to the organization', scopeType: 'org' },

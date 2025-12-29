@@ -156,4 +156,4 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION api.create_role IS 'Create a new role with permissions. Supports optional p_cloned_from_role_id for role duplication audit trail. Enforces subset-only delegation.';
+COMMENT ON FUNCTION api.create_role(TEXT, TEXT, TEXT, UUID[], UUID) IS 'Create a new role with permissions. Supports optional p_cloned_from_role_id for role duplication audit trail. Enforces subset-only delegation.';

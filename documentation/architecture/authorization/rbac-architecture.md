@@ -162,9 +162,13 @@ Each permission includes:
 - **name**: Full permission identifier (e.g., "medication.create")
 - **description**: Human-readable explanation
 - **requires_mfa**: Boolean flag for sensitive operations
-- **scope_type**: `'global' | 'org' | 'unit' | 'client'` - **Semantic tag** for permission scope (NOT enforced hierarchy levels)
+- **scope_type**: `'global' | 'org'` - Controls permission visibility by org_type
 
-**IMPORTANT**: `scope_type` values are semantic labels, not enforced organizational structure. Providers define their own hierarchies (`facility`, `program`, `campus`, `home`, `pod`, etc.), and permissions use flexible `scope_path` (ltree) for actual scoping.
+**Note**: `scope_type` determines which permissions are visible in the UI:
+- `global`: Visible only to `platform_owner` org_type (A4C organization)
+- `org`: Visible to all org_types (providers, provider partners, platform owner)
+
+See [Scoping Architecture](./scoping-architecture.md) for details on how the three scoping mechanisms interact.
 
 ---
 
@@ -291,7 +295,7 @@ interface PermissionDefinedEvent {
     action: string;  // e.g., 'create'
     name: string;  // Generated: 'medication.create'
     description: string;
-    scope_type: 'global' | 'org' | 'facility' | 'program' | 'client';
+    scope_type: 'global' | 'org';
     requires_mfa: boolean;
   };
   event_metadata: {
@@ -472,7 +476,7 @@ CREATE TABLE permissions_projection (
   action TEXT NOT NULL,
   name TEXT GENERATED ALWAYS AS (applet || '.' || action) STORED,
   description TEXT NOT NULL,
-  scope_type TEXT NOT NULL CHECK (scope_type IN ('global', 'org', 'unit', 'client')),  -- Semantic tags, not enforced levels
+  scope_type TEXT NOT NULL CHECK (scope_type IN ('global', 'org')),  -- Controls permission visibility by org_type
   requires_mfa BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -483,9 +487,10 @@ CREATE INDEX idx_permissions_applet ON permissions_projection(applet);
 CREATE INDEX idx_permissions_name ON permissions_projection(name);
 
 COMMENT ON COLUMN permissions_projection.scope_type IS
-  'Semantic label for permission scope. Values are flexible tags (not enforced hierarchy levels).
-   Providers define their own organizational structure (facility/campus/home/pod/wing/etc).
-   Actual scoping uses ltree paths in user_roles_projection.scope_path.';
+  'Controls permission visibility by org_type JWT claim.
+   global = visible only to platform_owner org_type (A4C organization).
+   org = visible to all org_types (providers, provider partners, platform owner).
+   See scoping-architecture.md for details on the three scoping mechanisms.';
 ```
 
 ### Roles Projection
