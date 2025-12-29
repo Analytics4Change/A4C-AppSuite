@@ -2,13 +2,13 @@
 
 ## Current Status
 
-**Phase**: 12 - Canonical Roles Protection
+**Phase**: 13 - UX Improvements
 **Status**: ✅ COMPLETE
 **Last Updated**: 2024-12-28
-**Completed**: Hide canonical roles (super_admin, provider_admin) from Role Management UI
-**Final Commit**: `78a6a1c9` - Hide canonical roles from Role Management UI
+**Completed**: 6 UX improvements - permission filtering, inactive role banner, display names, org_type filtering, role duplication, tree expansion fix
+**Final Commit**: `65051ba6` - feat(rbac): Role management UX improvements
 
-**Feature Status**: Role Management is fully complete and deployed. All 12 phases implemented.
+**Feature Status**: Role Management is fully complete and deployed. All 13 phases implemented.
 
 ---
 
@@ -101,6 +101,8 @@
 | `474afe1c` | fix(rbac): Resolve statement timeout and global roles visibility | 2024-12-25 | ✅ Deployed |
 | `b89b9bf6` | feat(rbac): Add OU scope tree dropdown for role management | 2024-12-25 | ✅ Deployed |
 | `57196ae9` | refactor(ou): Align organization-units UI with roles pattern | 2024-12-26 | ✅ Deployed |
+| `78a6a1c9` | fix(rbac): Hide canonical roles from Role Management UI | 2024-12-26 | ✅ Deployed |
+| `65051ba6` | feat(rbac): Role management UX improvements | 2024-12-28 | ✅ Deployed |
 
 All GitHub Actions workflows passed:
 - Deploy Frontend: Build + Docker push + k8s rollout
@@ -109,7 +111,7 @@ All GitHub Actions workflows passed:
 ## Feature Complete Summary
 
 The Role Management feature is **100% complete**:
-- ✅ 11 phases implemented
+- ✅ 13 phases implemented
 - ✅ 148 unit tests passing
 - ✅ 189 E2E tests passing (27 tests × 7 browser configs)
 - ✅ TypeScript compilation passes
@@ -237,3 +239,66 @@ The Role Management feature is **100% complete**:
 - `frontend/src/pages/roles/RolesManagePage.tsx`
 - `frontend/src/pages/roles/RolesPage.tsx`
 - `frontend/src/services/roles/MockRoleService.ts`
+
+**Commit**: `78a6a1c9` - fix(rbac): Hide canonical roles from Role Management UI
+
+---
+
+## Phase 13: UX Improvements ✅ COMPLETE
+
+**Date**: 2024-12-28
+**Status**: ✅ COMPLETE
+
+### Issue 1: Permission Selector Cognitive Load
+- [x] Add "Show only grantable" toggle (default: ON) - hides permissions user can't grant
+- [x] Add search input to filter permissions by name/description/displayName
+- [x] Add permission group collapse/expand functionality
+- [x] Add expand all / collapse all buttons
+
+### Issue 2: Inactive Role UX Clarity
+- [x] Add info banner at top of form when role is inactive
+- [x] Message: "This role is inactive. Reactivate it to make changes."
+- [x] Add "Reactivate" button in the banner for quick action
+
+### Issue 3: Role Duplication Feature
+- [x] Add "Duplicate" button in RolesManagePage edit mode header
+- [x] Implement `initializeFromRole()` in RoleFormViewModel
+- [x] Clone creates new role with same permissions, name suffixed with "(Copy)"
+- [x] Opens in create mode with pre-filled data
+- [x] On save, include `clonedFromRoleId` in create request for audit trail
+- [x] Update `api.create_role` to accept `p_cloned_from_role_id` parameter
+- [x] Include `cloned_from_role_id` in event metadata
+
+### Issue 4: Organization vs OU Permission Visibility
+- [x] Modify `api.get_permissions()` to filter by org_type from JWT
+- [x] Non-platform_owner orgs only see `scope_type IN ('org', 'facility', 'program', 'client')`
+- [x] Global permissions (`scope_type = 'global'`) hidden for provider/provider_partner
+- [x] Add `display_name` column to permissions_projection
+
+### Issue 5: Human-Readable Permission Names
+- [x] Add `display_name` column to permissions_projection
+- [x] Update `api.get_permissions()` to return `display_name`
+- [x] Update frontend Permission type to include `displayName`
+- [x] Update PermissionSelector to use `displayName` for labels
+
+### Issue 6: OU Hierarchy Tree Expansion Bug
+- [x] Add `expandedIds: Set<string>` prop to OrganizationTreeNodeProps
+- [x] Pass `expandedIds` from OrganizationTree to OrganizationTreeNode
+- [x] Fix recursive children render to use `expandedIds.has(childNode.id)`
+- [x] Pass `expandedIds` down to child OrganizationTreeNode recursively
+
+**Files Added**:
+- `infrastructure/supabase/supabase/migrations/20251228120000_permission_display_names.sql`
+- `infrastructure/supabase/supabase/migrations/20251228130000_filter_permissions_by_org_type.sql`
+- `infrastructure/supabase/supabase/migrations/20251228140000_role_duplication_support.sql`
+
+**Files Modified**:
+- `frontend/src/components/roles/PermissionSelector.tsx` - Filter toolbar, collapse/expand
+- `frontend/src/viewModels/roles/RoleFormViewModel.ts` - Filter state, initializeFromRole
+- `frontend/src/pages/roles/RolesManagePage.tsx` - Duplicate button, inactive banner, filter props
+- `frontend/src/types/role.types.ts` - Added displayName, clonedFromRoleId
+- `frontend/src/services/roles/SupabaseRoleService.ts` - Pass clonedFromRoleId
+- `frontend/src/components/organization-units/OrganizationTree.tsx` - Pass expandedIds
+- `frontend/src/components/organization-units/OrganizationTreeNode.tsx` - Accept expandedIds prop
+
+**Commit**: `65051ba6` - feat(rbac): Role management UX improvements

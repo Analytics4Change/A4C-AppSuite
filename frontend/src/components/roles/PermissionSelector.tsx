@@ -310,9 +310,13 @@ AppletGroup.displayName = 'AppletGroup';
  * Renders a grouped permission selector with subset-only enforcement.
  * Permissions the user doesn't possess are visually disabled.
  *
- * For platform_owner users with global permissions, displays two sections:
- * - "Organization Management (Global)" for global-scope permissions
- * - "Organization Unit Management" for org/facility/program/client scope
+ * For platform_owner users with global permissions, displays two sections
+ * separated by horizontal dividers (not collapsible groups):
+ * - "Global Scope" - global-scope permissions (platform-wide)
+ * - "Organization Scope" - org/facility/program/client scope permissions
+ *
+ * For non-platform_owner users, displays a flat list of applet groups
+ * with no section dividers.
  */
 export const PermissionSelector = observer(
   ({
@@ -549,34 +553,36 @@ export const PermissionSelector = observer(
           <>
             {/* Global-scope permissions section (platform_owner only) */}
             {globalGroups.length > 0 && (
-              <div className="space-y-3">
-                <div className="border-b border-gray-200 pb-2">
-                  <h4 className="text-sm font-semibold text-purple-700">
-                    Organization Management (Global)
-                  </h4>
-                  <p className="text-xs text-gray-500">
-                    Platform-wide permissions for managing organizations
-                  </p>
+              <div className="space-y-4">
+                {/* Section divider - clearly NOT a collapsible group */}
+                <div className="flex items-center gap-3 py-1" role="separator" aria-label="Global scope permissions">
+                  <div className="h-px flex-1 bg-purple-200"></div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-purple-600 whitespace-nowrap">
+                    Global Scope
+                  </span>
+                  <div className="h-px flex-1 bg-purple-200"></div>
                 </div>
-                <div className="space-y-4 pl-0">{renderGroups(globalGroups)}</div>
+                {renderGroups(globalGroups)}
               </div>
             )}
 
-            {/* Non-global permissions section */}
+            {/* Organization-scope permissions section */}
             {orgGroups.length > 0 && (
-              <div className="space-y-3">
-                <div className="border-b border-gray-200 pb-2">
-                  <h4 className="text-sm font-semibold text-blue-700">Organization Unit Management</h4>
-                  <p className="text-xs text-gray-500">
-                    Permissions for managing units within organizations
-                  </p>
+              <div className="space-y-4">
+                {/* Section divider */}
+                <div className="flex items-center gap-3 py-1" role="separator" aria-label="Organization scope permissions">
+                  <div className="h-px flex-1 bg-blue-200"></div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 whitespace-nowrap">
+                    Organization Scope
+                  </span>
+                  <div className="h-px flex-1 bg-blue-200"></div>
                 </div>
-                <div className="space-y-4 pl-0">{renderGroups(orgGroups)}</div>
+                {renderGroups(orgGroups)}
               </div>
             )}
           </>
         ) : (
-          /* Standard groups for non-platform_owner users */
+          /* Standard groups for non-platform_owner users - flat list, no section dividers */
           <div className="space-y-4">{renderGroups(orgGroups)}</div>
         )}
       </div>
