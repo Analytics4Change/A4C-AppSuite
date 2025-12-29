@@ -2,10 +2,10 @@
 
 ## Current Status
 
-**Phase**: 8 - RLS Recursion Fix ✅ COMPLETE
-**Status**: ✅ COMPLETE (Phases 1-3, 5-6, 8 done; Phase 4 optional; Phase 7 pending)
+**Phase**: 9 - Trigger WHEN Clause Optimization ✅ COMPLETE
+**Status**: ✅ COMPLETE (Phases 1-3, 5-9 done; Phase 4 optional)
 **Last Updated**: 2025-12-29
-**Next Step**: Bootstrap new organization to test NEW org workflow grants all 23 permissions AND verify role creation works end-to-end
+**Next Step**: Optional Phase 4 (Day 0 Baseline) or archive dev docs
 
 ---
 
@@ -148,13 +148,13 @@
 
 ---
 
-## Phase 7: Verification ⏸️ PENDING
+## Phase 7: Verification ✅ COMPLETE
 
-### 7.1 Test New Organization Bootstrap
-- [ ] Bootstrap new organization via UI
-- [ ] Verify Temporal workflow grants all 23 permissions
-- [ ] Verify `role.permission.granted` events emitted (AsyncAPI compliant)
-- [ ] Verify Role Management UI shows all permissions for new org's provider_admin
+### 7.1 Test New Organization Bootstrap (poc-test2-20251229)
+- [x] Bootstrap new organization via UI
+- [x] Verify Temporal workflow grants all 23 permissions (23 events emitted)
+- [x] Verify `role.permission.granted` events emitted (AsyncAPI compliant - on role stream)
+- [x] Verify Role Management UI shows all permissions for new org's provider_admin
 
 ---
 
@@ -180,6 +180,30 @@
 - [x] Commit both diagnostic and fix migrations
 - [x] Push to main branch
 - [x] Verify CI/CD pipeline succeeds
+
+---
+
+## Phase 9: Trigger WHEN Clause Optimization ✅ COMPLETE
+
+### 9.1 Diagnose Anti-Pattern
+- [x] Identified two triggers firing on ALL domain_events inserts
+- [x] `trigger_notify_bootstrap_initiated` - no WHEN clause, checks event_type inside function
+- [x] `bootstrap_workflow_trigger` - no WHEN clause, checks stream_type + event_type inside function
+
+### 9.2 Architectural Principle Established
+- [x] `process_domain_event_trigger`: NO WHEN clause (main event router - by design)
+- [x] All other triggers: MUST have WHEN clause to filter at trigger level
+
+### 9.3 Implement Fix
+- [x] Create migration `20251229223544_add_when_clauses_to_bootstrap_triggers.sql`
+- [x] Add `WHEN (NEW.event_type = 'organization.bootstrap.initiated')` to `trigger_notify_bootstrap_initiated`
+- [x] Add `WHEN (NEW.event_type = 'organization.bootstrap.failed')` to `bootstrap_workflow_trigger`
+- [x] Apply migration via `supabase db push --linked`
+
+### 9.4 Verification
+- [x] All 5 triggers on `domain_events` verified
+- [x] Only `process_domain_event_trigger` has no WHEN clause (correct)
+- [x] All other triggers have WHEN clauses
 
 ---
 
@@ -223,16 +247,22 @@
 - [x] emit_domain_event function has 3 overloads (fixed signature issue)
 - [x] PROVIDER_ADMIN_PERMISSIONS constant updated in Temporal activity
 
-### After Phase 7 (Verification)
-- [ ] New organization bootstrap grants 23 permissions
-- [ ] role.permission.granted events emitted for new orgs
-- [ ] End-to-end flow verified
+### After Phase 7 ✅ (Verification - poc-test2-20251229)
+- [x] New organization bootstrap grants 23 permissions
+- [x] role.permission.granted events emitted for new orgs (23 events on role stream)
+- [x] End-to-end flow verified
 
 ### After Phase 8 ✅
 - [x] `is_super_admin()` is SECURITY DEFINER
 - [x] `is_org_admin()` is SECURITY DEFINER
 - [x] Role creation via UI works (no more "stack depth limit exceeded")
 - [x] RLS policies still function correctly for tenant isolation
+
+### After Phase 9 ✅
+- [x] `trigger_notify_bootstrap_initiated` has WHEN clause
+- [x] `bootstrap_workflow_trigger` has WHEN clause
+- [x] Only `process_domain_event_trigger` fires on all events (by design)
+- [x] No unnecessary function calls for non-bootstrap events
 
 ---
 
@@ -248,24 +278,26 @@
 | `20251229201217_fix_emit_domain_event_overload.sql` | Add function overload that auto-calculates stream_version | ✅ Applied |
 | `20251229220540_stub_unused_overloads.sql` | Diagnostic stubs for function overloads (ruled out ambiguity) | ✅ Applied |
 | `20251229221456_fix_rls_recursion.sql` | **FIX**: SECURITY DEFINER on is_super_admin/is_org_admin | ✅ Applied |
+| `20251229223544_add_when_clauses_to_bootstrap_triggers.sql` | Add WHEN clauses to bootstrap triggers for performance | ✅ Applied |
 
 ---
 
 ## Audit Results (Final)
 
-| Metric | Before | After Phase 3 | After Phase 6 | After Phase 8 |
-|--------|--------|---------------|---------------|---------------|
-| Orphaned permissions | 19 | 0 | 0 | 0 |
-| Orphaned users | 5 | 0 | 0 | 0 |
-| Orphaned invitations | 2 | 0 | 0 | 0 |
-| Test data (fake org_id) | 3 rows | 0 | 0 | 0 |
-| `role.create` scope_type | global (BUG) | org (FIXED) | org | org |
-| scope_type values | 5 | 2 (global, org) | 2 | 2 |
-| Total permissions | 42 | 42 | **31** | 31 |
-| provider_admin template permissions | ? | 19 | **23** | 23 |
-| emit_domain_event overloads | 2 | 2 | **3** | 3 |
-| is_super_admin/is_org_admin | SECURITY INVOKER (BUG) | - | - | **SECURITY DEFINER** |
-| Role creation via UI | ❌ stack overflow | - | ❌ stack overflow | **✅ Working** |
+| Metric | Before | After Phase 3 | After Phase 6 | After Phase 8 | After Phase 9 |
+|--------|--------|---------------|---------------|---------------|---------------|
+| Orphaned permissions | 19 | 0 | 0 | 0 | 0 |
+| Orphaned users | 5 | 0 | 0 | 0 | 0 |
+| Orphaned invitations | 2 | 0 | 0 | 0 | 0 |
+| Test data (fake org_id) | 3 rows | 0 | 0 | 0 | 0 |
+| `role.create` scope_type | global (BUG) | org (FIXED) | org | org | org |
+| scope_type values | 5 | 2 (global, org) | 2 | 2 | 2 |
+| Total permissions | 42 | 42 | **31** | 31 | 31 |
+| provider_admin template permissions | ? | 19 | **23** | 23 | 23 |
+| emit_domain_event overloads | 2 | 2 | **3** | 3 | 3 |
+| is_super_admin/is_org_admin | SECURITY INVOKER (BUG) | - | - | **SECURITY DEFINER** | SECURITY DEFINER |
+| Role creation via UI | ❌ stack overflow | - | ❌ stack overflow | **✅ Working** | ✅ Working |
+| Bootstrap triggers with WHEN | 3/5 (60%) | - | - | - | **5/5 (100%)** |
 
 ---
 
@@ -320,19 +352,15 @@ domain_events INSERT
 
 ---
 
-## Future Tasks (Low Priority)
+### Trigger WHEN Clause Principle (Phase 9)
+**Architectural Pattern**: All triggers on `domain_events` except the main router must have WHEN clauses.
 
-### Add WHEN Clauses to Bootstrap Triggers
-Two BEFORE triggers on `domain_events` fire on ALL inserts without WHEN clauses:
-- `trigger_notify_bootstrap_initiated` - should only fire for `organization.bootstrap.initiated`
-- `bootstrap_workflow_trigger` - should only fire for `organization.bootstrap.*`
+| Trigger | Has WHEN? | Purpose |
+|---------|-----------|---------|
+| `process_domain_event_trigger` | NO (correct) | Main event router - fires on all by design |
+| `trigger_notify_bootstrap_initiated` | YES | `organization.bootstrap.initiated` only |
+| `bootstrap_workflow_trigger` | YES | `organization.bootstrap.failed` only |
+| `enqueue_workflow_from_bootstrap_event_trigger` | YES | `organization.bootstrap.initiated` only |
+| `update_workflow_queue_projection_trigger` | YES | `workflow.queue.*` events only |
 
-These add unnecessary overhead for non-bootstrap events. Fix:
-```sql
-DROP TRIGGER IF EXISTS trigger_notify_bootstrap_initiated ON domain_events;
-CREATE TRIGGER trigger_notify_bootstrap_initiated
-  BEFORE INSERT ON domain_events
-  FOR EACH ROW
-  WHEN (NEW.event_type = 'organization.bootstrap.initiated')
-  EXECUTE FUNCTION notify_workflow_worker_bootstrap();
-```
+**Why this matters**: PostgreSQL evaluates WHEN clauses before invoking the trigger function. Without WHEN, every INSERT causes a function call even if the function immediately exits. This adds unnecessary overhead (context switch, stack allocation) for high-volume event tables.
