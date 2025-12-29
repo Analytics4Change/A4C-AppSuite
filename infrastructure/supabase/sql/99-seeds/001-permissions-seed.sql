@@ -1,7 +1,7 @@
 -- ============================================
 -- AUTHORITATIVE PERMISSIONS SEED FILE
 -- ============================================
--- This file defines ALL 42 permissions for the A4C platform.
+-- This file defines ALL 31 permissions for the A4C platform.
 -- It emits permission.defined domain events which trigger projection updates.
 --
 -- IMPORTANT: This is the SINGLE SOURCE OF TRUTH for permission definitions.
@@ -12,6 +12,13 @@
 --   'org'    - Organization-level permissions (org admins)
 --
 -- Last Updated: 2025-12-29
+-- Changes:
+--   - Removed a4c_role.* (5 permissions) - not used
+--   - Removed medication.prescribe - not needed
+--   - Added medication.update, medication.delete
+--   - Removed organization.business_profile_create, business_profile_update, create_sub
+--   - Removed role.assign, role.grant (use user.role_assign, user.role_revoke instead)
+--   - Updated organization permission descriptions for clarity
 -- ============================================
 
 -- ============================================
@@ -122,60 +129,11 @@ EXCEPTION WHEN unique_violation THEN NULL;
 END $$;
 
 -- ============================================
--- ORG SCOPE PERMISSIONS (32 total)
+-- ORG SCOPE PERMISSIONS (21 total)
 -- Organization-level operations for org admins
 -- ============================================
 
--- A4C Role Management (Org) - 5 permissions
-DO $$ BEGIN
-  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "a4c_role", "action": "assign", "description": "Assign A4C roles to A4C staff users", "scope_type": "org", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: A4C internal role management"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "a4c_role", "action": "create", "description": "Create roles within A4C organization", "scope_type": "org", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: A4C internal role management"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "a4c_role", "action": "delete", "description": "Delete A4C internal roles", "scope_type": "org", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: A4C internal role management"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "a4c_role", "action": "update", "description": "Modify A4C internal roles", "scope_type": "org", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: A4C internal role management"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "a4c_role", "action": "view", "description": "View A4C internal roles", "scope_type": "org", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: A4C internal role management"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
-END $$;
+-- NOTE: a4c_role.* permissions removed - not used in codebase
 
 -- Client Management (Org) - 4 permissions
 DO $$ BEGIN
@@ -218,7 +176,8 @@ DO $$ BEGIN
 EXCEPTION WHEN unique_violation THEN NULL;
 END $$;
 
--- Medication Management (Org) - 4 permissions
+-- Medication Management (Org) - 5 permissions
+-- NOTE: Removed medication.prescribe, added medication.update and medication.delete
 DO $$ BEGIN
   INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
   VALUES (
@@ -243,7 +202,17 @@ DO $$ BEGIN
   INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
   VALUES (
     gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "medication", "action": "prescribe", "description": "Prescribe medications", "scope_type": "org", "requires_mfa": false}'::jsonb,
+    '{"applet": "medication", "action": "delete", "description": "Delete medications", "scope_type": "org", "requires_mfa": false}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Medication management"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "medication", "action": "update", "description": "Update medications", "scope_type": "org", "requires_mfa": false}'::jsonb,
     '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Medication management"}'::jsonb
   );
 EXCEPTION WHEN unique_violation THEN NULL;
@@ -259,32 +228,14 @@ DO $$ BEGIN
 EXCEPTION WHEN unique_violation THEN NULL;
 END $$;
 
--- Organization Management (Org-scoped) - 7 permissions
+-- Organization Management (Org-scoped) - 4 permissions
+-- NOTE: Removed business_profile_create, business_profile_update, create_sub
+-- Updated descriptions for clarity
 DO $$ BEGIN
   INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
   VALUES (
     gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "organization", "action": "business_profile_create", "description": "Create business profile for organization", "scope_type": "org", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Organization profile management"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "organization", "action": "business_profile_update", "description": "Update business profile for organization", "scope_type": "org", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Organization profile management"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "organization", "action": "create_ou", "description": "Create organizational units (departments, locations, campuses) within hierarchy", "scope_type": "org", "requires_mfa": false}'::jsonb,
+    '{"applet": "organization", "action": "create_ou", "description": "Create organization units within hierarchy", "scope_type": "org", "requires_mfa": false}'::jsonb,
     '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Organization hierarchy management"}'::jsonb
   );
 EXCEPTION WHEN unique_violation THEN NULL;
@@ -294,17 +245,7 @@ DO $$ BEGIN
   INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
   VALUES (
     gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "organization", "action": "create_sub", "description": "Create sub-organizations within organizational hierarchy", "scope_type": "org", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Organization hierarchy management"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "organization", "action": "update", "description": "Update organizations", "scope_type": "org", "requires_mfa": false}'::jsonb,
+    '{"applet": "organization", "action": "update", "description": "Update organization settings", "scope_type": "org", "requires_mfa": false}'::jsonb,
     '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Organization management"}'::jsonb
   );
 EXCEPTION WHEN unique_violation THEN NULL;
@@ -314,7 +255,7 @@ DO $$ BEGIN
   INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
   VALUES (
     gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "organization", "action": "view", "description": "View organization details", "scope_type": "org", "requires_mfa": false}'::jsonb,
+    '{"applet": "organization", "action": "view", "description": "View organization settings", "scope_type": "org", "requires_mfa": false}'::jsonb,
     '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Organization management"}'::jsonb
   );
 EXCEPTION WHEN unique_violation THEN NULL;
@@ -324,14 +265,14 @@ DO $$ BEGIN
   INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
   VALUES (
     gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "organization", "action": "view_ou", "description": "View organizational units (departments, locations, campuses)", "scope_type": "org", "requires_mfa": false}'::jsonb,
+    '{"applet": "organization", "action": "view_ou", "description": "View organization unit hierarchy", "scope_type": "org", "requires_mfa": false}'::jsonb,
     '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Organization hierarchy management"}'::jsonb
   );
 EXCEPTION WHEN unique_violation THEN NULL;
 END $$;
 
--- Role Management (Org) - 6 permissions
--- NOTE: role.create is ORG-scoped, not global. Roles are created within organizations.
+-- Role Management (Org) - 4 permissions
+-- NOTE: Removed role.assign and role.grant (use user.role_assign and user.role_revoke)
 DO $$ BEGIN
   INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
   VALUES (
@@ -346,27 +287,7 @@ DO $$ BEGIN
   INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
   VALUES (
     gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "role", "action": "assign", "description": "Assign roles", "scope_type": "org", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Role management"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
     '{"applet": "role", "action": "delete", "description": "Delete role (soft delete, removes from all users)", "scope_type": "org", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Role management"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "role", "action": "grant", "description": "Assign roles to users", "scope_type": "org", "requires_mfa": false}'::jsonb,
     '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Role management"}'::jsonb
   );
 EXCEPTION WHEN unique_violation THEN NULL;
@@ -455,5 +376,5 @@ END $$;
 
 -- ============================================
 -- END OF PERMISSIONS SEED FILE
--- Total: 42 permissions (10 global + 32 org)
+-- Total: 31 permissions (10 global + 21 org)
 -- ============================================

@@ -20,6 +20,12 @@
 
 6. **Optional Day 0 Baseline**: After verification, generate new clean baseline to consolidate migrations and remove corruption evidence.
 
+7. **Permission Cleanup (Phase 5)**: Reduced permissions from 42 to 31 by removing unused a4c_role.*, medication.prescribe, organization.business_profile_*, organization.create_sub, role.assign, role.grant. Added medication.update and medication.delete. - Added 2025-12-29
+
+8. **Provider Admin Backfill (Phase 6)**: Fixed template to have all 23 permissions (was missing 4). Backfilled existing provider_admin roles. For NEW databases, the Temporal workflow handles this correctly via event emission. - Added 2025-12-29
+
+9. **emit_domain_event Fix**: Added new function overload that auto-calculates stream_version. This fixed "stack depth limit exceeded" error when creating roles via UI. The error was actually a function signature mismatch, not recursion. - Added 2025-12-29
+
 ## Technical Context
 
 ### Architecture
@@ -65,22 +71,29 @@ The RBAC system uses three scoping mechanisms that work together:
 
 ## File Structure
 
-### Files to Modify
+### Files Modified (Phase 5-6)
 
-**Database Migrations:**
-- `infrastructure/supabase/sql/99-seeds/001-permissions-seed.sql` (NEW) - Authoritative 42 permissions
-- `infrastructure/supabase/supabase/migrations/YYYYMMDDHHMMSS_regenerate_permissions.sql` (NEW)
-- `infrastructure/supabase/supabase/migrations/YYYYMMDDHHMMSS_backfill_orphaned_events.sql` (NEW)
-- `infrastructure/supabase/supabase/migrations/YYYYMMDDHHMMSS_simplify_scope_type.sql` (NEW)
-- `infrastructure/supabase/supabase/migrations/YYYYMMDDHHMMSS_cleanup_test_data.sql` (NEW)
+**Database Migrations (Applied 2025-12-29):**
+- `infrastructure/supabase/supabase/migrations/20251229184955_permission_cleanup.sql` - Delete 13 unused, add 2 new
+- `infrastructure/supabase/supabase/migrations/20251229195740_backfill_provider_admin_permissions.sql` - Backfill 23 perms to existing provider_admin
+- `infrastructure/supabase/supabase/migrations/20251229201217_fix_emit_domain_event_overload.sql` - Add auto-version overload
 
-**Frontend:**
-- `frontend/src/types/role.types.ts` - Simplify ScopeType to 'global' | 'org'
+**Seed File (Updated 2025-12-29):**
+- `infrastructure/supabase/sql/99-seeds/001-permissions-seed.sql` - Now 31 permissions (was 42)
 
-**Documentation:**
+**Frontend (Updated 2025-12-29):**
+- `frontend/src/config/permissions.config.ts` - Removed deleted permissions, added medication.update/delete
+- `frontend/src/services/roles/MockRoleService.ts` - Aligned with new permission set
+
+**Temporal Activity (Updated 2025-12-29):**
+- `workflows/src/activities/organization-bootstrap/grant-provider-admin-permissions.ts` - PROVIDER_ADMIN_PERMISSIONS now 23
+
+**Previously Modified (Phase 1-3):**
+- `infrastructure/supabase/supabase/migrations/20251229082721_regenerate_permissions.sql`
+- `infrastructure/supabase/supabase/migrations/20251229083038_backfill_orphaned_events.sql`
+- `infrastructure/supabase/supabase/migrations/20251229153821_simplify_scope_type_constraint.sql`
+- `frontend/src/types/role.types.ts` - ScopeType = 'global' | 'org'
 - `documentation/architecture/authorization/scoping-architecture.md` (NEW)
-- `documentation/infrastructure/reference/database/tables/permissions_projection.md` (UPDATE)
-- `documentation/architecture/authorization/rbac-architecture.md` (UPDATE)
 
 ### Key Existing Files
 
@@ -108,19 +121,27 @@ The RBAC system uses three scoping mechanisms that work together:
 
 IDs don't match - projection was directly inserted from pg_dump, not derived from event.
 
-## Correct Permission Scope Types
+## Correct Permission Scope Types (After Phase 5)
 
 ### Global Scope (10 permissions)
 - organization.activate, create, create_root, deactivate, delete, search, suspend
 - permission.grant, revoke, view
 
-### Org Scope (32 permissions)
-- a4c_role.* (5)
-- client.* (4)
-- medication.* (4)
-- organization.business_profile_create/update, create_ou, create_sub, update, view, view_ou (7)
-- role.create, assign, delete, grant, update, view (6)
-- user.* (6)
+### Org Scope (21 permissions) - Updated 2025-12-29
+- client.create, view, update, delete (4)
+- medication.create, view, update, delete, administer (5)
+- organization.view, update, view_ou, create_ou (4)
+- role.create, view, update, delete (4)
+- user.create, view, update, delete, role_assign, role_revoke (6)
+
+**Deleted (Phase 5):**
+- a4c_role.* (5) - not used in codebase
+- medication.prescribe - not needed
+- organization.business_profile_create, business_profile_update, create_sub (3) - redundant
+- role.assign, role.grant (2) - use user.role_assign/revoke instead
+
+**Added (Phase 5):**
+- medication.update, medication.delete (2)
 
 ## Important Constraints
 
@@ -131,6 +152,12 @@ IDs don't match - projection was directly inserted from pg_dump, not derived fro
 3. **CASCADE on TRUNCATE**: When truncating `permissions_projection`, it will cascade to `role_permissions_projection`.
 
 4. **scope_type CHECK Constraint**: Must be updated AFTER all permissions have correct values.
+
+5. **emit_domain_event Overloads**: Three overloads exist with different signatures. When calling from RPC functions like `api.create_role`, use the 5-parameter version (auto-calculates stream_version). - Added 2025-12-29
+
+6. **role_permission_templates vs Temporal activity**: The template table is the source of truth for NEW organizations. The `PROVIDER_ADMIN_PERMISSIONS` constant in Temporal is for documentation only - the activity reads from the database. Both must stay in sync. - Added 2025-12-29
+
+7. **AsyncAPI Contract Compliance**: The backfill migration directly inserts into projections without emitting events. This is acceptable for one-time fixes. For NEW databases, the Temporal workflow emits proper `role.permission.granted` events which is contract-compliant. - Added 2025-12-29
 
 ## Why This Approach?
 

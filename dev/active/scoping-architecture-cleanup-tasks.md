@@ -2,10 +2,10 @@
 
 ## Current Status
 
-**Phase**: 4 - Day 0 Baseline (Optional)
-**Status**: ⏸️ PENDING
+**Phase**: 6 - Provider Admin Permission Backfill ✅ COMPLETE
+**Status**: ✅ COMPLETE (Phases 1-3, 5-6 done; Phase 4 optional)
 **Last Updated**: 2025-12-29
-**Next Step**: Decide whether to generate new Day 0 baseline
+**Next Step**: Bootstrap new organization to test NEW org workflow grants all 23 permissions
 
 ---
 
@@ -99,6 +99,65 @@
 
 ---
 
+## Phase 5: Permission Architecture Cleanup ✅ COMPLETE
+
+### 5.1 Delete Unused Permissions (13 deleted)
+- [x] Remove a4c_role.* permissions (5) - not used in codebase
+- [x] Remove medication.prescribe - user decision
+- [x] Remove organization.business_profile_* and create_sub (3) - redundant
+- [x] Remove role.assign and role.grant (2) - use user.role_assign/revoke instead
+
+### 5.2 Add Missing Permissions (2 added)
+- [x] Add medication.update
+- [x] Add medication.delete
+
+### 5.3 Update Display Names
+- [x] organization.view → View Settings
+- [x] organization.update → Update Settings
+- [x] organization.view_ou → View Hierarchy
+- [x] organization.create_ou → Create Unit
+
+### 5.4 Update Frontend Config
+- [x] Update `permissions.config.ts` - removed deleted permissions, added new ones
+- [x] Update `MockRoleService.ts` - aligned with new permission set
+
+---
+
+## Phase 6: Provider Admin Permission Backfill ✅ COMPLETE
+
+### 6.1 Fix role_permission_templates
+- [x] Add 4 missing permissions to template: medication.administer, role.delete, role.update, user.delete
+- [x] Template now has 23 permissions (was 19)
+
+### 6.2 Backfill Existing provider_admin Roles
+- [x] Create migration `20251229195740_backfill_provider_admin_permissions.sql`
+- [x] Backfill all 23 permissions to existing provider_admin roles
+- [x] Verify Live for Life has 23 permissions
+- [x] Verify poc-test1-20251229 has 23 permissions
+
+### 6.3 Fix emit_domain_event Function Signature
+- [x] Debug "stack depth limit exceeded" error when creating roles
+- [x] Root cause: api.create_role called emit_domain_event with 5 params, no matching overload
+- [x] Create migration `20251229201217_fix_emit_domain_event_overload.sql`
+- [x] Added overload that auto-calculates stream_version
+- [x] Role creation now works via UI
+
+### 6.4 Update Temporal Activity
+- [x] Update PROVIDER_ADMIN_PERMISSIONS constant in grant-provider-admin-permissions.ts
+- [x] Now includes all 23 permissions for new organization bootstrap
+
+---
+
+## Phase 7: Verification ⏸️ PENDING
+
+### 7.1 Test New Organization Bootstrap
+- [ ] Bootstrap new organization via UI
+- [ ] Verify Temporal workflow grants all 23 permissions
+- [ ] Verify `role.permission.granted` events emitted (AsyncAPI compliant)
+- [ ] Verify Role Management UI shows all permissions for new org's provider_admin
+
+---
+
 ## Success Validation Checkpoints
 
 ### After Phase 1 ✅
@@ -127,6 +186,23 @@
 - [ ] Migration list shows only baseline_v2
 - [ ] No regressions in functionality
 
+### After Phase 5 ✅
+- [x] 31 permissions in projection (42 - 13 + 2)
+- [x] Unused a4c_role.* permissions removed
+- [x] medication.update and medication.delete added
+- [x] Frontend config updated
+
+### After Phase 6 ✅
+- [x] role_permission_templates has 23 entries for provider_admin
+- [x] All existing provider_admin roles have 23 permissions
+- [x] emit_domain_event function has 3 overloads (fixed signature issue)
+- [x] PROVIDER_ADMIN_PERMISSIONS constant updated in Temporal activity
+
+### After Phase 7 (Verification)
+- [ ] New organization bootstrap grants 23 permissions
+- [ ] role.permission.granted events emitted for new orgs
+- [ ] End-to-end flow verified
+
 ---
 
 ## Completed Migrations
@@ -136,19 +212,25 @@
 | `20251229082721_regenerate_permissions.sql` | Regenerate all 42 permissions with correct scope_type | ✅ Applied |
 | `20251229083038_backfill_orphaned_events.sql` | Backfill user/invitation events, cleanup test data | ✅ Applied |
 | `20251229153821_simplify_scope_type_constraint.sql` | Simplify scope_type to global/org only | ✅ Applied |
+| `20251229184955_permission_cleanup.sql` | Delete 13 unused permissions, add 2 new ones | ✅ Applied |
+| `20251229195740_backfill_provider_admin_permissions.sql` | Backfill 23 permissions to existing provider_admin roles | ✅ Applied |
+| `20251229201217_fix_emit_domain_event_overload.sql` | Add function overload that auto-calculates stream_version | ✅ Applied |
 
 ---
 
 ## Audit Results (Final)
 
-| Metric | Before | After |
-|--------|--------|-------|
-| Orphaned permissions | 19 | 0 |
-| Orphaned users | 5 | 0 |
-| Orphaned invitations | 2 | 0 |
-| Test data (fake org_id) | 3 rows | 0 |
-| `role.create` scope_type | global (BUG) | org (FIXED) |
-| scope_type values | 5 (global, org, facility, program, client) | 2 (global, org) |
+| Metric | Before | After Phase 3 | After Phase 6 |
+|--------|--------|---------------|---------------|
+| Orphaned permissions | 19 | 0 | 0 |
+| Orphaned users | 5 | 0 | 0 |
+| Orphaned invitations | 2 | 0 | 0 |
+| Test data (fake org_id) | 3 rows | 0 | 0 |
+| `role.create` scope_type | global (BUG) | org (FIXED) | org |
+| scope_type values | 5 | 2 (global, org) | 2 |
+| Total permissions | 42 | 42 | **31** |
+| provider_admin template permissions | ? | 19 | **23** |
+| emit_domain_event overloads | 2 | 2 | **3** |
 
 ---
 
@@ -157,4 +239,27 @@
 1. All migrations applied via `supabase db push --linked`
 2. Verified in Supabase dashboard that all migrations applied
 3. Frontend type updated in `frontend/src/types/role.types.ts`
-4. Phase 4 (Day 0 baseline) is optional - user can decide whether to consolidate migrations
+4. Frontend config updated in `frontend/src/config/permissions.config.ts`
+5. Temporal activity updated in `workflows/src/activities/organization-bootstrap/grant-provider-admin-permissions.ts`
+6. Phase 4 (Day 0 baseline) is optional - user can decide whether to consolidate migrations
+
+## Important Technical Notes
+
+### Complete provider_admin Permission Set (23 total)
+```
+Organization (4): view, update, view_ou, create_ou
+Client (4): create, view, update, delete
+Medication (5): create, view, update, delete, administer
+Role (4): create, view, update, delete
+User (6): create, view, update, delete, role_assign, role_revoke
+```
+
+### emit_domain_event Function Overloads (3 total)
+1. `(p_stream_id, p_stream_type, p_stream_version, p_event_type, p_event_data, p_event_metadata)` - explicit version
+2. `(p_event_id, p_event_type, p_aggregate_type, p_aggregate_id, p_event_data, p_event_metadata)` - different naming
+3. `(p_stream_id, p_stream_type, p_event_type, p_event_data, p_event_metadata)` - **NEW: auto-calculates stream_version**
+
+### AsyncAPI Contract Compliance
+- **New database deployments**: COMPLIANT - Temporal workflow emits `role.permission.granted` events
+- **Backfill migration**: Non-compliant (direct INSERT) - acceptable for one-time fix
+- **Contract file**: `infrastructure/supabase/contracts/asyncapi/domains/rbac.yaml`

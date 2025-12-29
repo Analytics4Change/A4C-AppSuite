@@ -337,9 +337,22 @@ export class SupabaseRoleService implements IRoleService {
    * Creates a new role with permissions
    */
   async createRole(request: CreateRoleRequest): Promise<RoleOperationResult> {
-    log.debug('createRole called', { request });
+    const requestId = crypto.randomUUID().slice(0, 8);
+    const startTime = Date.now();
+
+    log.info(`[DIAG:createRole:ENTRY] requestId=${requestId}`, {
+      name: request.name,
+      description: request.description,
+      permissionCount: request.permissionIds.length,
+      permissionIds: request.permissionIds,
+      orgHierarchyScope: request.orgHierarchyScope,
+      clonedFromRoleId: request.clonedFromRoleId,
+      timestamp: new Date().toISOString(),
+    });
 
     try {
+      log.debug(`[DIAG:createRole:RPC_CALL] requestId=${requestId}`);
+
       const { data, error } = await supabase.schema('api').rpc('create_role', {
         p_name: request.name,
         p_description: request.description,
@@ -348,8 +361,15 @@ export class SupabaseRoleService implements IRoleService {
         p_cloned_from_role_id: request.clonedFromRoleId || null,
       });
 
+      const elapsed = Date.now() - startTime;
+
       if (error) {
-        log.error('Error creating role', error);
+        log.error(`[DIAG:createRole:RPC_ERROR] requestId=${requestId} elapsed=${elapsed}ms`, {
+          error: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
         return {
           success: false,
           error: error.message,
@@ -362,8 +382,15 @@ export class SupabaseRoleService implements IRoleService {
 
       const response = data as MutationResponse;
 
+      log.info(`[DIAG:createRole:RPC_RESPONSE] requestId=${requestId} elapsed=${elapsed}ms`, {
+        success: response.success,
+        roleId: response.role?.id,
+        error: response.error,
+        errorDetails: response.errorDetails,
+      });
+
       if (!response.success) {
-        log.warn('Create role failed', { response });
+        log.warn(`[DIAG:createRole:EXIT:FAILED] requestId=${requestId}`, { response });
         return {
           success: false,
           error: response.error,
@@ -371,7 +398,7 @@ export class SupabaseRoleService implements IRoleService {
         };
       }
 
-      log.info('Role created', { roleId: response.role?.id });
+      log.info(`[DIAG:createRole:EXIT:SUCCESS] requestId=${requestId} roleId=${response.role?.id}`);
       return {
         success: true,
         role: response.role
@@ -390,7 +417,8 @@ export class SupabaseRoleService implements IRoleService {
           : undefined,
       };
     } catch (err) {
-      log.error('Exception in createRole', err);
+      const elapsed = Date.now() - startTime;
+      log.error(`[DIAG:createRole:EXCEPTION] requestId=${requestId} elapsed=${elapsed}ms`, err);
       return {
         success: false,
         error: err instanceof Error ? err.message : 'Unknown error',

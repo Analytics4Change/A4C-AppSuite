@@ -1,16 +1,16 @@
 /**
  * GrantProviderAdminPermissionsActivity
  *
- * Creates a provider_admin role for the organization and grants the 16 canonical permissions.
+ * Creates a provider_admin role for the organization and grants the 23 canonical permissions.
  * This activity is called during organization bootstrap to ensure the initial admin user
  * has the correct permissions.
  *
- * Canonical provider_admin Permissions (16 total):
+ * Canonical provider_admin Permissions (23 total):
  * - Organization (4): view_ou, create_ou, view, update
  * - Client (4): create, view, update, delete
- * - Medication (2): create, view
- * - Role (3): create, assign, view
- * - User (3): create, view, update
+ * - Medication (5): create, view, update, delete, administer
+ * - Role (4): create, view, update, delete
+ * - User (6): create, view, update, delete, role_assign, role_revoke
  *
  * Idempotency:
  * - Check if provider_admin role exists for this org
@@ -19,7 +19,7 @@
  *
  * Events Emitted:
  * - role.created: When provider_admin role is created
- * - role.permission.granted: For each permission granted (16 max)
+ * - role.permission.granted: For each permission granted (23 max)
  *
  * See: documentation/architecture/authorization/permissions-reference.md
  */
@@ -30,7 +30,7 @@ import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/util
 const log = getLogger('GrantProviderAdminPermissions');
 
 /**
- * Reference: Canonical provider_admin permissions
+ * Reference: Canonical provider_admin permissions (23 total)
  *
  * Note: The source of truth is the role_permission_templates table in the database.
  * This constant is kept for documentation reference only.
@@ -43,22 +43,29 @@ export const PROVIDER_ADMIN_PERMISSIONS = [
   'organization.create_ou',
   'organization.view',
   'organization.update',
-  // Client (4) - aligned to DB naming
+  // Client (4)
   'client.create',
   'client.view',
   'client.update',
   'client.delete',
-  // Medication (2)
+  // Medication (5) - includes administer
   'medication.create',
   'medication.view',
-  // Role (3) - within org
+  'medication.update',
+  'medication.delete',
+  'medication.administer',
+  // Role (4) - full CRUD within org
   'role.create',
-  'role.assign',
   'role.view',
-  // User (3)
+  'role.update',
+  'role.delete',
+  // User (6) - includes role assignment and delete
   'user.create',
   'user.view',
   'user.update',
+  'user.delete',
+  'user.role_assign',
+  'user.role_revoke',
 ] as const;
 
 /**
@@ -107,7 +114,7 @@ export interface GrantProviderAdminPermissionsResult {
 
 /**
  * Grant provider_admin permissions activity
- * Creates role and grants 16 canonical permissions
+ * Creates role and grants 23 canonical permissions
  *
  * @param params - Parameters including orgId
  * @returns Result with roleId and permissions granted count

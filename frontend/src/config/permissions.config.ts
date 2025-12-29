@@ -5,12 +5,18 @@
  * IMPORTANT: This file is aligned to the database permissions_projection table.
  * Do NOT add permissions here that don't exist in the database.
  *
- * Canonical permissions (34 total):
- * - Organization (9): create, view_ou, create_ou, view, update, create_sub, deactivate, delete
- * - Client (5): create, view, update, delete, transfer
- * - Medication (5): create, view, update, delete, create_template
- * - Role (5): global_roles.create, cross_org.grant, role.create, role.assign, role.view
- * - User (4): users.impersonate, user.create, user.view, user.update
+ * Canonical permissions (31 total in database):
+ * - Organization Global (7): activate, create, create_root, deactivate, delete, search, suspend
+ * - Organization Org (4): view, update, view_ou, create_ou
+ * - Permission (3): grant, revoke, view
+ * - Client (4): create, view, update, delete
+ * - Medication (5): administer, create, view, update, delete
+ * - Role (4): create, view, update, delete
+ * - User (6): create, view, update, delete, role_assign, role_revoke
+ *
+ * Frontend-only extensions (not in DB):
+ * - client.transfer, medication.create_template, global_roles.create,
+ *   cross_org.grant, users.impersonate
  *
  * See: documentation/architecture/authorization/permissions-reference.md
  */
@@ -54,16 +60,7 @@ export const PERMISSIONS: Record<string, Permission> = {
     scope: 'global',
     riskLevel: 'high'
   },
-  'organization.create_sub': {
-    id: 'organization.create_sub',
-    category: 'Organization Management',
-    resource: 'organization',
-    action: 'create_sub',
-    displayName: 'Create Sub-Organization',
-    description: 'Create sub-organizations under existing organizations',
-    scope: 'global',
-    riskLevel: 'high'
-  },
+  // NOTE: organization.create_sub removed - sub-orgs are now organization units
   'organization.deactivate': {
     id: 'organization.deactivate',
     category: 'Organization Management',
@@ -129,8 +126,8 @@ export const PERMISSIONS: Record<string, Permission> = {
     category: 'Organization Management',
     resource: 'organization',
     action: 'view_ou',
-    displayName: 'View Organizational Units',
-    description: 'View organizational unit hierarchy (departments, locations, campuses)',
+    displayName: 'View Hierarchy',
+    description: 'View organization unit hierarchy',
     scope: 'organization',
     riskLevel: 'low'
   },
@@ -139,8 +136,8 @@ export const PERMISSIONS: Record<string, Permission> = {
     category: 'Organization Management',
     resource: 'organization',
     action: 'create_ou',
-    displayName: 'Create Organizational Unit',
-    description: 'Create organizational units (departments, locations, campuses) within hierarchy',
+    displayName: 'Create Unit',
+    description: 'Create organization units within hierarchy',
     scope: 'organization',
     riskLevel: 'medium'
   },
@@ -149,8 +146,8 @@ export const PERMISSIONS: Record<string, Permission> = {
     category: 'Organization Management',
     resource: 'organization',
     action: 'view',
-    displayName: 'View Organization',
-    description: 'View organization information',
+    displayName: 'View Settings',
+    description: 'View organization settings',
     scope: 'organization',
     riskLevel: 'low'
   },
@@ -159,8 +156,8 @@ export const PERMISSIONS: Record<string, Permission> = {
     category: 'Organization Management',
     resource: 'organization',
     action: 'update',
-    displayName: 'Update Organization',
-    description: 'Modify organization information and business profile',
+    displayName: 'Update Settings',
+    description: 'Update organization settings',
     scope: 'organization',
     riskLevel: 'medium'
   },
@@ -270,25 +267,16 @@ export const PERMISSIONS: Record<string, Permission> = {
   },
 
   // Role Management (Org-scoped) - aligned to database naming
+  // NOTE: role.assign removed - use user.role_assign instead
   'role.create': {
     id: 'role.create',
     category: 'Role Management',
     resource: 'role',
     action: 'create',
-    displayName: 'Create Organization Roles',
+    displayName: 'Create Role',
     description: 'Create custom roles for the organization',
     scope: 'organization',
     riskLevel: 'high'
-  },
-  'role.assign': {
-    id: 'role.assign',
-    category: 'Role Management',
-    resource: 'role',
-    action: 'assign',
-    displayName: 'Assign Roles',
-    description: 'Assign roles to users within organization',
-    scope: 'organization',
-    riskLevel: 'medium'
   },
   'role.view': {
     id: 'role.view',
@@ -329,6 +317,26 @@ export const PERMISSIONS: Record<string, Permission> = {
     action: 'update',
     displayName: 'Update Users',
     description: 'Modify user information within organization',
+    scope: 'organization',
+    riskLevel: 'medium'
+  },
+  'user.role_assign': {
+    id: 'user.role_assign',
+    category: 'User Management',
+    resource: 'user',
+    action: 'role_assign',
+    displayName: 'Assign Role',
+    description: 'Assign roles to users within organization',
+    scope: 'organization',
+    riskLevel: 'medium'
+  },
+  'user.role_revoke': {
+    id: 'user.role_revoke',
+    category: 'User Management',
+    resource: 'user',
+    action: 'role_revoke',
+    displayName: 'Revoke Role',
+    description: 'Revoke roles from users within organization',
     scope: 'organization',
     riskLevel: 'medium'
   }
@@ -384,11 +392,12 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
       'medication.update',
       'medication.delete',
       'role.create',
-      'role.assign',
       'role.view',
       'user.create',
       'user.view',
-      'user.update'
+      'user.update',
+      'user.role_assign',
+      'user.role_revoke'
     ],
     suggestedFor: ['provider_admin']
   }

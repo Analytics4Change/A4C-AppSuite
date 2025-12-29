@@ -44,41 +44,41 @@ function generateId(): string {
 
 /**
  * All available permissions (system-wide)
+ * Aligned to database permissions_projection (31 total)
  */
 const MOCK_PERMISSIONS: Permission[] = [
-  // Organization Management
-  { id: 'perm-org-view', name: 'organization.view', applet: 'organization', action: 'view', displayName: 'View Organizations', description: 'View organization details and settings', scopeType: 'org' },
-  { id: 'perm-org-update', name: 'organization.update', applet: 'organization', action: 'update', displayName: 'Update Organization', description: 'Modify organization settings and configuration', scopeType: 'org' },
-  { id: 'perm-org-create-ou', name: 'organization.create_ou', applet: 'organization', action: 'create_ou', displayName: 'Create Org Unit', description: 'Create new organizational units (departments, locations, etc.)', scopeType: 'org' },
-  { id: 'perm-org-view-ou', name: 'organization.view_ou', applet: 'organization', action: 'view_ou', displayName: 'View Org Units', description: 'View organizational unit hierarchy and details', scopeType: 'org' },
+  // Organization Management (4 org-scoped)
+  { id: 'perm-org-view', name: 'organization.view', applet: 'organization', action: 'view', displayName: 'View Settings', description: 'View organization settings', scopeType: 'org' },
+  { id: 'perm-org-update', name: 'organization.update', applet: 'organization', action: 'update', displayName: 'Update Settings', description: 'Update organization settings', scopeType: 'org' },
+  { id: 'perm-org-create-ou', name: 'organization.create_ou', applet: 'organization', action: 'create_ou', displayName: 'Create Unit', description: 'Create organization units within hierarchy', scopeType: 'org' },
+  { id: 'perm-org-view-ou', name: 'organization.view_ou', applet: 'organization', action: 'view_ou', displayName: 'View Hierarchy', description: 'View organization unit hierarchy', scopeType: 'org' },
 
-  // Client Records
-  { id: 'perm-client-create', name: 'client.create', applet: 'client', action: 'create', displayName: 'Create Client', description: 'Add new client records to the system', scopeType: 'org' },
-  { id: 'perm-client-view', name: 'client.view', applet: 'client', action: 'view', displayName: 'View Clients', description: 'View client information and records', scopeType: 'org' },
-  { id: 'perm-client-update', name: 'client.update', applet: 'client', action: 'update', displayName: 'Update Client', description: 'Modify client information and records', scopeType: 'org' },
-  { id: 'perm-client-delete', name: 'client.delete', applet: 'client', action: 'delete', displayName: 'Delete Client', description: 'Remove client records from the system', scopeType: 'org' },
+  // Client Management (4)
+  { id: 'perm-client-create', name: 'client.create', applet: 'client', action: 'create', displayName: 'Create Client', description: 'Add new client records', scopeType: 'org' },
+  { id: 'perm-client-view', name: 'client.view', applet: 'client', action: 'view', displayName: 'View Clients', description: 'View client information', scopeType: 'org' },
+  { id: 'perm-client-update', name: 'client.update', applet: 'client', action: 'update', displayName: 'Update Client', description: 'Modify client information', scopeType: 'org' },
+  { id: 'perm-client-delete', name: 'client.delete', applet: 'client', action: 'delete', displayName: 'Delete Client', description: 'Remove client records', scopeType: 'org' },
 
-  // Medication Management
-  { id: 'perm-med-create', name: 'medication.create', applet: 'medication', action: 'create', displayName: 'Add Medication', description: 'Add new medication entries for clients', scopeType: 'org' },
-  { id: 'perm-med-view', name: 'medication.view', applet: 'medication', action: 'view', displayName: 'View Medications', description: 'View medication records and history', scopeType: 'org' },
-  { id: 'perm-med-update', name: 'medication.update', applet: 'medication', action: 'update', displayName: 'Update Medication', description: 'Modify medication entries', scopeType: 'org' },
-  { id: 'perm-med-delete', name: 'medication.delete', applet: 'medication', action: 'delete', displayName: 'Delete Medication', description: 'Remove medication entries from records', scopeType: 'org' },
-  { id: 'perm-med-approve', name: 'medication.approve', applet: 'medication', action: 'approve', displayName: 'Approve Medication', description: 'Approve medication requests or changes', scopeType: 'org', requiresMfa: true },
+  // Medication Management (5 - includes administer)
+  { id: 'perm-med-administer', name: 'medication.administer', applet: 'medication', action: 'administer', displayName: 'Administer', description: 'Administer medications', scopeType: 'org' },
+  { id: 'perm-med-create', name: 'medication.create', applet: 'medication', action: 'create', displayName: 'Create', description: 'Add new medication entries', scopeType: 'org' },
+  { id: 'perm-med-view', name: 'medication.view', applet: 'medication', action: 'view', displayName: 'View', description: 'View medication records', scopeType: 'org' },
+  { id: 'perm-med-update', name: 'medication.update', applet: 'medication', action: 'update', displayName: 'Update', description: 'Modify medication entries', scopeType: 'org' },
+  { id: 'perm-med-delete', name: 'medication.delete', applet: 'medication', action: 'delete', displayName: 'Delete', description: 'Remove medication entries', scopeType: 'org' },
 
-  // User Management
-  { id: 'perm-user-create', name: 'user.create', applet: 'user', action: 'create', displayName: 'Create User', description: 'Invite new users to the organization', scopeType: 'org' },
-  { id: 'perm-user-view', name: 'user.view', applet: 'user', action: 'view', displayName: 'View Users', description: 'View user profiles and information', scopeType: 'org' },
-  { id: 'perm-user-update', name: 'user.update', applet: 'user', action: 'update', displayName: 'Update User', description: 'Modify user profiles and settings', scopeType: 'org' },
-  { id: 'perm-user-deactivate', name: 'user.deactivate', applet: 'user', action: 'deactivate', displayName: 'Deactivate User', description: 'Temporarily disable user accounts', scopeType: 'org' },
-
-  // Role Management
+  // Role Management (4 - removed role.assign, role.grant)
   { id: 'perm-role-create', name: 'role.create', applet: 'role', action: 'create', displayName: 'Create Role', description: 'Create custom roles for the organization', scopeType: 'org' },
   { id: 'perm-role-view', name: 'role.view', applet: 'role', action: 'view', displayName: 'View Roles', description: 'View role definitions and permissions', scopeType: 'org' },
-  { id: 'perm-role-assign', name: 'role.assign', applet: 'role', action: 'assign', displayName: 'Assign Role', description: 'Assign roles to users within the organization', scopeType: 'org' },
+  { id: 'perm-role-update', name: 'role.update', applet: 'role', action: 'update', displayName: 'Update Role', description: 'Modify role details and permissions', scopeType: 'org' },
+  { id: 'perm-role-delete', name: 'role.delete', applet: 'role', action: 'delete', displayName: 'Delete Role', description: 'Delete roles from the organization', scopeType: 'org' },
 
-  // Cross-Organization Access
-  { id: 'perm-cross-grant', name: 'cross_org.grant', applet: 'cross_org', action: 'grant', displayName: 'Grant Cross-Org Access', description: 'Grant access across organization boundaries', scopeType: 'org', requiresMfa: true },
-  { id: 'perm-cross-view', name: 'cross_org.view', applet: 'cross_org', action: 'view', displayName: 'View Cross-Org Access', description: 'View cross-organization access grants', scopeType: 'org' },
+  // User Management (6 - includes role_assign/revoke)
+  { id: 'perm-user-create', name: 'user.create', applet: 'user', action: 'create', displayName: 'Create User', description: 'Create new users in the organization', scopeType: 'org' },
+  { id: 'perm-user-view', name: 'user.view', applet: 'user', action: 'view', displayName: 'View Users', description: 'View user profiles and information', scopeType: 'org' },
+  { id: 'perm-user-update', name: 'user.update', applet: 'user', action: 'update', displayName: 'Update User', description: 'Modify user profiles and settings', scopeType: 'org' },
+  { id: 'perm-user-delete', name: 'user.delete', applet: 'user', action: 'delete', displayName: 'Delete User', description: 'Remove users from the organization', scopeType: 'org' },
+  { id: 'perm-user-role-assign', name: 'user.role_assign', applet: 'user', action: 'role_assign', displayName: 'Assign Role', description: 'Assign roles to users', scopeType: 'org' },
+  { id: 'perm-user-role-revoke', name: 'user.role_revoke', applet: 'user', action: 'role_revoke', displayName: 'Revoke Role', description: 'Revoke roles from users', scopeType: 'org' },
 ];
 
 /**
@@ -154,7 +154,7 @@ function getInitialMockRoles(): { roles: Role[]; rolePermissions: Map<string, st
       'perm-client-view', 'perm-client-update',
       'perm-med-view', 'perm-med-update',
       'perm-user-view', 'perm-user-update',
-      'perm-role-view', 'perm-role-assign',
+      'perm-role-view', 'perm-user-role-assign',
     ]],
   ]);
 
