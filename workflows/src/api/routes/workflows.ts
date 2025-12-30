@@ -151,7 +151,6 @@ async function bootstrapOrganizationHandler(
     .rpc('emit_domain_event', {
       p_stream_id: organizationId,
       p_stream_type: 'organization',
-      p_stream_version: 1,
       p_event_type: 'organization.bootstrap.initiated',
       p_event_data: {
         subdomain: requestData.subdomain,

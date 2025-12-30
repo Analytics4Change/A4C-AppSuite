@@ -243,7 +243,6 @@ serve(async (req) => {
       .rpc('emit_domain_event', {
         p_stream_id: userId,
         p_stream_type: 'user',
-        p_stream_version: 1,
         p_event_type: 'user.created',
         p_event_data: {
           user_id: userId,
@@ -280,7 +279,6 @@ serve(async (req) => {
       .rpc('emit_domain_event', {
         p_stream_id: invitation.id,
         p_stream_type: 'invitation',
-        p_stream_version: 1,
         p_event_type: 'invitation.accepted',
         p_event_data: {
           invitation_id: invitation.id,
