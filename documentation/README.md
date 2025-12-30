@@ -1,11 +1,20 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
 
 # A4C-AppSuite Documentation
 
 Welcome to the A4C (Analytics4Change) AppSuite documentation. This directory contains all consolidated documentation for the monorepo, organized by component and purpose.
+
+## For AI Agents
+
+- **[AGENT-INDEX.md](./AGENT-INDEX.md)** - Keyword navigation, task decision tree, token estimates
+- **[AGENT-GUIDELINES.md](./AGENT-GUIDELINES.md)** - Documentation creation and update rules
+
+Use the TL;DR section at the top of each document to quickly assess relevance before deep-reading.
+
+---
 
 ## Quick Start - Common Tasks
 

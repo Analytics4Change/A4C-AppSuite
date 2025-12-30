@@ -1029,3 +1029,9 @@ Before marking any task as complete:
    - ARIA attribute validation
 
 **Remember**: Documentation is not optional—it's a core requirement for maintainable, professional code. The validation system ensures our documentation stays current and accurate as the codebase evolves.
+
+## Documentation Resources
+
+- **[Agent Navigation Index](../documentation/AGENT-INDEX.md)** - Keyword-based doc navigation for AI agents
+- **[Agent Guidelines](../documentation/AGENT-GUIDELINES.md)** - Documentation creation and update rules
+- **[Frontend Documentation](../documentation/frontend/)** - All frontend-specific documentation

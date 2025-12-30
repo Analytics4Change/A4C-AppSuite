@@ -10,6 +10,21 @@ This is the A4C (Analytics4Change) AppSuite monorepo, containing:
 - **Workflows**: Temporal.io workflow orchestration for long-running business processes (`workflows/`)
 - **Infrastructure**: Terraform-based infrastructure as code (`infrastructure/`)
 
+## AI Agent Quick Start
+
+> **For AI Agents**: Start here for efficient documentation navigation.
+
+| Resource | Purpose |
+|----------|---------|
+| [AGENT-INDEX.md](documentation/AGENT-INDEX.md) | Keyword navigation, task decision tree, token estimates |
+| [AGENT-GUIDELINES.md](documentation/AGENT-GUIDELINES.md) | Documentation creation and update rules |
+| [documentation/README.md](documentation/README.md) | Complete table of contents |
+
+**Navigation Strategy**:
+1. Check AGENT-INDEX.md for keyword matches
+2. Read TL;DR sections at top of docs to assess relevance
+3. Deep-read only documents that match your task
+
 ## Monorepo Structure
 
 ```

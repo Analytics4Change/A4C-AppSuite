@@ -744,3 +744,9 @@ kubectl rollout status deployment/workflow-worker -n temporal
 ```bash
 kubectl logs -n temporal -l app=workflow-worker --tail=100
 ```
+
+## Documentation Resources
+
+- **[Agent Navigation Index](../documentation/AGENT-INDEX.md)** - Keyword-based doc navigation for AI agents
+- **[Agent Guidelines](../documentation/AGENT-GUIDELINES.md)** - Documentation creation and update rules
+- **[Workflows Documentation](../documentation/workflows/)** - All workflow-specific documentation

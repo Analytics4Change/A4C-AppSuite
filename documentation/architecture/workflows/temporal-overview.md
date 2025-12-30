@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-12-02
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Temporal.io provides durable workflow orchestration for long-running processes like organization onboarding, DNS provisioning, and user invitations. Workflows survive crashes, support automatic retries, and implement Saga compensation for rollbacks.
+
+**When to read**:
+- Understanding why we use Temporal instead of simple async operations
+- Implementing a new workflow or activity
+- Debugging workflow execution failures
+- Learning about Saga pattern for compensation
+
+**Prerequisites**: Basic understanding of async operations
+
+**Key topics**: `temporal`, `workflow`, `activity`, `saga`, `compensation`, `orchestration`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # Temporal.io Integration Overview
 

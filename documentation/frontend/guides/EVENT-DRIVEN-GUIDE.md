@@ -1,7 +1,26 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Guide to implementing CQRS patterns in React components. Emit events (not CRUD updates), always include a "reason", and use ViewModels to trigger events and read from projections.
+
+**When to read**:
+- Implementing a new feature that modifies data
+- Converting CRUD operations to event-driven patterns
+- Understanding why events require "reason" field
+- Building forms that emit domain events
+
+**Prerequisites**:
+- Read: [event-sourcing-overview.md](../../architecture/data/event-sourcing-overview.md)
+
+**Key topics**: `events`, `cqrs`, `react`, `viewmodel`, `domain-events`, `frontend`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # Event-Driven Frontend Implementation Guide
 

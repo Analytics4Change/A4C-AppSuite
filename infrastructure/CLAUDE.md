@@ -788,3 +788,9 @@ kubectl get deployment workflow-worker -n temporal
 #### Testing & Scripts
 - **Connectivity Testing**: `infrastructure/test-k8s-connectivity.sh`
 - **OAuth Scripts**: `infrastructure/supabase/scripts/` (OAuth configuration and verification)
+
+## Documentation Resources
+
+- **[Agent Navigation Index](../documentation/AGENT-INDEX.md)** - Keyword-based doc navigation for AI agents
+- **[Agent Guidelines](../documentation/AGENT-GUIDELINES.md)** - Documentation creation and update rules
+- **[Infrastructure Documentation](../documentation/infrastructure/)** - All infrastructure-specific documentation

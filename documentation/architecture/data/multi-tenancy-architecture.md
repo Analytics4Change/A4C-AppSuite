@@ -1,13 +1,31 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 converted_from: .plans/multi-tenancy/multi-tenancy-organization.html
 migration_note: "Converted from HTML and updated from Zitadel to Supabase Auth architecture"
 original_version: 1.0
 original_date: 2025-09-30
 ---
 
+<!-- TL;DR-START -->
+## TL;DR
 
+**Summary**: Multi-tenant data isolation using PostgreSQL Row-Level Security (RLS) with JWT claims. Every data table has `org_id` column and RLS policies that check `jwt->>'org_id'` to enforce tenant isolation at database layer.
+
+**When to read**:
+- Creating new tables that need tenant isolation
+- Understanding how data isolation is enforced
+- Debugging cross-tenant data access issues
+- Implementing organization hierarchy features
+
+**Prerequisites**:
+- Familiarity with PostgreSQL RLS
+- Read: [custom-claims-setup.md](../authentication/custom-claims-setup.md)
+
+**Key topics**: `multi-tenancy`, `rls`, `org_id`, `tenant-isolation`, `jwt-claims`, `postgresql`
+
+**Estimated read time**: 20 minutes
+<!-- TL;DR-END -->
 
 # Analytics4Change Multi-Tenant Architecture Specification
 

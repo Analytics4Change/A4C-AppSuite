@@ -1,9 +1,27 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 source: .plans/consolidated/agent-observations.md
 migration_note: "Extracted CQRS/Event Sourcing content from consolidated planning doc. Zitadel references updated to Supabase Auth."
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Event-First Architecture with CQRS where all state changes are recorded as immutable events in `domain_events` table, then projected to read-model tables via PostgreSQL triggers.
+
+**When to read**:
+- Understanding how data flows through the system
+- Implementing new domain events
+- Creating or updating projection tables
+- Debugging data inconsistencies
+
+**Prerequisites**: Familiarity with PostgreSQL triggers
+
+**Key topics**: `cqrs`, `events`, `projections`, `domain-events`, `event-sourcing`, `triggers`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
 
 # Event Sourcing & CQRS Architecture
 

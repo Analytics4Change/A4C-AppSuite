@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Three-mode authentication system (mock/integration/production) using dependency injection with `IAuthProvider` interface. Mock mode enables instant auth for development; production uses Supabase OAuth with JWT custom claims.
+
+**When to read**:
+- Setting up local development authentication
+- Adding new OAuth providers
+- Testing permission-based UI components
+- Understanding JWT custom claims (`org_id`, `permissions`, `user_role`, `scope_path`)
+
+**Prerequisites**: Familiarity with React context, JWT tokens
+
+**Key topics**: `authentication`, `oauth`, `jwt`, `mock-auth`, `supabase-auth`, `dependency-injection`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # Frontend Authentication Architecture
 

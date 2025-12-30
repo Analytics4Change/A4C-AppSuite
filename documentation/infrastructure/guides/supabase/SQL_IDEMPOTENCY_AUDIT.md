@@ -1,7 +1,23 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Comprehensive guide to idempotent SQL patterns for migrations. Covers `CREATE IF NOT EXISTS`, `DROP IF EXISTS` before `CREATE`, and safe `ALTER TABLE` patterns. Essential for CI/CD deployments.
+
+**When to read**:
+- Writing new database migrations
+- Fixing migrations that fail on re-run
+- Understanding idempotency patterns for tables, policies, triggers, functions
+- Reviewing migration quality before merging
+
+**Key topics**: `migration`, `sql`, `idempotent`, `database`, `ci-cd`, `patterns`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # SQL Migration Idempotency Audit Report
 

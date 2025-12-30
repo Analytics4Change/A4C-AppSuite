@@ -1,7 +1,27 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Step-by-step deployment procedures for database migrations and edge functions to Supabase. Covers both Supabase Studio (GUI) and CLI approaches.
+
+**When to read**:
+- Deploying database schema changes to production
+- Deploying edge functions
+- Setting up a new environment
+- Troubleshooting deployment failures
+
+**Prerequisites**:
+- Supabase project access
+- Read: [SQL_IDEMPOTENCY_AUDIT.md](./SQL_IDEMPOTENCY_AUDIT.md) for migration patterns
+
+**Key topics**: `deployment`, `supabase`, `migrations`, `edge-functions`, `production`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
 
 # Organization Module Deployment Instructions
 

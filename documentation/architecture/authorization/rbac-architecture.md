@@ -1,7 +1,26 @@
 ---
 status: current
-last_updated: 2025-12-29
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Permission-based RBAC system built on event sourcing. Permissions are stored in JWT claims (`permissions`, `user_role`, `org_id`, `scope_path`). RLS policies enforce access at database layer.
+
+**When to read**:
+- Implementing permission checks in frontend or backend
+- Adding new roles or permissions
+- Understanding authorization flow from JWT to database
+- Debugging "permission denied" errors
+
+**Prerequisites**:
+- Read: [event-sourcing-overview.md](../data/event-sourcing-overview.md)
+
+**Key topics**: `rbac`, `permissions`, `roles`, `jwt-claims`, `rls`, `authorization`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # Permission-Based RBAC Architecture
 
