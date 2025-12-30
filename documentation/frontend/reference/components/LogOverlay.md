@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Development-only real-time console log overlay with filtering, searching, virtual scrolling, log export, and configurable buffer management.
+
+**When to read**:
+- Debugging without browser dev tools
+- Configuring log filtering and categories
+- Understanding log capture and buffer management
+- Setting up remote log streaming
+
+**Prerequisites**: None
+
+**Key topics**: `debugging`, `logging`, `overlay`, `filtering`, `virtual-scrolling`, `development-only`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # LogOverlay
 

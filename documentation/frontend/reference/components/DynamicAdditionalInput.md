@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Strategy pattern-based component that dynamically renders different input types (range-hours, text, number, select) based on checkbox selection metadata.
+
+**When to read**:
+- Building conditional inputs based on checkbox selections
+- Extending FocusTrappedCheckboxGroup with custom inputs
+- Understanding strategy pattern for input types
+- Adding new input type strategies
+
+**Prerequisites**: [FocusTrappedCheckboxGroup.md](FocusTrappedCheckboxGroup.md)
+
+**Key topics**: `strategy-pattern`, `dynamic-input`, `checkbox-metadata`, `extensibility`
+
+**Estimated read time**: 6 minutes
+<!-- TL;DR-END -->
 
 # DynamicAdditionalInput
 

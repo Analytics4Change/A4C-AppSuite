@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Comprehensive OAuth testing guide with two-phase strategy (API verification + browser flow), testing scripts, JWT hook diagnostics, troubleshooting common errors (redirect_uri_mismatch, unauthorized_client), and verification checklists.
+
+**When to read**:
+- Testing Google OAuth configuration
+- Debugging OAuth flow failures
+- Verifying JWT custom claims are working
+- Setting up OAuth testing scripts
+
+**Prerequisites**: [SUPABASE-AUTH-SETUP.md](./SUPABASE-AUTH-SETUP.md)
+
+**Key topics**: `oauth-testing`, `google-oauth`, `jwt-verification`, `troubleshooting`, `test-scripts`
+
+**Estimated read time**: 22 minutes
+<!-- TL;DR-END -->
 
 # OAuth Testing Guide
 

@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Comprehensive guide to A4C's Event-First Architecture with CQRS, covering event sourcing principles, mandatory reason fields, event processors, database design, frontend integration, testing, and migration from traditional CRUD.
+
+**When to read**:
+- Understanding the event-driven architecture foundation
+- Implementing new domain events end-to-end
+- Migrating existing CRUD code to events
+- Designing event processors and projections
+
+**Prerequisites**: None
+
+**Key topics**: `event-sourcing`, `cqrs`, `domain-events`, `audit-trail`, `event-processors`, `projections`
+
+**Estimated read time**: 35 minutes
+<!-- TL;DR-END -->
 
 # Event-Driven Architecture Documentation
 

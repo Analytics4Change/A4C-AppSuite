@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: OAuth authentication component providing Google, Facebook, and Apple sign-in with proper branding, loading states, error handling, and PKCE security flow.
+
+**When to read**:
+- Implementing social login buttons
+- Understanding OAuth flow with PKCE
+- Configuring OAuth provider credentials
+- Handling authentication success/error callbacks
+
+**Prerequisites**: None
+
+**Key topics**: `oauth`, `authentication`, `google`, `facebook`, `apple`, `pkce`, `social-login`
+
+**Estimated read time**: 9 minutes
+<!-- TL;DR-END -->
 
 # OAuthProviders
 

@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Button component API reference with variants (default, destructive, outline, secondary, ghost, link, glass-disabled), sizes, asChild pattern, and WCAG 2.1 Level AA accessibility compliance.
+
+**When to read**:
+- Implementing buttons with specific variants or sizes
+- Using asChild pattern with Link or motion components
+- Understanding button accessibility and focus management
+- Customizing button styling with CVA and Tailwind
+
+**Prerequisites**: None
+
+**Key topics**: `button`, `variants`, `radix-slot`, `cva`, `accessibility`, `focus-ring`
+
+**Estimated read time**: 6 minutes
+<!-- TL;DR-END -->
 
 # Button
 

@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Architecture for medication search using RXNorm API with three-tier caching (memory, IndexedDB, server), fuzzy search, and iOS-safe storage limits.
+
+**When to read**:
+- Understanding medication search architecture
+- Configuring RXNorm API vs mock data
+- Debugging cache or search performance issues
+- Adding offline support for medication lookup
+
+**Prerequisites**: None
+
+**Key topics**: `rxnorm`, `medication-search`, `caching`, `fuzzy-search`, `indexeddb`, `circuit-breaker`
+
+**Estimated read time**: 7 minutes
+<!-- TL;DR-END -->
 
 # Medication Search Implementation
 

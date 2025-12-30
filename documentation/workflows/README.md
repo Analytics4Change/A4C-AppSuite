@@ -1,7 +1,24 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Documentation hub for Temporal.io workflow orchestration. Contains architecture decisions, how-to guides, and reference docs for organization bootstrap, DNS provisioning, user invitations, and RBAC activities.
+
+**When to read**:
+- Finding workflow documentation by category
+- Understanding workflows documentation structure
+- Navigating to specific workflow guides or references
+
+**Prerequisites**: None (entry point)
+
+**Key topics**: `temporal`, `workflows`, `documentation-hub`, `getting-started`, `activities`
+
+**Estimated read time**: 2 minutes
+<!-- TL;DR-END -->
 
 # Workflows Documentation
 

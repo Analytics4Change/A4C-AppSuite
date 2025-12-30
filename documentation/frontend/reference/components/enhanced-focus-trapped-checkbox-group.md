@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Advanced checkbox group with focus trapping, dynamic additional inputs via strategy pattern, back navigation, validation support, and comprehensive WCAG 2.1 Level AA keyboard navigation.
+
+**When to read**:
+- Implementing complex multi-step checkbox selections
+- Building forms with conditional additional inputs
+- Understanding focus intent pattern and region tracking
+- Creating accessible wizard-style interfaces
+
+**Prerequisites**: [FocusTrappedCheckboxGroup.md](FocusTrappedCheckboxGroup.md) for basic focus trap patterns
+
+**Key topics**: `focus-trap`, `checkbox-group`, `input-strategy`, `accessibility`, `wizard`, `validation`
+
+**Estimated read time**: 20 minutes
+<!-- TL;DR-END -->
 
 # EnhancedFocusTrappedCheckboxGroup
 

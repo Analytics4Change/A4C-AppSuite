@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: CQRS projection for user invitation tokens used in organization onboarding. Stores cryptographically secure tokens with expiration, role assignment, and status lifecycle (pending → accepted/expired). Edge Functions validate and accept invitations.
+
+**When to read**:
+- Implementing invitation workflows (Temporal activities)
+- Building Edge Functions for invitation validation/acceptance
+- Troubleshooting invitation token issues
+- Understanding invitation status lifecycle
+
+**Prerequisites**: [Edge Functions Deployment](../../guides/supabase/edge-functions-deployment.md)
+
+**Key topics**: `invitations`, `tokens`, `onboarding`, `edge-functions`, `status-lifecycle`
+
+**Estimated read time**: 25 minutes
+<!-- TL;DR-END -->
 
 # invitations_projection
 

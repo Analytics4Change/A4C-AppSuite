@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Radix UI-based label component for semantic form control association with disabled state styling and screen reader support.
+
+**When to read**:
+- Labeling form controls (inputs, checkboxes, selects)
+- Creating accessible required field indicators
+- Building reusable form field patterns
+- Understanding label-control association best practices
+
+**Prerequisites**: None
+
+**Key topics**: `label`, `radix-ui`, `htmlFor`, `form-association`, `accessibility`
+
+**Estimated read time**: 9 minutes
+<!-- TL;DR-END -->
 
 # Label
 

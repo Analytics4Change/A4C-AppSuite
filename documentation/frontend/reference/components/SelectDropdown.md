@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-11-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Native HTML select wrapper with consistent styling, error handling, and WCAG 2.1 compliance for static option lists (timezones, states, org types).
+
+**When to read**:
+- Building simple dropdowns with predefined options
+- Understanding when to use native select vs custom dropdowns
+- Implementing accessible single-selection interfaces
+- Creating form fields with validation
+
+**Prerequisites**: None
+
+**Key topics**: `select`, `dropdown`, `native`, `form-field`, `accessibility`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # SelectDropdown
 

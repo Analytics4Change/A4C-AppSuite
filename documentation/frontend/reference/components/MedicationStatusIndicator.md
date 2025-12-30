@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Displays controlled substance (DEA Schedule I-V) and psychotropic medication status with API auto-detection and manual fallback entry when detection fails.
+
+**When to read**:
+- Implementing medication regulatory status display
+- Handling DEA schedule and psychotropic classifications
+- Building graceful API fallback patterns
+- Understanding healthcare compliance requirements
+
+**Prerequisites**: None
+
+**Key topics**: `medication`, `controlled-substance`, `dea-schedule`, `psychotropic`, `regulatory`, `fallback`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # MedicationStatusIndicator
 

@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-12-29
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: CQRS projection storing atomic authorization units for RBAC. Each permission = applet.action (e.g., `clients.create`). Name is generated column. scope_type: 'global' (platform_owner only) or 'org' (all orgs). 33 total permissions (10 global + 23 org). Used in JWT custom claims array.
+
+**When to read**:
+- Defining new permissions for features
+- Understanding authorization check flow in JWT claims
+- Implementing permission management UI
+- Debugging why user lacks expected permission
+
+**Prerequisites**: [roles_projection](./roles_projection.md), [role_permissions_projection](./role_permissions_projection.md)
+
+**Key topics**: `permissions`, `rbac`, `applet-action`, `jwt-claims`, `scope-type`, `mfa-required`
+
+**Estimated read time**: 20 minutes
+<!-- TL;DR-END -->
 
 # permissions_projection
 

@@ -1,3 +1,26 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: End-to-end integration testing for event-driven workflows. Test flow: Event INSERT → NOTIFY → Worker → Temporal → Projections. Requires local Supabase (`start-local.sh`), port-forwarded Temporal, and local worker. Key helpers: `waitForWorkflowStart()`, `waitForWorkflowCompletion()`, `cleanupOrganization()`. Tests verify workflow triggering, projection updates, event linking, and idempotency.
+
+**When to read**:
+- Setting up integration test environment
+- Writing workflow integration tests with Jest
+- Testing event-workflow traceability
+- Debugging workflow execution issues
+
+**Prerequisites**: [triggering-workflows](./triggering-workflows.md), [event-metadata-schema](../reference/event-metadata-schema.md)
+
+**Key topics**: `integration-testing`, `jest`, `workflow-testing`, `local-supabase`, `port-forward`, `test-helpers`
+
+**Estimated read time**: 22 minutes
+<!-- TL;DR-END -->
+
 # Integration Testing Guide for Event-Driven Workflows
 
 ## Overview

@@ -1,3 +1,26 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Commit SHA-based Docker image tagging strategy that ensures automatic Kubernetes pod restarts, prevents stale cached builds, provides deployment traceability, and supports easy rollbacks. Replaces problematic `:latest` tag usage.
+
+**When to read**:
+- Setting up Docker CI/CD for new services
+- Debugging pods not restarting after deployment
+- Understanding image cache scoping strategy
+- Rolling back to previous deployment version
+
+**Prerequisites**: Docker/GitHub Actions CI/CD knowledge
+
+**Key topics**: `docker-tagging`, `commit-sha`, `kubernetes-restart`, `cache-invalidation`, `rollback`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
+
 # Docker Image Tagging Strategy
 
 **Status**: Active

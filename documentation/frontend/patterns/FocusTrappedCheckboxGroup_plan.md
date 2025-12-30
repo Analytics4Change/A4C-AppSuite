@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Design specification for WCAG-compliant focus-trapped checkbox group with edit mode, glassmorphism styling, and hybrid keyboard navigation.
+
+**When to read**:
+- Implementing focus trap components
+- Building accessible checkbox groups
+- Understanding hybrid keyboard navigation (Tab + Arrow)
+- Reference for WCAG 2.1 compliance patterns
+
+**Prerequisites**: [ui-patterns.md](ui-patterns.md) for general UI patterns
+
+**Key topics**: `focus-trap`, `accessibility`, `checkbox-group`, `wcag`, `keyboard-navigation`, `glassmorphism`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # Focus-Trapped Checkbox Group Component - Implementation Plan
 

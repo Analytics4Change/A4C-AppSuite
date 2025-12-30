@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Development-only real-time MobX state monitor showing observable values, render counts, and performance metrics with configurable position/opacity.
+
+**When to read**:
+- Debugging MobX reactivity issues
+- Monitoring component re-render frequency
+- Understanding observable array behavior
+- Troubleshooting state not updating
+
+**Prerequisites**: None
+
+**Key topics**: `mobx`, `debugging`, `observables`, `render-count`, `development-only`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # MobXDebugger
 

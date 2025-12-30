@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-12-24
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: WAI-ARIA compliant tree view components (OrganizationTree, OrganizationTreeNode, OrganizationUnitFormFields) for hierarchical organization unit management with keyboard navigation and type-ahead search.
+
+**When to read**:
+- Building accessible tree view interfaces
+- Implementing organization hierarchy management
+- Understanding WAI-ARIA tree pattern keyboard navigation
+- Creating MobX-integrated tree components
+
+**Prerequisites**: None
+
+**Key topics**: `tree-view`, `organization-units`, `wai-aria`, `keyboard-navigation`, `hierarchy`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
 
 # Organization Units Components
 

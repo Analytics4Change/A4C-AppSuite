@@ -1,13 +1,31 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Three-mode authentication system (mock, integration, production) using IAuthProvider interface with dependency injection for flexible development workflows.
+
+**When to read**:
+- Switching between mock and real authentication
+- Testing OAuth flows in development
+- Understanding JWT claims access patterns
+- Implementing role/permission checks in components
+
+**Prerequisites**: [supabase-auth-overview.md](../../architecture/authentication/supabase-auth-overview.md) for architecture context
+
+**Key topics**: `auth-provider`, `mock-auth`, `oauth`, `jwt-claims`, `permissions`, `dependency-injection`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # Authentication Provider Architecture
 
 **Quick Reference for Developers**
 
-## TL;DR
+### Quick Commands
 
 ```bash
 # Fast UI development (instant auth, any credentials work)

@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Primary application layout with header, sidebar, and content areas using React Router Outlet pattern, responsive design, and proper ARIA landmarks.
+
+**When to read**:
+- Understanding application layout structure
+- Configuring sidebar behavior and navigation
+- Implementing responsive mobile layouts
+- Adding semantic landmarks for accessibility
+
+**Prerequisites**: None
+
+**Key topics**: `layout`, `sidebar`, `navigation`, `responsive`, `react-router`, `landmarks`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
 
 # MainLayout
 

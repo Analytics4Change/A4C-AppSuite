@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Verification test results for Supabase Edge Functions (validate-invitation, organization-bootstrap, workflow-status, accept-invitation) confirming database connectivity, authentication enforcement, and SERVICE_ROLE_KEY configuration.
+
+**When to read**:
+- Validating Edge Functions after deployment
+- Troubleshooting auth or database connectivity issues
+- Creating test plans for new Edge Functions
+- Verifying SERVICE_ROLE_KEY secret configuration
+
+**Prerequisites**: Edge Functions deployed, Supabase project access
+
+**Key topics**: `edge-functions`, `function-testing`, `service-role-key`, `auth-verification`, `deployment-validation`
+
+**Estimated read time**: 8 minutes
+<!-- TL;DR-END -->
 
 # Edge Function Verification Tests
 

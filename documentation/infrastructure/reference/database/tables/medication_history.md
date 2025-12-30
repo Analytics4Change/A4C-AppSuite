@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Core clinical table for medication prescriptions connecting clients to medications. Tracks prescription details, dosage instructions, prescriber info, refills, compliance, effectiveness, and side effects. Parent of dosage_info (individual doses). RLS enabled but policies NOT YET IMPLEMENTED.
+
+**When to read**:
+- Building prescription management features
+- Implementing refill tracking or compliance monitoring
+- Querying client's active medications
+- Understanding medication workflow (prescribe → administer → track)
+
+**Prerequisites**: [clients](./clients.md), [medications](./medications.md), [dosage_info](./dosage_info.md)
+
+**Key topics**: `medication-history`, `prescriptions`, `refills`, `compliance`, `prn`, `controlled-substances`, `rls-gap`
+
+**Estimated read time**: 30 minutes
+<!-- TL;DR-END -->
 
 # medication_history
 

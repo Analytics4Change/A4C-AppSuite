@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Core clinical table storing patient/client records with demographics, contact info, medical history (allergies, conditions, blood type), and status tracking. Multi-tenant via organization_id. RLS enabled but policies NOT YET IMPLEMENTED - critical gap for production.
+
+**When to read**:
+- Implementing client registration or profile management features
+- Building medication safety checks (allergy cross-reference)
+- Querying client data with proper RLS enforcement
+- Understanding MAR (Medication Administration Record) data model
+
+**Prerequisites**: [organizations_projection](./organizations_projection.md), [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md)
+
+**Key topics**: `clients`, `phi`, `hipaa`, `multi-tenancy`, `rls-gap`, `allergies`, `medical-conditions`, `soft-delete`
+
+**Estimated read time**: 30 minutes
+<!-- TL;DR-END -->
 
 # clients
 

@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: High-level frontend architecture overview covering MVVM pattern, component layers, state management strategy, and module organization.
+
+**When to read**:
+- Understanding overall frontend structure
+- Onboarding to the codebase
+- Learning module boundaries and dependencies
+- Understanding data flow patterns
+
+**Prerequisites**: None
+
+**Key topics**: `architecture`, `mvvm`, `react`, `mobx`, `typescript`, `directory-structure`
+
+**Estimated read time**: 4 minutes
+<!-- TL;DR-END -->
 
 # Architecture Overview
 

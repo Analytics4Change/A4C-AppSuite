@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Modal interface for medication search with focus trapping, keyboard navigation, search history, and integration patterns for forms, workflows, and MobX ViewModels.
+
+**When to read**:
+- Implementing medication selection in forms
+- Understanding modal focus management
+- Building prescription or bulk medication entry workflows
+- Integrating with react-hook-form or MobX
+
+**Prerequisites**: None
+
+**Key topics**: `modal`, `medication-search`, `focus-trap`, `prescription`, `form-integration`
+
+**Estimated read time**: 18 minutes
+<!-- TL;DR-END -->
 
 # MedicationSearchModal
 

@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-12-02
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: CQRS projection storing physical addresses (headquarters, billing, mailing) for organizations. Created during bootstrap workflow via `createAddresses` activity. Supports geocoding metadata and one primary address per org. Includes soft delete and RLS policies.
+
+**When to read**:
+- Building organization address management UI
+- Understanding bootstrap workflow data model
+- Querying headquarters or billing addresses
+- Implementing address verification or geocoding
+
+**Prerequisites**: [organizations_projection](./organizations_projection.md)
+
+**Key topics**: `addresses`, `organization-bootstrap`, `headquarters`, `billing-address`, `pii`, `soft-delete`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
 
 # addresses_projection
 

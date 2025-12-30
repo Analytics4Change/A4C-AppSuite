@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Complete guide to Temporal error handling using Saga pattern. Covers retry policies (initialInterval, backoffCoefficient, maximumAttempts), ApplicationFailure for controlled errors, and compensation activities that rollback in reverse order. Key pattern: track state flags (orgCreated, dnsConfigured) and compensate in reverse.
+
+**When to read**:
+- Implementing saga compensation in workflows
+- Configuring retry policies for activities
+- Handling partial failures with rollback
+- Distinguishing transient vs permanent errors
+
+**Prerequisites**: [temporal-overview](../../architecture/workflows/temporal-overview.md)
+
+**Key topics**: `saga-pattern`, `compensation`, `retry-policies`, `ApplicationFailure`, `rollback`, `error-classification`
+
+**Estimated read time**: 20 minutes
+<!-- TL;DR-END -->
 
 # Error Handling and Compensation - Temporal Patterns
 

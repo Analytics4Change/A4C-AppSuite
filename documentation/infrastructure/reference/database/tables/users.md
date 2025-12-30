@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Shadow table for Supabase Auth users enabling RLS policies and multi-organization access tracking. User IDs must match `auth.users.id`. Tracks current organization context, accessible organizations array, and user metadata.
+
+**When to read**:
+- Understanding user-organization relationships
+- Implementing multi-org access or context switching
+- Working with user RLS policies (self-access, org-admin, super-admin)
+- Syncing Supabase Auth users with application data
+
+**Prerequisites**: [Supabase Auth Setup](../../guides/supabase/JWT-CLAIMS-SETUP.md)
+
+**Key topics**: `users`, `supabase-auth`, `multi-org-access`, `rls-policies`, `gdpr-compliance`
+
+**Estimated read time**: 25 minutes
+<!-- TL;DR-END -->
 
 # users
 

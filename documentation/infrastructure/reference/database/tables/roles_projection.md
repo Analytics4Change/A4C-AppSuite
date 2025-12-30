@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: CQRS projection for RBAC role definitions. Only `super_admin` is a system role with NULL org_id (global access); all other roles (`provider_admin`, `clinician`, etc.) MUST have organization_id. Check constraint enforces this dual pattern.
+
+**When to read**:
+- Creating or modifying roles in the RBAC system
+- Understanding system vs org-scoped role patterns
+- Implementing role-based UI rendering
+- Troubleshooting role visibility or scope constraint errors
+
+**Prerequisites**: [RBAC Architecture](../../../architecture/authorization/rbac-architecture.md)
+
+**Key topics**: `roles`, `rbac`, `super-admin`, `org-scoped-roles`, `scope-check-constraint`
+
+**Estimated read time**: 30 minutes
+<!-- TL;DR-END -->
 
 # roles_projection
 

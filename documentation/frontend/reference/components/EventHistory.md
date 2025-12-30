@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-11-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Real-time event timeline component with chronological display, expandable event details, visual categorization (icons/colors), and real-time subscription via useEventHistory hook.
+
+**When to read**:
+- Displaying entity change history and audit trails
+- Implementing real-time event subscriptions
+- Understanding event visualization patterns (icons, colors)
+- Building expandable event detail views
+
+**Prerequisites**: None
+
+**Key topics**: `event-history`, `audit-trail`, `timeline`, `realtime`, `event-sourcing`
+
+**Estimated read time**: 6 minutes
+<!-- TL;DR-END -->
 
 # EventHistory
 

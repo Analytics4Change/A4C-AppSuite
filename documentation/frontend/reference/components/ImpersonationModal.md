@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-11-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Security-critical modal for initiating impersonation with user search, mandatory reason input, security warnings, and comprehensive form validation before session start.
+
+**When to read**:
+- Implementing impersonation session initiation
+- Building user search with multi-field filtering
+- Understanding audit-logged form patterns
+- Creating security-conscious modal interfaces
+
+**Prerequisites**: None
+
+**Key topics**: `impersonation`, `modal`, `user-search`, `audit-logging`, `security`, `super-admin`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # ImpersonationModal
 

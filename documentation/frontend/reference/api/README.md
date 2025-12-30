@@ -1,7 +1,24 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Index for frontend API documentation covering Client API (CRUD operations), Medication API (RXNorm integration), Cache Service (hybrid caching), and Type Definitions.
+
+**When to read**:
+- Finding the right API documentation to read
+- Understanding the service layer architecture
+- Getting an overview of available API interfaces
+
+**Prerequisites**: None
+
+**Key topics**: `api-index`, `service-layer`, `interface-design`, `adapter-pattern`
+
+**Estimated read time**: 2 minutes
+<!-- TL;DR-END -->
 
 # API Documentation
 

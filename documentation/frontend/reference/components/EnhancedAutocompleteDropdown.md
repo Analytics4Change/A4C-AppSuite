@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Advanced autocomplete with unified highlighting (typed matches vs keyboard navigation), intelligent filtering (contains/startsWith), custom value support, and smart match sorting.
+
+**When to read**:
+- Building intelligent autocomplete interfaces
+- Understanding unified highlighting system
+- Implementing filter strategies
+- Creating combobox ARIA patterns
+
+**Prerequisites**: None
+
+**Key topics**: `autocomplete`, `combobox`, `highlighting`, `filtering`, `accessibility`
+
+**Estimated read time**: 20 minutes
+<!-- TL;DR-END -->
 
 # EnhancedAutocompleteDropdown
 

@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Async searchable dropdown with debouncing, highlighted matches, custom item rendering, and unified highlighting system for keyboard/mouse navigation.
+
+**When to read**:
+- Implementing async search with large datasets
+- Building medication or client search interfaces
+- Understanding combobox ARIA patterns
+- Customizing dropdown item rendering
+
+**Prerequisites**: None
+
+**Key topics**: `searchable`, `dropdown`, `async`, `debouncing`, `combobox`, `highlighting`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # SearchableDropdown
 

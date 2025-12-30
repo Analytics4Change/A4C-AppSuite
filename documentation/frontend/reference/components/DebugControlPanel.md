@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Development-only centralized debugging control panel with toggles for MobX monitor, performance monitor, network monitor, log overlay, and persistent settings.
+
+**When to read**:
+- Enabling/disabling development debug tools
+- Adding custom monitors to the debug panel
+- Understanding keyboard shortcuts (Ctrl+Shift+D, etc.)
+- Configuring debug panel position and opacity
+
+**Prerequisites**: None
+
+**Key topics**: `debugging`, `control-panel`, `mobx-monitor`, `performance`, `development-only`
+
+**Estimated read time**: 9 minutes
+<!-- TL;DR-END -->
 
 # DebugControlPanel
 

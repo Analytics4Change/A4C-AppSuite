@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: HybridCacheService with two-tier architecture (Memory L1 + IndexedDB L2) optimized for medication search caching, featuring LRU eviction, TTL support, cache warming, and comprehensive monitoring/invalidation strategies.
+
+**When to read**:
+- Implementing medication search with caching
+- Understanding hybrid memory/IndexedDB cache patterns
+- Setting up cache warming and preloading
+- Building cache invalidation strategies
+
+**Prerequisites**: None
+
+**Key topics**: `hybrid-cache`, `indexeddb`, `lru-eviction`, `cache-warming`, `medication-search`
+
+**Estimated read time**: 16 minutes
+<!-- TL;DR-END -->
 
 # Medication Search Cache Service
 

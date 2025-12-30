@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Styled text input with forwardRef for form library integration, validation states via aria-invalid, dark mode support, and file input styling.
+
+**When to read**:
+- Implementing form inputs with validation
+- Integrating with react-hook-form or similar
+- Styling inputs for error states and dark mode
+- Understanding accessible input patterns
+
+**Prerequisites**: None
+
+**Key topics**: `input`, `forwardRef`, `validation`, `aria-invalid`, `dark-mode`
+
+**Estimated read time**: 9 minutes
+<!-- TL;DR-END -->
 
 # Input
 

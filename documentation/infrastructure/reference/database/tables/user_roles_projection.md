@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: CQRS junction table assigning roles to users with organization and ltree scope. NULL org_id indicates global super_admin access; non-null indicates org-scoped assignment. Check constraint enforces scope consistency. Used by JWT custom claims hook.
+
+**When to read**:
+- Implementing role assignment/revocation workflows
+- Understanding RBAC authorization patterns
+- Debugging user permissions or JWT claims
+- Working with hierarchical scope_path inheritance
+
+**Prerequisites**: [roles_projection](roles_projection.md), [permissions_projection](permissions_projection.md)
+
+**Key topics**: `user-roles`, `rbac`, `jwt-claims`, `scope-path`, `null-org-super-admin`
+
+**Estimated read time**: 30 minutes
+<!-- TL;DR-END -->
 
 # user_roles_projection
 

@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Card component with composable sub-components (CardHeader, CardTitle, CardDescription, CardAction, CardContent, CardFooter) using CSS Grid layout and container queries.
+
+**When to read**:
+- Building card-based layouts with headers and actions
+- Creating interactive/selectable cards with keyboard support
+- Understanding Card grid layout system
+- Implementing accessible card patterns with ARIA
+
+**Prerequisites**: None
+
+**Key topics**: `card`, `composition`, `grid-layout`, `container-queries`, `accessibility`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # Card
 

@@ -1,3 +1,26 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Guide for Day 0 migration strategy that consolidates all schema changes into a single baseline file for Supabase CLI migration tracking, including backup procedures, migration repair commands, and CI/CD integration.
+
+**When to read**:
+- Transitioning to Supabase CLI from manual SQL deployment
+- Consolidating multiple migrations into a fresh baseline
+- Troubleshooting migration history issues
+- Understanding the v1 to v2 baseline consolidation
+
+**Prerequisites**: Supabase CLI installed, project access
+
+**Key topics**: `day0-migration`, `supabase-cli`, `baseline`, `migration-tracking`, `rollback`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
+
 # Day 0 Migration Guide
 
 This guide documents the Day 0 migration strategy used to transition from manually-maintained SQL files to Supabase CLI migrations.

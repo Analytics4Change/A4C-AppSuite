@@ -1,7 +1,24 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Testing guide for verifying SQL migrations can run multiple times without errors, including test strategies for triggers, seed data, projections, and an automated test script.
+
+**When to read**:
+- Testing SQL migration idempotency before deployment
+- Debugging duplicate data or constraint violations
+- Setting up automated idempotency testing in CI/CD
+
+**Prerequisites**: [SQL_IDEMPOTENCY_AUDIT.md](./SQL_IDEMPOTENCY_AUDIT.md)
+
+**Key topics**: `idempotency-testing`, `sql-migration`, `seed-data`, `ci-cd`, `postgresql`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # SQL Migration Idempotency Testing Guide
 

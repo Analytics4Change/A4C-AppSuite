@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Medication catalog reference table with drug info, RxNorm/NDC codes, regulatory flags (controlled, psychotropic, high-alert), and formulary management. Each organization maintains its own formulary. Not patient-specific (INTERNAL sensitivity). RLS enabled but policies NOT YET IMPLEMENTED.
+
+**When to read**:
+- Building medication selection autocomplete
+- Implementing formulary management features
+- Adding controlled substance tracking or reporting
+- Integrating with RxNorm or external drug databases
+
+**Prerequisites**: [organizations_projection](./organizations_projection.md)
+
+**Key topics**: `medications`, `formulary`, `rxnorm`, `ndc`, `controlled-substances`, `high-alert`, `rls-gap`
+
+**Estimated read time**: 25 minutes
+<!-- TL;DR-END -->
 
 # medications
 

@@ -31,34 +31,54 @@ purpose: agent-navigation
 | Keyword | Primary Document | Related |
 |---------|-----------------|---------|
 | `accessibility` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | TESTING.md, component docs |
-| `activity` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
+| `activities-reference` | [activities-reference.md](workflows/reference/activities-reference.md) | error-handling-and-compensation.md |
+| `activity` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | activities-reference.md |
+| `addresses` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | phones_projection.md |
+| `applet-action` | [permissions_projection.md](infrastructure/reference/database/tables/permissions_projection.md) | rbac-architecture.md |
 | `audit-trail` | [impersonation-architecture.md](architecture/authentication/impersonation-architecture.md) | impersonation-event-schema.md |
 | `authentication` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | supabase-auth-overview.md, custom-claims-setup.md |
-| `bootstrap` | [organization-onboarding-workflow.md](architecture/workflows/organization-onboarding-workflow.md) | tenants-as-organizations.md |
+| `bootstrap` | [organization-onboarding-workflow.md](architecture/workflows/organization-onboarding-workflow.md) | provider-onboarding-quickstart.md |
+| `bootstrap-workflow-design` | [organization-bootstrap-workflow-design.md](workflows/architecture/organization-bootstrap-workflow-design.md) | activities-reference.md |
+| `cascade-deactivation` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | user_roles_projection.md |
+| `clients` | [clients.md](infrastructure/reference/database/tables/clients.md) | medication_history.md |
 | `compensation` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
-| `contacts` | [contact-management-vision.md](architecture/features/contact-management-vision.md) | provider-partners-architecture.md |
+| `compliance` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | dosage_info.md |
+| `contacts` | [contacts_projection.md](infrastructure/reference/database/tables/contacts_projection.md) | provider-partners-architecture.md |
+| `controlled-substances` | [medications.md](infrastructure/reference/database/tables/medications.md) | dosage_info.md |
 | `cqrs` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md, MIGRATION-FROM-CRUD.md |
-| `cross-tenant` | [provider-partners-architecture.md](architecture/data/provider-partners-architecture.md) | var-partnerships.md |
+| `cross-tenant` | [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | var-partnerships.md |
 | `custom-claims` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | frontend-auth-architecture.md, custom-claims-setup.md |
 | `database-hook` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | custom-claims-setup.md |
 | `deployment` | [DEPLOYMENT_INSTRUCTIONS.md](infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) | infrastructure/CLAUDE.md |
 | `determinism` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | temporal-overview.md |
 | `development` | [DEVELOPMENT.md](frontend/guides/DEVELOPMENT.md) | frontend/CLAUDE.md |
 | `dns-provisioning` | [organization-onboarding-workflow.md](architecture/workflows/organization-onboarding-workflow.md) | event-driven-workflow-triggering.md |
+| `dns-verification` | [activities-reference.md](workflows/reference/activities-reference.md) | organization-bootstrap-workflow-design.md |
+| `domain-events` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-metadata-schema.md |
+| `dosage-info` | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | medication_history.md |
 | `edge-function` | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `email` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |
+| `event-metadata` | [event-metadata-schema.md](workflows/reference/event-metadata-schema.md) | triggering-workflows.md |
+| `event-types` | [event_types.md](infrastructure/reference/database/tables/event_types.md) | event-sourcing-overview.md |
 | `enterprise-sso` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
 | `events` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md |
 | `hipaa` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | impersonation-security-controls.md |
-| `idempotency` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | workflows/CLAUDE.md |
+| `formulary` | [medications.md](infrastructure/reference/database/tables/medications.md) | medication_history.md |
+| `hierarchy` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | scoping-architecture.md |
+| `idempotency` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | organization-bootstrap-workflow-design.md |
 | `impersonation` | [impersonation-architecture.md](architecture/authentication/impersonation-architecture.md) | impersonation-security-controls.md |
+| `integration-testing` | [integration-testing.md](workflows/guides/integration-testing.md) | triggering-workflows.md |
 | `invitation` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | organizations_projection.md |
+| `invitation-emails` | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | activities-reference.md |
 | `jwt` | [custom-claims-setup.md](architecture/authentication/custom-claims-setup.md) | frontend-auth-architecture.md, supabase-auth-overview.md |
 | `jwt-claims` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | frontend-auth-architecture.md, infrastructure/CLAUDE.md |
 | `kubernetes` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | KUBECONFIG_UPDATE_GUIDE.md |
 | `logging` | [logging-standards.md](architecture/logging-standards.md) | frontend/CLAUDE.md, workflows/CLAUDE.md |
-| `ltree` | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | provider-admin-permissions-architecture.md |
-| `medication` | [medications.md](infrastructure/reference/database/tables/medications.md) | medication-search-implementation.md, rxnorm-medication-autocomplete.md |
+| `ltree` | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | organization_units_projection.md |
+| `mar` | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | medication_history.md |
+| `medication` | [medications.md](infrastructure/reference/database/tables/medications.md) | medication-search-implementation.md |
+| `medication-administration` | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | medications.md |
+| `medication-history` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | medications.md |
 | `mfa` | [impersonation-security-controls.md](architecture/authentication/impersonation-security-controls.md) | enterprise-sso-guide.md |
 | `migration` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | DEPLOYMENT_INSTRUCTIONS.md, table-template.md |
 | `mobx` | [viewmodels.md](frontend/architecture/viewmodels.md) | frontend/CLAUDE.md, mobx-optimization.md |
@@ -66,32 +86,54 @@ purpose: agent-navigation
 | `oauth` | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | supabase-auth-overview.md, SUPABASE-AUTH-SETUP.md |
 | `okta` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
 | `organization` | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | organization-management-architecture.md |
+| `organization-bootstrap` | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | organization-bootstrap-workflow-design.md |
 | `organization-management` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | tenants-as-organizations.md |
-| `permissions` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | permissions-reference.md, scoping-architecture.md |
-| `pg-notify` | [event-driven-workflow-triggering.md](architecture/workflows/event-driven-workflow-triggering.md) | temporal-overview.md |
+| `organization-units` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | scoping-architecture.md |
+| `permissions` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | permissions_projection.md |
+| `permission-grants` | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | rbac-architecture.md |
+| `pg-notify` | [event-driven-workflow-triggering.md](architecture/workflows/event-driven-workflow-triggering.md) | triggering-workflows.md |
+| `phi` | [clients.md](infrastructure/reference/database/tables/clients.md) | dosage_info.md |
+| `phones` | [phones_projection.md](infrastructure/reference/database/tables/phones_projection.md) | addresses_projection.md |
+| `polling` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | integration-testing.md |
+| `postgres-notify` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-driven-workflow-triggering.md |
+| `prescriptions` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | dosage_info.md |
 | `projection` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | organizations_projection.md, table-template.md |
-| `provider-admin` | [provider-admin-permissions-architecture.md](architecture/authorization/provider-admin-permissions-architecture.md) | permissions-reference.md |
+| `provider-admin` | [provider-admin-permissions-architecture.md](architecture/authorization/provider-admin-permissions-architecture.md) | role_permission_templates.md |
+| `provider-onboarding` | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | organization-bootstrap-workflow-design.md |
 | `provider-partners` | [provider-partners-architecture.md](architecture/data/provider-partners-architecture.md) | var-partnerships.md |
 | `rbac` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | rbac-implementation-guide.md, scoping-architecture.md |
-| `resend` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |
+| `resend` | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | activities-reference.md |
+| `retry-policies` | [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | activities-reference.md |
 | `rls` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | table-template.md, SQL_IDEMPOTENCY_AUDIT.md |
-| `roles` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | user_roles_projection.md, role_permissions_projection.md |
+| `rls-gap` | [clients.md](infrastructure/reference/database/tables/clients.md) | medications.md |
+| `role-permissions` | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | roles_projection.md |
+| `role-templates` | [role_permission_templates.md](infrastructure/reference/database/tables/role_permission_templates.md) | provider-admin-permissions-architecture.md |
+| `roles` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | roles_projection.md |
+| `rxnorm` | [medications.md](infrastructure/reference/database/tables/medications.md) | rxnorm-medication-autocomplete.md |
 | `saga` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
+| `saga-pattern` | [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | organization-bootstrap-workflow-design.md |
+| `schema-registry` | [event_types.md](infrastructure/reference/database/tables/event_types.md) | event-sourcing-overview.md |
 | `saml` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
-| `scope_path` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | scoping-architecture.md |
-| `scoping` | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | rbac-architecture.md |
+| `scope_path` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | organization_units_projection.md |
+| `scoping` | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | organization_units_projection.md |
 | `social-login` | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) | OAUTH-TESTING.md |
+| `soft-delete` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | clients.md |
 | `supabase` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | DEPLOYMENT_INSTRUCTIONS.md, SUPABASE-AUTH-SETUP.md |
 | `supabase-auth` | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) | frontend-auth-architecture.md |
-| `temporal` | [temporal-overview.md](architecture/workflows/temporal-overview.md) | workflows/CLAUDE.md, error-handling-and-compensation.md |
-| `testing` | [TESTING.md](frontend/testing/TESTING.md) | viewmodel-testing.md |
-| `troubleshooting` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | OAUTH-TESTING.md |
+| `temporal` | [temporal-overview.md](architecture/workflows/temporal-overview.md) | workflows/CLAUDE.md, activities-reference.md |
+| `testing` | [TESTING.md](frontend/testing/TESTING.md) | integration-testing.md |
+| `three-layer-idempotency` | [organization-bootstrap-workflow-design.md](workflows/architecture/organization-bootstrap-workflow-design.md) | activities-reference.md |
+| `troubleshooting` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |
 | `var` | [var-partnerships.md](architecture/data/var-partnerships.md) | provider-partners-architecture.md |
 | `viewmodel` | [viewmodels.md](frontend/architecture/viewmodels.md) | viewmodel-testing.md, mobx-patterns.md |
 | `vite` | [DEVELOPMENT.md](frontend/guides/DEVELOPMENT.md) | frontend/CLAUDE.md |
 | `wcag` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | TESTING.md |
+| `var-contracts` | [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | var-partnerships.md |
 | `workflow` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | temporal-overview.md, implementation.md |
-| `workflow-trigger` | [event-driven-workflow-triggering.md](architecture/workflows/event-driven-workflow-triggering.md) | organization-onboarding-workflow.md |
+| `workflow-status` | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | triggering-workflows.md |
+| `workflow-testing` | [integration-testing.md](workflows/guides/integration-testing.md) | triggering-workflows.md |
+| `workflow-trigger` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-driven-workflow-triggering.md |
+| `workflow-traceability` | [event-metadata-schema.md](workflows/reference/event-metadata-schema.md) | integration-testing.md |
 
 ## Document Catalog
 
@@ -146,19 +188,37 @@ purpose: agent-navigation
 
 | Document | Summary | Keywords | ~Tokens |
 |----------|---------|----------|---------|
-| [implementation.md](workflows/guides/implementation.md) | How to build Temporal workflows | `workflow`, `implementation`, `guide` | 2200 |
-| [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | Saga pattern for workflow rollback | `saga`, `compensation`, `error-handling` | 1900 |
+| [implementation.md](workflows/guides/implementation.md) | Complete workflow implementation summary | `workflow`, `file-structure`, `deployment` | 2200 |
+| [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | Saga pattern for workflow rollback | `saga-pattern`, `compensation`, `retry-policies` | 1900 |
+| [triggering-workflows.md](workflows/guides/triggering-workflows.md) | Event-driven workflow triggering | `domain-events`, `postgres-notify`, `polling` | 1800 |
+| [integration-testing.md](workflows/guides/integration-testing.md) | Integration testing with local services | `jest`, `workflow-testing`, `local-supabase` | 2500 |
+| [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | Provider org creation via UI | `provider-onboarding`, `organization-form`, `troubleshooting` | 1500 |
+| [resend-email-provider.md](workflows/guides/resend-email-provider.md) | Resend email provider config | `resend`, `email-provider`, `kubernetes-secrets` | 1200 |
+| [event-metadata-schema.md](workflows/reference/event-metadata-schema.md) | Event metadata JSONB schema | `event-metadata`, `workflow-traceability`, `jsonb-indexes` | 2000 |
+| [activities-reference.md](workflows/reference/activities-reference.md) | All Temporal activity signatures | `activities-reference`, `dns-verification`, `compensation-activities` | 3200 |
+| [organization-bootstrap-workflow-design.md](workflows/architecture/organization-bootstrap-workflow-design.md) | Complete bootstrap workflow spec | `bootstrap-workflow-design`, `three-layer-idempotency`, `saga-compensation` | 5500 |
 
 ### Database Tables Reference
 
 | Table | Purpose | Keywords | ~Tokens |
 |-------|---------|----------|---------|
 | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | Multi-tenant organization hierarchy | `organization`, `tenant`, `rls` | 760 |
+| [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | Sub-org hierarchy with ltree | `organization-units`, `ltree`, `cascade-deactivation` | 900 |
 | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | Organization invitation tracking | `invitation`, `token`, `email` | 817 |
-| [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | User role assignments | `roles`, `users`, `rbac` | 700 |
-| [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | Role-permission mappings | `permissions`, `roles`, `rbac` | 650 |
-| [medications.md](infrastructure/reference/database/tables/medications.md) | Medication records | `medication`, `rxcui`, `drugs` | 600 |
-| [clients.md](infrastructure/reference/database/tables/clients.md) | Client/patient records | `client`, `patient`, `tenant` | 550 |
+| [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | User role assignments | `roles`, `scope_path`, `rbac` | 700 |
+| [roles_projection.md](infrastructure/reference/database/tables/roles_projection.md) | RBAC role definitions | `roles`, `system-role`, `organization-id` | 680 |
+| [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | Role-permission junction | `permission-grants`, `junction-table`, `rbac` | 650 |
+| [permissions_projection.md](infrastructure/reference/database/tables/permissions_projection.md) | Atomic RBAC permissions | `permissions`, `applet-action`, `scope-type` | 750 |
+| [role_permission_templates.md](infrastructure/reference/database/tables/role_permission_templates.md) | Bootstrap permission templates | `role-templates`, `bootstrap`, `provider-admin` | 500 |
+| [contacts_projection.md](infrastructure/reference/database/tables/contacts_projection.md) | Organization contacts | `contacts`, `billing-contact`, `pii` | 750 |
+| [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | Organization addresses | `addresses`, `headquarters`, `soft-delete` | 750 |
+| [phones_projection.md](infrastructure/reference/database/tables/phones_projection.md) | Organization phones | `phones`, `office-phone`, `fax` | 700 |
+| [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | VAR cross-org access | `cross-tenant`, `var-contracts`, `authorization` | 650 |
+| [medications.md](infrastructure/reference/database/tables/medications.md) | Medication catalog | `medication`, `formulary`, `rxnorm` | 600 |
+| [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | Prescription records | `prescriptions`, `compliance`, `controlled-substances` | 720 |
+| [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | MAR tracking | `dosage-info`, `mar`, `medication-administration` | 800 |
+| [clients.md](infrastructure/reference/database/tables/clients.md) | Client/patient records | `clients`, `phi`, `hipaa` | 550 |
+| [event_types.md](infrastructure/reference/database/tables/event_types.md) | Event schema registry | `event-types`, `schema-registry`, `json-schema` | 500 |
 
 ## Sync Instructions
 

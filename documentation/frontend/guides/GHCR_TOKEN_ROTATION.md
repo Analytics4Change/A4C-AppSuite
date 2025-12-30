@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Process for rotating GitHub Container Registry PAT tokens used by the machine user account for CI/CD authentication, scheduled every 90 days.
+
+**When to read**:
+- Token rotation is due (every 90 days)
+- Deployment fails with authentication errors
+- Setting up new machine user account
+- Auditing CI/CD security
+
+**Prerequisites**: Admin access to Analytics4Change organization
+
+**Key topics**: `ghcr`, `token-rotation`, `machine-user`, `cicd`, `github-secrets`
+
+**Estimated read time**: 5 minutes
+<!-- TL;DR-END -->
 
 # GHCR Token Rotation Process
 

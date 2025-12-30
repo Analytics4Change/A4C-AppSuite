@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Radix UI-based checkbox with checked, unchecked, and indeterminate states. Includes form integration patterns, select-all logic, and comprehensive accessibility support.
+
+**When to read**:
+- Implementing checkbox groups or select-all functionality
+- Handling indeterminate state for partial selections
+- Integrating checkboxes with react-hook-form
+- Understanding checkbox accessibility and ARIA attributes
+
+**Prerequisites**: None
+
+**Key topics**: `checkbox`, `radix-ui`, `indeterminate`, `react-hook-form`, `accessibility`
+
+**Estimated read time**: 18 minutes
+<!-- TL;DR-END -->
 
 # Checkbox
 

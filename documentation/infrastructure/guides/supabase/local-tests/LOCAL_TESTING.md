@@ -1,7 +1,24 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Quick-start guide for local Supabase testing with Podman, including scripts for start/stop, migration runs, idempotency verification, and Edge Function deployment.
+
+**When to read**:
+- Testing SQL migrations locally before deployment
+- Setting up local Supabase development environment
+- Debugging idempotency issues with migrations
+
+**Prerequisites**: Podman and Supabase CLI installed
+
+**Key topics**: `local-testing`, `podman`, `supabase-cli`, `migrations`, `edge-functions`
+
+**Estimated read time**: 6 minutes
+<!-- TL;DR-END -->
 
 # Local Supabase Testing Guide
 

@@ -1,3 +1,26 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Configuration table (NOT a CQRS projection) defining canonical permissions for each role type. Queried during organization bootstrap to grant permissions to new roles. Platform owners can modify. Default templates: provider_admin (16 perms), partner_admin (4), clinician (4), viewer (3).
+
+**When to read**:
+- Customizing default role permissions for new organizations
+- Understanding bootstrap workflow permission granting
+- Adding/removing permissions from role templates
+- Debugging why a role has specific default permissions
+
+**Prerequisites**: [permissions_projection](./permissions_projection.md), [roles_projection](./roles_projection.md)
+
+**Key topics**: `role-templates`, `bootstrap`, `permission-defaults`, `configuration-table`, `provider-admin`
+
+**Estimated read time**: 8 minutes
+<!-- TL;DR-END -->
+
 # role_permission_templates
 
 ## Overview

@@ -1,3 +1,25 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Tracker for partially implemented frontend features, currently documenting medication templates service (code exists but no UI/database).
+
+**When to read**:
+- Reviewing orphan code before cleanup
+- Understanding incomplete feature implementations
+- Planning feature completion work
+
+**Prerequisites**: None
+
+**Key topics**: `aspirational`, `medication-templates`, `incomplete-features`
+
+**Estimated read time**: 3 minutes
+<!-- TL;DR-END -->
+
 # Aspirational Features
 
 This document tracks frontend features that have partial implementation but are not yet complete or fully specified.

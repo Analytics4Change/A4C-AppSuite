@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Complete CI/CD pipeline guide covering GitHub Actions, container builds, k3s deployment, and Cloudflare tunnel configuration.
+
+**When to read**:
+- Setting up deployment pipeline
+- Troubleshooting build or deployment failures
+- Understanding container registry authentication
+- Managing kubernetes deployments and rollbacks
+
+**Prerequisites**: None
+
+**Key topics**: `deployment`, `cicd`, `github-actions`, `kubernetes`, `docker`, `cloudflare`, `ghcr`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
 
 # Deployment Guide
 

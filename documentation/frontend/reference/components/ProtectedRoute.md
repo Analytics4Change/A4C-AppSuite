@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: React Router route guard that redirects unauthenticated users to login while allowing authenticated access via Outlet pattern.
+
+**When to read**:
+- Implementing protected routes in React Router v6
+- Understanding authentication flow and redirects
+- Setting up route-based access control
+- Integrating with AuthContext
+
+**Prerequisites**: None
+
+**Key topics**: `protected-route`, `authentication`, `react-router`, `outlet`, `redirect`
+
+**Estimated read time**: 6 minutes
+<!-- TL;DR-END -->
 
 # ProtectedRoute
 

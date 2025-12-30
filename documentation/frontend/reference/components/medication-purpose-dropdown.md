@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Dynamic dropdown for medication therapeutic purposes with RXNorm API integration, automatic fallback to manual text input on API failure, and caching support.
+
+**When to read**:
+- Implementing medication purpose selection
+- Understanding RXNorm API integration patterns
+- Building graceful API fallback UX
+- Caching medication data for performance
+
+**Prerequisites**: None
+
+**Key topics**: `medication`, `rxnorm`, `dropdown`, `api-fallback`, `caching`, `mobx`
+
+**Estimated read time**: 18 minutes
+<!-- TL;DR-END -->
 
 # MedicationPurposeDropdown
 

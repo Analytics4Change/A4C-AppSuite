@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: 15-minute quick start guide for event-driven architecture covering deployment, TypeScript types generation, event emission patterns, React hooks, and form components with mandatory reason fields.
+
+**When to read**:
+- Getting started with event-driven patterns in A4C
+- Learning to emit domain events from frontend
+- Understanding the mandatory 'reason' field for audit trails
+- Implementing event-based forms
+
+**Prerequisites**: Supabase project access
+
+**Key topics**: `event-emission`, `domain-events`, `quick-start`, `audit-trail`, `react-hooks`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # Event-Driven Architecture Quick Start Guide
 

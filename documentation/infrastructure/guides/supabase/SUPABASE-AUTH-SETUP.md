@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Complete Supabase Auth setup guide covering social providers (Google/GitHub), custom JWT claims hook deployment, RLS policy updates, multi-tenant testing, and enterprise SSO preparation.
+
+**When to read**:
+- Setting up Supabase Auth for the first time
+- Configuring social login providers
+- Deploying JWT custom claims hook
+- Updating RLS policies for JWT-based auth
+
+**Prerequisites**: Supabase Pro plan, database schema deployed
+
+**Key topics**: `supabase-auth`, `oauth-setup`, `jwt-claims`, `rls-policies`, `multi-tenancy`
+
+**Estimated read time**: 30 minutes
+<!-- TL;DR-END -->
 
 # Supabase Auth Setup Guide
 

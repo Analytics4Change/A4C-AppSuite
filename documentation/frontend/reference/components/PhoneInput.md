@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-11-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: US phone number input with automatic (XXX) XXX-XXXX formatting, real-time validation display, and form library integration via controlled component pattern.
+
+**When to read**:
+- Implementing phone number fields in forms
+- Understanding auto-formatting with cursor preservation
+- Building accessible phone inputs with ARIA
+- Integrating with react-hook-form
+
+**Prerequisites**: None
+
+**Key topics**: `phone-input`, `formatting`, `validation`, `form-integration`, `accessibility`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
 
 # PhoneInput
 

@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Specialized input for hour ranges (e.g., "2-4 hours") with real-time validation and formatting, designed for FocusTrappedCheckboxGroup integration.
+
+**When to read**:
+- Building medication timing inputs
+- Creating validated range inputs
+- Understanding FocusTrappedCheckboxGroup input strategies
+- Implementing hour-based dosing intervals
+
+**Prerequisites**: [FocusTrappedCheckboxGroup.md](FocusTrappedCheckboxGroup.md)
+
+**Key topics**: `range-input`, `hours`, `validation`, `medication-timing`
+
+**Estimated read time**: 5 minutes
+<!-- TL;DR-END -->
 
 # RangeHoursInput
 

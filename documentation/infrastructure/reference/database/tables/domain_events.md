@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-11-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: The event store table implementing CQRS/Event Sourcing pattern - immutable, append-only record of all state changes. All projections are derived from this table. Includes stream versioning for optimistic concurrency and metadata for audit trails.
+
+**When to read**:
+- Understanding event sourcing and CQRS architecture
+- Implementing new domain events or event processors
+- Debugging projection issues or event processing failures
+- Querying audit trails or user action history
+
+**Prerequisites**: [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md)
+
+**Key topics**: `domain-events`, `event-sourcing`, `cqrs`, `audit-trail`, `stream-versioning`, `projections`
+
+**Estimated read time**: 25 minutes
+<!-- TL;DR-END -->
 
 # domain_events
 

@@ -1,3 +1,26 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Complete guide for deploying Supabase Edge Functions covering local development with Supabase CLI, GitHub Actions automated deployment, secrets management, monitoring/logging, and troubleshooting common issues (CORS, timeouts, 500 errors).
+
+**When to read**:
+- Creating new Edge Functions for workflow triggers
+- Setting up CI/CD for Edge Function deployment
+- Debugging Edge Function errors or CORS issues
+- Configuring secrets (RESEND_API_KEY, SERVICE_ROLE_KEY)
+
+**Prerequisites**: Supabase CLI installed, GitHub repository access
+
+**Key topics**: `edge-functions`, `deno`, `github-actions-deploy`, `cors`, `supabase-secrets`
+
+**Estimated read time**: 25 minutes
+<!-- TL;DR-END -->
+
 # Edge Functions Deployment Guide
 
 ## Overview

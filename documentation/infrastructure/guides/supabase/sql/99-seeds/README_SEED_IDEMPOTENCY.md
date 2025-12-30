@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Guide for making seed files idempotent using conditional INSERT with DO blocks, preserving event sourcing patterns while preventing duplicate events on re-execution.
+
+**When to read**:
+- Creating or updating seed data files
+- Fixing duplicate event issues in migrations
+- Understanding event-sourcing idempotency patterns
+- Testing seed file re-execution safety
+
+**Prerequisites**: [TEST_SQL_IDEMPOTENCY.md](../../TEST_SQL_IDEMPOTENCY.md)
+
+**Key topics**: `seed-idempotency`, `conditional-insert`, `event-sourcing`, `duplicate-prevention`, `migration-safety`
+
+**Estimated read time**: 5 minutes
+<!-- TL;DR-END -->
 
 # Seed Data Idempotency Guide
 

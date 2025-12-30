@@ -1,3 +1,26 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Event-driven workflow triggering guide. Flow: Edge Function → INSERT domain_events → PostgreSQL NOTIFY → Worker LISTEN → startWorkflow(). ~185ms end-to-end. Key event: `organization.bootstrap_initiated` with event_data containing name, slug, owner_email. Generate aggregate_id before INSERT, return 202 Accepted, poll event_metadata.workflow_id for status.
+
+**When to read**:
+- Triggering workflows from Edge Functions or frontend
+- Understanding event-driven workflow architecture
+- Monitoring workflow status via event queries
+- Implementing polling for workflow completion
+
+**Prerequisites**: [event-metadata-schema](../reference/event-metadata-schema.md), [temporal-overview](../../architecture/workflows/temporal-overview.md)
+
+**Key topics**: `workflow-triggering`, `domain-events`, `postgres-notify`, `202-accepted`, `polling`, `edge-functions`
+
+**Estimated read time**: 18 minutes
+<!-- TL;DR-END -->
+
 # Triggering Temporal Workflows via Events
 
 ## Overview

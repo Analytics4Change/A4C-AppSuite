@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Clinical operations table tracking medication administration events (MAR). Records scheduled doses, actual administration, skips, refusals, and adverse reactions. Links to medication_history (prescription) and clients. Supports vitals monitoring, double-check verification, and compliance tracking. RLS enabled but policies NOT YET IMPLEMENTED.
+
+**When to read**:
+- Building medication administration record (MAR) UI
+- Implementing dose scheduling or compliance tracking
+- Recording adverse reactions or side effects
+- Understanding clinical workflow for medication safety
+
+**Prerequisites**: [medication_history](./medication_history.md), [clients](./clients.md), [medications](./medications.md)
+
+**Key topics**: `dosage-info`, `mar`, `medication-administration`, `vitals`, `compliance`, `adverse-reactions`, `rls-gap`
+
+**Estimated read time**: 25 minutes
+<!-- TL;DR-END -->
 
 # dosage_info
 

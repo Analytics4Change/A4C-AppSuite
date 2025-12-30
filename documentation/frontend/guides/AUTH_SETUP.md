@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Step-by-step guide for configuring Zitadel authentication with Supabase, including OAuth setup, JWT claims, and RLS integration.
+
+**When to read**:
+- Setting up authentication for new environment
+- Configuring Zitadel and Supabase integration
+- Debugging authentication or RLS issues
+- Understanding multi-tenancy with JWT claims
+
+**Prerequisites**: [supabase-auth-overview.md](../../architecture/authentication/supabase-auth-overview.md) for architecture context
+
+**Key topics**: `zitadel`, `oauth`, `jwt-claims`, `supabase`, `rls`, `multi-tenancy`, `pkce`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # Authentication Setup Guide
 

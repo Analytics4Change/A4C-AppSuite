@@ -1,6 +1,29 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Production configuration guide for Resend email provider. Covers API key setup via Kubernetes secrets, domain verification for custom `@analytics4change.com` sending, inline HTML templates, and troubleshooting (401 Unauthorized, rate limits, spam). Factory pattern selects Resend in production when `RESEND_API_KEY` set.
+
+**When to read**:
+- Configuring Resend API key in Kubernetes
+- Verifying domain for custom sending address
+- Troubleshooting email delivery issues
+- Understanding email provider factory pattern
+
+**Prerequisites**: [activities-reference](../reference/activities-reference.md)
+
+**Key topics**: `resend`, `email-provider`, `kubernetes-secrets`, `domain-verification`, `invitation-emails`, `troubleshooting`
+
+**Estimated read time**: 20 minutes
+<!-- TL;DR-END -->
+
 # Resend Email Provider Guide
 
-**Last Updated**: 2025-01-14
+**Last Updated**: 2025-12-30
 **Status**: Production
 **Audience**: Developers, DevOps Engineers
 

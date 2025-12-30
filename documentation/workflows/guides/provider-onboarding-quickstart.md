@@ -1,7 +1,30 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: End-user guide for creating provider organizations via frontend form. 3-section form (General Info, Billing, Provider Admin) triggers Organization Bootstrap Workflow. Workflow: 12 activities (6 forward + 6 compensation) taking 10-30 seconds. Includes checkbox to copy address/phone between sections. Requires `organization.create_root` permission.
+
+**When to read**:
+- Understanding organization creation flow from UI perspective
+- Filling out provider onboarding form
+- Troubleshooting common workflow errors
+- Checking workflow status via Temporal Web UI
+
+**Prerequisites**: User authenticated with `organization.create_root` permission
+
+**Key topics**: `provider-onboarding`, `organization-form`, `bootstrap-workflow`, `troubleshooting`, `workflow-status`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
+
 # Provider Onboarding Quickstart Guide
 
 **Version**: 1.0
-**Last Updated**: 2025-12-02
+**Last Updated**: 2025-12-30
 **Status**: Current
 
 ## Overview

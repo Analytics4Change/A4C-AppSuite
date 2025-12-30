@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Advanced MobX patterns including ViewModel providers, reactions for side effects, command pattern, state machines, form handling, and testing strategies.
+
+**When to read**:
+- Implementing complex MobX patterns
+- Building ViewModel providers with React context
+- Creating state machines for workflows
+- Setting up undo/redo with command pattern
+
+**Prerequisites**: [viewmodels.md](../architecture/viewmodels.md) for basic ViewModel concepts
+
+**Key topics**: `mobx`, `patterns`, `state-machine`, `command-pattern`, `reactions`, `form-handling`
+
+**Estimated read time**: 18 minutes
+<!-- TL;DR-END -->
 
 # MobX Integration Patterns
 

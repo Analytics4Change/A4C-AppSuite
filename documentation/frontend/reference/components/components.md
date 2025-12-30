@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Component overview index covering core UI components (Button, Input, MultiSelectDropdown), form components, layout components (Modal), and MobX integration patterns.
+
+**When to read**:
+- Getting overview of available UI components
+- Understanding component architecture guidelines
+- Learning MobX observer component patterns
+- Finding component file size and accessibility requirements
+
+**Prerequisites**: None
+
+**Key topics**: `components`, `button`, `input`, `modal`, `mobx-observer`, `accessibility`, `wcag`
+
+**Estimated read time**: 6 minutes
+<!-- TL;DR-END -->
 
 # Component Documentation
 

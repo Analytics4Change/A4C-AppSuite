@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Comprehensive FAQ covering event-driven architecture questions: CQRS benefits, reason field requirements, validation, eventual consistency, historical queries, performance, troubleshooting, migration strategies, and GDPR compliance.
+
+**When to read**:
+- Understanding why event-sourcing instead of CRUD
+- Troubleshooting event processing issues
+- Planning data migration to events
+- Handling GDPR/compliance requirements
+
+**Prerequisites**: [QUICKSTART.md](./QUICKSTART.md)
+
+**Key topics**: `faq`, `cqrs`, `event-sourcing`, `troubleshooting`, `migration`, `gdpr`
+
+**Estimated read time**: 18 minutes
+<!-- TL;DR-END -->
 
 # Event-Driven Architecture FAQ
 

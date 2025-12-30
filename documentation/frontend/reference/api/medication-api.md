@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: IMedicationApi interface for medication search, history tracking, and prescription management with RXNorm integration support, mock implementations, and comprehensive error handling patterns.
+
+**When to read**:
+- Implementing medication search functionality
+- Integrating with RXNorm API for production
+- Managing medication history and prescriptions
+- Understanding medication-specific error handling
+
+**Prerequisites**: None
+
+**Key topics**: `medication-api`, `rxnorm-integration`, `prescription-management`, `medication-history`, `search-api`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # Medication API
 

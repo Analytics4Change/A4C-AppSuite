@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Guide for migrating to unified dropdown components and centralized state management using useDropdownManager hook and UnifiedDropdown component.
+
+**When to read**:
+- Migrating from SearchableDropdown or AutocompleteDropdown
+- Implementing new dropdown components
+- Reducing code duplication in form components
+- Understanding the strategy pattern for dropdowns
+
+**Prerequisites**: None
+
+**Key topics**: `dropdown`, `unified-dropdown`, `state-management`, `migration`, `design-patterns`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
 
 # Design Patterns Migration Guide
 

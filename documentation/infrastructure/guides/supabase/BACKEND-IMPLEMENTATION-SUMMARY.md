@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Complete implementation summary of backend JWT custom claims hook for Supabase Auth, including `custom_access_token_hook`, authentication helpers, organization switching, and deployment instructions.
+
+**When to read**:
+- Deploying JWT custom claims to Supabase
+- Understanding the JWT claims structure (org_id, user_role, permissions, scope_path)
+- Testing custom claims and RLS policy integration
+- Planning frontend integration with JWT claims
+
+**Prerequisites**: [SUPABASE-AUTH-SETUP.md](./SUPABASE-AUTH-SETUP.md)
+
+**Key topics**: `jwt-claims`, `supabase-auth`, `custom-hook`, `rls-integration`, `multi-tenancy`
+
+**Estimated read time**: 20 minutes
+<!-- TL;DR-END -->
 
 # Backend JWT Custom Claims Implementation Summary
 

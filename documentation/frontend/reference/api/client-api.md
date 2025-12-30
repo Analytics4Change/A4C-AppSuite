@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: IClientApi interface for CRUD operations (getClients, getClient, searchClients, createClient, updateClient, deleteClient) with MockClientApi for development and ProductionClientApi with caching for production.
+
+**When to read**:
+- Implementing client data management features
+- Creating mock implementations for testing
+- Setting up optimistic updates in ViewModels
+- Understanding client validation patterns
+
+**Prerequisites**: None
+
+**Key topics**: `client-api`, `crud-operations`, `mock-api`, `caching`, `optimistic-updates`
+
+**Estimated read time**: 18 minutes
+<!-- TL;DR-END -->
 
 # Client API
 

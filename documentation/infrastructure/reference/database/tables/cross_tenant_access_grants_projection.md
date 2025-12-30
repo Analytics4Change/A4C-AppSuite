@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: CQRS projection enabling cross-organization data access for provider_partner orgs (VAR contracts, court orders, social services). Time-bound, scope-limited grants with full audit trail. Supports statuses: active, revoked, expired, suspended. RLS enabled but policies NOT YET IMPLEMENTED - CRITICAL GAP.
+
+**When to read**:
+- Implementing VAR (Vendor Authorized Representative) access
+- Building cross-tenant authorization checks
+- Managing court-ordered or emergency access scenarios
+- Understanding provider_partner → provider data sharing model
+
+**Prerequisites**: [organizations_projection](./organizations_projection.md), [users](./users.md)
+
+**Key topics**: `cross-tenant`, `access-grants`, `var-contracts`, `provider-partner`, `authorization`, `compliance`, `rls-gap`
+
+**Estimated read time**: 20 minutes
+<!-- TL;DR-END -->
 
 # cross_tenant_access_grants_projection
 

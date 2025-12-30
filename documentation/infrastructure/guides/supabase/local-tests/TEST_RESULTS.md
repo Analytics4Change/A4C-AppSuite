@@ -1,7 +1,24 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Test results from local Supabase testing showing 86/99 SQL files pass, 4/4 Edge Functions deploy successfully, with detailed analysis of 13 idempotency failures and fix recommendations.
+
+**When to read**:
+- Understanding current migration test status
+- Identifying specific idempotency issues to fix
+- Planning migration fixes before CI/CD enablement
+
+**Prerequisites**: [LOCAL_TESTING.md](./LOCAL_TESTING.md)
+
+**Key topics**: `test-results`, `idempotency-failures`, `edge-functions`, `migration-status`, `fix-recommendations`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
 
 # Supabase Local Testing Results
 

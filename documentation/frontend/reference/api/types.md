@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Core TypeScript interfaces for medication domain (Medication, Dosage, DosageForm hierarchy), client management, search/filter types, RXNorm API types, and utility patterns (ApiResponse, AsyncState, FormState).
+
+**When to read**:
+- Creating medication-related features or forms
+- Understanding dosage form hierarchies and routes
+- Implementing search functionality with proper types
+- Building type-safe API service layers
+
+**Prerequisites**: None
+
+**Key topics**: `medication-types`, `dosage-form`, `client-types`, `rxnorm-api`, `type-guards`
+
+**Estimated read time**: 20 minutes
+<!-- TL;DR-END -->
 
 # Type Definitions
 

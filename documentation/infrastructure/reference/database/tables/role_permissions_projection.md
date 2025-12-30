@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: CQRS junction table implementing many-to-many relationship between roles and permissions. Each row is a permission grant to a role. Core of RBAC permission bundling - roles are named collections of permissions assigned to users. Events: `role.permission.granted`, `role.permission.revoked`.
+
+**When to read**:
+- Implementing role permission management UI
+- Debugging why a role doesn't have expected permissions
+- Understanding authorization check flow (user → roles → permissions)
+- Building permission audit reports
+
+**Prerequisites**: [roles_projection](./roles_projection.md), [permissions_projection](./permissions_projection.md)
+
+**Key topics**: `role-permissions`, `rbac`, `junction-table`, `permission-grants`, `authorization-check`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # role_permissions_projection
 

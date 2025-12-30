@@ -128,15 +128,27 @@ The system integrates with existing CLAUDE.md files at:
 - `logging-standards.md` - Unified logging strategy
 - `features/contact-management-vision.md` - Future contacts module
 
-### Remaining (~70 docs pending TL;DR in Phase 4)
+### Documents with TL;DR Added (Phase 4 - 57 guides/reference docs)
 
-- `documentation/frontend/guides/` - ~8 files
-- `documentation/frontend/reference/` - ~10 files
-- `documentation/frontend/architecture/` - ~5 files
-- `documentation/frontend/patterns/` - ~5 files
-- `documentation/infrastructure/guides/` - ~15 files
-- `documentation/infrastructure/reference/database/tables/` - ~12 files
-- `documentation/workflows/` - ~10 files
+**Frontend (18 files)**:
+- `frontend/guides/` - 9 files (AUTH_SETUP, DEPLOYMENT, DESIGN_PATTERNS_MIGRATION_GUIDE, etc.)
+- `frontend/reference/` - 3 files (api-client, supabase-client-api, permissions-api)
+- `frontend/architecture/` - 4 files (overview, auth-provider, viewmodels, routing)
+- `frontend/patterns/` - 2 files (ui-patterns, mobx-patterns)
+
+**Infrastructure (29 files)**:
+- `infrastructure/guides/supabase/` - 10 files (EDGE_FUNCTION_TESTS, OAUTH-MANUAL-SETUP, KUBECONFIG, etc.)
+- `infrastructure/reference/database/tables/` - 19 files (all projection tables + clinical tables)
+  - Organization: organizations, organization_units, invitations
+  - RBAC: roles, permissions, role_permissions, user_roles, role_permission_templates
+  - Contacts: contacts, addresses, phones
+  - Clinical: clients, medications, medication_history, dosage_info
+  - System: event_types, cross_tenant_access_grants
+
+**Workflows (10 files)**:
+- `workflows/guides/` - 7 files (implementation, error-handling, triggering, integration-testing, etc.)
+- `workflows/reference/` - 2 files (event-metadata-schema, activities-reference)
+- `workflows/architecture/` - 1 file (organization-bootstrap-workflow-design)
 
 ## Related Components
 
@@ -207,11 +219,29 @@ last_updated: 2025-12-30
 - `d2792a01` - Phase 1 complete + partial Phase 2 (2025-12-30)
 - `4f528146` - Phase 2 complete (2025-12-30) - 7 TL;DR sections, 18 new keywords
 - `03cced4e` - Phase 3 complete (2025-12-30) - 22 TL;DR sections, 19 new keywords
+- Pending - Phase 4 complete (2025-12-30) - 57 TL;DR sections, 60+ keywords, 66 links validated
 
 ### Keyword Index Growth
 - Phase 1: 27 initial keywords
 - Phase 2: +18 keywords (total: 45)
-- Phase 3: +19 keywords (total: 63 keywords in AGENT-INDEX.md)
+- Phase 3: +19 keywords (total: 63)
+- Phase 4: +60 keywords (total: 130+ keywords in AGENT-INDEX.md)
+
+### Document Catalog Growth
+- Phase 4 added to Document Catalog:
+  - 9 workflow documents (guides, reference, architecture)
+  - 17 database table documents
+  - Updated token estimates for all
+
+### Link Validation
+- All 66 internal links in AGENT-INDEX.md validated (2025-12-30)
+- Validation categories checked:
+  - Parent directory links (../CLAUDE.md, ../frontend/CLAUDE.md, etc.)
+  - Architecture docs (18 links)
+  - Frontend docs (8 links)
+  - Infrastructure docs (7 links + 17 database tables)
+  - Workflow docs (9 links)
+  - Root documentation files (./AGENT-GUIDELINES.md, ./README.md, ./templates/)
 
 ## Important Constraints
 

@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Complete implementation summary of organization bootstrap workflows (55 files, ~8,500 lines). Covers 6 phases: database schema, core infrastructure (providers, config), 10 activities, workflow with saga compensation, cleanup scripts, and worker deployment. Key patterns: three-layer idempotency, tag-based cleanup, pluggable providers (Cloudflare/Resend/Mock).
+
+**When to read**:
+- Understanding overall workflow implementation scope
+- Finding file locations for specific functionality
+- Reviewing npm scripts for workflow development
+- Understanding phase-by-phase build approach
+
+**Prerequisites**: [temporal-overview](../../architecture/workflows/temporal-overview.md)
+
+**Key topics**: `implementation-summary`, `file-structure`, `provider-pattern`, `idempotency`, `deployment`, `npm-scripts`
+
+**Estimated read time**: 25 minutes
+<!-- TL;DR-END -->
 
 # Temporal Workflows Implementation Summary
 

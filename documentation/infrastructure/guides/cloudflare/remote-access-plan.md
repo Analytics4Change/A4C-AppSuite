@@ -1,7 +1,24 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Implementation plan for secure SSH/VNC remote access via Cloudflare tunnels with Zero Trust authentication for the `a4c-developers` team, including DNS configuration and security policies.
+
+**When to read**:
+- Setting up secure remote access to development servers
+- Configuring Cloudflare Zero Trust for SSH/VNC
+- Understanding the tunnel configuration for access.firstovertheline.com
+
+**Prerequisites**: None
+
+**Key topics**: `cloudflare-tunnel`, `zero-trust`, `ssh-access`, `vnc-access`, `remote-development`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # Cloudflare Remote Access Implementation Plan
 

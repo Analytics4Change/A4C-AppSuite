@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-11-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Audit trail textarea with character count progress bar, min/max validation, color-coded feedback, and quick suggestion templates for common reasons.
+
+**When to read**:
+- Building audit trail reason capture fields
+- Implementing character count with visual progress
+- Creating suggestion-based quick entry patterns
+- Understanding validation feedback UX
+
+**Prerequisites**: None
+
+**Key topics**: `audit-trail`, `textarea`, `character-count`, `suggestions`, `validation`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # ReasonInput
 

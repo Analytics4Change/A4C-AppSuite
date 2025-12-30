@@ -1,7 +1,25 @@
 ---
 status: aspirational
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Planned architecture for offline-first event resilience with IndexedDB queuing, automatic retry, circuit breaker pattern, and network monitoring.
+
+**When to read**:
+- Planning event resilience implementation
+- Understanding offline-first patterns
+- Reviewing audit event handling for compliance
+- Designing cross-tenant access controls
+
+**Prerequisites**: [EVENT-DRIVEN-GUIDE.md](../../frontend/guides/EVENT-DRIVEN-GUIDE.md) for CQRS context
+
+**Key topics**: `event-resilience`, `offline-first`, `circuit-breaker`, `indexeddb`, `retry`, `audit-events`
+
+**Estimated read time**: 20 minutes
+<!-- TL;DR-END -->
 
 # Event Resilience and Error Recovery Plan
 > [!WARNING]

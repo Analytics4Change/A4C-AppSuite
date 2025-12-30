@@ -1,7 +1,24 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Status tracking for migrating Zitadel TEXT IDs to UUID surrogate keys, including 13 completed schema changes across mapping tables, authorization functions, RLS policies, and event processors.
+
+**When to read**:
+- Understanding the TEXT to UUID migration for org/user IDs
+- Checking which files were modified during surrogate key migration
+- Planning deployment of surrogate key changes
+
+**Prerequisites**: None
+
+**Key topics**: `surrogate-keys`, `uuid-migration`, `zitadel-mapping`, `schema-change`, `authorization`
+
+**Estimated read time**: 8 minutes
+<!-- TL;DR-END -->
 
 # Surrogate Key Migration Status
 

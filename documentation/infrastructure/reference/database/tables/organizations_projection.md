@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: CQRS projection for hierarchical organizational structure using PostgreSQL ltree extension. Supports platform_owner, provider, and provider_partner types with multi-level parent-child relationships for sub-organizations (campuses, departments, teams).
+
+**When to read**:
+- Working with multi-tenant organization isolation
+- Implementing hierarchical organization queries (ancestors/descendants)
+- Understanding ltree path patterns for scope_path
+- Troubleshooting RLS or organization visibility issues
+
+**Prerequisites**: PostgreSQL ltree extension knowledge
+
+**Key topics**: `organizations`, `ltree`, `multi-tenancy`, `hierarchy`, `rls-policies`, `soft-delete`
+
+**Estimated read time**: 30 minutes
+<!-- TL;DR-END -->
 
 # organizations_projection
 

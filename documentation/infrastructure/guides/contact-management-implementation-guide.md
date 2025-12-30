@@ -1,3 +1,26 @@
+---
+status: aspirational
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Comprehensive implementation roadmap for Contact Management module covering 5 phases: directory view, CRUD operations, advanced associations (phones/addresses), deduplication/import, and communication tracking. Foundation infrastructure complete via provider onboarding enhancement.
+
+**When to read**:
+- Planning Contact Management feature development
+- Understanding contact data model and relationships
+- Designing contact directory UI components
+- Implementing contact import/export or deduplication
+
+**Prerequisites**: [Provider Onboarding Enhancement](../../../dev/active/provider-onboarding-enhancement-plan.md) complete
+
+**Key topics**: `contact-management`, `junction-tables`, `deduplication`, `csv-import`, `communication-history`
+
+**Estimated read time**: 45 minutes (comprehensive guide)
+<!-- TL;DR-END -->
+
 # Contact Management Implementation Guide
 
 **Status**: 🔮 Aspirational

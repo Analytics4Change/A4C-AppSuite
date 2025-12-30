@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-11-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Security banner for active impersonation sessions showing impersonated user, time remaining with color-coded urgency (yellow/orange/red), and quick session termination button.
+
+**When to read**:
+- Implementing impersonation session visibility
+- Understanding time-based urgency escalation patterns
+- Building security-critical UI indicators
+- Managing impersonation session lifecycle
+
+**Prerequisites**: None
+
+**Key topics**: `impersonation`, `security-banner`, `session-timeout`, `audit`, `super-admin`
+
+**Estimated read time**: 6 minutes
+<!-- TL;DR-END -->
 
 # ImpersonationBanner
 

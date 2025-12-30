@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Step-by-step guide for migrating existing CRUD operations to event-driven architecture with domain events and audit trails.
+
+**When to read**:
+- Converting CRUD operations to event emission
+- Adding reason fields to forms for audit trails
+- Understanding event-based patterns vs direct database calls
+- Planning migration strategy for existing code
+
+**Prerequisites**: [EVENT-DRIVEN-GUIDE.md](EVENT-DRIVEN-GUIDE.md) for CQRS concepts
+
+**Key topics**: `crud-migration`, `events`, `audit-trail`, `cqrs`, `reason-collection`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # Migration Guide: CRUD to Event-Driven Architecture
 

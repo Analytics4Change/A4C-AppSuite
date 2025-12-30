@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-12-20
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Complete reference for all Temporal activities. Categories: Organization (create, activate), DNS (configure via Cloudflare, verify with quorum-based multi-server lookup), Invitations (generate tokens, send via Resend), RBAC (grantProviderAdminPermissions from templates), Compensation (removeDNS, deactivate). All activities emit domain events with workflow context. Key pattern: check-then-act for idempotency.
+
+**When to read**:
+- Understanding activity signatures and parameters
+- Implementing new activities following patterns
+- Debugging activity failures
+- Understanding event data schemas per activity
+
+**Prerequisites**: [temporal-overview](../../architecture/workflows/temporal-overview.md), [error-handling-and-compensation](../guides/error-handling-and-compensation.md)
+
+**Key topics**: `activities-reference`, `createOrganization`, `configureDNS`, `verifyDNS`, `grantProviderAdminPermissions`, `compensation-activities`
+
+**Estimated read time**: 25 minutes
+<!-- TL;DR-END -->
 
 # Temporal Activities Reference
 

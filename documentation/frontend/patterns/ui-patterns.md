@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: UI architecture patterns covering modal hierarchy, focus management, dropdown/autocomplete patterns, form validation, accessibility, and timing configuration.
+
+**When to read**:
+- Implementing modals and focus traps
+- Building accessible dropdowns and autocomplete
+- Understanding tab order and keyboard navigation
+- Configuring component timing for animations
+
+**Prerequisites**: None
+
+**Key topics**: `ui-patterns`, `modal`, `focus-management`, `dropdown`, `autocomplete`, `form-validation`, `accessibility`
+
+**Estimated read time**: 20 minutes
+<!-- TL;DR-END -->
 
 # UI Patterns and Architecture
 

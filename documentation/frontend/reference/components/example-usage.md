@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Comprehensive examples for FocusTrappedCheckboxGroup including basic usage, wizard integration, accessibility patterns, large dataset optimization, and testing approaches.
+
+**When to read**:
+- Learning FocusTrappedCheckboxGroup usage patterns
+- Integrating checkbox groups into multi-step wizards
+- Optimizing performance with large datasets
+- Writing tests for checkbox group components
+
+**Prerequisites**: [FocusTrappedCheckboxGroup.md](FocusTrappedCheckboxGroup.md) for component API
+
+**Key topics**: `examples`, `checkbox-group`, `wizard`, `performance`, `testing`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # FocusTrappedCheckboxGroup Example Usage
 

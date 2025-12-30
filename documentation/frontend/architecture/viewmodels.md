@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: MVVM architecture guide covering MobX state management, ViewModel patterns, observable arrays, cross-ViewModel communication, and testing strategies.
+
+**When to read**:
+- Creating new ViewModels
+- Understanding MobX observable patterns
+- Debugging reactivity issues (especially arrays)
+- Testing ViewModels in isolation
+
+**Prerequisites**: [overview.md](overview.md) for architecture context
+
+**Key topics**: `viewmodel`, `mobx`, `mvvm`, `observable`, `state-management`, `reactivity`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # ViewModels Architecture
 

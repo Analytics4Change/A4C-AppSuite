@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: WCAG 2.1 Level AA checkbox group with focus trapping, keyboard navigation (Tab/Arrow/Space), and Continue/Cancel action buttons.
+
+**When to read**:
+- Building accessible checkbox groups
+- Implementing focus trap patterns
+- Creating multi-step selection workflows
+- Understanding ARIA checkbox group semantics
+
+**Prerequisites**: None
+
+**Key topics**: `focus-trap`, `checkbox-group`, `accessibility`, `keyboard-navigation`, `aria`
+
+**Estimated read time**: 6 minutes
+<!-- TL;DR-END -->
 
 # FocusTrappedCheckboxGroup
 

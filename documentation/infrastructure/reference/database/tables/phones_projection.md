@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-12-02
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: CQRS projection storing phone numbers (office, mobile, fax, emergency) for organizations. Created during bootstrap workflow via `createPhones` activity. Supports extensions, country codes, and one primary phone per org. Includes soft delete and RLS policies.
+
+**When to read**:
+- Building organization phone management UI
+- Understanding bootstrap workflow data model
+- Querying main office or fax numbers
+- Implementing phone verification features
+
+**Prerequisites**: [organizations_projection](./organizations_projection.md)
+
+**Key topics**: `phones`, `organization-bootstrap`, `office-phone`, `fax`, `pii`, `soft-delete`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
 
 # phones_projection
 

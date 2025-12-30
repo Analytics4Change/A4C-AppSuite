@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Comprehensive API reference covering UI components (dropdowns, forms, modals), focus management system with 14 modal elements, MobX ViewModel patterns, service layer interfaces, and custom hooks for timing and keyboard navigation.
+
+**When to read**:
+- Understanding dropdown component variants and when to use each
+- Implementing focus management and modal hierarchy
+- Setting up MobX ViewModels with proper observable patterns
+- Creating service layer interfaces for testing
+
+**Prerequisites**: None
+
+**Key topics**: `dropdown-components`, `focus-management`, `mobx-viewmodel`, `service-layer`, `accessibility-api`
+
+**Estimated read time**: 25 minutes
+<!-- TL;DR-END -->
 
 # API and Component Documentation
 

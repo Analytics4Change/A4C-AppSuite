@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Guide for using git-crypt to encrypt sensitive environment files (.env.local) in the repository with transparent encryption/decryption.
+
+**When to read**:
+- Joining project and needing to unlock encrypted files
+- Adding new files to encryption
+- Rotating encryption keys after team changes
+- Troubleshooting git-crypt issues
+
+**Prerequisites**: None
+
+**Key topics**: `git-crypt`, `encryption`, `secrets`, `environment-variables`, `security`
+
+**Estimated read time**: 6 minutes
+<!-- TL;DR-END -->
 
 # Git-Crypt Setup Guide
 

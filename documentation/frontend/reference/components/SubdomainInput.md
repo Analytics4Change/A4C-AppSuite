@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-11-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: DNS-compliant subdomain input with auto-lowercase formatting, live domain preview (e.g., myorg.a4c.app), and reserved subdomain validation.
+
+**When to read**:
+- Building organization onboarding forms
+- Understanding DNS subdomain validation rules
+- Implementing live URL preview feedback
+- Checking reserved subdomain lists
+
+**Prerequisites**: None
+
+**Key topics**: `subdomain`, `dns-validation`, `organization`, `url-preview`, `reserved-names`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # SubdomainInput
 

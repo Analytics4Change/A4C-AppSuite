@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-12-24
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: CQRS projection for sub-organization hierarchy (regions, campuses, departments, teams) using PostgreSQL ltree. OUs have depth > 2 (orgs have depth = 2). Deactivation cascades to descendants. Deletion requires inactive status and no role assignments. RLS enforces scope_path-based access.
+
+**When to read**:
+- Building organization unit management UI with tree navigation
+- Implementing hierarchical scope-based authorization
+- Understanding ltree path queries for ancestor/descendant operations
+- Debugging cascade deactivation or role assignment validation
+
+**Prerequisites**: [organizations_projection](./organizations_projection.md), [user_roles_projection](./user_roles_projection.md)
+
+**Key topics**: `organization-units`, `ltree`, `hierarchy`, `cascade-deactivation`, `scope-path`, `rls-policies`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # organization_units_projection
 

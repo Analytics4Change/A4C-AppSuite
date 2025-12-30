@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Two-mode dropdown with read-only display (blue theme + edit icon) and edit mode (EnhancedAutocompleteDropdown), supporting focus advancement and form integration.
+
+**When to read**:
+- Building dropdown fields with edit capability after selection
+- Implementing focus advancement in multi-field forms
+- Creating compact dropdown displays with inline editing
+- Understanding display/edit mode state transitions
+
+**Prerequisites**: [EnhancedAutocompleteDropdown.md](EnhancedAutocompleteDropdown.md) for underlying autocomplete
+
+**Key topics**: `editable-dropdown`, `edit-mode`, `focus-advancement`, `autocomplete`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # EditableDropdown
 

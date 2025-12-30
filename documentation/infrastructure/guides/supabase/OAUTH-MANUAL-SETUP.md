@@ -1,3 +1,26 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Step-by-step guide to manually configure Google OAuth for A4C-AppSuite via Google Cloud Console and Supabase Dashboard, including credential creation, redirect URI setup, and verification scripts.
+
+**When to read**:
+- Setting up Google OAuth for a new environment
+- Rotating OAuth client secrets
+- Troubleshooting OAuth configuration errors
+- Verifying JWT custom claims are working
+
+**Prerequisites**: Google Cloud Console access, Supabase project access
+
+**Key topics**: `google-oauth`, `oauth-credentials`, `redirect-uri`, `supabase-dashboard`, `secret-rotation`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
+
 # OAuth Manual Setup Guide
 
 This guide documents how to manually configure Google OAuth for the A4C-AppSuite. OAuth configuration is a one-time setup that rarely needs to be changed, so it's managed manually rather than via CI/CD.

@@ -1,3 +1,26 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Complete schema for `event_metadata` JSONB column. Auto-populated workflow fields: `workflow_id`, `workflow_run_id`, `workflow_type`, `activity_id`. Required: `timestamp` (ISO 8601). Recommended: `tags[]`, `source`. Error tracking: `processing_error`, `retry_count`. Four partial indexes optimize workflow/activity queries. Use `emitEvent()` utility for automatic workflow context capture.
+
+**When to read**:
+- Emitting domain events with proper metadata
+- Querying events by workflow or activity
+- Understanding event-workflow traceability
+- Debugging event processing errors
+
+**Prerequisites**: [triggering-workflows](../guides/triggering-workflows.md)
+
+**Key topics**: `event-metadata`, `workflow-traceability`, `timestamp`, `tags`, `processing-error`, `jsonb-indexes`
+
+**Estimated read time**: 18 minutes
+<!-- TL;DR-END -->
+
 # Event Metadata Schema Reference
 
 ## Overview

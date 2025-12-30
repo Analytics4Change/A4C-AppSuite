@@ -1,7 +1,24 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Automated documentation validation report showing structure validation, code alignment, and coverage metrics.
+
+**When to read**:
+- Checking documentation health status
+- Reviewing code-documentation alignment issues
+- Tracking documentation coverage
+
+**Prerequisites**: None
+
+**Key topics**: `documentation`, `validation`, `code-alignment`
+
+**Estimated read time**: 2 minutes
+<!-- TL;DR-END -->
 
 ## 📚 Documentation Status Report
 

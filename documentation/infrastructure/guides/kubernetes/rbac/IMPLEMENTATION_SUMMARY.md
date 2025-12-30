@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Implementation summary for Kubernetes RBAC restricting GitHub Actions from cluster-admin to namespace-scoped deployment permissions for frontend (default namespace) and Temporal workers (temporal namespace).
+
+**When to read**:
+- Understanding GitHub Actions K8s deployment permissions
+- Updating KUBECONFIG secret for CI/CD
+- Auditing K8s security configuration
+- Troubleshooting deployment permission issues
+
+**Prerequisites**: Kubernetes cluster access, GitHub repository admin
+
+**Key topics**: `rbac`, `kubernetes-security`, `github-actions`, `kubeconfig`, `least-privilege`
+
+**Estimated read time**: 8 minutes
+<!-- TL;DR-END -->
 
 # RBAC Implementation Summary
 

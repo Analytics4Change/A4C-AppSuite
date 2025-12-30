@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: React portal wrapper for rendering dropdown content outside DOM hierarchy to escape z-index and overflow:hidden constraints.
+
+**When to read**:
+- Dropdowns getting clipped by parent overflow:hidden
+- Z-index stacking context issues with dropdowns
+- Understanding React portal pattern
+- Integrating portals with existing dropdown components
+
+**Prerequisites**: None
+
+**Key topics**: `portal`, `dropdown`, `z-index`, `overflow`, `react-portal`
+
+**Estimated read time**: 4 minutes
+<!-- TL;DR-END -->
 
 # DropdownPortal
 

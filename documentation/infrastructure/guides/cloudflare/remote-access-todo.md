@@ -1,7 +1,24 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Task tracking for Cloudflare remote access implementation with 5 phases: planning, configuration backup, documentation, implementation/testing, and finalization.
+
+**When to read**:
+- Tracking progress on Cloudflare remote access implementation
+- Understanding remaining tasks for SSH/VNC setup
+- Checking completion status of documentation and testing
+
+**Prerequisites**: [remote-access-plan.md](./remote-access-plan.md)
+
+**Key topics**: `cloudflare-tunnel`, `task-tracking`, `ssh-access`, `vnc-access`, `zero-trust`
+
+**Estimated read time**: 5 minutes
+<!-- TL;DR-END -->
 
 # Cloudflare Remote Access - Todo Tracking
 

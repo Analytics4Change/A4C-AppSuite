@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-11-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Schema registry catalog for all valid event types in the platform. Documents JSON schemas for validating event_data, processing rules, allowed roles, and projection mappings. Defines contract between Temporal workflows (producers) and PostgreSQL triggers (consumers).
+
+**When to read**:
+- Registering a new domain event type
+- Validating event_data schema before emitting events
+- Understanding which events affect which projections
+- Building event documentation or API catalogs
+
+**Prerequisites**: [domain_events](./domain_events.md), [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md)
+
+**Key topics**: `event-types`, `schema-registry`, `json-schema`, `event-validation`, `projection-mapping`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # event_types
 

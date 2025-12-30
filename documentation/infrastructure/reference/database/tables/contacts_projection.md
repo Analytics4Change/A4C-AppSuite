@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-12-02
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: CQRS projection storing contact information (billing, technical, admin, emergency) for organizations. Created during bootstrap workflow via `createContacts` activity. Supports one primary contact per org via unique partial index. Includes soft delete and RLS policies.
+
+**When to read**:
+- Building organization contact management UI
+- Understanding bootstrap workflow data model
+- Querying billing or admin contacts for an organization
+- Implementing contact CRUD operations
+
+**Prerequisites**: [organizations_projection](./organizations_projection.md)
+
+**Key topics**: `contacts`, `organization-bootstrap`, `billing-contact`, `pii`, `soft-delete`, `rls-policies`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
 
 # contacts_projection
 

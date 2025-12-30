@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-11-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Route guard component that redirects users without required permission to a fallback route, integrating with AuthContext RBAC system.
+
+**When to read**:
+- Implementing permission-based route protection
+- Restricting access to admin or feature-specific pages
+- Understanding RBAC integration patterns
+- Setting up conditional rendering based on permissions
+
+**Prerequisites**: None
+
+**Key topics**: `permissions`, `route-guard`, `rbac`, `redirect`, `authorization`
+
+**Estimated read time**: 8 minutes
+<!-- TL;DR-END -->
 
 # RequirePermission
 
