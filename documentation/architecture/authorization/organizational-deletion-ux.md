@@ -1,7 +1,25 @@
 ---
 status: aspirational
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: UX specification for zero-regret organization deletion workflows with progressive disclosure, typed confirmations, impact analysis, and role-specific constraints.
+
+**When to read**:
+- Designing destructive action UX patterns
+- Implementing organization deletion flows
+- Understanding progressive disclosure for dangerous operations
+- Adding typed confirmation to critical actions
+
+**Prerequisites**: [rbac-architecture.md](rbac-architecture.md) for role-based restrictions
+
+**Key topics**: `deletion-ux`, `progressive-disclosure`, `typed-confirmation`, `safeguards`, `impact-analysis`
+
+**Estimated read time**: 18 minutes
+<!-- TL;DR-END -->
 
 # Organizational Deletion UX Specification
 > [!WARNING]

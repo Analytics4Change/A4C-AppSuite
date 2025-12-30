@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Step-by-step implementation guide for RBAC system including database migrations, event processors, authorization functions, and frontend integration with auth provider.
+
+**When to read**:
+- Setting up RBAC in a new environment
+- Running RBAC database migrations
+- Debugging permission checking
+- Understanding RBAC event processing
+
+**Prerequisites**: [rbac-architecture.md](rbac-architecture.md) for concepts, [EVENT-DRIVEN-ARCHITECTURE.md](../../infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)
+
+**Key topics**: `rbac`, `implementation`, `migration`, `event-processor`, `authorization-functions`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # RBAC/Permissions Implementation Guide
 

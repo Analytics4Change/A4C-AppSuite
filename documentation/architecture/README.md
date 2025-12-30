@@ -1,7 +1,22 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Index of cross-cutting architecture documentation covering authentication, authorization, data patterns, and workflow orchestration.
+
+**When to read**:
+- Finding architecture documentation by topic
+- Understanding document organization
+- Checking document status (current vs aspirational)
+
+**Key topics**: `architecture`, `index`, `authentication`, `authorization`, `data`, `workflows`
+
+**Estimated read time**: 2 minutes
+<!-- TL;DR-END -->
 
 # Architecture Documentation
 

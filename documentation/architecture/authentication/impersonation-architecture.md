@@ -1,7 +1,25 @@
 ---
 status: aspirational
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Planned architecture for Super Admin impersonation allowing authorized admins to view/operate the application as any user while maintaining comprehensive audit trails for compliance.
+
+**When to read**:
+- Planning impersonation feature implementation
+- Understanding cross-tenant support requirements
+- Reviewing audit trail architecture for compliance
+- Designing session management for impersonation
+
+**Prerequisites**: [impersonation-security-controls.md](impersonation-security-controls.md) for security requirements
+
+**Key topics**: `impersonation`, `super-admin`, `audit-trail`, `cross-tenant`, `session-management`, `compliance`
+
+**Estimated read time**: 20 minutes
+<!-- TL;DR-END -->
 
 # Super Admin Impersonation Architecture
 > [!WARNING]

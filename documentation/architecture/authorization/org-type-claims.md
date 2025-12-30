@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-12-18
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Implementation of org_type JWT claim for UI feature gating, enabling conditional navigation visibility based on organization type while backend still enforces authorization.
+
+**When to read**:
+- Implementing conditional UI based on org type
+- Adding org_type to JWT claims
+- Understanding defense-in-depth (UI visibility vs backend auth)
+- Hiding features for specific organization types
+
+**Prerequisites**: [custom-claims-setup.md](../authentication/custom-claims-setup.md) for JWT hook
+
+**Key topics**: `org-type`, `jwt-claims`, `feature-gating`, `conditional-ui`, `navigation`
+
+**Estimated read time**: 8 minutes
+<!-- TL;DR-END -->
 
 # Organization Type Claims for UI Feature Gating
 

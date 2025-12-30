@@ -1,3 +1,26 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Database trigger + event processor pattern for starting Temporal workflows from domain events, providing decoupled, resilient, and auditable workflow orchestration.
+
+**When to read**:
+- Understanding how workflows are triggered from events
+- Implementing new event-triggered workflows
+- Debugging workflow start failures
+- Designing event-to-workflow patterns
+
+**Prerequisites**: [temporal-overview.md](temporal-overview.md), [event-sourcing-overview.md](../data/event-sourcing-overview.md)
+
+**Key topics**: `event-driven`, `workflow-trigger`, `database-trigger`, `pg-notify`, `decoupling`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
+
 # Event-Driven Workflow Triggering Architecture
 
 **Status**: ✅ Implemented (2025-11-24)

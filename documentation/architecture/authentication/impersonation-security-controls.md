@@ -1,7 +1,25 @@
 ---
 status: aspirational
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Security controls for impersonation including MFA requirements (TOTP, hardware keys), session limits, audit logging, and healthcare compliance measures.
+
+**When to read**:
+- Reviewing security requirements for impersonation
+- Implementing MFA verification for sensitive operations
+- Understanding defense-in-depth for admin access
+- Ensuring HIPAA/SOC 2 compliance for impersonation
+
+**Prerequisites**: [impersonation-architecture.md](impersonation-architecture.md)
+
+**Key topics**: `impersonation`, `security`, `mfa`, `totp`, `fido2`, `hipaa`, `audit`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # Impersonation Security Controls
 > [!WARNING]

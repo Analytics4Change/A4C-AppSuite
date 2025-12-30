@@ -1,7 +1,25 @@
 ---
 status: aspirational
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Event schema definitions for impersonation lifecycle events (started, renewed, ended) following CQRS/Event Sourcing patterns with AsyncAPI contracts.
+
+**When to read**:
+- Implementing impersonation event emission
+- Designing impersonation_sessions_projection
+- Writing event processors for impersonation
+- Understanding audit trail event structure
+
+**Prerequisites**: [impersonation-architecture.md](impersonation-architecture.md), [EVENT-DRIVEN-ARCHITECTURE.md](../../infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)
+
+**Key topics**: `impersonation`, `events`, `cqrs`, `asyncapi`, `audit-trail`, `projection`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
 
 # Impersonation Event Schema
 > [!WARNING]

@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-12-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Temporal implementation of organization bootstrap workflow with unified ID system, 2-hop architecture (Frontend → Backend API → Temporal), DNS provisioning, and invitation sending.
+
+**When to read**:
+- Implementing or debugging organization bootstrap
+- Understanding unified ID system for status polling
+- Adding activities to bootstrap workflow
+- Troubleshooting DNS or invitation issues
+
+**Prerequisites**: [temporal-overview.md](temporal-overview.md), [event-driven-workflow-triggering.md](event-driven-workflow-triggering.md)
+
+**Key topics**: `organization-bootstrap`, `temporal`, `dns-provisioning`, `invitations`, `unified-id`, `2-hop-architecture`
+
+**Estimated read time**: 18 minutes
+<!-- TL;DR-END -->
 
 # Organization Onboarding Workflow - Temporal Implementation
 

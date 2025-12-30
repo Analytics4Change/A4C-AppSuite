@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Multi-tenancy architecture using database records (not auth tenants), Supabase Auth with JWT claims, RLS isolation, and Temporal workflows for organization bootstrap.
+
+**When to read**:
+- Understanding multi-tenant architecture decisions
+- Comparing Supabase Auth vs Zitadel approach
+- Implementing organization bootstrap
+- Designing RLS policies with org_id
+
+**Prerequisites**: [supabase-auth-overview.md](../authentication/supabase-auth-overview.md)
+
+**Key topics**: `multi-tenancy`, `organizations`, `rls`, `jwt-claims`, `bootstrap`, `zitadel-migration`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # Provider Management & Multi-Tenancy Architecture
 

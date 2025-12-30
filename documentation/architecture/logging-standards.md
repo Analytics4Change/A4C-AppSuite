@@ -1,3 +1,26 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Unified logging strategy across frontend (Logger utility), workflows (Logger wrapper), and Edge Functions (direct console) with category-based filtering.
+
+**When to read**:
+- Implementing logging in new components
+- Configuring log categories and levels
+- Debugging log output visibility
+- Understanding Logger utility usage
+
+**Prerequisites**: None
+
+**Key topics**: `logging`, `logger`, `categories`, `frontend`, `workflows`, `edge-functions`
+
+**Estimated read time**: 8 minutes
+<!-- TL;DR-END -->
+
 # Logging Standards
 
 This document defines the unified logging strategy across all A4C-AppSuite components.

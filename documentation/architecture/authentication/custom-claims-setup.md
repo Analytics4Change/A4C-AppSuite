@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Architecture spec for the PostgreSQL database hook that adds org_id, user_role, permissions, and scope_path to Supabase JWT tokens for multi-tenant RLS and RBAC.
+
+**When to read**:
+- Understanding the JWT custom claims implementation
+- Debugging RLS policies that rely on JWT claims
+- Reviewing security model for multi-tenant isolation
+- Writing new RLS policies using custom claims
+
+**Prerequisites**: [JWT-CLAIMS-SETUP.md](../../infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) for deployment steps
+
+**Key topics**: `jwt`, `custom-claims`, `database-hook`, `rls`, `multi-tenant`, `rbac`, `security-definer`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # Supabase Auth - Custom JWT Claims Setup
 

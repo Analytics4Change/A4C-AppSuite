@@ -1,3 +1,26 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Canonical reference for all 31 platform permissions (10 global + 21 org-scoped) with resource.action naming convention and scope assignments.
+
+**When to read**:
+- Looking up specific permission names
+- Understanding global vs org-scoped permissions
+- Assigning permissions to roles
+- Adding new permissions to the system
+
+**Prerequisites**: [rbac-architecture.md](rbac-architecture.md) for permission model
+
+**Key topics**: `permissions`, `rbac`, `scope`, `global`, `org-scoped`, `resource-action`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
+
 # Permissions Reference
 
 ## Overview

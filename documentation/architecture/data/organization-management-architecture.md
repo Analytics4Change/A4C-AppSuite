@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-12-02
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Complete architecture for organization management module including frontend (React/MobX), service layer with factory pattern, Temporal workflows, and event-driven CQRS backend.
+
+**When to read**:
+- Understanding organization management module architecture
+- Implementing new organization-related features
+- Debugging organization CRUD operations
+- Understanding service factory pattern
+
+**Prerequisites**: [event-sourcing-overview.md](event-sourcing-overview.md), [temporal-overview.md](../workflows/temporal-overview.md)
+
+**Key topics**: `organization-management`, `cqrs`, `service-factory`, `temporal`, `mobx`, `dependency-injection`
+
+**Estimated read time**: 20 minutes
+<!-- TL;DR-END -->
 
 # Organization Management Module - Architecture
 

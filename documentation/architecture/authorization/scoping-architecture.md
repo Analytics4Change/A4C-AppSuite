@@ -1,3 +1,26 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Three complementary scoping mechanisms in RBAC: organization_id (data isolation), scope_type (permission classification), and org_hierarchy_scope (LTREE hierarchical access).
+
+**When to read**:
+- Understanding how permission scoping works
+- Debugging access control issues
+- Implementing hierarchical permissions
+- Adding new scoped permissions
+
+**Prerequisites**: [rbac-architecture.md](rbac-architecture.md)
+
+**Key topics**: `scoping`, `organization-id`, `scope-type`, `ltree`, `hierarchy`, `rls`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
+
 # RBAC Scoping Architecture
 
 ## Overview

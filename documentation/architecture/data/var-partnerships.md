@@ -1,7 +1,25 @@
 ---
 status: aspirational
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Planned implementation for Value-Added Reseller (VAR) partnerships including business model, revenue sharing, cross-tenant access patterns, and contract tracking.
+
+**When to read**:
+- Planning VAR partnership feature implementation
+- Understanding VAR business model requirements
+- Designing cross-tenant access for resellers
+- Implementing revenue share tracking
+
+**Prerequisites**: [provider-partners-architecture.md](provider-partners-architecture.md)
+
+**Key topics**: `var`, `partnerships`, `revenue-share`, `reseller`, `white-label`, `cross-tenant`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # VAR Partnership Implementation
 > [!WARNING]

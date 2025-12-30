@@ -1,7 +1,25 @@
 ---
 status: aspirational
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Step-by-step implementation guide for Super Admin impersonation including prerequisites (RBAC, Redis, JWT), database setup, API endpoints, and frontend integration.
+
+**When to read**:
+- Starting impersonation feature implementation
+- Setting up Redis for session storage
+- Implementing impersonation API endpoints
+- Integrating impersonation with frontend
+
+**Prerequisites**: RBAC system deployed, Redis configured, JWT infrastructure in place
+
+**Key topics**: `impersonation`, `implementation`, `redis`, `jwt`, `api`, `frontend`
+
+**Estimated read time**: 25 minutes
+<!-- TL;DR-END -->
 
 # Impersonation Implementation Guide
 > [!WARNING]

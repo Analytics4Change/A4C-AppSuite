@@ -1,7 +1,25 @@
 ---
 status: aspirational
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: UI/UX specification for impersonation including visual indicators (red border, banner), WCAG 2.1 AA accessibility, and session management controls.
+
+**When to read**:
+- Designing impersonation UI components
+- Implementing visual indicators for active impersonation
+- Ensuring accessibility compliance for impersonation UI
+- Building session timer and end session controls
+
+**Prerequisites**: [impersonation-architecture.md](impersonation-architecture.md)
+
+**Key topics**: `impersonation`, `ui`, `ux`, `accessibility`, `wcag`, `visual-indicators`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
 
 # Impersonation UI Specification
 > [!WARNING]

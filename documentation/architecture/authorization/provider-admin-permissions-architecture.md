@@ -1,3 +1,26 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Architecture for granting provider_admin permissions during org bootstrap, including database-driven templates, event-driven grants, and role scoping with LTREE hierarchy.
+
+**When to read**:
+- Understanding how provider_admin gets permissions
+- Debugging permission grants during bootstrap
+- Modifying role permission templates
+- Adding new permissions to provider_admin
+
+**Prerequisites**: [rbac-architecture.md](rbac-architecture.md), [permissions-reference.md](permissions-reference.md)
+
+**Key topics**: `provider-admin`, `permissions`, `bootstrap`, `templates`, `role-scoping`, `ltree`
+
+**Estimated read time**: 12 minutes
+<!-- TL;DR-END -->
+
 # Provider Admin Permissions Architecture
 
 ## Implementation Status

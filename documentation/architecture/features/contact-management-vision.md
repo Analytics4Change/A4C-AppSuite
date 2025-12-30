@@ -1,3 +1,26 @@
+---
+status: aspirational
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Vision for future contact management module enabling many-to-many contact-organization relationships, multi-org sharing, and advanced relationship queries.
+
+**When to read**:
+- Planning contact management feature
+- Understanding future data model for contacts
+- Designing multi-org contact sharing
+- Evaluating contact deduplication strategies
+
+**Prerequisites**: Provider Onboarding Enhancement (Phase 1-6)
+
+**Key topics**: `contacts`, `many-to-many`, `multi-org`, `junction-tables`, `deduplication`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
+
 # Contact Management Module - Vision
 
 **Status**: 🔮 Aspirational

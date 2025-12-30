@@ -1,7 +1,25 @@
 ---
 status: foundation-implemented
-last_updated: 2025-12-02
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Architecture for provider partner organizations (VAR, family, court, agencies) including cross-tenant access grants, conditional subdomain provisioning, and partner relationship tracking.
+
+**When to read**:
+- Implementing provider partner features
+- Understanding cross-tenant access patterns
+- Adding new partner type support
+- Debugging partner organization creation
+
+**Prerequisites**: [multi-tenancy-architecture.md](multi-tenancy-architecture.md), [temporal-overview.md](../workflows/temporal-overview.md)
+
+**Key topics**: `provider-partners`, `cross-tenant`, `var`, `relationships`, `access-grants`
+
+**Estimated read time**: 18 minutes
+<!-- TL;DR-END -->
 
 # Provider Partner Architecture
 

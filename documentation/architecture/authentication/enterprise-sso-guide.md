@@ -1,7 +1,25 @@
 ---
 status: aspirational
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Planned architecture for Enterprise SSO using SAML 2.0 with Supabase Auth, enabling healthcare customers to authenticate via their existing identity providers (Okta, Azure AD).
+
+**When to read**:
+- Planning Enterprise SSO implementation
+- Understanding SAML 2.0 integration with Supabase
+- Evaluating per-organization SSO requirements
+- Reviewing compliance requirements (HIPAA, SOC 2)
+
+**Prerequisites**: Supabase Pro plan or higher
+
+**Key topics**: `saml`, `enterprise-sso`, `identity-provider`, `okta`, `azure-ad`, `hipaa`, `compliance`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # Supabase Auth - Enterprise SSO (SAML 2.0) Guide
 > [!WARNING]
