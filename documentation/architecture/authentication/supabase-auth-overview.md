@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-12
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Architecture overview of Supabase Auth integration including social login, Enterprise SSO, JWT custom claims via database hooks, and RLS policy integration.
+
+**When to read**:
+- Understanding the authentication architecture
+- Comparing Supabase Auth vs Zitadel (migration context)
+- Implementing social login or Enterprise SSO
+- Understanding JWT token flow and session management
+
+**Prerequisites**: [Frontend Auth Architecture](frontend-auth-architecture.md) for implementation details
+
+**Key topics**: `supabase-auth`, `authentication`, `social-login`, `saml`, `enterprise-sso`, `jwt`, `rls`, `multi-tenant`, `session`
+
+**Estimated read time**: 15 minutes
+<!-- TL;DR-END -->
 
 # Supabase Auth Integration Overview
 

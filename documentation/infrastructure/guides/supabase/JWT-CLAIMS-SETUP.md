@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Step-by-step guide to deploy the PostgreSQL database hook that enriches JWT tokens with org_id, user_role, permissions, and scope_path for RBAC and multi-tenant RLS.
+
+**When to read**:
+- Setting up JWT custom claims in a new environment
+- Troubleshooting missing claims in JWT tokens
+- Testing or verifying JWT hook configuration
+- Understanding the claims hook SQL function
+
+**Prerequisites**: Supabase project access, deployed RBAC schema (roles, permissions tables)
+
+**Key topics**: `jwt`, `custom-claims`, `database-hook`, `rbac`, `rls`, `org_id`, `permissions`, `scope_path`
+
+**Estimated read time**: 10 minutes
+<!-- TL;DR-END -->
 
 # JWT Custom Claims Setup Guide
 

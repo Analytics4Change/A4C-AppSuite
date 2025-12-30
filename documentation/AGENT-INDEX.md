@@ -33,28 +33,46 @@ purpose: agent-navigation
 | `accessibility` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | TESTING.md, component docs |
 | `activity` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
 | `authentication` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | supabase-auth-overview.md, custom-claims-setup.md |
+| `compensation` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
 | `cqrs` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md, MIGRATION-FROM-CRUD.md |
+| `custom-claims` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | frontend-auth-architecture.md, custom-claims-setup.md |
+| `database-hook` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | custom-claims-setup.md |
 | `deployment` | [DEPLOYMENT_INSTRUCTIONS.md](infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) | infrastructure/CLAUDE.md |
+| `determinism` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | temporal-overview.md |
+| `development` | [DEVELOPMENT.md](frontend/guides/DEVELOPMENT.md) | frontend/CLAUDE.md |
 | `edge-function` | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | DEPLOYMENT_INSTRUCTIONS.md |
+| `email` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |
+| `enterprise-sso` | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) | SUPABASE-AUTH-SETUP.md |
 | `events` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md |
+| `idempotency` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | workflows/CLAUDE.md |
 | `invitation` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | organizations_projection.md |
 | `jwt` | [custom-claims-setup.md](architecture/authentication/custom-claims-setup.md) | frontend-auth-architecture.md, supabase-auth-overview.md |
+| `jwt-claims` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | frontend-auth-architecture.md, infrastructure/CLAUDE.md |
 | `kubernetes` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | KUBECONFIG_UPDATE_GUIDE.md |
 | `medication` | [medications.md](infrastructure/reference/database/tables/medications.md) | medication-search-implementation.md, rxnorm-medication-autocomplete.md |
 | `migration` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | DEPLOYMENT_INSTRUCTIONS.md, table-template.md |
-| `mobx` | [viewmodels.md](frontend/architecture/viewmodels.md) | mobx-optimization.md, mobx-patterns.md |
+| `mobx` | [viewmodels.md](frontend/architecture/viewmodels.md) | frontend/CLAUDE.md, mobx-optimization.md |
 | `multi-tenancy` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | organizations_projection.md |
 | `oauth` | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | supabase-auth-overview.md, SUPABASE-AUTH-SETUP.md |
 | `organization` | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | multi-tenancy-architecture.md |
 | `permissions` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | scoping-architecture.md, role_permissions_projection.md |
 | `projection` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | organizations_projection.md, table-template.md |
 | `rbac` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | scoping-architecture.md, user_roles_projection.md |
+| `resend` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |
 | `rls` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | table-template.md, SQL_IDEMPOTENCY_AUDIT.md |
 | `roles` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | user_roles_projection.md, role_permissions_projection.md |
+| `saga` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
+| `saml` | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) | SUPABASE-AUTH-SETUP.md |
+| `scope_path` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | scoping-architecture.md |
+| `social-login` | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) | OAUTH-TESTING.md |
 | `supabase` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | DEPLOYMENT_INSTRUCTIONS.md, SUPABASE-AUTH-SETUP.md |
+| `supabase-auth` | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) | frontend-auth-architecture.md |
 | `temporal` | [temporal-overview.md](architecture/workflows/temporal-overview.md) | workflows/CLAUDE.md, error-handling-and-compensation.md |
 | `testing` | [TESTING.md](frontend/testing/TESTING.md) | viewmodel-testing.md |
+| `troubleshooting` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | OAUTH-TESTING.md |
 | `viewmodel` | [viewmodels.md](frontend/architecture/viewmodels.md) | viewmodel-testing.md, mobx-patterns.md |
+| `vite` | [DEVELOPMENT.md](frontend/guides/DEVELOPMENT.md) | frontend/CLAUDE.md |
+| `wcag` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | TESTING.md |
 | `workflow` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | temporal-overview.md, implementation.md |
 
 ## Document Catalog

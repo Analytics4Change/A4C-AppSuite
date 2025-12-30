@@ -1,3 +1,27 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Infrastructure management guide covering Supabase migrations, Kubernetes deployments, Temporal workers, email providers (Resend), and deployment runbooks with troubleshooting.
+
+**When to read**:
+- Running database migrations (`supabase db push`)
+- Deploying Temporal workers to Kubernetes
+- Configuring OAuth or JWT custom claims
+- Setting up Resend email provider
+- Troubleshooting deployment failures
+
+**Prerequisites**: Access to Supabase project, kubectl configured for k3s cluster
+
+**Key topics**: `supabase`, `migrations`, `kubernetes`, `temporal`, `deployment`, `oauth`, `jwt-claims`, `resend`, `email`, `rls`, `troubleshooting`
+
+**Estimated read time**: 20 minutes (full), 5 minutes (relevant sections)
+<!-- TL;DR-END -->
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.

@@ -73,7 +73,28 @@ The system integrates with existing CLAUDE.md files at:
 | `frontend/CLAUDE.md` | Add "Documentation Resources" link section |
 | `workflows/CLAUDE.md` | Add "Documentation Resources" link section |
 | `infrastructure/CLAUDE.md` | Add "Documentation Resources" link section |
-| All 115+ docs | Add TL;DR section after frontmatter |
+
+### Documents with TL;DR Added (Phase 2 - 15 docs)
+
+| Document | TL;DR Summary |
+|----------|---------------|
+| `frontend/CLAUDE.md` | Frontend dev guide with auth, MobX, accessibility |
+| `workflows/CLAUDE.md` | Temporal workflow guide with determinism, saga patterns |
+| `infrastructure/CLAUDE.md` | Infrastructure guide with deployment runbook |
+| `documentation/README.md` | Master index for 115+ documentation files |
+| `architecture/authentication/frontend-auth-architecture.md` | Three-mode auth system with IAuthProvider |
+| `architecture/authentication/supabase-auth-overview.md` | Social login, Enterprise SSO, JWT flow |
+| `architecture/authorization/rbac-architecture.md` | Permission-based RBAC with JWT claims |
+| `architecture/data/event-sourcing-overview.md` | CQRS with domain_events and projections |
+| `architecture/data/multi-tenancy-architecture.md` | RLS isolation via org_id JWT claim |
+| `architecture/workflows/temporal-overview.md` | Durable workflow orchestration |
+| `infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md` | Migration and edge function deployment |
+| `infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md` | Database hook for custom JWT claims |
+| `infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md` | Idempotent SQL patterns |
+| `frontend/guides/DEVELOPMENT.md` | Local dev setup, npm commands |
+| `frontend/guides/EVENT-DRIVEN-GUIDE.md` | CQRS patterns in React |
+
+### Remaining (~100 docs pending TL;DR)
 
 ## Related Components
 
@@ -139,6 +160,8 @@ last_updated: 2025-12-30
 - Plan file: `/home/lars/.claude/plans/deep-roaming-barto.md`
 - Existing skill pattern: `.claude/skills/infrastructure-guidelines/SKILL.md`
 - Documentation structure exploration: Agent analysis from planning phase
+- Commit: `d2792a01` - Phase 1 complete + partial Phase 2 (2025-12-30)
+- Phase 2 complete: 2025-12-30 (7 more TL;DR sections, 18 new keywords in AGENT-INDEX.md)
 
 ## Important Constraints
 

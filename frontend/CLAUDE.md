@@ -1,3 +1,27 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Development guidelines for the React/TypeScript frontend including authentication modes, MobX patterns, WCAG accessibility standards, and component architecture.
+
+**When to read**:
+- Starting frontend development work
+- Working with authentication or JWT claims
+- Implementing accessible components
+- Debugging MobX reactivity issues
+- Using dropdown/form components
+
+**Prerequisites**: Basic React and TypeScript knowledge
+
+**Key topics**: `react`, `typescript`, `mobx`, `accessibility`, `wcag`, `authentication`, `jwt-claims`, `components`, `vite`, `tailwind`
+
+**Estimated read time**: 25 minutes (full), 5 minutes (relevant sections)
+<!-- TL;DR-END -->
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.

@@ -3,6 +3,22 @@ status: current
 last_updated: 2025-12-30
 ---
 
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Master index for 115+ documentation files organized by component (frontend, workflows, infrastructure) and purpose (architecture, guides, reference).
+
+**When to read**:
+- Finding documentation for a specific feature
+- Understanding the documentation structure
+- Locating API reference or architecture docs
+- Starting as a new developer
+
+**Key topics**: `documentation`, `index`, `frontend`, `workflows`, `infrastructure`, `architecture`, `guides`, `reference`
+
+**Estimated read time**: 3 minutes (navigation), varies per linked document
+<!-- TL;DR-END -->
+
 # A4C-AppSuite Documentation
 
 Welcome to the A4C (Analytics4Change) AppSuite documentation. This directory contains all consolidated documentation for the monorepo, organized by component and purpose.

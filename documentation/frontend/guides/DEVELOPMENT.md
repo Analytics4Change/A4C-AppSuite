@@ -1,7 +1,25 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-30
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Frontend development setup guide covering prerequisites, npm commands, cross-platform development, environment switching, and git configuration.
+
+**When to read**:
+- Setting up local development environment
+- Running dev server, tests, or builds
+- Switching between development machines
+- Troubleshooting environment issues
+
+**Prerequisites**: Node.js 18+, npm, Git
+
+**Key topics**: `development`, `setup`, `npm`, `vite`, `dev-server`, `testing`, `cross-platform`, `environment`
+
+**Estimated read time**: 8 minutes
+<!-- TL;DR-END -->
 
 # Development Guide
 

@@ -1,3 +1,27 @@
+---
+status: current
+last_updated: 2025-12-30
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Temporal.io workflow development guide covering determinism requirements, activity patterns, CQRS event sourcing, Saga compensation, and provider configuration.
+
+**When to read**:
+- Implementing or modifying Temporal workflows
+- Creating activities with side effects
+- Debugging non-determinism or replay errors
+- Understanding event emission patterns
+- Configuring DNS/email providers
+
+**Prerequisites**: Basic understanding of Temporal.io concepts, Node.js/TypeScript
+
+**Key topics**: `temporal`, `workflows`, `activities`, `determinism`, `saga`, `event-sourcing`, `cqrs`, `idempotency`, `compensation`, `cloudflare-dns`, `resend-email`
+
+**Estimated read time**: 20 minutes (full), 5 minutes (relevant sections)
+<!-- TL;DR-END -->
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
