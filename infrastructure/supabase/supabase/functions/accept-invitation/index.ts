@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v7';
+const DEPLOY_VERSION = 'v8';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -187,8 +187,42 @@ serve(async (req) => {
       });
 
       if (createError) {
-        authError = createError;
-        console.error(`[accept-invitation v${DEPLOY_VERSION}] User creation failed:`, createError);
+        // Check if user already exists (from previous failed attempt)
+        // This can happen if user creation succeeded but event emission failed
+        if (createError.message?.includes('already been registered')) {
+          console.log(`[accept-invitation v${DEPLOY_VERSION}] User already exists, looking up...`);
+
+          // Look up existing user by email using listUsers with filter
+          const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers();
+
+          if (listError) {
+            console.error(`[accept-invitation v${DEPLOY_VERSION}] Failed to list users:`, listError);
+            return new Response(
+              JSON.stringify({ error: 'Failed to look up existing user', details: listError.message }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          const existingUser = existingUsers.users.find(u => u.email === invitation.email);
+          if (existingUser) {
+            userId = existingUser.id;
+            console.log(`[accept-invitation v${DEPLOY_VERSION}] Found existing user: ${userId}`);
+          } else {
+            // User claimed to exist but not found - unexpected state
+            console.error(`[accept-invitation v${DEPLOY_VERSION}] User exists error but user not found`);
+            return new Response(
+              JSON.stringify({ error: 'User exists but not found', details: 'Inconsistent auth state' }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        } else {
+          // Other auth errors are still fatal
+          console.error(`[accept-invitation v${DEPLOY_VERSION}] User creation failed:`, createError);
+          return new Response(
+            JSON.stringify({ error: 'Failed to create user account', details: createError.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       } else {
         userId = authData.user.id;
         console.log(`[accept-invitation v${DEPLOY_VERSION}] User created: ${userId}`);
@@ -207,10 +241,11 @@ serve(async (req) => {
       );
     }
 
-    if (authError || !userId) {
-      console.error('Failed to create user:', authError);
+    // At this point, userId should be set (either from creation or lookup)
+    if (!userId) {
+      console.error('Failed to create or find user: userId is not set');
       return new Response(
-        JSON.stringify({ error: 'Failed to create user account', details: authError?.message || 'User ID not assigned' }),
+        JSON.stringify({ error: 'Failed to create user account', details: 'User ID not assigned' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
