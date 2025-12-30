@@ -232,12 +232,47 @@ supabase db push --linked
 
 | File | Purpose |
 |------|---------|
-| `infrastructure/supabase/supabase/migrations/20240101000000_baseline.sql` | Day 0 baseline (complete schema) |
+| `infrastructure/supabase/supabase/migrations/20251229000000_baseline_v2.sql` | Day 0 v2 baseline (current) |
+| `infrastructure/supabase/supabase/migrations.archived/2025-december-cleanup/` | Archived migrations from v1 baseline through Dec 2025 |
 | `infrastructure/supabase/sql.archived/` | Original granular SQL files (reference only) |
 | `infrastructure/supabase/backup_*.sql` | Pre-migration backups |
 | `.github/workflows/supabase-migrations.yml` | CI/CD migration workflow |
 
-## Decision Record
+## Decision Records
+
+### Day 0 v2 Baseline (2025-12-29)
+
+**Date**: 2025-12-29
+**Decision**: Create Day 0 v2 baseline consolidating 25 migrations
+
+**Context**:
+- Original Day 0 baseline (2024-12-22) followed by 24 incremental migrations
+- RBAC Scoping Architecture Cleanup (Phases 1-12) complete
+- OU cascade features, role management improvements, permission cleanup all finalized
+- Documentation audits revealed permission count discrepancies (docs said 31, actual 33)
+
+**Migrations Consolidated** (25 total):
+- `20240101000000_baseline.sql` (original Day 0)
+- `20251223*.sql` - OU cascade features (6 migrations)
+- `20251224*.sql` - Role management fixes (3 migrations)
+- `20251225*.sql` - API security fixes (2 migrations)
+- `20251228*.sql` - Permission enhancements (3 migrations)
+- `20251229*.sql` - RBAC cleanup phases 1-12 (11 migrations)
+
+**Outcome**:
+- Created `20251229000000_baseline_v2.sql` from production dump (10,320 lines)
+- Archived all 25 old migrations to `migrations.archived/2025-december-cleanup/`
+- Marked old migrations as reverted, new baseline as applied
+- Fixed documentation: 33 permissions (10 global + 23 org)
+
+**Verification**:
+- `supabase migration list --linked` shows only baseline_v2
+- `supabase db push --linked --dry-run` reports "Remote database is up to date"
+- Audit queries confirm: 33 permissions, 0 orphaned records
+
+---
+
+### Day 0 v1 Baseline (2024-12-22)
 
 **Date**: 2024-12-22
 **Decision**: Migrate to Supabase CLI migrations with Day 0 baseline
@@ -253,8 +288,14 @@ supabase db push --linked
 - Future changes will be incremental Supabase CLI migrations
 - Archived original SQL files to `sql.archived/` for reference
 
-**Benefits**:
+**Status**: Superseded by Day 0 v2 baseline (2025-12-29)
+
+---
+
+## Benefits of Day 0 Approach
+
 - Native migration tracking via Supabase CLI
 - Dry-run capability before production deployment
 - GitHub Actions integration for automated deployments
 - Rollback capability via `migration repair`
+- Clean starting point for new developers (single file vs 25+)

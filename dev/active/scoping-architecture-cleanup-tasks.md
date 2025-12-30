@@ -2,10 +2,10 @@
 
 ## Current Status
 
-**Phase**: 12 - Architect Recommendations Cleanup ✅ COMPLETE
-**Status**: ✅ COMPLETE (Phases 1-3, 5-12 done; Phase 4 optional; Phase 11 done)
+**Phase**: ALL PHASES COMPLETE ✅
+**Status**: ✅ COMPLETE (All phases 1-12 including Phase 4 Day 0 Baseline)
 **Last Updated**: 2025-12-29
-**Next Step**: Optional Phase 4 (Day 0 Baseline) or archive dev-docs
+**Next Step**: Archive dev-docs to dev/archived/
 
 ---
 
@@ -81,21 +81,23 @@
 
 ---
 
-## Phase 4: Day 0 Baseline (Optional) ⏸️ PENDING
+## Phase 4: Day 0 Baseline ✅ COMPLETE
 
 ### 4.1 Pre-Verification
-- [ ] All Phase 1-3 complete and verified
-- [ ] Run full audit queries
-- [ ] Test authorization behavior
-- [ ] Test UI functionality
+- [x] All Phase 1-3 complete and verified
+- [x] Run full audit queries (33 permissions, 0 orphans)
+- [x] Test authorization behavior
+- [x] Test UI functionality
 
 ### 4.2 Baseline Generation
-- [ ] Create backup: `supabase db dump --linked > backup_before_day0.sql`
-- [ ] Generate new baseline: `supabase db dump --linked > migrations/20250101000000_baseline_v2.sql`
-- [ ] Archive old migrations to `migrations.archived/`
-- [ ] Mark old migrations as reverted in remote
-- [ ] Mark new baseline as applied
-- [ ] Verify migration list shows only baseline_v2
+- [x] Create backup: `backup_before_day0_v2_20251229_171635.sql` (366KB)
+- [x] Generate new baseline: `migrations/20251229000000_baseline_v2.sql` (10,320 lines)
+- [x] Archive 25 old migrations to `migrations.archived/2025-december-cleanup/`
+- [x] Mark 25 old migrations as reverted in remote
+- [x] Mark new baseline as applied
+- [x] Verify migration list shows only baseline_v2
+- [x] Verify dry-run: "Remote database is up to date"
+- [x] Fix documentation: 33 permissions (10 global + 23 org), not 31
 
 ---
 
@@ -300,11 +302,12 @@
 - [x] Test data removed
 - [x] TypeScript compilation passes
 
-### After Phase 4 (Optional)
-- [ ] New baseline captures clean state
-- [ ] Old migrations archived
-- [ ] Migration list shows only baseline_v2
-- [ ] No regressions in functionality
+### After Phase 4 ✅
+- [x] New baseline captures clean state (10,320 lines)
+- [x] 25 old migrations archived to `migrations.archived/2025-december-cleanup/`
+- [x] Migration list shows only `20251229000000_baseline_v2.sql`
+- [x] Dry-run confirms: "Remote database is up to date"
+- [x] Documentation fixed: 33 permissions (10 global + 23 org)
 
 ### After Phase 5 ✅
 - [x] 31 permissions in projection (42 - 13 + 2)
@@ -370,28 +373,30 @@
 | `20251229223544_add_when_clauses_to_bootstrap_triggers.sql` | Add WHEN clauses to bootstrap triggers for performance | ✅ Applied |
 | `20251229225733_cleanup_diagnostic_stubs.sql` | Remove 3 diagnostic stub functions from Phase 8 debugging | ✅ Applied |
 | `20251229233333_remove_diagnostic_notices.sql` | Remove 40 [DIAG: RAISE NOTICE statements from 4 functions | ✅ Applied |
+| `20251229000000_baseline_v2.sql` | **Day 0 v2 Baseline** - Consolidates all 25 migrations | ✅ Applied |
 
 ---
 
 ## Audit Results (Final)
 
-| Metric | Before | After Phase 3 | After Phase 6 | After Phase 8 | After Phase 9 | After Phase 10 |
-|--------|--------|---------------|---------------|---------------|---------------|----------------|
+| Metric | Before | After Phase 3 | After Phase 6 | After Phase 8 | After Phase 10 | After Phase 4 (Final) |
+|--------|--------|---------------|---------------|---------------|----------------|----------------------|
 | Orphaned permissions | 19 | 0 | 0 | 0 | 0 | 0 |
 | Orphaned users | 5 | 0 | 0 | 0 | 0 | 0 |
 | Orphaned invitations | 2 | 0 | 0 | 0 | 0 | 0 |
 | Test data (fake org_id) | 3 rows | 0 | 0 | 0 | 0 | 0 |
 | `role.create` scope_type | global (BUG) | org (FIXED) | org | org | org | org |
 | scope_type values | 5 | 2 (global, org) | 2 | 2 | 2 | 2 |
-| Total permissions | 42 | 42 | **31** | 31 | 31 | 31 |
+| Total permissions | 42 | 42 | 31 | 31 | 31 | **33** (10 global + 23 org) |
 | provider_admin template permissions | ? | 19 | **23** | 23 | 23 | 23 |
-| api.emit_domain_event overloads | 2 | 2 | 3 | 3 | 3 | **1** (canonical) |
-| api.create_role overloads | 1 | 1 | 2 | 2 | 2 | **1** (canonical) |
+| api.emit_domain_event overloads | 2 | 2 | 3 | 3 | **1** (canonical) | 1 |
+| api.create_role overloads | 1 | 1 | 2 | 2 | **1** (canonical) | 1 |
 | is_super_admin/is_org_admin | SECURITY INVOKER (BUG) | - | - | **SECURITY DEFINER** | SECURITY DEFINER | SECURITY DEFINER |
 | Role creation via UI | ❌ stack overflow | - | ❌ stack overflow | **✅ Working** | ✅ Working | ✅ Working |
-| Bootstrap triggers with WHEN | 3/5 (60%) | - | - | - | **5/5 (100%)** | 5/5 (100%) |
-| Diagnostic RAISE NOTICE | 40+ | - | - | - | - | **0** (cleaned) |
-| Documentation files updated | - | - | - | - | - | **4 of 9** (5 already current) |
+| Bootstrap triggers with WHEN | 3/5 (60%) | - | - | **5/5 (100%)** | 5/5 (100%) | 5/5 (100%) |
+| Diagnostic RAISE NOTICE | 40+ | - | - | - | **0** (cleaned) | 0 |
+| Migration files | 25+ | - | - | - | 25+ | **1** (baseline_v2) |
+| Documentation accuracy | Outdated | - | - | - | 4/9 updated | **Correct** (33 perms) |
 
 ---
 
@@ -415,10 +420,9 @@ Role (4): create, view, update, delete
 User (6): create, view, update, delete, role_assign, role_revoke
 ```
 
-### emit_domain_event Function Overloads (3 total)
-1. `(p_stream_id, p_stream_type, p_stream_version, p_event_type, p_event_data, p_event_metadata)` - explicit version
-2. `(p_event_id, p_event_type, p_aggregate_type, p_aggregate_id, p_event_data, p_event_metadata)` - different naming
-3. `(p_stream_id, p_stream_type, p_event_type, p_event_data, p_event_metadata)` - **NEW: auto-calculates stream_version**
+### emit_domain_event Function Overloads (1 canonical)
+After Phase 10 cleanup, only one canonical overload remains:
+- `(p_stream_id, p_stream_type, p_event_type, p_event_data, p_event_metadata)` - auto-calculates stream_version
 
 ### AsyncAPI Contract Compliance
 - **New database deployments**: COMPLIANT - Temporal workflow emits `role.permission.granted` events
