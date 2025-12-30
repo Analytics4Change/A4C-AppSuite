@@ -2,10 +2,10 @@
 
 ## Current Status
 
-**Phase**: 9 - Trigger WHEN Clause Optimization ✅ COMPLETE
-**Status**: ✅ COMPLETE (Phases 1-3, 5-9 done; Phase 4 optional)
+**Phase**: 12 - Architect Recommendations Cleanup ✅ COMPLETE
+**Status**: ✅ COMPLETE (Phases 1-3, 5-12 done; Phase 4 optional; Phase 11 done)
 **Last Updated**: 2025-12-29
-**Next Step**: Optional Phase 4 (Day 0 Baseline) or archive dev docs
+**Next Step**: Optional Phase 4 (Day 0 Baseline) or archive dev-docs
 
 ---
 
@@ -207,6 +207,77 @@
 
 ---
 
+## Phase 10: Diagnostic Stub Cleanup ✅ COMPLETE
+
+### 10.1 Assess Diagnostic Stubs
+- [x] Query current function overloads
+- [x] Identified 3 diagnostic stubs from Phase 8 debugging (migration `20251229220540`)
+- [x] Confirmed stubs are dead code (never called - would RAISE EXCEPTION)
+
+### 10.2 Stubs Removed
+| Stub | Signature | Reason |
+|------|-----------|--------|
+| `api.create_role` | 4-param (text, text, text, uuid[]) | 5-param version is canonical |
+| `api.emit_domain_event` | 6-param legacy (event_id, aggregate_type...) | Dead code |
+| `api.emit_domain_event` | 6-param explicit (with stream_version) | 5-param auto-version is canonical |
+
+### 10.3 Implement Cleanup
+- [x] Create migration `20251229225733_cleanup_diagnostic_stubs.sql`
+- [x] DROP 3 stub functions
+- [x] Verify only canonical overloads remain
+- [x] Apply migration via `supabase db push --linked`
+
+### 10.4 Verification
+- [x] `api.create_role`: 1 canonical overload (5-param with p_cloned_from_role_id)
+- [x] `api.emit_domain_event`: 1 canonical overload (5-param auto-version)
+- [x] No regressions in role creation
+
+---
+
+## Phase 11: Software Architect Review ✅ COMPLETE
+
+### 11.1 Review Scope
+- [x] Anti-patterns - identified diagnostic RAISE NOTICE, TRUNCATE non-idempotency
+- [x] Code reuse opportunities - none significant identified
+- [x] Industry best practices (PostgreSQL, event sourcing, CQRS) - compliant
+- [x] Internal documentation alignment - 9 files needing updates identified
+- [x] Documentation gaps - permission counts outdated, invalid scope_types in docs
+- [x] General suggestions - org_id rename investigated (NOT NEEDED - columns already use organization_id)
+
+### 11.2 Files Reviewed
+- `dev/active/scoping-architecture-cleanup-*.md`
+- `infrastructure/supabase/supabase/migrations/20251229*.sql`
+- `documentation/architecture/authorization/`
+- Git commit history since 2025-12-29
+
+---
+
+## Phase 12: Architect Recommendations Cleanup ✅ COMPLETE
+
+### 12.1 Documentation Updates (9 files)
+- [x] `permissions-reference.md` - Updated permission counts (34→31), removed deleted permissions
+- [x] `scoping-architecture.md` - Updated permission counts (42→31), fixed org permissions (32→21)
+- [x] `permissions_projection.md` - Fixed scope_type (removed facility/program/client)
+- [x] `rbac-architecture.md` - Updated Zitadel→Supabase, fixed permission catalogs, updated role matrix
+- [x] `roles_projection.md` - No changes needed (already current)
+- [x] `rbac-implementation-guide.md` - Updated scope_type, permission counts, test examples
+- [x] `cross_tenant_access_grants_projection.md` - No changes needed (scope is different from scope_type)
+- [x] `invitations_projection.md` - No changes needed (already current)
+- [x] `user_roles_projection.md` - No changes needed (already current)
+
+### 12.2 Remove Diagnostic RAISE NOTICE Statements
+- [x] Identified 40 `[DIAG:` statements across 4 functions
+- [x] Created migration `20251229233333_remove_diagnostic_notices.sql`
+- [x] Cleaned functions: api.create_role, api.emit_domain_event, process_domain_event, process_rbac_event
+- [x] Applied migration via `supabase db push --linked`
+- [x] Verified: "SUCCESS: All diagnostic statements removed from 4 functions"
+
+### 12.3 Decisions
+- [x] **TRUNCATE idempotency**: SKIP - one-time cleanup migration, acceptable pattern
+- [x] **org_id → organization_id rename**: NOT NEEDED - all database columns already use organization_id
+
+---
+
 ## Success Validation Checkpoints
 
 ### After Phase 1 ✅
@@ -264,6 +335,24 @@
 - [x] Only `process_domain_event_trigger` fires on all events (by design)
 - [x] No unnecessary function calls for non-bootstrap events
 
+### After Phase 10 ✅
+- [x] 3 diagnostic stub functions removed
+- [x] `api.create_role`: 1 canonical overload (5-param)
+- [x] `api.emit_domain_event`: 1 canonical overload (5-param auto-version)
+- [x] Simplified API surface (no confusing overloads)
+
+### After Phase 11 ✅
+- [x] Architect review completed
+- [x] Anti-patterns documented (diagnostic RAISE NOTICE, TRUNCATE)
+- [x] Recommendations prioritized
+- [x] Documentation gaps identified (9 files)
+
+### After Phase 12 ✅
+- [x] All 9 documentation files reviewed and updated (4 changed, 5 already current)
+- [x] 40 diagnostic RAISE NOTICE statements removed from 4 functions
+- [x] Migration `20251229233333_remove_diagnostic_notices.sql` applied
+- [x] org_id rename determined NOT NEEDED (columns already use organization_id)
+
 ---
 
 ## Completed Migrations
@@ -279,25 +368,30 @@
 | `20251229220540_stub_unused_overloads.sql` | Diagnostic stubs for function overloads (ruled out ambiguity) | ✅ Applied |
 | `20251229221456_fix_rls_recursion.sql` | **FIX**: SECURITY DEFINER on is_super_admin/is_org_admin | ✅ Applied |
 | `20251229223544_add_when_clauses_to_bootstrap_triggers.sql` | Add WHEN clauses to bootstrap triggers for performance | ✅ Applied |
+| `20251229225733_cleanup_diagnostic_stubs.sql` | Remove 3 diagnostic stub functions from Phase 8 debugging | ✅ Applied |
+| `20251229233333_remove_diagnostic_notices.sql` | Remove 40 [DIAG: RAISE NOTICE statements from 4 functions | ✅ Applied |
 
 ---
 
 ## Audit Results (Final)
 
-| Metric | Before | After Phase 3 | After Phase 6 | After Phase 8 | After Phase 9 |
-|--------|--------|---------------|---------------|---------------|---------------|
-| Orphaned permissions | 19 | 0 | 0 | 0 | 0 |
-| Orphaned users | 5 | 0 | 0 | 0 | 0 |
-| Orphaned invitations | 2 | 0 | 0 | 0 | 0 |
-| Test data (fake org_id) | 3 rows | 0 | 0 | 0 | 0 |
-| `role.create` scope_type | global (BUG) | org (FIXED) | org | org | org |
-| scope_type values | 5 | 2 (global, org) | 2 | 2 | 2 |
-| Total permissions | 42 | 42 | **31** | 31 | 31 |
-| provider_admin template permissions | ? | 19 | **23** | 23 | 23 |
-| emit_domain_event overloads | 2 | 2 | **3** | 3 | 3 |
-| is_super_admin/is_org_admin | SECURITY INVOKER (BUG) | - | - | **SECURITY DEFINER** | SECURITY DEFINER |
-| Role creation via UI | ❌ stack overflow | - | ❌ stack overflow | **✅ Working** | ✅ Working |
-| Bootstrap triggers with WHEN | 3/5 (60%) | - | - | - | **5/5 (100%)** |
+| Metric | Before | After Phase 3 | After Phase 6 | After Phase 8 | After Phase 9 | After Phase 10 |
+|--------|--------|---------------|---------------|---------------|---------------|----------------|
+| Orphaned permissions | 19 | 0 | 0 | 0 | 0 | 0 |
+| Orphaned users | 5 | 0 | 0 | 0 | 0 | 0 |
+| Orphaned invitations | 2 | 0 | 0 | 0 | 0 | 0 |
+| Test data (fake org_id) | 3 rows | 0 | 0 | 0 | 0 | 0 |
+| `role.create` scope_type | global (BUG) | org (FIXED) | org | org | org | org |
+| scope_type values | 5 | 2 (global, org) | 2 | 2 | 2 | 2 |
+| Total permissions | 42 | 42 | **31** | 31 | 31 | 31 |
+| provider_admin template permissions | ? | 19 | **23** | 23 | 23 | 23 |
+| api.emit_domain_event overloads | 2 | 2 | 3 | 3 | 3 | **1** (canonical) |
+| api.create_role overloads | 1 | 1 | 2 | 2 | 2 | **1** (canonical) |
+| is_super_admin/is_org_admin | SECURITY INVOKER (BUG) | - | - | **SECURITY DEFINER** | SECURITY DEFINER | SECURITY DEFINER |
+| Role creation via UI | ❌ stack overflow | - | ❌ stack overflow | **✅ Working** | ✅ Working | ✅ Working |
+| Bootstrap triggers with WHEN | 3/5 (60%) | - | - | - | **5/5 (100%)** | 5/5 (100%) |
+| Diagnostic RAISE NOTICE | 40+ | - | - | - | - | **0** (cleaned) |
+| Documentation files updated | - | - | - | - | - | **4 of 9** (5 already current) |
 
 ---
 

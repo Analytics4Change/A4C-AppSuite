@@ -51,13 +51,12 @@ The A4C platform uses three complementary scoping mechanisms that work together 
 | `permission.revoke` | Revoke permissions from roles (catalog) |
 | `permission.view` | View permission catalog |
 
-**Org Permissions (32 total)**:
-- `a4c_role.*` (5) - A4C internal role management
-- `client.*` (4) - Client management
-- `medication.*` (4) - Medication management
-- `organization.*` org-scoped (7) - Business profile, org units, updates
-- `role.*` (6) - Role CRUD and assignment
-- `user.*` (6) - User management
+**Org Permissions (23 total)**:
+- `client.*` (4) - Client management (create, view, update, delete)
+- `medication.*` (5) - Medication management (create, view, update, delete, administer)
+- `organization.*` org-scoped (4) - Org view, update, view_ou, create_ou
+- `role.*` (4) - Role CRUD (create, view, update, delete)
+- `user.*` (6) - User management (create, view, update, delete, role_assign, role_revoke)
 
 ### 3. `org_type` (JWT Runtime Filter)
 
@@ -95,8 +94,8 @@ User Request → JWT contains org_type
 1. User opens Role Management UI (`/roles/manage`)
 2. Frontend calls `api.get_permissions()` to populate permission selector
 3. API checks JWT `org_type`:
-   - Platform owner sees 42 permissions (10 global + 32 org)
-   - Provider sees 32 permissions (org-scoped only)
+   - Platform owner sees 33 permissions (10 global + 23 org)
+   - Provider sees 23 permissions (org-scoped only)
 4. User creates role with selected permissions
 5. `api.create_role()` emits `role.created` event with `organization_id`
 6. Role is stored with user's `organization_id` (from JWT `org_id` claim)
@@ -107,21 +106,21 @@ User Request → JWT contains org_type
 
 - User: `lars.tice@gmail.com` (super_admin)
 - `org_type`: `platform_owner`
-- Sees: All 42 permissions, all global roles
+- Sees: All 33 permissions, all global roles
 - Can: Create organizations, manage platform settings
 
 ### Scenario 2: Provider Admin Managing Their Org
 
 - User: `troy@liveforlifeutah.com` (provider_admin)
 - `org_type`: `provider`
-- Sees: 32 org-scoped permissions
+- Sees: 23 org-scoped permissions
 - Can: Create roles, manage users within their organization
 - Cannot: See global permissions, manage other organizations
 
 ### Scenario 3: Role Assignment
 
 When assigning a role to a user:
-1. User must have `role.assign` permission
+1. User must have `user.role_assign` permission
 2. Role must belong to same organization (or be global)
 3. User can only grant permissions they possess (subset-only delegation)
 
@@ -178,7 +177,7 @@ function groupPermissionsByScopeAndApplet(permissions: Permission[]) {
 
 ### "Cannot assign permission"
 
-1. Check if user has `role.grant` permission
+1. Check if user has `user.role_assign` or `user.role_revoke` permission
 2. Check subset-only delegation: user must possess the permission
 3. Check permission `scope_type` matches user's visibility
 

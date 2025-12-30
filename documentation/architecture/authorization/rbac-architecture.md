@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-08
+last_updated: 2025-12-29
 ---
 
 # Permission-Based RBAC Architecture
@@ -100,42 +100,49 @@ Permissions are defined per **applet** (distinct functional modules in the appli
 
 #### Medication Management Applet
 
-- `medication.create` - Create new medication prescriptions
-- `medication.view` - View medication history and prescriptions
-- `medication.update` - Modify existing prescriptions
-- `medication.delete` - Discontinue/archive medications
-- `medication.approve` - Approve prescription changes (requires higher role)
+- `medication.create` - Create new medication records
+- `medication.view` - View medication records
+- `medication.update` - Modify medication records
+- `medication.delete` - Delete medication records
+- `medication.administer` - Administer medications to clients
 
 #### Organization Management Applet
 
-- `organization.create_root` - Create top-level organizations (Platform Owner only) - **IMPLEMENTED ✅** via bootstrap architecture
-- `organization.view_ou` - View organizational unit hierarchy (departments, locations, campuses) - Provider admin scoped - **IMPLEMENTED ✅**
-- `organization.create_ou` - Create organizational units (departments, locations, campuses) within hierarchy - Provider admin scoped - **IMPLEMENTED ✅**
-- `organization.create_sub` - Create sub-organizations within hierarchy (deprecated, use `organization.create_ou` instead)
-- `organization.view` - View organization information and hierarchy
-- `organization.update` - Update organization information
-- `organization.deactivate` - Deactivate organizations (billing, compliance, operational)
-- `organization.delete` - Delete organizations with cascade handling (super_admin: unrestricted, provider_admin/partner_admin: empty OUs only) - See [Organizational Deletion UX](./organizational-deletion-ux.md)
-- `organization.business_profile_create` - Create business profiles (Platform Owner only) - **IMPLEMENTED ✅** via bootstrap architecture
-- `organization.business_profile_update` - Update business profiles
+**Global Scope (10 permissions):**
+- `organization.activate` - Activate/reactivate organizations
+- `organization.create` - Create organizations (general)
+- `organization.create_root` - Create top-level organizations (Platform Owner only)
+- `organization.deactivate` - Deactivate organizations
+- `organization.delete` - Delete organizations with cascade handling
+- `organization.search` - Search across all organizations
+- `organization.suspend` - Suspend organization access
+- `permission.grant` - Grant permissions to roles (catalog)
+- `permission.revoke` - Revoke permissions from roles (catalog)
+- `permission.view` - View permission catalog
 
-**Bootstrap Integration**: Organization creation now uses event-driven bootstrap architecture documented in `.plans/provider-management/bootstrap-workflows.md`. The `organization.create_root` permission triggers the `orchestrate_organization_bootstrap()` workflow.
+**Org Scope (4 permissions):**
+- `organization.view` - View organization details
+- `organization.update` - Update organization settings
+- `organization.view_ou` - View organizational unit hierarchy - **IMPLEMENTED ✅**
+- `organization.create_ou` - Create organizational units within hierarchy - **IMPLEMENTED ✅**
+
+**Bootstrap Integration**: Organization creation now uses event-driven bootstrap architecture. The bootstrap workflow grants all 23 org-scoped permissions to the provider_admin role.
 
 #### Client Management Applet
 
-- `client.create` - Register new clients
+- `client.create` - Create new clients in the organization
 - `client.view` - View client records
-- `client.update` - Modify client information
-- `client.delete` - Archive clients
-- `client.discharge` - Discharge clients from programs
+- `client.update` - Update client information
+- `client.delete` - Delete client records
 
 #### User Management Applet
 
-- `user.create` - Create new user accounts
-- `user.view` - View user profiles
-- `user.update` - Modify user accounts
-- `user.delete` - Deactivate users
-- `user.assign_role` - Grant roles to users
+- `user.create` - Create/invite users to organization
+- `user.view` - View user profiles and assignments
+- `user.update` - Update user profiles
+- `user.delete` - Remove users from organization
+- `user.role_assign` - Assign roles to users
+- `user.role_revoke` - Revoke roles from users
 
 #### Access Grant Applet (Cross-Tenant) - **IMPLEMENTED ✅**
 
@@ -176,11 +183,11 @@ See [Scoping Architecture](./scoping-architecture.md) for details on how the thr
 
 ### Initial Roles (Phase 1)
 
-We start with just **two foundational roles** that map cleanly to Zitadel organization ownership models:
+We start with just **two foundational roles** that map cleanly to organization ownership models:
 
 #### 1. `super_admin`
 
-**Zitadel Mapping**: `IAM_OWNER` (Instance-level owner)
+**Mapping**: Platform-level administrator (instance-wide owner)
 
 **Scope**: All organizations (present and future)
 
@@ -221,7 +228,7 @@ We start with just **two foundational roles** that map cleanly to Zitadel organi
 
 #### 2. `provider_admin`
 
-**Zitadel Mapping**: `ORG_OWNER` (Organization-level owner)
+**Mapping**: Organization-level administrator (single org owner)
 
 **Scope**: Single Provider organization (their subdomain only)
 
@@ -772,35 +779,35 @@ async function checkPermissionDuringImpersonation(
 
 ---
 
-## Zitadel Integration
+## Supabase Auth Integration
 
 ### Organization Ownership Mapping
 
-Zitadel provides two levels of ownership that map to our role model:
+The RBAC system maps to organization ownership models:
 
-**IAM_OWNER (Instance Admin)**:
-- Zitadel instance-level owner
+**Platform Administrator (super_admin)**:
+- Platform-level instance owner
 - Can manage all organizations
 - Maps to: `super_admin` role
 - Scope: All organizations (`org_id = '*'`)
 
-**ORG_OWNER (Organization Admin)**:
-- Zitadel organization-level owner
+**Organization Administrator (provider_admin)**:
+- Organization-level owner
 - Can manage single organization
 - Maps to: `provider_admin` role
 - Scope: Single organization (`org_id = specific org`)
 
 ### JWT Claims Structure
 
-JWT tokens include permission context for authorization:
+JWT tokens include permission context for authorization via Supabase Auth custom claims hook:
 
 ```json
 {
   "sub": "user-id",
   "email": "user@example.com",
   "org_id": "acme_healthcare_001",
-  "zitadel_org_role": "ORG_OWNER",
-  "roles": ["provider_admin"],
+  "org_type": "provider",
+  "user_role": "provider_admin",
   "permissions": [
     "medication.create",
     "medication.view",
@@ -819,8 +826,8 @@ JWT tokens include permission context for authorization:
   "sub": "super-admin-id",
   "email": "admin@a4c.app",
   "org_id": "*",
-  "zitadel_org_role": "IAM_OWNER",
-  "roles": ["super_admin"],
+  "org_type": "platform_owner",
+  "user_role": "super_admin",
   "permissions": ["*"],  // Wildcard indicates all permissions
   "scope_path": "*",
   "iat": 1728484000,
@@ -830,19 +837,18 @@ JWT tokens include permission context for authorization:
 
 ### Role Synchronization
 
-Roles are synchronized between Zitadel and PostgreSQL projections:
+Roles are synchronized between Supabase Auth and PostgreSQL projections:
 
 **Process**:
-1. User assigned `ORG_OWNER` in Zitadel for an organization
-2. Webhook triggers `user.role.assigned` event
+1. User assigned role via admin action or organization bootstrap workflow
+2. Action emits `user.role.assigned` event
 3. Event processor updates `user_roles_projection`
-4. User gains all permissions associated with `provider_admin` role
+4. User gains all permissions associated with assigned role
+5. JWT custom claims hook includes permissions on next token refresh
 
 **Event Flow**:
 ```
-Zitadel Role Assignment
-  ↓
-Webhook to Edge Function
+Role Assignment (UI or Workflow)
   ↓
 Emit user.role.assigned Event
   ↓
@@ -851,6 +857,8 @@ domain_events Table
 Trigger: process_user_role_event()
   ↓
 user_roles_projection Updated
+  ↓
+JWT Refresh → Updated Claims
 ```
 
 ---
@@ -1047,9 +1055,10 @@ ORDER BY de.created_at DESC;
 Sensitive permissions require MFA before assignment or use:
 
 **Permissions Requiring MFA**:
-- `provider.impersonate`
+- `organization.delete` (for organization deletion)
+- `organization.deactivate` (for organization deactivation)
 - `access_grant.create` (for cross-tenant grants)
-- `user.assign_role` (for super_admin assignments)
+- `user.role_assign` (for super_admin assignments)
 
 **Enforcement**:
 ```typescript
@@ -1103,38 +1112,57 @@ EXECUTE FUNCTION raise_exception('Events are immutable for audit integrity');
 
 ## Appendix
 
-### A. Complete Permission Catalog (Initial)
+### A. Complete Permission Catalog (31 Total)
+
+**Global Permissions (10):**
+
+| Permission | Description |
+|------------|-------------|
+| `organization.activate` | Activate/reactivate organizations |
+| `organization.create` | Create organizations (general) |
+| `organization.create_root` | Create top-level provider organizations |
+| `organization.deactivate` | Deactivate organizations |
+| `organization.delete` | Delete organizations with cascade handling |
+| `organization.search` | Search across all organizations |
+| `organization.suspend` | Suspend organization access |
+| `permission.grant` | Grant permissions to roles (catalog) |
+| `permission.revoke` | Revoke permissions from roles (catalog) |
+| `permission.view` | View permission catalog |
+
+**Org-Scoped Permissions (21):**
 
 | Applet | Permissions | Description |
 |--------|------------|-------------|
-| medication | create, view, update, delete, approve | Medication management |
-| organization | create_root, create_ou, create_sub (deprecated), view, update, deactivate, delete, business_profile_create, business_profile_update | Organization management |
-| client | create, view, update, delete, discharge | Client records management |
-| user | create, view, update, delete, assign_role | User account management |
-| access_grant | create, view, revoke, approve | Cross-tenant access grants |
-| audit | view, export | Audit log access |
+| organization | view, update, view_ou, create_ou | Org-level management (4) |
+| client | create, view, update, delete | Client records management (4) |
+| medication | create, view, update, delete, administer | Medication management (5) |
+| role | create, view, update, delete | Role management (4) |
+| user | create, view, update, delete, role_assign, role_revoke | User account management (6) |
 
 ### B. Role Permission Matrix
 
 | Permission | super_admin | provider_admin |
 |-----------|-------------|----------------|
-| medication.* | ✅ | ✅ |
+| **Global (10)** | | |
+| organization.activate | ✅ | ❌ |
+| organization.create | ✅ | ❌ |
 | organization.create_root | ✅ | ❌ |
-| organization.view_ou | ✅ | ✅ (own org) |
-| organization.create_ou | ✅ | ✅ (own org) |
-| organization.create_sub (deprecated) | ✅ | ❌ (removed) |
+| organization.deactivate | ✅ | ❌ |
+| organization.delete | ✅ | ❌ |
+| organization.search | ✅ | ❌ |
+| organization.suspend | ✅ | ❌ |
+| permission.grant | ✅ | ❌ |
+| permission.revoke | ✅ | ❌ |
+| permission.view | ✅ | ❌ |
+| **Org-Scoped (21)** | | |
 | organization.view | ✅ | ✅ (own org) |
 | organization.update | ✅ | ✅ (own org) |
-| organization.deactivate | ✅ | ✅ (own org) |
-| organization.delete | ✅ (unrestricted) | ✅ (empty OUs only) |
-| organization.business_profile_create | ✅ | ❌ |
-| organization.business_profile_update | ✅ | ✅ (own org) |
+| organization.view_ou | ✅ | ✅ (own org) |
+| organization.create_ou | ✅ | ✅ (own org) |
 | client.* | ✅ | ✅ (own org) |
+| medication.* | ✅ | ✅ (own org) |
+| role.* | ✅ | ✅ (own org) |
 | user.* | ✅ | ✅ (own org) |
-| access_grant.create | ✅ | ✅ (own org data) |
-| access_grant.approve | ✅ | ✅ (own org data) |
-| audit.view | ✅ | ✅ (own org) |
-| audit.export | ✅ | ✅ (own org) |
 
 ### B.1 Organization Deletion Constraints and UX Requirements
 
@@ -1289,7 +1317,7 @@ const AdminPanel = () => {
 
 ---
 
-**Document Version**: 1.1
-**Last Updated**: 2025-10-27
-**Status**: Approved for Implementation (Frontend Complete)
+**Document Version**: 1.2
+**Last Updated**: 2025-12-29
+**Status**: Approved for Implementation (Frontend Complete, RBAC Cleanup Complete)
 **Owner**: A4C Development Team

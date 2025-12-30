@@ -68,7 +68,7 @@ After running seed data, verify projections were created correctly:
 ```sql
 -- Check permissions were created
 SELECT COUNT(*) FROM permissions_projection;
--- Expected: 30+ permissions (medication, provider, client, user, access_grant, audit)
+-- Expected: 31 permissions (10 global + 21 org-scoped)
 
 -- Check roles were created
 SELECT * FROM roles_projection;
@@ -120,8 +120,7 @@ SELECT
     'reason', 'Initial RBAC setup: granting ' || name || ' permission to provider_admin role'
   )
 FROM permissions_projection
-WHERE name != 'provider.impersonate'  -- Exclude super admin-only permission
-  AND scope_type IN ('org', 'unit', 'client')  -- Only org-scoped permissions (unit = provider-defined organizational unit)
+WHERE scope_type = 'org'  -- Only org-scoped permissions (excludes global permissions)
 ORDER BY name;
 ```
 
@@ -131,7 +130,7 @@ ORDER BY name;
 -- Check super_admin has all permissions
 SELECT COUNT(*) FROM role_permissions_projection
 WHERE role_id = '11111111-1111-1111-1111-111111111111';
--- Expected: 30+ (all permissions)
+-- Expected: 31 (all permissions)
 
 -- Check provider_admin has org-scoped permissions
 SELECT p.name
@@ -139,7 +138,7 @@ FROM role_permissions_projection rp
 JOIN permissions_projection p ON p.id = rp.permission_id
 WHERE rp.role_id = '22222222-2222-2222-2222-222222222222'
 ORDER BY p.name;
--- Expected: All except provider.impersonate and global-scoped permissions
+-- Expected: 23 permissions (21 org-scoped + permission.grant, permission.view)
 ```
 
 ---
@@ -208,23 +207,23 @@ WHERE ur.user_id = '<USER_UUID>';
 ### Test Permission Checks
 
 ```sql
--- Test super admin has impersonation permission
+-- Test super admin has organization management permission
 SELECT user_has_permission(
   '<SUPER_ADMIN_UUID>'::UUID,
-  'provider.impersonate',
+  'organization.create',
   'any_org_id',
   NULL
 );
 -- Expected: TRUE
 
--- Test provider admin does NOT have impersonation permission
+-- Test provider admin does NOT have global organization.create permission
 SELECT user_has_permission(
   '<PROVIDER_ADMIN_UUID>'::UUID,
-  'provider.impersonate',
+  'organization.create',
   'their_org_id',
   NULL
 );
--- Expected: FALSE
+-- Expected: FALSE (organization.create is a global permission)
 
 -- Test provider admin has medication.create permission in their org
 -- Example 1: Detention Center (complex hierarchy)
@@ -801,20 +800,23 @@ REINDEX TABLE role_permissions_projection;
 
 ### C. Common Permission Patterns
 
-| Use Case | Permission | Scope | Notes |
-|----------|------------|-------|-------|
-| Create medication | `medication.create` | org/unit | Unit can be: facility, campus, home, wing, pod, etc. (provider-defined) |
-| View client records | `client.view` | org/unit | Hierarchical scoping via ltree path |
-| Impersonate user | `provider.impersonate` | global | Super admin only |
-| Grant cross-tenant access | `access_grant.create` | org | Provider admin can grant access to their org data |
-| Export audit logs | `audit.export` | org | Full org scope or scoped to specific unit |
-| Delete empty OU | `organization.delete` | org | provider_admin: empty only; super_admin: unrestricted; see [deletion UX](./organizational-deletion-ux.md) |
+| Use Case | Permission | Scope Type | Notes |
+|----------|------------|------------|-------|
+| Create medication | `medication.create` | org | Hierarchical scoping via ltree path |
+| Administer medication | `medication.administer` | org | Medication administration to clients |
+| View client records | `client.view` | org | Hierarchical scoping via ltree path |
+| Create organization | `organization.create` | global | Super admin only |
+| Manage organization units | `organization.create_ou` | org | Provider admin can create OUs in their org |
+| Assign roles | `user.role_assign` | org | Provider admin can assign roles in their org |
+| Delete organization | `organization.delete` | global | Super admin only |
 
-**Note**: Scope values are semantic labels. Actual scoping uses ltree paths with provider-defined hierarchies.
+**Note**: `scope_type` determines permission visibility:
+- `global`: Visible only to platform_owner org_type (A4C organization)
+- `org`: Visible to all org_types (providers, provider partners, platform owner)
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-10-09
+**Document Version**: 1.1
+**Last Updated**: 2025-12-29
 **Status**: Ready for Implementation
 **Owner**: A4C Development Team

@@ -4,8 +4,8 @@
 
 This document defines the canonical permissions used in the A4C-AppSuite platform. All permissions follow the `resource.action` naming convention and are organized by scope type.
 
-**Last Updated**: 2025-12-20
-**Total Permissions**: 34 (7 global + 27 organization-scoped)
+**Last Updated**: 2025-12-29
+**Total Permissions**: 31 (10 global + 21 org-scoped)
 
 ## Permission Naming Convention
 
@@ -23,36 +23,37 @@ This document defines the canonical permissions used in the A4C-AppSuite platfor
 | `global` | Platform-wide permissions (super_admin only) | `organization.create`, `users.impersonate` |
 | `org` | Organization-scoped permissions | `client.view`, `medication.create` |
 
-## Global Permissions (7)
+## Global Permissions (10)
 
-These permissions are assigned only to `super_admin` and apply platform-wide.
+These permissions are assigned only to `super_admin` and apply platform-wide. Platform-level operations for managing the organization catalog.
 
 | Permission | Description | Notes |
 |------------|-------------|-------|
-| `organization.create` | Create top-level provider organizations | Also known as `create_root` |
-| `organization.create_sub` | Create sub-organizations (VAR partners) | Hierarchical org creation |
+| `organization.activate` | Activate a suspended organization | Returns org to active state |
+| `organization.create` | Create organizations (general) | Platform admin operation |
+| `organization.create_root` | Create top-level provider organizations | Root org creation |
 | `organization.deactivate` | Soft-delete organizations | Requires MFA |
 | `organization.delete` | Permanently delete organizations | Requires MFA, cascades |
-| `global_roles.create` | Create global system roles | A4C internal roles |
-| `cross_org.grant` | Grant permissions across organizations | For partner arrangements |
-| `users.impersonate` | Impersonate users in any organization | Audited, time-limited |
+| `organization.search` | Search across all organizations | Platform-wide search |
+| `organization.suspend` | Temporarily suspend an organization | Reversible via activate |
+| `permission.grant` | Grant permissions to roles | Platform permission management |
+| `permission.revoke` | Revoke permissions from roles | Platform permission management |
+| `permission.view` | View platform permission catalog | View all defined permissions |
 
-## Organization-Scoped Permissions (27)
+## Organization-Scoped Permissions (21)
 
-These permissions are assigned to organization-level roles and apply within the org_id context.
+These permissions are assigned to organization-level roles and apply within the organization context.
 
-### Organization Management (6)
+### Organization Management (4)
 
 | Permission | Description | provider_admin |
 |------------|-------------|----------------|
-| `organization.view_ou` | View organizational units (departments, locations) | Yes |
-| `organization.create_ou` | Create organizational units within hierarchy | Yes |
 | `organization.view` | View organization details | Yes |
 | `organization.update` | Update organization settings and profile | Yes |
-| `organization.business_profile_create` | Create business profile (deprecated) | Consolidated into update |
-| `organization.business_profile_update` | Update business profile (deprecated) | Consolidated into update |
+| `organization.view_ou` | View organizational units (departments, locations) | Yes |
+| `organization.create_ou` | Create organizational units within hierarchy | Yes |
 
-### Client Management (5)
+### Client Management (4)
 
 | Permission | Description | provider_admin |
 |------------|-------------|----------------|
@@ -60,7 +61,6 @@ These permissions are assigned to organization-level roles and apply within the 
 | `client.view` | View client records | Yes |
 | `client.update` | Update client information | Yes |
 | `client.delete` | Delete client records | Yes |
-| `client.transfer` | Transfer clients between organizations | No |
 
 ### Medication Management (5)
 
@@ -68,57 +68,49 @@ These permissions are assigned to organization-level roles and apply within the 
 |------------|-------------|----------------|
 | `medication.create` | Create medication records | Yes |
 | `medication.view` | View medication records | Yes |
-| `medication.update` | Update medication records | No |
-| `medication.delete` | Delete medication records | No |
-| `medication.create_template` | Create medication templates | No |
+| `medication.update` | Update medication records | Yes |
+| `medication.delete` | Delete medication records | Yes |
+| `medication.administer` | Administer medications to clients | Yes |
 
-### Role Management (3)
+### Role Management (4)
 
 | Permission | Description | provider_admin |
 |------------|-------------|----------------|
 | `role.create` | Create custom roles within organization | Yes |
-| `role.assign` | Assign roles to users | Yes |
 | `role.view` | View roles and their permissions | Yes |
+| `role.update` | Update role definitions | Yes |
+| `role.delete` | Delete roles | Yes |
 
-### User Management (3)
+### User Management (6)
 
 | Permission | Description | provider_admin |
 |------------|-------------|----------------|
 | `user.create` | Create/invite users to organization | Yes |
 | `user.view` | View user profiles and assignments | Yes |
 | `user.update` | Update user profiles | Yes |
-
-### A4C Role Management (5)
-
-These permissions are for A4C internal operations.
-
-| Permission | Description | super_admin |
-|------------|-------------|-------------|
-| `a4c_role.create` | Create A4C internal roles | Yes |
-| `a4c_role.assign` | Assign A4C roles | Yes |
-| `a4c_role.view` | View A4C role structure | Yes |
-| `a4c_role.update` | Update A4C roles | Yes |
-| `a4c_role.delete` | Delete A4C roles | Yes |
+| `user.delete` | Remove users from organization | Yes |
+| `user.role_assign` | Assign roles to users | Yes |
+| `user.role_revoke` | Revoke roles from users | Yes |
 
 ## Canonical Role Permissions
 
 ### super_admin
 
-Global platform administrator with all permissions. Can impersonate users for support.
+Global platform administrator with all permissions. Can manage the platform organization catalog.
 
-**Permissions**: All 34 permissions
+**Permissions**: All 31 permissions (10 global + 21 org-scoped)
 
-### provider_admin (16 permissions)
+### provider_admin (23 permissions)
 
-Organization owner with full control within their organization.
+Organization owner with full control within their organization. All 21 org-scoped permissions plus 2 permission management permissions.
 
 ```typescript
 const PROVIDER_ADMIN_PERMISSIONS = [
   // Organization (4)
-  'organization.view_ou',
-  'organization.create_ou',
   'organization.view',
   'organization.update',
+  'organization.view_ou',
+  'organization.create_ou',
 
   // Client (4)
   'client.create',
@@ -126,19 +118,26 @@ const PROVIDER_ADMIN_PERMISSIONS = [
   'client.update',
   'client.delete',
 
-  // Medication (2)
+  // Medication (5)
   'medication.create',
   'medication.view',
+  'medication.update',
+  'medication.delete',
+  'medication.administer',
 
-  // Role (3)
+  // Role (4)
   'role.create',
-  'role.assign',
   'role.view',
+  'role.update',
+  'role.delete',
 
-  // User (3)
+  // User (6)
   'user.create',
   'user.view',
   'user.update',
+  'user.delete',
+  'user.role_assign',
+  'user.role_revoke',
 ];
 ```
 
@@ -219,7 +218,7 @@ WHERE role_name = 'provider_admin' AND permission_name = 'old.permission';
 
 | Role | Permission Count |
 |------|------------------|
-| `provider_admin` | 16 |
+| `provider_admin` | 23 |
 | `partner_admin` | 4 |
 | `clinician` | 4 |
 | `viewer` | 3 |
@@ -230,12 +229,12 @@ Frontend permissions are defined in `frontend/src/config/permissions.config.ts`:
 
 ```typescript
 export const PERMISSIONS: Record<string, Permission> = {
-  // Global Level (7)
+  // Global Level (10)
   'organization.create': { scope: 'global', ... },
   // ...
 
   // Organization Level (21)
-  'organization.view_ou': { scope: 'organization', ... },
+  'organization.view': { scope: 'organization', ... },
   // ...
 };
 ```
@@ -277,6 +276,7 @@ Maps roles to their granted permissions.
 
 | Date | Change | Author |
 |------|--------|--------|
+| 2025-12-29 | Updated to 31 permissions (10 global, 21 org). Removed deleted permissions (a4c_role.*, role.assign, etc.). Updated provider_admin to 23 permissions. | Claude |
 | 2025-12-20 | Added Permission Templates section with role scoping architecture | Claude |
 | 2025-12-20 | Added `role_permission_templates` table for database-driven templates | Claude |
 | 2024-12-19 | Added `organization.view_ou` and `organization.create_ou` | Claude |

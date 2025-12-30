@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2025-12-29
 ---
 
 # permissions_projection
@@ -22,7 +22,7 @@ The `permissions_projection` table is a **CQRS read model** that stores atomic a
 | action | text | NO | - | Operation name (e.g., 'create', 'view', 'update', 'delete') |
 | name | text | NO | GENERATED | Permission identifier: `applet.action` (e.g., 'clients.create') |
 | description | text | NO | - | Human-readable explanation of permission purpose |
-| scope_type | text | NO | - | Hierarchical scope level (global, org, facility, program, client) |
+| scope_type | text | NO | - | Scope level: 'global' (platform-wide) or 'org' (organization-level) |
 | requires_mfa | boolean | NO | false | Whether MFA verification is required to use this permission |
 | created_at | timestamptz | NO | now() | Permission definition timestamp |
 
