@@ -53,7 +53,6 @@
  * ```
  */
 
-import { v4 as uuidv4 } from 'uuid';
 import { getSupabaseClient } from './supabase';
 
 export interface EmitEventParams {
@@ -111,8 +110,9 @@ export interface EmitEventParams {
 export async function emitEvent(params: EmitEventParams): Promise<string> {
   const supabase = getSupabaseClient();
 
-  // Generate event ID if not provided (for idempotency)
-  const eventId = params.event_id || uuidv4();
+  // Note: event_id param is accepted but not used - the database function
+  // auto-generates the event ID and returns it. The event_id field is kept
+  // in the interface for potential future idempotency support.
 
   // Build event metadata
   const metadata: Record<string, unknown> = {
@@ -183,13 +183,24 @@ export async function emitEvent(params: EmitEventParams): Promise<string> {
 
   // Insert event into domain_events table via RPC function
   // (PostgREST only exposes 'api' schema, so we use RPC to access public.domain_events)
-  const { error } = await supabase
+  //
+  // Function signature: api.emit_domain_event(
+  //   p_stream_id uuid,       -- aggregate_id (the entity ID)
+  //   p_stream_type text,     -- aggregate_type (e.g., 'organization', 'role')
+  //   p_event_type text,      -- event type (e.g., 'organization.created')
+  //   p_event_data jsonb,     -- event payload
+  //   p_event_metadata jsonb  -- audit context (optional, defaults to '{}')
+  // )
+  // Returns: UUID of the created event
+  //
+  // Note: stream_version is auto-calculated by the function.
+  // Note: eventId is not passed - the function generates and returns it.
+  const { data: returnedEventId, error } = await supabase
     .schema('api')
     .rpc('emit_domain_event', {
-      p_event_id: eventId,
+      p_stream_id: params.aggregate_id,
+      p_stream_type: params.aggregate_type,
       p_event_type: params.event_type,
-      p_aggregate_type: params.aggregate_type,
-      p_aggregate_id: params.aggregate_id,
       p_event_data: params.event_data,
       p_event_metadata: metadata
     });
@@ -198,8 +209,10 @@ export async function emitEvent(params: EmitEventParams): Promise<string> {
     throw new Error(`Failed to emit event: ${error.message}`);
   }
 
-  console.log(`[Event Emitter] Emitted ${params.event_type} event: ${eventId}`);
-  return eventId;
+  // The function returns the generated event UUID
+  const emittedEventId = returnedEventId as string;
+  console.log(`[Event Emitter] Emitted ${params.event_type} event: ${emittedEventId}`);
+  return emittedEventId;
 }
 
 /**
