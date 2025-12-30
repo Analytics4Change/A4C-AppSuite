@@ -1,12 +1,12 @@
 ---
-status: aspirational
+status: current
 last_updated: 2025-12-30
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Step-by-step implementation guide for Super Admin impersonation including prerequisites (RBAC, Redis, JWT), database setup, API endpoints, and frontend integration.
+**Summary**: Implementation guide for Super Admin impersonation. Infrastructure partially implemented - database and frontend scaffolding exists but end-to-end flow is NOT functional.
 
 **When to read**:
 - Starting impersonation feature implementation
@@ -22,8 +22,10 @@ last_updated: 2025-12-30
 <!-- TL;DR-END -->
 
 # Impersonation Implementation Guide
+
 > [!WARNING]
-> **This feature is not yet implemented.** This document describes planned functionality that has not been built. Implementation timeline and approach are subject to change based on business priorities.
+> **Infrastructure partially implemented but end-to-end flow NOT functional.**
+> See [impersonation-architecture.md](impersonation-architecture.md) for implementation status details.
 
 
 ## Overview

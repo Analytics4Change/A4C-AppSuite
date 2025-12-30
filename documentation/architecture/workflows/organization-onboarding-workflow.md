@@ -90,9 +90,9 @@ Temporal Server (temporal-frontend.temporal.svc.cluster.local:7233)
 Temporal Worker (workflow-worker deployment)
 ```
 
-**Activities**: 12 total (6 forward + 6 compensation)
-- **Forward**: createOrganization, createContacts, createAddresses, createPhones, configureDNS, generateAndSendInvitations
-- **Compensation**: compensateOrganization, compensateContacts, compensateAddresses, compensatePhones, compensateDNS, compensateInvitations
+**Activities**: 13 total (7 forward + 6 compensation)
+- **Forward**: createOrganization, grantProviderAdminPermissions, configureDNS, verifyDNS, generateInvitations, sendInvitationEmails, activateOrganization
+- **Compensation**: deactivateOrganization, removeDNS, revokeInvitations, deleteContacts, deleteAddresses, deletePhones
 
 **Key Characteristics**:
 - **Duration**: 2-5 minutes (DNS instant with Cloudflare proxy)

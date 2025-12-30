@@ -281,11 +281,11 @@ This table participates in the CQRS event-driven architecture:
 
 - **Event Trigger**: `[trigger_name]` (see Triggers section)
 
-### Audit Log Integration
+### Audit Trail
 
-- All changes logged to `audit_log` table via trigger
-- Tracks: user_id, timestamp, operation, old_values, new_values
-- Immutable audit trail for compliance
+- All state changes recorded via domain events in `domain_events` table
+- Events include: event_type, aggregate_id, event_data, metadata (user_id, timestamp, workflow context)
+- Immutable audit trail for HIPAA compliance - query `domain_events` for complete history
 
 ## JSONB Columns
 

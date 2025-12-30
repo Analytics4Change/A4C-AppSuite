@@ -1,12 +1,12 @@
 ---
-status: foundation-implemented
+status: current
 last_updated: 2025-12-30
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Architecture for provider partner organizations (VAR, family, court, agencies) including cross-tenant access grants, conditional subdomain provisioning, and partner relationship tracking.
+**Summary**: Architecture for provider partner organizations. Foundation implemented: partner types, conditional subdomains, relationship tracking. NOT implemented: cross-tenant access grant management UI.
 
 **When to read**:
 - Implementing provider partner features
@@ -24,13 +24,17 @@ last_updated: 2025-12-30
 # Provider Partner Architecture
 
 > [!NOTE]
-> **Foundation Implemented (2025-12-02)**. Core infrastructure for provider partners is complete:
+> **Foundation Implemented (2025-12-02)**. Organization creation works for all partner types:
 > - ✅ Partner type enum (`var`, `family`, `court`, `other`) in organization bootstrap
 > - ✅ Conditional subdomain provisioning (providers get subdomains, partners don't by default)
-> - ✅ Referring partner relationship tracking
+> - ✅ Referring partner relationship tracking in `referring_partner_id` field
 > - ✅ Organization bootstrap workflow handles both providers and partners
+> - ✅ Database table `cross_tenant_access_grants_projection` exists
 >
-> **Not Yet Implemented**: Type-specific relationship projections (VAR contracts, court authorizations, agency assignments, family consents) and cross-tenant access grants.
+> **NOT Implemented**:
+> - ❌ No UI for granting/revoking cross-tenant access
+> - ❌ No VAR dashboard to manage provider relationships
+> - ❌ Type-specific relationship projections (VAR contracts, court authorizations, etc.)
 
 **Status**: ✅ Foundation Implemented | ⏳ Type-Specific Features Planned
 **Version**: 2.2 (Updated for foundation implementation)
@@ -666,7 +670,7 @@ Enhanced metadata captures provider partner context:
 - ✅ Conditional subdomain provisioning (providers get DNS, partners don't)
 - ✅ `referring_partner_id` field for tracking partner referrals
 - ✅ 2-hop architecture: Frontend → Backend API → Temporal
-- ✅ 12 activities (6 forward + 6 compensation) in bootstrap workflow
+- ✅ 13 activities (7 forward + 6 compensation) in bootstrap workflow
 
 **Database Schema (Implemented)**:
 ```sql
@@ -770,7 +774,7 @@ CREATE TYPE partner_type AS ENUM ('var', 'family', 'court', 'other');
 
 ### Implemented Infrastructure
 - ✅ `workflows/src/workflows/organizationBootstrapWorkflow.ts` - Workflow implementation
-- ✅ `workflows/src/activities/` - All 12 activities
+- ✅ `workflows/src/activities/` - All 13 activities
 - ✅ `workflows/src/api/routes/workflows.ts` - Backend API endpoint
 - ✅ `infrastructure/supabase/sql/02-tables/organizations/` - Database schema
 

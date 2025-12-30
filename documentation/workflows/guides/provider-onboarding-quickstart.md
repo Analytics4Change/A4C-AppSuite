@@ -6,7 +6,7 @@ last_updated: 2025-12-30
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: End-user guide for creating provider organizations via frontend form. 3-section form (General Info, Billing, Provider Admin) triggers Organization Bootstrap Workflow. Workflow: 12 activities (6 forward + 6 compensation) taking 10-30 seconds. Includes checkbox to copy address/phone between sections. Requires `organization.create_root` permission.
+**Summary**: End-user guide for creating provider organizations via frontend form. 3-section form (General Info, Billing, Provider Admin) triggers Organization Bootstrap Workflow. Workflow: 13 activities (7 forward + 6 compensation) taking 10-30 seconds. Includes checkbox to copy address/phone between sections. Requires `organization.create_root` permission.
 
 **When to read**:
 - Understanding organization creation flow from UI perspective
@@ -38,7 +38,7 @@ Frontend Form → Backend API → Temporal → Domain Events → PostgreSQL
      │              │            │            │               │
      │              │            │            │               └─ Projections updated via triggers
      │              │            │            └─ Events stored for audit trail
-     │              │            └─ 12 activities (6 forward + 6 compensation)
+     │              │            └─ 13 activities (7 forward + 6 compensation)
      │              └─ JWT validation, workflow initiation
      └─ 3-section form with validation
 ```

@@ -1,12 +1,12 @@
 ---
-status: aspirational
+status: current
 last_updated: 2025-12-30
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Event schema definitions for impersonation lifecycle events (started, renewed, ended) following CQRS/Event Sourcing patterns with AsyncAPI contracts.
+**Summary**: Event schema definitions for impersonation. Database table `impersonation_sessions_projection` exists but events are NOT being emitted - end-to-end flow NOT functional.
 
 **When to read**:
 - Implementing impersonation event emission
@@ -22,8 +22,13 @@ last_updated: 2025-12-30
 <!-- TL;DR-END -->
 
 # Impersonation Event Schema
+
 > [!WARNING]
-> **This feature is not yet implemented.** This document describes planned functionality that has not been built. Implementation timeline and approach are subject to change based on business priorities.
+> **Database schema exists but events NOT being emitted.**
+> - ✅ `impersonation_sessions_projection` table exists
+> - ✅ Query functions exist (`get_impersonation_session_details`, etc.)
+> - ❌ No backend code emits `impersonation.started` or other events
+> See [impersonation-architecture.md](impersonation-architecture.md) for full implementation status.
 
 
 ## Overview

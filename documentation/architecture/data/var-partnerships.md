@@ -22,8 +22,15 @@ last_updated: 2025-12-30
 <!-- TL;DR-END -->
 
 # VAR Partnership Implementation
+
 > [!WARNING]
-> **This feature is not yet implemented.** This document describes planned functionality that has not been built. Implementation timeline and approach are subject to change based on business priorities.
+> **VAR-specific features NOT implemented.**
+> - ✅ VAR organizations CAN be created via organization bootstrap (select partner_type = 'var')
+> - ✅ VARs DO receive subdomains like regular providers
+> - ❌ VAR management dashboard NOT built
+> - ❌ Revenue share tracking NOT implemented
+> - ❌ White-label configuration NOT implemented
+> See [provider-partners-architecture.md](provider-partners-architecture.md) for foundation status.
 
 
 ## Overview

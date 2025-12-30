@@ -6,7 +6,7 @@ last_updated: 2025-12-30
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Complete design specification for OrganizationBootstrapWorkflow (12 activities, 10-40min duration). Three-layer idempotency: Workflow ID (`org-bootstrap-{orgId}`), activity check-then-act, event upsert. Unified ID system uses `organizationId` everywhere. 7-step flow: Create org → Configure DNS → Wait propagation → Verify DNS (quorum 2/3) → Generate invitations → Send emails → Activate. Saga compensation rolls back in reverse.
+**Summary**: Complete design specification for OrganizationBootstrapWorkflow (13 activities, 10-40min duration). Three-layer idempotency: Workflow ID (`org-bootstrap-{orgId}`), activity check-then-act, event upsert. Unified ID system uses `organizationId` everywhere. 7-step flow: Create org → Grant permissions → Configure DNS → Wait propagation → Verify DNS (quorum 2/3) → Generate invitations → Send emails → Activate. Saga compensation rolls back in reverse.
 
 **When to read**:
 - Understanding complete workflow design and rationale
@@ -27,7 +27,7 @@ last_updated: 2025-12-30
 **Implemented**: 2025-12-01 (production deployment with UAT passed)
 **Updated**: 2025-12-12 (Quorum-based DNS verification for Cloudflare proxy support)
 **Architecture**: 2-Hop (Frontend → Backend API → Temporal)
-**Activities**: 12 total (6 forward + 6 compensation)
+**Activities**: 13 total (7 forward + 6 compensation)
 **Design Pattern**: Design by Contract with Three-Layer Idempotency
 **Complexity Score**: 2.6/5 (Moderate - Justified)
 **Priority**: Critical - Core business functionality

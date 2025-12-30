@@ -102,18 +102,18 @@ graph LR
     D -->|4. Trigger| E[Event Processor]
     E -->|5. Project| F[3NF Tables]
     F -->|6. Read| A
-    D -->|7. Audit| G[audit_log table]
 ```
+
+> **Note**: The `domain_events` table IS the audit log. There is no separate audit table - the event store provides a complete, immutable audit trail with full context (user_id, timestamp, workflow info, reason).
 
 ### Detailed Flow
 
-1. **Application emits event** with full context and reason
+1. **Application emits event** with full context and reason (metadata includes user_id, reason)
 2. **Edge Function validates** against AsyncAPI schema
-3. **Event inserted** into `domain_events` table (append-only)
+3. **Event inserted** into `domain_events` table (append-only, immutable audit trail)
 4. **Database trigger fires** calling appropriate processor
 5. **Processor projects** event data to normalized tables
 6. **Application queries** projected tables for current state
-7. **Audit log updated** with change details and reason
 
 ## Implementation Guide
 

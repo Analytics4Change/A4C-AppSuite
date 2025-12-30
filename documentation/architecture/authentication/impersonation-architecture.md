@@ -1,12 +1,12 @@
 ---
-status: aspirational
+status: current
 last_updated: 2025-12-30
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Planned architecture for Super Admin impersonation allowing authorized admins to view/operate the application as any user while maintaining comprehensive audit trails for compliance.
+**Summary**: Architecture for Super Admin impersonation. Infrastructure scaffolded (DB schema, frontend UI) but end-to-end flow NOT functional - user list uses mock data, JWT claims are not swapped during impersonation.
 
 **When to read**:
 - Planning impersonation feature implementation
@@ -22,8 +22,15 @@ last_updated: 2025-12-30
 <!-- TL;DR-END -->
 
 # Super Admin Impersonation Architecture
+
 > [!WARNING]
-> **This feature is not yet implemented.** This document describes planned functionality that has not been built. Implementation timeline and approach are subject to change based on business priorities.
+> **Infrastructure scaffolded but end-to-end flow NOT functional.**
+> - ✅ Database: `impersonation_sessions_projection` table and query functions exist
+> - ✅ Frontend: `ImpersonationModal.tsx`, `ImpersonationBanner.tsx` components exist
+> - ❌ User list uses hardcoded mock data (`ImpersonationModal.tsx:48-54`)
+> - ❌ No backend RPC to actually start impersonation session
+> - ❌ JWT claims are NOT swapped - auth context remains unchanged
+> - ❌ Session only stored in browser sessionStorage, not database
 
 
 ## Executive Summary

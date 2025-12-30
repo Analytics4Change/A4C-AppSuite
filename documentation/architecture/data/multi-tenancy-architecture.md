@@ -588,10 +588,10 @@ complete profile
 
 ### 9.1 Core Tables
 
-- **organizations:** Tenant hierarchy (ltree)
+- **organizations_projection:** Tenant hierarchy (ltree)
 - **users:** User profiles linked to organizations
-- **audit_logs:** Comprehensive activity logging
-- **invitation_tokens:** Onboarding invitations
+- **domain_events:** Immutable event store (audit trail via event metadata)
+- **invitations_projection:** Onboarding invitations
 - **\[application_data\]:** All include organization_id
 
 ### 9.2 Caching Strategy
@@ -737,10 +737,10 @@ as "Coming Soon - Enterprise Feature"
 
 1.  Create Supabase project
 2.  Enable ltree extension
-3.  Create organizations table
-4.  Create users table
-5.  Create audit_logs table
-6.  Create invitation_tokens table
+3.  Create domain_events table (event store and audit trail)
+4.  Create organizations_projection table
+5.  Create users table
+6.  Create invitations_projection table
 7.  Configure RLS policies
 8.  Configure authentication settings
 

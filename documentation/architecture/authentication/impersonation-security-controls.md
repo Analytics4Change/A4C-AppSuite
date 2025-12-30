@@ -1,12 +1,12 @@
 ---
-status: aspirational
+status: current
 last_updated: 2025-12-30
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Security controls for impersonation including MFA requirements (TOTP, hardware keys), session limits, audit logging, and healthcare compliance measures.
+**Summary**: Security controls for impersonation. These requirements are documented but the feature is NOT yet functional - see architecture doc for implementation status.
 
 **When to read**:
 - Reviewing security requirements for impersonation
@@ -22,8 +22,10 @@ last_updated: 2025-12-30
 <!-- TL;DR-END -->
 
 # Impersonation Security Controls
+
 > [!WARNING]
-> **This feature is not yet implemented.** This document describes planned functionality that has not been built. Implementation timeline and approach are subject to change based on business priorities.
+> **Infrastructure partially implemented but end-to-end flow NOT functional.**
+> See [impersonation-architecture.md](impersonation-architecture.md) for implementation status details.
 
 
 ## Overview

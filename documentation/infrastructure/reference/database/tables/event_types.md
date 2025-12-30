@@ -185,7 +185,7 @@ The `event_types` table is a **catalog of all valid event types** in the A4C-App
 - **Examples**:
   - `['clients']` for 'client.admitted'
   - `['medication_history', 'dosage_info']` for 'medication.prescribed'
-  - `['users', 'audit_log']` for 'user.organization_switched'
+  - `['users']` for 'user.organization_switched'
 - **Usage**: Documentation, dependency analysis, projection monitoring
 
 #### created_at

@@ -136,15 +136,10 @@ The `users` table is a shadow table for Supabase Auth users, used for Row-Level 
   - User can have multiple roles across different organizations
   - Cascade behavior: ON DELETE CASCADE
 
-- **audit_log** ← `user_id`
-  - One-to-many relationship
-  - Audit trail of user actions
-  - Cascade behavior: Typically RESTRICT (preserve audit trail)
-
-- **api_audit_log** ← `user_id`
-  - One-to-many relationship
-  - API request audit logs
-  - Cascade behavior: Typically RESTRICT (preserve audit trail)
+- **domain_events** ← `event_metadata->>'user_id'`
+  - One-to-many relationship (via JSONB metadata)
+  - Complete audit trail of user-initiated actions
+  - Events are immutable (no cascade deletion)
 
 - **invitations_projection** ← `invited_by_user_id`
   - One-to-many relationship
@@ -528,12 +523,12 @@ This table can participate in the CQRS event-driven architecture:
 
 - **Current Implementation**: Events may be emitted by Edge Functions or Temporal workflows, not by database triggers
 
-### Audit Log Integration
+### Audit Trail
 
-- User actions tracked in `audit_log` table (user_id foreign key)
-- API requests logged in `api_audit_log` table
+- User actions tracked via `domain_events` table (user_id in event metadata)
+- All user-initiated state changes emit domain events
 - Last login timestamp provides basic activity tracking
-- For complete audit trail, query both audit tables filtering by `user_id`
+- For complete audit trail: `SELECT * FROM domain_events WHERE event_metadata->>'user_id' = '<user-uuid>'`
 
 ## JSONB Columns
 
@@ -751,7 +746,7 @@ SELECT * FROM users WHERE email = 'user@example.com';
 - **Related Tables**:
   - [organizations_projection](organizations_projection.md) - User organizations
   - [user_roles_projection](user_roles_projection.md) - User role assignments
-  - [audit_log](audit_log.md) - User action audit trail
+  - [domain_events](domain_events.md) - User action audit trail (via event metadata)
 - **Database Functions**:
   - [get_current_user_id()](../functions/authorization.md#get_current_user_id)
   - [is_super_admin()](../functions/authorization.md#is_super_admin)

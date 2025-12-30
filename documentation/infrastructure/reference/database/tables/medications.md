@@ -666,12 +666,12 @@ ORDER BY name;
 
 **Event Data**: See AsyncAPI schema in `infrastructure/supabase/contracts/asyncapi/domains/formulary.yaml` (once created)
 
-### Audit Log Integration
+### Audit Trail
 
-Not currently implemented. Recommended:
-- All changes logged to `audit_log` table via trigger
-- Track: user_id, timestamp, operation, old_values, new_values
-- Immutable audit trail for regulatory compliance
+> **Note**: Medication events integration not yet implemented. When implemented:
+- Changes would be recorded via domain events in `domain_events` table
+- Events include: event_type, aggregate_id, event_data, metadata (user_id, timestamp)
+- Query `domain_events WHERE aggregate_type = 'medication'` for complete audit history
 
 ## JSONB Columns
 

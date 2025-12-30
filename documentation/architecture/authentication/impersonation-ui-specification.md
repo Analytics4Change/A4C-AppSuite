@@ -1,12 +1,12 @@
 ---
-status: aspirational
+status: current
 last_updated: 2025-12-30
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: UI/UX specification for impersonation including visual indicators (red border, banner), WCAG 2.1 AA accessibility, and session management controls.
+**Summary**: UI/UX specification for impersonation. Frontend components exist (`ImpersonationModal.tsx`, `ImpersonationBanner.tsx`) but use mock data - end-to-end flow NOT functional.
 
 **When to read**:
 - Designing impersonation UI components
@@ -22,8 +22,13 @@ last_updated: 2025-12-30
 <!-- TL;DR-END -->
 
 # Impersonation UI Specification
+
 > [!WARNING]
-> **This feature is not yet implemented.** This document describes planned functionality that has not been built. Implementation timeline and approach are subject to change based on business priorities.
+> **Frontend components exist but end-to-end flow NOT functional.**
+> - ✅ `ImpersonationModal.tsx` exists but uses hardcoded mock user list
+> - ✅ `ImpersonationBanner.tsx` exists for visual indicator
+> - ❌ No actual backend integration - session stored in sessionStorage only
+> See [impersonation-architecture.md](impersonation-architecture.md) for full implementation status.
 
 
 ## Overview

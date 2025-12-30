@@ -1156,23 +1156,24 @@ Load Draft:
 9. **Stage 9**: Activate organization
 10. **Stage 10**: Emit completion event
 
-### Activities (12 total: 6 forward + 6 compensation)
+### Activities (13 total: 7 forward + 6 compensation)
 
 **Forward Activities**:
 1. `createOrganization()` - Create org, emit `organization.created` event
-2. `createContacts()` - Create contacts with type/label, emit `contact.created` events
-3. `createAddresses()` - Create addresses with type/label, emit `address.created` events
-4. `createPhones()` - Create phones with type/label, emit `phone.created` events
-5. `configureDNS()` - Cloudflare API call
-6. `generateAndSendInvitations()` - Create tokens + send emails
+2. `grantProviderAdminPermissions()` - Grant 16 canonical permissions to provider admin
+3. `configureDNS()` - Create DNS record via Cloudflare API
+4. `verifyDNS()` - Quorum-based DNS propagation verification (2/3 resolvers)
+5. `generateInvitations()` - Create invitation tokens
+6. `sendInvitationEmails()` - Send emails via Resend API
+7. `activateOrganization()` - Activate organization status
 
 **Compensation Activities** (Saga pattern rollback):
-1. `compensateOrganization()` - Soft-delete organization
-2. `compensateContacts()` - Soft-delete contacts
-3. `compensateAddresses()` - Soft-delete addresses
-4. `compensatePhones()` - Soft-delete phones
-5. `compensateDNS()` - Remove DNS record from Cloudflare
-6. `compensateInvitations()` - Mark invitations as cancelled
+1. `deactivateOrganization()` - Set organization to inactive
+2. `removeDNS()` - Remove DNS record from Cloudflare
+3. `revokeInvitations()` - Mark invitations as revoked
+4. `deleteContacts()` - Delete related contacts
+5. `deleteAddresses()` - Delete related addresses
+6. `deletePhones()` - Delete related phones
 
 ### Triggering Architecture
 
@@ -1200,7 +1201,7 @@ Temporal Worker (workflow-worker deployment)
 ✅ **Edge Functions** (4 Deno functions - proxying to Backend API)
 ✅ **Database Schema** (4 CQRS projections + 3 junction tables)
 ✅ **Event Processing** (trigger-based updates)
-✅ **Temporal Workflows** (12 activities: 6 forward + 6 compensation)
+✅ **Temporal Workflows** (13 activities: 7 forward + 6 compensation)
 ✅ **Worker Deployment** (workflow-worker in temporal namespace)
 ✅ **Testing** (100+ unit tests, 27 E2E tests)
 ✅ **Configuration System** (profile-based)

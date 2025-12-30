@@ -5,6 +5,8 @@
 **Status**: ✅ Phase 7 Complete (Phases 0-7 executed successfully)
 **Final Outcome**: 115+ files migrated, 12 database tables documented, 100% configuration coverage, 95% architecture accuracy
 
+> **Update (2025-12-30)**: Database table documentation has been expanded from 12 to 29 tables, including junction tables, workflow queue, and additional projections.
+
 ---
 
 ## Executive Summary

@@ -843,8 +843,8 @@ await emitEvent(...);
 - **[Multi-Tenancy Architecture](../../architecture/data/multi-tenancy-architecture.md)** - Organization isolation with RLS
 - **[Database Tables Reference](../../infrastructure/reference/database/tables/)** - All CQRS projection tables
   - [organizations_projection.md](../../infrastructure/reference/database/tables/organizations_projection.md) - Organization read model
-  - [users.md](../../infrastructure/reference/database/tables/users.md)** - User read model
-  - [audit_log_projection.md](../../infrastructure/reference/database/tables/audit_log_projection.md) - Audit trail
+  - [users.md](../../infrastructure/reference/database/tables/users.md) - User read model
+  - [domain_events.md](../../infrastructure/reference/database/tables/domain_events.md) - Event store (audit trail)
 
 ### Implementation & Testing
 - **[Design Patterns Migration Guide](./DESIGN_PATTERNS_MIGRATION_GUIDE.md)** - Component architecture patterns

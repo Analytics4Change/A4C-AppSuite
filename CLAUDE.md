@@ -122,7 +122,7 @@ For detailed guidance on each component, refer to their respective CLAUDE.md fil
 - **[Deployment Instructions](documentation/infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md)** - Production deployment
 
 ### Database Reference
-- **[Database Tables](documentation/infrastructure/reference/database/tables/)** - Complete schema documentation (12 core tables)
+- **[Database Tables](documentation/infrastructure/reference/database/tables/)** - Complete schema documentation (29 tables)
 - **[Event-Driven Architecture](documentation/infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)** - Backend event sourcing spec
 
 ## Common Development Workflows

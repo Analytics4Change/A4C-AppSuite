@@ -39,10 +39,13 @@ purpose: agent-navigation
 | `authentication` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | supabase-auth-overview.md, custom-claims-setup.md |
 | `bootstrap` | [organization-onboarding-workflow.md](architecture/workflows/organization-onboarding-workflow.md) | provider-onboarding-quickstart.md |
 | `bootstrap-workflow-design` | [organization-bootstrap-workflow-design.md](workflows/architecture/organization-bootstrap-workflow-design.md) | activities-reference.md |
+| `business-profile` | [organization_business_profiles_projection.md](infrastructure/reference/database/tables/organization_business_profiles_projection.md) | organizations_projection.md |
 | `cascade-deactivation` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | user_roles_projection.md |
 | `clients` | [clients.md](infrastructure/reference/database/tables/clients.md) | medication_history.md |
 | `compensation` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
 | `compliance` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | dosage_info.md |
+| `contact-addresses` | [contact_addresses.md](infrastructure/reference/database/tables/contact_addresses.md) | contacts_projection.md |
+| `contact-phones` | [contact_phones.md](infrastructure/reference/database/tables/contact_phones.md) | contacts_projection.md |
 | `contacts` | [contacts_projection.md](infrastructure/reference/database/tables/contacts_projection.md) | provider-partners-architecture.md |
 | `controlled-substances` | [medications.md](infrastructure/reference/database/tables/medications.md) | dosage_info.md |
 | `cqrs` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md, MIGRATION-FROM-CRUD.md |
@@ -67,6 +70,7 @@ purpose: agent-navigation
 | `hierarchy` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | scoping-architecture.md |
 | `idempotency` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | organization-bootstrap-workflow-design.md |
 | `impersonation` | [impersonation-architecture.md](architecture/authentication/impersonation-architecture.md) | impersonation-security-controls.md |
+| `impersonation-sessions` | [impersonation_sessions_projection.md](infrastructure/reference/database/tables/impersonation_sessions_projection.md) | impersonation-architecture.md |
 | `integration-testing` | [integration-testing.md](workflows/guides/integration-testing.md) | triggering-workflows.md |
 | `invitation` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | organizations_projection.md |
 | `invitation-emails` | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | activities-reference.md |
@@ -81,11 +85,15 @@ purpose: agent-navigation
 | `medication-history` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | medications.md |
 | `mfa` | [impersonation-security-controls.md](architecture/authentication/impersonation-security-controls.md) | enterprise-sso-guide.md |
 | `migration` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | DEPLOYMENT_INSTRUCTIONS.md, table-template.md |
+| `migrations-applied` | [_migrations_applied.md](infrastructure/reference/database/tables/_migrations_applied.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `mobx` | [viewmodels.md](frontend/architecture/viewmodels.md) | frontend/CLAUDE.md, mobx-optimization.md |
 | `multi-tenancy` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | tenants-as-organizations.md |
 | `oauth` | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | supabase-auth-overview.md, SUPABASE-AUTH-SETUP.md |
 | `okta` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
 | `organization` | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | organization-management-architecture.md |
+| `organization-addresses` | [organization_addresses.md](infrastructure/reference/database/tables/organization_addresses.md) | addresses_projection.md |
+| `organization-contacts` | [organization_contacts.md](infrastructure/reference/database/tables/organization_contacts.md) | contacts_projection.md |
+| `organization-phones` | [organization_phones.md](infrastructure/reference/database/tables/organization_phones.md) | phones_projection.md |
 | `organization-bootstrap` | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | organization-bootstrap-workflow-design.md |
 | `organization-management` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | tenants-as-organizations.md |
 | `organization-units` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | scoping-architecture.md |
@@ -93,6 +101,7 @@ purpose: agent-navigation
 | `permission-grants` | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | rbac-architecture.md |
 | `pg-notify` | [event-driven-workflow-triggering.md](architecture/workflows/event-driven-workflow-triggering.md) | triggering-workflows.md |
 | `phi` | [clients.md](infrastructure/reference/database/tables/clients.md) | dosage_info.md |
+| `phone-addresses` | [phone_addresses.md](infrastructure/reference/database/tables/phone_addresses.md) | phones_projection.md |
 | `phones` | [phones_projection.md](infrastructure/reference/database/tables/phones_projection.md) | addresses_projection.md |
 | `polling` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | integration-testing.md |
 | `postgres-notify` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-driven-workflow-triggering.md |
@@ -130,6 +139,7 @@ purpose: agent-navigation
 | `wcag` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | TESTING.md |
 | `var-contracts` | [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | var-partnerships.md |
 | `workflow` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | temporal-overview.md, implementation.md |
+| `workflow-queue` | [workflow_queue_projection.md](infrastructure/reference/database/tables/workflow_queue_projection.md) | organization-bootstrap-workflow-design.md |
 | `workflow-status` | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | triggering-workflows.md |
 | `workflow-testing` | [integration-testing.md](workflows/guides/integration-testing.md) | triggering-workflows.md |
 | `workflow-trigger` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-driven-workflow-triggering.md |

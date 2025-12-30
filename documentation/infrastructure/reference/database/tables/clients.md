@@ -581,12 +581,12 @@ GROUP BY status;
 
 **Event Trigger**: Would require creating trigger functions (see Triggers section)
 
-### Audit Log Integration
+### Audit Trail
 
-Not currently implemented. Recommended:
-- All changes logged to `audit_log` table via trigger
-- Track: user_id, timestamp, operation, old_values, new_values
-- Immutable audit trail for HIPAA compliance
+> **Note**: Client events integration not yet implemented. When implemented:
+- Changes would be recorded via domain events in `domain_events` table
+- Events include: event_type, aggregate_id, event_data, metadata (user_id, timestamp)
+- Query `domain_events WHERE aggregate_type = 'client'` for complete audit history
 
 ## JSONB Columns
 
@@ -815,8 +815,8 @@ None yet applied.
 **Audit Trail Requirements**:
 - ✅ created_by / updated_by fields present
 - ✅ created_at / updated_at timestamps present
-- ❌ Audit log trigger NOT YET IMPLEMENTED
-- Recommendation: Implement audit_log trigger for all modifications
+- ❌ Domain event integration NOT YET IMPLEMENTED
+- Recommendation: Emit domain events for all client modifications to `domain_events` table
 
 **Data Retention**:
 - Define retention policy (e.g., 7 years post-discharge for HIPAA)

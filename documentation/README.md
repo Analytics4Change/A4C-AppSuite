@@ -43,7 +43,7 @@ Use the TL;DR section at the top of each document to quickly assess relevance be
 ### Frequently Accessed Documentation
 - **[Frontend Authentication Architecture](./architecture/authentication/frontend-auth-architecture.md)** - Three-mode auth system (mock/integration/production)
 - **[RBAC Architecture](./architecture/authorization/rbac-architecture.md)** - Role-based access control, permissions
-- **[Database Table Reference](./infrastructure/reference/database/tables/)** - Complete schema documentation (12 core tables)
+- **[Database Table Reference](./infrastructure/reference/database/tables/)** - Complete schema documentation (29 tables)
 - **[JWT Custom Claims Setup](./infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md)** - Configure custom claims in Supabase
 - **[Event-Driven Guide](./frontend/guides/EVENT-DRIVEN-GUIDE.md)** - CQRS patterns in React
 - **[Deployment Instructions](./infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md)** - Deploy database migrations
@@ -130,12 +130,14 @@ Terraform IaC, Kubernetes deployments, Supabase resources
   - [Kubernetes](./infrastructure/guides/kubernetes/) - K8s deployments and configuration
 - **[Reference](./infrastructure/reference/)** - Quick lookup for schemas and configs
   - **[Database Reference](./infrastructure/reference/database/)**
-    - **[Table Documentation](./infrastructure/reference/database/tables/)** - Schema documentation (12 core tables documented)
-      - **Infrastructure & Auth**: [organizations_projection](./infrastructure/reference/database/tables/organizations_projection.md) (760 lines) • [users](./infrastructure/reference/database/tables/users.md) (742 lines)
-      - **Clinical Operations**: [clients](./infrastructure/reference/database/tables/clients.md) (953 lines) • [medications](./infrastructure/reference/database/tables/medications.md) (1,057 lines) • [medication_history](./infrastructure/reference/database/tables/medication_history.md) (1,006 lines) • [dosage_info](./infrastructure/reference/database/tables/dosage_info.md) (855 lines)
-      - **RBAC**: [permissions_projection](./infrastructure/reference/database/tables/permissions_projection.md) (728 lines) • [roles_projection](./infrastructure/reference/database/tables/roles_projection.md) (814 lines) • [user_roles_projection](./infrastructure/reference/database/tables/user_roles_projection.md) (831 lines) • [role_permissions_projection](./infrastructure/reference/database/tables/role_permissions_projection.md) (731 lines)
-      - **System**: [invitations_projection](./infrastructure/reference/database/tables/invitations_projection.md) (817 lines) • [cross_tenant_access_grants_projection](./infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) (721 lines)
-      - **Not Yet Documented** (7 additional tables): organization_business_profiles_projection, organization_domains_projection, provider_partnerships_projection, domain_events, event_subscriptions, audit_log_projection, audit_log
+    - **[Table Documentation](./infrastructure/reference/database/tables/)** - Schema documentation (29 tables documented)
+      - **Infrastructure & Auth**: [organizations_projection](./infrastructure/reference/database/tables/organizations_projection.md) • [organization_units_projection](./infrastructure/reference/database/tables/organization_units_projection.md) • [users](./infrastructure/reference/database/tables/users.md)
+      - **Clinical Operations**: [clients](./infrastructure/reference/database/tables/clients.md) • [medications](./infrastructure/reference/database/tables/medications.md) • [medication_history](./infrastructure/reference/database/tables/medication_history.md) • [dosage_info](./infrastructure/reference/database/tables/dosage_info.md)
+      - **RBAC**: [permissions_projection](./infrastructure/reference/database/tables/permissions_projection.md) • [roles_projection](./infrastructure/reference/database/tables/roles_projection.md) • [user_roles_projection](./infrastructure/reference/database/tables/user_roles_projection.md) • [role_permissions_projection](./infrastructure/reference/database/tables/role_permissions_projection.md) • [role_permission_templates](./infrastructure/reference/database/tables/role_permission_templates.md)
+      - **Events & Workflows**: [domain_events](./infrastructure/reference/database/tables/domain_events.md) • [event_types](./infrastructure/reference/database/tables/event_types.md) • [workflow_queue_projection](./infrastructure/reference/database/tables/workflow_queue_projection.md)
+      - **Contacts & Addresses**: [contacts_projection](./infrastructure/reference/database/tables/contacts_projection.md) • [addresses_projection](./infrastructure/reference/database/tables/addresses_projection.md) • [phones_projection](./infrastructure/reference/database/tables/phones_projection.md)
+      - **Junction Tables**: [organization_contacts](./infrastructure/reference/database/tables/organization_contacts.md) • [organization_addresses](./infrastructure/reference/database/tables/organization_addresses.md) • [organization_phones](./infrastructure/reference/database/tables/organization_phones.md) • [contact_addresses](./infrastructure/reference/database/tables/contact_addresses.md) • [contact_phones](./infrastructure/reference/database/tables/contact_phones.md) • [phone_addresses](./infrastructure/reference/database/tables/phone_addresses.md)
+      - **System & Audit**: [invitations_projection](./infrastructure/reference/database/tables/invitations_projection.md) • [cross_tenant_access_grants_projection](./infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) • [organization_business_profiles_projection](./infrastructure/reference/database/tables/organization_business_profiles_projection.md) • [impersonation_sessions_projection](./infrastructure/reference/database/tables/impersonation_sessions_projection.md) • [_migrations_applied](./infrastructure/reference/database/tables/_migrations_applied.md)
   - [Kubernetes Reference](./infrastructure/reference/kubernetes/) - K8s resource reference
 - **[Testing](./infrastructure/testing/)** - Infrastructure testing strategies
 - **[Operations](./infrastructure/operations/)** - Deployment and operational procedures
@@ -433,7 +435,7 @@ This documentation structure was created on **2025-01-12** as part of a comprehe
   - 30 planning docs categorized and migrated from .plans/
 - **Phase 4**: ✅ Technical Reference Validation (Complete - 2025-01-13)
   - API contracts validated (100% accuracy)
-  - Database schemas validated and documented (12 core tables)
+  - Database schemas validated and documented (29 tables)
   - Configuration validated (55 environment variables, 100% coverage)
   - Architecture validated (95% accuracy after remediation)
 - **Phase 5**: ✅ Annotation & Status Marking (Complete - 2025-01-13)
