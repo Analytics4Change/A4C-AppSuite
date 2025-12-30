@@ -37,14 +37,25 @@
 - [x] Add TL;DR to `documentation/frontend/guides/DEVELOPMENT.md`
 - [x] Update AGENT-INDEX.md with keywords from high-priority docs (18 new keywords added)
 
-## Phase 3: TL;DR Architecture Documents ⏸️ PENDING
+## Phase 3: TL;DR Architecture Documents ✅ COMPLETE
 
-- [ ] Add TL;DR to all `documentation/architecture/authentication/` files
-- [ ] Add TL;DR to all `documentation/architecture/authorization/` files
-- [ ] Add TL;DR to all `documentation/architecture/data/` files
-- [ ] Add TL;DR to all `documentation/architecture/workflows/` files
-- [ ] Add TL;DR to all `documentation/architecture/features/` files (if exists)
-- [ ] Update AGENT-INDEX.md with architecture doc keywords
+- [x] Add TL;DR to all `documentation/architecture/authentication/` files (7 files)
+  - custom-claims-setup.md, enterprise-sso-guide.md
+  - impersonation-architecture.md, impersonation-event-schema.md
+  - impersonation-implementation-guide.md, impersonation-security-controls.md
+  - impersonation-ui-specification.md
+- [x] Add TL;DR to all `documentation/architecture/authorization/` files (6 files)
+  - organizational-deletion-ux.md, org-type-claims.md, permissions-reference.md
+  - provider-admin-permissions-architecture.md, rbac-implementation-guide.md
+  - scoping-architecture.md
+- [x] Add TL;DR to all `documentation/architecture/data/` files (4 files)
+  - organization-management-architecture.md, provider-partners-architecture.md
+  - tenants-as-organizations.md, var-partnerships.md
+- [x] Add TL;DR to all `documentation/architecture/workflows/` files (2 files)
+  - event-driven-workflow-triggering.md, organization-onboarding-workflow.md
+- [x] Add TL;DR to misc architecture files (3 files)
+  - README.md, logging-standards.md, features/contact-management-vision.md
+- [x] Update AGENT-INDEX.md with 19 new architecture doc keywords
 
 ## Phase 4: TL;DR Guides & Reference ⏸️ PENDING
 
@@ -76,11 +87,23 @@
 
 ## Current Status
 
-**Phase**: 2 - TL;DR High-Priority Documents
-**Status**: ✅ COMPLETE (16/16 complete)
+**Phase**: 3 - TL;DR Architecture Documents
+**Status**: ✅ COMPLETE (22/22 architecture docs complete)
 **Last Updated**: 2025-12-30
-**Commit**: Pending - Phase 2 complete
-**Changes Made**:
-- Added TL;DR to 7 additional files (frontend/CLAUDE.md, workflows/CLAUDE.md, infrastructure/CLAUDE.md, documentation/README.md, supabase-auth-overview.md, JWT-CLAIMS-SETUP.md, DEVELOPMENT.md)
-- Added 18 new keywords to AGENT-INDEX.md
-**Next Step**: Phase 3 - Add TL;DR to remaining architecture documents
+**Commits**:
+- `d2792a01` - Phase 1 complete + partial Phase 2
+- `4f528146` - Phase 2 complete (pushed)
+- `03cced4e` - Phase 3 complete (pending push)
+
+**Phase 3 Summary**:
+- Added TL;DR to 22 architecture documents (7 auth, 6 authz, 4 data, 2 workflows, 3 misc)
+- Added 19 new keywords to AGENT-INDEX.md (total now 63 keywords)
+- All architecture docs now have progressive disclosure TL;DR sections
+
+**Total Progress**:
+- Phase 1: ✅ Core infrastructure (AGENT-INDEX.md, AGENT-GUIDELINES.md, CLAUDE.md updates)
+- Phase 2: ✅ 15 high-priority docs with TL;DR + 18 keywords
+- Phase 3: ✅ 22 architecture docs with TL;DR + 19 keywords
+- Phase 4: ⏸️ Pending - Guides & Reference docs (~70 remaining)
+
+**Next Step**: Phase 4 - Add TL;DR to remaining guides and reference documentation (frontend/guides, frontend/reference, infrastructure/guides, infrastructure/reference, workflows/guides, workflows/reference)

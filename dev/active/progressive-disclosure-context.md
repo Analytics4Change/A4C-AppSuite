@@ -94,7 +94,49 @@ The system integrates with existing CLAUDE.md files at:
 | `frontend/guides/DEVELOPMENT.md` | Local dev setup, npm commands |
 | `frontend/guides/EVENT-DRIVEN-GUIDE.md` | CQRS patterns in React |
 
-### Remaining (~100 docs pending TL;DR)
+### Documents with TL;DR Added (Phase 3 - 22 architecture docs)
+
+**Authentication (7 files)**:
+- `custom-claims-setup.md` - JWT hook architecture spec
+- `enterprise-sso-guide.md` - SAML 2.0 with Okta/Azure AD (aspirational)
+- `impersonation-architecture.md` - Super Admin impersonation (aspirational)
+- `impersonation-event-schema.md` - CQRS events for impersonation
+- `impersonation-implementation-guide.md` - Step-by-step implementation
+- `impersonation-security-controls.md` - MFA, audit, compliance
+- `impersonation-ui-specification.md` - Visual indicators, accessibility
+
+**Authorization (6 files)**:
+- `organizational-deletion-ux.md` - Zero-regret deletion workflows
+- `org-type-claims.md` - Feature gating via org_type JWT claim
+- `permissions-reference.md` - 31 canonical permissions
+- `provider-admin-permissions-architecture.md` - Bootstrap permission grants
+- `rbac-implementation-guide.md` - Step-by-step RBAC setup
+- `scoping-architecture.md` - Three scoping mechanisms (org_id, scope_type, ltree)
+
+**Data (4 files)**:
+- `organization-management-architecture.md` - Full module architecture
+- `provider-partners-architecture.md` - Cross-tenant VAR/family/court access
+- `tenants-as-organizations.md` - Multi-tenancy with Supabase Auth
+- `var-partnerships.md` - VAR business model (aspirational)
+
+**Workflows (2 files)**:
+- `event-driven-workflow-triggering.md` - DB trigger + pg_notify pattern
+- `organization-onboarding-workflow.md` - Temporal bootstrap implementation
+
+**Misc (3 files)**:
+- `architecture/README.md` - Architecture index
+- `logging-standards.md` - Unified logging strategy
+- `features/contact-management-vision.md` - Future contacts module
+
+### Remaining (~70 docs pending TL;DR in Phase 4)
+
+- `documentation/frontend/guides/` - ~8 files
+- `documentation/frontend/reference/` - ~10 files
+- `documentation/frontend/architecture/` - ~5 files
+- `documentation/frontend/patterns/` - ~5 files
+- `documentation/infrastructure/guides/` - ~15 files
+- `documentation/infrastructure/reference/database/tables/` - ~12 files
+- `documentation/workflows/` - ~10 files
 
 ## Related Components
 
@@ -160,8 +202,16 @@ last_updated: 2025-12-30
 - Plan file: `/home/lars/.claude/plans/deep-roaming-barto.md`
 - Existing skill pattern: `.claude/skills/infrastructure-guidelines/SKILL.md`
 - Documentation structure exploration: Agent analysis from planning phase
-- Commit: `d2792a01` - Phase 1 complete + partial Phase 2 (2025-12-30)
-- Phase 2 complete: 2025-12-30 (7 more TL;DR sections, 18 new keywords in AGENT-INDEX.md)
+
+### Commit History
+- `d2792a01` - Phase 1 complete + partial Phase 2 (2025-12-30)
+- `4f528146` - Phase 2 complete (2025-12-30) - 7 TL;DR sections, 18 new keywords
+- `03cced4e` - Phase 3 complete (2025-12-30) - 22 TL;DR sections, 19 new keywords
+
+### Keyword Index Growth
+- Phase 1: 27 initial keywords
+- Phase 2: +18 keywords (total: 45)
+- Phase 3: +19 keywords (total: 63 keywords in AGENT-INDEX.md)
 
 ## Important Constraints
 
