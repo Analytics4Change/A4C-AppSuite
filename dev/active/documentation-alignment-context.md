@@ -5,6 +5,7 @@
 **Date**: 2025-12-30
 **Feature**: Documentation alignment with codebase implementation
 **Goal**: Ensure `/documentation/` accurately reflects actual codebase state
+**Status**: ✅ COMPLETE (All 3 phases)
 
 ### Key Decisions
 
@@ -26,6 +27,16 @@
    - Organization creation works for all partner types
    - No UI for cross-tenant access grants
 
+7. **Permission Count Corrections** (Added 2025-12-30 Phase 3):
+   - Provider admin permissions: 16 → 23 (added medication.administer, role.delete, user.delete, etc.)
+   - Total permissions: 33 → 31 (10 global + 21 org-scoped)
+
+8. **Documentation Verification Results** (Added 2025-12-30 Phase 3):
+   - API functions: 42 in api schema (not 70+), all documented via SQL COMMENT ON
+   - Event processors: 17 functions (not 11), documented in EVENT-DRIVEN-ARCHITECTURE.md
+   - Frontend services: 7 factories documented in frontend/CLAUDE.md
+   - ViewModel patterns: 19 ViewModels documented in mobx-patterns.md
+
 ## Technical Context
 
 ### Architecture
@@ -39,6 +50,11 @@
 - 19 existing table docs + 10 new docs created
 - Junction tables for many-to-many relationships
 - All projections derived from `domain_events`
+
+### Permission System (Corrected)
+- **31 total permissions** (10 global + 21 org-scoped)
+- **23 provider_admin permissions** granted during bootstrap
+- Categories: organization (4), client (4), medication (5), role (4), user (6)
 
 ### Workflow Activities (Correct List)
 **Forward (7)**:
@@ -58,9 +74,15 @@
 5. deleteAddresses
 6. deletePhones
 
+### Version Numbers (Verified)
+- React: 19.1.1
+- TypeScript: 5.9.2
+- Vite: 7.0.6
+- All match documentation
+
 ## File Structure
 
-### New Files Created (2025-12-30)
+### New Files Created (2025-12-30 Phase 1)
 - `documentation/infrastructure/reference/database/tables/organization_contacts.md`
 - `documentation/infrastructure/reference/database/tables/organization_addresses.md`
 - `documentation/infrastructure/reference/database/tables/organization_phones.md`
@@ -72,7 +94,7 @@
 - `documentation/infrastructure/reference/database/tables/impersonation_sessions_projection.md`
 - `documentation/infrastructure/reference/database/tables/_migrations_applied.md`
 
-### Existing Files Modified (2025-12-30)
+### Files Modified Phase 1 & 2 (2025-12-30)
 - `CLAUDE.md` - Updated table count (12 → 29)
 - `documentation/README.md` - Updated table count, removed "Not Yet Documented" section
 - `documentation/MIGRATION_REPORT.md` - Added update note about expanded table docs
@@ -82,6 +104,11 @@
 - 2 provider partner docs - Updated status markers
 - 6 workflow docs - Corrected activity counts (12 → 13)
 - 4 table docs - Removed audit_log references (clients, medications, users, event_types)
+
+### Files Modified Phase 3 (2025-12-30)
+- `workflows/src/activities/organization-bootstrap/index.ts` - Permission count 16 → 23
+- `documentation/architecture/authorization/provider-admin-permissions-architecture.md` - Permission count fix
+- `documentation/infrastructure/reference/database/tables/permissions_projection.md` - Total count 33 → 31
 
 ## Important Constraints
 
@@ -94,6 +121,11 @@
 - Plan file: `/home/lars/.claude/plans/piped-pondering-eagle.md`
 - Template: `documentation/infrastructure/reference/database/table-template.md`
 - Guidelines: `documentation/AGENT-GUIDELINES.md`
+
+## Commits
+
+1. `58485078` - docs: Complete documentation alignment Phase 1 & 2
+2. `2fddc3e5` - docs: Complete Phase 3 documentation alignment - fix permission counts
 
 ## Why This Approach?
 
