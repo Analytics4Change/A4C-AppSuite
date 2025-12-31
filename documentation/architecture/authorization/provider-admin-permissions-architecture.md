@@ -43,7 +43,7 @@ last_updated: 2025-12-30
 
 - **`grantProviderAdminPermissions` activity**: Created at `workflows/src/activities/organization-bootstrap/grant-provider-admin-permissions.ts`
 - **Bootstrap workflow updated**: Now grants canonical permissions after organization creation (Step 1.5)
-- **Canonical permissions defined**: See [permissions-reference.md](./permissions-reference.md) for the 16 provider_admin permissions
+- **Canonical permissions defined**: See [permissions-reference.md](./permissions-reference.md) for the 23 provider_admin permissions
 - **Backfill SQL scripts**: Created for existing provider_admin roles
 
 ### What's Remaining

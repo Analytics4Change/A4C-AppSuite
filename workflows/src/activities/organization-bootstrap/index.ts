@@ -5,7 +5,7 @@
  *
  * Forward Activities (7):
  * - createOrganization: Create organization record with contacts/addresses/phones
- * - grantProviderAdminPermissions: Create provider_admin role and grant 16 permissions
+ * - grantProviderAdminPermissions: Create provider_admin role and grant 23 permissions
  * - configureDNS: Create DNS CNAME record (conditional)
  * - verifyDNS: Verify DNS propagation
  * - generateInvitations: Generate invitation tokens

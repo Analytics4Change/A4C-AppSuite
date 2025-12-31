@@ -6,7 +6,7 @@ last_updated: 2025-12-30
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: CQRS projection storing atomic authorization units for RBAC. Each permission = applet.action (e.g., `clients.create`). Name is generated column. scope_type: 'global' (platform_owner only) or 'org' (all orgs). 33 total permissions (10 global + 23 org). Used in JWT custom claims array.
+**Summary**: CQRS projection storing atomic authorization units for RBAC. Each permission = applet.action (e.g., `clients.create`). Name is generated column. scope_type: 'global' (platform_owner only) or 'org' (all orgs). 31 total permissions (10 global + 21 org). Used in JWT custom claims array.
 
 **When to read**:
 - Defining new permissions for features
