@@ -9,25 +9,17 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   validateEdgeFunctionEnv,
   createEnvErrorResponse,
   validateEmailFunctionEnv,
   validateAdminFunctionEnv,
 } from '../_shared/env-schema.ts';
+import { AnySchemaSupabaseClient } from '../_shared/types.ts';
 
 // Deployment version tracking
 const DEPLOY_VERSION = 'v1';
-
-/**
- * Type alias for Supabase clients configured with non-default schemas.
- * The default SupabaseClient<Database, 'public', Schema> doesn't accept
- * clients configured with schema: 'api'. This type accepts any schema.
- *
- * deno-lint-ignore no-explicit-any
- */
-type AnySchemaSupabaseClient = SupabaseClient<unknown, string, unknown>;
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -484,7 +476,8 @@ serve(async (req) => {
     // SMART EMAIL LOOKUP
     // ==========================================================================
     // Use service role for database operations
-    const supabaseAdmin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    // Note: SUPABASE_SERVICE_ROLE_KEY is guaranteed by Stage 2 validation above
+    const supabaseAdmin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY!, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
