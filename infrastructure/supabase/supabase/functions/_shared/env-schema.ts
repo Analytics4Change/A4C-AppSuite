@@ -153,3 +153,90 @@ export function createEnvErrorResponse(
     }
   );
 }
+
+// =============================================================================
+// Stage 2: Business Logic Validation Helpers
+// =============================================================================
+// These check conditional requirements AFTER Zod validates types.
+// Call these immediately after validateEdgeFunctionEnv() in each function.
+//
+// This follows the same two-stage validation pattern used by Workflows:
+// - Stage 1: Zod schema validates types and optionality (shared across all functions)
+// - Stage 2: Business logic validates conditional requirements (per-function)
+//
+// See: workflows/src/shared/config/validate-config.ts
+// See: documentation/infrastructure/operations/configuration/ENVIRONMENT_VARIABLES.md
+
+/**
+ * Result of Stage 2 business logic validation
+ */
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+/**
+ * Validate environment for email-sending functions (invite-user, resend-invitation).
+ * Stage 2 check: Requires RESEND_API_KEY when sending emails.
+ *
+ * @param env - Validated environment from Stage 1
+ * @param functionName - Name of the function for error messages
+ * @returns Validation result with any errors
+ *
+ * @example
+ * ```typescript
+ * const emailValidation = validateEmailFunctionEnv(env, 'invite-user');
+ * if (!emailValidation.valid) {
+ *   return createEnvErrorResponse(FUNCTION_NAME, DEPLOY_VERSION,
+ *     emailValidation.errors.join('; '), corsHeaders);
+ * }
+ * ```
+ */
+export function validateEmailFunctionEnv(
+  env: EdgeFunctionEnv,
+  functionName: string
+): ValidationResult {
+  const errors: string[] = [];
+
+  if (!env.RESEND_API_KEY) {
+    errors.push(
+      `RESEND_API_KEY is required for ${functionName}. ` +
+      'Set it via: supabase secrets set RESEND_API_KEY=re_YOUR_KEY'
+    );
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Validate environment for admin functions (require service role key).
+ * Stage 2 check: Requires SUPABASE_SERVICE_ROLE_KEY.
+ *
+ * @param env - Validated environment from Stage 1
+ * @param functionName - Name of the function for error messages
+ * @returns Validation result with any errors
+ *
+ * @example
+ * ```typescript
+ * const adminValidation = validateAdminFunctionEnv(env, 'invite-user');
+ * if (!adminValidation.valid) {
+ *   return createEnvErrorResponse(FUNCTION_NAME, DEPLOY_VERSION,
+ *     adminValidation.errors.join('; '), corsHeaders);
+ * }
+ * ```
+ */
+export function validateAdminFunctionEnv(
+  env: EdgeFunctionEnv,
+  functionName: string
+): ValidationResult {
+  const errors: string[] = [];
+
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    errors.push(
+      `SUPABASE_SERVICE_ROLE_KEY is required for ${functionName}. ` +
+      'This should be auto-injected by Supabase.'
+    );
+  }
+
+  return { valid: errors.length === 0, errors };
+}
