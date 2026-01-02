@@ -21,6 +21,7 @@ import {
   OrganizationUnitsManagePage,
 } from '@/pages/organization-units';
 import { RolesPage, RolesManagePage } from '@/pages/roles';
+import { UserListPage, UsersManagePage } from '@/pages/users';
 import { DebugControlPanel } from '@/components/debug/DebugControlPanel';
 import { LogOverlay } from '@/components/debug/LogOverlay';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -120,6 +121,18 @@ function App() {
                 <Route path="/roles/manage" element={
                   <RequirePermission permission="role.create" fallback="/clients">
                     <RolesManagePage />
+                  </RequirePermission>
+                } />
+
+                {/* User Management routes */}
+                <Route path="/users" element={
+                  <RequirePermission permission="user.view" fallback="/clients">
+                    <UserListPage />
+                  </RequirePermission>
+                } />
+                <Route path="/users/manage" element={
+                  <RequirePermission permission="user.create" fallback="/clients">
+                    <UsersManagePage />
                   </RequirePermission>
                 } />
 

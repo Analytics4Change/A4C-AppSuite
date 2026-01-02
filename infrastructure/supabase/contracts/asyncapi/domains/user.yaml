@@ -32,6 +32,86 @@ components:
       payload:
         $ref: '#/components/schemas/UserOrgSwitchedEvent'
 
+    UserAccessDatesUpdated:
+      name: user.access_dates.updated
+      title: User Access Dates Updated
+      summary: User-level access dates for an organization have been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserAccessDatesUpdatedEvent'
+
+    UserNotificationPreferencesUpdated:
+      name: user.notification_preferences.updated
+      title: User Notification Preferences Updated
+      summary: User notification preferences for an organization have been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserNotificationPreferencesUpdatedEvent'
+
+    UserAddressAdded:
+      name: user.address.added
+      title: User Address Added
+      summary: A new address has been added for a user (global or org-specific override)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserAddressAddedEvent'
+
+    UserAddressUpdated:
+      name: user.address.updated
+      title: User Address Updated
+      summary: An existing user address has been modified
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserAddressUpdatedEvent'
+
+    UserAddressRemoved:
+      name: user.address.removed
+      title: User Address Removed
+      summary: A user address has been deactivated or removed
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserAddressRemovedEvent'
+
+    UserPhoneAdded:
+      name: user.phone.added
+      title: User Phone Added
+      summary: A new phone has been added for a user (global or org-specific override)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserPhoneAddedEvent'
+
+    UserPhoneUpdated:
+      name: user.phone.updated
+      title: User Phone Updated
+      summary: An existing user phone has been modified
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserPhoneUpdatedEvent'
+
+    UserPhoneRemoved:
+      name: user.phone.removed
+      title: User Phone Removed
+      summary: A user phone has been deactivated or removed
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserPhoneRemovedEvent'
+
+    UserDeactivated:
+      name: user.deactivated
+      title: User Deactivated
+      summary: A user has been deactivated within an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserDeactivatedEvent'
+
+    UserReactivated:
+      name: user.reactivated
+      title: User Reactivated
+      summary: A deactivated user has been reactivated within an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserReactivatedEvent'
+
   schemas:
     UserCreatedEvent:
       type: object
@@ -62,6 +142,8 @@ components:
       required:
         - user_id
         - email
+        - first_name
+        - last_name
         - organization_id
         - auth_method
       properties:
@@ -72,21 +154,45 @@ components:
         email:
           type: string
           format: email
+        first_name:
+          type: string
+          maxLength: 100
+          description: User's first name (copied from invitation)
+        last_name:
+          type: string
+          maxLength: 100
+          description: User's last name (copied from invitation)
         organization_id:
           type: string
           format: uuid
           description: Organization the user is joining
         auth_method:
           type: string
-          enum: [email_password, oauth_google, oauth_github]
+          enum: [email_password, oauth_google, oauth_github, oauth_enterprise_sso]
           description: How the user authenticated
         invited_via:
           type: string
           enum: [organization_bootstrap, manual_invitation]
           description: How the user was invited
-        name:
+        access_start_date:
           type: string
-          description: User's display name (optional)
+          format: date
+          nullable: true
+          description: First date the user can access the org (copied from invitation, NULL = immediate)
+          examples:
+            - "2025-01-15"
+            - null
+        access_expiration_date:
+          type: string
+          format: date
+          nullable: true
+          description: Date the user's access will expire (copied from invitation, NULL = no expiration)
+          examples:
+            - "2025-12-31"
+            - null
+        notification_preferences:
+          $ref: './invitation.yaml#/components/schemas/NotificationPreferences'
+          description: Initial notification preferences (copied from invitation)
 
     UserSyncedFromAuthEvent:
       type: object
@@ -174,11 +280,35 @@ components:
           description: Role UUID from roles_projection
         role_name:
           type: string
-          enum: [super_admin, provider_admin, partner_admin, clinician, viewer]
-          description: Human-readable role name
+          maxLength: 100
+          description: |
+            Human-readable role name. Can be a canonical system role
+            (super_admin, provider_admin, etc.) or a custom organization-defined
+            role (e.g., "Program Manager - Aspen", "Clinical Lead").
+          examples:
+            - "super_admin"
+            - "provider_admin"
+            - "Program Manager - Aspen"
+            - "Clinical Lead"
         scope_path:
           type: string
-          description: Organizational scope path (ltree format)
+          description: Organizational scope path (ltree format, e.g., "liveforlife.aspen")
+        role_valid_from:
+          type: string
+          format: date
+          nullable: true
+          description: First date this role assignment is active (NULL = immediate)
+          examples:
+            - "2025-01-15"
+            - null
+        role_valid_until:
+          type: string
+          format: date
+          nullable: true
+          description: Last date this role assignment is active (NULL = no expiration)
+          examples:
+            - "2025-12-31"
+            - null
 
     UserOrgSwitchedEvent:
       type: object
@@ -224,3 +354,516 @@ components:
                     - "User selected different organization from dropdown"
                     - "Automatic switch after single org access granted"
                     - "Session initialization with default organization"
+
+    # =========================================================================
+    # Access Dates Events
+    # =========================================================================
+
+    UserAccessDatesUpdatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.access_dates.updated
+        event_data:
+          $ref: '#/components/schemas/UserAccessDatesUpdatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserAccessDatesUpdatedData:
+      type: object
+      required:
+        - user_id
+        - org_id
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        org_id:
+          type: string
+          format: uuid
+          description: Organization for which access dates are being updated
+        access_start_date:
+          type: string
+          format: date
+          nullable: true
+          description: New access start date (NULL = immediate access)
+        access_expiration_date:
+          type: string
+          format: date
+          nullable: true
+          description: New access expiration date (NULL = no expiration)
+        previous_access_start_date:
+          type: string
+          format: date
+          nullable: true
+          description: Previous access start date (for audit trail)
+        previous_access_expiration_date:
+          type: string
+          format: date
+          nullable: true
+          description: Previous access expiration date (for audit trail)
+
+    # =========================================================================
+    # Notification Preferences Events
+    # =========================================================================
+
+    UserNotificationPreferencesUpdatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.notification_preferences.updated
+        event_data:
+          $ref: '#/components/schemas/UserNotificationPreferencesUpdatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserNotificationPreferencesUpdatedData:
+      type: object
+      required:
+        - user_id
+        - org_id
+        - notification_preferences
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        org_id:
+          type: string
+          format: uuid
+          description: Organization for which preferences are being updated
+        notification_preferences:
+          $ref: './invitation.yaml#/components/schemas/NotificationPreferences'
+        previous_notification_preferences:
+          $ref: './invitation.yaml#/components/schemas/NotificationPreferences'
+          description: Previous preferences (for audit trail)
+
+    # =========================================================================
+    # Address Events
+    # =========================================================================
+
+    UserAddressData:
+      type: object
+      description: Common address data structure used across address events
+      required:
+        - address_id
+        - user_id
+        - label
+        - type
+        - street1
+        - city
+        - state
+        - zip_code
+      properties:
+        address_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        org_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: If set, this is an org-specific override address
+        label:
+          type: string
+          description: Human-readable label (e.g., "Home", "Work")
+        type:
+          type: string
+          enum: [physical, mailing, billing]
+        street1:
+          type: string
+        street2:
+          type: string
+          nullable: true
+        city:
+          type: string
+        state:
+          type: string
+        zip_code:
+          type: string
+        country:
+          type: string
+          default: "USA"
+        is_primary:
+          type: boolean
+          default: false
+          description: Whether this is the user's primary address (global addresses only)
+        is_active:
+          type: boolean
+          default: true
+
+    UserAddressAddedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.address.added
+        event_data:
+          $ref: '#/components/schemas/UserAddressData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserAddressUpdatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.address.updated
+        event_data:
+          allOf:
+            - $ref: '#/components/schemas/UserAddressData'
+            - type: object
+              properties:
+                previous_values:
+                  type: object
+                  description: Previous field values that were changed (for audit trail)
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserAddressRemovedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.address.removed
+        event_data:
+          type: object
+          required:
+            - address_id
+            - user_id
+          properties:
+            address_id:
+              type: string
+              format: uuid
+            user_id:
+              type: string
+              format: uuid
+            org_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: If set, this was an org-specific override
+            removal_type:
+              type: string
+              enum: [soft_delete, hard_delete]
+              description: Whether address was deactivated or permanently deleted
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    # =========================================================================
+    # Phone Events
+    # =========================================================================
+
+    UserPhoneData:
+      type: object
+      description: Common phone data structure used across phone events
+      required:
+        - phone_id
+        - user_id
+        - label
+        - type
+        - number
+      properties:
+        phone_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        org_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: If set, this is an org-specific override phone
+        label:
+          type: string
+          description: Human-readable label (e.g., "Personal Cell", "Work")
+        type:
+          type: string
+          enum: [mobile, office, fax, emergency]
+        number:
+          type: string
+        extension:
+          type: string
+          nullable: true
+        country_code:
+          type: string
+          default: "+1"
+        is_primary:
+          type: boolean
+          default: false
+          description: Whether this is the user's primary phone (global phones only)
+        is_active:
+          type: boolean
+          default: true
+        sms_capable:
+          type: boolean
+          default: false
+          description: Whether this phone can receive SMS notifications
+
+    UserPhoneAddedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.phone.added
+        event_data:
+          $ref: '#/components/schemas/UserPhoneData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserPhoneUpdatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.phone.updated
+        event_data:
+          allOf:
+            - $ref: '#/components/schemas/UserPhoneData'
+            - type: object
+              properties:
+                previous_values:
+                  type: object
+                  description: Previous field values that were changed (for audit trail)
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserPhoneRemovedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.phone.removed
+        event_data:
+          type: object
+          required:
+            - phone_id
+            - user_id
+          properties:
+            phone_id:
+              type: string
+              format: uuid
+            user_id:
+              type: string
+              format: uuid
+            org_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: If set, this was an org-specific override
+            removal_type:
+              type: string
+              enum: [soft_delete, hard_delete]
+              description: Whether phone was deactivated or permanently deleted
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    # =========================================================================
+    # User Lifecycle Events (Deactivation / Reactivation)
+    # =========================================================================
+
+    UserDeactivatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.deactivated
+        event_data:
+          $ref: '#/components/schemas/UserDeactivatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserDeactivatedData:
+      type: object
+      required:
+        - user_id
+        - org_id
+        - deactivated_at
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        org_id:
+          type: string
+          format: uuid
+          description: Organization from which the user is being deactivated
+        deactivated_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          description: Optional reason for deactivation
+          examples:
+            - "Account suspended"
+            - "End of contract"
+            - "User requested"
+
+    UserReactivatedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.reactivated
+        event_data:
+          $ref: '#/components/schemas/UserReactivatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserReactivatedData:
+      type: object
+      required:
+        - user_id
+        - org_id
+        - reactivated_at
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        org_id:
+          type: string
+          format: uuid
+          description: Organization in which the user is being reactivated
+        reactivated_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          description: Optional reason for reactivation
+          examples:
+            - "Account restored"
+            - "Contract renewed"
+            - "Admin decision"

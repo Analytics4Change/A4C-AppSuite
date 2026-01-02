@@ -43,6 +43,10 @@ export const edgeFunctionEnvSchema = z.object({
 
   // === Deployment tracking ===
   GIT_COMMIT_SHA: z.string().optional(),
+
+  // === Email Provider (Resend) ===
+  // Required for invite-user Edge Function
+  RESEND_API_KEY: z.string().min(1).optional(),
 });
 
 // =============================================================================
@@ -88,6 +92,7 @@ export function validateEdgeFunctionEnv(functionName: string): EdgeFunctionEnv {
     BACKEND_API_URL: Deno.env.get('BACKEND_API_URL'),
     FRONTEND_URL: Deno.env.get('FRONTEND_URL'),
     GIT_COMMIT_SHA: Deno.env.get('GIT_COMMIT_SHA'),
+    RESEND_API_KEY: Deno.env.get('RESEND_API_KEY'),
   };
 
   const result = edgeFunctionEnvSchema.safeParse(inputEnv);

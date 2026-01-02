@@ -6,6 +6,7 @@ import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { BottomNavigation, MoreMenuSheet } from '@/components/navigation';
 import {
   Users,
+  UsersRound,
   Pill,
   FileText,
   Settings,
@@ -79,6 +80,7 @@ export const MainLayout: React.FC = () => {
     { to: '/organizations', icon: Building, label: 'Organizations', roles: ['super_admin'], permission: 'organization.create', showForOrgTypes: ['platform_owner'] },
     { to: '/organization-units', icon: FolderTree, label: 'Organization Units', roles: ['super_admin', 'provider_admin'], permission: 'organization.view_ou', showForOrgTypes: ['provider'] },
     { to: '/roles', icon: Shield, label: 'Roles', roles: ['super_admin', 'provider_admin'], permission: 'role.create', showForOrgTypes: ['provider'] },
+    { to: '/users', icon: UsersRound, label: 'User Management', roles: ['super_admin', 'provider_admin'], permission: 'user.view', showForOrgTypes: ['provider'] },
     { to: '/medications', icon: Pill, label: 'Medication Management', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse'], hideForOrgTypes: ['platform_owner', 'provider_partner'] },
     { to: '/reports', icon: FileText, label: 'Reports', roles: ['super_admin', 'provider_admin', 'administrator'] },
     { to: '/settings', icon: Settings, label: 'Settings', roles: ['super_admin', 'provider_admin', 'administrator'] },

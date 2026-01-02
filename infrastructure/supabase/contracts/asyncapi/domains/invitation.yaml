@@ -66,7 +66,7 @@ components:
         - email
         - first_name
         - last_name
-        - role
+        - roles
         - token
         - expires_at
       properties:
@@ -93,15 +93,33 @@ components:
           type: string
           maxLength: 100
           description: Last name of the invited user
-        role:
-          type: string
-          enum: [provider_admin, partner_admin, clinician, viewer]
+        roles:
+          type: array
+          minItems: 1
           description: |
-            Role to assign when invitation is accepted:
-            - provider_admin: Full administrative access for provider organizations
-            - partner_admin: Full administrative access for partner organizations
-            - clinician: Clinical staff with medication management access
-            - viewer: Read-only access
+            Roles to assign when invitation is accepted. Supports both canonical
+            system roles and custom organization-defined roles. Each role includes
+            a denormalized name snapshot for display purposes.
+          items:
+            type: object
+            required:
+              - role_id
+            properties:
+              role_id:
+                type: string
+                format: uuid
+                description: UUID of the role to assign
+              role_name:
+                type: string
+                maxLength: 100
+                description: Denormalized role name snapshot for display (e.g., "Program Manager - Aspen")
+          examples:
+            - - role_id: "11111111-1111-1111-1111-111111111111"
+                role_name: "super_admin"
+            - - role_id: "550e8400-e29b-41d4-a716-446655440001"
+                role_name: "Program Manager - Aspen"
+              - role_id: "550e8400-e29b-41d4-a716-446655440002"
+                role_name: "Clinician"
         token:
           type: string
           description: Cryptographically secure invitation token (256 bits, base64url encoded)
@@ -113,6 +131,50 @@ components:
           description: When the invitation expires (default 7 days from creation)
           examples:
             - "2025-11-25T13:54:00.000Z"
+        access_start_date:
+          type: string
+          format: date
+          nullable: true
+          description: First date the user can access the org after accepting (NULL = immediate)
+          examples:
+            - "2025-01-15"
+            - null
+        access_expiration_date:
+          type: string
+          format: date
+          nullable: true
+          description: Date the user's access will expire (NULL = no expiration)
+          examples:
+            - "2025-12-31"
+            - null
+        notification_preferences:
+          $ref: '#/components/schemas/NotificationPreferences'
+          description: Initial notification preferences for the user
+
+    NotificationPreferences:
+      type: object
+      description: User notification preferences (per-org)
+      properties:
+        email:
+          type: boolean
+          default: true
+          description: Whether to send email notifications
+        sms:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+              default: false
+              description: Whether to send SMS notifications
+            phone_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: UUID of the phone to use for SMS (from user_phones or user_org_phone_overrides)
+        in_app:
+          type: boolean
+          default: false
+          description: Whether to send in-app notifications (future feature)
 
     InvitationRevokedEvent:
       type: object
@@ -204,7 +266,7 @@ components:
         - org_id
         - user_id
         - email
-        - role
+        - roles
         - accepted_at
       properties:
         invitation_id:
@@ -220,12 +282,41 @@ components:
         email:
           type: string
           format: email
-        role:
-          type: string
-          enum: [provider_admin, partner_admin, clinician, viewer]
+        roles:
+          type: array
+          minItems: 1
+          description: |
+            Snapshot of roles from the invitation that were promised to the user.
+            The actual role grants are emitted as separate user.role.assigned events.
+          items:
+            type: object
+            required:
+              - role_id
+            properties:
+              role_id:
+                type: string
+                format: uuid
+                description: UUID of the role that was assigned
+              role_name:
+                type: string
+                maxLength: 100
+                description: Denormalized role name snapshot
         accepted_at:
           type: string
           format: date-time
+        access_start_date:
+          type: string
+          format: date
+          nullable: true
+          description: First date the user can access the org (copied from invitation)
+        access_expiration_date:
+          type: string
+          format: date
+          nullable: true
+          description: Date the user's access will expire (copied from invitation)
+        notification_preferences:
+          $ref: '#/components/schemas/NotificationPreferences'
+          description: Notification preferences (copied from invitation to user_org_access)
 
     InvitationExpiredEvent:
       type: object
