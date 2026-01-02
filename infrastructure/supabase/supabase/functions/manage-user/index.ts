@@ -18,6 +18,15 @@ import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-
 // Deployment version tracking
 const DEPLOY_VERSION = 'v1';
 
+/**
+ * Type alias for Supabase clients configured with non-default schemas.
+ * The default SupabaseClient<Database, 'public', Schema> doesn't accept
+ * clients configured with schema: 'api'. This type accepts any schema.
+ *
+ * deno-lint-ignore no-explicit-any
+ */
+type AnySchemaSupabaseClient = SupabaseClient<unknown, string, unknown>;
+
 // CORS headers for frontend requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,7 +61,7 @@ interface ManageUserResponse {
  * Get user details for validation
  */
 async function getUserDetails(
-  supabase: SupabaseClient,
+  supabase: AnySchemaSupabaseClient,
   userId: string,
   orgId: string
 ): Promise<{ exists: boolean; isActive: boolean; email?: string }> {

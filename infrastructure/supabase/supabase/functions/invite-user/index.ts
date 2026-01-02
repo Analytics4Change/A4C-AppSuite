@@ -9,7 +9,7 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   validateEdgeFunctionEnv,
   createEnvErrorResponse,
@@ -21,21 +21,13 @@ import {
 const DEPLOY_VERSION = 'v1';
 
 /**
- * Interface for Supabase clients that support RPC calls.
- * Used instead of SupabaseClient to avoid schema type conflicts
- * (the default SupabaseClient assumes 'public' schema, but we use 'api' schema).
+ * Type alias for Supabase clients configured with non-default schemas.
+ * The default SupabaseClient<Database, 'public', Schema> doesn't accept
+ * clients configured with schema: 'api'. This type accepts any schema.
+ *
+ * deno-lint-ignore no-explicit-any
  */
-interface RpcClient {
-  rpc<T = unknown>(
-    fn: string,
-    args?: Record<string, unknown>,
-    options?: { count?: 'exact' | 'planned' | 'estimated' }
-  ): {
-    then<TResult1 = { data: T | null; error: Error | null }>(
-      onfulfilled?: (value: { data: T | null; error: Error | null }) => TResult1
-    ): Promise<TResult1>;
-  };
-}
+type AnySchemaSupabaseClient = SupabaseClient<unknown, string, unknown>;
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -123,7 +115,7 @@ function generateSecureToken(): string {
  * Check email status via smart lookup
  */
 async function checkEmailStatus(
-  supabase: RpcClient,
+  supabase: AnySchemaSupabaseClient,
   email: string,
   orgId: string
 ): Promise<EmailLookupResult> {
@@ -202,7 +194,7 @@ async function checkEmailStatus(
  * Emit invitation.expired event (lazy expiration detection)
  */
 async function emitExpirationEvent(
-  supabase: RpcClient,
+  supabase: AnySchemaSupabaseClient,
   invitation: { id: string; email: string; expires_at: string },
   orgId: string
 ): Promise<void> {
