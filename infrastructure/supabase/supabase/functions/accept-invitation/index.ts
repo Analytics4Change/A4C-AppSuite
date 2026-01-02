@@ -170,7 +170,6 @@ serve(async (req) => {
 
     // Create user account based on auth method
     let userId: string | undefined;
-    let authError: Error | null = null;
     const { credentials } = requestData;
 
     if (isEmailPassword) {
