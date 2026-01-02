@@ -9,11 +9,33 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  validateEdgeFunctionEnv,
+  createEnvErrorResponse,
+  validateEmailFunctionEnv,
+  validateAdminFunctionEnv,
+} from '../_shared/env-schema.ts';
 
 // Deployment version tracking
 const DEPLOY_VERSION = 'v1';
+
+/**
+ * Interface for Supabase clients that support RPC calls.
+ * Used instead of SupabaseClient to avoid schema type conflicts
+ * (the default SupabaseClient assumes 'public' schema, but we use 'api' schema).
+ */
+interface RpcClient {
+  rpc<T = unknown>(
+    fn: string,
+    args?: Record<string, unknown>,
+    options?: { count?: 'exact' | 'planned' | 'estimated' }
+  ): {
+    then<TResult1 = { data: T | null; error: Error | null }>(
+      onfulfilled?: (value: { data: T | null; error: Error | null }) => TResult1
+    ): Promise<TResult1>;
+  };
+}
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -101,7 +123,7 @@ function generateSecureToken(): string {
  * Check email status via smart lookup
  */
 async function checkEmailStatus(
-  supabase: SupabaseClient,
+  supabase: RpcClient,
   email: string,
   orgId: string
 ): Promise<EmailLookupResult> {
@@ -180,7 +202,7 @@ async function checkEmailStatus(
  * Emit invitation.expired event (lazy expiration detection)
  */
 async function emitExpirationEvent(
-  supabase: SupabaseClient,
+  supabase: RpcClient,
   invitation: { id: string; email: string; expires_at: string },
   orgId: string
 ): Promise<void> {
@@ -349,23 +371,30 @@ serve(async (req) => {
   }
 
   // ==========================================================================
-  // ENVIRONMENT VALIDATION - FAIL FAST
+  // ENVIRONMENT VALIDATION - TWO-STAGE FAIL FAST
   // ==========================================================================
+  // Stage 1: Zod schema validation (types and optionality)
+  // Stage 2: Business logic validation (conditional requirements)
+  // See: _shared/env-schema.ts for the two-stage pattern documentation
   let env;
   try {
+    // Stage 1: Zod schema validation
     env = validateEdgeFunctionEnv('invite-user');
+
+    // Stage 2: Business logic validation (this function requires admin + email)
+    const adminValidation = validateAdminFunctionEnv(env, 'invite-user');
+    if (!adminValidation.valid) {
+      return createEnvErrorResponse('invite-user', DEPLOY_VERSION,
+        adminValidation.errors.join('; '), corsHeaders);
+    }
+
+    const emailValidation = validateEmailFunctionEnv(env, 'invite-user');
+    if (!emailValidation.valid) {
+      return createEnvErrorResponse('invite-user', DEPLOY_VERSION,
+        emailValidation.errors.join('; '), corsHeaders);
+    }
   } catch (error) {
     return createEnvErrorResponse('invite-user', DEPLOY_VERSION, error.message, corsHeaders);
-  }
-
-  // Require service role key
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
-    return createEnvErrorResponse('invite-user', DEPLOY_VERSION, 'SUPABASE_SERVICE_ROLE_KEY is required', corsHeaders);
-  }
-
-  // Require Resend API key
-  if (!env.RESEND_API_KEY) {
-    return createEnvErrorResponse('invite-user', DEPLOY_VERSION, 'RESEND_API_KEY is required', corsHeaders);
   }
 
   try {
