@@ -2,35 +2,67 @@
  * Redirect URL Validation
  *
  * Validates redirect URLs to prevent open redirect vulnerabilities.
- * Uses VITE_PLATFORM_BASE_DOMAIN as the allowed domain.
+ * Automatically derives the allowed domain from the current hostname in production.
  *
- * FAIL-FAST: In production mode, requires VITE_PLATFORM_BASE_DOMAIN to be set.
+ * Domain Detection:
+ * - Production: Derives base domain from window.location.hostname
+ *   (e.g., "a4c.firstovertheline.com" → "firstovertheline.com")
+ * - Localhost: Returns 'localhost' (subdomain routing disabled)
+ * - Override: VITE_PLATFORM_BASE_DOMAIN can explicitly set the domain
  */
 
-const isMockMode = import.meta.env.VITE_APP_MODE === 'mock';
+import { getDeploymentConfig, isLocalhost } from '@/config/deployment.config';
 
 /**
- * Get the allowed domain from environment variable.
+ * Derive the base domain from a hostname.
  *
- * FAIL-FAST: Throws in production if VITE_PLATFORM_BASE_DOMAIN is not set.
- * In mock mode, returns 'localhost' for development convenience.
+ * Examples:
+ * - "a4c.firstovertheline.com" → "firstovertheline.com"
+ * - "poc-test1.firstovertheline.com" → "firstovertheline.com"
+ * - "localhost" → "localhost"
  *
- * @throws Error if VITE_PLATFORM_BASE_DOMAIN is missing in production mode
+ * @param hostname - The full hostname
+ * @returns The base domain (last two parts)
+ */
+function deriveBaseDomain(hostname: string): string {
+  const parts = hostname.split('.');
+  if (parts.length >= 2) {
+    return parts.slice(-2).join('.');
+  }
+  return hostname;
+}
+
+/**
+ * Get the allowed domain for redirect validation.
+ *
+ * Priority:
+ * 1. VITE_PLATFORM_BASE_DOMAIN (explicit override)
+ * 2. Derived from current hostname (production)
+ * 3. 'localhost' (when subdomain routing is disabled)
+ *
+ * @returns The allowed domain for redirect validation
  */
 function getAllowedDomain(): string {
+  // Explicit override takes priority
   const configuredDomain = import.meta.env.VITE_PLATFORM_BASE_DOMAIN;
-  if (configuredDomain) return configuredDomain;
+  if (configuredDomain) {
+    return configuredDomain;
+  }
 
-  // Mock mode: allow localhost for development
-  if (isMockMode) {
+  const config = getDeploymentConfig();
+
+  // Dev modes (subdomain routing disabled): allow localhost
+  if (!config.enableSubdomainRouting) {
     return 'localhost';
   }
 
-  // Production mode: FAIL-FAST - this is a security-critical configuration
-  throw new Error(
-    'VITE_PLATFORM_BASE_DOMAIN is required for redirect URL validation. ' +
-      'Please set this environment variable to prevent open redirect vulnerabilities.'
-  );
+  // Production: derive from current hostname
+  if (typeof window !== 'undefined') {
+    return deriveBaseDomain(window.location.hostname);
+  }
+
+  // SSR fallback (shouldn't happen in practice for redirects)
+  return 'localhost';
 }
 
 /**
@@ -105,36 +137,64 @@ export function sanitizeRedirectUrl(url: string | null | undefined): string | nu
 }
 
 /**
+ * Get the platform base domain for subdomain URL construction.
+ *
+ * Priority:
+ * 1. VITE_PLATFORM_BASE_DOMAIN (explicit override)
+ * 2. Derived from current hostname (production)
+ *
+ * @returns Base domain or null if on localhost
+ */
+function getPlatformBaseDomain(): string | null {
+  // Explicit override
+  const configuredDomain = import.meta.env.VITE_PLATFORM_BASE_DOMAIN;
+  if (configuredDomain) {
+    return configuredDomain;
+  }
+
+  // Localhost: subdomain routing not available
+  if (isLocalhost()) {
+    return null;
+  }
+
+  // Derive from current hostname
+  if (typeof window !== 'undefined') {
+    return deriveBaseDomain(window.location.hostname);
+  }
+
+  return null;
+}
+
+/**
  * Builds a subdomain URL for an organization.
  *
- * FAIL-FAST: Throws in production if VITE_PLATFORM_BASE_DOMAIN is not set.
- * In mock mode, returns null for development convenience.
+ * When subdomain routing is disabled (localhost), returns null.
+ * In production, derives the base domain from the current hostname.
  *
  * @param slug - Organization slug (subdomain)
  * @param path - Path to append (default: '/dashboard')
- * @returns Full subdomain URL, or null in mock mode if not configured
- * @throws Error if VITE_PLATFORM_BASE_DOMAIN is missing in production mode
+ * @returns Full subdomain URL, or null when subdomain routing is disabled
  *
  * @example
  * ```typescript
  * const url = buildSubdomainUrl('poc-test1', '/dashboard');
- * // => "https://poc-test1.firstovertheline.com/dashboard"
+ * // => "https://poc-test1.firstovertheline.com/dashboard" (production)
+ * // => null (localhost/development)
  * ```
  */
 export function buildSubdomainUrl(slug: string, path: string = '/dashboard'): string | null {
-  const baseDomain = import.meta.env.VITE_PLATFORM_BASE_DOMAIN;
+  const config = getDeploymentConfig();
+
+  // Subdomain routing disabled (localhost or dev mode): return null
+  if (!config.enableSubdomainRouting) {
+    return null;
+  }
+
+  const baseDomain = getPlatformBaseDomain();
 
   if (!baseDomain) {
-    // Mock mode: return null (subdomain feature not applicable in dev)
-    if (isMockMode) {
-      return null;
-    }
-
-    // Production mode: FAIL-FAST
-    throw new Error(
-      'VITE_PLATFORM_BASE_DOMAIN is required to build subdomain URLs. ' +
-        'Please set this environment variable.'
-    );
+    // No base domain available (shouldn't happen if enableSubdomainRouting is true)
+    return null;
   }
 
   // Ensure path starts with /

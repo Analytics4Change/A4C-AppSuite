@@ -247,29 +247,36 @@ src/
 
 ### Authentication Architecture
 
-**Status**: ✅ Supabase Auth with three-mode system (Completed 2025-10-27)
+**Status**: ✅ Supabase Auth with smart detection (Updated 2025-01-02)
 
-The application uses **dependency injection** with multiple authentication modes to support both rapid development and production requirements.
+The application uses **dependency injection** with smart environment detection to automatically determine the authentication mode.
 
-#### Three Authentication Modes
+#### Smart Detection
 
-1. **Mock Mode** (default for development)
+The authentication mode is automatically detected based on runtime conditions:
+
+| Scenario | Credentials | Hostname | Result |
+|----------|-------------|----------|--------|
+| `npm run dev` | Present | localhost | Real auth, NO subdomain redirect |
+| `npm run dev` | Missing | localhost | Mock auth, NO subdomain redirect |
+| `npm run dev:mock` | Present | localhost | Mock auth (forced), NO subdomain redirect |
+| Production build | Present | *.example.com | Real auth, subdomain redirect enabled |
+
+#### Two Authentication Modes
+
+1. **Mock Mode**
    - Instant authentication without network calls
    - Complete JWT claims structure for testing
    - Configurable user profiles (super_admin, provider_admin, etc.)
-   - Use: `npm run dev` or `npm run dev:mock`
+   - **Triggered by**: No Supabase credentials OR `VITE_FORCE_MOCK=true`
+   - Use: `npm run dev` (without credentials) or `npm run dev:mock`
 
-2. **Integration Mode** (for auth testing)
+2. **Real Mode** (Supabase)
    - Real OAuth flows with Google/GitHub
    - Real JWT tokens from Supabase
    - Custom claims from database hooks
-   - Use: `npm run dev:auth` or `npm run dev:integration`
-
-3. **Production Mode**
-   - Real Supabase Auth with social login
    - Enterprise SSO support (SAML 2.0)
-   - JWT custom claims with RLS enforcement
-   - Auto-selected in production builds
+   - **Triggered by**: Supabase credentials present (and not forcing mock)
 
 #### Provider Interface Pattern
 
@@ -335,22 +342,23 @@ const MyComponent = () => {
 
 #### Environment Configuration
 
-Control deployment mode via environment variable:
+Authentication mode is **automatically detected** - no `VITE_APP_MODE` needed:
 
 ```bash
-# .env.development (mock mode)
-VITE_APP_MODE=mock
+# .env.local - Real auth (credentials present = real mode)
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_BACKEND_API_URL=https://api-a4c.example.com
 
-# .env.development.integration (production mode for testing)
-VITE_APP_MODE=production
-VITE_SUPABASE_URL=https://your-dev-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-dev-anon-key
-
-# .env.production (production mode)
-VITE_APP_MODE=production
-VITE_SUPABASE_URL=https://your-prod-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-prod-anon-key
+# Optional: Force mock mode even with credentials
+# VITE_FORCE_MOCK=true
 ```
+
+**Key behaviors:**
+- Credentials present → Real Supabase auth
+- Credentials missing → Mock auth
+- Localhost → Subdomain routing disabled (stays on localhost:5173)
+- Production hostname → Subdomain routing enabled
 
 #### Testing with Authentication
 

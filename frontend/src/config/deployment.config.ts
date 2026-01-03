@@ -1,23 +1,38 @@
 /**
- * Deployment Mode Configuration
+ * Deployment Configuration with Smart Detection
  *
- * Centralized mapping from deployment mode to service implementations.
- * Single source of truth for all mock vs production decisions.
+ * Automatically detects the runtime environment to determine service configuration.
+ * Eliminates the need for manual VITE_APP_MODE configuration in most cases.
  *
- * Valid Modes:
- * - mock: All services mocked (fast local dev, offline capable)
- * - integration-auth: Mock auth but real workflows/invitations (for workflow testing)
- * - production: All services real (integration testing, production)
+ * Detection Logic:
+ * - Supabase credentials present + not forcing mock → use real services
+ * - Running on localhost → disable subdomain routing (subdomains don't work on localhost)
+ * - Production build + not localhost → enable full subdomain routing
  *
- * Invalid Combinations Prevented:
- * - Mock auth + Real organization service (Edge Functions reject mock JWT)
- * - Real auth + Mock organization service (Data inconsistency)
+ * Escape Hatch:
+ * - VITE_FORCE_MOCK=true → Force mock mode even with credentials present
  */
 import { Logger } from '@/utils/logger';
 
+/**
+ * Application mode type
+ *
+ * - 'mock': Using mock authentication and services
+ * - 'real': Using real Supabase authentication and services
+ */
+export type AppMode = 'mock' | 'real';
+
 const log = Logger.getLogger('config');
 
-export type AppMode = 'mock' | 'integration-auth' | 'production';
+/**
+ * Runtime environment detection results
+ */
+interface RuntimeEnvironment {
+  hasSupabaseCredentials: boolean;
+  isLocalhost: boolean;
+  isProductionBuild: boolean;
+  forceMock: boolean;
+}
 
 export interface DeploymentConfig {
   authProvider: 'mock' | 'supabase';
@@ -25,62 +40,78 @@ export interface DeploymentConfig {
   useMockOrganizationUnit: boolean;
   useMockWorkflow: boolean;
   useMockInvitation: boolean;
+  /** Whether to redirect users to org subdomains after login (requires real DNS) */
+  enableSubdomainRouting: boolean;
 }
 
-const DEPLOYMENT_CONFIGS: Record<AppMode, DeploymentConfig> = {
-  mock: {
-    authProvider: 'mock',
-    useMockOrganization: true,
-    useMockOrganizationUnit: true,
-    useMockWorkflow: true,
-    useMockInvitation: true,
-  },
-  'integration-auth': {
-    authProvider: 'mock',
-    useMockOrganization: true,
-    useMockOrganizationUnit: true,
-    useMockWorkflow: false,
-    useMockInvitation: false,
-  },
-  production: {
-    authProvider: 'supabase',
-    useMockOrganization: false,
-    useMockOrganizationUnit: false,
-    useMockWorkflow: false,
-    useMockInvitation: false,
+/**
+ * Check if running on localhost
+ *
+ * @returns true if hostname is localhost or 127.0.0.1
+ */
+export function isLocalhost(): boolean {
+  if (typeof window === 'undefined') {
+    return true; // SSR/Node context - assume localhost
   }
-};
+  const hostname = window.location.hostname;
+  return hostname === 'localhost' || hostname === '127.0.0.1';
+}
 
 /**
- * Get deployment configuration based on VITE_APP_MODE
+ * Detect the runtime environment
  *
- * Defaults to 'mock' in development, 'production' in production builds
+ * @returns Runtime environment detection results
+ */
+function detectEnvironment(): RuntimeEnvironment {
+  return {
+    hasSupabaseCredentials: !!import.meta.env.VITE_SUPABASE_URL,
+    isLocalhost: isLocalhost(),
+    isProductionBuild: import.meta.env.PROD === true,
+    forceMock: import.meta.env.VITE_FORCE_MOCK === 'true',
+  };
+}
+
+/**
+ * Get deployment configuration based on smart environment detection
  *
- * @throws Error if VITE_APP_MODE is invalid
+ * Decision matrix:
+ * - Credentials present + not forcing mock → real services
+ * - Localhost → subdomain routing disabled
+ * - Production build + not localhost → subdomain routing enabled
+ *
+ * @returns Deployment configuration
  */
 export function getDeploymentConfig(): DeploymentConfig {
-  const mode = (import.meta.env.VITE_APP_MODE as AppMode) ||
-               (import.meta.env.PROD ? 'production' : 'mock');
+  const env = detectEnvironment();
+  const useRealServices = env.hasSupabaseCredentials && !env.forceMock;
 
-  const config = DEPLOYMENT_CONFIGS[mode];
+  // Only enable subdomain routing in production builds AND not on localhost
+  // (subdomains like *.localhost don't resolve in browsers)
+  const enableSubdomainRouting = env.isProductionBuild && !env.isLocalhost;
 
-  if (!config) {
-    throw new Error(
-      `Invalid VITE_APP_MODE: "${mode}". Must be 'mock', 'integration-auth', or 'production'.`
-    );
-  }
+  const config: DeploymentConfig = {
+    authProvider: useRealServices ? 'supabase' : 'mock',
+    useMockOrganization: !useRealServices,
+    useMockOrganizationUnit: !useRealServices,
+    useMockWorkflow: !useRealServices,
+    useMockInvitation: !useRealServices,
+    enableSubdomainRouting,
+  };
 
-  log.info('Deployment mode configured', { mode, config });
+  log.info('Deployment config detected', {
+    environment: env,
+    config,
+  });
 
   return config;
 }
 
 /**
- * Get the current application mode
+ * Get a human-readable description of the current mode
  *
- * @returns Current deployment mode
+ * @returns 'mock' or 'real' based on detected environment
  */
-export function getAppMode(): AppMode {
-  return (import.meta.env.VITE_APP_MODE as AppMode) ||
-         (import.meta.env.PROD ? 'production' : 'mock');
+export function getAppMode(): 'mock' | 'real' {
+  const env = detectEnvironment();
+  return (env.hasSupabaseCredentials && !env.forceMock) ? 'real' : 'mock';
 }

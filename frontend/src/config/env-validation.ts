@@ -2,7 +2,12 @@
  * Environment Variable Validation
  *
  * Validates all VITE_* environment variables at application startup.
- * Throws immediately if required variables are missing (undefined causes failure).
+ * Uses smart detection instead of explicit mode configuration.
+ *
+ * Smart Detection:
+ * - Supabase credentials present → use real services
+ * - Credentials missing → mock mode
+ * - VITE_FORCE_MOCK=true → force mock mode
  *
  * Called from main.tsx BEFORE any other initialization.
  */
@@ -33,20 +38,22 @@ const numberString = (defaultValue: number) =>
 // =============================================================================
 
 const frontendEnvSchema = z.object({
-  // === Deployment Mode ===
-  VITE_APP_MODE: z.enum(['mock', 'integration-auth', 'production']).default('mock'),
+  // === Smart Detection Override ===
+  // Force mock mode even when Supabase credentials are present
+  VITE_FORCE_MOCK: booleanString,
 
   // === Supabase Configuration ===
-  VITE_SUPABASE_URL: z.string().url(),
-  VITE_SUPABASE_ANON_KEY: z.string().min(1),
+  // Optional: presence determines if real services are used
+  VITE_SUPABASE_URL: z.string().url().optional(),
+  VITE_SUPABASE_ANON_KEY: z.string().min(1).optional(),
 
   // === Backend API ===
   VITE_BACKEND_API_URL: z.string().url().optional(),
 
-  // === Platform Domain (required for cross-subdomain session sharing) ===
-  // Single source of truth for cookie scoping and redirect URL validation
+  // === Platform Domain (Optional - auto-derived from hostname in production) ===
+  // Can be explicitly set to override auto-detection
   // See: documentation/infrastructure/operations/configuration/ENVIRONMENT_VARIABLES.md
-  VITE_PLATFORM_BASE_DOMAIN: z.string().min(1),
+  VITE_PLATFORM_BASE_DOMAIN: z.string().min(1).optional(),
 
   // === Medication Search ===
   VITE_USE_RXNORM_API: booleanString,
@@ -90,21 +97,11 @@ const frontendEnvSchema = z.object({
   VITE_DEBUG_MOBX: booleanString,
   VITE_DEBUG_PERFORMANCE: booleanString,
   VITE_DEBUG_LOGS: booleanString,
-});
 
-/**
- * Mode-aware schema that makes Supabase optional in mock mode
- */
-const getSchemaForMode = (mode: string) => {
-  if (mode === 'mock') {
-    return frontendEnvSchema.extend({
-      VITE_SUPABASE_URL: z.string().url().optional(),
-      VITE_SUPABASE_ANON_KEY: z.string().min(1).optional(),
-      VITE_PLATFORM_BASE_DOMAIN: z.string().min(1).optional(),
-    });
-  }
-  return frontendEnvSchema;
-};
+  // === Deprecated (kept for backward compatibility, no longer used) ===
+  // VITE_APP_MODE is replaced by smart detection
+  VITE_APP_MODE: z.string().optional(),
+});
 
 // =============================================================================
 // Validation Function
@@ -125,12 +122,9 @@ export function validateEnvironment(): FrontendEnv {
     return validatedEnv;
   }
 
-  // Get mode first (with fallback to mock)
-  const mode = import.meta.env.VITE_APP_MODE || 'mock';
-
   // Build env object from import.meta.env
   const rawEnv = {
-    VITE_APP_MODE: import.meta.env.VITE_APP_MODE,
+    VITE_FORCE_MOCK: import.meta.env.VITE_FORCE_MOCK,
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
     VITE_BACKEND_API_URL: import.meta.env.VITE_BACKEND_API_URL,
@@ -164,22 +158,29 @@ export function validateEnvironment(): FrontendEnv {
     VITE_DEBUG_MOBX: import.meta.env.VITE_DEBUG_MOBX,
     VITE_DEBUG_PERFORMANCE: import.meta.env.VITE_DEBUG_PERFORMANCE,
     VITE_DEBUG_LOGS: import.meta.env.VITE_DEBUG_LOGS,
+    VITE_APP_MODE: import.meta.env.VITE_APP_MODE, // Deprecated but kept for compatibility
   };
 
-  // Validate against mode-appropriate schema
-  const schema = getSchemaForMode(mode);
-  const result = schema.safeParse(rawEnv);
+  // Validate against schema
+  const result = frontendEnvSchema.safeParse(rawEnv);
 
   if (!result.success) {
     const errors = result.error.issues
       .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
       .join('\n');
 
+    // Determine effective mode for display
+    const hasCredentials = !!rawEnv.VITE_SUPABASE_URL;
+    const forceMock = rawEnv.VITE_FORCE_MOCK === 'true';
+    const effectiveMode = (hasCredentials && !forceMock) ? 'real' : 'mock';
+
     const errorMessage = `
 ╔══════════════════════════════════════════════════════════════════╗
 ║                 ENVIRONMENT VALIDATION FAILED                     ║
 ╠══════════════════════════════════════════════════════════════════╣
-║ Mode: ${mode.padEnd(57)}║
+║ Detected Mode: ${effectiveMode.padEnd(49)}║
+║ Has Credentials: ${String(hasCredentials).padEnd(47)}║
+║ Force Mock: ${String(forceMock).padEnd(52)}║
 ╠══════════════════════════════════════════════════════════════════╣
 ${errors}
 ╠══════════════════════════════════════════════════════════════════╣
@@ -187,14 +188,21 @@ ${errors}
 ╚══════════════════════════════════════════════════════════════════╝
 `;
 
-    log.error('Environment validation failed', { mode, errors: result.error.issues });
+    log.error('Environment validation failed', { effectiveMode, errors: result.error.issues });
     throw new Error(`Environment validation failed:\n${errors}`);
   }
 
-  // Type assertion is safe here because:
-  // - In mock mode, Supabase fields are optional (won't be accessed)
-  // - In production/integration mode, validation ensures they exist
-  validatedEnv = result.data as FrontendEnv;
+  validatedEnv = result.data;
+
+  // Log detected configuration
+  const hasCredentials = !!validatedEnv.VITE_SUPABASE_URL;
+  const effectiveMode = (hasCredentials && !validatedEnv.VITE_FORCE_MOCK) ? 'real' : 'mock';
+  log.info('Environment validated', {
+    effectiveMode,
+    hasSupabaseCredentials: hasCredentials,
+    forceMock: validatedEnv.VITE_FORCE_MOCK,
+  });
+
   return validatedEnv;
 }
 

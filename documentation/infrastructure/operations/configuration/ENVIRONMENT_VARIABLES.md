@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2025-12-09
+last_updated: 2025-01-02
 ---
 
 # Environment Variables Reference
 
-**Last Updated**: 2025-12-09
-**Version**: 2.2.0
+**Last Updated**: 2025-01-02
+**Version**: 2.3.0
 
 This document provides a comprehensive reference for all environment variables used across the A4C-AppSuite monorepo.
 
@@ -169,22 +169,24 @@ validateEnv();
 ReactDOM.createRoot(document.getElementById('root')!).render(<App />);
 ```
 
-**Mode-Aware Validation**: The frontend has three auth modes:
-- `mock` - Supabase variables optional (for UI development)
-- `integration` - Supabase variables required
-- `production` - Supabase variables required
+**Smart Detection Validation**: The frontend uses smart detection (no mode variable required):
+- Supabase credentials present → Real auth mode
+- Supabase credentials missing → Mock auth mode
+- `VITE_FORCE_MOCK=true` → Force mock auth mode
 
 ```typescript
-// frontend/src/config/env-validation.ts
-const authMode = rawEnv.VITE_AUTH_MODE || 'mock';
-
-if (authMode === 'mock') {
-  // Use schema with optional Supabase vars
-  result = mockModeSchema.safeParse(rawEnv);
-} else {
-  // Use schema with required Supabase vars
-  result = productionModeSchema.safeParse(rawEnv);
+// frontend/src/config/deployment.config.ts
+function detectEnvironment(): RuntimeEnvironment {
+  return {
+    hasSupabaseCredentials: !!import.meta.env.VITE_SUPABASE_URL,
+    isLocalhost: isLocalhost(),
+    isProductionBuild: import.meta.env.PROD === true,
+    forceMock: import.meta.env.VITE_FORCE_MOCK === 'true',
+  };
 }
+
+// Auth mode is: real if credentials present AND not forcing mock
+const useRealServices = env.hasSupabaseCredentials && !env.forceMock;
 ```
 
 **Accessing Validated Environment**:
@@ -326,32 +328,45 @@ export const mySchema = z.object({
 
 ## Frontend Configuration
 
-### Primary Configuration
+### Smart Detection (No Mode Variable Required)
 
-#### `VITE_APP_MODE` (Primary Control Variable)
+The frontend uses **smart detection** to automatically determine authentication mode. No `VITE_APP_MODE` is required.
 
-**Purpose**: Controls deployment mode for entire frontend application
-**Valid Values**: `mock` | `production`
-**Default**: `mock` (development), `production` (in production builds)
-**Required**: No (has fallback)
+#### Detection Logic
 
-**Behavior Influence**:
-- `mock`: Uses DevAuthProvider for instant authentication, mock organization service, offline capability
-- `production`: Uses SupabaseAuthProvider for real OAuth flows, real Supabase backend, network-dependent
+| Condition | Auth Provider | Subdomain Routing |
+|-----------|---------------|-------------------|
+| Supabase credentials present | SupabaseAuthProvider (real) | Based on hostname |
+| Supabase credentials missing | DevAuthProvider (mock) | Disabled |
+| `VITE_FORCE_MOCK=true` | DevAuthProvider (mock) | Disabled |
+| Hostname = localhost | N/A | Disabled |
+| Hostname = *.example.com | N/A | Enabled |
 
-**Security Implications**: Controls whether real or mock JWT tokens are issued; affects RLS policy enforcement
+**Key Principle**: Presence of Supabase credentials determines auth mode; hostname determines subdomain routing.
 
 **Files**:
-- `frontend/src/config/deployment.config.ts` - Configuration logic
+- `frontend/src/config/deployment.config.ts` - Smart detection logic
 - `frontend/src/services/auth/AuthProviderFactory.ts` - Provider selection
+
+---
+
+### Primary Configuration
+
+#### `VITE_FORCE_MOCK` (Escape Hatch)
+
+**Purpose**: Force mock authentication even when Supabase credentials are present
+**Valid Values**: `true` | `false`
+**Default**: `false`
+**Required**: No
+
+**Behavior Influence**: When `true`, uses DevAuthProvider regardless of whether Supabase credentials are configured
+
+**Use Case**: Testing mock behavior without removing credentials from `.env.local`
 
 **Example**:
 ```bash
-# Development (mock mode)
-VITE_APP_MODE=mock
-
-# Integration testing (real auth)
-VITE_APP_MODE=production
+# Force mock mode even with credentials present
+VITE_FORCE_MOCK=true
 ```
 
 ---
@@ -361,30 +376,53 @@ VITE_APP_MODE=production
 #### `VITE_SUPABASE_URL`
 
 **Purpose**: Supabase project URL for backend API and authentication
-**Default**: None (required when `VITE_APP_MODE=production`)
+**Default**: None
 **Example**: `https://yourproject.supabase.co`
-**Required**: Yes (if `VITE_APP_MODE=production`)
+**Required**: No (presence triggers real auth mode)
 
-**Behavior Influence**: Determines which Supabase instance the application connects to; controls data isolation
+**Behavior Influence**: When present (and `VITE_FORCE_MOCK` is not `true`), activates SupabaseAuthProvider for real OAuth flows
 
 **Security Implications**: Points to either dev or production database; must match authentication configuration
 
 **Files**:
-- `frontend/src/lib/supabase.ts` - Supabase client initialization
+- `frontend/src/lib/supabase-ssr.ts` - Supabase client initialization
 - `frontend/src/services/auth/SupabaseAuthProvider.ts` - Authentication provider
 
 #### `VITE_SUPABASE_ANON_KEY`
 
 **Purpose**: Anonymous API key for Supabase public operations
-**Default**: None (required when `VITE_APP_MODE=production`)
-**Required**: Yes (if `VITE_APP_MODE=production`)
+**Default**: None
+**Required**: No (but required if `VITE_SUPABASE_URL` is set)
 
 **Behavior Influence**: Enables unauthenticated API calls to Supabase; limited by RLS policies
 
 **Security Implications**: Public key; safe to expose in frontend; RLS policies enforce security
 
 **Files**:
-- `frontend/src/lib/supabase.ts` - Supabase client initialization
+- `frontend/src/lib/supabase-ssr.ts` - Supabase client initialization
+
+---
+
+### Platform Domain Configuration
+
+#### `VITE_PLATFORM_BASE_DOMAIN` (Optional Override)
+
+**Purpose**: Override auto-derived platform domain for redirect validation
+**Default**: Auto-derived from current hostname in production
+**Required**: No (auto-detected)
+
+**Behavior Influence**: When set, used instead of auto-detection for:
+- Cookie domain scoping (cross-subdomain session sharing)
+- Redirect URL validation
+- Subdomain URL construction
+
+**Note**: On localhost, this value is ignored (subdomain routing is always disabled on localhost).
+
+**Example**:
+```bash
+# Override domain derivation (rarely needed)
+VITE_PLATFORM_BASE_DOMAIN=firstovertheline.com
+```
 
 ---
 
@@ -1195,6 +1233,31 @@ supabase secrets set BACKEND_API_URL=https://api-a4c.firstovertheline.com
 
 **Set by CI/CD**: Typically injected during deployment
 
+#### `RESEND_API_KEY`
+
+**Purpose**: API key for Resend email service (invitation emails)
+**Example**: `re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+**Required**: Yes (for `invite-user` and `resend-invitation` functions)
+
+**Behavior Influence**: Enables sending invitation emails to users. Functions that require this variable will return HTTP 500 if not set.
+
+**Setting via CLI**:
+```bash
+supabase secrets set RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+**Getting a Resend API key**:
+1. Sign up at https://resend.com
+2. Navigate to **API Keys** → **Create API Key**
+3. Permissions: **Send emails**
+4. Copy the key (starts with `re_`)
+
+**Functions requiring this variable**:
+- `invite-user` - Sends invitation emails to new users
+- `resend-invitation` - Resends invitation emails
+
+**Note**: This is a **conditional requirement** - only functions that send emails need this variable. The shared Zod schema marks it as optional, but functions that require it validate at startup (fail-fast pattern).
+
 ---
 
 ### Edge Function Schema
@@ -1211,21 +1274,30 @@ export const edgeFunctionEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
 
   // Custom variables (set via Dashboard or CLI)
-  BACKEND_API_URL: z.string().url().default('https://api-a4c.firstovertheline.com'),
+  PLATFORM_BASE_DOMAIN: z.string().default('firstovertheline.com'),
+  BACKEND_API_URL: z.string().url().optional(), // Derived from PLATFORM_BASE_DOMAIN
+  FRONTEND_URL: z.string().url().optional(),    // Derived from PLATFORM_BASE_DOMAIN
   GIT_COMMIT_SHA: z.string().optional(),
+
+  // Email provider (required for invitation functions)
+  RESEND_API_KEY: z.string().min(1).optional(), // Conditionally required per-function
 });
 ```
+
+**Two-Stage Validation Pattern**: The Zod schema marks `RESEND_API_KEY` as `.optional()` because not all functions need it. Functions that require it (like `invite-user`) perform a Stage 2 business logic check at startup to ensure the variable is present.
 
 ---
 
 ### Available Edge Functions
 
-| Function | Purpose | Requires Service Role |
-|----------|---------|----------------------|
-| `organization-bootstrap` | Initiate org bootstrap workflow via Backend API | No |
-| `workflow-status` | Query workflow progress from database | Yes |
-| `validate-invitation` | Validate invitation tokens | Yes |
-| `accept-invitation` | Accept invitation and create user | Yes |
+| Function | Purpose | Requires Service Role | Requires RESEND_API_KEY |
+|----------|---------|----------------------|-------------------------|
+| `organization-bootstrap` | Initiate org bootstrap workflow via Backend API | No | No |
+| `workflow-status` | Query workflow progress from database | Yes | No |
+| `invite-user` | Send user invitation emails | Yes | **Yes** |
+| `resend-invitation` | Resend invitation emails | Yes | **Yes** |
+| `validate-invitation` | Validate invitation tokens | Yes | No |
+| `accept-invitation` | Accept invitation and create user | Yes | No |
 
 ---
 
@@ -1255,13 +1327,14 @@ supabase functions deploy organization-bootstrap
 ### Mode Consistency Requirements
 
 **Frontend ↔ Workflows**:
-- If `VITE_APP_MODE=mock` (mock JWT) + `WORKFLOW_MODE=production` (real DNS) = Edge Functions will reject mock JWT
-- Must use consistent modes: mock↔mock, production↔production
+- If frontend has no Supabase credentials (mock JWT) + `WORKFLOW_MODE=production` (real DNS) = Edge Functions will reject mock JWT
+- Must use consistent modes: mock↔mock, real↔production
 
 ### Supabase Configuration
 
 **Frontend**:
 - Uses `VITE_SUPABASE_URL` with `VITE_SUPABASE_ANON_KEY` (limited by RLS)
+- Mode auto-detected: credentials present = real, credentials missing = mock
 
 **Workflows**:
 - Uses `SUPABASE_URL` with `SUPABASE_SERVICE_ROLE_KEY` (privileged access)
@@ -1272,14 +1345,15 @@ supabase functions deploy organization-bootstrap
 
 | Variable | Frontend | Workflows | Edge Functions | Behavior |
 |----------|----------|-----------|----------------|----------|
-| VITE_APP_MODE | Primary | N/A | N/A | Controls auth provider (mock vs real) |
+| VITE_SUPABASE_URL | Primary | N/A | N/A | Presence triggers real auth mode |
+| VITE_FORCE_MOCK | Optional | N/A | N/A | Force mock auth even with credentials |
 | WORKFLOW_MODE | N/A | Primary | N/A | Controls DNS/email providers |
-| SUPABASE_URL | Required (prod) | Required | Auto-injected | Database connection point |
-| SUPABASE_ANON_KEY | Required (prod) | N/A | Auto-injected | Frontend/Edge API access |
+| SUPABASE_URL | Required (real mode) | Required | Auto-injected | Database connection point |
+| SUPABASE_ANON_KEY | Required (real mode) | N/A | Auto-injected | Frontend/Edge API access |
 | SUPABASE_SERVICE_ROLE_KEY | N/A | Required | Auto-injected | Backend privileged operations |
-| BACKEND_API_URL | N/A | N/A | Required | Edge→Backend API proxy |
+| BACKEND_API_URL | Optional | N/A | Required | Frontend→Backend, Edge→Backend |
 | CLOUDFLARE_API_TOKEN | N/A | If DNS | N/A | DNS provisioning |
-| RESEND_API_KEY | N/A | If Email | N/A | Email delivery |
+| RESEND_API_KEY | N/A | If Email | If Email | Email delivery (Workflows + Edge Functions) |
 | TEMPORAL_ADDRESS | N/A | Required | N/A | Workflow server connection |
 
 ---
@@ -1382,7 +1456,7 @@ supabase functions deploy organization-bootstrap
 **Cause**: Mode mismatch between frontend and backend
 
 **Solution**:
-1. Ensure `VITE_APP_MODE=production` in frontend
+1. Ensure frontend has Supabase credentials (triggers real auth)
 2. Ensure `WORKFLOW_MODE=production` in workflows
 3. Verify both use same Supabase project
 4. Check JWT claims are correctly set
@@ -1392,10 +1466,9 @@ supabase functions deploy organization-bootstrap
 Use this checklist to validate your environment configuration:
 
 **Frontend**:
-- [ ] `.env.production` exists with real credentials (if deploying)
-- [ ] `.env.local` has valid Supabase credentials (if testing locally)
-- [ ] `VITE_APP_MODE` matches deployment environment
-- [ ] GitHub Secrets `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set
+- [ ] `.env.local` has valid Supabase credentials (for real auth testing)
+- [ ] `VITE_FORCE_MOCK` is NOT set to `true` (unless intentionally testing mock)
+- [ ] GitHub Secrets `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set (for CI/CD)
 
 **Workflows**:
 - [ ] `.env.local` has all required variables (if testing locally)
@@ -1415,11 +1488,14 @@ Use this checklist to validate your environment configuration:
 ```bash
 cd frontend
 
-# Test with mock mode
-VITE_APP_MODE=mock npm run dev
+# Test with mock mode (no credentials needed)
+npm run dev
 
-# Test with real Supabase
-VITE_APP_MODE=production npm run dev:auth
+# Force mock mode even with credentials
+npm run dev:mock
+
+# Test with real Supabase (credentials in .env.local)
+npm run dev  # Auto-detects credentials → real auth
 ```
 
 **Workflows (local)**:
@@ -1456,28 +1532,36 @@ npm run validate-config
 | File | Purpose | Tracked in Git | When Used |
 |------|---------|----------------|-----------|
 | `.env.example` | Template with all options | ✅ Yes | Reference for creating `.env.local` |
-| `.env.local` | Local development | ❌ No | Local development |
-| `.env.development` | Development mode | ✅ Yes | `npm run dev` (mock mode) |
-| `.env.development.integration` | Integration testing | ✅ Yes | `npm run dev:auth` (real auth) |
+| `.env.local` | Local development | ❌ No | `npm run dev` (auto-detects mode from credentials) |
 | `.env.production` | Production template | ✅ Yes | Production build (replaced by CI/CD) |
+
+**Note**: `npm run dev:mock` forces mock mode via `VITE_FORCE_MOCK=true` regardless of credentials in `.env.local`.
 
 ### Quick Configuration Examples
 
 **1. Local Frontend Development (Mock Auth)**
 ```bash
 # frontend/.env.local
-VITE_APP_MODE=mock
+# No Supabase credentials → auto-detects mock mode
 VITE_USE_RXNORM_API=false
-VITE_DEBUG_AUTH=false
 ```
 
 **2. Local Frontend with Real Auth**
 ```bash
 # frontend/.env.local
-VITE_APP_MODE=production
+# Presence of credentials → auto-detects real auth mode
 VITE_SUPABASE_URL=https://tmrjlswbsxmbglmaclxu.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGci...
+VITE_BACKEND_API_URL=https://api-a4c.firstovertheline.com
 VITE_USE_RXNORM_API=false
+```
+
+**2b. Force Mock Mode (with credentials present)**
+```bash
+# frontend/.env.local
+VITE_SUPABASE_URL=https://tmrjlswbsxmbglmaclxu.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGci...
+VITE_FORCE_MOCK=true  # Forces mock mode
 ```
 
 **3. Local Workflows Development (Console Logs)**
@@ -1529,11 +1613,11 @@ All environment configurations are validated on application startup using **Zod 
 ### What Gets Validated
 
 **Frontend** (`frontend/src/config/env-validation.ts`):
-- `VITE_RXNORM_API_URL` - URL format validation
-- `VITE_SUPABASE_URL` - Required in production/integration modes
-- `VITE_SUPABASE_ANON_KEY` - Required in production/integration modes
-- `VITE_AUTH_MODE` - Enum: `mock`, `integration`, `production`
-- `VITE_BACKEND_API_URL` - URL format validation
+- `VITE_SUPABASE_URL` - Optional URL (presence triggers real auth mode)
+- `VITE_SUPABASE_ANON_KEY` - Optional (required if VITE_SUPABASE_URL is set)
+- `VITE_FORCE_MOCK` - Optional boolean string
+- `VITE_PLATFORM_BASE_DOMAIN` - Optional string (auto-derived in production)
+- `VITE_BACKEND_API_URL` - Optional URL format validation
 
 **Workflows** (`workflows/src/shared/config/env-schema.ts`):
 - `WORKFLOW_MODE` - Enum: `mock`, `development`, `production`

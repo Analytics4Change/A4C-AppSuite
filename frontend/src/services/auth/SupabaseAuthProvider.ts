@@ -14,9 +14,10 @@
  * - Session persistence
  *
  * Usage:
- *   Set VITE_APP_MODE=production in .env to use this provider
+ *   Automatically selected when VITE_SUPABASE_URL is set
+ *   (unless VITE_FORCE_MOCK=true overrides to mock mode)
  *
- * See .plans/supabase-auth-integration/frontend-auth-architecture.md
+ * See documentation/architecture/authentication/frontend-auth-architecture.md
  */
 
 import { SupabaseClient, Session as SupabaseSession } from '@supabase/supabase-js';
@@ -60,9 +61,10 @@ export class SupabaseAuthProvider implements IAuthProvider {
       this.config = config;
     } else {
       const env = getEnv();
+      // Non-null assertions: constructor will throw if these are undefined
       this.config = {
-        supabaseUrl: env.VITE_SUPABASE_URL,
-        supabaseAnonKey: env.VITE_SUPABASE_ANON_KEY,
+        supabaseUrl: env.VITE_SUPABASE_URL!,
+        supabaseAnonKey: env.VITE_SUPABASE_ANON_KEY!,
         debug: import.meta.env.DEV,
       };
     }

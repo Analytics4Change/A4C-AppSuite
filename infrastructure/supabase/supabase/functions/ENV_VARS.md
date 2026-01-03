@@ -18,6 +18,33 @@ These environment variables must be configured in Supabase Dashboard → Project
 |----------|-------------|---------|---------|----------|
 | `BACKEND_API_URL` | Backend API URL for workflow operations | `https://api-a4c.firstovertheline.com` | `https://api-a4c.firstovertheline.com` | No (has default) |
 
+### Email Provider (Required for Invitation Functions)
+
+| Variable | Description | Example | Required |
+|----------|-------------|---------|----------|
+| `RESEND_API_KEY` | Resend API key for sending invitation emails | `re_xxxxxxxxxxxxx` | Yes (`invite-user`, `resend-invitation`) |
+
+**Note**: The `invite-user` and `resend-invitation` functions will return HTTP 500 if `RESEND_API_KEY` is not set.
+
+**Setting via CLI:**
+```bash
+supabase secrets set RESEND_API_KEY=re_YOUR_API_KEY --project-ref <project-ref>
+```
+
+**Getting a Resend API key:**
+1. Sign up at https://resend.com
+2. Navigate to **API Keys** → **Create API Key**
+3. Copy the key (starts with `re_`)
+
+**Functions requiring this variable:**
+
+| Function | Purpose | Requires RESEND_API_KEY |
+|----------|---------|------------------------|
+| `invite-user` | Send user invitation emails | **Yes** |
+| `resend-invitation` | Resend invitation emails | **Yes** |
+| `validate-invitation` | Validate invitation tokens | No |
+| `accept-invitation` | Accept invitation and create user | No |
+
 ## Configuration via Supabase Dashboard
 
 1. Navigate to Supabase Dashboard

@@ -2,8 +2,8 @@
  * Supabase Client with Cookie-Based Session Storage
  *
  * Uses @supabase/ssr for cross-subdomain session sharing.
- * Cookies are scoped to .{PLATFORM_BASE_DOMAIN} to allow session
- * sharing between a4c.{domain} and org subdomains.
+ * Cookie domain is automatically derived from the current hostname in production,
+ * or left unset on localhost (scopes to current hostname only).
  *
  * This enables:
  * 1. Login at a4c.{domain}/login
@@ -11,42 +11,66 @@
  * 3. Session persists across all subdomains
  */
 import { createBrowserClient } from '@supabase/ssr';
+import { isLocalhost, getDeploymentConfig } from '@/config/deployment.config';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const isMockMode = import.meta.env.VITE_APP_MODE === 'mock';
-const platformBaseDomain = import.meta.env.VITE_PLATFORM_BASE_DOMAIN;
+
+/**
+ * Derive the base domain from a hostname.
+ *
+ * Examples:
+ * - "a4c.firstovertheline.com" → "firstovertheline.com"
+ * - "poc-test1.firstovertheline.com" → "firstovertheline.com"
+ *
+ * @param hostname - The full hostname
+ * @returns The base domain (last two parts)
+ */
+function deriveBaseDomain(hostname: string): string {
+  const parts = hostname.split('.');
+  if (parts.length >= 2) {
+    return parts.slice(-2).join('.');
+  }
+  return hostname;
+}
 
 /**
  * Get cookie domain for cross-subdomain session sharing.
- * Uses VITE_PLATFORM_BASE_DOMAIN as the single source of truth.
  *
- * FAIL-FAST: In production mode, throws an error if VITE_PLATFORM_BASE_DOMAIN is not set.
- * This prevents silent failures where cookies are scoped incorrectly.
+ * Priority:
+ * 1. VITE_PLATFORM_BASE_DOMAIN (explicit override)
+ * 2. Derived from current hostname (production)
+ * 3. undefined (localhost - scopes to current hostname only)
  *
- * @returns Cookie domain prefixed with '.' for subdomain scope, or undefined for localhost/mock
- * @throws Error if VITE_PLATFORM_BASE_DOMAIN is missing in production mode
+ * @returns Cookie domain prefixed with '.' for subdomain scope, or undefined for localhost
  */
 function getCookieDomain(): string | undefined {
-  // In mock mode, don't set cookie domain (browser default for localhost)
-  if (isMockMode) return undefined;
-
-  // Production mode: VITE_PLATFORM_BASE_DOMAIN is required
-  if (!platformBaseDomain) {
-    throw new Error(
-      'VITE_PLATFORM_BASE_DOMAIN is required for cross-subdomain session sharing. ' +
-        'Please set this environment variable in .env.production or GitHub Actions secrets. ' +
-        'Example: VITE_PLATFORM_BASE_DOMAIN=firstovertheline.com'
-    );
+  // Localhost: don't set cookie domain (browser default scopes to current hostname)
+  if (isLocalhost()) {
+    return undefined;
   }
 
-  // Use configured platform base domain (prefixed with '.' for subdomain cookie scope)
-  return `.${platformBaseDomain}`;
+  // Explicit override takes priority
+  const configuredDomain = import.meta.env.VITE_PLATFORM_BASE_DOMAIN;
+  if (configuredDomain) {
+    return `.${configuredDomain}`;
+  }
+
+  // Production: derive from current hostname
+  if (typeof window !== 'undefined') {
+    const baseDomain = deriveBaseDomain(window.location.hostname);
+    // Prefix with '.' for subdomain cookie scope
+    return `.${baseDomain}`;
+  }
+
+  // SSR fallback: no domain (shouldn't happen in practice)
+  return undefined;
 }
 
-// Validate environment variables (same logic as original supabase.ts)
+// Validate environment variables
+const config = getDeploymentConfig();
 if (!supabaseUrl || !supabaseAnonKey) {
-  if (!isMockMode) {
+  if (config.authProvider === 'supabase') {
     throw new Error(
       'Missing Supabase environment variables. ' +
         'Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in .env.local'

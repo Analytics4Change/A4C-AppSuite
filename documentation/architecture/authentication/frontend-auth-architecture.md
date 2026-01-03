@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2025-01-02
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Three-mode authentication system (mock/integration/production) using dependency injection with `IAuthProvider` interface. Mock mode enables instant auth for development; production uses Supabase OAuth with JWT custom claims.
+**Summary**: Smart detection authentication system using dependency injection with `IAuthProvider` interface. Auth mode is auto-detected: credentials present = real Supabase auth, credentials missing = mock auth. Subdomain routing disabled on localhost.
 
 **When to read**:
 - Setting up local development authentication
@@ -16,7 +16,7 @@ last_updated: 2025-12-30
 
 **Prerequisites**: Familiarity with React context, JWT tokens
 
-**Key topics**: `authentication`, `oauth`, `jwt`, `mock-auth`, `supabase-auth`, `dependency-injection`
+**Key topics**: `authentication`, `oauth`, `jwt`, `mock-auth`, `supabase-auth`, `dependency-injection`, `smart-detection`
 
 **Estimated read time**: 15 minutes
 <!-- TL;DR-END -->
@@ -33,7 +33,7 @@ last_updated: 2025-12-30
 
 1. [Overview](#overview)
 2. [Architecture Principles](#architecture-principles)
-3. [Three-Mode Authentication System](#three-mode-authentication-system)
+3. [Smart Detection Authentication System](#smart-detection-authentication-system)
 4. [Provider Interface Pattern](#provider-interface-pattern)
 5. [Implementation Details](#implementation-details)
 6. [Session Management](#session-management)
@@ -45,24 +45,25 @@ last_updated: 2025-12-30
 
 ## Overview
 
-The frontend authentication system uses a **dependency injection pattern** with three operational modes to support both rapid development and production authentication requirements.
+The frontend authentication system uses a **dependency injection pattern** with **smart detection** to automatically determine the authentication mode based on runtime conditions.
 
 ### Key Features
 
 - ✅ **Interface-based design**: All auth providers implement `IAuthProvider`
-- ✅ **Three modes**: Mock (fast dev), Integration (auth testing), Production (real users)
-- ✅ **Environment toggle**: Single variable switches between modes
+- ✅ **Smart detection**: Auth mode auto-detected from credentials and hostname
+- ✅ **Two modes**: Mock (no credentials) and Real (Supabase credentials present)
 - ✅ **Complete JWT claims**: Mock mode includes full RBAC/RLS structure
-- ✅ **Zero runtime overhead**: Mode selected at build time
+- ✅ **Localhost awareness**: Subdomain routing disabled on localhost
+- ✅ **Single escape hatch**: `VITE_FORCE_MOCK=true` to force mock mode
 
 ### Architecture Diagram
 
 ```mermaid
 graph TD
     A[AuthContext] --> B[AuthProviderFactory]
-    B --> C{Environment Variable}
-    C -->|VITE_AUTH_PROVIDER=mock| D[DevAuthProvider]
-    C -->|VITE_AUTH_PROVIDER=supabase| E[SupabaseAuthProvider]
+    B --> C{Smart Detection}
+    C -->|No credentials OR VITE_FORCE_MOCK=true| D[DevAuthProvider]
+    C -->|Credentials present| E[SupabaseAuthProvider]
 
     D --> F[Mock Session + JWT]
     E --> G[Real OAuth Flow]
@@ -73,6 +74,10 @@ graph TD
 
     I --> J[AuthContext State]
     J --> K[React Components]
+
+    B --> L{Hostname Detection}
+    L -->|localhost| M[Subdomain routing disabled]
+    L -->|*.example.com| N[Subdomain routing enabled]
 
     style A fill:#3498db
     style B fill:#1abc9c
@@ -120,43 +125,57 @@ interface Session {
 
 ---
 
-## Three-Mode Authentication System
+## Smart Detection Authentication System
 
-### Mode Selection
+### How It Works
 
-Environment variable `VITE_AUTH_PROVIDER` controls which provider is used:
+Authentication mode is **automatically detected** at runtime—no mode variable required:
 
-```bash
-# Mock Mode (default for development)
-VITE_AUTH_PROVIDER=mock
+```typescript
+// frontend/src/config/deployment.config.ts
+function detectEnvironment(): RuntimeEnvironment {
+  return {
+    hasSupabaseCredentials: !!import.meta.env.VITE_SUPABASE_URL,
+    isLocalhost: isLocalhost(),
+    isProductionBuild: import.meta.env.PROD === true,
+    forceMock: import.meta.env.VITE_FORCE_MOCK === 'true',
+  };
+}
 
-# Integration Mode (for auth testing)
-VITE_AUTH_PROVIDER=supabase
-
-# Production Mode (auto-detected in production builds)
-# Uses VITE_AUTH_PROVIDER=supabase by default
+// Auth mode: real if credentials present AND not forcing mock
+const useRealServices = env.hasSupabaseCredentials && !env.forceMock;
 ```
+
+### Detection Matrix
+
+| Scenario | Credentials | Hostname | Result |
+|----------|-------------|----------|--------|
+| `npm run dev` | Present | localhost | Real auth, NO subdomain redirect |
+| `npm run dev` | Missing | localhost | Mock auth, NO subdomain redirect |
+| `npm run dev:mock` | Present | localhost | Mock auth (forced), NO subdomain redirect |
+| Production build | Present | *.example.com | Real auth, subdomain redirect enabled |
 
 ### Mode Comparison
 
-| Feature | Mock Mode | Integration Mode | Production Mode |
-|---------|-----------|------------------|-----------------|
-| **Provider** | DevAuthProvider | SupabaseAuthProvider | SupabaseAuthProvider |
-| **OAuth Flow** | ❌ Instant | ✅ Real | ✅ Real |
-| **JWT Claims** | ✅ Full Mock | ✅ Real from DB | ✅ Real from DB |
-| **Network Calls** | ❌ None | ✅ Real | ✅ Real |
-| **Login Speed** | Instant | 2-5 seconds | 2-5 seconds |
-| **Use Case** | UI development | Auth testing | End users |
-| **Database** | ❌ No RLS enforcement | ✅ RLS enforced | ✅ RLS enforced |
+| Feature | Mock Mode | Real Mode |
+|---------|-----------|-----------|
+| **Provider** | DevAuthProvider | SupabaseAuthProvider |
+| **OAuth Flow** | ❌ Instant | ✅ Real |
+| **JWT Claims** | ✅ Full Mock | ✅ Real from DB |
+| **Network Calls** | ❌ None | ✅ Real |
+| **Login Speed** | Instant | 2-5 seconds |
+| **Use Case** | UI development | Auth testing & Production |
+| **Database** | ❌ No RLS enforcement | ✅ RLS enforced |
+| **Triggered by** | No credentials OR `VITE_FORCE_MOCK=true` | Credentials present |
 
-### Mode 1: Mock Mode (Fast Development)
+### Mock Mode (No Credentials)
 
 **Purpose**: Rapid UI iteration without authentication delays
 
 **npm script**:
 ```bash
-npm run dev        # Uses .env.development (mock by default)
-npm run dev:mock   # Explicitly uses mock auth
+npm run dev        # Auto-detects mock mode (no credentials)
+npm run dev:mock   # Forces mock mode even with credentials
 ```
 
 **Behavior**:
@@ -168,9 +187,9 @@ npm run dev:mock   # Explicitly uses mock auth
 - ⚠️ No real authentication validation
 - ⚠️ Database RLS not enforced (mock org_id used)
 
-**Configuration** (`.env.development`):
+**Configuration** (`.env.local`—without Supabase credentials):
 ```bash
-VITE_AUTH_PROVIDER=mock
+# No VITE_SUPABASE_URL → auto-detects mock mode
 
 # Optional: Customize mock user
 VITE_DEV_USER_EMAIL=dev@example.com
@@ -189,14 +208,15 @@ Using instant authentication for development.
 Any credentials will work.
 ```
 
-### Mode 2: Integration Mode (Auth Testing)
+### Real Mode (Credentials Present)
 
-**Purpose**: Test full authentication stack locally
+**Purpose**: Test full authentication stack locally, or production use
 
 **npm script**:
 ```bash
-npm run dev:auth         # Uses real Supabase Auth
-npm run dev:integration  # Uses .env.development.integration
+npm run dev        # Auto-detects real mode (credentials present)
+npm run build      # Production build
+npm run preview    # Test production build locally
 ```
 
 **Behavior**:
@@ -205,48 +225,15 @@ npm run dev:integration  # Uses .env.development.integration
 - ✅ Custom claims from database hook
 - ✅ RLS policies enforced
 - ✅ Organization switching with JWT refresh
+- ✅ Stays on localhost (no subdomain redirect in development)
 - ⚠️ Requires OAuth provider configuration
-- ⚠️ Uses development Supabase project
 
-**Configuration** (`.env.development.integration`):
+**Configuration** (`.env.local`—with Supabase credentials):
 ```bash
-VITE_AUTH_PROVIDER=supabase
-VITE_SUPABASE_URL=https://your-dev-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-dev-anon-key
-VITE_DEBUG_AUTH=true  # Show auth debug logs
-```
-
-**Use Cases**:
-- Testing OAuth flows
-- Validating JWT custom claims
-- Testing RLS policies
-- Organization switching workflows
-- Permission-based UI rendering
-
-### Mode 3: Production Mode
-
-**Purpose**: Real user authentication
-
-**npm script**:
-```bash
-npm run build    # Uses .env.production
-npm run preview  # Test production build locally
-```
-
-**Behavior**:
-- ✅ Real OAuth with production providers
-- ✅ Real JWT tokens from production Supabase
-- ✅ Custom claims from production database
-- ✅ RLS policies enforced
-- ✅ Rate limiting and security controls
-- ⚠️ Debug logging disabled
-
-**Configuration** (`.env.production`):
-```bash
-VITE_AUTH_PROVIDER=supabase
-VITE_SUPABASE_URL=https://your-prod-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-prod-anon-key
-VITE_DEBUG_AUTH=false
+# Presence of credentials → auto-detects real mode
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_BACKEND_API_URL=https://api-a4c.firstovertheline.com
 VITE_DEBUG_MOBX=false
 ```
 

@@ -161,7 +161,7 @@ purpose: agent-navigation
 
 | Document | Summary | Keywords | ~Tokens |
 |----------|---------|----------|---------|
-| [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | Three-mode auth system (mock/integration/production) with IAuthProvider | `auth`, `oauth`, `jwt`, `mock-auth` | 4500 |
+| [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | Smart detection auth system (credentials = real, missing = mock) with IAuthProvider | `auth`, `oauth`, `jwt`, `mock-auth`, `smart-detection` | 4500 |
 | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) | OAuth2 PKCE flow, social login, enterprise SSO | `oauth`, `supabase`, `pkce`, `sso` | 2200 |
 | [custom-claims-setup.md](architecture/authentication/custom-claims-setup.md) | JWT custom claims via database hook | `jwt`, `claims`, `database-hook` | 1500 |
 | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | Permission-based RBAC with event sourcing | `rbac`, `permissions`, `roles` | 3100 |

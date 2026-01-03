@@ -5,9 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
-    "dev:mock": "VITE_APP_MODE=mock vite",
-    "dev:auth": "VITE_APP_MODE=production vite",
-    "dev:integration": "VITE_APP_MODE=production vite",
+    "dev:mock": "VITE_FORCE_MOCK=true vite",
     "build": "npm run sync-schemas && tsc && vite build",
     "preview": "vite preview",
     "sync-schemas": "node scripts/sync-schemas.cjs",

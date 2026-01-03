@@ -2,18 +2,19 @@
  * Authentication Provider Factory
  *
  * Factory function that creates the appropriate authentication provider
- * based on deployment mode configuration. This is the single point of control
- * for switching between mock and production authentication modes.
+ * based on smart environment detection. This is the single point of control
+ * for switching between mock and real authentication modes.
  *
- * Configuration via VITE_APP_MODE environment variable:
- * - "mock" - DevAuthProvider for fast local development
- * - "production" - SupabaseAuthProvider for integration testing and production
+ * Smart Detection:
+ * - Supabase credentials present → SupabaseAuthProvider (real auth)
+ * - Supabase credentials missing → DevAuthProvider (mock auth)
+ * - VITE_FORCE_MOCK=true → Forces DevAuthProvider even with credentials
  *
  * Usage:
  *   const authProvider = createAuthProvider();
  *   await authProvider.initialize();
  *
- * See .plans/supabase-auth-integration/frontend-auth-architecture.md
+ * See documentation/architecture/authentication/frontend-auth-architecture.md
  */
 
 import { IAuthProvider } from './IAuthProvider';
@@ -56,9 +57,11 @@ export function createAuthProvider(): IAuthProvider {
     case 'supabase': {
       log.info('🔐 Creating SupabaseAuthProvider (real authentication)');
       const env = getEnv();
+      // Credentials are guaranteed to exist when authProvider is 'supabase'
+      // (smart detection only returns 'supabase' when VITE_SUPABASE_URL is set)
       return new SupabaseAuthProvider({
-        supabaseUrl: env.VITE_SUPABASE_URL,
-        supabaseAnonKey: env.VITE_SUPABASE_ANON_KEY,
+        supabaseUrl: env.VITE_SUPABASE_URL!,
+        supabaseAnonKey: env.VITE_SUPABASE_ANON_KEY!,
         debug: import.meta.env.DEV,
       });
     }
@@ -66,9 +69,10 @@ export function createAuthProvider(): IAuthProvider {
     default: {
       log.warn(`Unknown auth provider type: ${providerType}, defaulting to Supabase`);
       const env = getEnv();
+      // Credentials are guaranteed to exist when authProvider is 'supabase'
       return new SupabaseAuthProvider({
-        supabaseUrl: env.VITE_SUPABASE_URL,
-        supabaseAnonKey: env.VITE_SUPABASE_ANON_KEY,
+        supabaseUrl: env.VITE_SUPABASE_URL!,
+        supabaseAnonKey: env.VITE_SUPABASE_ANON_KEY!,
         debug: import.meta.env.DEV,
       });
     }
