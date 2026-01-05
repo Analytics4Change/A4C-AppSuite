@@ -138,6 +138,19 @@ export const UsersManagePage: React.FC = observer(() => {
     }
   }, [searchParams, viewModel.items]);
 
+  // Sync roles to ViewModel when they load (handles async timing)
+  // This fixes the case where user clicks Create before roles finish loading
+  useEffect(() => {
+    if (formViewModel && availableRoles.length > 0) {
+      const roleRefs = availableRoles.map((r: Role) => ({
+        roleId: r.id,
+        roleName: r.name,
+      }));
+      formViewModel.setAssignableRoles(roleRefs);
+      log.debug('Synced roles to formViewModel', { roleCount: roleRefs.length });
+    }
+  }, [formViewModel, availableRoles]);
+
   // Filter users based on search and status
   const filteredUsers = useMemo(() => {
     let users = viewModel.items;

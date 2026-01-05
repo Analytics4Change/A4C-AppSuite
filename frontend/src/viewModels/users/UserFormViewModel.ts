@@ -118,6 +118,19 @@ export class UserFormViewModel {
     log.debug('UserFormViewModel initialized', { roleCount: assignableRoles.length });
   }
 
+  /**
+   * Update assignable roles (for async loading scenarios)
+   *
+   * This method handles the case where roles load asynchronously after the
+   * ViewModel is created. Without this, selectedRoles getter would filter
+   * against an empty array and return [] even when roles are selected.
+   */
+  setAssignableRoles(roles: RoleReference[]): void {
+    // Type assertion to work around readonly - controlled mutation from within ViewModel
+    (this as { assignableRoles: RoleReference[] }).assignableRoles = roles;
+    log.debug('Updated assignable roles', { roleCount: roles.length });
+  }
+
   // ============================================
   // Computed Properties
   // ============================================
