@@ -1,9 +1,22 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/utils/logger';
 import { Session } from '@/types/auth.types';
 
 const log = Logger.getLogger('api');
+
+/**
+ * Type alias for Supabase clients configured with non-default schemas.
+ *
+ * The default SupabaseClient<Database, 'public', Schema> type assumes
+ * SchemaName='public', but we need schema='api' for RPC calls.
+ * This type uses 'any' to preserve RPC method typing while accepting any
+ * schema configuration.
+ *
+ * Matches the pattern used in Edge Functions (_shared/types.ts).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnySchemaSupabaseClient = SupabaseClient<any, any, any>;
 
 export interface Database {
   public: {
@@ -96,6 +109,32 @@ class SupabaseService {
    */
   getClient(): SupabaseClient<Database> {
     return this.client;
+  }
+
+  /**
+   * Execute an RPC call on the 'api' schema.
+   *
+   * Centralizes schema selection and provides typed return values.
+   * Use this for all RPC functions defined in the 'api' schema.
+   *
+   * @param functionName - Name of the RPC function (e.g., 'get_user_org_access')
+   * @param params - Parameters to pass to the function
+   * @returns Promise with typed data or error
+   *
+   * @example
+   * ```typescript
+   * const { data, error } = await supabaseService.apiRpc<UserOrgAccess[]>(
+   *   'list_user_org_access',
+   *   { p_user_id: userId }
+   * );
+   * ```
+   */
+  async apiRpc<T>(
+    functionName: string,
+    params: Record<string, unknown>
+  ): Promise<{ data: T | null; error: PostgrestError | null }> {
+    const apiClient = this.client as AnySchemaSupabaseClient;
+    return apiClient.schema('api').rpc(functionName, params);
   }
 
   /**

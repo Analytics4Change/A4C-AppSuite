@@ -529,11 +529,8 @@ export class SupabaseUserCommandService implements IUserCommandService {
         orgId: request.orgId,
       });
 
-      const client = supabaseService.getClient();
-
       // Use RPC function to update access dates (emits domain event)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (client as any).schema('api').rpc(
+      const { error } = await supabaseService.apiRpc<void>(
         'update_user_access_dates',
         {
           p_user_id: request.userId,
@@ -610,11 +607,8 @@ export class SupabaseUserCommandService implements IUserCommandService {
         orgId: request.orgId,
       });
 
-      const client = supabaseService.getClient();
-
       // Use RPC function to update notification preferences
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (client as any).schema('api').rpc(
+      const { error } = await supabaseService.apiRpc<void>(
         'update_user_notification_preferences',
         {
           p_user_id: request.userId,

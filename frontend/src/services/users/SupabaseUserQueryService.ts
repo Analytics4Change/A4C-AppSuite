@@ -795,8 +795,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
 
     try {
       // Use RPC function instead of direct table access
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (client as any).schema('api').rpc(
+      const { data, error } = await supabaseService.apiRpc<DbUserOrgAccessListItem[]>(
         'list_user_org_access',
         { p_user_id: session.user.id }
       );
@@ -933,12 +932,9 @@ export class SupabaseUserQueryService implements IUserQueryService {
     userId: string,
     orgId: string
   ): Promise<UserOrgAccess | null> {
-    const client = supabaseService.getClient();
-
     try {
       // Use RPC function instead of direct table access
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (client as any).schema('api').rpc(
+      const { data, error } = await supabaseService.apiRpc<DbUserOrgAccessRow[]>(
         'get_user_org_access',
         {
           p_user_id: userId,
