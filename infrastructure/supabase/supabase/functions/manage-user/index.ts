@@ -17,7 +17,7 @@ import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-
 import { AnySchemaSupabaseClient } from '../_shared/types.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v1';
+const DEPLOY_VERSION = 'v2';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -47,6 +47,20 @@ interface ManageUserResponse {
   userId?: string;
   operation?: Operation;
   error?: string;
+}
+
+/**
+ * JWT Payload structure for custom claims
+ * Custom claims are added to the JWT payload via database hook (auth.custom_access_token_hook),
+ * NOT to user.app_metadata. We must decode the JWT directly to access them.
+ */
+interface JWTPayload {
+  permissions?: string[];
+  org_id?: string;
+  user_role?: string;
+  scope_path?: string;
+  sub?: string;
+  email?: string;
 }
 
 /**
@@ -120,12 +134,36 @@ serve(async (req) => {
       );
     }
 
-    // Create Supabase client with user's JWT for permission check
+    // Extract and decode JWT token to access custom claims
+    // Custom claims are added to the JWT payload via database hook, NOT to user.app_metadata
+    // See: infrastructure/supabase/sql/03-functions/authorization/003-supabase-auth-jwt-hook.sql
+    const jwt = authHeader.replace('Bearer ', '');
+    const jwtParts = jwt.split('.');
+
+    if (jwtParts.length !== 3) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JWT token format' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Decode JWT payload (base64)
+    let jwtPayload: JWTPayload;
+    try {
+      jwtPayload = JSON.parse(atob(jwtParts[1]));
+    } catch (_e) {
+      return new Response(
+        JSON.stringify({ error: 'Failed to decode JWT token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create Supabase client with user's JWT for auth validation
     const supabaseUser = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Get user and check permissions
+    // Validate the JWT by calling getUser
     const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
     if (authError || !user) {
       return new Response(
@@ -134,10 +172,10 @@ serve(async (req) => {
       );
     }
 
-    // Extract JWT claims
-    const jwtClaims = user.app_metadata || {};
-    const orgId = jwtClaims.org_id as string | undefined;
-    const permissions = (jwtClaims.permissions as string[]) || [];
+    // Extract custom claims from decoded JWT payload (not from user.app_metadata!)
+    // The JWT hook adds claims directly to the token payload
+    const orgId = jwtPayload.org_id;
+    const permissions = jwtPayload.permissions || [];
 
     if (!orgId) {
       return new Response(
