@@ -45,11 +45,11 @@ components:
         stream_id:
           type: string
           format: uuid
-          description: Organization UUID (invitation belongs to organization aggregate)
+          description: Invitation UUID (user lifecycle events keyed by invitation_id before user exists)
         stream_type:
           type: string
-          const: organization
-          description: Events emitted on organization aggregate
+          const: user
+          description: Events emitted on user aggregate (invitation is part of user lifecycle)
         event_type:
           type: string
           const: user.invited

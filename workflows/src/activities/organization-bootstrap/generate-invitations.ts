@@ -84,18 +84,19 @@ export async function generateInvitations(
     const invitationId = uuidv4();
     const token = generateInvitationToken();
 
-    // Emit UserInvited event (triggers projection update)
+    // Emit UserInvited event (triggers projection update via process_user_event)
+    // Routes to USER aggregate with invitation_id as stream_id (user_id doesn't exist yet)
     await emitEvent({
       event_type: 'user.invited',
-      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
-      aggregate_id: params.orgId,
+      aggregate_type: AGGREGATE_TYPES.USER,
+      aggregate_id: invitationId,
       event_data: {
         invitation_id: invitationId,
         org_id: params.orgId,
         email: user.email,
         first_name: user.firstName,
         last_name: user.lastName,
-        role: user.role,
+        roles: [{ role_id: null, role_name: user.role }],
         token,
         expires_at: expiresAt.toISOString()
       },

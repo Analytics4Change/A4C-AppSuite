@@ -599,12 +599,13 @@ serve(async (req) => {
       eventData.notification_preferences = requestData.notificationPreferences;
     }
 
-    // Emit user.invited event (per AsyncAPI contract, stream_id is org_id)
+    // Emit user.invited event - routes to USER aggregate via process_user_event()
+    // stream_id is invitation_id (user_id doesn't exist until invitation is accepted)
     console.log(`[invite-user v${DEPLOY_VERSION}] Emitting user.invited event...`);
     const { data: eventId, error: eventError } = await supabaseAdmin
       .rpc('emit_domain_event', {
-        p_stream_id: orgId, // Events on organization aggregate
-        p_stream_type: 'organization',
+        p_stream_id: invitationId, // Events on user aggregate (invitation is user lifecycle)
+        p_stream_type: 'user',
         p_event_type: 'user.invited',
         p_event_data: eventData,
         p_event_metadata: {
