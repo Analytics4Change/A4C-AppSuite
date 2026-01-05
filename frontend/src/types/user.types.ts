@@ -735,6 +735,8 @@ export type UserOperationErrorCode =
   | 'VALIDATION_ERROR'
   | 'PERMISSION_DENIED'
   | 'EMAIL_SEND_FAILED'
+  | 'FORBIDDEN'
+  | 'INVALID_DATES'
   | 'UNKNOWN';
 
 /**
