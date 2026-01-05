@@ -94,6 +94,9 @@ export class UserFormViewModel {
   /** Error message from last submission attempt */
   submissionError: string | null = null;
 
+  /** Detailed error info from last submission attempt */
+  submissionErrorDetails: { code?: string; details?: string } | null = null;
+
   /** Email lookup result (from UsersViewModel) */
   emailLookupResult: EmailLookupResult | null = null;
 
@@ -675,7 +678,11 @@ export class UserFormViewModel {
           log.info('Invitation submitted successfully', { email: request.email });
         } else {
           this.submissionError = result.error ?? 'An error occurred';
-          log.warn('Invitation submission failed', { error: result.error });
+          // Extract detailed error info for display
+          this.submissionErrorDetails = result.errorDetails?.context
+            ? { code: result.errorDetails.code, details: (result.errorDetails.context as { details?: string }).details }
+            : null;
+          log.warn('Invitation submission failed', { error: result.error, errorDetails: result.errorDetails });
         }
       });
 
@@ -725,6 +732,7 @@ export class UserFormViewModel {
       this.errors.clear();
       this.touchedFields.clear();
       this.submissionError = null;
+      this.submissionErrorDetails = null;
       this.emailLookupResult = null;
       this.isCheckingEmail = false;
       log.debug('Form reset');
@@ -737,6 +745,7 @@ export class UserFormViewModel {
   clearSubmissionError(): void {
     runInAction(() => {
       this.submissionError = null;
+      this.submissionErrorDetails = null;
     });
   }
 

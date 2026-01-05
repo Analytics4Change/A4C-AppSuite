@@ -615,6 +615,11 @@ export const UsersManagePage: React.FC = observer(() => {
                             <p className="text-red-700 text-sm mt-1">
                               {formViewModel.submissionError}
                             </p>
+                            {formViewModel.submissionErrorDetails?.details && (
+                              <p className="text-red-600 text-xs mt-2 font-mono bg-red-100 p-2 rounded">
+                                Details: {formViewModel.submissionErrorDetails.details}
+                              </p>
+                            )}
                           </div>
                           <button
                             type="button"
@@ -856,6 +861,11 @@ export const UsersManagePage: React.FC = observer(() => {
                               <p className="text-red-700 text-sm mt-1">
                                 {formViewModel.submissionError}
                               </p>
+                              {formViewModel.submissionErrorDetails?.details && (
+                                <p className="text-red-600 text-xs mt-2 font-mono bg-red-100 p-2 rounded">
+                                  Details: {formViewModel.submissionErrorDetails.details}
+                                </p>
+                              )}
                             </div>
                             <button
                               type="button"
