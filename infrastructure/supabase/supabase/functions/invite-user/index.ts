@@ -19,7 +19,7 @@ import {
 import { AnySchemaSupabaseClient } from '../_shared/types.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v2';
+const DEPLOY_VERSION = 'v3';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -494,12 +494,8 @@ serve(async (req) => {
       );
     }
 
-    if (!requestData.roles || requestData.roles.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'At least one role is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // NOTE: roles array is optional - empty array means user has no permissions until assigned
+    // This allows inviting users who will have roles assigned later by organization admin
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -95,11 +95,12 @@ components:
           description: Last name of the invited user
         roles:
           type: array
-          minItems: 1
+          minItems: 0
           description: |
-            Roles to assign when invitation is accepted. Supports both canonical
-            system roles and custom organization-defined roles. Each role includes
-            a denormalized name snapshot for display purposes.
+            Roles to assign when invitation is accepted. Empty array = user has no
+            permissions until roles are assigned by organization admin. Supports
+            both canonical system roles and custom organization-defined roles.
+            Each role includes a denormalized name snapshot for display purposes.
           items:
             type: object
             required:

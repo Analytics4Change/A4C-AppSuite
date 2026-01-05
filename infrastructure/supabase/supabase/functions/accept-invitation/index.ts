@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v8';
+const DEPLOY_VERSION = 'v9';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -92,6 +92,17 @@ serve(async (req) => {
       },
       db: {
         schema: 'api',
+      },
+    });
+
+    // Public schema client for projection table queries (roles_projection, etc.)
+    const publicClient = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      db: {
+        schema: 'public',
       },
     });
 
@@ -307,6 +318,88 @@ serve(async (req) => {
       );
     }
     console.log(`User created event emitted successfully: event_id=${_eventId}, user_id=${userId}, org_id=${invitation.organization_id}`);
+
+    // ==========================================================================
+    // EMIT user.role.assigned EVENTS FOR ROLES FROM INVITATION
+    // This populates user_roles_projection via process_user_event() trigger
+    // ==========================================================================
+
+    // Get roles from new format (roles array) or legacy format (single role string)
+    interface RoleRef {
+      role_id: string | null;
+      role_name: string;
+    }
+    const roles: RoleRef[] = invitation.roles?.length > 0
+      ? invitation.roles
+      : invitation.role
+        ? [{ role_id: null, role_name: invitation.role }]
+        : [];
+
+    console.log(`[accept-invitation v${DEPLOY_VERSION}] Processing ${roles.length} role(s) from invitation`);
+
+    for (const role of roles) {
+      const roleName = role.role_name;
+      let roleId = role.role_id;
+
+      // CRITICAL: role_id is NOT NULL in user_roles_projection
+      // Must resolve role_id if not provided
+      if (!roleId) {
+        console.log(`[accept-invitation v${DEPLOY_VERSION}] Looking up role_id for role_name: ${roleName}, org: ${invitation.organization_id}`);
+
+        const { data: roleData, error: lookupError } = await publicClient
+          .from('roles_projection')
+          .select('id, name')
+          .or(`organization_id.eq.${invitation.organization_id},organization_id.is.null`)
+          .eq('name', roleName)
+          .order('organization_id', { ascending: false, nullsFirst: false }) // Prefer org-specific over system role
+          .limit(1)
+          .single();
+
+        if (lookupError || !roleData?.id) {
+          // FAIL the acceptance - role assignment is critical for first user
+          console.error(`[accept-invitation v${DEPLOY_VERSION}] CRITICAL: Cannot resolve role_id for "${roleName}":`, lookupError);
+          return new Response(
+            JSON.stringify({
+              error: 'role_lookup_failed',
+              message: `Cannot find role "${roleName}" in organization. Contact administrator.`,
+              details: lookupError?.message,
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        roleId = roleData.id;
+        console.log(`[accept-invitation v${DEPLOY_VERSION}] Resolved role "${roleName}" to id: ${roleId}`);
+      }
+
+      // Emit user.role.assigned event
+      const { data: roleEventId, error: roleError } = await supabase
+        .rpc('emit_domain_event', {
+          p_stream_id: userId,
+          p_stream_type: 'user',
+          p_event_type: 'user.role.assigned',
+          p_event_data: {
+            user_id: userId,
+            role_id: roleId,  // Now guaranteed non-null
+            role_name: roleName,
+            org_id: invitation.organization_id,
+            scope_path: null,  // Organization-level scope
+          },
+          p_event_metadata: {
+            user_id: userId,
+            organization_id: invitation.organization_id,
+            invitation_id: invitation.id,
+            reason: 'Role assigned via invitation acceptance',
+          }
+        });
+
+      if (roleError) {
+        console.error(`[accept-invitation v${DEPLOY_VERSION}] Failed to emit user.role.assigned for ${roleName}:`, roleError);
+        // Continue with other roles - partial success is better than total failure
+      } else {
+        console.log(`[accept-invitation v${DEPLOY_VERSION}] ✓ Role assigned: ${roleName} (${roleId}) to user ${userId}, event_id=${roleEventId}`);
+      }
+    }
 
     // Emit invitation.accepted event per AsyncAPI contract
     const { data: _acceptedEventId, error: acceptedEventError } = await supabase
