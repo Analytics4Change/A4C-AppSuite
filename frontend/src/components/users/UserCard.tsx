@@ -10,6 +10,7 @@ import {
   RefreshCw,
   XCircle,
   Shield,
+  AlertTriangle,
 } from 'lucide-react';
 import type { UserListItem, UserDisplayStatus } from '@/types/user.types';
 import { getDisplayName, getExpirationText } from '@/types/user.types';
@@ -268,8 +269,8 @@ export const UserCard: React.FC<UserCardProps> = ({
       </CardHeader>
 
       <CardContent className="pt-0">
-        {/* Role Badges */}
-        {user.roles.length > 0 && (
+        {/* Role Badges or No Roles Warning */}
+        {user.roles.length > 0 ? (
           <div className="flex flex-wrap gap-1.5 mb-3">
             {user.roles.slice(0, 3).map((role) => (
               <span
@@ -286,6 +287,27 @@ export const UserCard: React.FC<UserCardProps> = ({
                 +{user.roles.length - 3} more
               </span>
             )}
+          </div>
+        ) : (
+          <div
+            className={`flex items-center gap-1.5 mb-3 px-2 py-1.5 rounded-lg ${
+              isInactive
+                ? 'bg-gray-50 border border-gray-200'
+                : 'bg-amber-50 border border-amber-200'
+            }`}
+          >
+            <AlertTriangle
+              size={14}
+              className={isInactive ? 'text-gray-400' : 'text-amber-600'}
+              aria-hidden="true"
+            />
+            <span
+              className={`text-xs font-medium ${
+                isInactive ? 'text-gray-500' : 'text-amber-700'
+              }`}
+            >
+              No roles assigned
+            </span>
           </div>
         )}
 

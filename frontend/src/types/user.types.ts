@@ -878,8 +878,8 @@ export const USER_VALIDATION = {
     message: 'Last name is required and must be 100 characters or less',
   },
   roles: {
-    minCount: 1,
-    message: 'At least one role must be selected',
+    minCount: 0,
+    message: 'Roles are optional - user will have no permissions until assigned',
   },
 };
 
