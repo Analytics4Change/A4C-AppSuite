@@ -133,7 +133,7 @@ interface DbUserPhoneRow {
   updated_at: string;
 }
 
-/** User org access row from user_org_access */
+/** User org access row from user_organizations_projection (via api.get_user_org_access RPC) */
 interface DbUserOrgAccessRow {
   user_id: string;
   org_id: string;
@@ -142,6 +142,12 @@ interface DbUserOrgAccessRow {
   notification_preferences: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+}
+
+/** User org access list item from api.list_user_org_access RPC */
+interface DbUserOrgAccessListItem extends DbUserOrgAccessRow {
+  org_name: string;
+  is_currently_active: boolean;
 }
 
 /** Email membership check result */
@@ -773,6 +779,9 @@ export class SupabaseUserQueryService implements IUserQueryService {
 
   /**
    * Get organizations the current user has access to
+   *
+   * Uses api.list_user_org_access RPC to fetch user's organization access
+   * with active status calculated server-side.
    */
   async getUserOrganizations(): Promise<
     Array<{ id: string; name: string; type: string }>
@@ -785,28 +794,45 @@ export class SupabaseUserQueryService implements IUserQueryService {
     }
 
     try {
-      const { data, error } = await client
-        .from('user_org_access')
-        .select(
-          `
-          org_id,
-          organizations_projection!inner (
-            id, name, org_type
-          )
-        `
-        )
-        .eq('user_id', session.user.id)
-        .eq('is_active', true);
+      // Use RPC function instead of direct table access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (client.schema('api').rpc as any)(
+        'list_user_org_access',
+        { p_user_id: session.user.id }
+      );
 
       if (error) {
-        log.error('Failed to fetch user organizations', error);
+        log.error('Failed to fetch user organizations via RPC', error);
         return [];
       }
 
-      return (data ?? []).map((uoa: any) => ({
-        id: uoa.organizations_projection.id,
-        name: uoa.organizations_projection.name,
-        type: uoa.organizations_projection.org_type,
+      const accessList = (data ?? []) as DbUserOrgAccessListItem[];
+
+      // Filter to only active organizations and fetch org details
+      // Note: The RPC returns org_name directly, but we need org_type
+      // For now, do a secondary query for type. TODO: Add org_type to RPC
+      const orgIds = accessList
+        .filter((uoa) => uoa.is_currently_active)
+        .map((uoa) => uoa.org_id);
+
+      if (orgIds.length === 0) {
+        return [];
+      }
+
+      const { data: orgs, error: orgsError } = await client
+        .from('organizations_projection')
+        .select('id, name, type')
+        .in('id', orgIds);
+
+      if (orgsError) {
+        log.error('Failed to fetch organization details', orgsError);
+        return [];
+      }
+
+      return (orgs ?? []).map((org: { id: string; name: string; type: string }) => ({
+        id: org.id,
+        name: org.name,
+        type: org.type,
       }));
     } catch (error) {
       log.error('Error in getUserOrganizations', error);
@@ -898,6 +924,11 @@ export class SupabaseUserQueryService implements IUserQueryService {
     }
   }
 
+  /**
+   * Get user's organization access configuration
+   *
+   * Uses api.get_user_org_access RPC instead of direct table access.
+   */
   async getUserOrgAccess(
     userId: string,
     orgId: string
@@ -905,18 +936,28 @@ export class SupabaseUserQueryService implements IUserQueryService {
     const client = supabaseService.getClient();
 
     try {
-      const { data, error } = await client
-        .from('user_org_access')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('org_id', orgId)
-        .single();
+      // Use RPC function instead of direct table access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (client.schema('api').rpc as any)(
+        'get_user_org_access',
+        {
+          p_user_id: userId,
+          p_org_id: orgId,
+        }
+      );
 
-      if (error || !data) {
+      if (error) {
+        log.error('Failed to fetch user org access via RPC', error);
         return null;
       }
 
-      const access = data as unknown as DbUserOrgAccessRow;
+      // RPC returns array, get first row
+      const accessRows = data as DbUserOrgAccessRow[] | null;
+      if (!accessRows || accessRows.length === 0) {
+        return null;
+      }
+
+      const access = accessRows[0];
 
       return {
         userId: access.user_id,

@@ -1,24 +1,25 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2025-01-05
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: CQRS junction table assigning roles to users with organization and ltree scope. NULL org_id indicates global super_admin access; non-null indicates org-scoped assignment. Check constraint enforces scope consistency. Used by JWT custom claims hook.
+**Summary**: CQRS junction table assigning roles to users with organization and ltree scope. NULL org_id indicates global super_admin access; non-null indicates org-scoped assignment. Supports temporal role assignments via `role_valid_from`/`role_valid_until` columns for time-limited access. Used by JWT custom claims hook.
 
 **When to read**:
 - Implementing role assignment/revocation workflows
 - Understanding RBAC authorization patterns
 - Debugging user permissions or JWT claims
 - Working with hierarchical scope_path inheritance
+- Implementing temporal (time-limited) role assignments
 
 **Prerequisites**: [roles_projection](roles_projection.md), [permissions_projection](permissions_projection.md)
 
-**Key topics**: `user-roles`, `rbac`, `jwt-claims`, `scope-path`, `null-org-super-admin`
+**Key topics**: `user-roles`, `rbac`, `jwt-claims`, `scope-path`, `null-org-super-admin`, `role-access-dates`, `temporal-roles`, `role-validity`
 
-**Estimated read time**: 30 minutes
+**Estimated read time**: 35 minutes
 <!-- TL;DR-END -->
 
 # user_roles_projection
@@ -41,6 +42,8 @@ The `user_roles_projection` table is a **CQRS read model** that assigns roles to
 | org_id | uuid | YES | NULL | Organization UUID (NULL for super_admin global access) |
 | scope_path | ltree | YES | NULL | Hierarchical scope path (NULL for global access) |
 | assigned_at | timestamptz | NO | now() | When role was assigned to user |
+| role_valid_from | date | YES | NULL | First date role assignment is active (NULL = immediate) |
+| role_valid_until | date | YES | NULL | Last date role assignment is active (NULL = no expiration) |
 
 ### Column Details
 
@@ -92,6 +95,31 @@ The `user_roles_projection` table is a **CQRS read model** that assigns roles to
 - **Usage**: Historical analysis, role assignment timeline tracking
 - **Immutable**: Role assignments are created/deleted (not updated), so timestamp never changes
 
+#### role_valid_from
+- **Type**: `date`
+- **Purpose**: Optional start date for when role assignment becomes active
+- **Nullable**: YES (NULL = role active immediately upon assignment)
+- **Constraint**: `user_roles_date_order_check` ensures `role_valid_from <= role_valid_until`
+- **Index**: `idx_user_roles_pending_start` (partial WHERE NOT NULL) for notification queries
+- **Use Cases**:
+  - Future-dated role assignments (e.g., promotion effective next month)
+  - Contractor start dates aligned with project kickoff
+  - Scheduled privilege escalation for temporary tasks
+- **Interaction with user_org_access**: Role-level dates work independently but intersection with org-level dates determines actual access. See `get_user_active_roles()` function.
+
+#### role_valid_until
+- **Type**: `date`
+- **Purpose**: Optional expiration date for role assignment
+- **Nullable**: YES (NULL = role never expires)
+- **Constraint**: `user_roles_date_order_check` ensures `role_valid_from <= role_valid_until`
+- **Index**: `idx_user_roles_expiring` (partial WHERE NOT NULL) for expiration notification queries
+- **Use Cases**:
+  - Temporary admin access (e.g., 30-day audit assistance)
+  - Contract end dates for external consultants
+  - Rotation schedules for sensitive roles (e.g., security officer)
+  - Time-limited elevated privileges for specific projects
+- **Interaction with user_org_access**: Effective access requires both role dates AND org-level dates to be valid. See `get_user_active_roles()` function.
+
 ## Relationships
 
 ### Parent Relationships (Foreign Keys)
@@ -120,6 +148,8 @@ The `user_roles_projection` table is a **CQRS read model** that assigns roles to
 | idx_user_roles_org | BTREE (partial) | org_id WHERE NOT NULL | Filter by organization | Org-scoped queries |
 | idx_user_roles_scope_path | GIST (partial) | scope_path WHERE NOT NULL | Hierarchical scope queries | ltree operations |
 | idx_user_roles_auth_lookup | BTREE | (user_id, org_id) | Authorization queries | Composite index for common pattern |
+| idx_user_roles_expiring | BTREE (partial) | role_valid_until WHERE NOT NULL | Find roles expiring soon | Notification/cleanup queries |
+| idx_user_roles_pending_start | BTREE (partial) | role_valid_from WHERE NOT NULL | Find future-starting roles | Activation notification queries |
 
 ### Index Usage Patterns
 
@@ -163,6 +193,40 @@ JOIN roles_projection r ON r.id = ur.role_id
 WHERE ur.user_id = '<user-uuid>'
   AND ur.org_id = '<org-uuid>';
 -- Uses: idx_user_roles_auth_lookup (composite index)
+```
+
+**Find Roles Expiring Within N Days**:
+```sql
+SELECT
+  u.email,
+  r.name as role_name,
+  o.name as org_name,
+  ur.role_valid_until,
+  ur.role_valid_until - CURRENT_DATE as days_remaining
+FROM user_roles_projection ur
+JOIN users u ON u.id = ur.user_id
+JOIN roles_projection r ON r.id = ur.role_id
+LEFT JOIN organizations_projection o ON o.id = ur.org_id
+WHERE ur.role_valid_until IS NOT NULL
+  AND ur.role_valid_until BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
+ORDER BY ur.role_valid_until;
+-- Uses: idx_user_roles_expiring (partial index)
+```
+
+**Find Roles with Future Start Dates**:
+```sql
+SELECT
+  u.email,
+  r.name as role_name,
+  ur.role_valid_from,
+  ur.role_valid_from - CURRENT_DATE as days_until_active
+FROM user_roles_projection ur
+JOIN users u ON u.id = ur.user_id
+JOIN roles_projection r ON r.id = ur.role_id
+WHERE ur.role_valid_from IS NOT NULL
+  AND ur.role_valid_from > CURRENT_DATE
+ORDER BY ur.role_valid_from;
+-- Uses: idx_user_roles_pending_start (partial index)
 ```
 
 ## Row-Level Security (RLS)
@@ -286,7 +350,50 @@ CHECK (
 
 **Purpose**: Enforces global vs org-scoped assignment pattern
 
+### Check Constraint: Role Date Order (user_roles_date_order_check)
+```sql
+CHECK (
+  role_valid_from IS NULL
+  OR role_valid_until IS NULL
+  OR role_valid_from <= role_valid_until
+)
+```
+
+**Purpose**: Ensures valid date ranges for temporal role assignments
+
 **Rules**:
+1. Both dates NULL → ✅ Valid (always active)
+2. Only `role_valid_from` set → ✅ Valid (starts on date, never expires)
+3. Only `role_valid_until` set → ✅ Valid (immediately active, expires on date)
+4. Both dates set with `from <= until` → ✅ Valid (bounded window)
+5. Both dates set with `from > until` → ❌ Invalid (constraint violation)
+
+**Validation Examples**:
+```sql
+-- ✅ VALID: No date restrictions (default)
+INSERT INTO user_roles_projection (user_id, role_id, org_id, scope_path)
+VALUES ('user-1', 'role-clinician', 'org-123', 'analytics4change.org_123'::ltree);
+
+-- ✅ VALID: Future start date, no expiration
+INSERT INTO user_roles_projection (user_id, role_id, org_id, scope_path, role_valid_from)
+VALUES ('user-2', 'role-admin', 'org-123', 'analytics4change.org_123'::ltree, '2025-02-01');
+
+-- ✅ VALID: Immediate start, expires in 30 days
+INSERT INTO user_roles_projection (user_id, role_id, org_id, scope_path, role_valid_until)
+VALUES ('user-3', 'role-temp_admin', 'org-123', 'analytics4change.org_123'::ltree, '2025-02-05');
+
+-- ✅ VALID: Bounded window (30-day temporary access)
+INSERT INTO user_roles_projection (user_id, role_id, org_id, scope_path, role_valid_from, role_valid_until)
+VALUES ('user-4', 'role-auditor', 'org-123', 'analytics4change.org_123'::ltree, '2025-01-15', '2025-02-14');
+
+-- ❌ INVALID: End date before start date
+INSERT INTO user_roles_projection (user_id, role_id, org_id, scope_path, role_valid_from, role_valid_until)
+VALUES ('user-5', 'role-admin', 'org-123', 'analytics4change.org_123'::ltree, '2025-02-01', '2025-01-15');
+-- ERROR: new row violates check constraint "user_roles_date_order_check"
+```
+
+### Scope Consistency Rules
+
 1. **Global assignments** (super_admin):
    - MUST have `org_id = NULL`
    - MUST have `scope_path = NULL`
@@ -315,6 +422,90 @@ INSERT INTO user_roles_projection (user_id, role_id, org_id, scope_path)
 VALUES ('user-4', 'role-manager', NULL, 'analytics4change.org_789'::ltree);
 -- ERROR: new row violates check constraint
 ```
+
+## Helper Functions
+
+### is_role_active(date, date)
+
+**Signature**:
+```sql
+CREATE OR REPLACE FUNCTION public.is_role_active(
+    p_role_valid_from date,
+    p_role_valid_until date
+)
+RETURNS boolean
+```
+
+**Purpose**: Checks if a role assignment is currently active based on its date window.
+
+**Logic**:
+- Returns `true` if `role_valid_from` is NULL or <= CURRENT_DATE
+- AND `role_valid_until` is NULL or >= CURRENT_DATE
+
+**Usage**:
+```sql
+SELECT
+  r.name as role_name,
+  is_role_active(ur.role_valid_from, ur.role_valid_until) as is_active
+FROM user_roles_projection ur
+JOIN roles_projection r ON r.id = ur.role_id
+WHERE ur.user_id = '<user-uuid>';
+```
+
+**Location**: `infrastructure/supabase/supabase/migrations/20251231220940_role_access_dates.sql`
+
+### get_user_active_roles(uuid, uuid)
+
+**Signature**:
+```sql
+CREATE OR REPLACE FUNCTION public.get_user_active_roles(
+    p_user_id uuid,
+    p_org_id uuid DEFAULT NULL
+)
+RETURNS TABLE (
+    role_id uuid,
+    role_name text,
+    organization_id uuid,
+    scope_path extensions.ltree
+)
+```
+
+**Purpose**: Returns user's currently active roles, respecting BOTH org-level access dates (from `user_org_access`) AND role-level access dates.
+
+**Logic**:
+1. Filters `user_roles_projection` by user_id (and optionally org_id)
+2. Checks role-level dates: `role_valid_from <= CURRENT_DATE` and `role_valid_until >= CURRENT_DATE`
+3. For org-scoped roles, also checks user-org level dates from `user_org_access`
+4. Global roles (`org_id IS NULL`) skip org-level access check
+5. Returns intersection: roles active within BOTH windows
+
+**Access Date Intersection**:
+```
+Effective Access = (User-Org Access Window) ∩ (Role-Level Window)
+
+Example:
+  User-Org Access: 2025-01-01 to 2025-12-31
+  Role Window: 2025-03-01 to 2025-06-30
+  Effective: 2025-03-01 to 2025-06-30 (role window is narrower)
+
+Example 2:
+  User-Org Access: 2025-06-01 to 2025-12-31
+  Role Window: 2025-03-01 to 2025-09-30
+  Effective: 2025-06-01 to 2025-09-30 (intersection of both)
+```
+
+**Usage**:
+```sql
+-- Get all active roles for a user
+SELECT * FROM get_user_active_roles('user-123');
+
+-- Get active roles for a user in specific organization
+SELECT * FROM get_user_active_roles('user-123', 'org-456');
+```
+
+**Security**: `SECURITY DEFINER` with `SET search_path = public` for RLS bypass during authorization queries.
+
+**Location**: `infrastructure/supabase/supabase/migrations/20251231220940_role_access_dates.sql`
 
 ## CQRS Event Sourcing
 
@@ -844,6 +1035,10 @@ WHERE ur.user_id = '<user-uuid>';
 - Added composite index `idx_user_roles_auth_lookup` (2025-01-08) - JWT generation optimization
 - Changed UNIQUE constraint to NULLS NOT DISTINCT (2025-01-05) - PostgreSQL 15+ upgrade
 - Migration from Zitadel to Supabase Auth (2025-10-27) - No schema changes
+- Added role-level temporal columns (2025-12-31) - `role_valid_from`, `role_valid_until` for time-limited role assignments
+  - Added `user_roles_date_order_check` constraint
+  - Added `idx_user_roles_expiring` and `idx_user_roles_pending_start` indexes
+  - Added `is_role_active()` and `get_user_active_roles()` helper functions
 
 ## References
 
@@ -852,3 +1047,4 @@ WHERE ur.user_id = '<user-uuid>';
 - **JWT Hook**: `infrastructure/supabase/sql/03-functions/authorization/003-supabase-auth-jwt-hook.sql:38-106`
 - **Table Definition**: `infrastructure/supabase/sql/02-tables/rbac/004-user_roles_projection.sql`
 - **Check Constraint**: `infrastructure/supabase/sql/02-tables/rbac/004-user_roles_projection.sql:18-23`
+- **Role Access Dates Migration**: `infrastructure/supabase/supabase/migrations/20251231220940_role_access_dates.sql`

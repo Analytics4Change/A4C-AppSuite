@@ -316,7 +316,7 @@ components:
           description: Date the user's access will expire (copied from invitation)
         notification_preferences:
           $ref: '#/components/schemas/NotificationPreferences'
-          description: Notification preferences (copied from invitation to user_org_access)
+          description: Notification preferences (copied from invitation to user_organizations_projection)
 
     InvitationExpiredEvent:
       type: object

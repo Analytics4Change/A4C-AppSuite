@@ -114,6 +114,22 @@
     - `eslint-disable-next-line @typescript-eslint/no-explicit-any` comments for type assertions
     - Edge Function invocations via `client.functions.invoke(name, { body: {...} })`
 
+19. **Table Rename: user_org_access → user_organizations_projection** (2026-01-05):
+    - Follows `*_projection` naming convention for CQRS read models
+    - Migration renames table, updates RLS policies, and updates all referencing functions
+    - Frontend migrated from direct table access to RPC calls (eliminates anti-pattern)
+    - RPC functions in `api` schema abstract table name from frontend:
+      - `api.get_user_org_access(uuid, uuid)` - Get access dates and prefs
+      - `api.list_user_org_access(uuid)` - List user's org access with active status
+      - `api.update_user_access_dates(uuid, uuid, date, date)` - Update with event emission
+      - `api.update_user_notification_preferences(uuid, uuid, jsonb)` - Update prefs
+
+20. **AccessDatesForm Real-Time Sync** (2026-01-05):
+    - Added `onChange` prop for real-time date sync in inline mode
+    - Previously: Users had to click "Save Changes" then "Send Invitation" (data loss bug)
+    - Now: Dates sync immediately to parent form as user types
+    - `onSave` kept for non-inline modal usage
+
 ## Technical Context
 
 ### Architecture
@@ -236,6 +252,13 @@ This feature spans frontend (React + MobX) and backend (Supabase Edge Functions)
 - `20251231221349_jwt_hook_access_date_validation.sql` - JWT claims v2
 - `20251231221901_user_extended_event_processors.sql` - Event handlers
 - `20260101205643_user_invitation_lookup_rpcs.sql` - Smart email lookup RPCs
+
+**Backend Database (Migration - 2026-01-05)**
+- `20260105162527_user_organizations_rpc_and_rename.sql` - Table rename + RPC API layer:
+  - Renames `user_org_access` → `user_organizations_projection` (naming convention)
+  - Updates RLS policies with new table name
+  - Updates functions: `sync_accessible_organizations`, `user_has_active_org_access`, `get_user_active_roles`, `custom_access_token_hook`
+  - Creates RPC functions: `api.get_user_org_access`, `api.list_user_org_access`, `api.update_user_access_dates`, `api.update_user_notification_preferences`
 
 **Backend RPC Functions** (Phase 5 - Deployed 2026-01-01)
 - `api.check_user_org_membership(email, org_id)` - Check user-org membership

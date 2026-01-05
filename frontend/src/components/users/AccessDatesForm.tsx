@@ -52,8 +52,15 @@ export interface AccessDatesFormProps {
   /** Current access expiration date (YYYY-MM-DD or null) */
   accessExpirationDate: string | null;
 
-  /** Called when dates are saved */
+  /** Called when dates are saved (explicit save action) */
   onSave: (data: AccessDatesFormData) => void;
+
+  /**
+   * Called on every date change for real-time sync (optional).
+   * When provided in inline mode, dates sync immediately without
+   * requiring explicit "Save Changes" click.
+   */
+  onChange?: (data: AccessDatesFormData) => void;
 
   /** Called when form is cancelled (optional) */
   onCancel?: () => void;
@@ -169,6 +176,7 @@ export const AccessDatesForm: React.FC<AccessDatesFormProps> = ({
   accessStartDate,
   accessExpirationDate,
   onSave,
+  onChange,
   onCancel,
   isSaving = false,
   inline = false,
@@ -210,16 +218,34 @@ export const AccessDatesForm: React.FC<AccessDatesFormProps> = ({
   // Handlers
   const handleStartChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      setLocalStart(e.target.value);
+      const newValue = e.target.value;
+      setLocalStart(newValue);
+
+      // In inline mode with onChange, sync immediately to parent
+      if (inline && onChange) {
+        onChange({
+          accessStartDate: newValue || null,
+          accessExpirationDate: localExpiration || null,
+        });
+      }
     },
-    []
+    [inline, onChange, localExpiration]
   );
 
   const handleExpirationChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      setLocalExpiration(e.target.value);
+      const newValue = e.target.value;
+      setLocalExpiration(newValue);
+
+      // In inline mode with onChange, sync immediately to parent
+      if (inline && onChange) {
+        onChange({
+          accessStartDate: localStart || null,
+          accessExpirationDate: newValue || null,
+        });
+      }
     },
-    []
+    [inline, onChange, localStart]
   );
 
   const handleBlur = useCallback((field: string) => {
@@ -230,7 +256,15 @@ export const AccessDatesForm: React.FC<AccessDatesFormProps> = ({
     setLocalStart('');
     setLocalExpiration('');
     setTouched(new Set());
-  }, []);
+
+    // In inline mode with onChange, sync cleared dates immediately
+    if (inline && onChange) {
+      onChange({
+        accessStartDate: null,
+        accessExpirationDate: null,
+      });
+    }
+  }, [inline, onChange]);
 
   const handleSave = useCallback(() => {
     setTouched(new Set(['accessStartDate', 'accessExpirationDate']));
@@ -422,8 +456,8 @@ export const AccessDatesForm: React.FC<AccessDatesFormProps> = ({
         </div>
       )}
 
-      {/* Inline save button */}
-      {inline && isDirty && (
+      {/* Inline save button - only show if onChange not provided (explicit save required) */}
+      {inline && isDirty && !onChange && (
         <div className="pt-2">
           <Button
             type="button"

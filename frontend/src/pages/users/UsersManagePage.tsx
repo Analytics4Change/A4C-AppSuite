@@ -651,11 +651,15 @@ export const UsersManagePage: React.FC = observer(() => {
                       <AccessDatesForm
                         accessStartDate={formViewModel.formData.accessStartDate || null}
                         accessExpirationDate={formViewModel.formData.accessExpirationDate || null}
-                        onSave={(data) => {
+                        onChange={(data) => {
+                          // Real-time sync - dates are captured immediately as user types
                           formViewModel.setAccessStartDate(data.accessStartDate || undefined);
                           formViewModel.setAccessExpirationDate(
                             data.accessExpirationDate || undefined
                           );
+                        }}
+                        onSave={() => {
+                          // No-op: onChange handles real-time sync in inline mode
                         }}
                         inline
                       />

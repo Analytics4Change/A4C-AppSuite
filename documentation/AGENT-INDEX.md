@@ -115,8 +115,10 @@ purpose: agent-navigation
 | `retry-policies` | [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | activities-reference.md |
 | `rls` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | table-template.md, SQL_IDEMPOTENCY_AUDIT.md |
 | `rls-gap` | [clients.md](infrastructure/reference/database/tables/clients.md) | medications.md |
+| `role-access-dates` | [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | rbac-architecture.md |
 | `role-permissions` | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | roles_projection.md |
 | `role-templates` | [role_permission_templates.md](infrastructure/reference/database/tables/role_permission_templates.md) | provider-admin-permissions-architecture.md |
+| `role-validity` | [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | rbac-architecture.md |
 | `roles` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | roles_projection.md |
 | `rxnorm` | [medications.md](infrastructure/reference/database/tables/medications.md) | rxnorm-medication-autocomplete.md |
 | `saga` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
@@ -130,6 +132,7 @@ purpose: agent-navigation
 | `supabase` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | DEPLOYMENT_INSTRUCTIONS.md, SUPABASE-AUTH-SETUP.md |
 | `supabase-auth` | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) | frontend-auth-architecture.md |
 | `temporal` | [temporal-overview.md](architecture/workflows/temporal-overview.md) | workflows/CLAUDE.md, activities-reference.md |
+| `temporal-roles` | [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | rbac-architecture.md |
 | `testing` | [TESTING.md](frontend/testing/TESTING.md) | integration-testing.md |
 | `three-layer-idempotency` | [organization-bootstrap-workflow-design.md](workflows/architecture/organization-bootstrap-workflow-design.md) | activities-reference.md |
 | `troubleshooting` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |

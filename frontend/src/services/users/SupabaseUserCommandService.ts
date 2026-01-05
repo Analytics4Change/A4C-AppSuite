@@ -514,25 +514,157 @@ export class SupabaseUserCommandService implements IUserCommandService {
     };
   }
 
+  /**
+   * Update user's access dates for the organization
+   *
+   * Uses api.update_user_access_dates RPC which emits a domain event
+   * and updates the user_organizations_projection.
+   */
   async updateAccessDates(
     request: UpdateAccessDatesRequest
   ): Promise<UserOperationResult> {
-    log.warn('updateAccessDates not yet implemented for Supabase');
-    return {
-      success: false,
-      error: 'updateAccessDates not yet implemented',
-      errorDetails: { code: 'UNKNOWN', message: 'Coming soon' },
-    };
+    try {
+      log.info('Updating user access dates', {
+        userId: request.userId,
+        orgId: request.orgId,
+      });
+
+      const client = supabaseService.getClient();
+
+      // Use RPC function to update access dates (emits domain event)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (client.schema('api').rpc as any)(
+        'update_user_access_dates',
+        {
+          p_user_id: request.userId,
+          p_org_id: request.orgId,
+          p_access_start_date: request.accessStartDate ?? null,
+          p_access_expiration_date: request.accessExpirationDate ?? null,
+        }
+      );
+
+      if (error) {
+        log.error('Failed to update access dates via RPC', error);
+
+        // Handle specific error codes
+        if (error.code === '42501') {
+          return {
+            success: false,
+            error: 'Access denied - insufficient permissions',
+            errorDetails: { code: 'FORBIDDEN', message: error.message },
+          };
+        }
+        if (error.code === 'P0002') {
+          return {
+            success: false,
+            error: 'User organization access record not found',
+            errorDetails: { code: 'NOT_FOUND', message: error.message },
+          };
+        }
+        if (error.code === '22023') {
+          return {
+            success: false,
+            error: 'Start date must be before expiration date',
+            errorDetails: { code: 'INVALID_DATES', message: error.message },
+          };
+        }
+
+        return {
+          success: false,
+          error: `Failed to update access dates: ${error.message}`,
+          errorDetails: { code: 'UNKNOWN', message: error.message },
+        };
+      }
+
+      log.info('Access dates updated successfully', {
+        userId: request.userId,
+        orgId: request.orgId,
+      });
+
+      return { success: true };
+    } catch (error) {
+      log.error('Error in updateAccessDates', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorDetails: {
+          code: 'UNKNOWN',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
   }
 
+  /**
+   * Update user's notification preferences for the organization
+   *
+   * Uses api.update_user_notification_preferences RPC to update
+   * the user_organizations_projection directly.
+   */
   async updateNotificationPreferences(
     request: UpdateNotificationPreferencesRequest
   ): Promise<UserOperationResult> {
-    log.warn('updateNotificationPreferences not yet implemented for Supabase');
-    return {
-      success: false,
-      error: 'updateNotificationPreferences not yet implemented',
-      errorDetails: { code: 'UNKNOWN', message: 'Coming soon' },
-    };
+    try {
+      log.info('Updating user notification preferences', {
+        userId: request.userId,
+        orgId: request.orgId,
+      });
+
+      const client = supabaseService.getClient();
+
+      // Use RPC function to update notification preferences
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (client.schema('api').rpc as any)(
+        'update_user_notification_preferences',
+        {
+          p_user_id: request.userId,
+          p_org_id: request.orgId,
+          p_notification_preferences: request.notificationPreferences,
+        }
+      );
+
+      if (error) {
+        log.error('Failed to update notification preferences via RPC', error);
+
+        // Handle specific error codes
+        if (error.code === '42501') {
+          return {
+            success: false,
+            error: 'Access denied - insufficient permissions',
+            errorDetails: { code: 'FORBIDDEN', message: error.message },
+          };
+        }
+        if (error.code === 'P0002') {
+          return {
+            success: false,
+            error: 'User organization access record not found',
+            errorDetails: { code: 'NOT_FOUND', message: error.message },
+          };
+        }
+
+        return {
+          success: false,
+          error: `Failed to update notification preferences: ${error.message}`,
+          errorDetails: { code: 'UNKNOWN', message: error.message },
+        };
+      }
+
+      log.info('Notification preferences updated successfully', {
+        userId: request.userId,
+        orgId: request.orgId,
+      });
+
+      return { success: true };
+    } catch (error) {
+      log.error('Error in updateNotificationPreferences', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorDetails: {
+          code: 'UNKNOWN',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
   }
 }

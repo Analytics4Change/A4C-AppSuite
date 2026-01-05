@@ -435,12 +435,47 @@
 - [ ] Domain events emitted and processed
 - [ ] RLS policies enforce org isolation
 
+## Phase 5.8: UAT Fixes ✅ COMPLETE
+
+### 5.8.1 AccessDatesForm Data Loss Bug
+- [x] Issue: Dates entered in create mode lost if user clicks "Send Invitation" without first clicking "Save Changes"
+- [x] Root cause: `AccessDatesForm` maintained local state, only synced to parent on explicit `onSave()`
+- [x] Fix: Added `onChange` prop for real-time sync in inline mode
+- [x] Updated `UsersManagePage.tsx` to use `onChange` prop
+- [x] `onSave` kept for non-inline (modal) usage
+
+### 5.8.2 Document Role-Level Access Dates
+- [x] Migration `20251231220940_role_access_dates.sql` added columns but docs were missing
+- [x] Updated `documentation/infrastructure/reference/database/tables/user_roles_projection.md`:
+  - [x] Added `role_valid_from`, `role_valid_until` to Table Schema
+  - [x] Added detailed Column Details section
+  - [x] Added `user_roles_date_order_check` constraint
+  - [x] Added `idx_user_roles_expiring`, `idx_user_roles_pending_start` indexes
+  - [x] Documented `is_role_active()` and `get_user_active_roles()` helper functions
+- [x] Updated `documentation/AGENT-INDEX.md` with keywords: `role-access-dates`, `role-validity`, `temporal-roles`
+
+### 5.8.3 Table Rename + RPC API Layer
+- [x] Issue: `user_org_access` doesn't follow `*_projection` naming convention
+- [x] Issue: Frontend uses direct `.from('user_org_access')` queries (anti-pattern)
+- [x] Created migration `20260105162527_user_organizations_rpc_and_rename.sql`:
+  - [x] Rename table `user_org_access` → `user_organizations_projection`
+  - [x] Update RLS policies with new names
+  - [x] Update functions: `sync_accessible_organizations`, `user_has_active_org_access`, `get_user_active_roles`, `custom_access_token_hook`
+  - [x] Create RPC functions: `api.get_user_org_access`, `api.list_user_org_access`, `api.update_user_access_dates`, `api.update_user_notification_preferences`
+- [x] Updated `SupabaseUserQueryService.ts` to use RPC calls:
+  - [x] `getUserOrganizations()` → `api.list_user_org_access`
+  - [x] `getUserOrgAccess()` → `api.get_user_org_access`
+- [x] Updated `SupabaseUserCommandService.ts` to implement:
+  - [x] `updateAccessDates()` → `api.update_user_access_dates`
+  - [x] `updateNotificationPreferences()` → `api.update_user_notification_preferences`
+- [x] Updated dev docs with new decisions and migration info
+
 ## Current Status
 
-**Phase**: Phase 5.6 - Frontend Service Connection
+**Phase**: Phase 5.8 - UAT Fixes
 **Status**: ✅ COMPLETE
-**Last Updated**: 2026-01-01
-**Next Step**: Test integration end-to-end OR Phase 5.7 - Constraint Validation (role assignment security) OR Phase 7 - Org Selector
+**Last Updated**: 2026-01-05
+**Next Step**: Deploy migration to production OR Phase 5.7 - Constraint Validation (role assignment security) OR Phase 7 - Org Selector
 
 ## Notes
 
