@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-01-05
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: CQRS projection for user invitation tokens used in organization onboarding. Stores cryptographically secure tokens with expiration, role assignment, and status lifecycle (pending → accepted/expired). Edge Functions validate and accept invitations.
+**Summary**: CQRS projection for user invitation tokens used in organization onboarding. Stores cryptographically secure tokens with expiration, multi-role assignment (via `roles` JSONB array), and status lifecycle (pending → accepted/expired). Events route to USER aggregate via `process_user_event()`. Edge Functions validate and accept invitations.
 
 **When to read**:
 - Implementing invitation workflows (Temporal activities)
@@ -16,7 +16,7 @@ last_updated: 2025-12-30
 
 **Prerequisites**: [Edge Functions Deployment](../../guides/supabase/edge-functions-deployment.md)
 
-**Key topics**: `invitations`, `tokens`, `onboarding`, `edge-functions`, `status-lifecycle`
+**Key topics**: `invitations`, `tokens`, `onboarding`, `edge-functions`, `status-lifecycle`, `multi-role-invitation`, `user-aggregate`
 
 **Estimated read time**: 25 minutes
 <!-- TL;DR-END -->
@@ -43,7 +43,8 @@ The `invitations_projection` table is a **CQRS read model** that stores user inv
 | email | text | NO | - | Invitee email address |
 | first_name | text | YES | NULL | Invitee first name (optional) |
 | last_name | text | YES | NULL | Invitee last name (optional) |
-| role | text | NO | - | Role name for user after acceptance |
+| role | text | YES | NULL | Legacy: Single role name (deprecated, use `roles`) |
+| roles | jsonb | YES | NULL | Multi-role assignment array (preferred) |
 | token | text | NO | - | Cryptographically secure invitation token (URL-safe) |
 | expires_at | timestamptz | NO | - | Invitation expiration (typically 7 days) |
 | status | text | NO | 'pending' | Invitation lifecycle status |
@@ -51,6 +52,9 @@ The `invitations_projection` table is a **CQRS read model** that stores user inv
 | created_at | timestamptz | YES | now() | Record creation timestamp |
 | updated_at | timestamptz | YES | now() | Record last update timestamp |
 | tags | text[] | YES | '{}' | Development entity tracking tags |
+| access_start_date | date | YES | NULL | First date user can access org (NULL = immediate) |
+| access_expiration_date | date | YES | NULL | Date user's access expires (NULL = no expiration) |
+| notification_preferences | jsonb | YES | NULL | Initial notification preferences for user |
 
 ### Column Details
 
@@ -92,13 +96,30 @@ The `invitations_projection` table is a **CQRS read model** that stores user inv
 - **PII**: Contains personally identifiable information
 - **Usage**: Personalize invitation email, reduce signup friction
 
-#### role
+#### role (DEPRECATED)
 - **Type**: `text`
-- **Purpose**: Role name to assign to user after invitation acceptance
-- **Constraints**: NOT NULL
+- **Purpose**: Legacy single role name (use `roles` array instead)
+- **Constraints**: NULLABLE (was NOT NULL before 2026-01-05)
 - **Values**: Role names from `roles_projection` (e.g., 'clinician', 'facility_admin')
-- **Usage**: Determines user's initial permissions after signup
-- **Validation**: Application ensures role exists and is valid for organization
+- **Migration Note**: New invitations use `roles` JSONB array. Event processors support both formats for backward compatibility.
+- **Deprecation**: This column is maintained for backward compatibility with bootstrap workflows. New Edge Function invitations use `roles` array.
+
+#### roles
+- **Type**: `jsonb`
+- **Purpose**: Multi-role assignment array for user after invitation acceptance
+- **Nullable**: YES (one of `role` or `roles` should be populated)
+- **Format**: Array of objects with `role_id` and `role_name`:
+  ```json
+  [
+    { "role_id": "uuid-or-null", "role_name": "provider_admin" },
+    { "role_id": "uuid", "role_name": "Program Manager - Aspen" }
+  ]
+  ```
+- **Usage**:
+  - `role_id`: UUID of role from `roles_projection` (NULL for system roles resolved at acceptance)
+  - `role_name`: Denormalized role name for display purposes
+- **Event Processing**: When invitation is accepted, each role in the array generates a separate `user.role.assigned` event
+- **Validation**: Application validates roles exist and user has permission to assign them
 
 #### token
 - **Type**: `text`
@@ -308,88 +329,99 @@ UNIQUE (token)
 
 ### Source Events
 
-**Event Type**: `UserInvited`
+**Event Type**: `user.invited`
 
-**Emitted By**: `GenerateInvitationsActivity` (Temporal workflow)
+**Aggregate**: USER (stream_type: `user`)
 
-**Event Payload**:
+**Stream ID**: `invitation_id` (user_id doesn't exist until acceptance)
+
+**Emitted By**:
+- `GenerateInvitationsActivity` (Temporal workflow - organization bootstrap)
+- `invite-user` Edge Function (manual user invitation)
+
+**Event Payload (Multi-Role Format - Current)**:
 ```typescript
 {
-  event_type: 'UserInvited',
-  aggregate_id: '<invitation-uuid>',  // invitation_id
-  aggregate_type: 'invitation',
-  payload: {
+  event_type: 'user.invited',
+  stream_id: '<invitation-uuid>',       // invitation_id as aggregate
+  stream_type: 'user',                  // Routes to process_user_event()
+  event_data: {
     invitation_id: '<uuid>',
-    organization_id: '<org-uuid>',
+    org_id: '<org-uuid>',
     email: 'newuser@provider.org',
     first_name: 'Jane',
     last_name: 'Doe',
-    role: 'clinician',
+    roles: [                            // Multi-role array (preferred)
+      { role_id: null, role_name: 'provider_admin' },
+      { role_id: '<uuid>', role_name: 'Program Manager - Aspen' }
+    ],
     token: '<256-bit-url-safe-token>',
-    expires_at: '2025-01-20T10:30:00Z'  // 7 days from now
+    expires_at: '2026-01-20T10:30:00Z',
+    access_start_date: '2026-01-15',    // Optional: delayed access
+    access_expiration_date: '2026-12-31' // Optional: time-limited access
   },
-  metadata: {
+  event_metadata: {
     user_id: '<admin-uuid>',            // Who invited the user
     correlation_id: '<workflow-uuid>',  // Temporal workflow ID
-    timestamp: '2025-01-13T10:30:00Z'
+    timestamp: '2026-01-13T10:30:00Z'
   }
 }
 ```
 
 ### Event Processor
 
-**Trigger**: `process_user_invited_event()`
+**Handler**: `process_user_event()` (lines 488-563)
 
-**Location**: `infrastructure/supabase/sql/04-triggers/process_user_invited.sql`
+**Location**: `infrastructure/supabase/supabase/migrations/20251231221901_user_extended_event_processors.sql`
 
-**Processing Logic**:
+**Event Routing**: The main event router (`process_domain_event()`) routes `stream_type: 'user'` events to `process_user_event()`, which handles `user.invited` among other user lifecycle events.
+
+**Processing Logic** (excerpt from `process_user_event()`):
 ```sql
-CREATE OR REPLACE FUNCTION process_user_invited_event()
-RETURNS TRIGGER AS $$
-BEGIN
+WHEN 'user.invited' THEN
   INSERT INTO invitations_projection (
     invitation_id,
     organization_id,
     email,
     first_name,
     last_name,
-    role,
+    role,              -- Legacy field (deprecated)
+    roles,             -- Multi-role JSONB array
     token,
     expires_at,
+    access_start_date,
+    access_expiration_date,
+    notification_preferences,
     status,
     created_at,
     updated_at
   )
   VALUES (
-    (NEW.payload->>'invitation_id')::UUID,
-    (NEW.payload->>'organization_id')::UUID,
-    NEW.payload->>'email',
-    NEW.payload->>'first_name',
-    NEW.payload->>'last_name',
-    NEW.payload->>'role',
-    NEW.payload->>'token',
-    (NEW.payload->>'expires_at')::TIMESTAMPTZ,
+    (v_event_data->>'invitation_id')::UUID,
+    (v_event_data->>'org_id')::UUID,
+    v_event_data->>'email',
+    v_event_data->>'first_name',
+    v_event_data->>'last_name',
+    v_event_data->>'role',                    -- Legacy single role
+    v_event_data->'roles',                    -- Multi-role array
+    v_event_data->>'token',
+    (v_event_data->>'expires_at')::TIMESTAMPTZ,
+    (v_event_data->>'access_start_date')::DATE,
+    (v_event_data->>'access_expiration_date')::DATE,
+    v_event_data->'notification_preferences',
     'pending',
     NOW(),
     NOW()
   )
   ON CONFLICT (invitation_id) DO NOTHING;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
 ```
 
 **Idempotency**: `ON CONFLICT (invitation_id) DO NOTHING`
 
-**Trigger Registration**:
-```sql
-CREATE TRIGGER trigger_process_user_invited
-  AFTER INSERT ON domain_events
-  FOR EACH ROW
-  WHEN (NEW.event_type = 'UserInvited')
-  EXECUTE FUNCTION process_user_invited_event();
-```
+**Related Events** (also handled by `process_user_event()`):
+- `invitation.accepted` - Updates status to 'accepted', sets accepted_at
+- `invitation.revoked` - Updates status to 'revoked' (workflow compensation)
+- `invitation.expired` - Updates status to 'expired' (scheduled cleanup)
 
 ## Common Queries
 
@@ -488,43 +520,47 @@ SELECT EXISTS (
 
 ### 1. Generate Invitation (Temporal Workflow)
 
-**Scenario**: Organization admin invites new clinician
+**Scenario**: Organization admin invites new staff member with multiple roles
 
 ```typescript
 // Temporal Activity: GenerateInvitationsActivity
+// File: workflows/src/activities/organization-bootstrap/generate-invitations.ts
+import { emitEvent } from '../../shared/events';
+import { AGGREGATE_TYPES } from '../../shared/events/types';
+
 async function generateInvitation(params: {
-  organization_id: string;
+  orgId: string;
   email: string;
   first_name?: string;
   last_name?: string;
-  role: string;
+  roles: Array<{ role_id: string | null; role_name: string }>;
+  access_start_date?: string;     // Optional: '2026-01-15'
+  access_expiration_date?: string; // Optional: '2026-12-31'
 }) {
-  const invitationId = uuidv4();
+  const invitationId = crypto.randomUUID();
   const token = generateSecureToken();  // 256-bit random, base64-url encoded
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);  // 7 days
 
-  // Emit UserInvited domain event
-  await supabase.from('domain_events').insert({
-    event_type: 'UserInvited',
-    aggregate_id: invitationId,
-    aggregate_type: 'invitation',
-    payload: {
+  // Emit user.invited domain event (USER aggregate)
+  await emitEvent({
+    event_type: 'user.invited',
+    aggregate_type: AGGREGATE_TYPES.USER,    // Routes to process_user_event()
+    aggregate_id: invitationId,              // invitation_id as stream_id
+    event_data: {
       invitation_id: invitationId,
-      organization_id: params.organization_id,
+      org_id: params.orgId,
       email: params.email,
       first_name: params.first_name,
       last_name: params.last_name,
-      role: params.role,
+      roles: params.roles,                   // Multi-role array
       token: token,
-      expires_at: expiresAt.toISOString()
+      expires_at: expiresAt.toISOString(),
+      access_start_date: params.access_start_date,
+      access_expiration_date: params.access_expiration_date,
     },
-    metadata: {
-      user_id: getCurrentUserId(),
-      correlation_id: getWorkflowId()
-    }
   });
 
-  // invitations_projection updated automatically via trigger
+  // invitations_projection updated automatically via process_user_event()
 
   // Send invitation email with token
   const invitationUrl = `https://app.example.com/accept-invitation?token=${token}`;
@@ -544,12 +580,13 @@ async function generateInvitation(params: {
 
 ```typescript
 // Edge Function: validate-invitation
+// File: infrastructure/supabase/supabase/functions/validate-invitation/index.ts
 import { createClient } from '@supabase/supabase-js';
 
 export async function validateInvitation(token: string) {
   const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY  // Service role bypasses RLS
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!  // Service role bypasses RLS
   );
 
   const { data: invitation, error } = await supabase
@@ -567,14 +604,20 @@ export async function validateInvitation(token: string) {
     };
   }
 
+  // Prefer roles array, fallback to legacy role field
+  const roles = invitation.roles
+    ?? (invitation.role ? [{ role_id: null, role_name: invitation.role }] : []);
+
   return {
     valid: true,
     invitation: {
       email: invitation.email,
       first_name: invitation.first_name,
       last_name: invitation.last_name,
-      role: invitation.role,
-      organization_id: invitation.organization_id
+      roles: roles,                           // Multi-role array
+      organization_id: invitation.organization_id,
+      access_start_date: invitation.access_start_date,
+      access_expiration_date: invitation.access_expiration_date,
     }
   };
 }
@@ -582,17 +625,18 @@ export async function validateInvitation(token: string) {
 
 ### 3. Accept Invitation (Edge Function)
 
-**Scenario**: User accepts invitation and creates account
+**Scenario**: User accepts invitation and creates account with multiple roles
 
 ```typescript
 // Edge Function: accept-invitation
+// File: infrastructure/supabase/supabase/functions/accept-invitation/index.ts
 async function acceptInvitation(params: {
   token: string;
   password: string;
 }) {
   const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
   // 1. Validate token
@@ -623,42 +667,56 @@ async function acceptInvitation(params: {
     throw new Error(`User creation failed: ${authError.message}`);
   }
 
-  // 3. Insert user record
-  await supabase.from('users').insert({
-    id: authUser.user.id,
-    email: invitation.email,
-    first_name: invitation.first_name,
-    last_name: invitation.last_name,
-    current_organization_id: invitation.organization_id,
-    accessible_organizations: [invitation.organization_id]
-  });
+  // 3. Normalize roles (prefer array, fallback to legacy field)
+  const roles = invitation.roles
+    ?? (invitation.role ? [{ role_id: null, role_name: invitation.role }] : []);
 
-  // 4. Assign role to user (emit domain event)
-  await supabase.from('domain_events').insert({
-    event_type: 'user.role.assigned',
-    aggregate_id: authUser.user.id,
-    aggregate_type: 'user',
-    payload: {
-      user_id: authUser.user.id,
-      role_name: invitation.role,
+  // 4. Emit invitation.accepted event
+  await supabase.rpc('emit_domain_event', {
+    p_stream_id: invitation.invitation_id,
+    p_stream_type: 'user',
+    p_event_type: 'invitation.accepted',
+    p_event_data: {
+      invitation_id: invitation.invitation_id,
       org_id: invitation.organization_id,
-      scope_path: `analytics4change.org_${invitation.organization_id}`
+      user_id: authUser.user.id,
+      email: invitation.email,
+      roles: roles,
+      accepted_at: new Date().toISOString(),
+      access_start_date: invitation.access_start_date,
+      access_expiration_date: invitation.access_expiration_date,
     },
-    metadata: {
-      user_id: 'system',
-      correlation_id: invitation.invitation_id
+    p_event_metadata: {
+      user_id: authUser.user.id,
+      reason: 'Invitation accepted by user'
     }
   });
 
-  // 5. Mark invitation as accepted
-  await supabase
-    .from('invitations_projection')
-    .update({
-      status: 'accepted',
-      accepted_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', invitation.id);
+  // 5. Assign each role to user (emit domain events)
+  for (const role of roles) {
+    await supabase.rpc('emit_domain_event', {
+      p_stream_id: authUser.user.id,
+      p_stream_type: 'user',
+      p_event_type: 'user.role.assigned',
+      p_event_data: {
+        user_id: authUser.user.id,
+        role_id: role.role_id,
+        role_name: role.role_name,
+        org_id: invitation.organization_id,
+        scope_path: `analytics4change.org_${invitation.organization_id}`,
+        access_start_date: invitation.access_start_date,
+        access_expiration_date: invitation.access_expiration_date,
+      },
+      p_event_metadata: {
+        user_id: 'system',
+        correlation_id: invitation.invitation_id,
+        reason: 'Role assigned via invitation acceptance'
+      }
+    });
+  }
+
+  // Note: invitations_projection updated automatically by process_user_event()
+  // via invitation.accepted event handler
 
   return {
     user_id: authUser.user.id,
@@ -830,11 +888,25 @@ SELECT * FROM invitations_projection WHERE token = '<token>';
 **Schema Changes**:
 - Added `tags` column for dev cleanup (2024-12-10)
 - Migration from Zitadel to Supabase Auth (2025-10-27) - Updated Edge Functions, no schema changes
+- Multi-role invitation system (2025-12-31):
+  - Added `roles` JSONB column for multi-role array
+  - Added `access_start_date` and `access_expiration_date` columns
+  - Added `notification_preferences` JSONB column
+  - Made `role` column NULLABLE (deprecated in favor of `roles`)
+  - Migration: `20251231221901_user_extended_event_processors.sql`
+- Event routing fix (2026-01-05):
+  - Changed `stream_type` from 'organization' to 'user'
+  - Events now route to `process_user_event()` instead of `process_organization_event()`
+  - Migration: `20260105_invitation_event_routing.sql` (Bootstrap workflow and Edge Function updates)
 
 ## References
 
-- **Event Processor Trigger**: `infrastructure/supabase/sql/04-triggers/process_user_invited.sql`
-- **Table Definition**: `infrastructure/supabase/sql/02-tables/invitations/invitations_projection.sql`
-- **RLS Enable**: `infrastructure/supabase/sql/02-tables/invitations/invitations_projection.sql:62`
-- **Edge Functions**: `infrastructure/supabase/functions/validate-invitation/`, `accept-invitation/`
-- **Temporal Workflow**: `workflows/src/activities/GenerateInvitationsActivity.ts`
+- **Event Processor**: `infrastructure/supabase/supabase/migrations/20251231221901_user_extended_event_processors.sql` (lines 488-563)
+- **Table Definition**: `infrastructure/supabase/supabase/migrations/20251229000000_baseline_v2.sql` (invitations_projection)
+- **AsyncAPI Contract**: `infrastructure/supabase/contracts/asyncapi/domains/invitation.yaml`
+- **Edge Functions**:
+  - `infrastructure/supabase/supabase/functions/invite-user/index.ts` - Manual user invitation
+  - `infrastructure/supabase/supabase/functions/accept-invitation/index.ts` - Invitation acceptance
+  - `infrastructure/supabase/supabase/functions/validate-invitation/index.ts` - Token validation
+- **Temporal Activity**: `workflows/src/activities/organization-bootstrap/generate-invitations.ts`
+- **Frontend Service**: `frontend/src/services/users/SupabaseUserCommandService.ts` - Invites users via Edge Function

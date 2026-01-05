@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-01-05
 ---
 
 <!-- TL;DR-START -->
@@ -362,6 +362,54 @@ const { data: { session } } = await supabase.auth.refreshSession();
 ```
 
 **JWT tokens are immutable** - must refresh to get new claims.
+
+### Issue: Edge Functions Reading Wrong JWT Claims (2026-01-05)
+
+**Symptom**: Edge Functions return `user_role: 'viewer'` instead of actual role, or missing `org_id`/`permissions`.
+
+**Root Cause**: Reading claims from wrong source. JWT claims are in the token **payload**, not in `user.app_metadata`.
+
+**❌ WRONG - Claims from app_metadata (always empty)**:
+```typescript
+// This DOES NOT work - app_metadata doesn't contain custom claims
+const { data: { user } } = await supabase.auth.getUser();
+const claims = user?.app_metadata;  // Empty or wrong!
+```
+
+**✅ CORRECT - Decode JWT payload**:
+```typescript
+// Get the access token and decode it
+const authHeader = req.headers.get('Authorization');
+if (!authHeader?.startsWith('Bearer ')) {
+  throw new Error('Missing Authorization header');
+}
+
+const token = authHeader.replace('Bearer ', '');
+// Decode JWT payload (second segment, base64)
+const payload = JSON.parse(atob(token.split('.')[1]));
+
+// Custom claims are in the payload
+const claims = {
+  org_id: payload.org_id,           // UUID string
+  user_role: payload.user_role,      // 'super_admin', 'provider_admin', etc.
+  permissions: payload.permissions,  // Array of permission strings
+  scope_path: payload.scope_path,    // ltree path or null
+};
+```
+
+**Why?**:
+- Supabase Auth's `custom_access_token_hook` adds claims to the JWT **payload**
+- `user.app_metadata` is stored in the `auth.users` table - separate from JWT claims
+- The hook enriches the token at sign-in time, not the user record
+
+**Verification Query**:
+```sql
+-- Check what the hook returns for a user
+SELECT public.get_user_claims_preview('<user-uuid>');
+
+-- Verify hook is registered
+SELECT * FROM auth.hooks WHERE hook_name = 'custom_access_token_hook';
+```
 
 ---
 

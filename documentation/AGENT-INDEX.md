@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-01-05
 purpose: agent-navigation
 ---
 
@@ -34,6 +34,7 @@ purpose: agent-navigation
 | `activities-reference` | [activities-reference.md](workflows/reference/activities-reference.md) | error-handling-and-compensation.md |
 | `activity` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | activities-reference.md |
 | `addresses` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | phones_projection.md |
+| `apiRpc` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | supabase.service.ts |
 | `applet-action` | [permissions_projection.md](infrastructure/reference/database/tables/permissions_projection.md) | rbac-architecture.md |
 | `audit-trail` | [impersonation-architecture.md](architecture/authentication/impersonation-architecture.md) | impersonation-event-schema.md |
 | `authentication` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | supabase-auth-overview.md, custom-claims-setup.md |
@@ -60,6 +61,7 @@ purpose: agent-navigation
 | `domain-events` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-metadata-schema.md |
 | `dosage-info` | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | medication_history.md |
 | `edge-function` | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | DEPLOYMENT_INSTRUCTIONS.md |
+| `edge-function-jwt` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | EDGE_FUNCTION_TESTS.md |
 | `email` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |
 | `event-metadata` | [event-metadata-schema.md](workflows/reference/event-metadata-schema.md) | triggering-workflows.md |
 | `event-types` | [event_types.md](infrastructure/reference/database/tables/event_types.md) | event-sourcing-overview.md |
@@ -87,6 +89,7 @@ purpose: agent-navigation
 | `migration` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | DEPLOYMENT_INSTRUCTIONS.md, table-template.md |
 | `migrations-applied` | [_migrations_applied.md](infrastructure/reference/database/tables/_migrations_applied.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `mobx` | [viewmodels.md](frontend/architecture/viewmodels.md) | frontend/CLAUDE.md, mobx-optimization.md |
+| `multi-role-invitation` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | user_roles_projection.md |
 | `multi-tenancy` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | tenants-as-organizations.md |
 | `oauth` | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | supabase-auth-overview.md, SUPABASE-AUTH-SETUP.md |
 | `okta` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
@@ -136,6 +139,7 @@ purpose: agent-navigation
 | `testing` | [TESTING.md](frontend/testing/TESTING.md) | integration-testing.md |
 | `three-layer-idempotency` | [organization-bootstrap-workflow-design.md](workflows/architecture/organization-bootstrap-workflow-design.md) | activities-reference.md |
 | `troubleshooting` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |
+| `user-aggregate` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | event-sourcing-overview.md |
 | `var` | [var-partnerships.md](architecture/data/var-partnerships.md) | provider-partners-architecture.md |
 | `viewmodel` | [viewmodels.md](frontend/architecture/viewmodels.md) | viewmodel-testing.md, mobx-patterns.md |
 | `vite` | [DEVELOPMENT.md](frontend/guides/DEVELOPMENT.md) | frontend/CLAUDE.md |
@@ -217,7 +221,7 @@ purpose: agent-navigation
 |-------|---------|----------|---------|
 | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | Multi-tenant organization hierarchy | `organization`, `tenant`, `rls` | 760 |
 | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | Sub-org hierarchy with ltree | `organization-units`, `ltree`, `cascade-deactivation` | 900 |
-| [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | Organization invitation tracking | `invitation`, `token`, `email` | 817 |
+| [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | Organization invitation tracking with multi-role | `invitation`, `token`, `multi-role-invitation`, `user-aggregate` | 910 |
 | [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | User role assignments | `roles`, `scope_path`, `rbac` | 700 |
 | [roles_projection.md](infrastructure/reference/database/tables/roles_projection.md) | RBAC role definitions | `roles`, `system-role`, `organization-id` | 680 |
 | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | Role-permission junction | `permission-grants`, `junction-table`, `rbac` | 650 |
