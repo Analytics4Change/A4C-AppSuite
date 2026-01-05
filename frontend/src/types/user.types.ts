@@ -737,6 +737,9 @@ export type UserOperationErrorCode =
   | 'EMAIL_SEND_FAILED'
   | 'FORBIDDEN'
   | 'INVALID_DATES'
+  | 'HTTP_ERROR'      // Edge Function returned non-2xx status
+  | 'RELAY_ERROR'     // Network relay error (Supabase infrastructure)
+  | 'FETCH_ERROR'     // Connection/fetch error
   | 'UNKNOWN';
 
 /**

@@ -14,6 +14,11 @@
  * @see IUserCommandService for interface documentation
  */
 
+import {
+  FunctionsHttpError,
+  FunctionsRelayError,
+  FunctionsFetchError,
+} from '@supabase/supabase-js';
 import type { IUserCommandService } from './IUserCommandService';
 import type {
   InviteUserRequest,
@@ -29,12 +34,77 @@ import type {
   UpdateAccessDatesRequest,
   UpdateNotificationPreferencesRequest,
   RoleReference,
+  UserOperationErrorCode,
 } from '@/types/user.types';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/user.types';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('api');
+
+/**
+ * Extract detailed error from Supabase Edge Function error response.
+ *
+ * When Edge Functions return non-2xx status codes, the Supabase SDK wraps
+ * the response in a FunctionsHttpError. The actual error message from the
+ * Edge Function is accessible via `error.context.json()`.
+ *
+ * @param error - The error from functions.invoke()
+ * @param operation - Human-readable operation name for fallback messages
+ * @returns Object with error message, code, and optional details
+ */
+async function extractEdgeFunctionError(
+  error: unknown,
+  operation: string
+): Promise<{ message: string; code: UserOperationErrorCode; details?: string }> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = await error.context.json();
+      log.error(`Edge Function HTTP error for ${operation}`, {
+        status: error.context.status,
+        body,
+      });
+      return {
+        message: body?.error ?? `${operation} failed`,
+        code: (body?.code as UserOperationErrorCode) ?? 'HTTP_ERROR',
+        details: body?.details,
+      };
+    } catch {
+      // Response body wasn't JSON - use status code
+      log.error(`Edge Function error (non-JSON response) for ${operation}`, {
+        status: error.context.status,
+      });
+      return {
+        message: `${operation} failed (HTTP ${error.context.status})`,
+        code: 'HTTP_ERROR',
+      };
+    }
+  }
+
+  if (error instanceof FunctionsRelayError) {
+    log.error(`Edge Function relay error for ${operation}`, error);
+    return {
+      message: `Network error: ${error.message}`,
+      code: 'RELAY_ERROR',
+    };
+  }
+
+  if (error instanceof FunctionsFetchError) {
+    log.error(`Edge Function fetch error for ${operation}`, error);
+    return {
+      message: `Connection error: ${error.message}`,
+      code: 'FETCH_ERROR',
+    };
+  }
+
+  // Unknown error type
+  const msg = error instanceof Error ? error.message : 'Unknown error';
+  log.error(`Unknown error type for ${operation}`, error);
+  return {
+    message: `${operation} failed: ${msg}`,
+    code: 'UNKNOWN',
+  };
+}
 
 /**
  * Edge Function endpoints
@@ -80,13 +150,14 @@ export class SupabaseUserCommandService implements IUserCommandService {
       );
 
       if (error) {
-        log.error('Failed to invite user', error);
+        const errorInfo = await extractEdgeFunctionError(error, 'Invite user');
         return {
           success: false,
-          error: `Failed to invite user: ${error.message}`,
+          error: errorInfo.message,
           errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
+            code: errorInfo.code,
+            message: errorInfo.message,
+            context: errorInfo.details ? { details: errorInfo.details } : undefined,
           },
         };
       }
@@ -157,10 +228,15 @@ export class SupabaseUserCommandService implements IUserCommandService {
       );
 
       if (error) {
-        log.error('Failed to resend invitation', error);
+        const errorInfo = await extractEdgeFunctionError(error, 'Resend invitation');
         return {
           success: false,
-          error: `Failed to resend invitation: ${error.message}`,
+          error: errorInfo.message,
+          errorDetails: {
+            code: errorInfo.code,
+            message: errorInfo.message,
+            context: errorInfo.details ? { details: errorInfo.details } : undefined,
+          },
         };
       }
 
@@ -203,10 +279,15 @@ export class SupabaseUserCommandService implements IUserCommandService {
       );
 
       if (error) {
-        log.error('Failed to revoke invitation', error);
+        const errorInfo = await extractEdgeFunctionError(error, 'Revoke invitation');
         return {
           success: false,
-          error: `Failed to revoke invitation: ${error.message}`,
+          error: errorInfo.message,
+          errorDetails: {
+            code: errorInfo.code,
+            message: errorInfo.message,
+            context: errorInfo.details ? { details: errorInfo.details } : undefined,
+          },
         };
       }
 
@@ -252,10 +333,15 @@ export class SupabaseUserCommandService implements IUserCommandService {
       );
 
       if (error) {
-        log.error('Failed to deactivate user', error);
+        const errorInfo = await extractEdgeFunctionError(error, 'Deactivate user');
         return {
           success: false,
-          error: `Failed to deactivate user: ${error.message}`,
+          error: errorInfo.message,
+          errorDetails: {
+            code: errorInfo.code,
+            message: errorInfo.message,
+            context: errorInfo.details ? { details: errorInfo.details } : undefined,
+          },
         };
       }
 
@@ -307,10 +393,15 @@ export class SupabaseUserCommandService implements IUserCommandService {
       );
 
       if (error) {
-        log.error('Failed to reactivate user', error);
+        const errorInfo = await extractEdgeFunctionError(error, 'Reactivate user');
         return {
           success: false,
-          error: `Failed to reactivate user: ${error.message}`,
+          error: errorInfo.message,
+          errorDetails: {
+            code: errorInfo.code,
+            message: errorInfo.message,
+            context: errorInfo.details ? { details: errorInfo.details } : undefined,
+          },
         };
       }
 
