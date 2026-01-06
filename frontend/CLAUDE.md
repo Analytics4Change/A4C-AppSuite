@@ -245,6 +245,70 @@ src/
 - **Interface-based Services**: All services implement interfaces for easy mocking/testing
 - **Unified Component Pattern**: Create single, reusable components for similar functionality (e.g., MultiSelectDropdown for all multi-select needs)
 
+### Service Session Management
+
+> **⚠️ CRITICAL: Never Cache Sessions Manually**
+>
+> Supabase manages session state automatically after login. Services that manually cache sessions
+> will fail silently when the cache is stale or never populated. This has caused critical bugs
+> including empty data lists where all queries silently returned zero results.
+
+**ALWAYS** retrieve sessions directly from Supabase's auth client in every service method that needs authentication context:
+
+```typescript
+// ✅ CORRECT: Retrieve session from Supabase client
+async getUsersPaginated(): Promise<PaginatedResult<UserListItem>> {
+  const client = supabaseService.getClient();
+
+  // Get session directly from Supabase - it manages auth state automatically
+  const { data: { session } } = await client.auth.getSession();
+  if (!session) {
+    log.error('No authenticated session');
+    return { items: [], totalCount: 0 };
+  }
+
+  // Decode JWT to extract custom claims
+  const claims = this.decodeJWT(session.access_token);
+  if (!claims.org_id) {
+    log.error('No organization context in JWT claims');
+    return { items: [], totalCount: 0 };
+  }
+
+  // Use claims.org_id for RLS-compatible queries
+}
+
+// Helper method for JWT decoding
+private decodeJWT(token: string): DecodedJWTClaims {
+  try {
+    const payload = token.split('.')[1];
+    return JSON.parse(globalThis.atob(payload));
+  } catch {
+    return {};
+  }
+}
+```
+
+**NEVER** use manual session caching or custom session storage:
+
+```typescript
+// ❌ WRONG: Manual session cache - this will FAIL SILENTLY
+const session = supabaseService.getCurrentSession();  // Returns NULL!
+if (!session?.claims.org_id) {
+  return { items: [] };  // Silent failure - empty list returned
+}
+```
+
+**Why manual caching fails:**
+1. Custom session caches require explicit population (calling `updateSession()`)
+2. If the cache is never populated, all service methods silently fail
+3. Supabase already manages session state automatically - don't duplicate it
+4. The Supabase client's `auth.getSession()` always returns the current valid session
+
+**When you need JWT claims** (org_id, permissions, role, scope_path):
+- Call `client.auth.getSession()` to get the session
+- Decode the `access_token` to extract custom claims
+- Use the same `decodeJWT()` pattern shown above
+
 ### Authentication Architecture
 
 **Status**: ✅ Supabase Auth with smart detection (Updated 2025-01-02)

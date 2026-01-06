@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-01-06
 ---
 
 <!-- TL;DR-START -->
@@ -368,6 +368,35 @@ const ProtectedRoute = ({ children, requiredPermission }) => {
   return children;
 };
 ```
+
+### Session Access in Service Classes
+
+> **⚠️ CRITICAL: Never Cache Sessions Manually in Services**
+
+When service classes need session data (e.g., `org_id` for queries), **always retrieve the session directly from Supabase's auth client**. Do not use manual session caches.
+
+```typescript
+// ✅ CORRECT: Always get session from Supabase client
+async getUsersPaginated(): Promise<PaginatedResult<UserListItem>> {
+  const client = supabaseService.getClient();
+
+  const { data: { session } } = await client.auth.getSession();
+  if (!session) {
+    log.error('No authenticated session');
+    return { items: [], totalCount: 0 };
+  }
+
+  const claims = this.decodeJWT(session.access_token);
+  // Use claims.org_id, claims.permissions, etc.
+}
+
+// ❌ WRONG: Manual session cache (causes silent failures)
+const session = supabaseService.getCurrentSession();  // Returns NULL!
+```
+
+**Why**: Supabase manages session state automatically after login. Manual caches require explicit population and will silently return null if never initialized, causing empty results instead of errors.
+
+**See**: [Session Access in Services](../../architecture/authentication/frontend-auth-architecture.md#session-access-in-services) for complete implementation details and the `decodeJWT()` helper pattern.
 
 ---
 

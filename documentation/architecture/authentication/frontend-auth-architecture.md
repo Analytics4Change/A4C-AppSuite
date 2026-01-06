@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-01-02
+last_updated: 2026-01-06
 ---
 
 <!-- TL;DR-START -->
@@ -705,6 +705,84 @@ const session = await authProvider.refreshSession();
 await supabaseService.updateAuthSession(session);
 ```
 
+### Session Access in Services
+
+> **⚠️ CRITICAL: Always Use `client.auth.getSession()`**
+>
+> When services need session data (especially `org_id` for RLS queries), they must retrieve the session
+> directly from Supabase's auth client. **Never rely on manually cached sessions** - this has caused
+> critical bugs where services returned empty results because the cache was never populated.
+
+**Correct Pattern for Service Classes:**
+
+```typescript
+// ✅ CORRECT: Retrieve session from Supabase client
+async getUsersPaginated(): Promise<PaginatedResult<UserListItem>> {
+  const client = supabaseService.getClient();
+
+  // Always get session from Supabase - it manages auth state automatically
+  const { data: { session } } = await client.auth.getSession();
+  if (!session) {
+    log.error('No authenticated session');
+    return { items: [], totalCount: 0 };
+  }
+
+  // Decode JWT to extract custom claims
+  const claims = this.decodeJWT(session.access_token);
+  if (!claims.org_id) {
+    log.error('No organization context');
+    return { items: [], totalCount: 0 };
+  }
+
+  // Use claims.org_id for organization-scoped queries
+}
+```
+
+**JWT Claims Decoding Helper:**
+
+Every service that needs JWT claims should include this helper method:
+
+```typescript
+interface DecodedJWTClaims {
+  org_id?: string;
+  user_role?: string;
+  permissions?: string[];
+  sub?: string;
+}
+
+private decodeJWT(token: string): DecodedJWTClaims {
+  try {
+    const payload = token.split('.')[1];
+    const decoded = JSON.parse(globalThis.atob(payload));
+    return {
+      org_id: decoded.org_id,
+      user_role: decoded.user_role,
+      permissions: decoded.permissions || [],
+      sub: decoded.sub,
+    };
+  } catch {
+    return {};
+  }
+}
+```
+
+**Why This Pattern is Required:**
+
+1. **Supabase manages session state automatically** - After login, the client has the session
+2. **Manual caches require explicit population** - If `updateAuthSession()` is never called, the cache stays null
+3. **Silent failures** - Services using empty caches return empty arrays instead of erroring
+4. **Consistency** - All services should use the same pattern for predictable behavior
+
+**Anti-Pattern (Do NOT Use):**
+
+```typescript
+// ❌ WRONG: Manual session cache - will fail silently
+const session = supabaseService.getCurrentSession();  // Returns NULL!
+if (!session?.claims.org_id) {
+  return { items: [] };  // Silent failure
+}
+```
+
 ---
 
 ## Organization Context
@@ -716,14 +794,21 @@ await supabaseService.updateAuthSession(session);
 ```typescript
 export class ProductionOrganizationService implements IOrganizationService {
   async getCurrentOrganizationId(): Promise<string> {
-    const authProvider = getAuthProvider();
-    const session = await authProvider.getSession();
+    const client = supabaseService.getClient();
 
-    if (!session?.claims.org_id) {
-      throw new Error('No organization context available');
+    // Get session directly from Supabase client
+    const { data: { session } } = await client.auth.getSession();
+    if (!session) {
+      throw new Error('No authenticated user - cannot determine organization context');
     }
 
-    return session.claims.org_id;
+    // Decode JWT to get org_id
+    const claims = this.decodeJWT(session.access_token);
+    if (!claims.org_id) {
+      throw new Error('User has no organization context');
+    }
+
+    return claims.org_id;
   }
 }
 ```

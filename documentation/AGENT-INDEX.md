@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-05
+last_updated: 2026-01-06
 purpose: agent-navigation
 ---
 
@@ -130,6 +130,8 @@ purpose: agent-navigation
 | `saml` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
 | `scope_path` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | organization_units_projection.md |
 | `scoping` | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | organization_units_projection.md |
+| `session-management` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | auth-provider-architecture.md, frontend/CLAUDE.md |
+| `getSession` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | auth-provider-architecture.md |
 | `social-login` | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) | OAUTH-TESTING.md |
 | `soft-delete` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | clients.md |
 | `supabase` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | DEPLOYMENT_INSTRUCTIONS.md, SUPABASE-AUTH-SETUP.md |
