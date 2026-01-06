@@ -169,18 +169,10 @@ export class MockUserCommandService implements IUserCommandService {
       };
     }
 
-    // Validate roles
-    if (!request.roles || request.roles.length === 0) {
-      return {
-        success: false,
-        error: 'At least one role is required',
-        errorDetails: { code: 'VALIDATION_ERROR', message: 'Roles cannot be empty' },
-      };
-    }
-
+    // Roles are optional - empty array means user has no permissions until assigned
     // Simulate subset-only validation (mock always passes for known roles)
     const knownRoleIds = MOCK_ROLES.map((r) => r.id);
-    const unknownRoles = request.roles.filter((r) => !knownRoleIds.includes(r.roleId));
+    const unknownRoles = (request.roles || []).filter((r) => !knownRoleIds.includes(r.roleId));
     if (unknownRoles.length > 0) {
       return {
         success: false,
@@ -470,18 +462,10 @@ export class MockUserCommandService implements IUserCommandService {
     await this.simulateDelay();
     log.debug('Mock: Adding user to organization', { userId, roles });
 
-    // Validate roles
-    if (!roles || roles.length === 0) {
-      return {
-        success: false,
-        error: 'At least one role is required',
-        errorDetails: { code: 'VALIDATION_ERROR', message: 'Roles cannot be empty' },
-      };
-    }
-
+    // Roles are optional - empty array means user has no permissions until assigned
     // Map roles to Role objects
     const roleObjects: Role[] = [];
-    for (const roleRef of roles) {
+    for (const roleRef of roles || []) {
       const role = MOCK_ROLES.find((r) => r.id === roleRef.roleId);
       if (!role) {
         return {
