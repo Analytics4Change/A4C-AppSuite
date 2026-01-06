@@ -36,6 +36,17 @@ import { Logger } from '@/utils/logger';
 const log = Logger.getLogger('api');
 
 // ============================================================================
+// JWT Claims Type
+// ============================================================================
+
+interface DecodedJWTClaims {
+  org_id?: string;
+  user_role?: string;
+  permissions?: string[];
+  sub?: string;
+}
+
+// ============================================================================
 // Database Row Types (for untyped Supabase responses)
 // ============================================================================
 
@@ -226,9 +237,24 @@ export class SupabaseUserQueryService implements IUserQueryService {
     options?: UserQueryOptions
   ): Promise<PaginatedResult<UserListItem>> {
     const client = supabaseService.getClient();
-    const session = supabaseService.getCurrentSession();
 
-    if (!session?.claims.org_id) {
+    // Get session from Supabase client (already authenticated)
+    const { data: { session } } = await client.auth.getSession();
+    if (!session) {
+      log.error('No authenticated session for getUsersPaginated');
+      return {
+        items: [],
+        totalCount: 0,
+        page: 1,
+        pageSize: 20,
+        totalPages: 0,
+        hasMore: false,
+      };
+    }
+
+    // Decode JWT to get org_id
+    const claims = this.decodeJWT(session.access_token);
+    if (!claims.org_id) {
       log.error('No organization context for getUsersPaginated');
       return {
         items: [],
@@ -262,7 +288,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
           `,
             { count: 'exact' }
           )
-          .eq('user_roles_projection.organization_id', session.claims.org_id);
+          .eq('user_roles_projection.organization_id', claims.org_id);
 
         // Apply status filter
         if (options?.filters?.status === 'active') {
@@ -328,7 +354,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
         let invQuery = client
           .from('invitations_projection')
           .select('*', { count: 'exact' })
-          .eq('organization_id', session.claims.org_id)
+          .eq('organization_id', claims.org_id)
           .in('status', ['pending', 'expired']);
 
         // Apply search filter
@@ -522,9 +548,16 @@ export class SupabaseUserQueryService implements IUserQueryService {
    */
   async getInvitations(): Promise<Invitation[]> {
     const client = supabaseService.getClient();
-    const session = supabaseService.getCurrentSession();
 
-    if (!session?.claims.org_id) {
+    // Get session from Supabase client
+    const { data: { session } } = await client.auth.getSession();
+    if (!session) {
+      log.error('No authenticated session for getInvitations');
+      return [];
+    }
+
+    const claims = this.decodeJWT(session.access_token);
+    if (!claims.org_id) {
       log.error('No organization context for getInvitations');
       return [];
     }
@@ -533,7 +566,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
       const { data, error } = await client
         .from('invitations_projection')
         .select('*')
-        .eq('organization_id', session.claims.org_id)
+        .eq('organization_id', claims.org_id)
         .in('status', ['pending', 'expired'])
         .order('created_at', { ascending: false });
 
@@ -630,9 +663,10 @@ export class SupabaseUserQueryService implements IUserQueryService {
    */
   async checkEmailStatus(email: string): Promise<EmailLookupResult> {
     const client = supabaseService.getClient();
-    const session = supabaseService.getCurrentSession();
 
-    if (!session?.claims.org_id) {
+    // Get session from Supabase client
+    const { data: { session } } = await client.auth.getSession();
+    if (!session) {
       return {
         status: 'not_found',
         userId: null,
@@ -644,7 +678,20 @@ export class SupabaseUserQueryService implements IUserQueryService {
       };
     }
 
-    const orgId = session.claims.org_id;
+    const claims = this.decodeJWT(session.access_token);
+    if (!claims.org_id) {
+      return {
+        status: 'not_found',
+        userId: null,
+        invitationId: null,
+        firstName: null,
+        lastName: null,
+        expiresAt: null,
+        currentRoles: null,
+      };
+    }
+
+    const orgId = claims.org_id;
 
     try {
       // Check if user has membership in this org
@@ -757,9 +804,19 @@ export class SupabaseUserQueryService implements IUserQueryService {
    * This prevents privilege escalation during user invitation.
    */
   async getAssignableRoles(): Promise<RoleReference[]> {
-    const session = supabaseService.getCurrentSession();
+    const client = supabaseService.getClient();
 
-    if (!session?.claims.org_id || !session?.user?.id) {
+    // Get session from Supabase client (already authenticated)
+    const { data: { session } } = await client.auth.getSession();
+    if (!session) {
+      log.error('No authenticated session for getAssignableRoles');
+      return [];
+    }
+
+    // Decode JWT to get org_id
+    const claims = this.decodeJWT(session.access_token);
+    if (!claims.org_id) {
+      log.error('No organization context for getAssignableRoles');
       return [];
     }
 
@@ -770,7 +827,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
       const { data, error } = await supabaseService.apiRpc<DbAssignableRoleRow[]>(
         'get_assignable_roles',
         {
-          p_org_id: session.claims.org_id,
+          p_org_id: claims.org_id,
         }
       );
 
@@ -803,9 +860,18 @@ export class SupabaseUserQueryService implements IUserQueryService {
     Array<{ id: string; name: string; type: string }>
   > {
     const client = supabaseService.getClient();
-    const session = supabaseService.getCurrentSession();
 
-    if (!session?.user.id) {
+    // Get session from Supabase client (already authenticated)
+    const { data: { session } } = await client.auth.getSession();
+    if (!session) {
+      log.error('No authenticated session for getUserOrganizations');
+      return [];
+    }
+
+    // Decode JWT to get user_id (sub claim)
+    const claims = this.decodeJWT(session.access_token);
+    if (!claims.sub) {
+      log.error('No user ID in session for getUserOrganizations');
       return [];
     }
 
@@ -813,7 +879,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
       // Use RPC function instead of direct table access
       const { data, error } = await supabaseService.apiRpc<DbUserOrgAccessListItem[]>(
         'list_user_org_access',
-        { p_user_id: session.user.id }
+        { p_user_id: claims.sub }
       );
 
       if (error) {
@@ -985,6 +1051,29 @@ export class SupabaseUserQueryService implements IUserQueryService {
     } catch (error) {
       log.error('Error in getUserOrgAccess', error);
       return null;
+    }
+  }
+
+  // ============================================================================
+  // Private Helper Methods
+  // ============================================================================
+
+  /**
+   * Decode JWT token to extract claims
+   * Uses same approach as SupabaseAuthProvider.decodeJWT()
+   */
+  private decodeJWT(token: string): DecodedJWTClaims {
+    try {
+      const payload = token.split('.')[1];
+      const decoded = JSON.parse(globalThis.atob(payload));
+      return {
+        org_id: decoded.org_id,
+        user_role: decoded.user_role,
+        permissions: decoded.permissions || [],
+        sub: decoded.sub,
+      };
+    } catch {
+      return {};
     }
   }
 }

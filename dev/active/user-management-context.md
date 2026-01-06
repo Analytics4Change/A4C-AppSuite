@@ -165,6 +165,22 @@
     - Error codes: `SCOPE_HIERARCHY_VIOLATION`, `SUBSET_ONLY_VIOLATION`, `ROLE_ASSIGNMENT_VIOLATION`
     - Pattern: Service extracts `errorDetails` → passes via `context` → ViewModel formats for display
 
+26. **Session Management Pattern Standardization** (2026-01-06):
+    - **Problem**: Three different session management patterns existed:
+      - Pattern A: `client.auth.getSession()` ✅ Works (RLS-only, Supabase manages)
+      - Pattern B: `authProvider.getSession()` ⚠️ Works but inconsistent
+      - Pattern C: `supabaseService.getCurrentSession()` ❌ BROKEN (cache never populated)
+    - **Root cause**: `supabaseService.updateAuthSession()` was never called anywhere
+    - **Fix**: Standardize ALL services on Pattern A:
+      - `client.auth.getSession()` retrieves session from Supabase auth state
+      - Decode JWT via `decodeJWT()` helper to get `org_id`, `user_role`, `permissions`, `sub`
+      - Each service adds its own `decodeJWT()` helper (matches SupabaseAuthProvider pattern)
+    - **Files refactored**:
+      - `SupabaseUserQueryService.ts` - 5 methods updated
+      - `MedicationTemplateService.ts` - 3 methods updated
+      - `ProductionOrganizationService.ts` - 3 methods updated (also changed import from `getAuthProvider` to `supabaseService`)
+    - **Why not sync the cache**: Syncing two session sources is fragile. Better to use Supabase's built-in session management directly.
+
 ## Technical Context
 
 ### Architecture

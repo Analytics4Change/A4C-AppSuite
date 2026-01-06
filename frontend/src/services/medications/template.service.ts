@@ -16,10 +16,36 @@ import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('api');
 
+interface DecodedJWTClaims {
+  org_id?: string;
+  user_role?: string;
+  permissions?: string[];
+  sub?: string;
+}
+
 class MedicationTemplateService {
   private static instance: MedicationTemplateService;
 
   private constructor() {}
+
+  /**
+   * Decode JWT token to extract claims
+   * Uses same approach as SupabaseAuthProvider.decodeJWT()
+   */
+  private decodeJWT(token: string): DecodedJWTClaims {
+    try {
+      const payload = token.split('.')[1];
+      const decoded = JSON.parse(globalThis.atob(payload));
+      return {
+        org_id: decoded.org_id,
+        user_role: decoded.user_role,
+        permissions: decoded.permissions || [],
+        sub: decoded.sub,
+      };
+    } catch {
+      return {};
+    }
+  }
 
   static getInstance(): MedicationTemplateService {
     if (!MedicationTemplateService.instance) {
@@ -44,12 +70,20 @@ class MedicationTemplateService {
         throw new Error('Source medication not found');
       }
 
-      // Get current user and organization from session
-      const session = supabaseService.getCurrentSession();
-      if (!session || !session.claims.org_id) {
+      // Get session from Supabase client (already authenticated)
+      const client = supabaseService.getClient();
+      const { data: { session } } = await client.auth.getSession();
+      if (!session) {
+        log.error('No authenticated session for createTemplate');
         throw new Error('User organization context required');
       }
-      const user = session.user;
+
+      // Decode JWT to get org_id and user_id
+      const claims = this.decodeJWT(session.access_token);
+      if (!claims.org_id || !claims.sub) {
+        log.error('No organization context for createTemplate');
+        throw new Error('User organization context required');
+      }
 
       // Extract client initials if requested
       let clientInitials: string | undefined;
@@ -59,7 +93,7 @@ class MedicationTemplateService {
 
       // Create template object (stripping PII)
       const template: Omit<MedicationTemplate, 'id'> = {
-        organizationId: session.claims.org_id,
+        organizationId: claims.org_id,
         name: request.templateName,
 
         // Preserve medication info
@@ -88,7 +122,7 @@ class MedicationTemplateService {
 
         // Metadata
         sourceClientInitials: clientInitials,
-        createdBy: user.id,
+        createdBy: claims.sub,
         createdAt: new Date(),
         updatedAt: new Date(),
         usageCount: 0,
@@ -98,7 +132,6 @@ class MedicationTemplateService {
       };
 
       // Save to database
-      const client = await supabaseService.getClient();
       const { data, error } = await (client as any)
         .from('medication_templates')
         .insert(template)
@@ -123,16 +156,26 @@ class MedicationTemplateService {
    */
   async getTemplates(options?: TemplateFilterOptions): Promise<MedicationTemplate[]> {
     try {
-      const session = supabaseService.getCurrentSession();
-      if (!session || !session.claims.org_id) {
+      const client = supabaseService.getClient();
+
+      // Get session from Supabase client (already authenticated)
+      const { data: { session } } = await client.auth.getSession();
+      if (!session) {
+        log.error('No authenticated session for getTemplates');
         throw new Error('User organization context required');
       }
 
-      const client = await supabaseService.getClient();
+      // Decode JWT to get org_id
+      const claims = this.decodeJWT(session.access_token);
+      if (!claims.org_id) {
+        log.error('No organization context for getTemplates');
+        throw new Error('User organization context required');
+      }
+
       let query = (client as any)
         .from('medication_templates')
         .select('*')
-        .eq('organization_id', session.claims.org_id);
+        .eq('organization_id', claims.org_id);
 
       // Apply filters
       if (options?.searchTerm) {
@@ -346,18 +389,27 @@ class MedicationTemplateService {
    */
   async getTemplateStats(): Promise<TemplateStats> {
     try {
-      const session = supabaseService.getCurrentSession();
-      if (!session || !session.claims.org_id) {
+      const client = supabaseService.getClient();
+
+      // Get session from Supabase client (already authenticated)
+      const { data: { session } } = await client.auth.getSession();
+      if (!session) {
+        log.error('No authenticated session for getTemplateStats');
         throw new Error('User organization context required');
       }
 
-      const client = await supabaseService.getClient();
+      // Decode JWT to get org_id
+      const claims = this.decodeJWT(session.access_token);
+      if (!claims.org_id) {
+        log.error('No organization context for getTemplateStats');
+        throw new Error('User organization context required');
+      }
 
       // Get all templates for stats
       const { data: templates, error } = await (client as any)
         .from('medication_templates')
         .select('*')
-        .eq('organization_id', session.claims.org_id);
+        .eq('organization_id', claims.org_id);
 
       if (error) {
         throw error;

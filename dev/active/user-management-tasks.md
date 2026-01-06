@@ -545,12 +545,56 @@
 - [ ] Test with role assignment violation scenario
 - [ ] Verify detailed error message displays in UI
 
+## Phase 5.11: Session Management Pattern Standardization ✅ COMPLETE
+
+### 5.11.1 Root Cause Analysis (2026-01-06)
+- [x] Issue: Users list completely empty on `/users` and `/users/manage` pages
+- [x] Traced root cause: Three different session management patterns exist
+  - Pattern A: RLS-Only (`client.auth.getSession()`) ✅ Works
+  - Pattern B: `authProvider.getSession()` ⚠️ Works but inconsistent
+  - Pattern C: `supabaseService.getCurrentSession()` ❌ BROKEN
+- [x] Pattern C broken because:
+  - `supabaseService.currentSession` is never populated
+  - `updateAuthSession()` method exists but never called
+  - Services using this pattern fail silently (return empty arrays)
+
+### 5.11.2 Solution: Standardize on Pattern A
+- [x] **SupabaseUserQueryService.ts** refactored:
+  - [x] Added `DecodedJWTClaims` interface
+  - [x] Added `decodeJWT()` helper method
+  - [x] Updated `getUsersPaginated()` to use `client.auth.getSession()`
+  - [x] Updated `getInvitations()` to use `client.auth.getSession()`
+  - [x] Updated `checkEmailStatus()` to use `client.auth.getSession()`
+  - [x] Updated `getAssignableRoles()` to use `client.auth.getSession()`
+  - [x] Updated `getUserOrganizations()` to use `client.auth.getSession()`
+- [x] **MedicationTemplateService.ts** refactored:
+  - [x] Added `DecodedJWTClaims` interface
+  - [x] Added `decodeJWT()` helper method
+  - [x] Updated `createTemplate()` to use `client.auth.getSession()`
+  - [x] Updated `getTemplates()` to use `client.auth.getSession()`
+  - [x] Updated `getTemplateStats()` to use `client.auth.getSession()`
+- [x] **ProductionOrganizationService.ts** refactored:
+  - [x] Replaced `getAuthProvider()` import with `supabaseService`
+  - [x] Added `DecodedJWTClaims` interface
+  - [x] Added `decodeJWT()` helper method
+  - [x] Updated `getCurrentOrganizationId()` to use `client.auth.getSession()`
+  - [x] Updated `getCurrentOrganizationName()` to use `client.auth.getSession()`
+  - [x] Updated `hasOrganizationContext()` to use `client.auth.getSession()`
+
+### 5.11.3 Validation
+- [x] TypeScript typecheck passes (`npm run typecheck`)
+- [x] Production build succeeds (`npm run build`)
+- [ ] Manual test: Users list populates correctly
+- [ ] Manual test: Invitations appear in list
+- [ ] Manual test: Role management still works
+- [ ] Manual test: Organization unit management still works
+
 ## Current Status
 
-**Phase**: Phase 5.10 - Error Propagation Fix
-**Status**: ✅ COMPLETE
+**Phase**: Phase 5.11 - Session Management Pattern Standardization
+**Status**: ✅ COMPLETE (Code changes done, manual testing pending)
 **Last Updated**: 2026-01-06
-**Next Step**: Verify error messages display correctly in UI when role assignment fails
+**Next Step**: Manual testing of users list to verify fix works
 
 ## Notes
 
