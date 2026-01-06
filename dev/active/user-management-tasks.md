@@ -518,12 +518,39 @@
 - [x] Kept role validation in `updateUserRoles()` (different use case - can't remove ALL roles)
 - [x] Frontend already supported no-role invitations (`USER_VALIDATION.roles.minCount: 0`)
 
+## Phase 5.10: Error Propagation Fix ✅ IN PROGRESS
+
+### 5.10.1 Root Cause Analysis (2026-01-06)
+- [x] Issue: Detailed error messages from Edge Function not displayed in UI
+- [x] Traced error flow: Edge Function → Service → ViewModel → UI
+- [x] Problem 1: `extractEdgeFunctionError()` didn't extract `errorDetails` object from response
+- [x] Problem 2: ViewModel looked for wrong path (`context.details` instead of `context` directly)
+
+### 5.10.2 Service Layer Fix
+- [x] Updated `extractEdgeFunctionError()` in `SupabaseUserCommandService.ts`:
+  - [x] Added `errorDetails` field to return interface
+  - [x] Extract code from `body.errorDetails.code` with fallback to `body.code`
+  - [x] Pass through full `body.errorDetails` object
+- [x] Updated `inviteUser()` to pass `errorDetails` via `context` field
+
+### 5.10.3 ViewModel Layer Fix
+- [x] Added `formatViolationDetails()` helper method to `UserFormViewModel.ts`:
+  - [x] Extracts messages from `violations` array if present
+  - [x] Falls back to user-friendly messages based on code
+  - [x] Handles `SCOPE_HIERARCHY_VIOLATION`, `SUBSET_ONLY_VIOLATION`, `ROLE_ASSIGNMENT_VIOLATION`
+- [x] Updated error extraction in `submit()` method to use correct path
+- [x] TypeScript typecheck passed
+
+### 5.10.4 Validation
+- [ ] Test with role assignment violation scenario
+- [ ] Verify detailed error message displays in UI
+
 ## Current Status
 
-**Phase**: Phase 5.7 - Constraint Validation
-**Status**: ✅ COMPLETE
+**Phase**: Phase 5.10 - Error Propagation Fix
+**Status**: ✅ IN PROGRESS
 **Last Updated**: 2026-01-06
-**Next Step**: Phase 6.2 - Role Reassignment OR Phase 7 - Org Selector OR Integration Validation testing
+**Next Step**: Test the fix by attempting to invite user with unassignable role
 
 ## Notes
 

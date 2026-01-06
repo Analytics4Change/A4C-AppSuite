@@ -620,6 +620,49 @@ export class UserFormViewModel {
   // ============================================
 
   /**
+   * Format violation details from Edge Function error context for user display.
+   *
+   * Edge Function returns errorDetails with structure like:
+   * {
+   *   code: 'ROLE_ASSIGNMENT_VIOLATION',
+   *   role_id: 'uuid',
+   *   role_name: 'Role Name',
+   *   violations: [{ error_code: 'SCOPE_HIERARCHY_VIOLATION', message: '...' }]
+   * }
+   *
+   * @param ctx - The errorDetails context from Edge Function
+   * @returns Human-readable error message
+   */
+  private formatViolationDetails(ctx: Record<string, unknown>): string {
+    // Check for violations array (contains detailed messages)
+    const violations = ctx.violations as
+      | Array<{ error_code: string; message: string; role_name?: string }>
+      | undefined;
+    if (violations && violations.length > 0) {
+      return violations.map((v) => v.message).join('; ');
+    }
+
+    // Fallback to role_name + code for user-friendly message
+    const roleName = ctx.role_name as string | undefined;
+    const code = ctx.code as string | undefined;
+    if (roleName && code) {
+      if (code === 'SCOPE_HIERARCHY_VIOLATION') {
+        return `Role "${roleName}" has a scope outside your authority`;
+      }
+      if (code === 'SUBSET_ONLY_VIOLATION') {
+        return `Role "${roleName}" has permissions you don't have`;
+      }
+      if (code === 'ROLE_ASSIGNMENT_VIOLATION') {
+        return `Cannot assign role "${roleName}" - check permissions and scope`;
+      }
+      return `Role "${roleName}": ${code}`;
+    }
+
+    // Last resort: JSON stringify for debugging
+    return JSON.stringify(ctx);
+  }
+
+  /**
    * Build invitation request from form data
    */
   buildRequest(): InviteUserRequest {
@@ -679,9 +722,16 @@ export class UserFormViewModel {
         } else {
           this.submissionError = result.error ?? 'An error occurred';
           // Extract detailed error info for display
-          this.submissionErrorDetails = result.errorDetails?.context
-            ? { code: result.errorDetails.code, details: (result.errorDetails.context as { details?: string }).details }
-            : null;
+          // The context contains the full errorDetails from the Edge Function
+          const ctx = result.errorDetails?.context as Record<string, unknown> | undefined;
+          if (ctx) {
+            this.submissionErrorDetails = {
+              code: result.errorDetails?.code ?? (ctx.code as string),
+              details: this.formatViolationDetails(ctx),
+            };
+          } else {
+            this.submissionErrorDetails = null;
+          }
           log.warn('Invitation submission failed', { error: result.error, errorDetails: result.errorDetails });
         }
       });

@@ -43,6 +43,17 @@ import { Logger } from '@/utils/logger';
 const log = Logger.getLogger('api');
 
 /**
+ * Edge Function error extraction result
+ */
+interface EdgeFunctionErrorResult {
+  message: string;
+  code: UserOperationErrorCode;
+  details?: string;
+  /** Full errorDetails object from Edge Function response (for role validation errors, etc.) */
+  errorDetails?: Record<string, unknown>;
+}
+
+/**
  * Extract detailed error from Supabase Edge Function error response.
  *
  * When Edge Functions return non-2xx status codes, the Supabase SDK wraps
@@ -51,12 +62,12 @@ const log = Logger.getLogger('api');
  *
  * @param error - The error from functions.invoke()
  * @param operation - Human-readable operation name for fallback messages
- * @returns Object with error message, code, and optional details
+ * @returns Object with error message, code, details, and full errorDetails object
  */
 async function extractEdgeFunctionError(
   error: unknown,
   operation: string
-): Promise<{ message: string; code: UserOperationErrorCode; details?: string }> {
+): Promise<EdgeFunctionErrorResult> {
   if (error instanceof FunctionsHttpError) {
     try {
       const body = await error.context.json();
@@ -66,8 +77,13 @@ async function extractEdgeFunctionError(
       });
       return {
         message: body?.error ?? `${operation} failed`,
-        code: (body?.code as UserOperationErrorCode) ?? 'HTTP_ERROR',
+        // Extract code from errorDetails if present, otherwise from top-level
+        code: (body?.errorDetails?.code as UserOperationErrorCode)
+          ?? (body?.code as UserOperationErrorCode)
+          ?? 'HTTP_ERROR',
         details: body?.details,
+        // Pass through the full errorDetails object for rich error information
+        errorDetails: body?.errorDetails,
       };
     } catch {
       // Response body wasn't JSON - use status code
@@ -157,7 +173,8 @@ export class SupabaseUserCommandService implements IUserCommandService {
           errorDetails: {
             code: errorInfo.code,
             message: errorInfo.message,
-            context: errorInfo.details ? { details: errorInfo.details } : undefined,
+            // Pass through full errorDetails from Edge Function for rich error display
+            context: errorInfo.errorDetails ?? (errorInfo.details ? { details: errorInfo.details } : undefined),
           },
         };
       }
