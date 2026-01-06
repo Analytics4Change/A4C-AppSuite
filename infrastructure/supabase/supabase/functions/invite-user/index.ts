@@ -19,7 +19,7 @@ import {
 import { AnySchemaSupabaseClient } from '../_shared/types.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v4';
+const DEPLOY_VERSION = 'v5';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -512,7 +512,7 @@ serve(async (req) => {
     // Validate that inviter can assign the requested roles (permission subset + scope hierarchy)
     // Empty roles array is always valid (no-role invitations allowed)
     if (requestData.roles && requestData.roles.length > 0) {
-      const roleIds = requestData.roles.map(r => r.role_id);
+      const roleIds = requestData.roles.map(r => r.roleId);
       console.log(`[invite-user v${DEPLOY_VERSION}] Validating role assignment for ${roleIds.length} roles...`);
 
       // Create a Supabase client with the user's JWT to validate as them
