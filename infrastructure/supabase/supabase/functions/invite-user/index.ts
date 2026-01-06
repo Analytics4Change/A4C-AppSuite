@@ -19,7 +19,7 @@ import {
 import { AnySchemaSupabaseClient } from '../_shared/types.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v3';
+const DEPLOY_VERSION = 'v4';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -504,6 +504,56 @@ serve(async (req) => {
         JSON.stringify({ error: 'Invalid email format' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // ==========================================================================
+    // ROLE ASSIGNMENT VALIDATION
+    // ==========================================================================
+    // Validate that inviter can assign the requested roles (permission subset + scope hierarchy)
+    // Empty roles array is always valid (no-role invitations allowed)
+    if (requestData.roles && requestData.roles.length > 0) {
+      const roleIds = requestData.roles.map(r => r.role_id);
+      console.log(`[invite-user v${DEPLOY_VERSION}] Validating role assignment for ${roleIds.length} roles...`);
+
+      // Create a Supabase client with the user's JWT to validate as them
+      // This uses their permissions/scopes to check what they can assign
+      const supabaseUserApi = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: authHeader } },
+        db: { schema: 'api' },
+      });
+
+      const { data: validationResult, error: validationError } = await supabaseUserApi
+        .rpc('validate_role_assignment', { p_role_ids: roleIds });
+
+      if (validationError) {
+        console.error(`[invite-user v${DEPLOY_VERSION}] Role validation error:`, validationError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to validate role assignment', details: validationError.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (validationResult && !validationResult.valid) {
+        const violations = validationResult.violations || [];
+        const firstViolation = violations[0];
+        console.log(`[invite-user v${DEPLOY_VERSION}] Role assignment denied:`, firstViolation);
+
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: firstViolation?.message || 'Role assignment not permitted',
+            errorDetails: {
+              code: firstViolation?.error_code || 'ROLE_ASSIGNMENT_VIOLATION',
+              role_id: firstViolation?.role_id,
+              role_name: firstViolation?.role_name,
+              violations: violations,
+            },
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`[invite-user v${DEPLOY_VERSION}] Role assignment validated successfully`);
     }
 
     // ==========================================================================

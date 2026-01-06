@@ -340,21 +340,36 @@
 - [x] TypeScript compilation verified
 - [x] Production build successful
 
-## Phase 5.7: Constraint Validation ⏸️ PENDING
+## Phase 5.7: Constraint Validation ✅ COMPLETE
 
 ### 5.7.1 Role Assignment Security
-- [ ] Implement `validate_role_assignment()` in invite-user Edge Function
-  - [ ] Permission subset check: `role.permissions ⊆ inviter.permissions`
-  - [ ] Scope hierarchy check: `role.scope_path <@ inviter.scope_path` (ltree)
-  - [ ] NULL scope semantics: NULL = global = allows any target scope
-- [ ] Update invite-user Edge Function with constraint validation
-- [ ] Add error responses for permission/scope violations
+- [x] Implement `validate_role_assignment()` in invite-user Edge Function
+  - [x] Permission subset check: `role.permissions ⊆ inviter.permissions`
+  - [x] Scope hierarchy check: `role.scope_path <@ inviter.scope_path` (ltree)
+  - [x] NULL scope semantics: NULL = global = allows any target scope
+- [x] Update invite-user Edge Function with constraint validation
+- [x] Add error responses for permission/scope violations
 
 ### 5.5.2 Assignable Roles API
-- [ ] Create `api.get_assignable_roles()` RPC
-  - [ ] Filter roles by inviter's permission subset
-  - [ ] Filter roles by inviter's scope hierarchy
-  - [ ] Return roles with scope badges for UI display
+- [x] Create `api.get_assignable_roles()` RPC
+  - [x] Filter roles by inviter's permission subset
+  - [x] Filter roles by inviter's scope hierarchy
+  - [x] Return roles with scope badges for UI display
+
+### 5.7.2 Implementation Details (2026-01-06)
+- [x] Migration `20260106174825_role_assignment_constraints.sql`:
+  - [x] Helper: `get_user_aggregated_permissions(p_user_id UUID)` - returns all user's permissions
+  - [x] Helper: `get_user_scope_paths(p_user_id UUID)` - returns all user's scope paths
+  - [x] Helper: `check_permissions_subset(p_required UUID[], p_available UUID[])` - pure function
+  - [x] Helper: `check_scope_containment(p_target_scope ltree, p_user_scopes ltree[])` - ltree check
+  - [x] Fixed NULL handling: `array_position(p_user_scopes, NULL) IS NOT NULL` (not `NULL = ANY()`)
+  - [x] `api.get_assignable_roles(p_org_id UUID)` - filters by permission + scope + global access
+  - [x] `api.validate_role_assignment(p_role_ids UUID[])` - validates role assignment with error codes
+  - [x] Global access bypass: super_admin (NULL scope) skips permission subset checks
+- [x] Edge Function `invite-user` v18 deployed with role validation
+- [x] Updated `SupabaseUserQueryService.ts` to call `api.get_assignable_roles` RPC
+- [x] Extended `RoleReference` with `orgHierarchyScope` and `permissionCount`
+- [x] Updated `UserFormFields.tsx` with `rolesFiltered` indicator
 
 ## Phase 6: User Lifecycle ✅ COMPLETE (Partial - Merged into Phase 5)
 
@@ -470,12 +485,45 @@
   - [x] `updateNotificationPreferences()` → `api.update_user_notification_preferences`
 - [x] Updated dev docs with new decisions and migration info
 
+## Phase 5.9: Invitation Acceptance Fixes ✅ COMPLETE
+
+### 5.9.1 Role Lookup RPC Pattern (2026-01-06)
+- [x] Issue: `accept-invitation` Edge Function used direct table query for role lookup
+- [x] Root cause: Queried `roles_projection` directly instead of using RPC (anti-pattern)
+- [x] Created migration `20260106000451_get_role_by_name_rpc.sql`:
+  - [x] `api.get_role_by_name(role_name TEXT)` returns role_id
+  - [x] Handles both canonical system roles and custom org-defined roles
+- [x] Updated `accept-invitation/index.ts` to use RPC call
+- [x] Deployed via GitHub Actions (Edge Functions v68)
+
+### 5.9.2 Enhanced Error Logging (2026-01-06)
+- [x] Issue: Frontend showed generic error messages from Edge Functions
+- [x] Root cause: `FunctionsHttpError` wraps actual response, needed extraction
+- [x] Created `extractEdgeFunctionError()` in `SupabaseInvitationService.ts`
+- [x] Extracts actual error message via `error.context.json()`
+- [x] Logs HTTP status and response body for debugging
+
+### 5.9.3 user.role.assigned Event Emission (2026-01-06)
+- [x] Issue: Roles assigned during invitation acceptance weren't triggering role projection updates
+- [x] Fix: `accept-invitation` now emits `user.role.assigned` event for each role
+- [x] Event processor updates `user_roles_projection` correctly
+
+### 5.9.4 No-Role User Invitations (2026-01-06)
+- [x] Issue: AsyncAPI contract required `minItems: 1` for roles in `InvitationAcceptedData`
+- [x] Use case: Allow invitations without roles (admin assigns roles after review)
+- [x] Updated `invitation.yaml` line 288: `minItems: 1` → `minItems: 0`
+- [x] Updated `MockUserCommandService.ts` to remove role validation from:
+  - [x] `inviteUser()` method
+  - [x] `addUserToOrganization()` method
+- [x] Kept role validation in `updateUserRoles()` (different use case - can't remove ALL roles)
+- [x] Frontend already supported no-role invitations (`USER_VALIDATION.roles.minCount: 0`)
+
 ## Current Status
 
-**Phase**: Phase 5.8 - UAT Fixes
+**Phase**: Phase 5.7 - Constraint Validation
 **Status**: ✅ COMPLETE
-**Last Updated**: 2026-01-05
-**Next Step**: Deploy migration to production OR Phase 5.7 - Constraint Validation (role assignment security) OR Phase 7 - Org Selector
+**Last Updated**: 2026-01-06
+**Next Step**: Phase 6.2 - Role Reassignment OR Phase 7 - Org Selector OR Integration Validation testing
 
 ## Notes
 
@@ -487,6 +535,17 @@
   - `manage-user` Edge Function for deactivate/reactivate operations
   - 8 database migrations deployed for user management schema
   - Event processors handle all user lifecycle events
+- ✅ Phase 5.9 complete: Invitation acceptance working end-to-end
+  - RPC pattern for role lookup (`api.get_role_by_name`)
+  - No-role invitations supported (contract + mock service aligned)
+  - Enhanced error extraction from Edge Functions
+  - `user.role.assigned` events emitted correctly
+- ✅ Phase 5.7 complete: Constraint validation for role assignment
+  - Migration: 4 helper functions + 2 RPC functions
+  - `check_scope_containment` fixed NULL handling (`array_position` vs `= ANY()`)
+  - Global access bypass for super_admin (NULL scope skips permission subset check)
+  - Edge Function `invite-user` v18 validates before emitting events
+  - Frontend shows "roles you can assign" indicator when list is filtered
 - ✅ Phase 1 complete: Types, interfaces, mock services, factory created
   - `user.types.ts` - 1100+ lines with comprehensive types and validation
   - `IUserQueryService.ts` / `IUserCommandService.ts` - CQRS interfaces

@@ -249,6 +249,12 @@ export interface RoleReference {
 
   /** Denormalized role name for display (e.g., "Program Manager - Aspen") */
   roleName: string;
+
+  /** Hierarchical scope for role assignment (ltree path, e.g., "org_uuid.unit_uuid") */
+  orgHierarchyScope?: string;
+
+  /** Number of permissions in this role (for UI display) */
+  permissionCount?: number;
 }
 
 // ============================================================================

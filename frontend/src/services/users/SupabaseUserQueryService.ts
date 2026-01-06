@@ -180,6 +180,14 @@ interface DbSimpleRoleRow {
   name: string;
 }
 
+/** Assignable role row from api.get_assignable_roles RPC */
+interface DbAssignableRoleRow {
+  role_id: string;
+  role_name: string;
+  org_hierarchy_scope: string | null;
+  permission_count: number;
+}
+
 /**
  * Map database invitation status to display status
  */
@@ -741,35 +749,43 @@ export class SupabaseUserQueryService implements IUserQueryService {
 
   /**
    * Get roles that the current user can assign
+   *
+   * Enforces two constraints via api.get_assignable_roles RPC:
+   * 1. Permission subset: Role's permissions must be subset of inviter's permissions
+   * 2. Scope hierarchy: Role's scope must be contained by inviter's scope (ltree)
+   *
+   * This prevents privilege escalation during user invitation.
    */
   async getAssignableRoles(): Promise<RoleReference[]> {
-    const client = supabaseService.getClient();
     const session = supabaseService.getCurrentSession();
 
-    if (!session?.claims.org_id) {
+    if (!session?.claims.org_id || !session?.user?.id) {
       return [];
     }
 
     try {
-      // For now, return all active roles in the org
-      // TODO: Implement api.get_assignable_roles RPC for subset-only filtering
-      const { data: roles, error } = await client
-        .from('roles_projection')
-        .select('id, name')
-        .eq('organization_id', session.claims.org_id)
-        .eq('is_active', true)
-        .order('name');
+      // Call api.get_assignable_roles RPC which filters by:
+      // 1. Permission subset (role permissions ⊆ user permissions)
+      // 2. Scope hierarchy (role scope <@ user scope via ltree)
+      const { data, error } = await supabaseService.apiRpc<DbAssignableRoleRow[]>(
+        'get_assignable_roles',
+        {
+          p_org_id: session.claims.org_id,
+        }
+      );
 
       if (error) {
-        log.error('Failed to fetch assignable roles', error);
+        log.error('Failed to fetch assignable roles via RPC', error);
         return [];
       }
 
-      const typedRoles = (roles ?? []) as unknown as DbSimpleRoleRow[];
+      const assignableRoles = (data ?? []) as DbAssignableRoleRow[];
 
-      return typedRoles.map((r) => ({
-        roleId: r.id,
-        roleName: r.name,
+      return assignableRoles.map((r) => ({
+        roleId: r.role_id,
+        roleName: r.role_name,
+        orgHierarchyScope: r.org_hierarchy_scope ?? undefined,
+        permissionCount: r.permission_count,
       }));
     } catch (error) {
       log.error('Error in getAssignableRoles', error);

@@ -91,6 +91,13 @@ export interface UserFormFieldsProps {
   /** Whether this is edit mode (hides email field) */
   isEditMode?: boolean;
 
+  /**
+   * Whether the role list is filtered based on permission constraints.
+   * When true, shows an info message explaining that only assignable roles are displayed.
+   * @default false
+   */
+  rolesFiltered?: boolean;
+
   /** Additional CSS classes */
   className?: string;
 }
@@ -333,6 +340,7 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
     onSuggestedAction,
     disabled = false,
     isEditMode = false,
+    rolesFiltered = false,
     className,
   }) => {
     const baseId = useId();
@@ -511,11 +519,16 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
             )}
           >
             Roles
-            <span className="text-red-500 ml-0.5">*</span>
           </Label>
-          <p className="text-xs text-gray-500 mb-2">
+          <p className="text-xs text-gray-500 mb-1">
             Select one or more roles to assign to this user
           </p>
+          {rolesFiltered && (
+            <p className="text-xs text-blue-600 mb-2 flex items-center gap-1">
+              <Shield size={12} aria-hidden="true" />
+              <span>Showing roles you have permission to assign</span>
+            </p>
+          )}
 
           <div
             role="group"
@@ -583,11 +596,18 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
                       >
                         {role.description}
                       </p>
-                      {role.orgHierarchyScope && (
-                        <p className="text-xs text-gray-400 mt-0.5 font-mono">
-                          Scope: {role.orgHierarchyScope}
-                        </p>
-                      )}
+                      <div className="flex items-center gap-3 mt-0.5">
+                        {role.permissionCount !== undefined && role.permissionCount > 0 && (
+                          <span className="text-xs text-gray-400">
+                            {role.permissionCount} permission{role.permissionCount !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {role.orgHierarchyScope && (
+                          <span className="text-xs text-gray-400 font-mono">
+                            Scope: {role.orgHierarchyScope}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </label>
                 );

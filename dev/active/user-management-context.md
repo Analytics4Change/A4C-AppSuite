@@ -130,6 +130,34 @@
     - Now: Dates sync immediately to parent form as user types
     - `onSave` kept for non-inline modal usage
 
+21. **RPC Pattern for Role Lookup in Accept-Invitation** (2026-01-06):
+    - Created `api.get_role_by_name(role_name)` RPC function
+    - Edge Functions must not query tables directly (anti-pattern)
+    - RPC abstracts table structure from consumers
+    - Handles canonical roles (super_admin) and custom org-defined roles
+
+22. **No-Role User Invitations** (2026-01-06):
+    - Users can now be invited without assigning any roles
+    - `InvitationAcceptedData.roles.minItems` changed from `1` to `0`
+    - Aligns with `UserInvitedData.roles` which already allowed `minItems: 0`
+    - Use case: Admin invites user, assigns roles later after review
+    - Frontend validation already supported this (`USER_VALIDATION.roles.minCount: 0`)
+
+23. **Edge Function Error Extraction Pattern** (2026-01-06):
+    - `FunctionsHttpError` from Supabase SDK wraps actual error response
+    - Extract detailed error via `error.context.json()` to get Edge Function's error message
+    - Pattern implemented in `SupabaseInvitationService.extractEdgeFunctionError()`
+    - Enables meaningful error messages in UI instead of generic failures
+
+24. **Role Assignment Constraint Validation** (2026-01-06):
+    - Two constraints: permission subset + scope hierarchy (ltree)
+    - Helper functions extracted from `api.create_role()`: `get_user_aggregated_permissions()`, `get_user_scope_paths()`, `check_permissions_subset()`, `check_scope_containment()`
+    - Global access bypass: NULL scope in `user_roles_projection` means super_admin-level access, skips permission subset checks
+    - NULL handling gotcha: `NULL = ANY(ARRAY[NULL])` returns NULL, not TRUE - use `array_position(p_user_scopes, NULL) IS NOT NULL`
+    - Edge Function calls `api.validate_role_assignment()` before emitting `user.invited` event
+    - Frontend calls `api.get_assignable_roles()` which filters by inviter's permissions + scopes
+    - Filtered indicator shown in UI when role list is constrained
+
 ## Technical Context
 
 ### Architecture
@@ -259,6 +287,20 @@ This feature spans frontend (React + MobX) and backend (Supabase Edge Functions)
   - Updates RLS policies with new table name
   - Updates functions: `sync_accessible_organizations`, `user_has_active_org_access`, `get_user_active_roles`, `custom_access_token_hook`
   - Creates RPC functions: `api.get_user_org_access`, `api.list_user_org_access`, `api.update_user_access_dates`, `api.update_user_notification_preferences`
+
+**Backend Database (Migration - 2026-01-06)**
+- `20260106000451_get_role_by_name_rpc.sql` - RPC for role lookup:
+  - Creates `api.get_role_by_name(role_name TEXT)` function
+  - Returns role_id for accept-invitation Edge Function
+  - Handles canonical system roles and custom org-defined roles
+  - Avoids direct table queries from Edge Functions (anti-pattern)
+- `20260106174825_role_assignment_constraints.sql` - Role assignment constraint validation:
+  - Helper: `get_user_aggregated_permissions(p_user_id UUID)` - all user's permissions
+  - Helper: `get_user_scope_paths(p_user_id UUID)` - all user's scope paths
+  - Helper: `check_permissions_subset(p_required UUID[], p_available UUID[])` - pure function
+  - Helper: `check_scope_containment(p_target_scope ltree, p_user_scopes ltree[])` - ltree check
+  - RPC: `api.get_assignable_roles(p_org_id UUID)` - filtered role list for UI
+  - RPC: `api.validate_role_assignment(p_role_ids UUID[])` - validation with error codes
 
 **Backend RPC Functions** (Phase 5 - Deployed 2026-01-01)
 - `api.check_user_org_membership(email, org_id)` - Check user-org membership
