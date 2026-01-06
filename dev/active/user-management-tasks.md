@@ -518,7 +518,7 @@
 - [x] Kept role validation in `updateUserRoles()` (different use case - can't remove ALL roles)
 - [x] Frontend already supported no-role invitations (`USER_VALIDATION.roles.minCount: 0`)
 
-## Phase 5.10: Error Propagation Fix ✅ IN PROGRESS
+## Phase 5.10: Error Propagation Fix ✅ COMPLETE
 
 ### 5.10.1 Root Cause Analysis (2026-01-06)
 - [x] Issue: Detailed error messages from Edge Function not displayed in UI
@@ -548,9 +548,9 @@
 ## Current Status
 
 **Phase**: Phase 5.10 - Error Propagation Fix
-**Status**: ✅ IN PROGRESS
+**Status**: ✅ COMPLETE
 **Last Updated**: 2026-01-06
-**Next Step**: Test the fix by attempting to invite user with unassignable role
+**Next Step**: Verify error messages display correctly in UI when role assignment fails
 
 ## Notes
 
@@ -573,6 +573,11 @@
   - Global access bypass for super_admin (NULL scope skips permission subset check)
   - Edge Function `invite-user` v18 validates before emitting events
   - Frontend shows "roles you can assign" indicator when list is filtered
+- ✅ Phase 5.10 complete: Error propagation from Edge Functions
+  - `extractEdgeFunctionError()` now passes through full `errorDetails` object
+  - Added `formatViolationDetails()` helper in UserFormViewModel
+  - Error codes mapped to user-friendly messages (`SCOPE_HIERARCHY_VIOLATION`, etc.)
+  - Commit: `7fa4ecf3 fix(users): Propagate detailed error messages from Edge Functions`
 - ✅ Phase 1 complete: Types, interfaces, mock services, factory created
   - `user.types.ts` - 1100+ lines with comprehensive types and validation
   - `IUserQueryService.ts` / `IUserCommandService.ts` - CQRS interfaces

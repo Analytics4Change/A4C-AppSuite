@@ -158,6 +158,13 @@
     - Frontend calls `api.get_assignable_roles()` which filters by inviter's permissions + scopes
     - Filtered indicator shown in UI when role list is constrained
 
+25. **Error Propagation from Edge Functions** (2026-01-06):
+    - Edge Functions return rich error details in `errorDetails` object (code, role_name, violations array)
+    - `extractEdgeFunctionError()` must pass through full `errorDetails` object, not just `body.error`
+    - ViewModel uses `formatViolationDetails()` helper to convert error codes to user-friendly messages
+    - Error codes: `SCOPE_HIERARCHY_VIOLATION`, `SUBSET_ONLY_VIOLATION`, `ROLE_ASSIGNMENT_VIOLATION`
+    - Pattern: Service extracts `errorDetails` → passes via `context` → ViewModel formats for display
+
 ## Technical Context
 
 ### Architecture
