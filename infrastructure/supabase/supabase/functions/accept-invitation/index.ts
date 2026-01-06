@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v9';
+const DEPLOY_VERSION = 'v10';
 
 // CORS headers for frontend requests
 const corsHeaders = {
@@ -95,16 +95,6 @@ serve(async (req) => {
       },
     });
 
-    // Public schema client for projection table queries (roles_projection, etc.)
-    const publicClient = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-      db: {
-        schema: 'public',
-      },
-    });
 
     // Parse request body
     const requestData: AcceptInvitationRequest = await req.json();
@@ -346,15 +336,14 @@ serve(async (req) => {
       if (!roleId) {
         console.log(`[accept-invitation v${DEPLOY_VERSION}] Looking up role_id for role_name: ${roleName}, org: ${invitation.organization_id}`);
 
-        const { data: roleData, error: lookupError } = await publicClient
-          .from('roles_projection')
-          .select('id, name')
-          .or(`organization_id.eq.${invitation.organization_id},organization_id.is.null`)
-          .eq('name', roleName)
-          .order('organization_id', { ascending: false, nullsFirst: false }) // Prefer org-specific over system role
-          .limit(1)
-          .single();
+        // Use RPC function in api schema (follows CQRS pattern)
+        const { data: roleResults, error: lookupError } = await supabase
+          .rpc('get_role_by_name', {
+            p_org_id: invitation.organization_id,
+            p_role_name: roleName
+          });
 
+        const roleData = roleResults?.[0];
         if (lookupError || !roleData?.id) {
           // FAIL the acceptance - role assignment is critical for first user
           console.error(`[accept-invitation v${DEPLOY_VERSION}] CRITICAL: Cannot resolve role_id for "${roleName}":`, lookupError);

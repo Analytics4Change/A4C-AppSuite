@@ -16,6 +16,11 @@
  * All operations are event-driven - NO direct database writes.
  */
 
+import {
+  FunctionsHttpError,
+  FunctionsRelayError,
+  FunctionsFetchError,
+} from '@supabase/supabase-js';
 import type { IInvitationService } from './IInvitationService';
 import type {
   InvitationDetails,
@@ -35,6 +40,64 @@ const EDGE_FUNCTIONS = {
   ACCEPT: 'accept-invitation',
   RESEND: 'resend-invitation'
 } as const;
+
+/**
+ * Extract detailed error from Supabase Edge Function error response.
+ *
+ * When Edge Functions return non-2xx status codes, the Supabase SDK wraps
+ * the response in a FunctionsHttpError. The actual error message from the
+ * Edge Function is accessible via `error.context.json()`.
+ *
+ * @param error - The error from functions.invoke()
+ * @param operation - Human-readable operation name for fallback messages
+ * @returns Object with error message and optional details
+ */
+async function extractEdgeFunctionError(
+  error: unknown,
+  operation: string
+): Promise<{ message: string; details?: string }> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = await error.context.json();
+      log.error(`Edge Function HTTP error for ${operation}`, {
+        status: error.context.status,
+        body,
+      });
+      return {
+        message: body?.message ?? body?.error ?? `${operation} failed`,
+        details: body?.details,
+      };
+    } catch {
+      // Response body wasn't JSON - use status code
+      log.error(`Edge Function error (non-JSON response) for ${operation}`, {
+        status: error.context.status,
+      });
+      return {
+        message: `${operation} failed (HTTP ${error.context.status})`,
+      };
+    }
+  }
+
+  if (error instanceof FunctionsRelayError) {
+    log.error(`Edge Function relay error for ${operation}`, error);
+    return {
+      message: `Network error: ${error.message}`,
+    };
+  }
+
+  if (error instanceof FunctionsFetchError) {
+    log.error(`Edge Function fetch error for ${operation}`, error);
+    return {
+      message: `Connection error: ${error.message}`,
+    };
+  }
+
+  // Unknown error type
+  log.error(`Unknown error for ${operation}`, error);
+  return {
+    message: error instanceof Error ? error.message : 'Unknown error',
+  };
+}
 
 /**
  * Production invitation service using Supabase Edge Functions
@@ -68,8 +131,8 @@ export class SupabaseInvitationService implements IInvitationService {
       );
 
       if (error) {
-        log.error('Invitation validation failed', error);
-        throw new Error(`Invalid invitation: ${error.message}`);
+        const extracted = await extractEdgeFunctionError(error, 'Validate invitation');
+        throw new Error(extracted.message);
       }
 
       if (!data?.orgName || !data?.role) {
@@ -138,8 +201,8 @@ export class SupabaseInvitationService implements IInvitationService {
       );
 
       if (error) {
-        log.error('Failed to accept invitation', error);
-        throw new Error(`Failed to accept invitation: ${error.message}`);
+        const extracted = await extractEdgeFunctionError(error, 'Accept invitation');
+        throw new Error(extracted.message);
       }
 
       if (!data?.userId || !data?.orgId || !data?.redirectUrl) {
@@ -190,8 +253,8 @@ export class SupabaseInvitationService implements IInvitationService {
       );
 
       if (error) {
-        log.error('Failed to resend invitation', error);
-        throw new Error(`Failed to resend: ${error.message}`);
+        const extracted = await extractEdgeFunctionError(error, 'Resend invitation');
+        throw new Error(extracted.message);
       }
 
       const success = data?.sent === true;
