@@ -9,6 +9,8 @@
     }
   },
   "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
     "useUnknownInCatchVariables": false
   }
 }
