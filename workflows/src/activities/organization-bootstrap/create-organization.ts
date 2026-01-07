@@ -15,7 +15,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import type { CreateOrganizationParams } from '@shared/types';
-import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
+import { getSupabaseClient, emitEvent, buildTags, getLogger, buildTracingForEvent } from '@shared/utils';
 
 const log = getLogger('CreateOrganization');
 
@@ -97,7 +97,8 @@ export async function createOrganization(
       partner_type: params.partnerType || null,
       referring_partner_id: params.referringPartnerId || null
     },
-    tags
+    tags,
+    ...buildTracingForEvent(params.tracing, 'createOrganization')
   });
 
   log.debug('Emitted organization.created event', { orgId });
@@ -122,7 +123,8 @@ export async function createOrganization(
         type: contact.type,
         label: contact.label
       },
-      tags
+      tags,
+      ...buildTracingForEvent(params.tracing, 'createContact')
     });
 
     // Emit organization.contact.linked junction event
@@ -135,7 +137,8 @@ export async function createOrganization(
         organization_id: orgId,
         contact_id: contactId
       },
-      tags
+      tags,
+      ...buildTracingForEvent(params.tracing, 'linkContact')
     });
   }
 
@@ -161,7 +164,8 @@ export async function createOrganization(
         type: address.type,
         label: address.label
       },
-      tags
+      tags,
+      ...buildTracingForEvent(params.tracing, 'createAddress')
     });
 
     // Emit organization.address.linked junction event
@@ -174,7 +178,8 @@ export async function createOrganization(
         organization_id: orgId,
         address_id: addressId
       },
-      tags
+      tags,
+      ...buildTracingForEvent(params.tracing, 'linkAddress')
     });
   }
 
@@ -197,7 +202,8 @@ export async function createOrganization(
         type: phone.type,
         label: phone.label
       },
-      tags
+      tags,
+      ...buildTracingForEvent(params.tracing, 'createPhone')
     });
 
     // Emit organization.phone.linked junction event
@@ -210,7 +216,8 @@ export async function createOrganization(
         organization_id: orgId,
         phone_id: phoneId
       },
-      tags
+      tags,
+      ...buildTracingForEvent(params.tracing, 'linkPhone')
     });
   }
 

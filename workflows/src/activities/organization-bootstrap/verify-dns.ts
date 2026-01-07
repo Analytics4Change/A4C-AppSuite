@@ -25,7 +25,7 @@
 
 import { Resolver } from 'dns';
 import type { VerifyDNSParams } from '@shared/types';
-import { emitEvent, buildTags, getLogger } from '@shared/utils';
+import { emitEvent, buildTags, getLogger, buildTracingForEvent } from '@shared/utils';
 import { AGGREGATE_TYPES } from '@shared/constants';
 
 const log = getLogger('VerifyDNS');
@@ -125,7 +125,8 @@ export async function verifyDNS(params: VerifyDNSParams): Promise<boolean> {
         verification_method: 'development',
         mode: workflowMode
       },
-      tags: buildTags()
+      tags: buildTags(),
+      ...buildTracingForEvent(params.tracing, 'verifyDNS')
     });
 
     return true;
@@ -192,7 +193,8 @@ export async function verifyDNS(params: VerifyDNSParams): Promise<boolean> {
       })),
       resolved_ips: successfulResult?.ips || []
     },
-    tags: buildTags()
+    tags: buildTags(),
+    ...buildTracingForEvent(params.tracing, 'verifyDNS')
   });
 
   log.info('DNS verified successfully via quorum', { domain: params.domain });

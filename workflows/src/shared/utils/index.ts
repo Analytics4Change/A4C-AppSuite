@@ -5,7 +5,14 @@
  */
 
 export { getSupabaseClient, resetSupabaseClient } from './supabase';
-export { emitEvent, getEnvironmentTags, buildTags } from './emit-event';
+export {
+  emitEvent,
+  getEnvironmentTags,
+  buildTags,
+  generateSpanId,
+  buildTracingForEvent,
+  createActivityTracingContext,
+} from './emit-event';
 export {
   getLogger,
   workflowLog,

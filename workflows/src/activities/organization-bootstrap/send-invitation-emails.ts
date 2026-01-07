@@ -27,7 +27,7 @@ import type {
   Invitation
 } from '@shared/types';
 import { createEmailProvider } from '@shared/providers/email/factory';
-import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
+import { getSupabaseClient, emitEvent, buildTags, getLogger, buildTracingForEvent } from '@shared/utils';
 import { AGGREGATE_TYPES } from '@shared/constants';
 import { getWorkflowsEnv } from '@shared/config/env-schema';
 
@@ -208,7 +208,8 @@ export async function sendInvitationEmails(
           email: invitation.email,
           sent_at: new Date().toISOString()
         },
-        tags
+        tags,
+        ...buildTracingForEvent(params.tracing, 'sendInvitationEmail')
       });
 
       log.debug('Email sent', { email: invitation.email });

@@ -143,7 +143,9 @@ export async function organizationBootstrapWorkflow(
 ): Promise<OrganizationBootstrapResult> {
   log.info('Starting OrganizationBootstrapWorkflow', {
     organizationId: params.organizationId,
-    subdomain: params.subdomain
+    subdomain: params.subdomain,
+    hasTracing: !!params.tracing,
+    traceId: params.tracing?.traceId
   });
 
   // Initialize workflow state for compensation tracking
@@ -178,7 +180,8 @@ export async function organizationBootstrapWorkflow(
       addresses: params.orgData.addresses,
       phones: params.orgData.phones,
       partnerType: params.orgData.partnerType,
-      referringPartnerId: params.orgData.referringPartnerId
+      referringPartnerId: params.orgData.referringPartnerId,
+      tracing: params.tracing
     });
 
     state.orgCreated = true;
@@ -198,7 +201,7 @@ export async function organizationBootstrapWorkflow(
     const scopePath = params.subdomain || params.orgData.name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
     log.info('Step 1.5: Granting provider_admin permissions', { orgId: state.orgId, scopePath });
 
-    const permResult = await grantProviderAdminPermissions({ orgId: state.orgId!, scopePath });
+    const permResult = await grantProviderAdminPermissions({ orgId: state.orgId!, scopePath, tracing: params.tracing });
 
     log.info('Provider admin permissions granted', {
       orgId: state.orgId,
@@ -225,8 +228,9 @@ export async function organizationBootstrapWorkflow(
         try {
           const dnsResult = await configureDNS({
             orgId: state.orgId!,
-            subdomain: params.subdomain
+            subdomain: params.subdomain,
             // targetDomain defaults to PLATFORM_BASE_DOMAIN from env config
+            tracing: params.tracing
           });
 
           state.domain = dnsResult.fqdn;
@@ -241,7 +245,7 @@ export async function organizationBootstrapWorkflow(
 
           // Verify DNS propagation - errors propagate to DNS retry loop
           // This ensures the organization.subdomain.verified event is emitted
-          await verifyDNS({ orgId: state.orgId!, domain: dnsResult.fqdn });
+          await verifyDNS({ orgId: state.orgId!, domain: dnsResult.fqdn, tracing: params.tracing });
           log.info('DNS verified successfully', { fqdn: dnsResult.fqdn });
 
           // Only set dnsSuccess AFTER verifyDNS succeeds
@@ -294,7 +298,8 @@ export async function organizationBootstrapWorkflow(
 
     state.invitations = await generateInvitations({
       orgId: state.orgId!,
-      users: params.users
+      users: params.users,
+      tracing: params.tracing
     });
 
     log.info('Invitations generated', {
@@ -313,7 +318,8 @@ export async function organizationBootstrapWorkflow(
       invitations: state.invitations,
       domain: state.domain!,
       // frontendUrl passed from params if provided, otherwise activity uses FRONTEND_URL from env
-      frontendUrl: params.frontendUrl
+      frontendUrl: params.frontendUrl,
+      tracing: params.tracing
     });
 
     state.invitationsSent = true;
@@ -335,7 +341,7 @@ export async function organizationBootstrapWorkflow(
     // ========================================
     log.info('Step 5: Activating organization', { orgId: state.orgId });
 
-    await activateOrganization({ orgId: state.orgId! });
+    await activateOrganization({ orgId: state.orgId!, tracing: params.tracing });
 
     log.info('Organization activated', { orgId: state.orgId });
 

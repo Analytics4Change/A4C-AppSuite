@@ -181,3 +181,92 @@ export interface EventMonitoringOperationResult<T = void> {
   /** Error code for programmatic handling */
   errorCode?: EventMonitoringErrorCode;
 }
+
+// ============================================================================
+// Tracing Types (Added Phase 5 - Event Tracing)
+// ============================================================================
+
+/**
+ * A domain event with tracing information.
+ * Returned by api.get_events_by_session() and api.get_events_by_correlation() RPC functions.
+ */
+export interface TracedEvent {
+  /** Unique event ID (UUID) */
+  id: string;
+  /** Event type (e.g., 'user.created', 'invitation.accepted') */
+  event_type: string;
+  /** Stream/aggregate ID this event belongs to */
+  stream_id: string;
+  /** Type of stream (e.g., 'organization', 'user', 'invitation') */
+  stream_type: EventStreamType;
+  /** Event payload data (JSON) */
+  event_data: Record<string, unknown>;
+  /** Event metadata including correlation_id, user_id, etc. */
+  event_metadata: FailedEventMetadata;
+  /** Correlation ID for request tracing across services (UUID) */
+  correlation_id: string | null;
+  /** Session ID from browser/auth (UUID) */
+  session_id: string | null;
+  /** W3C trace ID (32 hex chars) */
+  trace_id: string | null;
+  /** Span ID for this operation (16 hex chars) */
+  span_id: string | null;
+  /** Parent span ID for causation chain (16 hex chars) */
+  parent_span_id: string | null;
+  /** When the event was created */
+  created_at: string;
+}
+
+/**
+ * Result of fetching traced events.
+ */
+export interface TracedEventsResult {
+  /** List of traced events */
+  events: TracedEvent[];
+  /** Total count of matching events */
+  totalCount: number;
+}
+
+/**
+ * A span in a trace timeline.
+ * Returned by api.get_trace_timeline() RPC function.
+ * Represents a single operation within a distributed trace.
+ */
+export interface TraceSpan {
+  /** Unique event ID (UUID) */
+  id: string;
+  /** Event type (e.g., 'organization.created') */
+  event_type: string;
+  /** Stream/aggregate ID */
+  stream_id: string;
+  /** Type of stream */
+  stream_type: EventStreamType;
+  /** Span ID for this operation (16 hex chars) */
+  span_id: string | null;
+  /** Parent span ID (16 hex chars) */
+  parent_span_id: string | null;
+  /** Service that generated this span (e.g., 'temporal-worker', 'edge-function') */
+  service_name: string | null;
+  /** Operation name (e.g., 'createOrganization', 'configureDNS') */
+  operation_name: string | null;
+  /** Duration of the operation in milliseconds */
+  duration_ms: number | null;
+  /** Span status ('ok', 'error') */
+  status: 'ok' | 'error' | null;
+  /** When the span was created */
+  created_at: string;
+  /** Depth in the trace tree (0 = root, 1 = child of root, etc.) */
+  depth: number;
+}
+
+/**
+ * Result of fetching a trace timeline.
+ */
+export interface TraceTimelineResult {
+  /** Trace ID (32 hex chars) */
+  trace_id: string;
+  /** Ordered list of spans in the trace */
+  spans: TraceSpan[];
+  /** Total span count */
+  totalSpans: number;
+}

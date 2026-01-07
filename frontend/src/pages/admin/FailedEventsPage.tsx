@@ -47,11 +47,51 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  Copy,
+  Link2,
 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
 import { cn } from '@/components/ui/utils';
 
 const log = Logger.getLogger('component');
+
+/**
+ * Copy button component for copying values to clipboard
+ */
+interface CopyButtonProps {
+  value: string;
+  label: string;
+}
+
+const CopyButton: React.FC<CopyButtonProps> = ({ value, label }) => {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      log.error('Failed to copy to clipboard', { err });
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="ml-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+      title={`Copy ${label}`}
+      aria-label={`Copy ${label} to clipboard`}
+    >
+      {copied ? (
+        <CheckCircle className="h-3 w-3 text-green-500" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+    </button>
+  );
+};
 
 /**
  * Stat card component for displaying summary metrics
@@ -182,13 +222,15 @@ const EventRow: React.FC<EventRowProps> = ({
             <div>
               <h4 className="font-semibold text-sm text-gray-700 mb-2">Event Info</h4>
               <div className="space-y-1 text-sm">
-                <div>
+                <div className="flex items-center">
                   <span className="text-gray-500">ID:</span>{' '}
-                  <span className="font-mono">{event.id}</span>
+                  <span className="font-mono ml-1">{event.id}</span>
+                  <CopyButton value={event.id} label="Event ID" />
                 </div>
-                <div>
+                <div className="flex items-center">
                   <span className="text-gray-500">Stream ID:</span>{' '}
-                  <span className="font-mono">{event.stream_id}</span>
+                  <span className="font-mono ml-1">{event.stream_id}</span>
+                  <CopyButton value={event.stream_id} label="Stream ID" />
                 </div>
                 <div>
                   <span className="text-gray-500">Processed At:</span>{' '}
@@ -197,29 +239,92 @@ const EventRow: React.FC<EventRowProps> = ({
               </div>
             </div>
 
-            {/* Metadata */}
+            {/* Tracing Info */}
             <div>
-              <h4 className="font-semibold text-sm text-gray-700 mb-2">Metadata</h4>
+              <h4 className="font-semibold text-sm text-gray-700 mb-2 flex items-center gap-1">
+                <Link2 className="h-4 w-4" />
+                Tracing
+              </h4>
               <div className="space-y-1 text-sm">
                 {event.event_metadata?.correlation_id && (
-                  <div>
+                  <div className="flex items-center">
                     <span className="text-gray-500">Correlation ID:</span>{' '}
-                    <span className="font-mono">{event.event_metadata.correlation_id}</span>
+                    <span className="font-mono ml-1 text-blue-600">
+                      {String(event.event_metadata.correlation_id).slice(0, 8)}...
+                    </span>
+                    <CopyButton value={String(event.event_metadata.correlation_id)} label="Correlation ID" />
                   </div>
                 )}
-                {event.event_metadata?.user_id && (
-                  <div>
-                    <span className="text-gray-500">User ID:</span>{' '}
-                    <span className="font-mono">{event.event_metadata.user_id}</span>
+                {event.event_metadata?.session_id && (
+                  <div className="flex items-center">
+                    <span className="text-gray-500">Session ID:</span>{' '}
+                    <span className="font-mono ml-1 text-purple-600">
+                      {String(event.event_metadata.session_id).slice(0, 8)}...
+                    </span>
+                    <CopyButton value={String(event.event_metadata.session_id)} label="Session ID" />
                   </div>
                 )}
-                {event.event_metadata?.source_function && (
-                  <div>
-                    <span className="text-gray-500">Source:</span>{' '}
-                    {event.event_metadata.source_function}
+                {Boolean(event.event_metadata?.trace_id) && (
+                  <div className="flex items-center">
+                    <span className="text-gray-500">Trace ID:</span>{' '}
+                    <span className="font-mono ml-1 text-green-600">
+                      {String(event.event_metadata.trace_id).slice(0, 8)}...
+                    </span>
+                    <CopyButton value={String(event.event_metadata.trace_id)} label="Trace ID" />
                   </div>
                 )}
+                {Boolean(event.event_metadata?.span_id) && (
+                  <div className="flex items-center">
+                    <span className="text-gray-500">Span ID:</span>{' '}
+                    <span className="font-mono ml-1">{String(event.event_metadata.span_id)}</span>
+                    <CopyButton value={String(event.event_metadata.span_id)} label="Span ID" />
+                  </div>
+                )}
+                {Boolean(event.event_metadata?.parent_span_id) && (
+                  <div className="flex items-center">
+                    <span className="text-gray-500">Parent Span:</span>{' '}
+                    <span className="font-mono ml-1">{String(event.event_metadata.parent_span_id)}</span>
+                    <CopyButton value={String(event.event_metadata.parent_span_id)} label="Parent Span ID" />
+                  </div>
+                )}
+                {!event.event_metadata?.correlation_id &&
+                  !event.event_metadata?.session_id &&
+                  !event.event_metadata?.trace_id && (
+                    <p className="text-gray-400 italic">No tracing data available</p>
+                  )}
               </div>
+            </div>
+          </div>
+
+          {/* Audit Context */}
+          <div className="mt-4">
+            <h4 className="font-semibold text-sm text-gray-700 mb-2">Audit Context</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              {event.event_metadata?.user_id && (
+                <div className="flex items-center">
+                  <span className="text-gray-500">User ID:</span>{' '}
+                  <span className="font-mono ml-1">{String(event.event_metadata.user_id).slice(0, 8)}...</span>
+                  <CopyButton value={String(event.event_metadata.user_id)} label="User ID" />
+                </div>
+              )}
+              {event.event_metadata?.source_function && (
+                <div>
+                  <span className="text-gray-500">Source:</span>{' '}
+                  <span className="ml-1">{String(event.event_metadata.source_function)}</span>
+                </div>
+              )}
+              {event.event_metadata?.reason && (
+                <div>
+                  <span className="text-gray-500">Reason:</span>{' '}
+                  <span className="ml-1">{String(event.event_metadata.reason)}</span>
+                </div>
+              )}
+              {event.event_metadata?.ip_address && (
+                <div>
+                  <span className="text-gray-500">IP Address:</span>{' '}
+                  <span className="font-mono ml-1">{String(event.event_metadata.ip_address)}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -260,6 +365,9 @@ export const FailedEventsPage: React.FC = () => {
 
   // Filters
   const [correlationSearch, setCorrelationSearch] = useState('');
+  const [sessionSearch, setSessionSearch] = useState('');
+  const [traceSearch, setTraceSearch] = useState('');
+  const [searchType, setSearchType] = useState<'correlation' | 'session' | 'trace' | null>(null);
   const [eventTypeFilter, setEventTypeFilter] = useState<string | null>(null);
   const [streamTypeFilter, setStreamTypeFilter] = useState<EventStreamType | null>(null);
 
@@ -292,22 +400,83 @@ export const FailedEventsPage: React.FC = () => {
     setEventsLoading(true);
     setEventsError(null);
     try {
-      let result;
-
-      if (correlationSearch.trim()) {
-        result = await eventMonitoringService.searchByCorrelationId(correlationSearch.trim());
+      // Handle search by tracing IDs
+      if (searchType === 'session' && sessionSearch.trim()) {
+        const result = await eventMonitoringService.getEventsBySession(sessionSearch.trim());
+        if (result.success && result.data) {
+          // Convert TracedEvent[] to FailedEvent[] for display
+          // The service returns all events (not just failed), filter to show in list
+          const failedStyleEvents: FailedEvent[] = result.data.events.map((e) => ({
+            id: e.id,
+            stream_id: e.stream_id,
+            stream_type: e.stream_type,
+            event_type: e.event_type,
+            event_data: e.event_data,
+            event_metadata: e.event_metadata,
+            processing_error: 'N/A - Showing all events for session',
+            created_at: e.created_at,
+            processed_at: null,
+          }));
+          setEvents(failedStyleEvents);
+        } else {
+          setEventsError(result.error ?? 'Failed to search by session');
+        }
+      } else if (searchType === 'correlation' && correlationSearch.trim()) {
+        const result = await eventMonitoringService.getEventsByCorrelation(correlationSearch.trim());
+        if (result.success && result.data) {
+          const failedStyleEvents: FailedEvent[] = result.data.events.map((e) => ({
+            id: e.id,
+            stream_id: e.stream_id,
+            stream_type: e.stream_type,
+            event_type: e.event_type,
+            event_data: e.event_data,
+            event_metadata: e.event_metadata,
+            processing_error: 'N/A - Showing all events for correlation',
+            created_at: e.created_at,
+            processed_at: null,
+          }));
+          setEvents(failedStyleEvents);
+        } else {
+          setEventsError(result.error ?? 'Failed to search by correlation');
+        }
+      } else if (searchType === 'trace' && traceSearch.trim()) {
+        const result = await eventMonitoringService.getTraceTimeline(traceSearch.trim());
+        if (result.success && result.data) {
+          // Convert TraceSpan[] to FailedEvent[] for display
+          const failedStyleEvents: FailedEvent[] = result.data.spans.map((span) => ({
+            id: span.id,
+            stream_id: span.stream_id,
+            stream_type: span.stream_type,
+            event_type: span.event_type,
+            event_data: {},
+            event_metadata: {
+              trace_id: result.data!.trace_id,
+              span_id: span.span_id ?? undefined,
+              parent_span_id: span.parent_span_id ?? undefined,
+              service_name: span.service_name ?? undefined,
+              operation_name: span.operation_name ?? undefined,
+            },
+            processing_error: span.status === 'error' ? 'Error status in trace' : 'N/A - Trace span',
+            created_at: span.created_at,
+            processed_at: null,
+          }));
+          setEvents(failedStyleEvents);
+        } else {
+          setEventsError(result.error ?? 'Failed to fetch trace');
+        }
       } else {
-        result = await eventMonitoringService.getFailedEvents({
+        // Default: load failed events
+        const result = await eventMonitoringService.getFailedEvents({
           limit: 100,
           eventType: eventTypeFilter ?? undefined,
           streamType: streamTypeFilter ?? undefined,
         });
-      }
 
-      if (result.success && result.data) {
-        setEvents(result.data.events);
-      } else {
-        setEventsError(result.error ?? 'Failed to load events');
+        if (result.success && result.data) {
+          setEvents(result.data.events);
+        } else {
+          setEventsError(result.error ?? 'Failed to load events');
+        }
       }
     } catch (error) {
       setEventsError(error instanceof Error ? error.message : 'Unknown error');
@@ -315,7 +484,7 @@ export const FailedEventsPage: React.FC = () => {
       setEventsLoading(false);
       setLastRefresh(new Date());
     }
-  }, [correlationSearch, eventTypeFilter, streamTypeFilter]);
+  }, [correlationSearch, sessionSearch, traceSearch, searchType, eventTypeFilter, streamTypeFilter]);
 
   // Load data on mount and filter change
   useEffect(() => {
@@ -444,60 +613,134 @@ export const FailedEventsPage: React.FC = () => {
       <Card className="mb-6">
         <CardContent className="p-4">
           <div className="flex flex-wrap items-center gap-4">
-            {/* Correlation ID Search */}
-            <div className="flex-1 min-w-[200px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Search by correlation ID..."
-                  value={correlationSearch}
-                  onChange={(e) => setCorrelationSearch(e.target.value)}
-                  className="pl-10"
-                />
+            {/* Search Type Selector */}
+            <div className="min-w-[150px]">
+              <select
+                value={searchType ?? ''}
+                onChange={(e) => {
+                  const newType = (e.target.value || null) as typeof searchType;
+                  setSearchType(newType);
+                  // Clear other search fields when switching
+                  if (newType !== 'correlation') setCorrelationSearch('');
+                  if (newType !== 'session') setSessionSearch('');
+                  if (newType !== 'trace') setTraceSearch('');
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                aria-label="Search type"
+              >
+                <option value="">Failed Events (default)</option>
+                <option value="correlation">Search by Correlation ID</option>
+                <option value="session">Search by Session ID</option>
+                <option value="trace">Search by Trace ID</option>
+              </select>
+            </div>
+
+            {/* Dynamic Search Input based on search type */}
+            {searchType === 'correlation' && (
+              <div className="flex-1 min-w-[250px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-blue-500" />
+                  <Input
+                    type="text"
+                    placeholder="Enter correlation ID (UUID)..."
+                    value={correlationSearch}
+                    onChange={(e) => setCorrelationSearch(e.target.value)}
+                    className="pl-10 border-blue-300 focus:border-blue-500"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Event Type Filter */}
-            <div className="min-w-[150px]">
-              <select
-                value={eventTypeFilter ?? ''}
-                onChange={(e) => setEventTypeFilter(e.target.value || null)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                aria-label="Filter by event type"
-              >
-                <option value="">All event types</option>
-                {eventTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {searchType === 'session' && (
+              <div className="flex-1 min-w-[250px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-500" />
+                  <Input
+                    type="text"
+                    placeholder="Enter session ID (UUID)..."
+                    value={sessionSearch}
+                    onChange={(e) => setSessionSearch(e.target.value)}
+                    className="pl-10 border-purple-300 focus:border-purple-500"
+                  />
+                </div>
+              </div>
+            )}
 
-            {/* Stream Type Filter */}
-            <div className="min-w-[150px]">
-              <select
-                value={streamTypeFilter ?? ''}
-                onChange={(e) =>
-                  setStreamTypeFilter((e.target.value || null) as EventStreamType | null)
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                aria-label="Filter by stream type"
-              >
-                <option value="">All stream types</option>
-                <option value="organization">organization</option>
-                <option value="user">user</option>
-                <option value="invitation">invitation</option>
-                <option value="role">role</option>
-                <option value="contact">contact</option>
-              </select>
-            </div>
+            {searchType === 'trace' && (
+              <div className="flex-1 min-w-[250px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
+                  <Input
+                    type="text"
+                    placeholder="Enter trace ID (32 hex chars)..."
+                    value={traceSearch}
+                    onChange={(e) => setTraceSearch(e.target.value)}
+                    className="pl-10 border-green-300 focus:border-green-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Show type filters only when not searching */}
+            {!searchType && (
+              <>
+                {/* Event Type Filter */}
+                <div className="min-w-[150px]">
+                  <select
+                    value={eventTypeFilter ?? ''}
+                    onChange={(e) => setEventTypeFilter(e.target.value || null)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    aria-label="Filter by event type"
+                  >
+                    <option value="">All event types</option>
+                    {eventTypes.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Stream Type Filter */}
+                <div className="min-w-[150px]">
+                  <select
+                    value={streamTypeFilter ?? ''}
+                    onChange={(e) =>
+                      setStreamTypeFilter((e.target.value || null) as EventStreamType | null)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    aria-label="Filter by stream type"
+                  >
+                    <option value="">All stream types</option>
+                    <option value="organization">organization</option>
+                    <option value="user">user</option>
+                    <option value="invitation">invitation</option>
+                    <option value="role">role</option>
+                    <option value="contact">contact</option>
+                  </select>
+                </div>
+              </>
+            )}
 
             <div className="text-sm text-gray-500">
               Last refreshed: {lastRefresh.toLocaleTimeString()}
             </div>
           </div>
+
+          {/* Search info banner */}
+          {searchType && (
+            <div className={cn(
+              'mt-3 px-3 py-2 rounded-md text-sm flex items-center gap-2',
+              searchType === 'correlation' && 'bg-blue-50 text-blue-700',
+              searchType === 'session' && 'bg-purple-50 text-purple-700',
+              searchType === 'trace' && 'bg-green-50 text-green-700'
+            )}>
+              <Link2 className="h-4 w-4" />
+              {searchType === 'correlation' && 'Showing all events with matching correlation ID (not just failed events)'}
+              {searchType === 'session' && 'Showing all events from this user session (not just failed events)'}
+              {searchType === 'trace' && 'Showing trace timeline with span hierarchy (not just failed events)'}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -505,8 +748,19 @@ export const FailedEventsPage: React.FC = () => {
       <Card>
         <CardHeader className="border-b">
           <CardTitle className="text-lg flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Failed Events ({events.length})
+            {searchType ? (
+              <>
+                <Link2 className="h-5 w-5" />
+                {searchType === 'correlation' && `Events by Correlation (${events.length})`}
+                {searchType === 'session' && `Events by Session (${events.length})`}
+                {searchType === 'trace' && `Trace Timeline (${events.length} spans)`}
+              </>
+            ) : (
+              <>
+                <Filter className="h-5 w-5" />
+                Failed Events ({events.length})
+              </>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">

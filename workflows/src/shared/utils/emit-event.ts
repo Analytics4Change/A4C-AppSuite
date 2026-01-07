@@ -54,6 +54,8 @@
  */
 
 import { getSupabaseClient } from './supabase';
+import { randomBytes } from 'crypto';
+import type { WorkflowTracingParams, TracingContext } from '../types';
 
 export interface EmitEventParams {
   /** Event type in dot-notation (e.g., 'organization.created', 'user.invited', 'invitation.accepted') */
@@ -79,6 +81,32 @@ export interface EmitEventParams {
 
   /** Optional tags for development entity tracking */
   tags?: string[];
+
+  // ========================================
+  // Tracing Fields (Added 2026-01-07)
+  // Enables end-to-end request tracing from frontend to database
+  // ========================================
+
+  /** User auth session ID from Supabase JWT (null if unauthenticated) */
+  session_id?: string | null;
+
+  /** W3C compatible trace ID (32 hex chars) - spans entire request lifecycle */
+  trace_id?: string;
+
+  /** Current span ID (16 hex chars) - identifies this specific operation */
+  span_id?: string;
+
+  /** Parent span ID (16 hex chars) - links to parent operation for causation chain */
+  parent_span_id?: string;
+
+  /** Operation duration in milliseconds */
+  duration_ms?: number;
+
+  /** Service name (e.g., 'temporal-worker', 'edge-function') */
+  service_name?: string;
+
+  /** Operation name (e.g., 'createOrganization', 'configureDNS') */
+  operation_name?: string;
 
   // ========================================
   // Audit Context Fields (Added 2025-12-22)
@@ -162,6 +190,30 @@ export async function emitEvent(params: EmitEventParams): Promise<string> {
   }
   if (params.causation_id) {
     metadata.causation_id = params.causation_id;
+  }
+
+  // Add tracing fields (for end-to-end request tracing)
+  // These are extracted by api.emit_domain_event() and stored in dedicated columns
+  if (params.session_id !== undefined) {
+    metadata.session_id = params.session_id;
+  }
+  if (params.trace_id) {
+    metadata.trace_id = params.trace_id;
+  }
+  if (params.span_id) {
+    metadata.span_id = params.span_id;
+  }
+  if (params.parent_span_id) {
+    metadata.parent_span_id = params.parent_span_id;
+  }
+  if (params.duration_ms !== undefined) {
+    metadata.duration_ms = params.duration_ms;
+  }
+  if (params.service_name) {
+    metadata.service_name = params.service_name;
+  }
+  if (params.operation_name) {
+    metadata.operation_name = params.operation_name;
   }
 
   // Add audit context fields (for audit trail)
@@ -259,4 +311,80 @@ export function buildTags(customTags?: string[]): string[] {
   }
 
   return allTags;
+}
+
+// ========================================
+// Tracing Helpers (Added 2026-01-07)
+// ========================================
+
+/**
+ * Generate a W3C compatible span ID (16 hex characters)
+ * Used to identify individual operations within a trace
+ */
+export function generateSpanId(): string {
+  return randomBytes(8).toString('hex');
+}
+
+/**
+ * Build tracing fields for emitEvent from workflow tracing params
+ *
+ * Creates a new span ID for each event while preserving the trace chain.
+ * The workflow's parentSpanId becomes this event's parent_span_id.
+ *
+ * @param tracing - Tracing params from workflow input
+ * @param operationName - Name of the current operation (e.g., 'createOrganization')
+ * @returns Tracing fields for EmitEventParams
+ *
+ * @example
+ * ```typescript
+ * await emitEvent({
+ *   event_type: 'organization.created',
+ *   aggregate_type: 'organization',
+ *   aggregate_id: orgId,
+ *   event_data: { ... },
+ *   ...buildTracingForEvent(params.tracing, 'createOrganization'),
+ * });
+ * ```
+ */
+export function buildTracingForEvent(
+  tracing: WorkflowTracingParams | undefined,
+  operationName: string
+): Partial<EmitEventParams> {
+  if (!tracing) {
+    return {};
+  }
+
+  return {
+    correlation_id: tracing.correlationId,
+    session_id: tracing.sessionId,
+    trace_id: tracing.traceId,
+    span_id: generateSpanId(),
+    parent_span_id: tracing.parentSpanId,
+    service_name: 'temporal-worker',
+    operation_name: operationName,
+  };
+}
+
+/**
+ * Create activity tracing context from workflow tracing params
+ *
+ * Used when activities need to create child spans or pass tracing to sub-operations.
+ *
+ * @param tracing - Tracing params from workflow input
+ * @returns Full TracingContext for the activity
+ */
+export function createActivityTracingContext(
+  tracing: WorkflowTracingParams | undefined
+): TracingContext | undefined {
+  if (!tracing) {
+    return undefined;
+  }
+
+  return {
+    correlationId: tracing.correlationId,
+    sessionId: tracing.sessionId,
+    traceId: tracing.traceId,
+    spanId: generateSpanId(),
+    parentSpanId: tracing.parentSpanId,
+  };
 }

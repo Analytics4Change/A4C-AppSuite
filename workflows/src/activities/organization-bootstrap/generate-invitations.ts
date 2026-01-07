@@ -22,7 +22,7 @@
 import { randomBytes } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import type { GenerateInvitationsParams, Invitation } from '@shared/types';
-import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
+import { getSupabaseClient, emitEvent, buildTags, getLogger, buildTracingForEvent } from '@shared/utils';
 import { AGGREGATE_TYPES } from '@shared/constants';
 
 const log = getLogger('GenerateInvitations');
@@ -100,7 +100,8 @@ export async function generateInvitations(
         token,
         expires_at: expiresAt.toISOString()
       },
-      tags
+      tags,
+      ...buildTracingForEvent(params.tracing, 'generateInvitation')
     });
 
     log.debug('Generated invitation', { email: user.email });

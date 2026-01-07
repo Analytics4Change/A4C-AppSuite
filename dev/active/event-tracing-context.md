@@ -120,11 +120,32 @@ interface EventMetadata {
 - ✅ `infrastructure/supabase/supabase/migrations/20260107171628_update_emit_domain_event_tracing.sql` - Update api.emit_domain_event to extract tracing from metadata
 - ✅ `frontend/src/utils/tracing.ts` - Frontend tracing utilities (W3C traceparent, correlation IDs, session extraction)
 
-### Files Still To Create (Phase 5+)
+### New Files Created (Phase 4 - 2026-01-07)
 
-- `frontend/src/components/ui/ErrorWithCorrelation.tsx` - Error display with reference ID
+- No new files - extended existing types and utilities
+
+### Files Created (Phase 6 - 2026-01-07)
+
+- ✅ `frontend/src/components/ui/ErrorWithCorrelation.tsx` - Error display with reference ID, trace ID (non-prod), copy buttons, InlineErrorWithCorrelation variant
+
+### Files Still To Create (Phase 7+)
+
 - `infrastructure/supabase/supabase/functions/_shared/__tests__/emit-event.test.ts` - Unit tests
 - `frontend/src/utils/__tests__/tracing.test.ts` - Unit tests
+
+### Existing Files Modified (Phase 4 - 2026-01-07)
+
+- ✅ `workflows/src/shared/types/index.ts` - Added TracingContext, WorkflowTracingParams, tracing to activity params
+- ✅ `workflows/src/shared/utils/emit-event.ts` - Added tracing fields, generateSpanId, buildTracingForEvent, createActivityTracingContext
+- ✅ `workflows/src/shared/utils/index.ts` - Exported new tracing functions
+- ✅ `workflows/src/workflows/organization-bootstrap/workflow.ts` - Pass tracing to all forward activities
+- ✅ `workflows/src/activities/organization-bootstrap/create-organization.ts` - Use buildTracingForEvent for all events
+- ✅ `workflows/src/activities/organization-bootstrap/configure-dns.ts` - Use buildTracingForEvent
+- ✅ `workflows/src/activities/organization-bootstrap/verify-dns.ts` - Use buildTracingForEvent
+- ✅ `workflows/src/activities/organization-bootstrap/generate-invitations.ts` - Use buildTracingForEvent
+- ✅ `workflows/src/activities/organization-bootstrap/send-invitation-emails.ts` - Use buildTracingForEvent
+- ✅ `workflows/src/activities/organization-bootstrap/activate-organization.ts` - Use buildTracingForEvent
+- ✅ `workflows/src/activities/organization-bootstrap/grant-provider-admin-permissions.ts` - Use buildTracingForEvent, use types from shared/types
 
 ### Existing Files Modified (Phase 2 & 3 - 2026-01-07)
 
@@ -140,15 +161,22 @@ interface EventMetadata {
 - ✅ `frontend/src/services/users/SupabaseUserCommandService.ts` - Added tracing headers to all Edge Function calls, correlation ID in errors
 - ✅ `frontend/src/types/user.types.ts` - Added `correlationId` to `UserOperationResult.errorDetails` type - Updated 2026-01-07
 
-### Files Still To Modify (Phase 4+)
+### Files Modified (Phase 5 - 2026-01-07)
 
-- `frontend/src/services/admin/EventMonitoringService.ts` - Add query methods
-- `frontend/src/pages/admin/FailedEventsPage.tsx` - Add session_id UI
-- `workflows/src/shared/types/index.ts` - Add tracing params
-- `workflows/src/workflows/organization-bootstrap/workflow.ts` - Pass correlation_id
+- ✅ `frontend/src/types/event-monitoring.types.ts` - Added TracedEvent, TracedEventsResult, TraceSpan, TraceTimelineResult types for tracing queries
+- ✅ `frontend/src/services/admin/EventMonitoringService.ts` - Added getEventsBySession(), getEventsByCorrelation(), getTraceTimeline() methods
+- ✅ `frontend/src/pages/admin/FailedEventsPage.tsx` - Added:
+  - Search type selector (Failed Events / Correlation / Session / Trace)
+  - Color-coded search inputs (blue=correlation, purple=session, green=trace)
+  - Tracing info section with copy buttons for all tracing fields
+  - Audit context section (user_id, source_function, reason, ip_address)
+  - CopyButton component for clipboard functionality
+
+### Files Still To Modify (Phase 6+)
+
 - `documentation/infrastructure/guides/event-observability.md` - Update docs
-- `documentation/workflows/reference/event-metadata-schema.md` - Add session_id
-- `documentation/AGENT-INDEX.md` - Add session-id keyword
+- `documentation/workflows/reference/event-metadata-schema.md` - Add trace_id, span_id, duration_ms fields
+- `documentation/AGENT-INDEX.md` - Add session-id, trace-id, span-id keywords
 
 ## Related Components
 

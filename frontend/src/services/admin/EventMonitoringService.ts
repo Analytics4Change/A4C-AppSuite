@@ -20,6 +20,11 @@ import type {
   RetryEventResult,
   EventProcessingStats,
   EventMonitoringOperationResult,
+  TracedEvent,
+  TracedEventsResult,
+  TraceSpan,
+  TraceTimelineResult,
+  EventStreamType,
 } from '@/types/event-monitoring.types';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
@@ -54,6 +59,36 @@ interface GetStatsRpcResponse {
   failed_last_7d: number;
   by_event_type: Array<{ event_type: string; count: number }>;
   by_stream_type: Array<{ stream_type: string; count: number }>;
+}
+
+interface TracedEventRpcResponse {
+  id: string;
+  event_type: string;
+  stream_id: string;
+  stream_type: string;
+  event_data: Record<string, unknown>;
+  event_metadata: Record<string, unknown>;
+  correlation_id: string | null;
+  session_id: string | null;
+  trace_id: string | null;
+  span_id: string | null;
+  parent_span_id: string | null;
+  created_at: string;
+}
+
+interface TraceSpanRpcResponse {
+  id: string;
+  event_type: string;
+  stream_id: string;
+  stream_type: string;
+  span_id: string | null;
+  parent_span_id: string | null;
+  service_name: string | null;
+  operation_name: string | null;
+  duration_ms: number | null;
+  status: string | null;
+  created_at: string;
+  depth: number;
 }
 
 /**
@@ -335,11 +370,9 @@ export class EventMonitoringService {
   }
 
   /**
-   * Search failed events by correlation ID.
+   * Search failed events by correlation ID (legacy client-side filtering).
    *
-   * Useful for tracing a specific request across services when
-   * debugging failures.
-   *
+   * @deprecated Use getEventsByCorrelation() for proper RPC-based search
    * @param correlationId - The correlation ID to search for
    * @returns Promise with matching failed events
    */
@@ -350,7 +383,6 @@ export class EventMonitoringService {
       log.info('Searching failed events by correlation ID', { correlationId });
 
       // Use the main get_failed_events RPC but filter client-side
-      // In a future enhancement, we could add p_correlation_id parameter to RPC
       const result = await this.getFailedEvents({ limit: 100 });
 
       if (!result.success || !result.data) {
@@ -371,6 +403,267 @@ export class EventMonitoringService {
       };
     } catch (error) {
       log.error('Unexpected error searching by correlation ID', { correlationId, error });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: 'UNKNOWN',
+      };
+    }
+  }
+
+  // ============================================================================
+  // Tracing Methods (Added Phase 5 - Event Tracing)
+  // ============================================================================
+
+  /**
+   * Get all events for a specific session.
+   *
+   * Returns all domain events associated with a user session,
+   * useful for debugging user-reported issues.
+   *
+   * @param sessionId - The session ID (UUID from Supabase Auth JWT)
+   * @param limit - Maximum number of events to return (default: 100)
+   * @returns Promise with list of traced events
+   *
+   * @example
+   * ```typescript
+   * const result = await eventMonitoringService.getEventsBySession(sessionId);
+   * if (result.success) {
+   *   console.log(`Found ${result.data.totalCount} events for session`);
+   * }
+   * ```
+   */
+  async getEventsBySession(
+    sessionId: string,
+    limit: number = 100
+  ): Promise<EventMonitoringOperationResult<TracedEventsResult>> {
+    try {
+      log.info('Fetching events by session ID', { sessionId, limit });
+
+      const { data, error } = await supabaseService.apiRpc<TracedEventRpcResponse[]>(
+        'get_events_by_session',
+        {
+          p_session_id: sessionId,
+          p_limit: limit,
+        }
+      );
+
+      if (error) {
+        log.error('Failed to fetch events by session', { sessionId, error });
+
+        if (error.code === '42501' || error.message?.includes('permission denied')) {
+          return {
+            success: false,
+            error: 'Access denied. Platform administrator access required.',
+            errorCode: 'FORBIDDEN',
+          };
+        }
+
+        return {
+          success: false,
+          error: `Failed to fetch events: ${error.message}`,
+          errorCode: 'RPC_ERROR',
+        };
+      }
+
+      const events: TracedEvent[] = (data ?? []).map((row) => ({
+        id: row.id,
+        event_type: row.event_type,
+        stream_id: row.stream_id,
+        stream_type: row.stream_type as EventStreamType,
+        event_data: row.event_data,
+        event_metadata: row.event_metadata as TracedEvent['event_metadata'],
+        correlation_id: row.correlation_id,
+        session_id: row.session_id,
+        trace_id: row.trace_id,
+        span_id: row.span_id,
+        parent_span_id: row.parent_span_id,
+        created_at: row.created_at,
+      }));
+
+      log.info(`Fetched ${events.length} events for session`, { sessionId });
+
+      return {
+        success: true,
+        data: {
+          events,
+          totalCount: events.length,
+        },
+      };
+    } catch (error) {
+      log.error('Unexpected error fetching events by session', { sessionId, error });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: 'UNKNOWN',
+      };
+    }
+  }
+
+  /**
+   * Get all events for a specific correlation ID.
+   *
+   * Returns all domain events associated with a single request,
+   * useful for tracing a request across services.
+   *
+   * @param correlationId - The correlation ID (UUID)
+   * @param limit - Maximum number of events to return (default: 100)
+   * @returns Promise with list of traced events
+   *
+   * @example
+   * ```typescript
+   * const result = await eventMonitoringService.getEventsByCorrelation(correlationId);
+   * if (result.success) {
+   *   console.log(`Found ${result.data.totalCount} events for correlation`);
+   * }
+   * ```
+   */
+  async getEventsByCorrelation(
+    correlationId: string,
+    limit: number = 100
+  ): Promise<EventMonitoringOperationResult<TracedEventsResult>> {
+    try {
+      log.info('Fetching events by correlation ID', { correlationId, limit });
+
+      const { data, error } = await supabaseService.apiRpc<TracedEventRpcResponse[]>(
+        'get_events_by_correlation',
+        {
+          p_correlation_id: correlationId,
+          p_limit: limit,
+        }
+      );
+
+      if (error) {
+        log.error('Failed to fetch events by correlation', { correlationId, error });
+
+        if (error.code === '42501' || error.message?.includes('permission denied')) {
+          return {
+            success: false,
+            error: 'Access denied. Platform administrator access required.',
+            errorCode: 'FORBIDDEN',
+          };
+        }
+
+        return {
+          success: false,
+          error: `Failed to fetch events: ${error.message}`,
+          errorCode: 'RPC_ERROR',
+        };
+      }
+
+      const events: TracedEvent[] = (data ?? []).map((row) => ({
+        id: row.id,
+        event_type: row.event_type,
+        stream_id: row.stream_id,
+        stream_type: row.stream_type as EventStreamType,
+        event_data: row.event_data,
+        event_metadata: row.event_metadata as TracedEvent['event_metadata'],
+        correlation_id: row.correlation_id,
+        session_id: row.session_id,
+        trace_id: row.trace_id,
+        span_id: row.span_id,
+        parent_span_id: row.parent_span_id,
+        created_at: row.created_at,
+      }));
+
+      log.info(`Fetched ${events.length} events for correlation`, { correlationId });
+
+      return {
+        success: true,
+        data: {
+          events,
+          totalCount: events.length,
+        },
+      };
+    } catch (error) {
+      log.error('Unexpected error fetching events by correlation', { correlationId, error });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: 'UNKNOWN',
+      };
+    }
+  }
+
+  /**
+   * Get a trace timeline for a specific trace ID.
+   *
+   * Returns all spans in a distributed trace, ordered by creation time
+   * and depth in the span hierarchy. Useful for visualizing the full
+   * execution path of a request.
+   *
+   * @param traceId - The trace ID (32 hex chars, W3C format)
+   * @returns Promise with trace timeline containing ordered spans
+   *
+   * @example
+   * ```typescript
+   * const result = await eventMonitoringService.getTraceTimeline(traceId);
+   * if (result.success) {
+   *   result.data.spans.forEach(span => {
+   *     const indent = '  '.repeat(span.depth);
+   *     console.log(`${indent}${span.operation_name} (${span.duration_ms}ms)`);
+   *   });
+   * }
+   * ```
+   */
+  async getTraceTimeline(
+    traceId: string
+  ): Promise<EventMonitoringOperationResult<TraceTimelineResult>> {
+    try {
+      log.info('Fetching trace timeline', { traceId });
+
+      const { data, error } = await supabaseService.apiRpc<TraceSpanRpcResponse[]>(
+        'get_trace_timeline',
+        {
+          p_trace_id: traceId,
+        }
+      );
+
+      if (error) {
+        log.error('Failed to fetch trace timeline', { traceId, error });
+
+        if (error.code === '42501' || error.message?.includes('permission denied')) {
+          return {
+            success: false,
+            error: 'Access denied. Platform administrator access required.',
+            errorCode: 'FORBIDDEN',
+          };
+        }
+
+        return {
+          success: false,
+          error: `Failed to fetch trace: ${error.message}`,
+          errorCode: 'RPC_ERROR',
+        };
+      }
+
+      const spans: TraceSpan[] = (data ?? []).map((row) => ({
+        id: row.id,
+        event_type: row.event_type,
+        stream_id: row.stream_id,
+        stream_type: row.stream_type as EventStreamType,
+        span_id: row.span_id,
+        parent_span_id: row.parent_span_id,
+        service_name: row.service_name,
+        operation_name: row.operation_name,
+        duration_ms: row.duration_ms,
+        status: row.status as TraceSpan['status'],
+        created_at: row.created_at,
+        depth: row.depth,
+      }));
+
+      log.info(`Fetched ${spans.length} spans for trace`, { traceId });
+
+      return {
+        success: true,
+        data: {
+          trace_id: traceId,
+          spans,
+          totalSpans: spans.length,
+        },
+      };
+    } catch (error) {
+      log.error('Unexpected error fetching trace timeline', { traceId, error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

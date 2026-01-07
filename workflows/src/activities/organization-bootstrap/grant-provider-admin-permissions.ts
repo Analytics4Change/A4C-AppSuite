@@ -25,7 +25,8 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
+import { getSupabaseClient, emitEvent, buildTags, getLogger, buildTracingForEvent } from '@shared/utils';
+import type { GrantProviderAdminPermissionsParams, GrantProviderAdminPermissionsResult } from '@shared/types';
 
 const log = getLogger('GrantProviderAdminPermissions');
 
@@ -96,22 +97,6 @@ async function getTemplatePermissions(roleName: string): Promise<string[]> {
   return (data as Array<{ permission_name: string }>).map(row => row.permission_name);
 }
 
-export interface GrantProviderAdminPermissionsParams {
-  /** Organization ID */
-  orgId: string;
-  /** Scope path for the role (e.g., subdomain like 'acme-health') */
-  scopePath: string;
-}
-
-export interface GrantProviderAdminPermissionsResult {
-  /** Role ID (UUID) */
-  roleId: string;
-  /** Number of permissions granted (0 if all already existed) */
-  permissionsGranted: number;
-  /** Whether role already existed */
-  roleAlreadyExisted: boolean;
-}
-
 /**
  * Grant provider_admin permissions activity
  * Creates role and grants 23 canonical permissions
@@ -166,7 +151,8 @@ export async function grantProviderAdminPermissions(
         scope: 'organization',
         is_system_role: true
       },
-      tags
+      tags,
+      ...buildTracingForEvent(params.tracing, 'createProviderAdminRole')
     });
 
     log.info('Created provider_admin role', { roleId, orgId: params.orgId });
@@ -224,7 +210,8 @@ export async function grantProviderAdminPermissions(
         permission_id: permId,
         permission_name: permName
       },
-      tags
+      tags,
+      ...buildTracingForEvent(params.tracing, 'grantPermission')
     });
 
     permissionsGranted++;

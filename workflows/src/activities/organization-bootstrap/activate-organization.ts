@@ -15,7 +15,7 @@
  */
 
 import type { ActivateOrganizationParams } from '@shared/types';
-import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
+import { getSupabaseClient, emitEvent, buildTags, getLogger, buildTracingForEvent } from '@shared/utils';
 import { AGGREGATE_TYPES } from '@shared/constants';
 
 const log = getLogger('ActivateOrganization');
@@ -62,7 +62,8 @@ export async function activateOrganization(
         activated_at: new Date().toISOString(),
         previous_is_active: org.is_active
       },
-      tags: buildTags()
+      tags: buildTags(),
+      ...buildTracingForEvent(params.tracing, 'activateOrganization')
     });
 
     return true;
@@ -94,7 +95,8 @@ export async function activateOrganization(
       activated_at: activatedAt,
       previous_is_active: org.is_active
     },
-    tags: buildTags()
+    tags: buildTags(),
+    ...buildTracingForEvent(params.tracing, 'activateOrganization')
   });
 
   log.debug('Emitted organization.activated event', { orgId: params.orgId });

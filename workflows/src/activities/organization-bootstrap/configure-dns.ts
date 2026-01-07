@@ -21,7 +21,7 @@
 
 import type { ConfigureDNSParams, ConfigureDNSResult } from '@shared/types';
 import { createDNSProvider } from '@shared/providers/dns/factory';
-import { emitEvent, buildTags, getLogger } from '@shared/utils';
+import { emitEvent, buildTags, getLogger, buildTracingForEvent } from '@shared/utils';
 import { AGGREGATE_TYPES } from '@shared/constants';
 import { getWorkflowsEnv } from '@shared/config/env-schema';
 
@@ -92,7 +92,8 @@ export async function configureDNS(
         dns_record_value: existing.content,
         cloudflare_zone_id: zone.id
       },
-      tags: buildTags()
+      tags: buildTags(),
+      ...buildTracingForEvent(params.tracing, 'configureDNS')
     });
 
     return {
@@ -128,7 +129,8 @@ export async function configureDNS(
       dns_record_value: record.content,
       cloudflare_zone_id: zone.id
     },
-    tags: buildTags()
+    tags: buildTags(),
+    ...buildTracingForEvent(params.tracing, 'configureDNS')
   });
 
   log.info('Emitted organization.subdomain.dns_created event', { orgId: params.orgId });

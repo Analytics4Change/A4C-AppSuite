@@ -108,6 +108,12 @@ export interface OrganizationBootstrapParams {
    * Defaults to production values if not specified
    */
   retryConfig?: DnsRetryConfig;
+
+  /**
+   * Optional tracing context for end-to-end request correlation
+   * Propagated from Edge Functions to enable debugging across services
+   */
+  tracing?: WorkflowTracingParams;
 }
 
 /**
@@ -184,6 +190,8 @@ export interface CreateOrganizationParams {
   phones: PhoneInfo[];
   partnerType?: 'var' | 'family' | 'court' | 'other';
   referringPartnerId?: string;
+  /** Optional tracing context for end-to-end request correlation */
+  tracing?: WorkflowTracingParams;
 }
 
 /**
@@ -194,6 +202,8 @@ export interface ConfigureDNSParams {
   subdomain: string;
   /** Target domain for CNAME. Defaults to PLATFORM_BASE_DOMAIN from env config. */
   targetDomain?: string;
+  /** Optional tracing context for end-to-end request correlation */
+  tracing?: WorkflowTracingParams;
 }
 
 /**
@@ -213,6 +223,8 @@ export interface ConfigureDNSResult {
 export interface VerifyDNSParams {
   orgId: string;
   domain: string;
+  /** Optional tracing context for end-to-end request correlation */
+  tracing?: WorkflowTracingParams;
 }
 
 /**
@@ -226,6 +238,8 @@ export interface GenerateInvitationsParams {
     lastName: string;
     role: string;
   }>;
+  /** Optional tracing context for end-to-end request correlation */
+  tracing?: WorkflowTracingParams;
 }
 
 /**
@@ -247,6 +261,8 @@ export interface SendInvitationEmailsParams {
   domain: string;
   /** Frontend URL for invitation links. Defaults to FRONTEND_URL from env config. */
   frontendUrl?: string;
+  /** Optional tracing context for end-to-end request correlation */
+  tracing?: WorkflowTracingParams;
 }
 
 /**
@@ -265,6 +281,8 @@ export interface SendInvitationEmailsResult {
  */
 export interface ActivateOrganizationParams {
   orgId: string;
+  /** Optional tracing context for end-to-end request correlation */
+  tracing?: WorkflowTracingParams;
 }
 
 // ========================================
@@ -322,6 +340,8 @@ export interface GrantProviderAdminPermissionsParams {
   orgId: string;
   /** Scope path for the role (e.g., subdomain like 'acme-health') */
   scopePath: string;
+  /** Optional tracing context for end-to-end request correlation */
+  tracing?: WorkflowTracingParams;
 }
 
 /**
@@ -397,6 +417,58 @@ export interface EmailResult {
   messageId: string;
   accepted: string[];
   rejected: string[];
+}
+
+// ========================================
+// Tracing Types
+// ========================================
+
+/**
+ * Tracing Context for end-to-end request correlation
+ *
+ * Propagated from frontend → Edge Functions → Temporal → Activities
+ * Enables debugging failed requests by correlation ID and session attribution.
+ *
+ * W3C Trace Context compatible:
+ * - trace_id: 32 hex chars (UUID without dashes)
+ * - span_id: 16 hex chars
+ * - parent_span_id: Links to parent operation
+ */
+export interface TracingContext {
+  /** Business request correlation ID (UUID) - groups related operations */
+  correlationId: string;
+
+  /** User auth session ID from Supabase JWT (null if unauthenticated) */
+  sessionId: string | null;
+
+  /** W3C compatible trace ID (32 hex chars) - spans entire request lifecycle */
+  traceId: string;
+
+  /** Current span ID (16 hex chars) - identifies this specific operation */
+  spanId: string;
+
+  /** Parent span ID (16 hex chars) - links to parent operation for causation chain */
+  parentSpanId?: string;
+}
+
+/**
+ * Tracing fields for workflow params
+ *
+ * Subset of TracingContext passed from Edge Functions to workflows.
+ * The workflow creates new spanId for each operation.
+ */
+export interface WorkflowTracingParams {
+  /** Business request correlation ID (UUID) */
+  correlationId: string;
+
+  /** User auth session ID (null if unauthenticated) */
+  sessionId: string | null;
+
+  /** W3C compatible trace ID (32 hex chars) */
+  traceId: string;
+
+  /** Parent span ID from the caller (Edge Function's span) */
+  parentSpanId: string;
 }
 
 // ========================================
