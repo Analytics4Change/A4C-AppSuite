@@ -17,6 +17,7 @@ import {
   UserCog,
   FolderTree,
   Shield,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ImpersonationBanner } from '@/components/auth/ImpersonationBanner';
@@ -84,6 +85,7 @@ export const MainLayout: React.FC = () => {
     { to: '/medications', icon: Pill, label: 'Medication Management', roles: ['super_admin', 'provider_admin', 'administrator', 'nurse'], hideForOrgTypes: ['platform_owner', 'provider_partner'] },
     { to: '/reports', icon: FileText, label: 'Reports', roles: ['super_admin', 'provider_admin', 'administrator'] },
     { to: '/settings', icon: Settings, label: 'Settings', roles: ['super_admin', 'provider_admin', 'administrator'] },
+    { to: '/admin/events', icon: AlertTriangle, label: 'Event Monitor', roles: ['super_admin'], showForOrgTypes: ['platform_owner'] },
   ];
 
   // Filter nav items based on user role and permissions
