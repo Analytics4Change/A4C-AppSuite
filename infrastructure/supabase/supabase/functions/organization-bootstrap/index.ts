@@ -15,15 +15,19 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+import {
+  generateCorrelationId,
+  createInternalError,
+  createCorsPreflightResponse,
+  standardCorsHeaders,
+  createErrorResponse,
+} from '../_shared/error-response.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v3';
+const DEPLOY_VERSION = 'v4';
 
 // CORS headers for frontend requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const corsHeaders = standardCorsHeaders;
 
 /**
  * Contact information structure
@@ -102,11 +106,13 @@ interface BootstrapResponse {
 }
 
 serve(async (req) => {
-  console.log(`[organization-bootstrap ${DEPLOY_VERSION}] Processing ${req.method} request`);
+  // Generate correlation ID for request tracing
+  const correlationId = generateCorrelationId();
+  console.log(`[organization-bootstrap ${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}`);
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return createCorsPreflightResponse(corsHeaders);
   }
 
   // ==========================================================================
@@ -329,13 +335,6 @@ serve(async (req) => {
 
   } catch (error) {
     console.error(`[organization-bootstrap ${DEPLOY_VERSION}] Unhandled error:`, error);
-    return new Response(
-      JSON.stringify({
-        error: 'Internal server error',
-        details: error.message,
-        version: DEPLOY_VERSION
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createInternalError(correlationId, corsHeaders, error.message);
   }
 });

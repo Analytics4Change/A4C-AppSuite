@@ -10,15 +10,21 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+import {
+  generateCorrelationId,
+  handleRpcError,
+  createValidationError,
+  createNotFoundError,
+  createInternalError,
+  createCorsPreflightResponse,
+  standardCorsHeaders,
+} from '../_shared/error-response.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v8';
+const DEPLOY_VERSION = 'v9';
 
 // CORS headers for frontend requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const corsHeaders = standardCorsHeaders;
 
 interface InvitationValidation {
   valid: boolean;
@@ -33,11 +39,13 @@ interface InvitationValidation {
 }
 
 serve(async (req) => {
-  console.log(`[validate-invitation v${DEPLOY_VERSION}] Processing ${req.method} request`);
+  // Generate correlation ID for request tracing
+  const correlationId = generateCorrelationId();
+  console.log(`[validate-invitation v${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}`);
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return createCorsPreflightResponse(corsHeaders);
   }
 
   // ==========================================================================
@@ -85,10 +93,7 @@ serve(async (req) => {
     }
 
     if (!token) {
-      return new Response(
-        JSON.stringify({ error: 'Missing token parameter' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createValidationError('Missing token parameter', correlationId, corsHeaders, 'token');
     }
 
     // Query invitation via RPC function in api schema (bypasses public schema restriction)
@@ -98,10 +103,7 @@ serve(async (req) => {
 
     if (invitationError) {
       console.error(`[validate-invitation v${DEPLOY_VERSION}] RPC error:`, invitationError);
-      return new Response(
-        JSON.stringify({ valid: false, error: 'Database error', details: invitationError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return handleRpcError(invitationError, correlationId, corsHeaders, 'Query invitation');
     }
 
     // RPC returns array, get first result
@@ -109,10 +111,7 @@ serve(async (req) => {
 
     if (!invitation) {
       console.log(`[validate-invitation v${DEPLOY_VERSION}] No invitation found for token`);
-      return new Response(
-        JSON.stringify({ valid: false, error: 'Invalid invitation token' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createNotFoundError('Invitation', correlationId, corsHeaders);
     }
 
     console.log(`[validate-invitation v${DEPLOY_VERSION}] Found invitation: ${invitation.id}`);
@@ -153,10 +152,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Validate invitation edge function error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error(`[validate-invitation v${DEPLOY_VERSION}] Unhandled error:`, error);
+    return createInternalError(correlationId, corsHeaders, error.message);
   }
 });

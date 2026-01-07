@@ -10,15 +10,22 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+import {
+  generateCorrelationId,
+  handleRpcError,
+  createValidationError,
+  createNotFoundError,
+  createUnauthorizedError,
+  createInternalError,
+  createCorsPreflightResponse,
+  standardCorsHeaders,
+} from '../_shared/error-response.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v23';
+const DEPLOY_VERSION = 'v24';
 
 // CORS headers for frontend requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const corsHeaders = standardCorsHeaders;
 
 interface WorkflowStatusResponse {
   workflowId: string;
@@ -42,11 +49,13 @@ interface WorkflowStage {
 }
 
 serve(async (req) => {
-  console.log(`[workflow-status ${DEPLOY_VERSION}] Processing ${req.method} request`);
+  // Generate correlation ID for request tracing
+  const correlationId = generateCorrelationId();
+  console.log(`[workflow-status ${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}`);
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return createCorsPreflightResponse(corsHeaders);
   }
 
   // ==========================================================================
@@ -74,10 +83,7 @@ serve(async (req) => {
     // Verify authorization (JWT token)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header', version: DEPLOY_VERSION }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createUnauthorizedError(correlationId, corsHeaders, 'Missing authorization header');
     }
 
     console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ Authorization header present`);
@@ -88,10 +94,7 @@ serve(async (req) => {
 
     if (authError || !user) {
       console.error(`[workflow-status ${DEPLOY_VERSION}] Auth error:`, authError);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized', details: authError?.message, version: DEPLOY_VERSION }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createUnauthorizedError(correlationId, corsHeaders, authError?.message || 'Unauthorized');
     }
 
     console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ User authenticated: ${user.email}`);
@@ -102,24 +105,13 @@ serve(async (req) => {
       requestBody = await req.json();
     } catch (parseError) {
       console.error(`[workflow-status ${DEPLOY_VERSION}] Failed to parse request body:`, parseError);
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid request body',
-          details: 'Could not parse JSON',
-          version: DEPLOY_VERSION,
-          step: 'body_parse'
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createValidationError('Invalid request body: Could not parse JSON', correlationId, corsHeaders);
     }
 
     const { workflowId } = requestBody;
 
     if (!workflowId) {
-      return new Response(
-        JSON.stringify({ error: 'Missing workflowId parameter', version: DEPLOY_VERSION }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createValidationError('Missing workflowId parameter', correlationId, corsHeaders, 'workflowId');
     }
 
     console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ workflowId: ${workflowId}`);
@@ -132,24 +124,13 @@ serve(async (req) => {
 
     if (statusError) {
       console.error(`[workflow-status ${DEPLOY_VERSION}] RPC error:`, statusError);
-      return new Response(
-        JSON.stringify({
-          error: 'Failed to get workflow status',
-          details: statusError.message,
-          version: DEPLOY_VERSION,
-          step: 'rpc_call'
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return handleRpcError(statusError, correlationId, corsHeaders, 'Get workflow status');
     }
 
     console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ RPC returned ${statusData?.length || 0} rows`);
 
     if (!statusData || statusData.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'Workflow not found', workflowId, version: DEPLOY_VERSION }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createNotFoundError(`Workflow (id: ${workflowId})`, correlationId, corsHeaders);
     }
 
     const status = statusData[0];
@@ -227,15 +208,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error(`[workflow-status ${DEPLOY_VERSION}] Unhandled error:`, error);
-    return new Response(
-      JSON.stringify({
-        error: 'Internal server error',
-        details: error.message,
-        version: DEPLOY_VERSION,
-        step: 'unhandled_exception'
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createInternalError(correlationId, corsHeaders, error.message);
   }
 });
 

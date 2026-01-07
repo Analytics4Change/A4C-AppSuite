@@ -15,15 +15,20 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 import { AnySchemaSupabaseClient } from '../_shared/types.ts';
+import {
+  generateCorrelationId,
+  handleRpcError,
+  createInternalError,
+  createCorsPreflightResponse,
+  standardCorsHeaders,
+  createErrorResponse,
+} from '../_shared/error-response.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v2';
+const DEPLOY_VERSION = 'v3';
 
 // CORS headers for frontend requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const corsHeaders = standardCorsHeaders;
 
 /**
  * Supported operations
@@ -92,18 +97,20 @@ async function getUserDetails(
 }
 
 serve(async (req) => {
-  console.log(`[manage-user v${DEPLOY_VERSION}] Processing ${req.method} request`);
+  // Generate correlation ID for request tracing
+  const correlationId = generateCorrelationId();
+  console.log(`[manage-user v${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}`);
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return createCorsPreflightResponse(corsHeaders);
   }
 
   // Only allow POST
   if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    return createErrorResponse(
+      { error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED', status: 405, correlationId },
+      corsHeaders
     );
   }
 
@@ -301,10 +308,7 @@ serve(async (req) => {
 
     if (eventError) {
       console.error(`[manage-user v${DEPLOY_VERSION}] Failed to emit event:`, eventError);
-      return new Response(
-        JSON.stringify({ error: `Failed to ${requestData.operation} user`, details: eventError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return handleRpcError(eventError, correlationId, corsHeaders, `${requestData.operation} user`);
     }
 
     console.log(`[manage-user v${DEPLOY_VERSION}] Event emitted: ${eventId}`);
@@ -343,14 +347,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error(`[manage-user v${DEPLOY_VERSION}] Error:`, error);
-    return new Response(
-      JSON.stringify({
-        error: 'Internal server error',
-        details: error.message,
-        version: DEPLOY_VERSION,
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error(`[manage-user v${DEPLOY_VERSION}] Unhandled error:`, error);
+    return createInternalError(correlationId, corsHeaders, error.message);
   }
 });

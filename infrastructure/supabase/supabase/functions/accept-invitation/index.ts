@@ -10,15 +10,22 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+import {
+  generateCorrelationId,
+  handleRpcError,
+  createValidationError,
+  createNotFoundError,
+  createInternalError,
+  createCorsPreflightResponse,
+  standardCorsHeaders,
+  ErrorCodes,
+} from '../_shared/error-response.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v10';
+const DEPLOY_VERSION = 'v11';
 
 // CORS headers for frontend requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const corsHeaders = standardCorsHeaders;
 
 /**
  * Supported OAuth providers (matches frontend OAuthProvider type)
@@ -59,11 +66,13 @@ interface AcceptInvitationResponse {
 }
 
 serve(async (req) => {
-  console.log(`[accept-invitation v${DEPLOY_VERSION}] Processing ${req.method} request`);
+  // Generate correlation ID for request tracing
+  const correlationId = generateCorrelationId();
+  console.log(`[accept-invitation v${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}`);
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return createCorsPreflightResponse(corsHeaders);
   }
 
   // ==========================================================================
@@ -101,17 +110,11 @@ serve(async (req) => {
 
     // Validate request
     if (!requestData.token) {
-      return new Response(
-        JSON.stringify({ error: 'Missing token' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createValidationError('Missing token', correlationId, corsHeaders, 'token');
     }
 
     if (!requestData.credentials) {
-      return new Response(
-        JSON.stringify({ error: 'Missing credentials' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createValidationError('Missing credentials', correlationId, corsHeaders, 'credentials');
     }
 
     // Determine auth method from credentials
@@ -119,10 +122,7 @@ serve(async (req) => {
     const isEmailPassword = !!requestData.credentials.password;
 
     if (!isOAuth && !isEmailPassword) {
-      return new Response(
-        JSON.stringify({ error: 'Missing password or OAuth provider' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createValidationError('Missing password or OAuth provider', correlationId, corsHeaders);
     }
 
     console.log(`[accept-invitation v${DEPLOY_VERSION}] Auth method: ${isOAuth ? 'oauth' : 'email_password'}`);
@@ -134,20 +134,14 @@ serve(async (req) => {
 
     if (invitationError) {
       console.error(`[accept-invitation v${DEPLOY_VERSION}] RPC error:`, invitationError);
-      return new Response(
-        JSON.stringify({ error: 'Database error', details: invitationError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return handleRpcError(invitationError, correlationId, corsHeaders, 'Query invitation');
     }
 
     // RPC returns array, get first result
     const invitation = invitations?.[0];
 
     if (!invitation) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid invitation token' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createNotFoundError('Invitation', correlationId, corsHeaders);
     }
 
     console.log(`[accept-invitation v${DEPLOY_VERSION}] Found invitation: ${invitation.id}`);
@@ -296,16 +290,9 @@ serve(async (req) => {
 
     if (eventError) {
       console.error('Failed to emit user.created event:', eventError);
-      // CRITICAL: Event emission failure means role assignment won't happen
+      // CRITICAL: Event emission failure or processing failure
       // User account exists but has no role - return error to prevent silent failure
-      return new Response(
-        JSON.stringify({
-          error: 'Failed to emit user.created event',
-          details: eventError.message,
-          userId, // Include for debugging - user was created but event failed
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return handleRpcError(eventError, correlationId, corsHeaders, 'Emit user.created event');
     }
     console.log(`User created event emitted successfully: event_id=${_eventId}, user_id=${userId}, org_id=${invitation.organization_id}`);
 
@@ -415,15 +402,7 @@ serve(async (req) => {
       console.error('Failed to emit invitation.accepted event:', acceptedEventError);
       // CRITICAL: This event triggers role assignment via database trigger
       // Without it, user has no role and will default to 'viewer' in JWT hook
-      return new Response(
-        JSON.stringify({
-          error: 'Failed to emit invitation.accepted event',
-          details: acceptedEventError.message,
-          userId, // User was created
-          invitationId: invitation.id,
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return handleRpcError(acceptedEventError, correlationId, corsHeaders, 'Emit invitation.accepted event');
     }
     console.log(`Invitation accepted event emitted: event_id=${_acceptedEventId}, invitation_id=${invitation.id}`);
 
@@ -470,14 +449,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Accept invitation edge function error:', error);
-    return new Response(
-      JSON.stringify({
-        error: 'Internal server error',
-        details: error.message,
-        version: DEPLOY_VERSION
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error(`[accept-invitation v${DEPLOY_VERSION}] Unhandled error:`, error);
+    return createInternalError(correlationId, corsHeaders, error.message);
   }
 });
