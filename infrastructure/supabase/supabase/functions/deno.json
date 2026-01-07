@@ -7,9 +7,5 @@
     "rules": {
       "exclude": ["no-import-prefix"]
     }
-  },
-  "compilerOptions": {
-    "strict": true,
-    "noImplicitAny": true
   }
 }
