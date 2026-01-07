@@ -39,7 +39,7 @@ COMMENT ON FUNCTION public.get_user_aggregated_permissions(UUID) IS
 -- NULL in the array means global access (can assign to any scope)
 -- Note: Roles with validity dates are considered active if current date is within range
 CREATE OR REPLACE FUNCTION public.get_user_scope_paths(p_user_id UUID)
-RETURNS ltree[]
+RETURNS extensions.ltree[]
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
@@ -47,7 +47,7 @@ SET search_path = public, extensions, pg_temp
 AS $$
   SELECT COALESCE(
     array_agg(DISTINCT ur.scope_path),
-    '{}'::ltree[]
+    '{}'::extensions.ltree[]
   )
   FROM user_roles_projection ur
   WHERE ur.user_id = p_user_id
@@ -81,8 +81,8 @@ COMMENT ON FUNCTION public.check_permissions_subset(UUID[], UUID[]) IS
 -- NULL in user_scopes means global access (allows any target)
 -- NULL target_scope means role has no scope restriction (rare but valid)
 CREATE OR REPLACE FUNCTION public.check_scope_containment(
-  p_target_scope ltree,
-  p_user_scopes ltree[]
+  p_target_scope extensions.ltree,
+  p_user_scopes extensions.ltree[]
 )
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -109,7 +109,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.check_scope_containment(ltree, ltree[]) IS
+COMMENT ON FUNCTION public.check_scope_containment(extensions.ltree, extensions.ltree[]) IS
 'Returns TRUE if target scope is within any user scope. NULL user scope = global access.';
 
 
@@ -408,7 +408,7 @@ DECLARE
   v_user_id UUID;
   v_org_id UUID;
   v_user_perms UUID[];
-  v_user_scopes ltree[];
+  v_user_scopes extensions.ltree[];
 BEGIN
   v_user_id := public.get_current_user_id();
   v_org_id := COALESCE(p_org_id, public.get_current_org_id());
@@ -495,7 +495,7 @@ AS $$
 DECLARE
   v_user_id UUID;
   v_user_perms UUID[];
-  v_user_scopes ltree[];
+  v_user_scopes extensions.ltree[];
   v_role RECORD;
   v_role_perms UUID[];
   v_violations JSONB := '[]'::JSONB;
@@ -581,4 +581,4 @@ GRANT EXECUTE ON FUNCTION api.validate_role_assignment(UUID[]) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_user_aggregated_permissions(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_user_scope_paths(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.check_permissions_subset(UUID[], UUID[]) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.check_scope_containment(ltree, ltree[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.check_scope_containment(extensions.ltree, extensions.ltree[]) TO authenticated;
