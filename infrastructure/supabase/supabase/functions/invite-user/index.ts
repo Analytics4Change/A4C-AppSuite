@@ -28,6 +28,7 @@ import {
   extractTracingContext,
   createSpan,
   endSpan,
+  type TracingContext,
 } from '../_shared/tracing-context.ts';
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
@@ -537,7 +538,7 @@ serve(async (req) => {
     // Validate that inviter can assign the requested roles (permission subset + scope hierarchy)
     // Empty roles array is always valid (no-role invitations allowed)
     if (requestData.roles && requestData.roles.length > 0) {
-      const roleIds = requestData.roles.map(r => r.roleId);
+      const roleIds = requestData.roles.map(r => r.role_id);
       console.log(`[invite-user v${DEPLOY_VERSION}] Validating role assignment for ${roleIds.length} roles...`);
 
       // Create a Supabase client with the user's JWT to validate as them
