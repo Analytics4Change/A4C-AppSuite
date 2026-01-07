@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-06
+last_updated: 2026-01-07
 purpose: agent-navigation
 ---
 
@@ -34,6 +34,7 @@ purpose: agent-navigation
 | `activities-reference` | [activities-reference.md](workflows/reference/activities-reference.md) | error-handling-and-compensation.md |
 | `activity` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | activities-reference.md |
 | `addresses` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | phones_projection.md |
+| `apm-integration` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `apiRpc` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | supabase.service.ts |
 | `applet-action` | [permissions_projection.md](infrastructure/reference/database/tables/permissions_projection.md) | rbac-architecture.md |
 | `audit-trail` | [impersonation-architecture.md](architecture/authentication/impersonation-architecture.md) | impersonation-event-schema.md |
@@ -61,9 +62,11 @@ purpose: agent-navigation
 | `dns-verification` | [activities-reference.md](workflows/reference/activities-reference.md) | organization-bootstrap-workflow-design.md |
 | `domain-events` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-metadata-schema.md |
 | `dosage-info` | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | medication_history.md |
+| `duration-ms` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `edge-function` | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `edge-function-jwt` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | EDGE_FUNCTION_TESTS.md |
 | `email` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |
+| `event-archival` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `event-errors` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md, triggering-workflows.md |
 | `event-metadata` | [event-metadata-schema.md](workflows/reference/event-metadata-schema.md) | triggering-workflows.md |
 | `event-processing` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md, DEPLOYMENT_INSTRUCTIONS.md |
@@ -98,6 +101,7 @@ purpose: agent-navigation
 | `oauth` | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | supabase-auth-overview.md, SUPABASE-AUTH-SETUP.md |
 | `observability` | [event-observability.md](infrastructure/guides/event-observability.md) | logging-standards.md, infrastructure/CLAUDE.md |
 | `okta` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
+| `otlp-export` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `organization` | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | organization-management-architecture.md |
 | `organization-addresses` | [organization_addresses.md](infrastructure/reference/database/tables/organization_addresses.md) | addresses_projection.md |
 | `organization-contacts` | [organization_contacts.md](infrastructure/reference/database/tables/organization_contacts.md) | contacts_projection.md |
@@ -105,6 +109,7 @@ purpose: agent-navigation
 | `organization-bootstrap` | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | organization-bootstrap-workflow-design.md |
 | `organization-management` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | tenants-as-organizations.md |
 | `organization-units` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | scoping-architecture.md |
+| `parent-span-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `permissions` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | permissions_projection.md |
 | `permission-grants` | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | rbac-architecture.md |
 | `pg-notify` | [event-driven-workflow-triggering.md](architecture/workflows/event-driven-workflow-triggering.md) | triggering-workflows.md |
@@ -120,6 +125,7 @@ purpose: agent-navigation
 | `provider-partners` | [provider-partners-architecture.md](architecture/data/provider-partners-architecture.md) | var-partnerships.md |
 | `rbac` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | rbac-implementation-guide.md, scoping-architecture.md |
 | `resend` | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | activities-reference.md |
+| `retention-policy` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `retry-policies` | [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | activities-reference.md |
 | `rls` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | table-template.md, SQL_IDEMPOTENCY_AUDIT.md |
 | `rls-gap` | [clients.md](infrastructure/reference/database/tables/clients.md) | medications.md |
@@ -133,10 +139,12 @@ purpose: agent-navigation
 | `saga-pattern` | [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | organization-bootstrap-workflow-design.md |
 | `schema-registry` | [event_types.md](infrastructure/reference/database/tables/event_types.md) | event-sourcing-overview.md |
 | `saml` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
+| `session-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `scope_path` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | organization_units_projection.md |
 | `scoping` | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | organization_units_projection.md |
 | `session-management` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | auth-provider-architecture.md, frontend/CLAUDE.md |
 | `getSession` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | auth-provider-architecture.md |
+| `span-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `social-login` | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) | OAUTH-TESTING.md |
 | `soft-delete` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | clients.md |
 | `supabase` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | DEPLOYMENT_INSTRUCTIONS.md, SUPABASE-AUTH-SETUP.md |
@@ -146,11 +154,15 @@ purpose: agent-navigation
 | `testing` | [TESTING.md](frontend/testing/TESTING.md) | integration-testing.md |
 | `three-layer-idempotency` | [organization-bootstrap-workflow-design.md](workflows/architecture/organization-bootstrap-workflow-design.md) | activities-reference.md |
 | `tracing` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md, logging-standards.md |
+| `trace-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
+| `traceparent` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
+| `trace-sampling` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `troubleshooting` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |
 | `user-aggregate` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | event-sourcing-overview.md |
 | `var` | [var-partnerships.md](architecture/data/var-partnerships.md) | provider-partners-architecture.md |
 | `viewmodel` | [viewmodels.md](frontend/architecture/viewmodels.md) | viewmodel-testing.md, mobx-patterns.md |
 | `vite` | [DEVELOPMENT.md](frontend/guides/DEVELOPMENT.md) | frontend/CLAUDE.md |
+| `w3c-trace-context` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `wcag` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | TESTING.md |
 | `var-contracts` | [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | var-partnerships.md |
 | `workflow` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | temporal-overview.md, implementation.md |
@@ -207,7 +219,8 @@ purpose: agent-navigation
 | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | Google OAuth testing guide | `oauth`, `testing`, `google` | 1400 |
 | [SUPABASE-AUTH-SETUP.md](infrastructure/guides/supabase/SUPABASE-AUTH-SETUP.md) | Auth provider configuration | `supabase`, `auth`, `setup` | 1600 |
 | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | Edge function testing guide | `edge-function`, `testing`, `deno` | 1200 |
-| [event-observability.md](infrastructure/guides/event-observability.md) | Event processing observability and debugging | `observability`, `tracing`, `failed-events`, `correlation-id` | 1400 |
+| [event-observability.md](infrastructure/guides/event-observability.md) | Event processing observability, W3C Trace Context, span timing | `observability`, `tracing`, `failed-events`, `correlation-id`, `trace-id`, `span-id`, `session-id`, `w3c-trace-context` | 3200 |
+| [observability-operations.md](infrastructure/guides/observability-operations.md) | **[Aspirational]** Production-scale: retention, sampling, APM integration | `retention-policy`, `trace-sampling`, `apm-integration`, `otlp-export`, `event-archival` | 2000 |
 | [table-template.md](infrastructure/reference/database/table-template.md) | Database table documentation template | `template`, `database`, `schema` | 800 |
 
 ### Workflows
@@ -220,7 +233,7 @@ purpose: agent-navigation
 | [integration-testing.md](workflows/guides/integration-testing.md) | Integration testing with local services | `jest`, `workflow-testing`, `local-supabase` | 2500 |
 | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | Provider org creation via UI | `provider-onboarding`, `organization-form`, `troubleshooting` | 1500 |
 | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | Resend email provider config | `resend`, `email-provider`, `kubernetes-secrets` | 1200 |
-| [event-metadata-schema.md](workflows/reference/event-metadata-schema.md) | Event metadata JSONB schema | `event-metadata`, `workflow-traceability`, `jsonb-indexes` | 2000 |
+| [event-metadata-schema.md](workflows/reference/event-metadata-schema.md) | Event metadata JSONB schema, W3C Trace Context fields | `event-metadata`, `workflow-traceability`, `jsonb-indexes`, `trace-id`, `span-id`, `duration-ms` | 3500 |
 | [activities-reference.md](workflows/reference/activities-reference.md) | All Temporal activity signatures | `activities-reference`, `dns-verification`, `compensation-activities` | 3200 |
 | [organization-bootstrap-workflow-design.md](workflows/architecture/organization-bootstrap-workflow-design.md) | Complete bootstrap workflow spec | `bootstrap-workflow-design`, `three-layer-idempotency`, `saga-compensation` | 5500 |
 

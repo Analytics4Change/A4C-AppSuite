@@ -1,24 +1,25 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-01-07
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Complete schema for `event_metadata` JSONB column. Auto-populated workflow fields: `workflow_id`, `workflow_run_id`, `workflow_type`, `activity_id`. Required: `timestamp` (ISO 8601). Recommended: `tags[]`, `source`. Error tracking: `processing_error`, `retry_count`. Four partial indexes optimize workflow/activity queries. Use `emitEvent()` utility for automatic workflow context capture.
+**Summary**: Complete schema for `event_metadata` JSONB column and dedicated tracing columns. Auto-populated workflow fields: `workflow_id`, `workflow_run_id`, `workflow_type`, `activity_id`. W3C Trace Context fields: `trace_id`, `span_id`, `parent_span_id`, `session_id`, `correlation_id` (promoted to columns for query performance). Timing: `duration_ms`. Required: `timestamp` (ISO 8601). Recommended: `tags[]`, `source`. Error tracking: `processing_error`, `retry_count`. Indexes optimize workflow, tracing, and activity queries.
 
 **When to read**:
 - Emitting domain events with proper metadata
 - Querying events by workflow or activity
 - Understanding event-workflow traceability
 - Debugging event processing errors
+- Implementing distributed tracing across services
 
-**Prerequisites**: [triggering-workflows](../guides/triggering-workflows.md)
+**Prerequisites**: [triggering-workflows](../guides/triggering-workflows.md), [event-observability](../../infrastructure/guides/event-observability.md)
 
-**Key topics**: `event-metadata`, `workflow-traceability`, `timestamp`, `tags`, `processing-error`, `jsonb-indexes`
+**Key topics**: `event-metadata`, `workflow-traceability`, `timestamp`, `tags`, `processing-error`, `jsonb-indexes`, `trace-id`, `span-id`, `parent-span-id`, `session-id`, `correlation-id`, `duration-ms`, `w3c-trace-context`
 
-**Estimated read time**: 18 minutes
+**Estimated read time**: 22 minutes
 <!-- TL;DR-END -->
 
 # Event Metadata Schema Reference
@@ -39,6 +40,19 @@ interface EventMetadata {
   workflow_type?: string;      // Workflow function name
   activity_id?: string;        // Activity function name (if event from activity)
 
+  // Distributed Tracing - W3C Trace Context compatible
+  // NOTE: These fields are ALSO stored in dedicated columns for query performance
+  trace_id?: string;           // W3C trace ID (32 hex chars) - stored in column
+  span_id?: string;            // Operation span ID (16 hex chars) - stored in column
+  parent_span_id?: string;     // Parent span for causation chains - stored in column
+  session_id?: string;         // Supabase Auth session ID (UUID) - stored in column
+  correlation_id?: string;     // Business request correlation (UUID) - stored in column
+  duration_ms?: number;        // Operation duration in milliseconds
+
+  // Service Context
+  service_name?: string;       // 'edge-function', 'temporal-worker', 'frontend'
+  operation_name?: string;     // Operation being performed
+
   // Timing
   timestamp: string;           // ISO 8601 timestamp (required)
 
@@ -46,7 +60,6 @@ interface EventMetadata {
   tags?: string[];             // Contextual tags for filtering/grouping
   source?: string;             // Event source (ui, api, cron, webhook)
   user_id?: string;            // User who triggered event (if applicable)
-  correlation_id?: string;     // External correlation ID
 
   // Error Tracking
   processing_error?: string;   // Error message if workflow start failed
@@ -56,6 +69,27 @@ interface EventMetadata {
   [key: string]: any;          // Additional custom metadata
 }
 ```
+
+### Column vs JSONB Storage Strategy
+
+**Why some fields have dedicated columns**:
+
+Five tracing fields are promoted to dedicated columns in the `domain_events` table (not just JSONB):
+
+| Field | Column Type | Why Column? |
+|-------|-------------|-------------|
+| `correlation_id` | `UUID` | High-cardinality queries by request |
+| `session_id` | `UUID` | Session-level debugging queries |
+| `trace_id` | `TEXT` | W3C format, trace timeline reconstruction |
+| `span_id` | `TEXT` | Operation-level queries |
+| `parent_span_id` | `TEXT` | Causation chain traversal |
+
+**Benefits of column promotion**:
+1. **Query Performance**: Composite indexes like `(correlation_id, created_at DESC)` enable sub-100ms queries
+2. **JSONB Limitation**: Extracting from JSONB prevents index usage in `WHERE correlation_id = X AND created_at > Y`
+3. **Schema Validation**: Column types enforce format (UUID vs TEXT)
+
+**Automatic Population**: The `api.emit_domain_event()` function automatically extracts these fields from `p_event_metadata` JSONB and populates the columns. You don't need to pass them separately.
 
 ## Field Definitions
 
@@ -273,11 +307,177 @@ await supabase.from('domain_events').insert({
 
 **Query**:
 ```sql
--- Find all events for a request trace
+-- Find all events for a request trace (uses column index)
 SELECT * FROM domain_events
-WHERE event_metadata->>'correlation_id' = 'trace-abc123'
+WHERE correlation_id = '550e8400-e29b-41d4-a716-446655440000'::uuid
 ORDER BY created_at ASC;
 ```
+
+### Distributed Tracing (W3C Trace Context)
+
+These fields enable end-to-end request tracing across frontend, Edge Functions, Temporal workflows, and database. They support [W3C Trace Context](https://www.w3.org/TR/trace-context/) for APM tool interoperability.
+
+#### `trace_id`
+
+**Type**: `string`
+**Required**: No (auto-populated by tracing utilities)
+**Populated By**: Frontend tracing utils, Edge Function `extractTracingContext()`, or worker
+**Format**: 32 lowercase hex characters (W3C compatible)
+**Column**: `trace_id TEXT` (promoted from JSONB)
+**Purpose**: Unique identifier for an entire distributed trace
+**Example**: `"4bf92f3577b34da6a3ce929d0e0e4736"`
+
+**Usage**:
+```sql
+-- Find all events in a trace (uses column index)
+SELECT * FROM domain_events
+WHERE trace_id = '4bf92f3577b34da6a3ce929d0e0e4736'
+ORDER BY created_at ASC;
+
+-- Or use RPC function for hierarchical view
+SELECT * FROM api.get_trace_timeline('4bf92f3577b34da6a3ce929d0e0e4736');
+```
+
+**Note**: Generated from UUID v4 without dashes. Same trace_id links all events from a single user request across services.
+
+#### `span_id`
+
+**Type**: `string`
+**Required**: No (auto-populated by tracing utilities)
+**Populated By**: Edge Function `createSpan()`, activity `buildTracingForEvent()`
+**Format**: 16 lowercase hex characters (W3C compatible)
+**Column**: `span_id TEXT` (promoted from JSONB)
+**Purpose**: Unique identifier for a single operation within a trace
+**Example**: `"00f067aa0ba902b7"`
+
+**Usage**:
+```sql
+-- Find specific operation
+SELECT * FROM domain_events
+WHERE span_id = '00f067aa0ba902b7';
+```
+
+**Note**: Each Edge Function call, Temporal activity, or distinct operation gets a unique span_id.
+
+#### `parent_span_id`
+
+**Type**: `string`
+**Required**: No (NULL for root spans)
+**Populated By**: `createSpan()` from current context's span_id
+**Format**: 16 lowercase hex characters
+**Column**: `parent_span_id TEXT` (promoted from JSONB)
+**Purpose**: Links to parent operation, enabling call tree reconstruction
+**Example**: `"a716446655440000"`
+
+**Usage**:
+```sql
+-- Find child operations of a span
+SELECT * FROM domain_events
+WHERE parent_span_id = 'a716446655440000'
+ORDER BY created_at ASC;
+
+-- Reconstruct call tree (using CTE)
+WITH RECURSIVE trace_tree AS (
+  -- Root spans (no parent)
+  SELECT id, event_type, span_id, parent_span_id, 0 AS depth
+  FROM domain_events
+  WHERE trace_id = '4bf92f3577b34da6a3ce929d0e0e4736'
+    AND parent_span_id IS NULL
+
+  UNION ALL
+
+  -- Child spans
+  SELECT e.id, e.event_type, e.span_id, e.parent_span_id, tt.depth + 1
+  FROM domain_events e
+  JOIN trace_tree tt ON e.parent_span_id = tt.span_id
+  WHERE e.trace_id = '4bf92f3577b34da6a3ce929d0e0e4736'
+)
+SELECT * FROM trace_tree ORDER BY depth, created_at;
+```
+
+**Note**: NULL indicates a root span (entry point). The `api.get_trace_timeline()` RPC function provides this logic.
+
+#### `session_id`
+
+**Type**: `string`
+**Required**: No (populated from JWT when available)
+**Populated By**: Frontend `getSessionId()`, extracted from Supabase Auth JWT
+**Format**: UUID v4
+**Column**: `session_id UUID` (promoted from JSONB)
+**Purpose**: Links events to user authentication session
+**Example**: `"f47ac10b-58cc-4372-a567-0e02b2c3d479"`
+
+**Usage**:
+```sql
+-- Find all events for a user session (uses column index)
+SELECT * FROM domain_events
+WHERE session_id = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'::uuid
+ORDER BY created_at ASC;
+
+-- Or use RPC function
+SELECT * FROM api.get_events_by_session('f47ac10b-58cc-4372-a567-0e02b2c3d479'::uuid);
+```
+
+**Note**: Tied to Supabase Auth session. Session ID changes when user logs out and back in.
+
+#### `duration_ms`
+
+**Type**: `number`
+**Required**: No (populated by span timing)
+**Populated By**: `endSpan()` calculates from start time
+**Format**: Integer milliseconds
+**Storage**: JSONB only (not promoted to column)
+**Purpose**: Measures operation latency for performance analysis
+**Example**: `245`
+
+**Usage**:
+```sql
+-- Find slow operations (>1 second)
+SELECT
+  id,
+  event_type,
+  (event_metadata->>'duration_ms')::int AS duration_ms,
+  event_metadata->>'operation_name' AS operation,
+  created_at
+FROM domain_events
+WHERE (event_metadata->>'duration_ms')::int > 1000
+ORDER BY (event_metadata->>'duration_ms')::int DESC
+LIMIT 20;
+
+-- Average duration by event type
+SELECT
+  event_type,
+  AVG((event_metadata->>'duration_ms')::numeric) AS avg_ms,
+  MAX((event_metadata->>'duration_ms')::int) AS max_ms,
+  COUNT(*) AS count
+FROM domain_events
+WHERE event_metadata->>'duration_ms' IS NOT NULL
+GROUP BY event_type
+ORDER BY avg_ms DESC;
+```
+
+**Note**: Captures end-to-end operation time. Useful for identifying performance bottlenecks.
+
+#### `service_name`
+
+**Type**: `string`
+**Required**: No (recommended for debugging)
+**Populated By**: Application code
+**Format**: Lowercase string
+**Storage**: JSONB only
+**Purpose**: Identifies which service emitted the event
+**Values**: `'edge-function'`, `'temporal-worker'`, `'frontend'`
+**Example**: `"edge-function"`
+
+#### `operation_name`
+
+**Type**: `string`
+**Required**: No (recommended for debugging)
+**Populated By**: `createSpan(context, operationName)` or `buildEventMetadata()`
+**Format**: kebab-case or camelCase
+**Storage**: JSONB only
+**Purpose**: Identifies the specific operation being performed
+**Example**: `"invite-user"`, `"createOrganizationActivity"`
 
 ### Error Tracking
 
@@ -481,20 +681,61 @@ async function createOrganizationActivity(input: CreateOrgInput) {
 
 ## Indexes for Performance
 
-Four indexes optimize queries on `event_metadata`:
+### Tracing Column Indexes (Promoted Columns)
+
+Three composite indexes optimize tracing queries on dedicated columns:
 
 ```sql
--- Index 1: Query events by workflow_id
+-- Index 1: Query by correlation_id with time range
+CREATE INDEX CONCURRENTLY idx_events_correlation_time
+ON domain_events (correlation_id, created_at DESC)
+WHERE correlation_id IS NOT NULL;
+
+-- Index 2: Query by session_id with time range
+CREATE INDEX CONCURRENTLY idx_events_session_time
+ON domain_events (session_id, created_at DESC)
+WHERE session_id IS NOT NULL;
+
+-- Index 3: Query by trace_id with time range
+CREATE INDEX CONCURRENTLY idx_events_trace_time
+ON domain_events (trace_id, created_at DESC)
+WHERE trace_id IS NOT NULL;
+```
+
+**Usage**:
+```sql
+-- Fast correlation lookup (uses column index)
+SELECT * FROM domain_events
+WHERE correlation_id = '550e8400-e29b-41d4-a716-446655440000'::uuid
+ORDER BY created_at DESC;
+
+-- Fast session lookup (uses column index)
+SELECT * FROM domain_events
+WHERE session_id = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'::uuid
+ORDER BY created_at DESC;
+
+-- Fast trace lookup (uses column index)
+SELECT * FROM domain_events
+WHERE trace_id = '4bf92f3577b34da6a3ce929d0e0e4736'
+ORDER BY created_at DESC;
+```
+
+### Workflow Metadata Indexes (JSONB)
+
+Four indexes optimize queries on `event_metadata` JSONB:
+
+```sql
+-- Index 4: Query events by workflow_id
 CREATE INDEX idx_domain_events_workflow_id
 ON domain_events ((event_metadata->>'workflow_id'))
 WHERE event_metadata->>'workflow_id' IS NOT NULL;
 
--- Index 2: Query events by workflow_run_id
+-- Index 5: Query events by workflow_run_id
 CREATE INDEX idx_domain_events_workflow_run_id
 ON domain_events ((event_metadata->>'workflow_run_id'))
 WHERE event_metadata->>'workflow_run_id' IS NOT NULL;
 
--- Index 3: Composite index for workflow + event type queries
+-- Index 6: Composite index for workflow + event type queries
 CREATE INDEX idx_domain_events_workflow_type
 ON domain_events (
   (event_metadata->>'workflow_id'),
@@ -502,7 +743,7 @@ ON domain_events (
 )
 WHERE event_metadata->>'workflow_id' IS NOT NULL;
 
--- Index 4: Query events by activity_id
+-- Index 7: Query events by activity_id
 CREATE INDEX idx_domain_events_activity_id
 ON domain_events ((event_metadata->>'activity_id'))
 WHERE event_metadata->>'activity_id' IS NOT NULL;
@@ -537,24 +778,31 @@ WHERE event_metadata->>'activity_id' = 'createOrganizationActivity';
 
 ### Field Constraints
 
-| Field | Type | Max Length | Pattern |
-|-------|------|------------|---------|
-| `workflow_id` | string | 255 chars | Application-defined |
-| `workflow_run_id` | string | 36 chars | UUID v4 |
-| `workflow_type` | string | 100 chars | camelCase |
-| `activity_id` | string | 100 chars | camelCase |
-| `timestamp` | string | - | ISO 8601 |
-| `tags` | array | 10 items | lowercase, no spaces |
-| `source` | string | 50 chars | lowercase |
-| `user_id` | string | 36 chars | UUID v4 |
-| `correlation_id` | string | 255 chars | Application-defined |
-| `processing_error` | string | 1000 chars | - |
-| `retry_count` | number | - | >= 0 |
+| Field | Type | Max Length | Pattern | Storage |
+|-------|------|------------|---------|---------|
+| `workflow_id` | string | 255 chars | Application-defined | JSONB |
+| `workflow_run_id` | string | 36 chars | UUID v4 | JSONB |
+| `workflow_type` | string | 100 chars | camelCase | JSONB |
+| `activity_id` | string | 100 chars | camelCase | JSONB |
+| `trace_id` | string | 32 chars | 32 lowercase hex | **Column** |
+| `span_id` | string | 16 chars | 16 lowercase hex | **Column** |
+| `parent_span_id` | string | 16 chars | 16 lowercase hex | **Column** |
+| `session_id` | string | 36 chars | UUID v4 | **Column** |
+| `correlation_id` | string | 36 chars | UUID v4 | **Column** |
+| `duration_ms` | number | - | >= 0 | JSONB |
+| `service_name` | string | 50 chars | lowercase | JSONB |
+| `operation_name` | string | 100 chars | kebab-case/camelCase | JSONB |
+| `timestamp` | string | - | ISO 8601 | JSONB |
+| `tags` | array | 10 items | lowercase, no spaces | JSONB |
+| `source` | string | 50 chars | lowercase | JSONB |
+| `user_id` | string | 36 chars | UUID v4 | JSONB |
+| `processing_error` | string | 1000 chars | - | JSONB |
+| `retry_count` | number | - | >= 0 | JSONB |
 
 ## TypeScript Types
 
 ```typescript
-// workflows/src/shared/types/event-metadata.ts
+// workflows/src/shared/types/index.ts
 
 /**
  * Event metadata schema for domain_events.event_metadata column
@@ -566,6 +814,19 @@ export interface EventMetadata {
   workflow_type?: string;
   activity_id?: string;
 
+  // Distributed Tracing - W3C Trace Context compatible
+  // NOTE: Also stored in dedicated columns for query performance
+  trace_id?: string;         // 32 hex chars - stored in column
+  span_id?: string;          // 16 hex chars - stored in column
+  parent_span_id?: string;   // 16 hex chars - stored in column
+  session_id?: string;       // UUID - stored in column
+  correlation_id?: string;   // UUID - stored in column
+  duration_ms?: number;      // Operation duration
+
+  // Service Context
+  service_name?: string;     // 'edge-function', 'temporal-worker', 'frontend'
+  operation_name?: string;   // Operation being performed
+
   // Timing (required)
   timestamp: string; // ISO 8601
 
@@ -573,7 +834,6 @@ export interface EventMetadata {
   tags?: string[];
   source?: 'ui' | 'api' | 'cron' | 'webhook' | 'worker' | string;
   user_id?: string;
-  correlation_id?: string;
 
   // Error Tracking (auto-populated on failure)
   processing_error?: string;
@@ -581,6 +841,28 @@ export interface EventMetadata {
 
   // Custom fields
   [key: string]: any;
+}
+
+/**
+ * Tracing context for distributed tracing
+ */
+export interface TracingContext {
+  correlationId: string;      // Business request correlation
+  sessionId: string | null;   // Supabase Auth session
+  traceId: string;            // W3C trace ID (32 hex)
+  spanId: string;             // Current operation span (16 hex)
+  parentSpanId: string | null; // Parent operation span
+  sampled: boolean;           // Whether trace is sampled
+}
+
+/**
+ * Subset of tracing context passed to workflows
+ */
+export interface WorkflowTracingParams {
+  correlationId: string;
+  sessionId?: string | null;
+  traceId: string;
+  parentSpanId?: string | null;
 }
 
 /**
@@ -592,6 +874,13 @@ export interface EmitEventMetadata {
   source?: string;
   user_id?: string;
   correlation_id?: string;
+  trace_id?: string;
+  span_id?: string;
+  parent_span_id?: string;
+  session_id?: string;
+  duration_ms?: number;
+  service_name?: string;
+  operation_name?: string;
   [key: string]: any;
 }
 ```
@@ -688,6 +977,23 @@ ORDER BY created_at ASC;
 
 ## Migration History
 
+### 2026-01-07: W3C Trace Context Support
+
+**Migrations**:
+- `20260107170706_add_event_tracing_columns.sql` - Add tracing columns and indexes
+- `20260107171628_update_emit_domain_event_tracing.sql` - Update emit_domain_event to extract tracing
+
+**Changes**:
+- Added 5 dedicated columns: `correlation_id`, `session_id`, `trace_id`, `span_id`, `parent_span_id`
+- Added 3 composite indexes for tracing queries
+- Added 3 RPC functions: `api.get_events_by_session()`, `api.get_events_by_correlation()`, `api.get_trace_timeline()`
+- Updated `api.emit_domain_event()` to auto-extract tracing fields from metadata JSONB
+
+**Backward Compatibility**: ✅ Fully compatible
+- Old events without tracing fields remain queryable (columns are nullable)
+- `api.emit_domain_event()` auto-extracts tracing from metadata (no API change)
+- New column indexes are partial (only index non-null values)
+
 ### 2025-11-24: Event-Workflow Linking
 
 **Migration**: `018-event-workflow-linking-index.sql`
@@ -704,10 +1010,13 @@ ORDER BY created_at ASC;
 
 ## Related Documentation
 
+- **Event Observability Guide**: `documentation/infrastructure/guides/event-observability.md` - W3C Trace Context, debugging workflows
 - **Triggering Workflows Guide**: `documentation/workflows/guides/triggering-workflows.md`
 - **Event-Driven Architecture**: `documentation/architecture/workflows/event-driven-workflow-triggering.md`
 - **EventQueries API**: `workflows/src/shared/utils/event-queries.ts`
 - **emitEvent Utility**: `workflows/src/shared/utils/emit-event.ts`
+- **Frontend Tracing**: `frontend/src/utils/tracing.ts` - W3C traceparent, correlation ID generation
+- **Edge Function Tracing**: `infrastructure/supabase/supabase/functions/_shared/tracing-context.ts`
 - **Database Schema**: `infrastructure/supabase/sql/02-tables/events/domain_events.sql`
 
 ## Support

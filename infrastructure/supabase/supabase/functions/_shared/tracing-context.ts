@@ -369,7 +369,7 @@ export function extractClientInfo(req: Request): {
 } {
   return {
     ipAddress:
-      req.headers.get('x-forwarded-for') ||
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
       req.headers.get('x-real-ip') ||
       null,
     userAgent: req.headers.get('user-agent') || null,

@@ -1,19 +1,25 @@
+---
+status: current
+last_updated: 2026-01-07
+---
+
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Guide for monitoring and debugging failed domain events using the event processing observability system.
+**Summary**: Guide for monitoring and debugging failed domain events using the event processing observability system, including W3C Trace Context support for end-to-end tracing.
 
 **When to read**:
 - Debugging why an operation silently failed (user created but no role assigned)
 - Investigating event processing errors in production
 - Setting up error alerting or monitoring dashboards
-- Understanding how correlation IDs trace requests across services
+- Understanding how correlation IDs and trace context trace requests across services
+- Tracing requests from frontend through Edge Functions to database
 
 **Prerequisites**: Understanding of CQRS event sourcing, access to Supabase dashboard or SQL
 
-**Key topics**: `event-errors`, `observability`, `tracing`, `correlation-id`, `failed-events`, `event-processing`, `debugging`
+**Key topics**: `event-errors`, `observability`, `tracing`, `correlation-id`, `trace-id`, `span-id`, `session-id`, `traceparent`, `w3c-trace-context`, `duration-ms`, `failed-events`, `event-processing`, `debugging`
 
-**Estimated read time**: 10 minutes (full), 3 minutes (relevant sections)
+**Estimated read time**: 15 minutes (full), 5 minutes (relevant sections)
 <!-- TL;DR-END -->
 
 # Event Processing & Observability Guide
@@ -186,6 +192,267 @@ All events emitted via `api.emit_domain_event()` should include:
 | `reason` | When meaningful | Human-readable justification |
 | `ip_address` | Edge Functions | Client IP |
 | `user_agent` | Edge Functions | Client info |
+
+---
+
+## W3C Trace Context
+
+The system supports [W3C Trace Context](https://www.w3.org/TR/trace-context/) for distributed tracing across services. This enables end-to-end visibility from frontend through Edge Functions, Temporal workflows, and into the database.
+
+### Trace Context Fields
+
+| Field | Column | Description | Format |
+|-------|--------|-------------|--------|
+| `trace_id` | ✅ Column | Unique identifier for the entire trace | 32 hex chars (UUID without dashes) |
+| `span_id` | ✅ Column | Unique identifier for a single operation | 16 hex chars |
+| `parent_span_id` | ✅ Column | Parent span for causation chains | 16 hex chars |
+| `session_id` | ✅ Column | Supabase Auth session ID | UUID |
+| `correlation_id` | ✅ Column | Business request correlation | UUID |
+| `duration_ms` | JSONB | Operation duration in milliseconds | number |
+
+**Note**: `trace_id`, `span_id`, `parent_span_id`, `session_id`, and `correlation_id` are promoted to dedicated columns (not just JSONB) for query performance at scale.
+
+### Traceparent Header Format
+
+The `traceparent` header follows W3C format:
+```
+traceparent: 00-{trace_id}-{span_id}-{flags}
+```
+
+Example:
+```
+traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+              │   └──────trace_id──────────┘  └───span_id───┘  │
+              version                                          sampled
+```
+
+- **version**: Always `00`
+- **trace_id**: 32 lowercase hex characters (128-bit)
+- **span_id**: 16 lowercase hex characters (64-bit)
+- **flags**: `01` = sampled, `00` = not sampled
+
+### Frontend Integration
+
+Frontend services create tracing context and pass headers to Edge Functions:
+
+```typescript
+import { createTracingContext, buildHeadersFromContext } from '@/utils/tracing';
+import { Logger } from '@/utils/logger';
+
+// Create context once, use for both logging and headers
+const tracingContext = await createTracingContext();
+Logger.pushTracingContext(tracingContext);
+
+try {
+  const headers = buildHeadersFromContext(tracingContext);
+  const { data, error } = await supabase.functions.invoke('invite-user', {
+    body: { email, roleId },
+    headers,  // Includes traceparent, X-Correlation-ID, X-Session-ID
+  });
+
+  if (error) {
+    // Error includes correlation ID for support tickets
+    console.error(`Failed: ${error.message} (Ref: ${error.correlationId})`);
+  }
+} finally {
+  Logger.popTracingContext();  // Always pop in finally block
+}
+```
+
+**Headers sent**:
+```
+traceparent: 00-{traceId}-{spanId}-01
+X-Correlation-ID: {correlationId}
+X-Session-ID: {sessionId}
+```
+
+### Edge Function Integration
+
+Edge Functions extract tracing context and propagate to events:
+
+```typescript
+import { extractTracingContext, createSpan, endSpan } from '../_shared/tracing-context.ts';
+import { buildEventMetadata } from '../_shared/emit-event.ts';
+
+Deno.serve(async (req) => {
+  const context = extractTracingContext(req);  // Parse headers
+  const span = createSpan(context, 'invite-user');
+
+  try {
+    // Build event metadata with tracing
+    const eventMetadata = buildEventMetadata(context, 'user.invited', req, {
+      user_id: actingUser.id,
+      reason: 'User invited via UI',
+    });
+
+    await supabase.rpc('emit_domain_event', {
+      p_stream_id: userId,
+      p_stream_type: 'user',
+      p_event_type: 'user.invited',
+      p_event_data: { email, roles: [roleId] },
+      p_event_metadata: eventMetadata,  // Tracing auto-extracted by DB function
+    });
+
+    endSpan(span, 'ok');
+    return new Response(JSON.stringify({ success: true }));
+  } catch (error) {
+    endSpan(span, 'error');
+    throw error;
+  }
+});
+```
+
+### Temporal Workflow Integration
+
+Workflows receive tracing context and propagate to activities:
+
+```typescript
+// Workflow receives tracing in params
+export async function organizationBootstrapWorkflow(
+  params: OrganizationBootstrapParams
+): Promise<OrganizationBootstrapResult> {
+  // Pass tracing to each activity
+  await createOrganization({
+    ...orgParams,
+    tracing: params.tracing,  // { correlationId, sessionId, traceId, parentSpanId }
+  });
+}
+
+// Activity uses tracing in emitEvent
+async function createOrganization(params: CreateOrganizationParams) {
+  const tracingParams = buildTracingForEvent(params.tracing);
+
+  await emitEvent({
+    eventType: 'organization.created',
+    aggregateId: orgId,
+    eventData: { name, slug },
+    ...tracingParams,  // Includes trace_id, span_id, parent_span_id
+  });
+}
+```
+
+---
+
+## Span Timing
+
+Every operation can capture timing information via `duration_ms` for latency analysis.
+
+### Capturing Span Timing
+
+Edge Functions use `createSpan()` and `endSpan()`:
+
+```typescript
+import { createSpan, endSpan } from '../_shared/tracing-context.ts';
+
+const span = createSpan(context, 'invite-user');
+try {
+  // ... operation logic ...
+  endSpan(span, 'ok');  // Calculates duration automatically
+} catch (error) {
+  endSpan(span, 'error');
+  throw error;
+}
+```
+
+The span object contains:
+```typescript
+interface Span {
+  spanId: string;
+  parentSpanId: string | null;
+  operationName: string;
+  startTime: number;      // Date.now() at span creation
+  endTime?: number;       // Date.now() at endSpan()
+  status?: 'ok' | 'error';
+  durationMs?: number;    // Calculated: endTime - startTime
+  attributes: Record<string, unknown>;
+}
+```
+
+### Querying by Duration
+
+Find slow operations:
+
+```sql
+-- Events taking >1 second
+SELECT
+  id,
+  event_type,
+  (event_metadata->>'duration_ms')::int AS duration_ms,
+  event_metadata->>'operation_name' AS operation,
+  created_at
+FROM domain_events
+WHERE (event_metadata->>'duration_ms')::int > 1000
+ORDER BY (event_metadata->>'duration_ms')::int DESC
+LIMIT 20;
+```
+
+---
+
+## Trace Timeline (RPC Functions)
+
+Three RPC functions enable querying events by tracing context:
+
+### `api.get_events_by_correlation()`
+
+Find all events for a business request:
+
+```sql
+SELECT * FROM api.get_events_by_correlation(
+  p_correlation_id := '550e8400-e29b-41d4-a716-446655440000'::uuid
+);
+```
+
+Returns events ordered by `created_at ASC` for request flow analysis.
+
+### `api.get_events_by_session()`
+
+Find all events for a user session:
+
+```sql
+SELECT * FROM api.get_events_by_session(
+  p_session_id := 'f47ac10b-58cc-4372-a567-0e02b2c3d479'::uuid
+);
+```
+
+Useful for debugging user-reported issues when they provide session info.
+
+### `api.get_trace_timeline()`
+
+Get full trace with parent-child span relationships:
+
+```sql
+SELECT * FROM api.get_trace_timeline(
+  p_trace_id := '4bf92f3577b34da6a3ce929d0e0e4736'
+);
+```
+
+Returns:
+- `id` - Event UUID
+- `event_type` - Event type
+- `span_id` - Operation span
+- `parent_span_id` - Parent span (NULL for root)
+- `duration_ms` - Operation duration (if available)
+- `service_name` - Source service (edge-function, temporal-worker)
+- `operation_name` - Operation name
+- `created_at` - Timestamp
+- `depth` - Nesting level in call tree (0 = root)
+- `path` - Full path from root
+
+### Admin Dashboard Search
+
+The Failed Events page (`/admin/events`) supports multiple search modes:
+
+| Search Type | Input | Color | Description |
+|------------|-------|-------|-------------|
+| Failed Events | - | Default | View events with processing_error |
+| Correlation | UUID | Blue | Search by `correlation_id` |
+| Session | UUID | Purple | Search by `session_id` |
+| Trace | Hex string | Green | Search by `trace_id` |
+
+Each search mode displays:
+- **Tracing Info**: correlation_id, session_id, trace_id, span_id, parent_span_id
+- **Audit Context**: user_id, source_function, reason, ip_address
+- **Copy buttons** for all ID fields
 
 ---
 
@@ -386,7 +653,9 @@ To add monitoring for new event types:
 
 ## Related Documentation
 
+- [Observability Operations](./observability-operations.md) - **[Aspirational]** Production-scale: retention, sampling, APM integration
 - [Event Sourcing Overview](../../architecture/data/event-sourcing-overview.md) - CQRS architecture
+- [Event Metadata Schema](../../workflows/reference/event-metadata-schema.md) - Complete metadata field definitions
 - [Database Tables Reference](../reference/database/tables/) - Schema documentation
 - [Edge Functions](../../../infrastructure/supabase/supabase/functions/) - Source code
 

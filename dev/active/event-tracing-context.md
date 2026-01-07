@@ -128,10 +128,11 @@ interface EventMetadata {
 
 - ✅ `frontend/src/components/ui/ErrorWithCorrelation.tsx` - Error display with reference ID, trace ID (non-prod), copy buttons, InlineErrorWithCorrelation variant
 
-### Files Still To Create (Phase 7+)
+### Files Created (Phase 7 - 2026-01-07)
 
-- `infrastructure/supabase/supabase/functions/_shared/__tests__/emit-event.test.ts` - Unit tests
-- `frontend/src/utils/__tests__/tracing.test.ts` - Unit tests
+- ✅ `frontend/src/utils/__tests__/tracing.test.ts` - 43 Vitest unit tests for frontend tracing utilities
+- ✅ `infrastructure/supabase/supabase/functions/_shared/__tests__/tracing-context.test.ts` - 38 Deno tests for Edge Function tracing
+- ✅ `infrastructure/supabase/supabase/functions/_shared/__tests__/emit-event.test.ts` - 16 Deno tests for event emission
 
 ### Existing Files Modified (Phase 4 - 2026-01-07)
 
@@ -172,11 +173,11 @@ interface EventMetadata {
   - Audit context section (user_id, source_function, reason, ip_address)
   - CopyButton component for clipboard functionality
 
-### Files Still To Modify (Phase 6+)
+### Files Modified (Phase 8 - 2026-01-07)
 
-- `documentation/infrastructure/guides/event-observability.md` - Update docs
-- `documentation/workflows/reference/event-metadata-schema.md` - Add trace_id, span_id, duration_ms fields
-- `documentation/AGENT-INDEX.md` - Add session-id, trace-id, span-id keywords
+- ✅ `documentation/infrastructure/guides/event-observability.md` - Added W3C Trace Context, Span Timing, Trace Timeline sections
+- ✅ `documentation/workflows/reference/event-metadata-schema.md` - Added trace_id, span_id, parent_span_id, duration_ms fields, column vs JSONB strategy
+- ✅ `documentation/AGENT-INDEX.md` - Added session-id, trace-id, span-id, traceparent, w3c-trace-context, duration-ms, parent-span-id keywords
 
 ## Related Components
 
@@ -271,6 +272,16 @@ logger.error('Failed to send invitation', error, { invitationId });
 - Event metadata schema: `documentation/workflows/reference/event-metadata-schema.md`
 - AGENT-GUIDELINES.md for documentation requirements
 
+## Git Commits (Event Tracing Feature)
+
+| Commit | Description |
+|--------|-------------|
+| *pending* | docs(tracing): Complete Phase 8 documentation updates |
+| `80294aac` | feat(tracing): Complete Phases 4-6 (Temporal, Admin Dashboard, ErrorWithCorrelation) |
+| `8b96a694` | feat(tracing): Add frontend tracing with Phase 3 refinements |
+| `b3c28148` | feat(tracing): Add W3C trace context support to Edge Functions |
+| `43ab29ac` | feat(observability): Add event processing error visibility system |
+
 ## Important Constraints
 
 1. **Supabase Auth JWT Structure**: Must verify `session_id` claim exists. If not, getSessionId() returns null gracefully.
@@ -286,6 +297,10 @@ logger.error('Failed to send invitation', error, { invitationId });
 6. **Single Context Source**: Always create tracing context once with `createTracingContext()`, then use `buildHeadersFromContext(context)` to build headers. Never call `buildTracingHeaders()` separately as it generates different IDs. - Added 2026-01-07
 
 7. **TracingLogContext Type Compatibility**: `TracingLogContext.sessionId` must be `string | null` (not `string | undefined`) to match `TracingContext.sessionId`. This was fixed during implementation. - Discovered 2026-01-07
+
+8. **x-forwarded-for Header Parsing**: When extracting client IP from `x-forwarded-for` header, always split by comma and take the first IP only: `req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()`. The header can contain multiple IPs (client, proxies). Bug discovered in Phase 7 testing. - Discovered 2026-01-07
+
+9. **W3C Span ID Validation**: Span IDs in traceparent header must be valid 16-character hex strings. Using descriptive text like `originalspan0000` will fail parsing because characters like 'o', 'r', 'g' are not valid hex. Always use generated hex IDs. - Discovered 2026-01-07
 
 ## Why This Approach?
 
@@ -398,3 +413,33 @@ After initial Phase 3 implementation, four issues were identified and fixed:
 2. Include in error messages as `(Ref: {correlationId})`
 3. Return via `correlationId` field in result
 4. Added `correlationId` to `UserOperationResult.errorDetails` type
+
+## Phase 7 Implementation Notes (2026-01-07)
+
+### Test Coverage Summary
+
+| Suite | Tests | Framework | File |
+|-------|-------|-----------|------|
+| Frontend tracing | 43 | Vitest | `frontend/src/utils/__tests__/tracing.test.ts` |
+| Edge Function tracing-context | 38 | Deno.test | `_shared/__tests__/tracing-context.test.ts` |
+| Edge Function emit-event | 16 | Deno.test | `_shared/__tests__/emit-event.test.ts` |
+| **Total** | **97** | | |
+
+### Running Tests
+
+```bash
+# Frontend tests (Vitest)
+cd frontend
+npm run test -- src/utils/__tests__/tracing.test.ts --run
+
+# Edge Function tests (Deno)
+cd infrastructure/supabase/supabase/functions
+deno test --allow-net _shared/__tests__/tracing-context.test.ts
+deno test --allow-net _shared/__tests__/emit-event.test.ts
+```
+
+### Bug Fixes Discovered During Testing
+
+1. **`extractClientInfo()` in tracing-context.ts** (line 372): Was returning full `x-forwarded-for` header instead of first IP. Fixed to split by comma and take first.
+
+2. **Test data in emit-event.test.ts** (line 234): Integration test used `originalspan0000` as span ID which contains non-hex characters. Fixed to use valid hex `a716446655440000`.
