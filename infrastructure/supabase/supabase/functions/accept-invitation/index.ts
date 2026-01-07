@@ -17,13 +17,11 @@ import {
   createInternalError,
   createCorsPreflightResponse,
   standardCorsHeaders,
-  ErrorCodes,
 } from '../_shared/error-response.ts';
 import {
   extractTracingContext,
   createSpan,
   endSpan,
-  type TracingContext,
 } from '../_shared/tracing-context.ts';
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
