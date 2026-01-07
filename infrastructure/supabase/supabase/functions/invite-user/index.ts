@@ -19,19 +19,15 @@ import {
 import { AnySchemaSupabaseClient } from '../_shared/types.ts';
 import {
   handleRpcError,
-  createValidationError,
-  createUnauthorizedError,
   createInternalError,
   createCorsPreflightResponse,
   standardCorsHeaders,
   createErrorResponse,
-  ErrorCodes,
 } from '../_shared/error-response.ts';
 import {
   extractTracingContext,
   createSpan,
   endSpan,
-  type TracingContext,
 } from '../_shared/tracing-context.ts';
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 

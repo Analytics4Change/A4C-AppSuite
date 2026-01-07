@@ -19,7 +19,6 @@ import {
   createInternalError,
   createCorsPreflightResponse,
   standardCorsHeaders,
-  createErrorResponse,
 } from '../_shared/error-response.ts';
 import {
   extractTracingContext,
