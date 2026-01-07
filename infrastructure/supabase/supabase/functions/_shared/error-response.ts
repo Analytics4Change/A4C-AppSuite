@@ -292,10 +292,19 @@ export function createInternalError(
 /**
  * Standard CORS headers for Edge Functions.
  * Import and use these in all Edge Functions for consistency.
+ *
+ * Includes W3C Trace Context headers (traceparent, tracestate) and
+ * custom tracing headers (x-correlation-id, x-session-id) for
+ * end-to-end request tracing.
+ *
+ * @see _shared/tracing-context.ts - Tracing implementation
+ * @see documentation/infrastructure/guides/event-observability.md
  */
 export const standardCorsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, traceparent, tracestate, x-correlation-id, x-session-id',
+  'Access-Control-Expose-Headers': 'traceparent, x-correlation-id',
 };
 
 /**

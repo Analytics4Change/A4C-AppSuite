@@ -18,7 +18,6 @@ import {
 } from '../_shared/env-schema.ts';
 import { AnySchemaSupabaseClient } from '../_shared/types.ts';
 import {
-  generateCorrelationId,
   handleRpcError,
   createValidationError,
   createUnauthorizedError,
@@ -28,9 +27,16 @@ import {
   createErrorResponse,
   ErrorCodes,
 } from '../_shared/error-response.ts';
+import {
+  extractTracingContext,
+  createSpan,
+  endSpan,
+  type TracingContext,
+} from '../_shared/tracing-context.ts';
+import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v6';
+const DEPLOY_VERSION = 'v7-tracing';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -131,7 +137,8 @@ function generateSecureToken(): string {
 async function checkEmailStatus(
   supabase: AnySchemaSupabaseClient,
   email: string,
-  orgId: string
+  orgId: string,
+  tracingContext?: TracingContext
 ): Promise<EmailLookupResult> {
   // Check for existing user in this org's user_roles_projection
   const { data: existingRole, error: roleError } = await supabase
@@ -171,7 +178,7 @@ async function checkEmailStatus(
 
     if (expiresAt < now) {
       // Invitation is expired - emit lazy expiration event
-      await emitExpirationEvent(supabase, invitation, orgId);
+      await emitExpirationEvent(supabase, invitation, orgId, tracingContext);
       return {
         status: 'expired_invitation',
         invitationId: invitation.id,
@@ -210,9 +217,21 @@ async function checkEmailStatus(
 async function emitExpirationEvent(
   supabase: AnySchemaSupabaseClient,
   invitation: { id: string; email: string; expires_at: string },
-  orgId: string
+  orgId: string,
+  tracingContext?: TracingContext
 ): Promise<void> {
   console.log(`[invite-user v${DEPLOY_VERSION}] Emitting lazy expiration event for invitation ${invitation.id}`);
+
+  // Build metadata with tracing if context provided
+  const metadata = tracingContext
+    ? buildEventMetadata(tracingContext, 'invitation.expired', undefined, {
+        trigger: 'lazy_expiration_detection',
+        detected_by: 'invite-user-edge-function',
+      })
+    : {
+        trigger: 'lazy_expiration_detection',
+        detected_by: 'invite-user-edge-function',
+      };
 
   const { error } = await supabase.rpc('emit_domain_event', {
     p_stream_id: invitation.id,
@@ -225,10 +244,7 @@ async function emitExpirationEvent(
       expired_at: new Date().toISOString(),
       original_expires_at: invitation.expires_at,
     },
-    p_event_metadata: {
-      trigger: 'lazy_expiration_detection',
-      detected_by: 'invite-user-edge-function',
-    },
+    p_event_metadata: metadata,
   });
 
   if (error) {
@@ -361,9 +377,12 @@ If you didn't expect this invitation, you can safely ignore this email.
 }
 
 serve(async (req) => {
-  // Generate correlation ID for request tracing
-  const correlationId = generateCorrelationId();
-  console.log(`[invite-user v${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}`);
+  // Extract tracing context from request headers (W3C traceparent + custom headers)
+  const tracingContext = extractTracingContext(req);
+  const correlationId = tracingContext.correlationId;
+  const span = createSpan(tracingContext, 'invite-user');
+
+  console.log(`[invite-user v${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}, trace_id=${tracingContext.traceId}`);
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -581,7 +600,7 @@ serve(async (req) => {
       },
     });
 
-    const emailStatus = await checkEmailStatus(supabaseAdmin, requestData.email, orgId);
+    const emailStatus = await checkEmailStatus(supabaseAdmin, requestData.email, orgId, tracingContext);
     console.log(`[invite-user v${DEPLOY_VERSION}] Email status: ${emailStatus.status}`);
 
     // Handle non-invitable statuses
@@ -664,12 +683,10 @@ serve(async (req) => {
         p_stream_type: 'user',
         p_event_type: 'user.invited',
         p_event_data: eventData,
-        p_event_metadata: {
+        p_event_metadata: buildEventMetadata(tracingContext, 'user.invited', req, {
           user_id: user.id,
-          ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null,
-          user_agent: req.headers.get('user-agent') || null,
           reason: 'Manual user invitation',
-        },
+        }),
       });
 
     if (eventError) {
@@ -720,13 +737,19 @@ serve(async (req) => {
       emailStatus: emailStatus.status,
     };
 
+    // End span with success status
+    const completedSpan = endSpan(span, 'ok');
+    console.log(`[invite-user v${DEPLOY_VERSION}] Completed in ${completedSpan.durationMs}ms, correlation_id=${correlationId}`);
+
     return new Response(
       JSON.stringify(response),
       { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error(`[invite-user v${DEPLOY_VERSION}] Unhandled error:`, error);
+    // End span with error status
+    const completedSpan = endSpan(span, 'error');
+    console.error(`[invite-user v${DEPLOY_VERSION}] Unhandled error after ${completedSpan.durationMs}ms:`, error);
     return createInternalError(correlationId, corsHeaders, error.message);
   }
 });

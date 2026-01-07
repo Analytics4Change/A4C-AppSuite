@@ -11,7 +11,6 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 import {
-  generateCorrelationId,
   handleRpcError,
   createValidationError,
   createNotFoundError,
@@ -20,9 +19,10 @@ import {
   createCorsPreflightResponse,
   standardCorsHeaders,
 } from '../_shared/error-response.ts';
+import { extractTracingContext } from '../_shared/tracing-context.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v24';
+const DEPLOY_VERSION = 'v25-tracing';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -49,9 +49,10 @@ interface WorkflowStage {
 }
 
 serve(async (req) => {
-  // Generate correlation ID for request tracing
-  const correlationId = generateCorrelationId();
-  console.log(`[workflow-status ${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}`);
+  // Extract tracing context from request headers (W3C traceparent + custom headers)
+  const tracingContext = extractTracingContext(req);
+  const correlationId = tracingContext.correlationId;
+  console.log(`[workflow-status ${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}, trace_id=${tracingContext.traceId}`);
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {

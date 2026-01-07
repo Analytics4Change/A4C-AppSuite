@@ -16,15 +16,20 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 import {
-  generateCorrelationId,
   createInternalError,
   createCorsPreflightResponse,
   standardCorsHeaders,
   createErrorResponse,
 } from '../_shared/error-response.ts';
+import {
+  extractTracingContext,
+  createSpan,
+  endSpan,
+  buildTracingHeaders,
+} from '../_shared/tracing-context.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v4';
+const DEPLOY_VERSION = 'v5-tracing';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -106,9 +111,12 @@ interface BootstrapResponse {
 }
 
 serve(async (req) => {
-  // Generate correlation ID for request tracing
-  const correlationId = generateCorrelationId();
-  console.log(`[organization-bootstrap ${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}`);
+  // Extract tracing context from request headers (W3C traceparent + custom headers)
+  const tracingContext = extractTracingContext(req);
+  const correlationId = tracingContext.correlationId;
+  const span = createSpan(tracingContext, 'organization-bootstrap');
+
+  console.log(`[organization-bootstrap ${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}, trace_id=${tracingContext.traceId}`);
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -261,11 +269,15 @@ serve(async (req) => {
     const apiEndpoint = `${backendApiUrl}/api/v1/workflows/organization-bootstrap`;
 
     try {
+      // Include tracing headers for downstream propagation
+      const tracingHeaders = buildTracingHeaders(tracingContext);
+
       const apiResponse = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': authHeader,
+          ...tracingHeaders,
         },
         body: JSON.stringify({
           subdomain: requestData.subdomain,
@@ -305,10 +317,13 @@ serve(async (req) => {
         );
       }
 
-      console.log(`[organization-bootstrap ${DEPLOY_VERSION}] ✓ Bootstrap initiated successfully:`, {
+      // End span with success status
+      const completedSpan = endSpan(span, 'ok');
+      console.log(`[organization-bootstrap ${DEPLOY_VERSION}] ✓ Bootstrap initiated successfully in ${completedSpan.durationMs}ms:`, {
         workflowId: responseData.workflowId,
         organizationId: responseData.organizationId,
         user: user.email,
+        correlation_id: correlationId,
       });
 
       // Return the Backend API response (includes workflowId, organizationId)
@@ -321,7 +336,8 @@ serve(async (req) => {
       );
 
     } catch (fetchError) {
-      console.error(`[organization-bootstrap ${DEPLOY_VERSION}] Failed to call Backend API:`, fetchError);
+      const completedSpan = endSpan(span, 'error');
+      console.error(`[organization-bootstrap ${DEPLOY_VERSION}] Failed to call Backend API after ${completedSpan.durationMs}ms:`, fetchError);
       return new Response(
         JSON.stringify({
           error: 'Failed to reach Backend API',
@@ -334,7 +350,9 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error(`[organization-bootstrap ${DEPLOY_VERSION}] Unhandled error:`, error);
+    // End span with error status
+    const completedSpan = endSpan(span, 'error');
+    console.error(`[organization-bootstrap ${DEPLOY_VERSION}] Unhandled error after ${completedSpan.durationMs}ms:`, error);
     return createInternalError(correlationId, corsHeaders, error.message);
   }
 });

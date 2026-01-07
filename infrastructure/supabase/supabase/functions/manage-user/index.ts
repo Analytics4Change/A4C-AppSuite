@@ -16,16 +16,21 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 import { AnySchemaSupabaseClient } from '../_shared/types.ts';
 import {
-  generateCorrelationId,
   handleRpcError,
   createInternalError,
   createCorsPreflightResponse,
   standardCorsHeaders,
   createErrorResponse,
 } from '../_shared/error-response.ts';
+import {
+  extractTracingContext,
+  createSpan,
+  endSpan,
+} from '../_shared/tracing-context.ts';
+import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v3';
+const DEPLOY_VERSION = 'v4-tracing';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -97,9 +102,12 @@ async function getUserDetails(
 }
 
 serve(async (req) => {
-  // Generate correlation ID for request tracing
-  const correlationId = generateCorrelationId();
-  console.log(`[manage-user v${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}`);
+  // Extract tracing context from request headers (W3C traceparent + custom headers)
+  const tracingContext = extractTracingContext(req);
+  const correlationId = tracingContext.correlationId;
+  const span = createSpan(tracingContext, 'manage-user');
+
+  console.log(`[manage-user v${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}, trace_id=${tracingContext.traceId}`);
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -298,12 +306,10 @@ serve(async (req) => {
         p_stream_type: 'user',
         p_event_type: eventType,
         p_event_data: eventData,
-        p_event_metadata: {
+        p_event_metadata: buildEventMetadata(tracingContext, eventType, req, {
           user_id: user.id,
-          ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null,
-          user_agent: req.headers.get('user-agent') || null,
           reason: requestData.reason || `Manual ${requestData.operation}`,
-        },
+        }),
       });
 
     if (eventError) {
@@ -341,13 +347,19 @@ serve(async (req) => {
       operation: requestData.operation,
     };
 
+    // End span with success status
+    const completedSpan = endSpan(span, 'ok');
+    console.log(`[manage-user v${DEPLOY_VERSION}] Completed in ${completedSpan.durationMs}ms, correlation_id=${correlationId}`);
+
     return new Response(
       JSON.stringify(response),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error(`[manage-user v${DEPLOY_VERSION}] Unhandled error:`, error);
+    // End span with error status
+    const completedSpan = endSpan(span, 'error');
+    console.error(`[manage-user v${DEPLOY_VERSION}] Unhandled error after ${completedSpan.durationMs}ms:`, error);
     return createInternalError(correlationId, corsHeaders, error.message);
   }
 });

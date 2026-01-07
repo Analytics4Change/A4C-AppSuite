@@ -11,7 +11,6 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 import {
-  generateCorrelationId,
   handleRpcError,
   createValidationError,
   createNotFoundError,
@@ -20,9 +19,16 @@ import {
   standardCorsHeaders,
   ErrorCodes,
 } from '../_shared/error-response.ts';
+import {
+  extractTracingContext,
+  createSpan,
+  endSpan,
+  type TracingContext,
+} from '../_shared/tracing-context.ts';
+import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v11';
+const DEPLOY_VERSION = 'v12-tracing';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -66,9 +72,12 @@ interface AcceptInvitationResponse {
 }
 
 serve(async (req) => {
-  // Generate correlation ID for request tracing
-  const correlationId = generateCorrelationId();
-  console.log(`[accept-invitation v${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}`);
+  // Extract tracing context from request headers (W3C traceparent + custom headers)
+  const tracingContext = extractTracingContext(req);
+  const correlationId = tracingContext.correlationId;
+  const span = createSpan(tracingContext, 'accept-invitation');
+
+  console.log(`[accept-invitation v${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}, trace_id=${tracingContext.traceId}`);
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -280,12 +289,12 @@ serve(async (req) => {
           invited_via: 'organization_bootstrap',
           auth_method: isEmailPassword ? 'email_password' : 'oauth',
         },
-        p_event_metadata: {
+        p_event_metadata: buildEventMetadata(tracingContext, 'user.created', req, {
           user_id: userId,
           organization_id: invitation.organization_id,
           invitation_token: requestData.token,
           automated: true,
-        }
+        })
       });
 
     if (eventError) {
@@ -361,12 +370,12 @@ serve(async (req) => {
             org_id: invitation.organization_id,
             scope_path: null,  // Organization-level scope
           },
-          p_event_metadata: {
+          p_event_metadata: buildEventMetadata(tracingContext, 'user.role.assigned', req, {
             user_id: userId,
             organization_id: invitation.organization_id,
             invitation_id: invitation.id,
             reason: 'Role assigned via invitation acceptance',
-          }
+          })
         });
 
       if (roleError) {
@@ -391,11 +400,11 @@ serve(async (req) => {
           role: invitation.role,
           accepted_at: new Date().toISOString(),
         },
-        p_event_metadata: {
+        p_event_metadata: buildEventMetadata(tracingContext, 'invitation.accepted', req, {
           user_id: userId,
           organization_id: invitation.organization_id,
           automated: true,
-        }
+        })
       });
 
     if (acceptedEventError) {
@@ -440,6 +449,10 @@ serve(async (req) => {
       redirectUrl,
     };
 
+    // End span with success status
+    const completedSpan = endSpan(span, 'ok');
+    console.log(`[accept-invitation v${DEPLOY_VERSION}] Completed in ${completedSpan.durationMs}ms, correlation_id=${correlationId}`);
+
     return new Response(
       JSON.stringify(response),
       {
@@ -449,7 +462,9 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error(`[accept-invitation v${DEPLOY_VERSION}] Unhandled error:`, error);
+    // End span with error status
+    const completedSpan = endSpan(span, 'error');
+    console.error(`[accept-invitation v${DEPLOY_VERSION}] Unhandled error after ${completedSpan.durationMs}ms:`, error);
     return createInternalError(correlationId, corsHeaders, error.message);
   }
 });
