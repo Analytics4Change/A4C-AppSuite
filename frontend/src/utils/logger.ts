@@ -24,6 +24,21 @@ export interface LogConfig {
   remoteEndpoint?: string;
 }
 
+/**
+ * Tracing context for request correlation
+ * Set via Logger.setTracingContext() before making Edge Function calls
+ */
+export interface TracingLogContext {
+  /** Business correlation ID */
+  correlationId?: string;
+  /** User auth session ID (null if not authenticated) */
+  sessionId?: string | null;
+  /** W3C trace ID (32 hex chars) */
+  traceId?: string;
+  /** Operation span ID (16 hex chars) */
+  spanId?: string;
+}
+
 export interface LogEntry {
   timestamp: number;
   level: LogLevel;
@@ -31,6 +46,8 @@ export interface LogEntry {
   message: string;
   args: any[];
   location?: string;
+  /** Tracing context at time of log */
+  tracing?: TracingLogContext;
 }
 
 // Log level priorities for comparison
@@ -120,6 +137,12 @@ export class CategoryLogger {
  */
 export class Logger {
   private static instance: Logger;
+  /**
+   * Stack of tracing contexts to handle nested/interleaved operations.
+   * Using a stack ensures that if operation B starts while A is in progress,
+   * popping B's context restores A's context correctly.
+   */
+  private static tracingContextStack: TracingLogContext[] = [];
   private config: LogConfig;
   private buffer: LogEntry[] = [];
   private categoryLoggers = new WeakMap<object, CategoryLogger>();
@@ -127,6 +150,69 @@ export class Logger {
 
   private constructor(config: LogConfig) {
     this.config = config;
+  }
+
+  /**
+   * Push a tracing context onto the stack
+   *
+   * Call this before making Edge Function calls to include
+   * tracing IDs in all log messages within that request scope.
+   * Always pair with popTracingContext() in a finally block.
+   *
+   * @param context - Tracing context with correlation/trace/span IDs
+   *
+   * @example
+   * const context = await createTracingContext();
+   * Logger.pushTracingContext(context);
+   * try {
+   *   const headers = buildHeadersFromContext(context);
+   *   await edgeFunctionCall({ headers });
+   * } finally {
+   *   Logger.popTracingContext();
+   * }
+   */
+  static pushTracingContext(context: TracingLogContext): void {
+    Logger.tracingContextStack.push(context);
+  }
+
+  /**
+   * Pop the current tracing context from the stack
+   *
+   * Call this after completing the traced operation.
+   * If there was a parent context, it becomes active again.
+   *
+   * @returns The popped context, or undefined if stack was empty
+   */
+  static popTracingContext(): TracingLogContext | undefined {
+    return Logger.tracingContextStack.pop();
+  }
+
+  /**
+   * Get the current tracing context (top of stack)
+   *
+   * @returns Current tracing context or null if stack is empty
+   */
+  static getTracingContext(): TracingLogContext | null {
+    const stack = Logger.tracingContextStack;
+    return stack.length > 0 ? stack[stack.length - 1] : null;
+  }
+
+  /**
+   * Set tracing context (replaces entire stack with single context)
+   *
+   * @deprecated Use pushTracingContext() for proper nesting support
+   */
+  static setTracingContext(context: TracingLogContext): void {
+    Logger.tracingContextStack = [context];
+  }
+
+  /**
+   * Clear all tracing contexts
+   *
+   * @deprecated Use popTracingContext() for proper nesting support
+   */
+  static clearTracingContext(): void {
+    Logger.tracingContextStack = [];
   }
 
   /**
@@ -232,6 +318,12 @@ export class Logger {
   }
 
   private writeLog(entry: LogEntry): void {
+    // Add tracing context if available (from top of stack)
+    const currentContext = Logger.getTracingContext();
+    if (currentContext) {
+      entry.tracing = { ...currentContext };
+    }
+
     switch (this.config.output) {
       case 'console':
         this.writeToConsole(entry);
@@ -249,25 +341,45 @@ export class Logger {
   }
 
   private writeToConsole(entry: LogEntry): void {
-    const { level, category, message, args, timestamp, location } = entry;
+    const { level, category, message, args, timestamp, location, tracing } = entry;
     const color = LOG_COLORS[level];
-    
+
     let prefix = `${color}[${level.toUpperCase()}]${RESET_COLOR}`;
-    
+
     if (this.config.includeTimestamp) {
       const time = new Date(timestamp).toISOString();
       prefix += ` ${time}`;
     }
-    
+
     prefix += ` [${category}]`;
-    
+
     if (location) {
       prefix += ` (${location})`;
     }
 
+    // Add tracing context if present (shortened for readability)
+    if (tracing) {
+      const traceInfo: string[] = [];
+      if (tracing.traceId) {
+        // Show first 8 chars of trace ID for readability
+        traceInfo.push(`trace:${tracing.traceId.substring(0, 8)}`);
+      }
+      if (tracing.spanId) {
+        // Show first 8 chars of span ID for readability
+        traceInfo.push(`span:${tracing.spanId.substring(0, 8)}`);
+      }
+      if (tracing.correlationId) {
+        // Show first 8 chars of correlation ID for readability
+        traceInfo.push(`corr:${tracing.correlationId.substring(0, 8)}`);
+      }
+      if (traceInfo.length > 0) {
+        prefix += ` {${traceInfo.join(' ')}}`;
+      }
+    }
+
     // Use appropriate console method
     const consoleMethod = console[level] || console.log;
-    
+
     if (args.length > 0) {
       consoleMethod(`${prefix} ${message}`, ...args);
     } else {

@@ -29,6 +29,7 @@ import type {
 } from '@/types/organization.types';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
+import { buildHeadersFromContext, createTracingContext } from '@/utils/tracing';
 
 const log = Logger.getLogger('invitation');
 
@@ -42,38 +43,57 @@ const EDGE_FUNCTIONS = {
 } as const;
 
 /**
+ * Result from extracting Edge Function errors
+ */
+interface EdgeFunctionErrorResult {
+  message: string;
+  details?: string;
+  /** Correlation ID from response headers for support tickets */
+  correlationId?: string;
+}
+
+/**
  * Extract detailed error from Supabase Edge Function error response.
  *
  * When Edge Functions return non-2xx status codes, the Supabase SDK wraps
  * the response in a FunctionsHttpError. The actual error message from the
  * Edge Function is accessible via `error.context.json()`.
  *
+ * Also extracts the X-Correlation-ID header if present for support tickets.
+ *
  * @param error - The error from functions.invoke()
  * @param operation - Human-readable operation name for fallback messages
- * @returns Object with error message and optional details
+ * @returns Object with error message, optional details, and correlation ID
  */
 async function extractEdgeFunctionError(
   error: unknown,
   operation: string
-): Promise<{ message: string; details?: string }> {
+): Promise<EdgeFunctionErrorResult> {
   if (error instanceof FunctionsHttpError) {
+    // Try to extract correlation ID from response headers
+    const correlationId = error.context.headers.get('x-correlation-id') ?? undefined;
+
     try {
       const body = await error.context.json();
       log.error(`Edge Function HTTP error for ${operation}`, {
         status: error.context.status,
+        correlationId,
         body,
       });
       return {
         message: body?.message ?? body?.error ?? `${operation} failed`,
         details: body?.details,
+        correlationId,
       };
     } catch {
       // Response body wasn't JSON - use status code
       log.error(`Edge Function error (non-JSON response) for ${operation}`, {
         status: error.context.status,
+        correlationId,
       });
       return {
         message: `${operation} failed (HTTP ${error.context.status})`,
+        correlationId,
       };
     }
   }
@@ -119,20 +139,29 @@ export class SupabaseInvitationService implements IInvitationService {
    * @throws Error if token invalid, expired, or already accepted
    */
   async validateInvitation(token: string): Promise<InvitationDetails> {
+    // Set up tracing context for this operation
+    const tracingContext = await createTracingContext();
+    Logger.pushTracingContext(tracingContext);
+
     try {
       log.debug('Validating invitation token', { token });
 
       const client = supabaseService.getClient();
+      const headers = buildHeadersFromContext(tracingContext);
       const { data, error } = await client.functions.invoke(
         EDGE_FUNCTIONS.VALIDATE,
         {
-          body: { token }
+          body: { token },
+          headers,
         }
       );
 
       if (error) {
         const extracted = await extractEdgeFunctionError(error, 'Validate invitation');
-        throw new Error(extracted.message);
+        const errorWithRef = extracted.correlationId
+          ? `${extracted.message} (Ref: ${extracted.correlationId})`
+          : extracted.message;
+        throw new Error(errorWithRef);
       }
 
       if (!data?.orgName || !data?.role) {
@@ -154,6 +183,8 @@ export class SupabaseInvitationService implements IInvitationService {
     } catch (error) {
       log.error('Error validating invitation', error);
       throw error;
+    } finally {
+      Logger.popTracingContext();
     }
   }
 
@@ -183,6 +214,10 @@ export class SupabaseInvitationService implements IInvitationService {
     token: string,
     credentials: UserCredentials
   ): Promise<AcceptInvitationResult> {
+    // Set up tracing context for this operation
+    const tracingContext = await createTracingContext();
+    Logger.pushTracingContext(tracingContext);
+
     try {
       log.info('Accepting invitation', {
         token,
@@ -190,19 +225,24 @@ export class SupabaseInvitationService implements IInvitationService {
       });
 
       const client = supabaseService.getClient();
+      const headers = buildHeadersFromContext(tracingContext);
       const { data, error } = await client.functions.invoke(
         EDGE_FUNCTIONS.ACCEPT,
         {
           body: {
             token,
             credentials
-          }
+          },
+          headers,
         }
       );
 
       if (error) {
         const extracted = await extractEdgeFunctionError(error, 'Accept invitation');
-        throw new Error(extracted.message);
+        const errorWithRef = extracted.correlationId
+          ? `${extracted.message} (Ref: ${extracted.correlationId})`
+          : extracted.message;
+        throw new Error(errorWithRef);
       }
 
       if (!data?.userId || !data?.orgId || !data?.redirectUrl) {
@@ -227,6 +267,8 @@ export class SupabaseInvitationService implements IInvitationService {
     } catch (error) {
       log.error('Error accepting invitation', error);
       throw error;
+    } finally {
+      Logger.popTracingContext();
     }
   }
 
@@ -241,20 +283,29 @@ export class SupabaseInvitationService implements IInvitationService {
    * @throws Error if invitation not found or already accepted
    */
   async resendInvitation(invitationId: string): Promise<boolean> {
+    // Set up tracing context for this operation
+    const tracingContext = await createTracingContext();
+    Logger.pushTracingContext(tracingContext);
+
     try {
       log.info('Resending invitation', { invitationId });
 
       const client = supabaseService.getClient();
+      const headers = buildHeadersFromContext(tracingContext);
       const { data, error } = await client.functions.invoke(
         EDGE_FUNCTIONS.RESEND,
         {
-          body: { invitationId }
+          body: { invitationId },
+          headers,
         }
       );
 
       if (error) {
         const extracted = await extractEdgeFunctionError(error, 'Resend invitation');
-        throw new Error(extracted.message);
+        const errorWithRef = extracted.correlationId
+          ? `${extracted.message} (Ref: ${extracted.correlationId})`
+          : extracted.message;
+        throw new Error(errorWithRef);
       }
 
       const success = data?.sent === true;
@@ -267,6 +318,8 @@ export class SupabaseInvitationService implements IInvitationService {
     } catch (error) {
       log.error('Error resending invitation', error);
       throw error;
+    } finally {
+      Logger.popTracingContext();
     }
   }
 }

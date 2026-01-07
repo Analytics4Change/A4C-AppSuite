@@ -774,6 +774,9 @@ export interface UserOperationResult {
 
     /** Additional context */
     context?: Record<string, unknown>;
+
+    /** Correlation ID from Edge Function response for support tickets */
+    correlationId?: string;
   };
 }
 

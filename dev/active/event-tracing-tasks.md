@@ -74,38 +74,72 @@
 
 ---
 
-## Phase 3: Frontend Integration ⏸️ PENDING
+## Phase 3: Frontend Integration ✅ COMPLETE
 
 ### 3.1 Tracing Utilities
-- [ ] Create `frontend/src/utils/tracing.ts` with:
-  - [ ] `generateCorrelationId()` - UUID v4
-  - [ ] `generateTraceId()` - 32 hex chars (UUID without dashes)
-  - [ ] `generateSpanId()` - 16 hex chars
-  - [ ] `generateTraceparent()` - W3C format: `00-{traceId}-{spanId}-01`
-  - [ ] `getSessionId()` - Extract `session_id` from Supabase Auth JWT
-  - [ ] `buildTracingHeaders()` - Build all headers for Edge Function calls
+- [x] Create `frontend/src/utils/tracing.ts` with:
+  - [x] `generateCorrelationId()` - UUID v4
+  - [x] `generateTraceId()` - 32 hex chars (UUID without dashes)
+  - [x] `generateSpanId()` - 16 hex chars
+  - [x] `generateTraceparent()` - W3C format: `00-{traceId}-{spanId}-01`
+  - [x] `parseTraceparent()` - Parse traceparent header value
+  - [x] `getSessionId()` - Extract `session_id` from Supabase Auth JWT
+  - [x] `buildTracingHeaders()` - Build all headers for Edge Function calls (async) - **DEPRECATED**
+  - [x] `buildTracingHeadersSync()` - Sync version when session known
+  - [x] `createTracingContext()` - Create full tracing context (async)
+  - [x] `createTracingContextSync()` - Sync version when session known
+  - [x] `buildHeadersFromContext()` - Build headers from existing TracingContext (preferred) - **Added 2026-01-07**
 
-### 3.2 Structured Logging
-- [ ] Create `frontend/src/utils/logger.ts` with:
-  - [ ] `LogContext` interface (correlationId, sessionId, traceId, spanId)
-  - [ ] `StructuredLogger` class
-  - [ ] `setContext(ctx)` - Set trace context for subsequent logs
-  - [ ] `info(message, data?)` - Log with automatic trace context
-  - [ ] `warn(message, data?)` - Log with automatic trace context
-  - [ ] `error(message, error, data?)` - Log with stack trace and trace context
-  - [ ] Export singleton `logger` instance
+### 3.2 Structured Logging (Extended existing logger.ts)
+- [x] Extended `frontend/src/utils/logger.ts` with:
+  - [x] `TracingLogContext` interface (correlationId, sessionId, traceId, spanId)
+  - [x] `Logger.setTracingContext(ctx)` - Set trace context - **DEPRECATED in favor of push/pop**
+  - [x] `Logger.clearTracingContext()` - Clear context - **DEPRECATED in favor of push/pop**
+  - [x] `Logger.pushTracingContext(ctx)` - Push context onto stack (preferred) - **Added 2026-01-07**
+  - [x] `Logger.popTracingContext()` - Pop context from stack (preferred) - **Added 2026-01-07**
+  - [x] `Logger.getTracingContext()` - Get current trace context (top of stack)
+  - [x] Updated `LogEntry` interface to include `tracing` field
+  - [x] Updated `writeToConsole()` to display trace IDs (shortened for readability)
+  - [x] Updated `writeLog()` to automatically include current trace context
 
 ### 3.3 Service Updates
-- [ ] Update `SupabaseInvitationService.ts`:
-  - [ ] Import buildTracingHeaders
-  - [ ] Add headers to `acceptInvitation()` Edge Function call
-  - [ ] Add headers to `sendInvitation()` Edge Function call
-  - [ ] Set logger context before calls
-- [ ] Update `SupabaseUserCommandService.ts`:
-  - [ ] Import buildTracingHeaders
-  - [ ] Add headers to all Edge Function calls
-  - [ ] Set logger context before calls
-- [ ] Test headers are sent to Edge Functions (verify in browser Network tab)
+- [x] Update `SupabaseInvitationService.ts`:
+  - [x] Import buildHeadersFromContext, createTracingContext
+  - [x] Add tracing to `validateInvitation()` - pushTracingContext, buildHeadersFromContext, popTracingContext on finally
+  - [x] Add tracing to `acceptInvitation()` - pushTracingContext, buildHeadersFromContext, popTracingContext on finally
+  - [x] Add tracing to `resendInvitation()` - pushTracingContext, buildHeadersFromContext, popTracingContext on finally
+  - [x] Extract correlation ID from error response headers for support tickets - **Added 2026-01-07**
+- [x] Update `SupabaseUserCommandService.ts`:
+  - [x] Import buildHeadersFromContext, createTracingContext
+  - [x] Add tracing to `inviteUser()` - pushTracingContext, buildHeadersFromContext, popTracingContext on finally
+  - [x] Add tracing to `resendInvitation()` - pushTracingContext, buildHeadersFromContext, popTracingContext on finally
+  - [x] Add tracing to `revokeInvitation()` - pushTracingContext, buildHeadersFromContext, popTracingContext on finally
+  - [x] Add tracing to `deactivateUser()` - pushTracingContext, buildHeadersFromContext, popTracingContext on finally
+  - [x] Add tracing to `reactivateUser()` - pushTracingContext, buildHeadersFromContext, popTracingContext on finally
+  - [x] Extract correlation ID from error response headers for support tickets - **Added 2026-01-07**
+- [x] Update `UserOperationResult.errorDetails` type to include `correlationId` field - **Added 2026-01-07**
+- [x] TypeScript compilation passes
+
+### 3.4 Phase 3 Refinements (Architectural Review) - **Added 2026-01-07**
+
+Four issues were identified and fixed after initial implementation:
+
+1. **Issue: Duplicate ID Generation** - Context and headers generated different trace IDs
+   - **Fix**: Added `buildHeadersFromContext(context)` to ensure same IDs in logs and headers
+
+2. **Issue: Redundant Async Calls** - `getSessionId()` called twice per operation
+   - **Fix**: `buildHeadersFromContext()` uses pre-created context, no additional async calls
+
+3. **Issue: Static Logger Context Race Condition** - Single static context could be overwritten by concurrent operations
+   - **Fix**: Changed to stack-based context with `pushTracingContext()`/`popTracingContext()`
+
+4. **Issue: No Correlation ID in Error Responses** - Not captured for support tickets
+   - **Fix**: Extract `x-correlation-id` from error response headers, include in error messages as `(Ref: ...)`
+
+**Files Created**: `frontend/src/utils/tracing.ts`
+**Files Modified**: `frontend/src/utils/logger.ts`, `frontend/src/services/invitation/SupabaseInvitationService.ts`, `frontend/src/services/users/SupabaseUserCommandService.ts`, `frontend/src/types/user.types.ts`
+**Completed**: 2026-01-07
+**Refinements**: 2026-01-07
 
 ---
 
@@ -168,7 +202,7 @@
 
 ---
 
-## Phase 6: Frontend Error UX ⏸️ PENDING
+## Phase 6: Frontend Error UX ⏸️ PARTIALLY COMPLETE
 
 ### 6.1 Error Display Component
 - [ ] Create `ErrorWithCorrelation.tsx` component:
@@ -178,11 +212,14 @@
   - [ ] Add "Copy Reference ID" button
   - [ ] In non-production: show traceId for debugging
 
-### 6.2 Service Error Handling
-- [ ] Update `SupabaseInvitationService.ts`:
-  - [ ] Extract correlation_id from error response headers
-  - [ ] Return correlation_id with error for UI display
-- [ ] Update `SupabaseUserCommandService.ts` (same pattern)
+### 6.2 Service Error Handling ✅ COMPLETE (moved from Phase 3 refinements)
+- [x] Update `SupabaseInvitationService.ts`:
+  - [x] Extract correlation_id from error response headers (`x-correlation-id`)
+  - [x] Include correlation_id in error messages as `(Ref: {id})`
+  - [x] Return correlation_id via `EdgeFunctionErrorResult.correlationId`
+- [x] Update `SupabaseUserCommandService.ts`:
+  - [x] Same pattern as above
+  - [x] Added `correlationId` to `UserOperationResult.errorDetails` type
 - [ ] Update UI components to use ErrorWithCorrelation where Edge Function errors occur
 
 ---
@@ -291,10 +328,13 @@
 - [x] Events in domain_events have trace columns populated (via emit_domain_event extraction)
 - [x] CORS headers configured for tracing headers
 
-### Phase 3 Complete
-- [ ] Frontend generates valid traceparent headers
-- [ ] Headers are sent with Edge Function invocations
-- [ ] Logger outputs JSON with trace context
+### Phase 3 Complete ✅
+- [x] Frontend generates valid traceparent headers (`frontend/src/utils/tracing.ts`)
+- [x] Headers are sent with Edge Function invocations (both service files updated)
+- [x] Logger outputs trace context (extended `logger.ts` with `TracingLogContext`)
+- [x] Same trace IDs used in logs and headers (`buildHeadersFromContext` pattern)
+- [x] Stack-based context avoids race conditions (`pushTracingContext`/`popTracingContext`)
+- [x] Error responses include correlation ID for support tickets
 
 ### Phase 4 Complete
 - [ ] Temporal workflow receives tracing context
@@ -307,9 +347,10 @@
 - [ ] Search by trace_id returns correct events
 - [ ] Trace timeline visualization works
 
-### Phase 6 Complete
-- [ ] Error display shows correlation_id reference
-- [ ] Copy button works
+### Phase 6 Partially Complete ⏳
+- [x] Services extract and return correlation_id from error response headers
+- [x] Error messages include reference ID `(Ref: {correlationId})`
+- [ ] Error display component with copy button (ErrorWithCorrelation.tsx)
 - [ ] Non-production shows trace_id
 
 ### End-to-End Validation
@@ -321,11 +362,19 @@
 
 ## Current Status
 
-**Phase**: Phase 3 - Frontend Integration
+**Phase**: Phase 4 - Temporal Workflow Integration
 **Status**: ⏸️ PENDING (not started)
 **Last Updated**: 2026-01-07
-**Next Step**: Create `frontend/src/utils/tracing.ts` with W3C traceparent generation
+**Next Step**: Add tracing fields to `OrganizationBootstrapParams` and update workflow to propagate context
 
 **Completed Phases**:
 - ✅ Phase 1: Database Schema Enhancement (2026-01-07)
 - ✅ Phase 2: Edge Functions Foundation (2026-01-07)
+- ✅ Phase 3: Frontend Integration (2026-01-07) - with refinements
+- ⏳ Phase 6: Frontend Error UX (partially complete - service layer done, UI component pending)
+
+**Phase 3 Refinements Summary** (2026-01-07):
+- Added `buildHeadersFromContext()` to ensure same IDs in logs and headers
+- Changed Logger from single static context to stack-based push/pop
+- Added correlation ID extraction from error response headers
+- Added `correlationId` to `UserOperationResult.errorDetails` type

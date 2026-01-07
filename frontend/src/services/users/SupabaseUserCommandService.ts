@@ -39,6 +39,7 @@ import type {
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/user.types';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
+import { buildHeadersFromContext, createTracingContext } from '@/utils/tracing';
 
 const log = Logger.getLogger('api');
 
@@ -51,6 +52,8 @@ interface EdgeFunctionErrorResult {
   details?: string;
   /** Full errorDetails object from Edge Function response (for role validation errors, etc.) */
   errorDetails?: Record<string, unknown>;
+  /** Correlation ID from response headers for support tickets */
+  correlationId?: string;
 }
 
 /**
@@ -60,19 +63,25 @@ interface EdgeFunctionErrorResult {
  * the response in a FunctionsHttpError. The actual error message from the
  * Edge Function is accessible via `error.context.json()`.
  *
+ * Also extracts the X-Correlation-ID header if present for support tickets.
+ *
  * @param error - The error from functions.invoke()
  * @param operation - Human-readable operation name for fallback messages
- * @returns Object with error message, code, details, and full errorDetails object
+ * @returns Object with error message, code, details, full errorDetails object, and correlation ID
  */
 async function extractEdgeFunctionError(
   error: unknown,
   operation: string
 ): Promise<EdgeFunctionErrorResult> {
   if (error instanceof FunctionsHttpError) {
+    // Try to extract correlation ID from response headers
+    const correlationId = error.context.headers.get('x-correlation-id') ?? undefined;
+
     try {
       const body = await error.context.json();
       log.error(`Edge Function HTTP error for ${operation}`, {
         status: error.context.status,
+        correlationId,
         body,
       });
       return {
@@ -84,15 +93,18 @@ async function extractEdgeFunctionError(
         details: body?.details,
         // Pass through the full errorDetails object for rich error information
         errorDetails: body?.errorDetails,
+        correlationId,
       };
     } catch {
       // Response body wasn't JSON - use status code
       log.error(`Edge Function error (non-JSON response) for ${operation}`, {
         status: error.context.status,
+        correlationId,
       });
       return {
         message: `${operation} failed (HTTP ${error.context.status})`,
         code: 'HTTP_ERROR',
+        correlationId,
       };
     }
   }
@@ -145,10 +157,15 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * 5. Sends invitation email via Resend
    */
   async inviteUser(request: InviteUserRequest): Promise<UserOperationResult> {
+    // Set up tracing context for this operation
+    const tracingContext = await createTracingContext();
+    Logger.pushTracingContext(tracingContext);
+
     try {
       log.info('Inviting user', { email: request.email });
 
       const client = supabaseService.getClient();
+      const headers = buildHeadersFromContext(tracingContext);
       const { data, error } = await client.functions.invoke(
         EDGE_FUNCTIONS.INVITE_USER,
         {
@@ -162,19 +179,24 @@ export class SupabaseUserCommandService implements IUserCommandService {
             accessExpirationDate: request.accessExpirationDate,
             notificationPreferences: request.notificationPreferences,
           },
+          headers,
         }
       );
 
       if (error) {
         const errorInfo = await extractEdgeFunctionError(error, 'Invite user');
+        const errorMessage = errorInfo.correlationId
+          ? `${errorInfo.message} (Ref: ${errorInfo.correlationId})`
+          : errorInfo.message;
         return {
           success: false,
-          error: errorInfo.message,
+          error: errorMessage,
           errorDetails: {
             code: errorInfo.code,
             message: errorInfo.message,
             // Pass through full errorDetails from Edge Function for rich error display
             context: errorInfo.errorDetails ?? (errorInfo.details ? { details: errorInfo.details } : undefined),
+            correlationId: errorInfo.correlationId,
           },
         };
       }
@@ -221,6 +243,8 @@ export class SupabaseUserCommandService implements IUserCommandService {
           message: error instanceof Error ? error.message : 'Unknown error',
         },
       };
+    } finally {
+      Logger.popTracingContext();
     }
   }
 
@@ -230,10 +254,15 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * Calls the invite-user Edge Function with resend operation
    */
   async resendInvitation(invitationId: string): Promise<UserOperationResult> {
+    // Set up tracing context for this operation
+    const tracingContext = await createTracingContext();
+    Logger.pushTracingContext(tracingContext);
+
     try {
       log.info('Resending invitation', { invitationId });
 
       const client = supabaseService.getClient();
+      const headers = buildHeadersFromContext(tracingContext);
       const { data, error } = await client.functions.invoke(
         EDGE_FUNCTIONS.INVITE_USER,
         {
@@ -241,18 +270,23 @@ export class SupabaseUserCommandService implements IUserCommandService {
             operation: 'resend',
             invitationId,
           },
+          headers,
         }
       );
 
       if (error) {
         const errorInfo = await extractEdgeFunctionError(error, 'Resend invitation');
+        const errorMessage = errorInfo.correlationId
+          ? `${errorInfo.message} (Ref: ${errorInfo.correlationId})`
+          : errorInfo.message;
         return {
           success: false,
-          error: errorInfo.message,
+          error: errorMessage,
           errorDetails: {
             code: errorInfo.code,
             message: errorInfo.message,
             context: errorInfo.details ? { details: errorInfo.details } : undefined,
+            correlationId: errorInfo.correlationId,
           },
         };
       }
@@ -272,6 +306,8 @@ export class SupabaseUserCommandService implements IUserCommandService {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
+    } finally {
+      Logger.popTracingContext();
     }
   }
 
@@ -281,10 +317,15 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * Calls the invite-user Edge Function with revoke operation
    */
   async revokeInvitation(invitationId: string): Promise<UserOperationResult> {
+    // Set up tracing context for this operation
+    const tracingContext = await createTracingContext();
+    Logger.pushTracingContext(tracingContext);
+
     try {
       log.info('Revoking invitation', { invitationId });
 
       const client = supabaseService.getClient();
+      const headers = buildHeadersFromContext(tracingContext);
       const { data, error } = await client.functions.invoke(
         EDGE_FUNCTIONS.INVITE_USER,
         {
@@ -292,18 +333,23 @@ export class SupabaseUserCommandService implements IUserCommandService {
             operation: 'revoke',
             invitationId,
           },
+          headers,
         }
       );
 
       if (error) {
         const errorInfo = await extractEdgeFunctionError(error, 'Revoke invitation');
+        const errorMessage = errorInfo.correlationId
+          ? `${errorInfo.message} (Ref: ${errorInfo.correlationId})`
+          : errorInfo.message;
         return {
           success: false,
-          error: errorInfo.message,
+          error: errorMessage,
           errorDetails: {
             code: errorInfo.code,
             message: errorInfo.message,
             context: errorInfo.details ? { details: errorInfo.details } : undefined,
+            correlationId: errorInfo.correlationId,
           },
         };
       }
@@ -323,6 +369,8 @@ export class SupabaseUserCommandService implements IUserCommandService {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
+    } finally {
+      Logger.popTracingContext();
     }
   }
 
@@ -335,10 +383,15 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * 3. Emits user.deactivated event
    */
   async deactivateUser(userId: string): Promise<UserOperationResult> {
+    // Set up tracing context for this operation
+    const tracingContext = await createTracingContext();
+    Logger.pushTracingContext(tracingContext);
+
     try {
       log.info('Deactivating user', { userId });
 
       const client = supabaseService.getClient();
+      const headers = buildHeadersFromContext(tracingContext);
       const { data, error } = await client.functions.invoke(
         EDGE_FUNCTIONS.MANAGE_USER,
         {
@@ -346,18 +399,23 @@ export class SupabaseUserCommandService implements IUserCommandService {
             operation: 'deactivate',
             userId,
           },
+          headers,
         }
       );
 
       if (error) {
         const errorInfo = await extractEdgeFunctionError(error, 'Deactivate user');
+        const errorMessage = errorInfo.correlationId
+          ? `${errorInfo.message} (Ref: ${errorInfo.correlationId})`
+          : errorInfo.message;
         return {
           success: false,
-          error: errorInfo.message,
+          error: errorMessage,
           errorDetails: {
             code: errorInfo.code,
             message: errorInfo.message,
             context: errorInfo.details ? { details: errorInfo.details } : undefined,
+            correlationId: errorInfo.correlationId,
           },
         };
       }
@@ -383,6 +441,8 @@ export class SupabaseUserCommandService implements IUserCommandService {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
+    } finally {
+      Logger.popTracingContext();
     }
   }
 
@@ -395,10 +455,15 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * 3. Emits user.reactivated event
    */
   async reactivateUser(userId: string): Promise<UserOperationResult> {
+    // Set up tracing context for this operation
+    const tracingContext = await createTracingContext();
+    Logger.pushTracingContext(tracingContext);
+
     try {
       log.info('Reactivating user', { userId });
 
       const client = supabaseService.getClient();
+      const headers = buildHeadersFromContext(tracingContext);
       const { data, error } = await client.functions.invoke(
         EDGE_FUNCTIONS.MANAGE_USER,
         {
@@ -406,18 +471,23 @@ export class SupabaseUserCommandService implements IUserCommandService {
             operation: 'reactivate',
             userId,
           },
+          headers,
         }
       );
 
       if (error) {
         const errorInfo = await extractEdgeFunctionError(error, 'Reactivate user');
+        const errorMessage = errorInfo.correlationId
+          ? `${errorInfo.message} (Ref: ${errorInfo.correlationId})`
+          : errorInfo.message;
         return {
           success: false,
-          error: errorInfo.message,
+          error: errorMessage,
           errorDetails: {
             code: errorInfo.code,
             message: errorInfo.message,
             context: errorInfo.details ? { details: errorInfo.details } : undefined,
+            correlationId: errorInfo.correlationId,
           },
         };
       }
@@ -443,6 +513,8 @@ export class SupabaseUserCommandService implements IUserCommandService {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
+    } finally {
+      Logger.popTracingContext();
     }
   }
 

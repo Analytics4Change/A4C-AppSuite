@@ -24,6 +24,12 @@
 
 8. **Server-side Query RPCs**: Add `api.get_events_by_session()`, `api.get_events_by_correlation()`, and `api.get_trace_timeline()` for efficient server-side queries.
 
+9. **Stack-based Logger Context**: Use push/pop pattern instead of set/clear to handle concurrent operations safely. If operation B starts while A is in progress, popping B's context restores A's context correctly. - Added 2026-01-07
+
+10. **Single Context for Logs and Headers**: Create `TracingContext` once via `createTracingContext()`, then use `buildHeadersFromContext(context)` to build headers. This ensures the same trace/span/correlation IDs appear in both logs and HTTP headers. - Added 2026-01-07
+
+11. **Correlation ID in Error Responses**: Extract `x-correlation-id` header from Edge Function error responses and include in error messages as `(Ref: {id})` for support ticket correlation. - Added 2026-01-07
+
 ## Technical Context
 
 ### Architecture
@@ -106,22 +112,21 @@ interface EventMetadata {
 
 ## File Structure
 
-### New Files Created (Phase 1 & 2 - 2026-01-07)
+### New Files Created (Phase 1, 2 & 3 - 2026-01-07)
 
 - ✅ `infrastructure/supabase/supabase/functions/_shared/tracing-context.ts` - W3C trace context extraction and span management
 - ✅ `infrastructure/supabase/supabase/functions/_shared/emit-event.ts` - Shared event emission helper with buildEventMetadata()
 - ✅ `infrastructure/supabase/supabase/migrations/20260107170706_add_event_tracing_columns.sql` - Add columns, indexes, RPC functions
 - ✅ `infrastructure/supabase/supabase/migrations/20260107171628_update_emit_domain_event_tracing.sql` - Update api.emit_domain_event to extract tracing from metadata
+- ✅ `frontend/src/utils/tracing.ts` - Frontend tracing utilities (W3C traceparent, correlation IDs, session extraction)
 
-### Files Still To Create (Phase 3+)
+### Files Still To Create (Phase 5+)
 
-- `frontend/src/utils/tracing.ts` - Frontend tracing utilities
-- `frontend/src/utils/logger.ts` - Structured logging with trace context
 - `frontend/src/components/ui/ErrorWithCorrelation.tsx` - Error display with reference ID
 - `infrastructure/supabase/supabase/functions/_shared/__tests__/emit-event.test.ts` - Unit tests
 - `frontend/src/utils/__tests__/tracing.test.ts` - Unit tests
 
-### Existing Files Modified (Phase 2 - 2026-01-07)
+### Existing Files Modified (Phase 2 & 3 - 2026-01-07)
 
 - ✅ `infrastructure/supabase/supabase/functions/_shared/error-response.ts` - Added CORS headers for tracing (traceparent, x-correlation-id, x-session-id)
 - ✅ `infrastructure/supabase/supabase/functions/accept-invitation/index.ts` - v12-tracing: Full tracing with span timing, buildEventMetadata for 3 events
@@ -130,11 +135,13 @@ interface EventMetadata {
 - ✅ `infrastructure/supabase/supabase/functions/organization-bootstrap/index.ts` - v5-tracing: Tracing header propagation to Backend API
 - ✅ `infrastructure/supabase/supabase/functions/validate-invitation/index.ts` - v10-tracing: Basic tracing context extraction
 - ✅ `infrastructure/supabase/supabase/functions/workflow-status/index.ts` - v25-tracing: Basic tracing context extraction
+- ✅ `frontend/src/utils/logger.ts` - Extended with TracingLogContext, pushTracingContext/popTracingContext (stack-based), trace ID display in console
+- ✅ `frontend/src/services/invitation/SupabaseInvitationService.ts` - Added tracing headers to all Edge Function calls, correlation ID in errors
+- ✅ `frontend/src/services/users/SupabaseUserCommandService.ts` - Added tracing headers to all Edge Function calls, correlation ID in errors
+- ✅ `frontend/src/types/user.types.ts` - Added `correlationId` to `UserOperationResult.errorDetails` type - Updated 2026-01-07
 
-### Files Still To Modify (Phase 3+)
+### Files Still To Modify (Phase 4+)
 
-- `frontend/src/services/invitation/SupabaseInvitationService.ts` - Add headers
-- `frontend/src/services/users/SupabaseUserCommandService.ts` - Add headers
 - `frontend/src/services/admin/EventMonitoringService.ts` - Add query methods
 - `frontend/src/pages/admin/FailedEventsPage.tsx` - Add session_id UI
 - `workflows/src/shared/types/index.ts` - Add tracing params
@@ -188,20 +195,36 @@ Deno.serve(async (req) => {
 });
 ```
 
-### Frontend Header Pattern
+### Frontend Header Pattern (Recommended - 2026-01-07)
 ```typescript
+import { createTracingContext, buildHeadersFromContext } from '@/utils/tracing';
+import { Logger } from '@/utils/logger';
+
+// Create context once, use for both logging and headers
+const tracingContext = await createTracingContext();
+Logger.pushTracingContext(tracingContext);  // Stack-based for concurrency safety
+
+try {
+  const headers = buildHeadersFromContext(tracingContext);  // Same IDs as logging
+  const { data, error } = await client.functions.invoke('function-name', {
+    body: { ... },
+    headers,
+  });
+  // ... handle response ...
+} finally {
+  Logger.popTracingContext();  // Always pop in finally block
+}
+```
+
+### Frontend Header Pattern (Deprecated)
+```typescript
+// ❌ DEPRECATED - generates different IDs for logs vs headers
 import { buildTracingHeaders, generateTraceparent } from '@/utils/tracing';
 import { logger } from '@/utils/logger';
 
-// Set trace context for logging
 const traceparent = generateTraceparent();
 logger.setContext({ traceId: traceparent.traceId, spanId: traceparent.spanId });
-
-const headers = await buildTracingHeaders();
-const { data, error } = await client.functions.invoke('function-name', {
-  body: { ... },
-  headers,
-});
+const headers = await buildTracingHeaders();  // Different IDs!
 ```
 
 ### Structured Logging Pattern
@@ -229,6 +252,12 @@ logger.error('Failed to send invitation', error, { invitationId });
 3. **Backward Compatibility**: Events without tracing metadata should still work (fields are optional in event_metadata JSONB).
 
 4. **Platform-Only Admin**: FailedEventsPage is restricted to super_admin in Analytics4Change org.
+
+5. **Always Use Push/Pop Pattern**: Logger context must use `pushTracingContext()` / `popTracingContext()` pattern, NOT `setTracingContext()` / `clearTracingContext()`. The stack-based approach prevents race conditions when multiple async operations run concurrently. Always call `popTracingContext()` in a `finally` block. - Added 2026-01-07
+
+6. **Single Context Source**: Always create tracing context once with `createTracingContext()`, then use `buildHeadersFromContext(context)` to build headers. Never call `buildTracingHeaders()` separately as it generates different IDs. - Added 2026-01-07
+
+7. **TracingLogContext Type Compatibility**: `TracingLogContext.sessionId` must be `string | null` (not `string | undefined`) to match `TracingContext.sessionId`. This was fixed during implementation. - Discovered 2026-01-07
 
 ## Why This Approach?
 
@@ -307,3 +336,37 @@ await supabase.rpc('emit_domain_event', {
   p_event_metadata: eventMetadata,  // Tracing fields auto-extracted by DB function
 });
 ```
+
+## Phase 3 Refinements (2026-01-07)
+
+### Issues Identified During Architectural Review
+
+After initial Phase 3 implementation, four issues were identified and fixed:
+
+#### Issue 1: Duplicate ID Generation
+**Problem**: `createTracingContext()` and `buildTracingHeaders()` generated different trace/span/correlation IDs, causing mismatch between logs and HTTP headers.
+
+**Solution**: Added `buildHeadersFromContext(context: TracingContext)` that builds headers from an existing context, ensuring the same IDs are used everywhere.
+
+#### Issue 2: Redundant Async Calls
+**Problem**: `getSessionId()` was called twice per operation - once in `createTracingContext()` and once in `buildTracingHeaders()`.
+
+**Solution**: `buildHeadersFromContext()` uses the pre-created context which already contains the session ID, eliminating redundant JWT decoding.
+
+#### Issue 3: Static Logger Context Race Condition
+**Problem**: `Logger.setTracingContext()` used a single static variable. If operation B started while A was in progress, B would overwrite A's context, then A's `clearTracingContext()` would clear B's context.
+
+**Solution**: Changed to stack-based context management:
+- `tracingContextStack: TracingLogContext[]` instead of `tracingContext: TracingLogContext | null`
+- `pushTracingContext(ctx)` pushes onto stack
+- `popTracingContext()` pops from stack
+- `getTracingContext()` returns top of stack
+
+#### Issue 4: No Correlation ID in Error Responses
+**Problem**: When Edge Functions returned errors, the correlation ID from the response wasn't captured for support tickets.
+
+**Solution**: Updated `extractEdgeFunctionError()` in both service files to:
+1. Extract `x-correlation-id` from `error.context.headers`
+2. Include in error messages as `(Ref: {correlationId})`
+3. Return via `correlationId` field in result
+4. Added `correlationId` to `UserOperationResult.errorDetails` type
