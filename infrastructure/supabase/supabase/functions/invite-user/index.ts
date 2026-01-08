@@ -33,7 +33,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v9-resend-tracing-fix';
+const DEPLOY_VERSION = 'v10-resend-env-fix';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -618,7 +618,7 @@ serve(async (req) => {
       }
 
       // Send the invitation email
-      const emailResult = await sendInvitationEmail(env.RESEND_API_KEY, {
+      const emailResult = await sendInvitationEmail(env.RESEND_API_KEY!, {
         email: existingInvitation.email,
         firstName: existingInvitation.first_name || 'User',
         lastName: existingInvitation.last_name || '',
@@ -626,7 +626,7 @@ serve(async (req) => {
         token: newToken,
         expiresAt: newExpiresAt,
         frontendUrl: env.FRONTEND_URL,
-        baseDomain: env.EMAIL_FROM_DOMAIN,
+        baseDomain: env.PLATFORM_BASE_DOMAIN,
       });
 
       if (!emailResult.success) {
