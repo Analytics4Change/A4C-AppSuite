@@ -377,6 +377,31 @@ kubectl logs -n temporal -l app=workflow-worker | grep "sendInvitationEmails"
 6. **Event-Driven**: All state changes emit domain events for CQRS projections
 7. **Event Metadata for Audit**: The `domain_events` table is the SOLE audit trail - no separate audit table
 8. **Email Provider**: Resend (primary), SMTP (fallback) - workers require `RESEND_API_KEY` in Kubernetes secrets
+9. **CQRS Query Pattern**: Frontend MUST query projections via `api.` schema RPC functions - NEVER direct table queries with PostgREST embedding
+
+### CQRS Query Rule
+
+> **⚠️ CRITICAL: All frontend queries MUST use `api.` schema RPC functions.**
+
+Projection tables are denormalized read models - they should NEVER be queried directly with PostgREST embedding across tables.
+
+| ✅ Correct Pattern | ❌ Wrong Pattern |
+|-------------------|------------------|
+| `api.list_users(p_org_id)` | `.from('users').select(..., user_roles_projection!inner(...))` |
+| `api.get_roles(p_org_id)` | `.from('roles_projection').select(..., permissions!inner(...))` |
+| `api.get_organizations()` | `.from('organizations_projection').select(...)` |
+
+**Why this matters:**
+- Projections are denormalized at event processing time - joins should NOT happen at query time
+- PostgREST embedding re-normalizes data, defeating CQRS benefits
+- RPC functions encapsulate query logic in database (testable, versionable, single source of truth)
+- Violating this pattern causes 406 errors and breaks multi-tenant isolation
+
+**When creating new query functionality:**
+1. Create RPC function in `api` schema (e.g., `api.list_users()`)
+2. Grant EXECUTE to `authenticated` role
+3. Frontend calls via `.schema('api').rpc('function_name', params)`
+4. Never use `.from('table').select()` with `!inner` joins across projections
 
 ### Event Metadata Requirements
 

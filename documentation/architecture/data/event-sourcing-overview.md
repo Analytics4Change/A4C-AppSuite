@@ -243,6 +243,42 @@ CREATE TRIGGER trigger_process_domain_events
   EXECUTE FUNCTION process_domain_event();
 ```
 
+### Query Pattern: RPC Functions Only
+
+> **⚠️ CRITICAL**: All frontend queries MUST use `api.` schema RPC functions.
+
+PostgREST embedding (`.select('..., related_table!inner(...)')`) across projection tables is **forbidden** because:
+
+1. **Violates CQRS separation** - joins should happen at event processing time, not query time
+2. **Projections should be denormalized** - no joins needed for common queries
+3. **RPC functions encapsulate query logic** in database (testable, versionable, single source of truth)
+4. **Consistent pattern** across all services for maintainability
+
+```typescript
+// ✅ CORRECT: RPC function call (CQRS pattern)
+const { data } = await supabase
+  .schema('api')
+  .rpc('list_users', { p_org_id: orgId });
+
+// ❌ WRONG: Direct table query with PostgREST embedding
+const { data } = await supabase
+  .from('users')
+  .select(`
+    id, email, name,
+    user_roles_projection!inner (
+      role_id,
+      roles_projection (id, name)
+    )
+  `)
+  .eq('user_roles_projection.organization_id', orgId);
+```
+
+**Services following this pattern:**
+- `SupabaseUserQueryService` → `api.list_users()`
+- `SupabaseRoleService` → `api.get_roles()`, `api.get_role_by_id()`
+- `SupabaseOrganizationQueryService` → `api.get_organizations()`, `api.get_organization_by_id()`
+- `SupabaseOrganizationUnitService` → `api.get_organization_units()`
+
 ---
 
 ## Related Documentation

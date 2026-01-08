@@ -309,6 +309,60 @@ if (!session?.claims.org_id) {
 - Decode the `access_token` to extract custom claims
 - Use the same `decodeJWT()` pattern shown above
 
+### CQRS Query Pattern
+
+> **⚠️ CRITICAL: All Data Queries MUST Use RPC Functions**
+>
+> NEVER use direct table queries with PostgREST embedding across projection tables.
+> This violates CQRS pattern and has caused critical bugs including 406 errors.
+
+**ALWAYS** use `api.` schema RPC functions for data queries:
+
+```typescript
+// ✅ CORRECT: RPC function call (CQRS pattern)
+const { data, error } = await client
+  .schema('api')
+  .rpc('list_users', {
+    p_org_id: claims.org_id,
+    p_status: statusFilter,
+    p_search_term: searchTerm,
+  });
+
+// ✅ CORRECT: Other RPC examples
+await client.schema('api').rpc('get_roles', { p_org_id: orgId });
+await client.schema('api').rpc('get_organizations', {});
+await client.schema('api').rpc('get_organization_units', { p_org_id: orgId });
+```
+
+**NEVER** use direct table queries with PostgREST embedding:
+
+```typescript
+// ❌ WRONG: Direct table query with embedding - VIOLATES CQRS
+const { data } = await client
+  .from('users')
+  .select(`
+    id, email, name,
+    user_roles_projection!inner (
+      role_id,
+      roles_projection (id, name)
+    )
+  `)
+  .eq('user_roles_projection.organization_id', orgId);
+```
+
+**Why RPC functions are required:**
+1. Projections are denormalized read models - joins should happen at event processing time, not query time
+2. PostgREST embedding across projections re-normalizes data, defeating CQRS benefits
+3. RPC functions encapsulate query logic in the database (single source of truth, testable, versionable)
+4. RPC functions can handle complex filtering, sorting, and pagination efficiently
+5. Consistent pattern across all services for maintainability
+
+**Services using this pattern:**
+- `SupabaseUserQueryService` → `api.list_users()`
+- `SupabaseRoleService` → `api.get_roles()`, `api.get_role_by_id()`
+- `SupabaseOrganizationQueryService` → `api.get_organizations()`, `api.get_organization_by_id()`
+- `SupabaseOrganizationUnitService` → `api.get_organization_units()`
+
 ### Authentication Architecture
 
 **Status**: ✅ Supabase Auth with smart detection (Updated 2025-01-02)

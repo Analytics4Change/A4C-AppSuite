@@ -347,6 +347,38 @@ kubectl run temporal-worker --image=...
 
 **Why**: YAML files in git provide version control, code review, and reproducible deployments.
 
+### 10. Frontend Queries via RPC Only
+
+> **⚠️ CRITICAL**: Frontend MUST query projections via `api.` schema RPC functions - NEVER direct table queries.
+
+```typescript
+// ✅ CORRECT: RPC function call (follows CQRS)
+const { data } = await supabase
+  .schema('api')
+  .rpc('list_users', { p_org_id: orgId });
+
+// ❌ WRONG: Direct table query with PostgREST embedding - VIOLATES CQRS
+const { data } = await supabase
+  .from('users')
+  .select(`..., related_projection!inner(...)`);
+```
+
+| ✅ Correct Pattern | ❌ Wrong Pattern |
+|-------------------|------------------|
+| `api.list_users(p_org_id)` | `.from('users').select(..., user_roles_projection!inner(...))` |
+| `api.get_roles(p_org_id)` | `.from('roles_projection').select(..., permissions!inner(...))` |
+
+**Why**:
+1. Projections are denormalized at event processing time - joins should NOT happen at query time
+2. PostgREST embedding across projections re-normalizes data, defeating CQRS benefits
+3. RPC functions encapsulate query logic in database (testable, versionable, single source of truth)
+4. Violating this pattern causes 406 errors and breaks multi-tenant isolation
+
+**When creating new query functionality:**
+1. Create RPC function in `api` schema (e.g., `CREATE OR REPLACE FUNCTION api.list_users(...)`)
+2. Grant EXECUTE to `authenticated` role
+3. Frontend calls via `.schema('api').rpc('function_name', params)`
+
 ## Complete Migration Template
 
 ```sql

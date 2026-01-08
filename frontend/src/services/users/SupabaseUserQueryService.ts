@@ -1,14 +1,14 @@
 /**
  * Supabase User Query Service
  *
- * Production implementation of IUserQueryService using Supabase database
- * projections for reads. Queries are automatically scoped by JWT claims
- * via RLS policies.
+ * Production implementation of IUserQueryService using Supabase RPC functions
+ * for reads. Follows CQRS pattern - all queries via api.* schema RPC functions.
  *
  * Architecture:
- * - Direct database queries to projection tables (users, invitations_projection, etc.)
+ * - CRITICAL: All user list queries via api.list_users() RPC
  * - RPC calls for complex lookups (email status, assignable roles)
- * - All queries scoped to current org via RLS
+ * - NEVER use direct table queries with PostgREST embedding
+ * - All queries scoped to current org via RLS + JWT claims
  *
  * @see IUserQueryService for interface documentation
  */
@@ -274,62 +274,62 @@ export class SupabaseUserQueryService implements IUserQueryService {
       const items: UserListItem[] = [];
       let totalCount = 0;
 
-      // Fetch users with their roles
+      // Fetch users with their roles via RPC (CQRS pattern)
+      // CRITICAL: Always use api.list_users() RPC - NEVER direct table queries with PostgREST embedding
       if (!options?.filters?.invitationsOnly) {
-        let userQuery = client
-          .from('users')
-          .select(
-            `
-            id, email, first_name, last_name, name, is_active, created_at, updated_at, last_login_at,
-            user_roles_projection!inner (
-              role_id,
-              roles_projection (id, name)
-            )
-          `,
-            { count: 'exact' }
-          )
-          .eq('user_roles_projection.organization_id', claims.org_id);
-
-        // Apply status filter
+        // Determine status filter for RPC
+        let statusFilter: string | null = null;
         if (options?.filters?.status === 'active') {
-          userQuery = userQuery.eq('is_active', true);
+          statusFilter = 'active';
         } else if (options?.filters?.status === 'deactivated') {
-          userQuery = userQuery.eq('is_active', false);
+          statusFilter = 'deactivated';
         }
 
-        // Apply search filter
-        if (options?.filters?.searchTerm) {
-          const term = `%${options.filters.searchTerm}%`;
-          userQuery = userQuery.or(`email.ilike.${term},name.ilike.${term}`);
-        }
+        // When combining with invitations, fetch all users (large page size)
+        // When usersOnly, use actual pagination
+        const usersOnly = options?.filters?.usersOnly ?? false;
+        const rpcPageSize = usersOnly ? pageSize : 10000; // Large number when combining
+        const rpcPage = usersOnly ? page : 1;
 
-        // Apply sorting
-        const sortBy = options?.sort?.sortBy ?? 'name';
-        const sortOrder = options?.sort?.sortOrder === 'desc';
-        userQuery = userQuery.order(sortBy, { ascending: !sortOrder });
-
-        // Apply pagination (only if not combining with invitations)
-        if (options?.filters?.usersOnly) {
-          userQuery = userQuery.range(offset, offset + pageSize - 1);
-        }
-
-        const { data, error: usersError, count } = await userQuery;
+        const { data, error: usersError } = await client
+          .schema('api')
+          .rpc('list_users', {
+            p_org_id: claims.org_id,
+            p_status: statusFilter,
+            p_search_term: options?.filters?.searchTerm ?? null,
+            p_sort_by: options?.sort?.sortBy ?? 'name',
+            p_sort_desc: options?.sort?.sortOrder === 'desc',
+            p_page: rpcPage,
+            p_page_size: rpcPageSize,
+          });
 
         if (usersError) {
-          log.error('Failed to fetch users', usersError);
+          log.error('Failed to fetch users via RPC', usersError);
           throw new Error(`Failed to fetch users: ${usersError.message}`);
         }
 
-        if (data) {
-          totalCount += count ?? 0;
-          const users = data as unknown as DbUserRow[];
+        if (data && Array.isArray(data)) {
+          // Get total count from first row (all rows have same total_count)
+          const rpcTotalCount = data.length > 0 ? (data[0] as { total_count: number }).total_count : 0;
+          totalCount += rpcTotalCount;
 
-          for (const user of users) {
-            const roles: RoleReference[] =
-              user.user_roles_projection?.map((urp) => ({
-                roleId: urp.role_id,
-                roleName: urp.roles_projection?.name ?? 'Unknown',
-              })) ?? [];
+          for (const user of data as Array<{
+            id: string;
+            email: string;
+            first_name: string | null;
+            last_name: string | null;
+            name: string | null;
+            is_active: boolean;
+            created_at: string;
+            updated_at: string;
+            last_login_at: string | null;
+            roles: Array<{ role_id: string; role_name: string }> | null;
+            total_count: number;
+          }>) {
+            const roles: RoleReference[] = (user.roles ?? []).map((r) => ({
+              roleId: r.role_id,
+              roleName: r.role_name,
+            }));
 
             items.push({
               id: user.id,
