@@ -33,7 +33,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v10-resend-env-fix';
+const DEPLOY_VERSION = 'v11-cqrs-compliant';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -537,14 +537,14 @@ serve(async (req) => {
 
       console.log(`[invite-user v${DEPLOY_VERSION}] Resending invitation ${requestData.invitationId}`);
 
-      // Lookup existing invitation
-      const { data: existingInvitation, error: lookupError } = await supabaseAdmin
-        .from('invitations_projection')
-        .select('*')
-        .eq('id', requestData.invitationId)
-        .eq('organization_id', orgId)
-        .single();
+      // Lookup existing invitation via CQRS-compliant RPC
+      const { data: invitationData, error: lookupError } = await supabaseAdmin
+        .rpc('get_invitation_for_resend', {
+          p_invitation_id: requestData.invitationId,
+          p_org_id: orgId,
+        });
 
+      const existingInvitation = invitationData?.[0];
       if (lookupError || !existingInvitation) {
         console.error(`[invite-user v${DEPLOY_VERSION}] Invitation not found:`, lookupError);
         return new Response(
@@ -572,14 +572,11 @@ serve(async (req) => {
       const newExpiresAt = new Date();
       newExpiresAt.setDate(newExpiresAt.getDate() + INVITATION_EXPIRY_DAYS);
 
-      // Get organization name for email
+      // Get organization name for email via CQRS-compliant RPC
       const { data: orgData } = await supabaseAdmin
-        .from('organizations_projection')
-        .select('name')
-        .eq('id', orgId)
-        .single();
+        .rpc('get_organization_by_id', { p_org_id: orgId });
 
-      const orgName = orgData?.name || 'Analytics4Change';
+      const orgName = orgData?.[0]?.name || 'Analytics4Change';
 
       // Emit user.invited event with updated token (event processor will update projection)
       // Use proper TracingContext for W3C trace context propagation
