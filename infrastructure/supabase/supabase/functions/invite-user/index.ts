@@ -33,7 +33,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v8-resend-support';
+const DEPLOY_VERSION = 'v9-resend-tracing-fix';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -502,6 +502,21 @@ serve(async (req) => {
     console.log(`[invite-user v${DEPLOY_VERSION}] User ${user.id} authorized for org ${orgId}`);
 
     // ==========================================================================
+    // ADMIN CLIENT SETUP (needed for both resend and create operations)
+    // ==========================================================================
+    // Use service role for database operations
+    // Note: SUPABASE_SERVICE_ROLE_KEY is guaranteed by Stage 2 validation above
+    const supabaseAdmin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      db: {
+        schema: 'api',
+      },
+    });
+
+    // ==========================================================================
     // REQUEST PARSING
     // ==========================================================================
     const requestData: InviteUserRequest = await req.json();
@@ -567,13 +582,11 @@ serve(async (req) => {
       const orgName = orgData?.name || 'Analytics4Change';
 
       // Emit user.invited event with updated token (event processor will update projection)
-      const eventMetadata = buildEventMetadata({
-        correlationId,
-        userId: user.id,
+      // Use proper TracingContext for W3C trace context propagation
+      const eventMetadata = buildEventMetadata(tracingContext, 'user.invited', req, {
+        user_id: user.id,
         reason: 'Invitation resent',
-        ipAddress,
-        userAgent,
-        requestId: correlationId,
+        is_resend: true,
       });
 
       const { error: eventError } = await (supabaseAdmin as AnySchemaSupabaseClient)
@@ -731,18 +744,7 @@ serve(async (req) => {
     // ==========================================================================
     // SMART EMAIL LOOKUP
     // ==========================================================================
-    // Use service role for database operations
-    // Note: SUPABASE_SERVICE_ROLE_KEY is guaranteed by Stage 2 validation above
-    const supabaseAdmin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY!, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-      db: {
-        schema: 'api',
-      },
-    });
-
+    // Note: supabaseAdmin already declared above (shared for resend and create)
     const emailStatus = await checkEmailStatus(supabaseAdmin, requestData.email, orgId, tracingContext);
     console.log(`[invite-user v${DEPLOY_VERSION}] Email status: ${emailStatus.status}`);
 
