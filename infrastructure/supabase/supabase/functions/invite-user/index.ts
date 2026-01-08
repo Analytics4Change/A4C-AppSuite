@@ -33,7 +33,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v7-tracing';
+const DEPLOY_VERSION = 'v8-resend-support';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -62,13 +62,20 @@ interface NotificationPreferences {
 }
 
 /**
+ * Supported operations
+ */
+type Operation = 'create' | 'resend' | 'revoke';
+
+/**
  * Request format from frontend
  */
 interface InviteUserRequest {
-  email: string;
-  firstName: string;
-  lastName: string;
-  roles: RoleReference[];
+  operation?: Operation;              // Default: 'create'
+  invitationId?: string;              // Required for resend/revoke operations
+  email?: string;                     // Required for create operation
+  firstName?: string;                 // Required for create operation
+  lastName?: string;                  // Required for create operation
+  roles?: RoleReference[];
   accessStartDate?: string | null;    // ISO date (YYYY-MM-DD) or null
   accessExpirationDate?: string | null; // ISO date (YYYY-MM-DD) or null
   notificationPreferences?: NotificationPreferences;
@@ -495,10 +502,149 @@ serve(async (req) => {
     console.log(`[invite-user v${DEPLOY_VERSION}] User ${user.id} authorized for org ${orgId}`);
 
     // ==========================================================================
-    // REQUEST VALIDATION
+    // REQUEST PARSING
     // ==========================================================================
     const requestData: InviteUserRequest = await req.json();
+    const operation = requestData.operation || 'create';
 
+    console.log(`[invite-user v${DEPLOY_VERSION}] Operation: ${operation}`);
+
+    // ==========================================================================
+    // RESEND OPERATION
+    // ==========================================================================
+    if (operation === 'resend') {
+      if (!requestData.invitationId) {
+        return new Response(
+          JSON.stringify({ error: 'Missing invitationId for resend operation' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`[invite-user v${DEPLOY_VERSION}] Resending invitation ${requestData.invitationId}`);
+
+      // Lookup existing invitation
+      const { data: existingInvitation, error: lookupError } = await supabaseAdmin
+        .from('invitations_projection')
+        .select('*')
+        .eq('id', requestData.invitationId)
+        .eq('organization_id', orgId)
+        .single();
+
+      if (lookupError || !existingInvitation) {
+        console.error(`[invite-user v${DEPLOY_VERSION}] Invitation not found:`, lookupError);
+        return new Response(
+          JSON.stringify({ error: 'Invitation not found or access denied' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (existingInvitation.status === 'accepted') {
+        return new Response(
+          JSON.stringify({ error: 'Cannot resend accepted invitation' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (existingInvitation.status === 'revoked') {
+        return new Response(
+          JSON.stringify({ error: 'Cannot resend revoked invitation' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Generate new token and expiration
+      const newToken = generateSecureToken();
+      const newExpiresAt = new Date();
+      newExpiresAt.setDate(newExpiresAt.getDate() + INVITATION_EXPIRY_DAYS);
+
+      // Get organization name for email
+      const { data: orgData } = await supabaseAdmin
+        .from('organizations_projection')
+        .select('name')
+        .eq('id', orgId)
+        .single();
+
+      const orgName = orgData?.name || 'Analytics4Change';
+
+      // Emit user.invited event with updated token (event processor will update projection)
+      const eventMetadata = buildEventMetadata({
+        correlationId,
+        userId: user.id,
+        reason: 'Invitation resent',
+        ipAddress,
+        userAgent,
+        requestId: correlationId,
+      });
+
+      const { error: eventError } = await (supabaseAdmin as AnySchemaSupabaseClient)
+        .schema('api')
+        .rpc('emit_domain_event', {
+          p_stream_id: existingInvitation.id,
+          p_stream_type: 'user',
+          p_event_type: 'user.invited',
+          p_event_data: {
+            invitation_id: existingInvitation.id,
+            organization_id: orgId,
+            email: existingInvitation.email,
+            first_name: existingInvitation.first_name,
+            last_name: existingInvitation.last_name,
+            roles: existingInvitation.roles || [],
+            token: newToken,
+            expires_at: newExpiresAt.toISOString(),
+            access_start_date: existingInvitation.access_start_date,
+            access_expiration_date: existingInvitation.access_expiration_date,
+            notification_preferences: existingInvitation.notification_preferences,
+            is_resend: true,
+          },
+          p_event_metadata: eventMetadata,
+        });
+
+      if (eventError) {
+        console.error(`[invite-user v${DEPLOY_VERSION}] Failed to emit resend event:`, eventError);
+        return handleRpcError(eventError, correlationId, corsHeaders, 'resend invitation');
+      }
+
+      // Send the invitation email
+      const emailResult = await sendInvitationEmail(env.RESEND_API_KEY, {
+        email: existingInvitation.email,
+        firstName: existingInvitation.first_name || 'User',
+        lastName: existingInvitation.last_name || '',
+        orgName,
+        token: newToken,
+        expiresAt: newExpiresAt,
+        frontendUrl: env.FRONTEND_URL,
+        baseDomain: env.EMAIL_FROM_DOMAIN,
+      });
+
+      if (!emailResult.success) {
+        console.error(`[invite-user v${DEPLOY_VERSION}] Email send failed:`, emailResult.error);
+        // Event already emitted, so invitation is updated - just warn about email
+        return new Response(
+          JSON.stringify({
+            success: true,
+            invitationId: existingInvitation.id,
+            warning: 'Invitation updated but email delivery failed',
+            emailError: emailResult.error,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`[invite-user v${DEPLOY_VERSION}] Invitation resent successfully: ${existingInvitation.id}`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          invitationId: existingInvitation.id,
+          emailStatus: 'pending_invitation',
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ==========================================================================
+    // CREATE OPERATION - REQUEST VALIDATION
+    // ==========================================================================
     if (!requestData.email) {
       return new Response(
         JSON.stringify({ error: 'Missing email' }),
