@@ -384,25 +384,21 @@ export class SupabaseUserQueryService implements IUserQueryService {
           options.filters.status === 'pending' ||
           options.filters.status === 'expired')
       ) {
-        let invQuery = client
-          .from('invitations_projection')
-          .select('*', { count: 'exact' })
-          .eq('organization_id', claims.org_id)
-          .in('status', ['pending', 'expired']);
-
-        // Apply search filter
-        if (options?.filters?.searchTerm) {
-          const term = `%${options.filters.searchTerm}%`;
-          invQuery = invQuery.ilike('email', term);
-        }
-
-        const { data: invData, error: invError, count: invCount } = await invQuery;
+        // Use RPC function for CQRS-compliant query (not direct table access)
+        const { data: invData, error: invError } = await supabaseService.apiRpc<DbInvitationRow[]>(
+          'list_invitations',
+          {
+            p_org_id: claims.org_id,
+            p_status: ['pending', 'expired'],
+            p_search_term: options?.filters?.searchTerm ?? null,
+          }
+        );
 
         if (invError) {
           log.error('Failed to fetch invitations', invError);
         } else if (invData) {
-          totalCount += invCount ?? 0;
-          const invitations = invData as unknown as DbInvitationRow[];
+          const invitations = invData ?? [];
+          totalCount += invitations.length;
 
           for (const inv of invitations) {
             const displayStatus = computeInvitationDisplayStatus(
@@ -590,19 +586,22 @@ export class SupabaseUserQueryService implements IUserQueryService {
     }
 
     try {
-      const { data, error } = await client
-        .from('invitations_projection')
-        .select('*')
-        .eq('organization_id', claims.org_id)
-        .in('status', ['pending', 'expired'])
-        .order('created_at', { ascending: false });
+      // Use RPC function for CQRS-compliant query (not direct table access)
+      const { data, error } = await supabaseService.apiRpc<DbInvitationRow[]>(
+        'list_invitations',
+        {
+          p_org_id: claims.org_id,
+          p_status: ['pending', 'expired'],
+          p_search_term: null,
+        }
+      );
 
       if (error) {
         log.error('Failed to fetch invitations', error);
         return [];
       }
 
-      const invitations = (data ?? []) as unknown as DbInvitationRow[];
+      const invitations = data ?? [];
       return invitations.map((inv) => ({
         id: inv.id,
         invitationId: inv.id,
@@ -638,21 +637,27 @@ export class SupabaseUserQueryService implements IUserQueryService {
    * Get invitation by ID
    */
   async getInvitationById(invitationId: string): Promise<Invitation | null> {
-    const client = supabaseService.getClient();
-
     try {
-      const { data: inv, error } = await client
-        .from('invitations_projection')
-        .select('*')
-        .eq('id', invitationId)
-        .single();
+      // Use RPC function for CQRS-compliant query (not direct table access)
+      const { data, error } = await supabaseService.apiRpc<DbInvitationRow[]>(
+        'get_invitation_by_id',
+        {
+          p_invitation_id: invitationId,
+        }
+      );
 
-      if (error || !inv) {
+      if (error) {
         log.error('Failed to fetch invitation by ID', error);
         return null;
       }
 
-      const invitation = inv as unknown as DbInvitationRow;
+      // RPC returns array, get first row
+      const rows = data ?? [];
+      if (rows.length === 0) {
+        return null;
+      }
+
+      const invitation = rows[0];
 
       return {
         id: invitation.id,
