@@ -287,10 +287,11 @@ CREATE POLICY invitations_super_admin_all
 CREATE POLICY invitations_org_admin_all
   ON invitations_projection FOR ALL
   USING (
-    organization_id = (current_setting('request.jwt.claims', true)::json->>'org_id')::UUID
-    AND is_org_admin(get_current_user_id(), organization_id)
+    has_org_admin_permission()
+    AND organization_id = get_current_org_id()
   );
 ```
+- Uses `has_org_admin_permission()` JWT-claims-based function (no DB query)
 
 **Policy 3: Edge Functions (Service Role Bypass)**
 ```sql

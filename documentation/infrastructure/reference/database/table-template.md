@@ -125,14 +125,14 @@ SELECT * FROM [table];
 CREATE POLICY "[table]_insert_policy"
   ON [table] FOR INSERT
   WITH CHECK (
-    is_org_admin(get_current_user_id(), organization_id) OR
-    is_super_admin(get_current_user_id())
+    is_super_admin(get_current_user_id()) OR
+    (has_org_admin_permission() AND organization_id = get_current_org_id())
   );
 ```
 
 **Purpose**: Control who can create new records
 
-**Logic**: _[Explain policy logic]_
+**Logic**: Uses JWT-claims-based `has_org_admin_permission()` for org admin check (no database query). _[Customize as needed]_
 
 ### UPDATE Policy
 

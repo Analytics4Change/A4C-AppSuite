@@ -212,13 +212,14 @@ CREATE POLICY roles_org_admin_select
   ON roles_projection FOR SELECT
   USING (
     organization_id IS NOT NULL
-    AND is_org_admin(get_current_user_id(), organization_id)
+    AND has_org_admin_permission()
+    AND organization_id = get_current_org_id()
   );
 ```
 - **Purpose**: Organization admins can view roles in their organization
 - **Operations**: SELECT only (create/update via API with permission checks)
 - **Scope**: Only organization-scoped roles (excludes global templates)
-- **Function**: `is_org_admin(user_id, org_id)` checks user's admin role assignment
+- **Function**: `has_org_admin_permission()` checks JWT claims for admin role (no DB query)
 
 ### Policy 3: System Role Visibility (super_admin)
 ```sql
@@ -732,8 +733,9 @@ SELECT
 FROM roles_projection r
 WHERE r.organization_id = '<org-uuid>';
 
--- Check user's org_admin status
-SELECT is_org_admin('<user-uuid>', '<org-uuid>');
+-- Check user's org_admin status (JWT-claims-based)
+SELECT has_org_admin_permission();  -- Returns true if JWT indicates admin role
+SELECT get_current_org_id();  -- Current org from JWT claims
 
 -- Verify JWT claims contain correct org_id
 -- Check: request.jwt.claims->>'org_id'

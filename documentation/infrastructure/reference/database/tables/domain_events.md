@@ -299,11 +299,12 @@ CREATE POLICY domain_events_super_admin_all
 CREATE POLICY domain_events_org_admin_select ON domain_events
   FOR SELECT
   USING (
-    is_org_admin(get_current_user_id(), (event_metadata->>'org_id')::uuid)
+    has_org_admin_permission()
+    AND (event_metadata->>'org_id')::uuid = get_current_org_id()
   );
 ```
 
-**Note**: Requires standardizing `org_id` in event_metadata for all events.
+**Note**: Requires standardizing `org_id` in event_metadata for all events. Uses JWT-claims-based `has_org_admin_permission()` instead of database-querying functions.
 
 ## Constraints
 

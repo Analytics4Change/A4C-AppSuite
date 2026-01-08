@@ -249,13 +249,14 @@ CREATE POLICY user_roles_org_admin_select
   ON user_roles_projection FOR SELECT
   USING (
     org_id IS NOT NULL
-    AND is_org_admin(get_current_user_id(), org_id)
+    AND has_org_admin_permission()
+    AND org_id = get_current_org_id()
   );
 ```
 - **Purpose**: Organization admins can view role assignments within their organization
 - **Operations**: SELECT only (assign/revoke via API with permission checks)
 - **Scope**: Only organization-scoped assignments (not global super_admin)
-- **Function**: `is_org_admin(user_id, org_id)` validates admin privileges
+- **Function**: `has_org_admin_permission()` checks JWT claims for admin role (no DB query)
 
 ### Policy 3: User Self-Access
 ```sql

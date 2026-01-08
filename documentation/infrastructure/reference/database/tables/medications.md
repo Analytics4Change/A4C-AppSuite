@@ -365,7 +365,8 @@ CREATE POLICY "medications_insert_policy"
   WITH CHECK (
     is_super_admin(get_current_user_id()) OR
     (
-      is_org_admin(get_current_user_id(), organization_id)
+      has_org_admin_permission()
+      AND organization_id = get_current_org_id()
       AND user_has_permission(get_current_user_id(), 'medications.manage', organization_id)
     )
   );
@@ -373,7 +374,7 @@ CREATE POLICY "medications_insert_policy"
 
 **Purpose**: Control who can add medications to formulary
 
-**Logic**: Allow insertions if user is super admin or org admin with medication management permission
+**Logic**: Allow insertions if user is super admin or org admin (JWT-claims-based) with medication management permission
 
 #### Recommended UPDATE Policy
 
@@ -966,7 +967,7 @@ CREATE INDEX IF NOT EXISTS idx_medications_active_ingredients_gin
   - medication_history - Medication prescriptions (to be documented)
   - clients - Patient allergy checks
 - **AsyncAPI Contracts**: `infrastructure/supabase/contracts/asyncapi/domains/formulary.yaml` (to be created)
-- **Database Functions**: `is_super_admin()`, `is_org_admin()`, `user_has_permission()` (see `infrastructure/supabase/sql/03-functions/`)
+- **Database Functions**: `is_super_admin()`, `has_org_admin_permission()`, `user_has_permission()` (see `infrastructure/supabase/sql/03-functions/`)
 - **SQL Files**:
   - Table: `infrastructure/supabase/sql/02-tables/medications/table.sql`
   - Indexes: `infrastructure/supabase/sql/02-tables/medications/indexes/`

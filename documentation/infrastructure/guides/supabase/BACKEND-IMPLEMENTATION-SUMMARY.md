@@ -61,7 +61,7 @@ The backend JWT custom claims infrastructure for Supabase Auth has been successf
 
 **Updated Functions**:
 - ✅ `get_current_user_id()` - Now supports both Supabase Auth (UUID) and legacy Zitadel (TEXT via mapping)
-- ✅ `is_org_admin(p_user_id, p_org_id)` - Fixed deleted_at reference bug
+- ⚠️ `is_org_admin(p_user_id, p_org_id)` - **DEPRECATED** (January 2026). Replaced by JWT-claims-based `has_org_admin_permission()` function which checks JWT claims directly without database queries.
 
 **New Functions**:
 - ✅ `get_current_org_id()` - Extracts org_id from JWT custom claims
@@ -79,7 +79,7 @@ The backend JWT custom claims infrastructure for Supabase Auth has been successf
 - ✅ Added all JWT custom claims extraction functions
 - ✅ Added complete JWT custom access token hook
 - ✅ Added helper functions for org switching and claims preview
-- ✅ Fixed `is_org_admin()` bug (removed invalid deleted_at check on user_roles_projection)
+- ⚠️ **DEPRECATED**: `is_org_admin()` has been replaced by `has_org_admin_permission()` (January 2026)
 
 **Benefits**:
 - Single-file deployment for complete database setup

@@ -156,14 +156,15 @@ CREATE POLICY role_permissions_org_admin_select
       FROM roles_projection r
       WHERE r.id = role_permissions_projection.role_id
         AND r.organization_id IS NOT NULL
-        AND is_org_admin(get_current_user_id(), r.organization_id)
+        AND has_org_admin_permission()
+        AND r.organization_id = get_current_org_id()
     )
   );
 ```
 - **Purpose**: Organization admins can view permission grants for their organization's roles
 - **Operations**: SELECT only (grant/revoke via API with permission checks)
 - **Scope**: Only organization-scoped roles (not global templates)
-- **Function**: `is_org_admin(user_id, org_id)` checks admin role assignment
+- **Function**: `has_org_admin_permission()` checks JWT claims for admin role (no DB query)
 
 ### Policy 3: Global Role Permissions Visibility
 ```sql

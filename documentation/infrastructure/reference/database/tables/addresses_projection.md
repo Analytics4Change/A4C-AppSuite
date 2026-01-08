@@ -173,7 +173,8 @@ CREATE INDEX idx_addresses_active
 CREATE POLICY "addresses_org_admin_select"
   ON addresses_projection FOR SELECT
   USING (
-    is_org_admin(get_current_user_id(), organization_id)
+    has_org_admin_permission()
+    AND organization_id = get_current_org_id()
     AND deleted_at IS NULL
   );
 ```
@@ -181,9 +182,10 @@ CREATE POLICY "addresses_org_admin_select"
 **Purpose**: Organization admins can view addresses in their organization
 
 **Logic**:
-- User must be an admin of the organization
+- User must have org admin permission (via JWT claims)
+- Organization must match user's current org (from JWT)
 - Soft-deleted records are excluded
-- Uses `is_org_admin()` helper function
+- Uses `has_org_admin_permission()` JWT-claims-based function (no DB query)
 
 ### ALL Policy (Super Admins)
 

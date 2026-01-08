@@ -386,8 +386,8 @@ CREATE POLICY access_grants_provider_view
 CREATE POLICY access_grants_provider_manage
   ON cross_tenant_access_grants_projection FOR ALL
   USING (
-    provider_org_id = (current_setting('request.jwt.claims', true)::json->>'org_id')::UUID
-    AND is_org_admin(get_current_user_id(), provider_org_id)
+    provider_org_id = get_current_org_id()
+    AND has_org_admin_permission()
   );
 ```
 

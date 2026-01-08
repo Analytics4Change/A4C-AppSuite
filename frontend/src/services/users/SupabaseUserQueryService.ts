@@ -317,7 +317,10 @@ export class SupabaseUserQueryService implements IUserQueryService {
 
         if (usersError) {
           log.error('Failed to fetch users', usersError);
-        } else if (data) {
+          throw new Error(`Failed to fetch users: ${usersError.message}`);
+        }
+
+        if (data) {
           totalCount += count ?? 0;
           const users = data as unknown as DbUserRow[];
 

@@ -284,15 +284,15 @@ CREATE POLICY "clients_select_policy"
 CREATE POLICY "clients_insert_policy"
   ON clients FOR INSERT
   WITH CHECK (
-    is_org_admin(get_current_user_id(), organization_id) OR
     is_super_admin(get_current_user_id()) OR
+    (has_org_admin_permission() AND organization_id = get_current_org_id()) OR
     user_has_permission(get_current_user_id(), 'clients.create', organization_id)
   );
 ```
 
 **Purpose**: Control who can create new client records
 
-**Logic**: Allow insertions if user is super admin, org admin, or has explicit permission
+**Logic**: Allow insertions if user is super admin, org admin (JWT-claims-based), or has explicit permission
 
 #### Recommended UPDATE Policy
 
@@ -952,7 +952,7 @@ VACUUM FULL clients; -- Requires exclusive lock
   - medication_history - Client medication prescriptions (to be documented)
   - dosage_info - Medication dosage administration (to be documented)
 - **AsyncAPI Contracts**: `infrastructure/supabase/contracts/asyncapi/domains/clinical.yaml` (to be created)
-- **Database Functions**: `is_super_admin()`, `is_org_admin()`, `user_has_permission()` (see `infrastructure/supabase/sql/03-functions/`)
+- **Database Functions**: `is_super_admin()`, `has_org_admin_permission()`, `user_has_permission()` (see `infrastructure/supabase/sql/03-functions/`)
 - **SQL Files**:
   - Table: `infrastructure/supabase/sql/02-tables/clients/table.sql`
   - Indexes: `infrastructure/supabase/sql/02-tables/clients/indexes/`

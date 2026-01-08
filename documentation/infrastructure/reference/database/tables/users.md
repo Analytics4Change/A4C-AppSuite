@@ -246,7 +246,8 @@ CREATE POLICY users_org_admin_select
       SELECT 1
       FROM user_roles_projection ur
       WHERE ur.user_id = users.id
-        AND is_org_admin(get_current_user_id(), ur.org_id)
+        AND has_org_admin_permission()
+        AND ur.organization_id = get_current_org_id()
     )
   );
 ```
@@ -255,9 +256,10 @@ CREATE POLICY users_org_admin_select
 
 **Logic**:
 - Joins with `user_roles_projection` to find user's organizations
-- Calls `is_org_admin(current_user_id, org_id)` for each user's org
+- Uses `has_org_admin_permission()` to check JWT claims for admin role
+- Checks organization ID matches user's current org from JWT
 - Returns users who have roles in current admin's organization
-- Allows viewing users across all orgs the admin manages
+- JWT-claims-based (no database query for permission check)
 
 **Testing**:
 ```sql
@@ -670,7 +672,8 @@ SELECT get_current_user_id();
 
 -- Check if user has necessary role
 SELECT is_super_admin(get_current_user_id());
-SELECT is_org_admin(get_current_user_id(), '<org-uuid>');
+SELECT has_org_admin_permission();  -- JWT-claims-based check
+SELECT get_current_org_id();  -- Current org from JWT
 ```
 
 #### User ID Mismatch with Supabase Auth
@@ -750,7 +753,7 @@ SELECT * FROM users WHERE email = 'user@example.com';
 - **Database Functions**:
   - [get_current_user_id()](../functions/authorization.md#get_current_user_id)
   - [is_super_admin()](../functions/authorization.md#is_super_admin)
-  - [is_org_admin()](../functions/authorization.md#is_org_admin)
+  - [has_org_admin_permission()](../functions/authorization.md#has_org_admin_permission) - JWT-claims-based admin check
 - **Supabase Auth**: [Supabase Auth Documentation](https://supabase.com/docs/guides/auth)
 
 ---

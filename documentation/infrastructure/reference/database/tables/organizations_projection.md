@@ -290,15 +290,16 @@ DROP POLICY IF EXISTS organizations_org_admin_select ON organizations_projection
 CREATE POLICY organizations_org_admin_select
   ON organizations_projection
   FOR SELECT
-  USING (is_org_admin(get_current_user_id(), id));
+  USING (has_org_admin_permission() AND id = get_current_org_id());
 ```
 
 **Purpose**: Organization administrators can view their own organization details
 
 **Logic**:
-- Calls `is_org_admin(user_id, org_id)` function
-- Checks if user has `org_admin` role for this specific organization
+- Calls `has_org_admin_permission()` to check JWT claims for admin role
+- Checks organization ID matches user's current org from JWT
 - Returns true only for user's assigned organization
+- JWT-claims-based (no database query required)
 
 **Testing**:
 ```sql
@@ -706,7 +707,8 @@ CREATE INDEX idx_organizations_metadata ON organizations_projection USING GIN (m
 ```sql
 -- Verify current user role
 SELECT is_super_admin(get_current_user_id());
-SELECT is_org_admin(get_current_user_id(), '<org-uuid>');
+SELECT has_org_admin_permission();  -- JWT-claims-based check
+SELECT get_current_org_id();  -- Current org from JWT
 ```
 
 #### Unique Constraint Violations
@@ -773,7 +775,7 @@ WHERE path <@ 'root.org_acme_healthcare';
 - **AsyncAPI Contracts**: `infrastructure/supabase/contracts/asyncapi/domains/organization.yaml`
 - **Database Functions**:
   - [is_super_admin()](../functions/authorization.md#is_super_admin)
-  - [is_org_admin()](../functions/authorization.md#is_org_admin)
+  - [has_org_admin_permission()](../functions/authorization.md#has_org_admin_permission) - JWT-claims-based admin check
 - **Ltree Documentation**: [PostgreSQL ltree](https://www.postgresql.org/docs/current/ltree.html)
 
 ---

@@ -188,9 +188,9 @@ CREATE POLICY ou_super_admin_all ON organization_units_projection
 ```sql
 CREATE POLICY ou_org_admin_select ON organization_units_projection
   FOR SELECT
-  USING (organization_id IS NOT NULL AND is_org_admin(get_current_user_id(), organization_id));
+  USING (organization_id IS NOT NULL AND has_org_admin_permission() AND organization_id = get_current_org_id());
 ```
-**Purpose**: Organization admins can view all OUs within their organization.
+**Purpose**: Organization admins can view all OUs within their organization. Uses JWT-claims-based `has_org_admin_permission()` function.
 
 ### Policy: ou_scope_select
 ```sql
