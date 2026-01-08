@@ -406,9 +406,10 @@ export class SupabaseUserQueryService implements IUserQueryService {
               inv.expires_at
             );
 
-            // Skip if status filter doesn't match
+            // Skip if status filter doesn't match (but 'all' shows everything)
             if (
               options?.filters?.status &&
+              options.filters.status !== 'all' &&
               displayStatus !== options.filters.status
             ) {
               continue;
@@ -416,8 +417,9 @@ export class SupabaseUserQueryService implements IUserQueryService {
 
             const roles: RoleReference[] = Array.isArray(inv.roles)
               ? inv.roles.map((r) => ({
-                  roleId: r.role_id,
-                  roleName: r.role_name,
+                  // Handle both camelCase (from JSONB) and snake_case (from projection)
+                  roleId: r.role_id ?? (r as unknown as { roleId: string }).roleId,
+                  roleName: r.role_name ?? (r as unknown as { roleName: string }).roleName,
                 }))
               : [];
 
