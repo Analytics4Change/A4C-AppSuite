@@ -1,0 +1,338 @@
+components:
+  messages:
+    PlatformAdminFailedEventsViewed:
+      name: platform.admin.failed_events_viewed
+      title: Failed Events Viewed
+      summary: Platform admin viewed failed domain events for observability
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PlatformAdminFailedEventsViewedEvent'
+
+    PlatformAdminEventRetryAttempted:
+      name: platform.admin.event_retry_attempted
+      title: Event Retry Attempted
+      summary: Platform admin attempted to retry a failed event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PlatformAdminEventRetryAttemptedEvent'
+
+    PlatformAdminProcessingStatsViewed:
+      name: platform.admin.processing_stats_viewed
+      title: Processing Stats Viewed
+      summary: Platform admin viewed event processing statistics
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PlatformAdminProcessingStatsViewedEvent'
+
+    PlatformAdminEventDismissed:
+      name: platform.admin.event_dismissed
+      title: Event Dismissed
+      summary: Platform admin dismissed a failed event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PlatformAdminEventDismissedEvent'
+
+    PlatformAdminEventUndismissed:
+      name: platform.admin.event_undismissed
+      title: Event Undismissed
+      summary: Platform admin reversed dismissal of a failed event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PlatformAdminEventUndismissedEvent'
+
+  schemas:
+    PlatformAdminFailedEventsViewedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Platform admin user ID who viewed the events
+        stream_type:
+          type: string
+          const: platform_admin
+        event_type:
+          type: string
+          const: platform.admin.failed_events_viewed
+        event_data:
+          type: object
+          required:
+            - filters
+          properties:
+            filters:
+              type: object
+              description: Filters applied when viewing failed events
+              properties:
+                limit:
+                  type: integer
+                  description: Maximum number of events returned
+                  default: 25
+                offset:
+                  type: integer
+                  description: Pagination offset
+                  default: 0
+                event_type:
+                  type: string
+                  nullable: true
+                  description: Filter by specific event type
+                stream_type:
+                  type: string
+                  nullable: true
+                  description: Filter by specific stream type
+                since:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: Filter events created after this timestamp
+                include_dismissed:
+                  type: boolean
+                  description: Whether to include dismissed events
+                  default: false
+                sort_by:
+                  type: string
+                  enum: [created_at, event_type]
+                  description: Column to sort by
+                  default: created_at
+                sort_order:
+                  type: string
+                  enum: [asc, desc]
+                  description: Sort direction
+                  default: desc
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - properties:
+                organization_id:
+                  type: string
+                  description: Organization ID from JWT claims (platform owner org)
+                reason:
+                  examples:
+                    - Platform admin viewed failed events for observability monitoring
+                    - Platform admin investigated failed event processing for support ticket
+
+    PlatformAdminEventRetryAttemptedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Platform admin user ID who attempted the retry
+        stream_type:
+          type: string
+          const: platform_admin
+        event_type:
+          type: string
+          const: platform.admin.event_retry_attempted
+        event_data:
+          type: object
+          required:
+            - target_event_id
+            - target_event_type
+            - target_stream_type
+            - target_stream_id
+            - retry_success
+          properties:
+            target_event_id:
+              type: string
+              format: uuid
+              description: ID of the event that was retried
+            target_event_type:
+              type: string
+              description: Type of the event that was retried
+            target_stream_type:
+              type: string
+              description: Stream type of the event that was retried
+            target_stream_id:
+              type: string
+              format: uuid
+              description: Stream ID of the event that was retried
+            original_error:
+              type: string
+              description: The error message before retry attempt
+            retry_success:
+              type: boolean
+              description: Whether the retry succeeded
+            new_error:
+              type: string
+              nullable: true
+              description: Error message after retry (null if successful)
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - properties:
+                organization_id:
+                  type: string
+                  description: Organization ID from JWT claims (platform owner org)
+                reason:
+                  examples:
+                    - Platform admin attempted to retry failed event processing
+                    - Platform admin retried event for support ticket TICKET-1234
+
+    PlatformAdminProcessingStatsViewedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Platform admin user ID who viewed the stats
+        stream_type:
+          type: string
+          const: platform_admin
+        event_type:
+          type: string
+          const: platform.admin.processing_stats_viewed
+        event_data:
+          type: object
+          required:
+            - timestamp
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+              description: When the stats were viewed
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - properties:
+                organization_id:
+                  type: string
+                  description: Organization ID from JWT claims (platform owner org)
+                reason:
+                  examples:
+                    - Platform admin viewed event processing statistics
+                    - Platform admin checked system health metrics
+
+    PlatformAdminEventDismissedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Unique ID for this audit event (gen_random_uuid)
+        stream_type:
+          type: string
+          const: platform_admin
+        event_type:
+          type: string
+          const: platform.admin.event_dismissed
+        event_data:
+          type: object
+          required:
+            - target_event_id
+            - target_event_type
+            - target_stream_type
+            - target_stream_id
+          properties:
+            target_event_id:
+              type: string
+              format: uuid
+              description: ID of the event that was dismissed
+            target_event_type:
+              type: string
+              description: Type of the event that was dismissed
+            target_stream_type:
+              type: string
+              description: Stream type of the event that was dismissed
+            target_stream_id:
+              type: string
+              format: uuid
+              description: Stream ID of the event that was dismissed
+            reason:
+              type: string
+              nullable: true
+              description: Optional reason provided for dismissing the event
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - properties:
+                organization_id:
+                  type: string
+                  description: Organization ID from JWT claims (platform owner org)
+                reason:
+                  examples:
+                    - Platform admin dismissed failed event
+                    - Platform admin dismissed failed event: Legacy migration artifact
+
+    PlatformAdminEventUndismissedEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Unique ID for this audit event (gen_random_uuid)
+        stream_type:
+          type: string
+          const: platform_admin
+        event_type:
+          type: string
+          const: platform.admin.event_undismissed
+        event_data:
+          type: object
+          required:
+            - target_event_id
+            - target_event_type
+            - target_stream_type
+            - target_stream_id
+          properties:
+            target_event_id:
+              type: string
+              format: uuid
+              description: ID of the event that was undismissed
+            target_event_type:
+              type: string
+              description: Type of the event that was undismissed
+            target_stream_type:
+              type: string
+              description: Stream type of the event that was undismissed
+            target_stream_id:
+              type: string
+              format: uuid
+              description: Stream ID of the event that was undismissed
+            previous_dismissed_by:
+              type: string
+              format: uuid
+              description: User ID who originally dismissed the event
+            previous_dismiss_reason:
+              type: string
+              nullable: true
+              description: Reason that was given when event was dismissed
+        event_metadata:
+          allOf:
+            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+            - properties:
+                organization_id:
+                  type: string
+                  description: Organization ID from JWT claims (platform owner org)
+                reason:
+                  examples:
+                    - Platform admin reversed dismissal of failed event

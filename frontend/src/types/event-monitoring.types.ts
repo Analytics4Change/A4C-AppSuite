@@ -51,6 +51,12 @@ export interface FailedEvent {
   created_at: string;
   /** When processing was last attempted (null if never processed) */
   processed_at: string | null;
+  /** When the event was dismissed (null if not dismissed) */
+  dismissed_at: string | null;
+  /** User ID who dismissed the event (null if not dismissed) */
+  dismissed_by: string | null;
+  /** Reason for dismissal (null if not dismissed or no reason provided) */
+  dismiss_reason: string | null;
 }
 
 /**
@@ -96,16 +102,33 @@ export interface RetryEventResult {
 }
 
 /**
+ * Result of a dismiss/undismiss operation.
+ * Returned by api.dismiss_failed_event() and api.undismiss_failed_event() RPC functions.
+ */
+export interface DismissEventResult {
+  /** Whether the operation was successful */
+  success: boolean;
+  /** Success or error message */
+  message?: string;
+  /** Error message if failed */
+  error?: string;
+}
+
+/**
  * Event processing statistics.
  * Returned by api.get_event_processing_stats() RPC function.
  */
 export interface EventProcessingStats {
-  /** Total count of failed events */
+  /** Total count of failed events (not dismissed) */
   total_failed: number;
-  /** Count of failed events in the last 24 hours */
+  /** Count of failed events in the last 24 hours (not dismissed) */
   failed_last_24h: number;
   /** Count of failed events in the last 7 days */
   failed_last_7d: number;
+  /** Total count of dismissed events */
+  dismissed_count: number;
+  /** Count of events dismissed in the last 24 hours */
+  dismissed_last_24h: number;
   /** Breakdown by event type */
   by_event_type: EventTypeStats[];
   /** Breakdown by stream type */
@@ -133,17 +156,35 @@ export interface StreamTypeStats {
 }
 
 /**
+ * Sort column options for failed events.
+ */
+export type FailedEventsSortBy = 'created_at' | 'event_type';
+
+/**
+ * Sort direction options.
+ */
+export type SortOrder = 'asc' | 'desc';
+
+/**
  * Query options for fetching failed events.
  */
 export interface FailedEventsQueryOptions {
-  /** Maximum number of events to return (default: 50) */
+  /** Maximum number of events to return (default: 25) */
   limit?: number;
+  /** Pagination offset (default: 0) */
+  offset?: number;
   /** Filter by specific event type */
   eventType?: string;
   /** Filter by specific stream type */
   streamType?: EventStreamType;
   /** Only return events created after this timestamp */
   since?: string;
+  /** Include dismissed events (default: false) */
+  includeDismissed?: boolean;
+  /** Sort column (default: 'created_at') */
+  sortBy?: FailedEventsSortBy;
+  /** Sort direction (default: 'desc') */
+  sortOrder?: SortOrder;
   /** Search by correlation ID */
   correlationId?: string;
 }

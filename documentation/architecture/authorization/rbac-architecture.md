@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-01-08
 ---
 
 <!-- TL;DR-START -->
@@ -1131,9 +1131,9 @@ EXECUTE FUNCTION raise_exception('Events are immutable for audit integrity');
 
 ## Appendix
 
-### A. Complete Permission Catalog (31 Total)
+### A. Complete Permission Catalog (32 Total)
 
-**Global Permissions (10):**
+**Global Permissions (11):**
 
 | Permission | Description |
 |------------|-------------|
@@ -1147,6 +1147,7 @@ EXECUTE FUNCTION raise_exception('Events are immutable for audit integrity');
 | `permission.grant` | Grant permissions to roles (catalog) |
 | `permission.revoke` | Revoke permissions from roles (catalog) |
 | `permission.view` | View permission catalog |
+| `platform.admin` | Platform administrative access (observability, cross-tenant operations) |
 
 **Org-Scoped Permissions (21):**
 
@@ -1162,7 +1163,7 @@ EXECUTE FUNCTION raise_exception('Events are immutable for audit integrity');
 
 | Permission | super_admin | provider_admin |
 |-----------|-------------|----------------|
-| **Global (10)** | | |
+| **Global (11)** | | |
 | organization.activate | ✅ | ❌ |
 | organization.create | ✅ | ❌ |
 | organization.create_root | ✅ | ❌ |
@@ -1170,9 +1171,10 @@ EXECUTE FUNCTION raise_exception('Events are immutable for audit integrity');
 | organization.delete | ✅ | ❌ |
 | organization.search | ✅ | ❌ |
 | organization.suspend | ✅ | ❌ |
-| permission.grant | ✅ | ❌ |
-| permission.revoke | ✅ | ❌ |
-| permission.view | ✅ | ❌ |
+| permission.grant | ✅ | ✅ (org-scoped) |
+| permission.revoke | ✅ | ✅ (org-scoped) |
+| permission.view | ✅ | ✅ |
+| platform.admin | ✅ | ❌ |
 | **Org-Scoped (21)** | | |
 | organization.view | ✅ | ✅ (own org) |
 | organization.update | ✅ | ✅ (own org) |
@@ -1305,6 +1307,83 @@ const AdminPanel = () => {
 
 ---
 
+### F. Platform Privileged Access
+
+Platform owner administrative functions require the `platform.admin` permission. This is the **canonical pattern** for implementing platform-level access control.
+
+#### The `has_platform_privilege()` Function
+
+```sql
+-- Canonical function for platform owner access checks
+CREATE OR REPLACE FUNCTION has_platform_privilege()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT 'platform.admin' = ANY(
+    COALESCE(
+      ARRAY(
+        SELECT jsonb_array_elements_text(
+          COALESCE(
+            (current_setting('request.jwt.claims', true)::jsonb)->'permissions',
+            '[]'::jsonb
+          )
+        )
+      ),
+      ARRAY[]::text[]
+    )
+  );
+$$;
+```
+
+**Design by Contract**:
+- **Precondition**: Valid JWT with `permissions` claim array
+- **Postcondition**: Returns `true` IFF `platform.admin` in permissions array
+- **Invariant**: No database queries (JWT-only for performance)
+- **Error handling**: Returns `false` on missing/malformed claims (fail-safe)
+
+#### Usage Pattern
+
+```sql
+-- In RLS policies:
+CREATE POLICY "platform_admin_all" ON some_table
+  USING (has_platform_privilege());
+
+-- In SECURITY DEFINER functions:
+IF NOT has_platform_privilege() THEN
+  RAISE EXCEPTION 'Access denied: platform.admin permission required';
+END IF;
+```
+
+#### Extensibility
+
+To grant platform admin access to a new delegate role (e.g., `platform_support`):
+
+```sql
+INSERT INTO role_permissions_projection (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles_projection r, permissions_projection p
+WHERE r.name = 'platform_support' AND p.name = 'platform.admin';
+```
+
+**No code changes required** - the permission flows through JWT claims automatically.
+
+#### Platform Admin Audit Events
+
+All platform admin actions emit audit events to `domain_events`:
+
+| Event Type | Description |
+|------------|-------------|
+| `platform.admin.failed_events_viewed` | Admin viewed failed events for observability |
+| `platform.admin.event_retry_attempted` | Admin attempted to retry a failed event |
+| `platform.admin.processing_stats_viewed` | Admin viewed event processing statistics |
+
+**AsyncAPI Contract**: `infrastructure/supabase/contracts/asyncapi/domains/platform-admin.yaml`
+
+---
+
 ### E. Related Documentation
 
 #### Authentication & Authorization
@@ -1336,7 +1415,7 @@ const AdminPanel = () => {
 
 ---
 
-**Document Version**: 1.2
-**Last Updated**: 2025-12-29
-**Status**: Approved for Implementation (Frontend Complete, RBAC Cleanup Complete)
+**Document Version**: 1.3
+**Last Updated**: 2026-01-08
+**Status**: Approved for Implementation (Platform Privilege Pattern Added)
 **Owner**: A4C Development Team

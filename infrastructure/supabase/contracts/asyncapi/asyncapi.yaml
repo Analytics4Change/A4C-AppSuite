@@ -62,6 +62,12 @@ channels:
           - $ref: './domains/organization-unit.yaml#/components/messages/OrganizationUnitReactivated'
           - $ref: './domains/organization-unit.yaml#/components/messages/OrganizationUnitDeleted'
           - $ref: './domains/organization-unit.yaml#/components/messages/OrganizationUnitMoved'
+          # Platform Admin audit events (observability and system management)
+          - $ref: './domains/platform-admin.yaml#/components/messages/PlatformAdminFailedEventsViewed'
+          - $ref: './domains/platform-admin.yaml#/components/messages/PlatformAdminEventRetryAttempted'
+          - $ref: './domains/platform-admin.yaml#/components/messages/PlatformAdminProcessingStatsViewed'
+          - $ref: './domains/platform-admin.yaml#/components/messages/PlatformAdminEventDismissed'
+          - $ref: './domains/platform-admin.yaml#/components/messages/PlatformAdminEventUndismissed'
     subscribe:
       summary: Subscribe to domain events
       operationId: onDomainEvent
@@ -102,6 +108,8 @@ components:
             - organization_unit
             - invitation
             - program
+            - platform_admin
+            - impersonation
           description: Type of entity this event affects
         stream_version:
           type: integer

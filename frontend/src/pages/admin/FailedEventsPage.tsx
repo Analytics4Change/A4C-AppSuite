@@ -34,12 +34,16 @@ import type {
   FailedEvent,
   EventProcessingStats,
   EventStreamType,
+  FailedEventsSortBy,
+  SortOrder,
 } from '@/types/event-monitoring.types';
 import {
   RefreshCw,
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
+  ChevronLeft,
   RotateCcw,
   Search,
   Filter,
@@ -49,6 +53,10 @@ import {
   Clock,
   Copy,
   Link2,
+  EyeOff,
+  Eye,
+  Archive,
+  ArrowUpDown,
 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
 import { cn } from '@/components/ui/utils';
@@ -140,7 +148,10 @@ interface EventRowProps {
   isExpanded: boolean;
   onToggle: () => void;
   onRetry: () => Promise<void>;
+  onDismiss: (reason?: string) => Promise<void>;
+  onUndismiss: () => Promise<void>;
   isRetrying: boolean;
+  isDismissing: boolean;
 }
 
 const EventRow: React.FC<EventRowProps> = ({
@@ -148,18 +159,29 @@ const EventRow: React.FC<EventRowProps> = ({
   isExpanded,
   onToggle,
   onRetry,
+  onDismiss,
+  onUndismiss,
   isRetrying,
+  isDismissing,
 }) => {
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleString();
   };
 
+  const isDismissed = Boolean(event.dismissed_at);
+
   return (
-    <div className="border-b border-gray-200 last:border-b-0">
+    <div className={cn(
+      "border-b border-gray-200 last:border-b-0",
+      isDismissed && "bg-gray-50"
+    )}>
       {/* Main row */}
       <div
-        className="flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer"
+        className={cn(
+          "flex items-center px-4 py-3 cursor-pointer",
+          isDismissed ? "hover:bg-gray-100" : "hover:bg-gray-50"
+        )}
         onClick={onToggle}
         role="button"
         tabIndex={0}
@@ -181,36 +203,88 @@ const EventRow: React.FC<EventRowProps> = ({
 
         <div className="flex-1 grid grid-cols-5 gap-4 items-center">
           <div className="truncate" title={event.event_type}>
-            <span className="font-mono text-sm">{event.event_type}</span>
+            <span className={cn("font-mono text-sm", isDismissed && "text-gray-400")}>
+              {event.event_type}
+            </span>
+            {isDismissed && (
+              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-600">
+                <Archive className="h-3 w-3 mr-1" />
+                Dismissed
+              </span>
+            )}
           </div>
-          <div className="text-sm text-gray-600">{event.stream_type}</div>
-          <div className="text-sm text-gray-600 truncate" title={event.stream_id}>
+          <div className={cn("text-sm", isDismissed ? "text-gray-400" : "text-gray-600")}>
+            {event.stream_type}
+          </div>
+          <div className={cn("text-sm truncate", isDismissed ? "text-gray-400" : "text-gray-600")} title={event.stream_id}>
             {event.stream_id.slice(0, 8)}...
           </div>
-          <div className="text-sm text-gray-600">{formatDate(event.created_at)}</div>
-          <div className="text-sm text-red-600 truncate" title={event.processing_error}>
+          <div className={cn("text-sm", isDismissed ? "text-gray-400" : "text-gray-600")}>
+            {formatDate(event.created_at)}
+          </div>
+          <div className={cn("text-sm truncate", isDismissed ? "text-gray-400" : "text-red-600")} title={event.processing_error}>
             {event.processing_error.slice(0, 40)}...
           </div>
         </div>
 
-        <div className="ml-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRetry();
-            }}
-            disabled={isRetrying}
-            aria-label={`Retry event ${event.id}`}
-          >
-            {isRetrying ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <RotateCcw className="h-4 w-4" />
-            )}
-            <span className="ml-1">Retry</span>
-          </Button>
+        <div className="ml-4 flex gap-2">
+          {isDismissed ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onUndismiss();
+              }}
+              disabled={isDismissing}
+              aria-label={`Undismiss event ${event.id}`}
+            >
+              {isDismissing ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+              <span className="ml-1">Restore</span>
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRetry();
+                }}
+                disabled={isRetrying}
+                aria-label={`Retry event ${event.id}`}
+              >
+                {isRetrying ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="h-4 w-4" />
+                )}
+                <span className="ml-1">Retry</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDismiss();
+                }}
+                disabled={isDismissing}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label={`Dismiss event ${event.id}`}
+              >
+                {isDismissing ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <EyeOff className="h-4 w-4" />
+                )}
+                <span className="ml-1">Dismiss</span>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -328,6 +402,37 @@ const EventRow: React.FC<EventRowProps> = ({
             </div>
           </div>
 
+          {/* Dismissed Info (if dismissed) */}
+          {isDismissed && (
+            <div className="mt-4">
+              <h4 className="font-semibold text-sm text-gray-700 mb-2 flex items-center gap-1">
+                <Archive className="h-4 w-4" />
+                Dismissed
+              </h4>
+              <div className="p-3 bg-gray-100 rounded border text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-gray-500">Dismissed At:</span>{' '}
+                    <span className="ml-1">{formatDate(event.dismissed_at!)}</span>
+                  </div>
+                  {event.dismissed_by && (
+                    <div className="flex items-center">
+                      <span className="text-gray-500">Dismissed By:</span>{' '}
+                      <span className="font-mono ml-1">{event.dismissed_by.slice(0, 8)}...</span>
+                      <CopyButton value={event.dismissed_by} label="Dismissed By" />
+                    </div>
+                  )}
+                </div>
+                {event.dismiss_reason && (
+                  <div className="mt-2">
+                    <span className="text-gray-500">Reason:</span>{' '}
+                    <span className="ml-1">{event.dismiss_reason}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Processing Error */}
           <div className="mt-4">
             <h4 className="font-semibold text-sm text-gray-700 mb-2">Processing Error</h4>
@@ -370,10 +475,21 @@ export const FailedEventsPage: React.FC = () => {
   const [searchType, setSearchType] = useState<'correlation' | 'session' | 'trace' | null>(null);
   const [eventTypeFilter, setEventTypeFilter] = useState<string | null>(null);
   const [streamTypeFilter, setStreamTypeFilter] = useState<EventStreamType | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'failed' | 'dismissed' | 'all'>('failed');
+
+  // Sorting
+  const [sortBy, setSortBy] = useState<FailedEventsSortBy>('created_at');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+
+  // Pagination
+  const PAGE_SIZE = 25;
+  const [offset, setOffset] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
 
   // UI state
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [retryingEventId, setRetryingEventId] = useState<string | null>(null);
+  const [dismissingEventId, setDismissingEventId] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
@@ -416,6 +532,9 @@ export const FailedEventsPage: React.FC = () => {
             processing_error: 'N/A - Showing all events for session',
             created_at: e.created_at,
             processed_at: null,
+            dismissed_at: null,
+            dismissed_by: null,
+            dismiss_reason: null,
           }));
           setEvents(failedStyleEvents);
         } else {
@@ -434,6 +553,9 @@ export const FailedEventsPage: React.FC = () => {
             processing_error: 'N/A - Showing all events for correlation',
             created_at: e.created_at,
             processed_at: null,
+            dismissed_at: null,
+            dismissed_by: null,
+            dismiss_reason: null,
           }));
           setEvents(failedStyleEvents);
         } else {
@@ -459,21 +581,38 @@ export const FailedEventsPage: React.FC = () => {
             processing_error: span.status === 'error' ? 'Error status in trace' : 'N/A - Trace span',
             created_at: span.created_at,
             processed_at: null,
+            dismissed_at: null,
+            dismissed_by: null,
+            dismiss_reason: null,
           }));
           setEvents(failedStyleEvents);
         } else {
           setEventsError(result.error ?? 'Failed to fetch trace');
         }
       } else {
-        // Default: load failed events
+        // Default: load failed events with filters, sorting, and pagination
         const result = await eventMonitoringService.getFailedEvents({
-          limit: 100,
+          limit: PAGE_SIZE,
+          offset,
           eventType: eventTypeFilter ?? undefined,
           streamType: streamTypeFilter ?? undefined,
+          includeDismissed: statusFilter === 'dismissed' || statusFilter === 'all',
+          sortBy,
+          sortOrder,
         });
 
         if (result.success && result.data) {
-          setEvents(result.data.events);
+          // For "dismissed" filter, only show dismissed events
+          // For "failed" filter (default), only show non-dismissed
+          // For "all", show everything
+          let filteredEvents = result.data.events;
+          if (statusFilter === 'dismissed') {
+            filteredEvents = result.data.events.filter((e) => e.dismissed_at !== null);
+          } else if (statusFilter === 'failed') {
+            filteredEvents = result.data.events.filter((e) => e.dismissed_at === null);
+          }
+          setEvents(filteredEvents);
+          setTotalCount(result.data.totalCount);
         } else {
           setEventsError(result.error ?? 'Failed to load events');
         }
@@ -484,7 +623,7 @@ export const FailedEventsPage: React.FC = () => {
       setEventsLoading(false);
       setLastRefresh(new Date());
     }
-  }, [correlationSearch, sessionSearch, traceSearch, searchType, eventTypeFilter, streamTypeFilter]);
+  }, [correlationSearch, sessionSearch, traceSearch, searchType, eventTypeFilter, streamTypeFilter, statusFilter, sortBy, sortOrder, offset]);
 
   // Load data on mount and filter change
   useEffect(() => {
@@ -538,11 +677,98 @@ export const FailedEventsPage: React.FC = () => {
     [loadStats]
   );
 
+  // Handle dismiss
+  const handleDismiss = useCallback(
+    async (eventId: string, reason?: string) => {
+      setDismissingEventId(eventId);
+      try {
+        const result = await eventMonitoringService.dismissFailedEvent(eventId, reason);
+        if (result.success && result.data?.success) {
+          // Update event in list with dismissed status
+          setEvents((prev) =>
+            prev.map((e) =>
+              e.id === eventId
+                ? {
+                    ...e,
+                    dismissed_at: new Date().toISOString(),
+                    dismissed_by: 'current-user', // Will be from session in real usage
+                    dismiss_reason: reason ?? null,
+                  }
+                : e
+            )
+          );
+          log.info('Event dismissed', { eventId });
+          // Refresh to get updated list
+          loadEvents();
+          loadStats();
+        } else {
+          log.error('Dismiss operation failed', { eventId, error: result.data?.error || result.error });
+        }
+      } finally {
+        setDismissingEventId(null);
+      }
+    },
+    [loadEvents, loadStats]
+  );
+
+  // Handle undismiss
+  const handleUndismiss = useCallback(
+    async (eventId: string) => {
+      setDismissingEventId(eventId);
+      try {
+        const result = await eventMonitoringService.undismissFailedEvent(eventId);
+        if (result.success && result.data?.success) {
+          // Update event in list to remove dismissed status
+          setEvents((prev) =>
+            prev.map((e) =>
+              e.id === eventId
+                ? {
+                    ...e,
+                    dismissed_at: null,
+                    dismissed_by: null,
+                    dismiss_reason: null,
+                  }
+                : e
+            )
+          );
+          log.info('Event undismissed', { eventId });
+          // Refresh to get updated list
+          loadEvents();
+          loadStats();
+        } else {
+          log.error('Undismiss operation failed', { eventId, error: result.data?.error || result.error });
+        }
+      } finally {
+        setDismissingEventId(null);
+      }
+    },
+    [loadEvents, loadStats]
+  );
+
+  // Toggle sort column
+  const toggleSort = useCallback((column: FailedEventsSortBy) => {
+    if (sortBy === column) {
+      // Toggle sort order
+      setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+    } else {
+      // New column, default to descending
+      setSortBy(column);
+      setSortOrder('desc');
+    }
+    // Reset to first page when sorting changes
+    setOffset(0);
+  }, [sortBy]);
+
   // Manual refresh
   const handleRefresh = () => {
     loadStats();
     loadEvents();
   };
+
+  // Reset offset when filters change
+  useEffect(() => {
+    setOffset(0);
+  }, [eventTypeFilter, streamTypeFilter, statusFilter, searchType]);
 
   // Get unique event types from events for filter dropdown
   const eventTypes = [...new Set(events.map((e) => e.event_type))].sort();
@@ -581,7 +807,7 @@ export const FailedEventsPage: React.FC = () => {
           <span>{statsError}</span>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <StatCard
             title="Total Failed Events"
             value={stats?.total_failed ?? 0}
@@ -589,19 +815,25 @@ export const FailedEventsPage: React.FC = () => {
             variant={stats?.total_failed && stats.total_failed > 0 ? 'danger' : 'default'}
           />
           <StatCard
-            title="Last 24 Hours"
+            title="Failed (24h)"
             value={stats?.failed_last_24h ?? 0}
             icon={<Clock className="h-5 w-5" />}
             variant={stats?.failed_last_24h && stats.failed_last_24h > 0 ? 'warning' : 'default'}
           />
           <StatCard
-            title="Last 7 Days"
-            value={stats?.failed_last_7d ?? 0}
-            icon={<Activity className="h-5 w-5" />}
+            title="Dismissed"
+            value={stats?.dismissed_count ?? 0}
+            icon={<Archive className="h-5 w-5" />}
             variant="default"
           />
           <StatCard
-            title="Event Types Affected"
+            title="Dismissed (24h)"
+            value={stats?.dismissed_last_24h ?? 0}
+            icon={<EyeOff className="h-5 w-5" />}
+            variant="default"
+          />
+          <StatCard
+            title="Event Types"
             value={stats?.by_event_type?.length ?? 0}
             icon={<AlertTriangle className="h-5 w-5" />}
             variant="default"
@@ -719,6 +951,22 @@ export const FailedEventsPage: React.FC = () => {
                     <option value="contact">contact</option>
                   </select>
                 </div>
+
+                {/* Status Filter (Failed vs Dismissed) */}
+                <div className="min-w-[150px]">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) =>
+                      setStatusFilter(e.target.value as 'failed' | 'dismissed' | 'all')
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    aria-label="Filter by status"
+                  >
+                    <option value="failed">Failed (not dismissed)</option>
+                    <option value="dismissed">Dismissed</option>
+                    <option value="all">All events</option>
+                  </select>
+                </div>
               </>
             )}
 
@@ -785,13 +1033,45 @@ export const FailedEventsPage: React.FC = () => {
               <div className="flex items-center px-4 py-2 bg-gray-100 border-b text-sm font-medium text-gray-600">
                 <div className="w-6" />
                 <div className="flex-1 grid grid-cols-5 gap-4">
-                  <div>Event Type</div>
+                  {/* Sortable: Event Type */}
+                  <button
+                    className="flex items-center gap-1 hover:text-gray-900 text-left"
+                    onClick={() => toggleSort('event_type')}
+                    aria-label={`Sort by event type ${sortBy === 'event_type' ? (sortOrder === 'desc' ? 'descending' : 'ascending') : ''}`}
+                  >
+                    Event Type
+                    {sortBy === 'event_type' ? (
+                      sortOrder === 'desc' ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronUp className="h-4 w-4" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                    )}
+                  </button>
                   <div>Stream Type</div>
                   <div>Stream ID</div>
-                  <div>Created At</div>
+                  {/* Sortable: Created At */}
+                  <button
+                    className="flex items-center gap-1 hover:text-gray-900 text-left"
+                    onClick={() => toggleSort('created_at')}
+                    aria-label={`Sort by created date ${sortBy === 'created_at' ? (sortOrder === 'desc' ? 'descending' : 'ascending') : ''}`}
+                  >
+                    Created At
+                    {sortBy === 'created_at' ? (
+                      sortOrder === 'desc' ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronUp className="h-4 w-4" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                    )}
+                  </button>
                   <div>Error</div>
                 </div>
-                <div className="ml-4 w-20">Action</div>
+                <div className="ml-4 w-32">Actions</div>
               </div>
 
               {/* Event Rows */}
@@ -805,10 +1085,47 @@ export const FailedEventsPage: React.FC = () => {
                       setExpandedEventId(expandedEventId === event.id ? null : event.id)
                     }
                     onRetry={() => handleRetry(event.id)}
+                    onDismiss={(reason) => handleDismiss(event.id, reason)}
+                    onUndismiss={() => handleUndismiss(event.id)}
                     isRetrying={retryingEventId === event.id}
+                    isDismissing={dismissingEventId === event.id}
                   />
                 ))}
               </div>
+
+              {/* Pagination Controls */}
+              {!searchType && totalCount > PAGE_SIZE && (
+                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t">
+                  <div className="text-sm text-gray-600">
+                    Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, totalCount)} of {totalCount} events
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                      disabled={offset === 0}
+                      aria-label="Previous page"
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-500">
+                      Page {Math.floor(offset / PAGE_SIZE) + 1} of {Math.ceil(totalCount / PAGE_SIZE)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setOffset(offset + PAGE_SIZE)}
+                      disabled={offset + PAGE_SIZE >= totalCount}
+                      aria-label="Next page"
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

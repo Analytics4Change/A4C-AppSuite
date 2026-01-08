@@ -18,6 +18,7 @@ import type {
   FailedEventsQueryOptions,
   FailedEventsResult,
   RetryEventResult,
+  DismissEventResult,
   EventProcessingStats,
   EventMonitoringOperationResult,
   TracedEvent,
@@ -38,12 +39,17 @@ interface GetFailedEventsRpcResponse {
   id: string;
   stream_id: string;
   stream_type: string;
+  stream_version: number;
   event_type: string;
   event_data: Record<string, unknown>;
   event_metadata: Record<string, unknown>;
   processing_error: string;
   created_at: string;
   processed_at: string | null;
+  dismissed_at: string | null;
+  dismissed_by: string | null;
+  dismiss_reason: string | null;
+  total_count: number;
 }
 
 interface RetryEventRpcResponse {
@@ -53,12 +59,27 @@ interface RetryEventRpcResponse {
   retried_at: string;
 }
 
+interface DismissEventRpcResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
 interface GetStatsRpcResponse {
-  total_failed: number;
+  total_events: number;
+  failed_events: number;
   failed_last_24h: number;
-  failed_last_7d: number;
-  by_event_type: Array<{ event_type: string; count: number }>;
-  by_stream_type: Array<{ stream_type: string; count: number }>;
+  dismissed_count: number;
+  dismissed_last_24h: number;
+  failed_by_event_type: Record<string, number>;
+  failed_by_stream_type: Record<string, number>;
+  recent_failures: Array<{
+    id: string;
+    stream_type: string;
+    event_type: string;
+    processing_error: string;
+    created_at: string;
+  }>;
 }
 
 interface TracedEventRpcResponse {
@@ -104,14 +125,17 @@ export class EventMonitoringService {
    * Returns events where `processing_error IS NOT NULL`, indicating
    * the event trigger processing failed after the event was inserted.
    *
-   * @param options - Query options (limit, filters)
-   * @returns Promise with list of failed events
+   * @param options - Query options (limit, offset, filters, sorting)
+   * @returns Promise with list of failed events and total count for pagination
    *
    * @example
    * ```typescript
    * const result = await eventMonitoringService.getFailedEvents({
-   *   limit: 20,
+   *   limit: 25,
+   *   offset: 0,
    *   eventType: 'user.created',
+   *   sortBy: 'created_at',
+   *   sortOrder: 'desc',
    * });
    * if (result.success) {
    *   console.log(`Found ${result.data.totalCount} failed events`);
@@ -127,10 +151,14 @@ export class EventMonitoringService {
       const { data, error } = await supabaseService.apiRpc<GetFailedEventsRpcResponse[]>(
         'get_failed_events',
         {
-          p_limit: options.limit ?? 50,
+          p_limit: options.limit ?? 25,
+          p_offset: options.offset ?? 0,
           p_event_type: options.eventType ?? null,
           p_stream_type: options.streamType ?? null,
           p_since: options.since ?? null,
+          p_include_dismissed: options.includeDismissed ?? false,
+          p_sort_by: options.sortBy ?? 'created_at',
+          p_sort_order: options.sortOrder ?? 'desc',
         }
       );
 
@@ -153,6 +181,9 @@ export class EventMonitoringService {
         };
       }
 
+      // Total count is included in each row from the RPC
+      const totalCount = data && data.length > 0 ? data[0].total_count : 0;
+
       const events: FailedEvent[] = (data ?? []).map((row) => ({
         id: row.id,
         stream_id: row.stream_id,
@@ -163,15 +194,18 @@ export class EventMonitoringService {
         processing_error: row.processing_error,
         created_at: row.created_at,
         processed_at: row.processed_at,
+        dismissed_at: row.dismissed_at,
+        dismissed_by: row.dismissed_by,
+        dismiss_reason: row.dismiss_reason,
       }));
 
-      log.info(`Fetched ${events.length} failed events`);
+      log.info(`Fetched ${events.length} failed events (total: ${totalCount})`);
 
       return {
         success: true,
         data: {
           events,
-          totalCount: events.length,
+          totalCount,
         },
       };
     } catch (error) {
@@ -280,11 +314,181 @@ export class EventMonitoringService {
   }
 
   /**
+   * Dismiss a failed event (mark as acknowledged).
+   *
+   * This operation marks a failed event as dismissed without deleting it.
+   * The event remains in the system for audit purposes and can be
+   * undismissed later if needed.
+   *
+   * @param eventId - UUID of the event to dismiss
+   * @param reason - Optional reason for dismissing the event
+   * @returns Promise with dismiss operation result
+   *
+   * @example
+   * ```typescript
+   * const result = await eventMonitoringService.dismissFailedEvent(
+   *   eventId,
+   *   'Legacy migration artifact - safe to ignore'
+   * );
+   * if (result.success && result.data?.success) {
+   *   console.log('Event dismissed successfully');
+   * }
+   * ```
+   */
+  async dismissFailedEvent(
+    eventId: string,
+    reason?: string
+  ): Promise<EventMonitoringOperationResult<DismissEventResult>> {
+    try {
+      log.info('Dismissing failed event', { eventId, reason });
+
+      const { data, error } = await supabaseService.apiRpc<DismissEventRpcResponse>(
+        'dismiss_failed_event',
+        {
+          p_event_id: eventId,
+          p_reason: reason ?? null,
+        }
+      );
+
+      if (error) {
+        log.error('Failed to dismiss event', { eventId, error });
+
+        // Handle permission errors
+        if (error.code === '42501' || error.message?.includes('permission denied')) {
+          return {
+            success: false,
+            error: 'Access denied. Platform administrator access required.',
+            errorCode: 'FORBIDDEN',
+          };
+        }
+
+        return {
+          success: false,
+          error: `Failed to dismiss event: ${error.message}`,
+          errorCode: 'RPC_ERROR',
+        };
+      }
+
+      if (!data) {
+        return {
+          success: false,
+          error: 'No response from dismiss operation',
+          errorCode: 'RPC_ERROR',
+        };
+      }
+
+      log.info('Event dismiss completed', {
+        eventId,
+        success: data.success,
+        error: data.error,
+      });
+
+      return {
+        success: true,
+        data: {
+          success: data.success,
+          message: data.message,
+          error: data.error,
+        },
+      };
+    } catch (error) {
+      log.error('Unexpected error dismissing event', { eventId, error });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: 'UNKNOWN',
+      };
+    }
+  }
+
+  /**
+   * Undismiss a failed event (reverse dismissal).
+   *
+   * This operation reverses a previous dismissal, making the event
+   * appear in the default failed events list again.
+   *
+   * @param eventId - UUID of the event to undismiss
+   * @returns Promise with undismiss operation result
+   *
+   * @example
+   * ```typescript
+   * const result = await eventMonitoringService.undismissFailedEvent(eventId);
+   * if (result.success && result.data?.success) {
+   *   console.log('Event undismissed successfully');
+   * }
+   * ```
+   */
+  async undismissFailedEvent(
+    eventId: string
+  ): Promise<EventMonitoringOperationResult<DismissEventResult>> {
+    try {
+      log.info('Undismissing failed event', { eventId });
+
+      const { data, error } = await supabaseService.apiRpc<DismissEventRpcResponse>(
+        'undismiss_failed_event',
+        {
+          p_event_id: eventId,
+        }
+      );
+
+      if (error) {
+        log.error('Failed to undismiss event', { eventId, error });
+
+        // Handle permission errors
+        if (error.code === '42501' || error.message?.includes('permission denied')) {
+          return {
+            success: false,
+            error: 'Access denied. Platform administrator access required.',
+            errorCode: 'FORBIDDEN',
+          };
+        }
+
+        return {
+          success: false,
+          error: `Failed to undismiss event: ${error.message}`,
+          errorCode: 'RPC_ERROR',
+        };
+      }
+
+      if (!data) {
+        return {
+          success: false,
+          error: 'No response from undismiss operation',
+          errorCode: 'RPC_ERROR',
+        };
+      }
+
+      log.info('Event undismiss completed', {
+        eventId,
+        success: data.success,
+        error: data.error,
+      });
+
+      return {
+        success: true,
+        data: {
+          success: data.success,
+          message: data.message,
+          error: data.error,
+        },
+      };
+    } catch (error) {
+      log.error('Unexpected error undismissing event', { eventId, error });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: 'UNKNOWN',
+      };
+    }
+  }
+
+  /**
    * Get event processing statistics.
    *
    * Returns aggregate statistics about failed events including:
-   * - Total count of failed events
-   * - Failed events in last 24 hours and 7 days
+   * - Total count of failed events (not dismissed)
+   * - Failed events in last 24 hours
+   * - Dismissed event counts
    * - Breakdown by event type
    * - Breakdown by stream type
    *
@@ -295,7 +499,7 @@ export class EventMonitoringService {
    * const result = await eventMonitoringService.getProcessingStats();
    * if (result.success) {
    *   console.log(`Total failed: ${result.data.total_failed}`);
-   *   console.log(`Last 24h: ${result.data.failed_last_24h}`);
+   *   console.log(`Dismissed: ${result.data.dismissed_count}`);
    * }
    * ```
    */
@@ -328,35 +532,48 @@ export class EventMonitoringService {
       }
 
       if (!data) {
-        // Return empty stats if no data (might be single-row response issue)
+        // Return empty stats if no data
         return {
           success: true,
           data: {
             total_failed: 0,
             failed_last_24h: 0,
             failed_last_7d: 0,
+            dismissed_count: 0,
+            dismissed_last_24h: 0,
             by_event_type: [],
             by_stream_type: [],
           },
         };
       }
 
+      // Convert object maps to arrays for the frontend
+      const byEventType = Object.entries(data.failed_by_event_type || {}).map(
+        ([event_type, count]) => ({ event_type, count })
+      );
+      const byStreamType = Object.entries(data.failed_by_stream_type || {}).map(
+        ([stream_type, count]) => ({
+          stream_type: stream_type as EventProcessingStats['by_stream_type'][0]['stream_type'],
+          count,
+        })
+      );
+
       log.info('Processing stats fetched', {
-        total: data.total_failed,
+        failed: data.failed_events,
+        dismissed: data.dismissed_count,
         last24h: data.failed_last_24h,
       });
 
       return {
         success: true,
         data: {
-          total_failed: data.total_failed,
+          total_failed: data.failed_events,
           failed_last_24h: data.failed_last_24h,
-          failed_last_7d: data.failed_last_7d,
-          by_event_type: data.by_event_type ?? [],
-          by_stream_type: (data.by_stream_type ?? []).map((s) => ({
-            stream_type: s.stream_type as EventProcessingStats['by_stream_type'][0]['stream_type'],
-            count: s.count,
-          })),
+          failed_last_7d: 0, // Not returned by current RPC, could be added later
+          dismissed_count: data.dismissed_count,
+          dismissed_last_24h: data.dismissed_last_24h,
+          by_event_type: byEventType,
+          by_stream_type: byStreamType,
         },
       };
     } catch (error) {
