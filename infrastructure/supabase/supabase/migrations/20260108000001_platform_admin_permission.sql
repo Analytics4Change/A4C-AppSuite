@@ -17,11 +17,11 @@
 -- Step 1: Add platform.admin permission
 -- ============================================================================
 
+-- Note: 'name' column is a GENERATED column (applet || '.' || action), so we don't include it
 INSERT INTO permissions_projection (
   id,
   applet,
   action,
-  name,
   description,
   scope_type,
   requires_mfa,
@@ -32,14 +32,13 @@ VALUES (
   'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
   'platform',
   'admin',
-  'platform.admin',
   'Full platform administrative access including observability, cross-tenant operations, and system management. Required for Event Monitor, audit log access, and platform-level features.',
   'global',
   false,
   'Platform Administration',
   NOW()
 )
-ON CONFLICT (name) DO UPDATE SET
+ON CONFLICT (applet, action) DO UPDATE SET
   description = EXCLUDED.description,
   display_name = EXCLUDED.display_name;
 
