@@ -494,14 +494,8 @@ export class SupabaseUserQueryService implements IUserQueryService {
       };
     } catch (error) {
       log.error('Error in getUsersPaginated', error);
-      return {
-        items: [],
-        totalCount: 0,
-        page: 1,
-        pageSize: 20,
-        totalPages: 0,
-        hasMore: false,
-      };
+      // Re-throw so error propagates to ViewModel and displays in UI
+      throw error;
     }
   }
 
