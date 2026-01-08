@@ -11,6 +11,7 @@
 -- ============================================================================
 
 DROP POLICY IF EXISTS "addresses_super_admin_all" ON public.addresses_projection;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.addresses_projection;
 CREATE POLICY "platform_admin_all" ON public.addresses_projection
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.addresses_projection IS
@@ -21,6 +22,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.addresses_projection IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "business_profiles_super_admin_all" ON public.organization_business_profiles_projection;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.organization_business_profiles_projection;
 CREATE POLICY "platform_admin_all" ON public.organization_business_profiles_projection
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.organization_business_profiles_projection IS
@@ -30,6 +32,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.organization_business_profiles_
 -- clients policies
 -- ============================================================================
 
+DROP POLICY IF EXISTS "clients_delete" ON public.clients;
 DROP POLICY IF EXISTS "clients_delete" ON public.clients;
 CREATE POLICY "clients_delete" ON public.clients FOR DELETE
   USING (
@@ -43,6 +46,7 @@ COMMENT ON POLICY "clients_delete" ON public.clients IS
   'Allows authorized users to delete client records (prefer archiving)';
 
 DROP POLICY IF EXISTS "clients_insert" ON public.clients;
+DROP POLICY IF EXISTS "clients_insert" ON public.clients;
 CREATE POLICY "clients_insert" ON public.clients FOR INSERT
   WITH CHECK (
     has_platform_privilege()
@@ -53,6 +57,7 @@ COMMENT ON POLICY "clients_insert" ON public.clients IS
   'Allows organization admins and authorized users to create client records';
 
 DROP POLICY IF EXISTS "clients_select" ON public.clients;
+DROP POLICY IF EXISTS "clients_select" ON public.clients;
 CREATE POLICY "clients_select" ON public.clients FOR SELECT
   USING (
     has_platform_privilege()
@@ -62,6 +67,7 @@ CREATE POLICY "clients_select" ON public.clients FOR SELECT
 DROP POLICY IF EXISTS "clients_super_admin_select" ON public.clients;
 -- Removed: redundant with clients_select having has_platform_privilege()
 
+DROP POLICY IF EXISTS "clients_update" ON public.clients;
 DROP POLICY IF EXISTS "clients_update" ON public.clients;
 CREATE POLICY "clients_update" ON public.clients FOR UPDATE
   USING (
@@ -79,6 +85,7 @@ COMMENT ON POLICY "clients_update" ON public.clients IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "contact_addresses_super_admin_all" ON public.contact_addresses;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.contact_addresses;
 CREATE POLICY "platform_admin_all" ON public.contact_addresses
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.contact_addresses IS
@@ -89,6 +96,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.contact_addresses IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "contact_phones_super_admin_all" ON public.contact_phones;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.contact_phones;
 CREATE POLICY "platform_admin_all" ON public.contact_phones
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.contact_phones IS
@@ -99,6 +107,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.contact_phones IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "contacts_super_admin_all" ON public.contacts_projection;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.contacts_projection;
 CREATE POLICY "platform_admin_all" ON public.contacts_projection
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.contacts_projection IS
@@ -109,6 +118,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.contacts_projection IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "cross_tenant_grants_super_admin_all" ON public.cross_tenant_access_grants_projection;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.cross_tenant_access_grants_projection;
 CREATE POLICY "platform_admin_all" ON public.cross_tenant_access_grants_projection
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.cross_tenant_access_grants_projection IS
@@ -118,6 +128,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.cross_tenant_access_grants_proj
 -- domain_events policies
 -- ============================================================================
 
+DROP POLICY IF EXISTS "domain_events_authenticated_insert" ON public.domain_events;
 DROP POLICY IF EXISTS "domain_events_authenticated_insert" ON public.domain_events;
 CREATE POLICY "domain_events_authenticated_insert" ON public.domain_events FOR INSERT
   WITH CHECK (
@@ -131,6 +142,7 @@ CREATE POLICY "domain_events_authenticated_insert" ON public.domain_events FOR I
 COMMENT ON POLICY "domain_events_authenticated_insert" ON public.domain_events IS
   'Allows authenticated users to INSERT events. Validates org_id matches JWT claim and reason >= 10 chars.';
 
+DROP POLICY IF EXISTS "domain_events_org_select" ON public.domain_events;
 DROP POLICY IF EXISTS "domain_events_org_select" ON public.domain_events;
 CREATE POLICY "domain_events_org_select" ON public.domain_events FOR SELECT
   USING (
@@ -151,6 +163,7 @@ DROP POLICY IF EXISTS "domain_events_super_admin_all" ON public.domain_events;
 -- ============================================================================
 
 DROP POLICY IF EXISTS "dosage_info_delete" ON public.dosage_info;
+DROP POLICY IF EXISTS "dosage_info_delete" ON public.dosage_info;
 CREATE POLICY "dosage_info_delete" ON public.dosage_info FOR DELETE
   USING (
     has_platform_privilege()
@@ -162,6 +175,7 @@ CREATE POLICY "dosage_info_delete" ON public.dosage_info FOR DELETE
 COMMENT ON POLICY "dosage_info_delete" ON public.dosage_info IS
   'Allows medication administrators to delete dosage records';
 
+DROP POLICY IF EXISTS "dosage_info_insert" ON public.dosage_info;
 DROP POLICY IF EXISTS "dosage_info_insert" ON public.dosage_info;
 CREATE POLICY "dosage_info_insert" ON public.dosage_info FOR INSERT
   WITH CHECK (
@@ -175,11 +189,13 @@ COMMENT ON POLICY "dosage_info_insert" ON public.dosage_info IS
   'Allows medication administrators to schedule doses in their organization';
 
 DROP POLICY IF EXISTS "dosage_info_super_admin_select" ON public.dosage_info;
+DROP POLICY IF EXISTS "platform_admin_select" ON public.dosage_info;
 CREATE POLICY "platform_admin_select" ON public.dosage_info FOR SELECT
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_select" ON public.dosage_info IS
   'Allows platform admins to view all dosage records across all organizations';
 
+DROP POLICY IF EXISTS "dosage_info_update" ON public.dosage_info;
 DROP POLICY IF EXISTS "dosage_info_update" ON public.dosage_info;
 CREATE POLICY "dosage_info_update" ON public.dosage_info FOR UPDATE
   USING (
@@ -200,6 +216,7 @@ COMMENT ON POLICY "dosage_info_update" ON public.dosage_info IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "event_types_super_admin_all" ON public.event_types;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.event_types;
 CREATE POLICY "platform_admin_all" ON public.event_types
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.event_types IS
@@ -210,6 +227,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.event_types IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "invitations_super_admin_all" ON public.invitations_projection;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.invitations_projection;
 CREATE POLICY "platform_admin_all" ON public.invitations_projection
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.invitations_projection IS
@@ -219,6 +237,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.invitations_projection IS
 -- medication_history policies
 -- ============================================================================
 
+DROP POLICY IF EXISTS "medication_history_delete" ON public.medication_history;
 DROP POLICY IF EXISTS "medication_history_delete" ON public.medication_history;
 CREATE POLICY "medication_history_delete" ON public.medication_history FOR DELETE
   USING (
@@ -232,6 +251,7 @@ COMMENT ON POLICY "medication_history_delete" ON public.medication_history IS
   'Allows authorized prescribers to discontinue prescriptions';
 
 DROP POLICY IF EXISTS "medication_history_insert" ON public.medication_history;
+DROP POLICY IF EXISTS "medication_history_insert" ON public.medication_history;
 CREATE POLICY "medication_history_insert" ON public.medication_history FOR INSERT
   WITH CHECK (
     has_platform_privilege()
@@ -244,11 +264,13 @@ COMMENT ON POLICY "medication_history_insert" ON public.medication_history IS
   'Allows authorized prescribers to create prescriptions in their organization';
 
 DROP POLICY IF EXISTS "medication_history_super_admin_select" ON public.medication_history;
+DROP POLICY IF EXISTS "platform_admin_select" ON public.medication_history;
 CREATE POLICY "platform_admin_select" ON public.medication_history FOR SELECT
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_select" ON public.medication_history IS
   'Allows platform admins to view all prescription records across all organizations';
 
+DROP POLICY IF EXISTS "medication_history_update" ON public.medication_history;
 DROP POLICY IF EXISTS "medication_history_update" ON public.medication_history;
 CREATE POLICY "medication_history_update" ON public.medication_history FOR UPDATE
   USING (
@@ -269,6 +291,7 @@ COMMENT ON POLICY "medication_history_update" ON public.medication_history IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "medications_delete" ON public.medications;
+DROP POLICY IF EXISTS "medications_delete" ON public.medications;
 CREATE POLICY "medications_delete" ON public.medications FOR DELETE
   USING (
     has_platform_privilege()
@@ -280,6 +303,7 @@ CREATE POLICY "medications_delete" ON public.medications FOR DELETE
 COMMENT ON POLICY "medications_delete" ON public.medications IS
   'Allows authorized pharmacy staff to remove medications from formulary';
 
+DROP POLICY IF EXISTS "medications_insert" ON public.medications;
 DROP POLICY IF EXISTS "medications_insert" ON public.medications;
 CREATE POLICY "medications_insert" ON public.medications FOR INSERT
   WITH CHECK (
@@ -296,11 +320,13 @@ COMMENT ON POLICY "medications_insert" ON public.medications IS
   'Allows organization admins and pharmacy staff to add medications to formulary';
 
 DROP POLICY IF EXISTS "medications_super_admin_select" ON public.medications;
+DROP POLICY IF EXISTS "platform_admin_select" ON public.medications;
 CREATE POLICY "platform_admin_select" ON public.medications FOR SELECT
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_select" ON public.medications IS
   'Allows platform admins to view all medication formularies across all organizations';
 
+DROP POLICY IF EXISTS "medications_update" ON public.medications;
 DROP POLICY IF EXISTS "medications_update" ON public.medications;
 CREATE POLICY "medications_update" ON public.medications FOR UPDATE
   USING (
@@ -318,6 +344,7 @@ COMMENT ON POLICY "medications_update" ON public.medications IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "org_addresses_super_admin_all" ON public.organization_addresses;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.organization_addresses;
 CREATE POLICY "platform_admin_all" ON public.organization_addresses
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.organization_addresses IS
@@ -328,6 +355,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.organization_addresses IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "org_contacts_super_admin_all" ON public.organization_contacts;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.organization_contacts;
 CREATE POLICY "platform_admin_all" ON public.organization_contacts
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.organization_contacts IS
@@ -338,6 +366,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.organization_contacts IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "org_phones_super_admin_all" ON public.organization_phones;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.organization_phones;
 CREATE POLICY "platform_admin_all" ON public.organization_phones
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.organization_phones IS
@@ -348,6 +377,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.organization_phones IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "organizations_select" ON public.organizations_projection;
+DROP POLICY IF EXISTS "organizations_select" ON public.organizations_projection;
 CREATE POLICY "organizations_select" ON public.organizations_projection FOR SELECT
   USING (
     has_platform_privilege()
@@ -355,6 +385,7 @@ CREATE POLICY "organizations_select" ON public.organizations_projection FOR SELE
   );
 
 DROP POLICY IF EXISTS "organizations_super_admin_all" ON public.organizations_projection;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.organizations_projection;
 CREATE POLICY "platform_admin_all" ON public.organizations_projection
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.organizations_projection IS
@@ -365,6 +396,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.organizations_projection IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "ou_super_admin_all" ON public.organization_units_projection;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.organization_units_projection;
 CREATE POLICY "platform_admin_all" ON public.organization_units_projection
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.organization_units_projection IS
@@ -376,6 +408,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.organization_units_projection I
 
 DROP POLICY IF EXISTS "permissions_super_admin_all" ON public.permissions_projection;
 DROP POLICY IF EXISTS "permissions_superadmin" ON public.permissions_projection;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.permissions_projection;
 CREATE POLICY "platform_admin_all" ON public.permissions_projection
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.permissions_projection IS
@@ -386,6 +419,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.permissions_projection IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "phone_addresses_super_admin_all" ON public.phone_addresses;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.phone_addresses;
 CREATE POLICY "platform_admin_all" ON public.phone_addresses
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.phone_addresses IS
@@ -396,6 +430,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.phone_addresses IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "phones_super_admin_all" ON public.phones_projection;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.phones_projection;
 CREATE POLICY "platform_admin_all" ON public.phones_projection
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.phones_projection IS
@@ -407,6 +442,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.phones_projection IS
 
 DROP POLICY IF EXISTS "role_permissions_super_admin_all" ON public.role_permissions_projection;
 DROP POLICY IF EXISTS "role_permissions_superadmin" ON public.role_permissions_projection;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.role_permissions_projection;
 CREATE POLICY "platform_admin_all" ON public.role_permissions_projection
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.role_permissions_projection IS
@@ -418,6 +454,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.role_permissions_projection IS
 
 DROP POLICY IF EXISTS "roles_super_admin_all" ON public.roles_projection;
 DROP POLICY IF EXISTS "roles_superadmin" ON public.roles_projection;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.roles_projection;
 CREATE POLICY "platform_admin_all" ON public.roles_projection
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.roles_projection IS
@@ -429,6 +466,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.roles_projection IS
 
 DROP POLICY IF EXISTS "user_roles_super_admin_all" ON public.user_roles_projection;
 DROP POLICY IF EXISTS "user_roles_superadmin" ON public.user_roles_projection;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.user_roles_projection;
 CREATE POLICY "platform_admin_all" ON public.user_roles_projection
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.user_roles_projection IS
@@ -439,6 +477,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.user_roles_projection IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "users_select" ON public.users;
+DROP POLICY IF EXISTS "users_select" ON public.users;
 CREATE POLICY "users_select" ON public.users FOR SELECT
   USING (
     has_platform_privilege()
@@ -447,6 +486,7 @@ CREATE POLICY "users_select" ON public.users FOR SELECT
   );
 
 DROP POLICY IF EXISTS "users_super_admin_all" ON public.users;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.users;
 CREATE POLICY "platform_admin_all" ON public.users
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.users IS
@@ -533,6 +573,7 @@ Regular users see global roles (if in platform_owner org) and their org roles.';
 -- ============================================================================
 
 DROP POLICY IF EXISTS "user_addresses_super_admin_all" ON public.user_addresses;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.user_addresses;
 CREATE POLICY "platform_admin_all" ON public.user_addresses
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.user_addresses IS
@@ -543,6 +584,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.user_addresses IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "user_org_address_overrides_super_admin_all" ON public.user_org_address_overrides;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.user_org_address_overrides;
 CREATE POLICY "platform_admin_all" ON public.user_org_address_overrides
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.user_org_address_overrides IS
@@ -553,6 +595,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.user_org_address_overrides IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "user_phones_super_admin_all" ON public.user_phones;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.user_phones;
 CREATE POLICY "platform_admin_all" ON public.user_phones
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.user_phones IS
@@ -563,6 +606,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.user_phones IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "user_org_phone_overrides_super_admin_all" ON public.user_org_phone_overrides;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.user_org_phone_overrides;
 CREATE POLICY "platform_admin_all" ON public.user_org_phone_overrides
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.user_org_phone_overrides IS
@@ -573,6 +617,7 @@ COMMENT ON POLICY "platform_admin_all" ON public.user_org_phone_overrides IS
 -- ============================================================================
 
 DROP POLICY IF EXISTS "user_organizations_super_admin_all" ON public.user_organizations_projection;
+DROP POLICY IF EXISTS "platform_admin_all" ON public.user_organizations_projection;
 CREATE POLICY "platform_admin_all" ON public.user_organizations_projection
   USING (has_platform_privilege());
 COMMENT ON POLICY "platform_admin_all" ON public.user_organizations_projection IS
