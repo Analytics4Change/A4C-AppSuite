@@ -33,7 +33,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v11-cqrs-compliant';
+const DEPLOY_VERSION = 'v12-org-id-fix';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -594,7 +594,7 @@ serve(async (req) => {
           p_event_type: 'user.invited',
           p_event_data: {
             invitation_id: existingInvitation.id,
-            organization_id: orgId,
+            org_id: orgId,  // Must be org_id to match AsyncAPI contract
             email: existingInvitation.email,
             first_name: existingInvitation.first_name,
             last_name: existingInvitation.last_name,
