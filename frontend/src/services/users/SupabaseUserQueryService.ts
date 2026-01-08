@@ -315,8 +315,15 @@ export class SupabaseUserQueryService implements IUserQueryService {
         });
 
         if (usersError) {
+          // Include full Supabase error details for debugging
+          const errorDetails = JSON.stringify({
+            message: usersError.message,
+            code: usersError.code,
+            details: usersError.details,
+            hint: usersError.hint,
+          }, null, 2);
           log.error('Failed to fetch users via RPC', usersError);
-          throw new Error(`Failed to fetch users: ${usersError.message}`);
+          throw new Error(`Failed to fetch users: ${usersError.message}\n\nDetails: ${errorDetails}`);
         }
 
         if (data && Array.isArray(data)) {
