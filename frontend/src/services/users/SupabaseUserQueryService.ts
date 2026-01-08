@@ -292,7 +292,8 @@ export class SupabaseUserQueryService implements IUserQueryService {
         const rpcPage = usersOnly ? page : 1;
 
         // Use supabaseService.apiRpc() which handles 'api' schema type casting
-        const { data, error: usersError } = await supabaseService.apiRpc<Array<{
+        // Wrapped in try-catch to capture thrown exceptions (not just returned errors)
+        type RpcUserRow = {
           id: string;
           email: string;
           first_name: string | null;
@@ -304,15 +305,28 @@ export class SupabaseUserQueryService implements IUserQueryService {
           last_login_at: string | null;
           roles: Array<{ role_id: string; role_name: string }> | null;
           total_count: number;
-        }>>('list_users', {
-          p_org_id: claims.org_id,
-          p_status: statusFilter,
-          p_search_term: options?.filters?.searchTerm ?? null,
-          p_sort_by: options?.sort?.sortBy ?? 'name',
-          p_sort_desc: options?.sort?.sortOrder === 'desc',
-          p_page: rpcPage,
-          p_page_size: rpcPageSize,
-        });
+        };
+        let data: RpcUserRow[] | null = null;
+        let usersError: { message: string; code?: string; details?: string; hint?: string } | null = null;
+
+        try {
+          const result = await supabaseService.apiRpc<RpcUserRow[]>('list_users', {
+            p_org_id: claims.org_id,
+            p_status: statusFilter,
+            p_search_term: options?.filters?.searchTerm ?? null,
+            p_sort_by: options?.sort?.sortBy ?? 'name',
+            p_sort_desc: options?.sort?.sortOrder === 'desc',
+            p_page: rpcPage,
+            p_page_size: rpcPageSize,
+          });
+          data = result.data;
+          usersError = result.error;
+        } catch (rpcException) {
+          // Supabase client threw an exception instead of returning { error }
+          log.error('apiRpc THREW EXCEPTION', rpcException);
+          const exMsg = rpcException instanceof Error ? rpcException.message : String(rpcException);
+          throw new Error(`RPC call threw exception: ${exMsg}`);
+        }
 
         // DEBUG: Log raw response to understand error propagation
         log.info('apiRpc list_users response', {
