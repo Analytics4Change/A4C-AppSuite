@@ -314,6 +314,14 @@ export class SupabaseUserQueryService implements IUserQueryService {
           p_page_size: rpcPageSize,
         });
 
+        // DEBUG: Log raw response to understand error propagation
+        log.info('apiRpc list_users response', {
+          hasData: !!data,
+          dataLength: Array.isArray(data) ? data.length : 'not array',
+          hasError: !!usersError,
+          errorObject: usersError,
+        });
+
         if (usersError) {
           // Include full Supabase error details for debugging
           const errorDetails = JSON.stringify({
