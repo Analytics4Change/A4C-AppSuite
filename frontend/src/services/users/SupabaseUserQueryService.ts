@@ -376,9 +376,11 @@ export class SupabaseUserQueryService implements IUserQueryService {
       }
 
       // Fetch invitations
+      // Include invitations when: no filter, 'all', 'pending', or 'expired'
       if (
         !options?.filters?.usersOnly &&
         (!options?.filters?.status ||
+          options.filters.status === 'all' ||
           options.filters.status === 'pending' ||
           options.filters.status === 'expired')
       ) {
