@@ -291,17 +291,28 @@ export class SupabaseUserQueryService implements IUserQueryService {
         const rpcPageSize = usersOnly ? pageSize : 10000; // Large number when combining
         const rpcPage = usersOnly ? page : 1;
 
-        const { data, error: usersError } = await client
-          .schema('api')
-          .rpc('list_users', {
-            p_org_id: claims.org_id,
-            p_status: statusFilter,
-            p_search_term: options?.filters?.searchTerm ?? null,
-            p_sort_by: options?.sort?.sortBy ?? 'name',
-            p_sort_desc: options?.sort?.sortOrder === 'desc',
-            p_page: rpcPage,
-            p_page_size: rpcPageSize,
-          });
+        // Use supabaseService.apiRpc() which handles 'api' schema type casting
+        const { data, error: usersError } = await supabaseService.apiRpc<Array<{
+          id: string;
+          email: string;
+          first_name: string | null;
+          last_name: string | null;
+          name: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+          last_login_at: string | null;
+          roles: Array<{ role_id: string; role_name: string }> | null;
+          total_count: number;
+        }>>('list_users', {
+          p_org_id: claims.org_id,
+          p_status: statusFilter,
+          p_search_term: options?.filters?.searchTerm ?? null,
+          p_sort_by: options?.sort?.sortBy ?? 'name',
+          p_sort_desc: options?.sort?.sortOrder === 'desc',
+          p_page: rpcPage,
+          p_page_size: rpcPageSize,
+        });
 
         if (usersError) {
           log.error('Failed to fetch users via RPC', usersError);
@@ -310,22 +321,10 @@ export class SupabaseUserQueryService implements IUserQueryService {
 
         if (data && Array.isArray(data)) {
           // Get total count from first row (all rows have same total_count)
-          const rpcTotalCount = data.length > 0 ? (data[0] as { total_count: number }).total_count : 0;
+          const rpcTotalCount = data.length > 0 ? data[0].total_count : 0;
           totalCount += rpcTotalCount;
 
-          for (const user of data as Array<{
-            id: string;
-            email: string;
-            first_name: string | null;
-            last_name: string | null;
-            name: string | null;
-            is_active: boolean;
-            created_at: string;
-            updated_at: string;
-            last_login_at: string | null;
-            roles: Array<{ role_id: string; role_name: string }> | null;
-            total_count: number;
-          }>) {
+          for (const user of data) {
             const roles: RoleReference[] = (user.roles ?? []).map((r) => ({
               roleId: r.role_id,
               roleName: r.role_name,
