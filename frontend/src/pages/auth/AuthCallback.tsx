@@ -195,6 +195,11 @@ export const AuthCallback: React.FC = () => {
   /**
    * Determine the best redirect URL after OAuth callback.
    * Priority: sessionStorage returnTo > org subdomain > /clients
+   *
+   * IMPORTANT: This function gets a FRESH session from Supabase instead of using
+   * the `session` from React state. This avoids the stale closure problem where
+   * handleOAuthCallback() updates Supabase's internal state but the React state
+   * closure captured at render time still has the old (null) session.
    */
   const determineRedirectUrl = async (): Promise<string> => {
     // Priority 1: Explicit redirect from sessionStorage (from invitation flow)
@@ -208,7 +213,27 @@ export const AuthCallback: React.FC = () => {
     }
 
     // Priority 2: Determine from JWT claims (returning user)
-    const orgId = session?.claims?.org_id;
+    // Get FRESH session from Supabase - don't use stale closure from initial render
+    // The handleOAuthCallback updated Supabase's internal state but React state may be stale
+    const client = supabaseService.getClient();
+    const { data: { session: freshSession } } = await client.auth.getSession();
+
+    // Decode JWT to get custom claims (org_id, user_role, permissions, etc.)
+    let orgId: string | null = null;
+    if (freshSession?.access_token) {
+      try {
+        const payload = freshSession.access_token.split('.')[1];
+        const claims = JSON.parse(globalThis.atob(payload));
+        orgId = claims.org_id;
+        log.info('[AuthCallback] Decoded JWT claims for redirect', {
+          org_id: claims.org_id,
+          user_role: claims.user_role,
+        });
+      } catch (err) {
+        log.error('[AuthCallback] Failed to decode JWT', err);
+      }
+    }
+
     if (orgId) {
       try {
         log.info('[AuthCallback] Looking up org subdomain', { orgId });
@@ -300,14 +325,29 @@ export const AuthCallback: React.FC = () => {
             const result = await completeOAuthInvitationAcceptance(invitationContext);
 
             if (result.success && result.redirectUrl) {
-              // Redirect to login with the target URL as parameter
-              // User will log in and then be redirected to the subdomain
-              const loginUrl = `/login?redirect=${encodeURIComponent(result.redirectUrl)}`;
-              log.info('[AuthCallback] Invitation accepted, redirecting to login', {
+              // Refresh session to get new JWT with assigned role claims
+              // (Role was just assigned by Edge Function, but current JWT is stale from OAuth callback)
+              const client = supabaseService.getClient();
+              const { error: refreshError } = await client.auth.refreshSession();
+              if (refreshError) {
+                log.warn('[AuthCallback] Failed to refresh session after role assignment', {
+                  error: refreshError.message,
+                });
+                // Continue anyway - user will have correct role on next login
+              } else {
+                log.info('[AuthCallback] Session refreshed with updated role claims');
+              }
+
+              // Redirect directly to the organization's subdomain
+              // The Edge Function returns the correct subdomain URL based on invitation.organization_id
+              // Skip LoginPage to avoid sanitization issues and stale session race conditions
+              log.info('[AuthCallback] Invitation accepted, redirecting to org subdomain', {
                 redirectUrl: result.redirectUrl,
-                loginUrl,
               });
-              navigate(loginUrl, { replace: true });
+
+              // Use window.location.href for cross-origin subdomain redirect
+              // (React Router's navigate() only works for same-origin)
+              window.location.href = result.redirectUrl;
               return;
             } else {
               // Display error with correlation ID

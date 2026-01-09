@@ -166,3 +166,48 @@ OAuth requires browser redirect - the identity provider (Google) must authentica
 - Single correlation ID across entire invitation lifecycle
 - Query `domain_events WHERE correlation_id = X` returns complete story
 - Alternative (request-scoped) would fragment the lifecycle
+
+---
+
+## Post-UAT Bug Fixes (Added 2026-01-09)
+
+### Bugs Discovered During Testing
+
+Five issues emerged during UAT testing with OAuth invitation acceptance:
+
+1. **JWT Race Condition**: User sees `viewer` role instead of assigned role after OAuth invitation acceptance. Re-login fixes it. Root cause: JWT issued BEFORE role assignment during OAuth flow.
+
+2. **Duplicate `user.created` Events**: Edge Function emits `user.created` twice for OAuth users. OAuth-specific block (lines 335-363) AND generic block (lines 399-425) both emit.
+
+3. **Wrong Redirect (Invitation Acceptance)**: OAuth user redirected to platform owner's subdomain instead of invited org's subdomain. Root cause: Redirecting through LoginPage adds complexity that can fail (URL sanitization, stale session).
+
+4. **Wrong Redirect (Returning OAuth User)**: OAuth users logging back in are redirected to wrong subdomain. Root cause: `determineRedirectUrl()` uses `session` from closure captured at component render time - doesn't pick up updated session after `handleOAuthCallback()`.
+
+5. **Migration Inconsistency**: Migration file references `user_org_access` but deployed function uses `user_organizations_projection`.
+
+### Key Discoveries
+
+- **Database state is CORRECT**: Both OAuth and email/password users have correct `current_organization_id`
+- **JWT hook returns CORRECT claims**: `org_id`, `user_role`, `scope_path` all correct when tested directly
+- **Bug is in frontend redirect logic**: Stale React closure pattern causes wrong session to be used
+
+### New Decisions (2026-01-09)
+
+8. **Direct Subdomain Redirect**: After invitation acceptance, redirect directly to Edge Function's `redirectUrl` using `window.location.href`. Skip LoginPage entirely to avoid sanitization issues and stale session race conditions.
+
+9. **Fresh Session Fetch**: For returning OAuth users, get fresh session from `supabase.auth.getSession()` inside `determineRedirectUrl()` instead of using stale closure. Decode JWT to extract custom claims.
+
+### New Constraints (2026-01-09)
+
+6. **Stale Closure Pattern**: React closures capture state at render time. If async operations update state (like `handleOAuthCallback`), the closure still has old values. Solution: Fetch fresh data from source (Supabase client) instead of relying on React state.
+
+7. **Cross-Origin Redirect**: Use `window.location.href` for subdomain redirects, not React Router's `navigate()`. React Router only works for same-origin navigation.
+
+### Fix Plan Reference
+
+Detailed fix plan at: `/home/lars/.claude/plans/foamy-beaming-toucan.md`
+
+Files to modify:
+- `frontend/src/pages/auth/AuthCallback.tsx` - Fix 1 (direct redirect) + Fix 4 (fresh session)
+- `infrastructure/supabase/supabase/functions/accept-invitation/index.ts` - Fix 2 (duplicate events)
+- `infrastructure/supabase/supabase/migrations/20251231221349_jwt_hook_access_date_validation.sql` - Fix 3 (table name)

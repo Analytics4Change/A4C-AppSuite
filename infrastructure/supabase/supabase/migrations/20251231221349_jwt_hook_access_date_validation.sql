@@ -32,15 +32,15 @@ BEGIN
   -- ACCESS DATE VALIDATION (New in this migration)
   -- =========================================================================
 
-  -- Check user-level access dates from user_org_access
+  -- Check user-level access dates from user_organizations_projection
   IF v_org_id IS NOT NULL THEN
     SELECT
-      uoa.access_start_date,
-      uoa.access_expiration_date
+      uop.access_start_date,
+      uop.access_expiration_date
     INTO v_org_access_record
-    FROM public.user_org_access uoa
-    WHERE uoa.user_id = v_user_id
-      AND uoa.org_id = v_org_id;
+    FROM public.user_organizations_projection uop
+    WHERE uop.user_id = v_user_id
+      AND uop.org_id = v_org_id;
 
     -- Check if access hasn't started yet
     IF v_org_access_record.access_start_date IS NOT NULL

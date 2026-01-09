@@ -26,7 +26,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v13-oauth-authmethod';
+const DEPLOY_VERSION = 'v14-fix-duplicate-user-created';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -394,35 +394,37 @@ serve(async (req) => {
       hasOrgData: !!orgData,
     }));
 
-    // Emit user.created event via API wrapper
-    // Client already configured with api schema
-    const { data: _eventId, error: eventError } = await supabase
-      .rpc('emit_domain_event', {
-        p_stream_id: userId,
-        p_stream_type: 'user',
-        p_event_type: 'user.created',
-        p_event_data: {
-          user_id: userId,
-          email: invitation.email,
-          organization_id: invitation.organization_id,
-          invited_via: 'organization_bootstrap',
-          auth_method: isEmailPassword ? 'email_password' : 'oauth',
-        },
-        p_event_metadata: buildEventMetadata(tracingContext, 'user.created', req, {
-          user_id: userId,
-          organization_id: invitation.organization_id,
-          invitation_token: requestData.token,
-          automated: true,
-        })
-      });
+    // Emit user.created event for email/password users only
+    // OAuth users already have this event emitted in the OAuth block above (lines 335-363)
+    if (isEmailPassword) {
+      const { data: _eventId, error: eventError } = await supabase
+        .rpc('emit_domain_event', {
+          p_stream_id: userId,
+          p_stream_type: 'user',
+          p_event_type: 'user.created',
+          p_event_data: {
+            user_id: userId,
+            email: invitation.email,
+            organization_id: invitation.organization_id,
+            invited_via: 'organization_bootstrap',
+            auth_method: 'email_password',
+          },
+          p_event_metadata: buildEventMetadata(tracingContext, 'user.created', req, {
+            user_id: userId,
+            organization_id: invitation.organization_id,
+            invitation_token: requestData.token,
+            automated: true,
+          })
+        });
 
-    if (eventError) {
-      console.error('Failed to emit user.created event:', eventError);
-      // CRITICAL: Event emission failure or processing failure
-      // User account exists but has no role - return error to prevent silent failure
-      return handleRpcError(eventError, correlationId, corsHeaders, 'Emit user.created event');
+      if (eventError) {
+        console.error('Failed to emit user.created event:', eventError);
+        // CRITICAL: Event emission failure or processing failure
+        // User account exists but has no role - return error to prevent silent failure
+        return handleRpcError(eventError, correlationId, corsHeaders, 'Emit user.created event');
+      }
+      console.log(`User created event emitted successfully: event_id=${_eventId}, user_id=${userId}, org_id=${invitation.organization_id}`);
     }
-    console.log(`User created event emitted successfully: event_id=${_eventId}, user_id=${userId}, org_id=${invitation.organization_id}`);
 
     // ==========================================================================
     // EMIT user.role.assigned EVENTS FOR ROLES FROM INVITATION
