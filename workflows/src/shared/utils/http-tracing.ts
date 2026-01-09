@@ -88,23 +88,16 @@ export function extractTracingFromHeaders(
   const traceparent = getHeader(headers, 'traceparent');
 
   // Parse W3C traceparent: "00-<trace_id>-<span_id>-<flags>"
-  let traceId: string;
-  let parentSpanId: string;
+  let traceId: string = generateTraceId();
+  let parentSpanId: string = generateSpanId();
 
   if (traceparent) {
     const parts = traceparent.split('-');
-    if (parts.length >= 3) {
+    if (parts.length >= 3 && parts[1] && parts[2]) {
       traceId = parts[1];
       parentSpanId = parts[2];
-    } else {
-      // Invalid traceparent format, generate new IDs
-      traceId = generateTraceId();
-      parentSpanId = generateSpanId();
     }
-  } else {
-    // No traceparent, generate new IDs
-    traceId = generateTraceId();
-    parentSpanId = generateSpanId();
+    // If invalid format, keep the generated defaults
   }
 
   return {
