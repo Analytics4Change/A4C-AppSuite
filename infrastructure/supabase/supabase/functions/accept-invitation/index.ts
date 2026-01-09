@@ -26,7 +26,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v12-tracing';
+const DEPLOY_VERSION = 'v13-oauth-authmethod';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -35,7 +35,24 @@ const corsHeaders = standardCorsHeaders;
  * Supported OAuth providers (matches frontend OAuthProvider type)
  * See: frontend/src/types/auth.types.ts
  */
-type OAuthProvider = 'google' | 'github' | 'facebook' | 'apple';
+type OAuthProvider = 'google' | 'github' | 'facebook' | 'apple' | 'azure' | 'okta' | 'keycloak';
+
+/**
+ * SSO configuration for enterprise SAML auth
+ */
+interface SSOConfig {
+  type: 'saml';
+  domain: string;
+}
+
+/**
+ * Auth method discriminated union (matches frontend AuthMethod type)
+ * See: frontend/src/types/auth.types.ts
+ */
+type AuthMethod =
+  | { type: 'email_password' }
+  | { type: 'oauth'; provider: OAuthProvider }
+  | { type: 'sso'; config: SSOConfig };
 
 /**
  * User credentials from frontend
@@ -43,18 +60,21 @@ type OAuthProvider = 'google' | 'github' | 'facebook' | 'apple';
  */
 interface UserCredentials {
   email: string;
-  password?: string;      // For email/password auth
-  oauth?: OAuthProvider;  // For OAuth auth
+  password?: string;           // For email/password auth
+  authMethod?: AuthMethod;     // For OAuth/SSO auth
+  authenticatedUserId?: string; // Pre-authenticated OAuth user ID
 }
 
 /**
  * Request format from frontend:
  * - Email/password: { token, credentials: { email, password } }
- * - OAuth: { token, credentials: { email, oauth: 'google' } }
+ * - OAuth: { token, credentials: { email, authMethod: { type: 'oauth', provider: 'google' }, authenticatedUserId }, platform }
+ * - SSO: { token, credentials: { email, authMethod: { type: 'sso', config: { type: 'saml', domain: 'acme.com' } }, authenticatedUserId }, platform }
  */
 interface AcceptInvitationRequest {
   token: string;
   credentials: UserCredentials;
+  platform?: 'web' | 'ios' | 'android';
 }
 
 /**
@@ -126,14 +146,15 @@ serve(async (req) => {
     }
 
     // Determine auth method from credentials
-    const isOAuth = !!requestData.credentials.oauth;
+    const authMethodType = requestData.credentials.authMethod?.type;
+    const isOAuth = authMethodType === 'oauth' || authMethodType === 'sso';
     const isEmailPassword = !!requestData.credentials.password;
 
     if (!isOAuth && !isEmailPassword) {
-      return createValidationError('Missing password or OAuth provider', correlationId, corsHeaders);
+      return createValidationError('Missing password or authMethod', correlationId, corsHeaders);
     }
 
-    console.log(`[accept-invitation v${DEPLOY_VERSION}] Auth method: ${isOAuth ? 'oauth' : 'email_password'}`);
+    console.log(`[accept-invitation v${DEPLOY_VERSION}] Auth method: ${authMethodType || 'email_password'}`);
 
     // Query invitation via RPC function in api schema (bypasses public schema restriction)
     console.log(`[accept-invitation v${DEPLOY_VERSION}] Querying invitation via RPC...`);
@@ -243,17 +264,103 @@ serve(async (req) => {
         console.log(`[accept-invitation v${DEPLOY_VERSION}] User created: ${userId}`);
       }
     } else if (isOAuth) {
-      // OAuth flow: User needs to complete OAuth first, then we link the invitation
-      // For now, OAuth acceptance is not implemented - user must use email/password
-      // TODO: Implement OAuth acceptance flow
-      console.warn(`[accept-invitation v${DEPLOY_VERSION}] OAuth acceptance not yet implemented`);
-      return new Response(
-        JSON.stringify({
-          error: 'OAuth acceptance not yet implemented. Please use email/password.',
-          provider: credentials.oauth
-        }),
-        { status: 501, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      // OAuth/SSO flow: User has already authenticated via browser redirect, we complete the invitation
+      const authenticatedUserId = credentials.authenticatedUserId;
+      const authMethod = credentials.authMethod!;
+      const provider = authMethod.type === 'oauth'
+        ? authMethod.provider
+        : (authMethod as { type: 'sso'; config: SSOConfig }).config.type;
+
+      console.log(`[accept-invitation v${DEPLOY_VERSION}] Processing ${authMethod.type} authentication`, {
+        provider,
+        platform: requestData.platform || 'web',
+      });
+
+      if (!authenticatedUserId) {
+        return new Response(
+          JSON.stringify({
+            error: 'Authentication required',
+            message: `Please complete ${provider} sign-in first.`,
+            correlationId,
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Verify authenticated user exists in Supabase Auth
+      const { data: { user: authUser }, error: userError } =
+        await supabase.auth.admin.getUserById(authenticatedUserId);
+
+      if (userError || !authUser) {
+        console.error(`[accept-invitation v${DEPLOY_VERSION}] Failed to verify user:`, userError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to verify authenticated user', correlationId }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Verify email matches invitation (case-insensitive)
+      if (authUser.email?.toLowerCase() !== invitation.email.toLowerCase()) {
+        console.warn(`[accept-invitation v${DEPLOY_VERSION}] Email mismatch: ${authUser.email} vs ${invitation.email}`);
+        return new Response(
+          JSON.stringify({
+            error: 'Email mismatch',
+            message: `Your ${provider} account (${authUser.email}) doesn't match the invitation email (${invitation.email}). Please sign in with the correct account.`,
+            correlationId,
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      userId = authUser.id;
+      console.log(`[accept-invitation v${DEPLOY_VERSION}] ${provider} user verified: ${userId}`);
+
+      // Check if user is new or existing (has roles in ANY organization - "Sally scenario")
+      // Sally: user with role in Org A accepts invite to Org B → skip user.created
+      const { data: existingRoles, error: rolesCheckError } = await supabase
+        .from('user_roles_projection')
+        .select('id')
+        .eq('user_id', userId)
+        .limit(1);
+
+      if (rolesCheckError) {
+        console.warn(`[accept-invitation v${DEPLOY_VERSION}] Failed to check existing roles:`, rolesCheckError);
+        // Continue - we'll emit user.created to be safe (idempotent via projections)
+      }
+
+      const isExistingUser = existingRoles && existingRoles.length > 0;
+
+      // Only emit user.created for NEW users (Sally scenario: skip for existing)
+      if (!isExistingUser) {
+        const { data: _oauthEventId, error: oauthEventError } = await supabase
+          .rpc('emit_domain_event', {
+            p_stream_id: userId,
+            p_stream_type: 'user',
+            p_event_type: 'user.created',
+            p_event_data: {
+              user_id: userId,
+              email: invitation.email,
+              organization_id: invitation.organization_id,
+              invited_via: 'organization_bootstrap',
+              auth_method: authMethod.type,
+              auth_provider: provider,
+              platform: requestData.platform || 'web',
+            },
+            p_event_metadata: buildEventMetadata(tracingContext, 'user.created', req, {
+              user_id: userId,
+              organization_id: invitation.organization_id,
+              automated: true,
+            })
+          });
+
+        if (oauthEventError) {
+          console.error(`[accept-invitation v${DEPLOY_VERSION}] Failed to emit user.created for OAuth user:`, oauthEventError);
+          return handleRpcError(oauthEventError, correlationId, corsHeaders, 'Emit user.created event (OAuth)');
+        }
+        console.log(`[accept-invitation v${DEPLOY_VERSION}] user.created event emitted for new ${provider} user`);
+      } else {
+        console.log(`[accept-invitation v${DEPLOY_VERSION}] Existing user (Sally scenario) - skipping user.created event`);
+      }
     }
 
     // At this point, userId should be set (either from creation or lookup)

@@ -21,8 +21,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   InvitationAcceptanceViewModel,
-  type AuthMethod
+  type AuthMethodSelection
 } from '@/viewModels/organization/InvitationAcceptanceViewModel';
+import { getAuthProvider } from '@/services/auth/AuthProviderFactory';
 import {
   Building,
   Mail,
@@ -43,6 +44,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [viewModel] = useState(() => new InvitationAcceptanceViewModel());
+  const authProvider = getAuthProvider();
 
   const token = searchParams.get('token');
 
@@ -111,22 +113,21 @@ export const AcceptInvitationPage: React.FC = observer(() => {
 
   /**
    * Handle Google OAuth
+   *
+   * Initiates OAuth flow via ViewModel. The page will redirect to Google,
+   * then callback to /auth/callback which completes the invitation acceptance.
    */
   const handleGoogleSignIn = async () => {
-    const result = await viewModel.acceptWithGoogle();
-
-    if (result?.redirectUrl) {
-      log.info('Invitation accepted via Google, redirecting', {
-        redirectUrl: result.redirectUrl
-      });
-      handleRedirect(result.redirectUrl);
-    }
+    log.info('Initiating Google OAuth for invitation acceptance');
+    // This will redirect to Google - page will be unloaded
+    await viewModel.acceptWithOAuth('google', authProvider);
+    // If we reach here, OAuth initiation failed (error is in viewModel)
   };
 
   /**
-   * Handle auth method change
+   * Handle auth method selection change
    */
-  const handleAuthMethodChange = (method: AuthMethod) => {
+  const handleAuthMethodChange = (method: AuthMethodSelection) => {
     viewModel.setAuthMethod(method);
   };
 
@@ -223,7 +224,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
                     type="button"
                     onClick={() => handleAuthMethodChange('email_password')}
                     className={`p-3 rounded-lg border-2 transition-all ${
-                      viewModel.authMethod === 'email_password'
+                      viewModel.authMethodSelection === 'email_password'
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
@@ -234,9 +235,9 @@ export const AcceptInvitationPage: React.FC = observer(() => {
 
                   <button
                     type="button"
-                    onClick={() => handleAuthMethodChange('google')}
+                    onClick={() => handleAuthMethodChange('oauth')}
                     className={`p-3 rounded-lg border-2 transition-all ${
-                      viewModel.authMethod === 'google'
+                      viewModel.authMethodSelection === 'oauth'
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
@@ -270,7 +271,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
               </div>
 
               {/* Email/Password Form */}
-              {viewModel.authMethod === 'email_password' && (
+              {viewModel.authMethodSelection === 'email_password' && (
                 <form onSubmit={handleEmailPasswordSubmit} className="space-y-4">
                   {/* Email */}
                   <div className="space-y-2">
@@ -357,7 +358,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
               )}
 
               {/* Google OAuth */}
-              {viewModel.authMethod === 'google' && (
+              {viewModel.authMethodSelection === 'oauth' && (
                 <div className="space-y-4">
                   {/* Email (read-only for Google) */}
                   <div className="space-y-2">

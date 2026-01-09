@@ -5,14 +5,192 @@ import { Logger } from '@/utils/logger';
 import { Loader2 } from 'lucide-react';
 import { sanitizeRedirectUrl, buildSubdomainUrl } from '@/utils/redirect-validation';
 import { getOrganizationSubdomainInfo } from '@/services/organization/getOrganizationSubdomainInfo';
+import { getAuthContextStorage } from '@/services/storage';
+import type { InvitationAuthContext } from '@/types/auth.types';
+import { supabaseService } from '@/services/auth/supabase.service';
+import { generateTraceparent, getSessionId } from '@/utils/tracing';
+import {
+  FunctionsHttpError,
+  FunctionsRelayError,
+  FunctionsFetchError,
+} from '@supabase/supabase-js';
+import { ErrorWithCorrelation } from '@/components/ui/ErrorWithCorrelation';
 
 const log = Logger.getLogger('component');
+
+/** Storage key for invitation context during OAuth redirect */
+const INVITATION_CONTEXT_KEY = 'invitation_acceptance_context';
+
+/** Context expires after 10 minutes */
+const CONTEXT_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * Result from extracting Edge Function errors
+ */
+interface EdgeFunctionErrorResult {
+  message: string;
+  details?: string;
+  correlationId?: string;
+}
+
+/**
+ * Result from OAuth invitation acceptance
+ */
+interface InvitationAcceptanceResult {
+  success: boolean;
+  redirectUrl?: string;
+  error?: string;
+  correlationId?: string;
+  traceId?: string;
+}
+
+/**
+ * Error state with correlation for display
+ */
+interface CallbackError {
+  message: string;
+  correlationId?: string;
+  traceId?: string;
+}
+
+/**
+ * Extract detailed error from Supabase Edge Function error response.
+ */
+async function extractEdgeFunctionError(
+  error: unknown,
+  operation: string
+): Promise<EdgeFunctionErrorResult> {
+  if (error instanceof FunctionsHttpError) {
+    const correlationId = error.context.headers.get('x-correlation-id') ?? undefined;
+
+    try {
+      const body = await error.context.json();
+      log.error(`[AuthCallback] Edge Function HTTP error for ${operation}`, {
+        status: error.context.status,
+        correlationId,
+        body,
+      });
+      return {
+        message: body?.message ?? body?.error ?? `${operation} failed`,
+        details: body?.details,
+        correlationId,
+      };
+    } catch {
+      log.error(`[AuthCallback] Edge Function error (non-JSON response) for ${operation}`, {
+        status: error.context.status,
+        correlationId,
+      });
+      return {
+        message: `${operation} failed (HTTP ${error.context.status})`,
+        correlationId,
+      };
+    }
+  }
+
+  if (error instanceof FunctionsRelayError) {
+    log.error(`[AuthCallback] Edge Function relay error for ${operation}`, error);
+    return { message: `Network error: ${error.message}` };
+  }
+
+  if (error instanceof FunctionsFetchError) {
+    log.error(`[AuthCallback] Edge Function fetch error for ${operation}`, error);
+    return { message: `Connection error: ${error.message}` };
+  }
+
+  log.error(`[AuthCallback] Unknown error for ${operation}`, error);
+  return { message: error instanceof Error ? error.message : 'Unknown error' };
+}
+
+/**
+ * Complete invitation acceptance after OAuth callback.
+ *
+ * Calls the accept-invitation Edge Function with the authenticated user.
+ * NOTE: Does NOT send X-Correlation-ID - backend uses stored invitation.correlation_id.
+ */
+async function completeOAuthInvitationAcceptance(
+  context: InvitationAuthContext
+): Promise<InvitationAcceptanceResult> {
+  const client = supabaseService.getClient();
+
+  const { data: { session } } = await client.auth.getSession();
+  if (!session) {
+    log.error('[AuthCallback] No session after OAuth callback');
+    return { success: false, error: 'No authenticated session' };
+  }
+
+  // Generate tracing headers (NOT correlation ID - backend uses stored value)
+  const { header: traceparent, traceId, spanId } = generateTraceparent();
+  const sessionId = await getSessionId();
+
+  const headers: Record<string, string> = {
+    traceparent,
+    // NOTE: Do NOT include X-Correlation-ID - backend reuses invitation.correlation_id
+  };
+
+  if (sessionId) {
+    headers['X-Session-ID'] = sessionId;
+  }
+
+  const provider = context.authMethod.type === 'oauth'
+    ? context.authMethod.provider
+    : context.authMethod.type === 'sso'
+      ? context.authMethod.config.type
+      : 'unknown';
+
+  log.info('[AuthCallback] Calling accept-invitation Edge Function', {
+    traceId,
+    spanId,
+    provider,
+    platform: context.platform,
+  });
+
+  const { data, error } = await client.functions.invoke('accept-invitation', {
+    body: {
+      token: context.token,
+      credentials: {
+        email: session.user.email,
+        authMethod: context.authMethod,
+        authenticatedUserId: session.user.id,
+      },
+      platform: context.platform,
+    },
+    headers,
+  });
+
+  if (error) {
+    const extracted = await extractEdgeFunctionError(error, 'Accept invitation via OAuth');
+    log.error('[AuthCallback] OAuth invitation acceptance failed', {
+      message: extracted.message,
+      correlationId: extracted.correlationId,
+      traceId,
+    });
+    return {
+      success: false,
+      error: extracted.message,
+      correlationId: extracted.correlationId,
+      traceId,
+    };
+  }
+
+  log.info('[AuthCallback] OAuth invitation acceptance successful', {
+    userId: data.userId,
+    orgId: data.orgId,
+    redirectUrl: data.redirectUrl,
+    traceId,
+  });
+
+  return {
+    success: true,
+    redirectUrl: data.redirectUrl,
+  };
+}
 
 export const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
   const { handleOAuthCallback, session } = useAuth();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<CallbackError | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('Please wait while we verify your credentials...');
 
   /**
    * Determine the best redirect URL after OAuth callback.
@@ -69,16 +247,85 @@ export const AuthCallback: React.FC = () => {
     const processCallback = async () => {
       try {
         setIsProcessing(true);
-        log.info('Processing OAuth callback');
+        log.info('[AuthCallback] Processing OAuth callback');
 
         // Use the auth context's callback handler
         await handleOAuthCallback(window.location.href);
 
-        log.info('Authentication successful');
+        log.info('[AuthCallback] OAuth authentication successful');
 
         // Clear the URL parameters before redirecting
         window.history.replaceState({}, document.title, window.location.pathname);
 
+        // Check for invitation acceptance flow
+        const storage = getAuthContextStorage();
+        const invitationContextStr = await storage.getItem(INVITATION_CONTEXT_KEY);
+
+        if (invitationContextStr) {
+          // Clear context immediately to prevent re-processing
+          await storage.removeItem(INVITATION_CONTEXT_KEY);
+
+          let invitationContext: InvitationAuthContext;
+          try {
+            invitationContext = JSON.parse(invitationContextStr);
+          } catch {
+            log.error('[AuthCallback] Failed to parse invitation context');
+            setError({ message: 'Invalid invitation context. Please try accepting the invitation again.' });
+            return;
+          }
+
+          // TTL check - reject stale context
+          const age = Date.now() - invitationContext.createdAt;
+          if (age > CONTEXT_TTL_MS) {
+            log.warn('[AuthCallback] Invitation context expired', {
+              age,
+              maxAge: CONTEXT_TTL_MS,
+            });
+            setError({ message: 'Session expired. Please try accepting the invitation again.' });
+            return;
+          }
+
+          if (invitationContext.flow === 'invitation_acceptance') {
+            setStatusMessage('Completing invitation acceptance...');
+
+            const provider = invitationContext.authMethod.type === 'oauth'
+              ? invitationContext.authMethod.provider
+              : 'sso';
+
+            log.info('[AuthCallback] Completing invitation acceptance', {
+              provider,
+              platform: invitationContext.platform,
+            });
+
+            const result = await completeOAuthInvitationAcceptance(invitationContext);
+
+            if (result.success && result.redirectUrl) {
+              // Redirect to login with the target URL as parameter
+              // User will log in and then be redirected to the subdomain
+              const loginUrl = `/login?redirect=${encodeURIComponent(result.redirectUrl)}`;
+              log.info('[AuthCallback] Invitation accepted, redirecting to login', {
+                redirectUrl: result.redirectUrl,
+                loginUrl,
+              });
+              navigate(loginUrl, { replace: true });
+              return;
+            } else {
+              // Display error with correlation ID
+              log.error('[AuthCallback] Invitation acceptance failed', {
+                error: result.error,
+                correlationId: result.correlationId,
+              });
+              setError({
+                message: result.error || 'Failed to accept invitation',
+                correlationId: result.correlationId,
+                traceId: result.traceId,
+              });
+              return;
+            }
+          }
+        }
+
+        // Standard OAuth flow (not invitation acceptance)
         // Determine best redirect URL (explicit > org subdomain > default)
         const redirectUrl = await determineRedirectUrl();
 
@@ -91,8 +338,10 @@ export const AuthCallback: React.FC = () => {
           navigate(redirectUrl, { replace: true });
         }
       } catch (err) {
-        log.error('Auth callback failed', err);
-        setError(err instanceof Error ? err.message : 'Authentication failed');
+        log.error('[AuthCallback] Auth callback failed', err);
+        setError({
+          message: err instanceof Error ? err.message : 'Authentication failed',
+        });
         setIsProcessing(false);
 
         // Redirect to login after a delay
@@ -108,29 +357,16 @@ export const AuthCallback: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#f8fafc] to-white">
-        <div className="text-center">
-          <div className="mb-4">
-            <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
-              <svg
-                className="h-8 w-8 text-red-600"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </div>
-          </div>
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">Authentication Failed</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <p className="text-sm text-gray-500">Redirecting to login...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#f8fafc] to-white p-4">
+        <div className="w-full max-w-md">
+          <ErrorWithCorrelation
+            title="Authentication Failed"
+            message={error.message}
+            correlationId={error.correlationId}
+            traceId={error.traceId}
+            onDismiss={() => navigate('/login')}
+          />
+          <p className="text-sm text-gray-500 text-center mt-4">Redirecting to login...</p>
         </div>
       </div>
     );
@@ -141,7 +377,7 @@ export const AuthCallback: React.FC = () => {
       <div className="text-center">
         <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
         <h2 className="text-2xl font-semibold text-gray-900 mb-2">Completing Sign In</h2>
-        <p className="text-gray-600">Please wait while we verify your credentials...</p>
+        <p className="text-gray-600">{statusMessage}</p>
       </div>
     </div>
   );

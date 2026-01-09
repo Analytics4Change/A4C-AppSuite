@@ -221,7 +221,7 @@ export class SupabaseInvitationService implements IInvitationService {
     try {
       log.info('Accepting invitation', {
         token,
-        authMethod: credentials.oauth ? 'oauth' : 'email/password'
+        authMethod: credentials.authMethod?.type || 'email_password'
       });
 
       const client = supabaseService.getClient();

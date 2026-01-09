@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-07
+last_updated: 2026-01-09
 purpose: agent-navigation
 ---
 
@@ -83,6 +83,7 @@ purpose: agent-navigation
 | `integration-testing` | [integration-testing.md](workflows/guides/integration-testing.md) | triggering-workflows.md |
 | `invitation` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | organizations_projection.md |
 | `invitation-emails` | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | activities-reference.md |
+| `invitation-oauth` | [oauth-invitation-acceptance.md](architecture/authentication/oauth-invitation-acceptance.md) | invitations_projection.md, frontend-auth-architecture.md |
 | `jwt` | [custom-claims-setup.md](architecture/authentication/custom-claims-setup.md) | frontend-auth-architecture.md, supabase-auth-overview.md |
 | `jwt-claims` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | frontend-auth-architecture.md, infrastructure/CLAUDE.md |
 | `kubernetes` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | KUBECONFIG_UPDATE_GUIDE.md |
@@ -98,7 +99,7 @@ purpose: agent-navigation
 | `mobx` | [viewmodels.md](frontend/architecture/viewmodels.md) | frontend/CLAUDE.md, mobx-optimization.md |
 | `multi-role-invitation` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | user_roles_projection.md |
 | `multi-tenancy` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | tenants-as-organizations.md |
-| `oauth` | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | supabase-auth-overview.md, SUPABASE-AUTH-SETUP.md |
+| `oauth` | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | supabase-auth-overview.md, oauth-invitation-acceptance.md |
 | `observability` | [event-observability.md](infrastructure/guides/event-observability.md) | logging-standards.md, infrastructure/CLAUDE.md |
 | `okta` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
 | `otlp-export` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |

@@ -194,8 +194,56 @@ export interface LoginCredentials {
 
 /**
  * OAuth provider types supported by Supabase
+ * Expanded to include enterprise SSO providers
  */
-export type OAuthProvider = 'google' | 'github' | 'facebook' | 'apple';
+export type OAuthProvider =
+  | 'google'
+  | 'github'
+  | 'facebook'
+  | 'apple'
+  | 'azure'      // EntraID / Azure AD
+  | 'okta'       // Enterprise OIDC
+  | 'keycloak';  // Self-hosted OIDC
+
+/**
+ * SSO configuration for enterprise SAML-based auth
+ */
+export interface SSOConfig {
+  type: 'saml';
+  domain: string;  // e.g., 'acme.com' for IdP discovery
+}
+
+/**
+ * Unified auth method discriminated union.
+ * Used for invitation acceptance and future auth flows.
+ *
+ * @see documentation/architecture/authentication/oauth-invitation-acceptance.md
+ */
+export type AuthMethod =
+  | { type: 'email_password' }
+  | { type: 'oauth'; provider: OAuthProvider }
+  | { type: 'sso'; config: SSOConfig };
+
+/**
+ * Invitation auth context stored during OAuth redirect.
+ * Used by AuthCallback to complete invitation acceptance after OAuth.
+ *
+ * @see documentation/architecture/authentication/oauth-invitation-acceptance.md
+ */
+export interface InvitationAuthContext {
+  /** Invitation token from URL */
+  token: string;
+  /** Email address from invitation */
+  email: string;
+  /** Flow identifier for AuthCallback routing */
+  flow: 'invitation_acceptance';
+  /** Authentication method being used */
+  authMethod: AuthMethod;
+  /** Platform for callback URL routing */
+  platform: 'web' | 'ios' | 'android';
+  /** Timestamp for TTL validation (milliseconds since epoch) */
+  createdAt: number;
+}
 
 /**
  * OAuth login options

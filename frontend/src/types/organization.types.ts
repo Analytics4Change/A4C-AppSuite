@@ -9,6 +9,8 @@
  * - Partner type classification
  */
 
+import { AuthMethod } from './auth.types';
+
 /**
  * Contact form data with label and type classification
  */
@@ -273,12 +275,16 @@ export interface InvitationDetails {
 }
 
 /**
- * User credentials for invitation acceptance
+ * User credentials for invitation acceptance.
+ * Supports email/password, OAuth, and SSO authentication methods.
+ *
+ * @see documentation/architecture/authentication/oauth-invitation-acceptance.md
  */
 export interface UserCredentials {
   email: string;
-  password?: string; // For email/password auth
-  oauth?: 'google'; // For OAuth auth (Google only in MVP)
+  password?: string;           // For email/password auth
+  authMethod?: AuthMethod;     // For OAuth/SSO auth
+  authenticatedUserId?: string; // Pre-authenticated OAuth user ID (from session)
 }
 
 /**

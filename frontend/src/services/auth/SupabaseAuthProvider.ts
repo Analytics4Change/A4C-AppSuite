@@ -170,12 +170,16 @@ export class SupabaseAuthProvider implements IAuthProvider {
   /**
    * Login with OAuth provider
    * Initiates OAuth flow (may redirect browser)
+   *
+   * Note: Our OAuthProvider type includes enterprise providers (okta, keycloak)
+   * that may require SSO configuration. Cast to Supabase's Provider type.
    */
   async loginWithOAuth(provider: OAuthProvider, options?: OAuthOptions): Promise<Session | void> {
     log.info('🔐 SupabaseAuthProvider: OAuth login with', provider);
 
+    // Cast to Supabase's Provider type - our extended providers are handled via SSO
     const { error } = await this.client.auth.signInWithOAuth({
-      provider,
+      provider: provider as 'google' | 'github' | 'facebook' | 'apple' | 'azure',
       options: {
         redirectTo: options?.redirectTo || window.location.origin + '/auth/callback',
         scopes: options?.scopes,

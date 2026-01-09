@@ -25,19 +25,26 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import type { IInvitationService } from '@/services/invitation/IInvitationService';
 import { InvitationServiceFactory } from '@/services/invitation/InvitationServiceFactory';
+import type { IAuthProvider } from '@/services/auth/IAuthProvider';
 import type {
   InvitationDetails,
   UserCredentials,
   AcceptInvitationResult
 } from '@/types';
+import type { OAuthProvider, InvitationAuthContext } from '@/types/auth.types';
+import { getAuthContextStorage } from '@/services/storage';
+import { detectPlatform, getCallbackUrl } from '@/utils/platform';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('viewmodel');
 
+/** Storage key for invitation context during OAuth redirect */
+const INVITATION_CONTEXT_KEY = 'invitation_acceptance_context';
+
 /**
- * Authentication method selection
+ * Authentication method selection for UI state
  */
-export type AuthMethod = 'email_password' | 'google';
+export type AuthMethodSelection = 'email_password' | 'oauth';
 
 /**
  * Invitation Acceptance ViewModel
@@ -55,7 +62,7 @@ export class InvitationAcceptanceViewModel {
   validationError: string | null = null;
 
   // User Credentials
-  authMethod: AuthMethod = 'email_password';
+  authMethodSelection: AuthMethodSelection = 'email_password';
   email = '';
   password = '';
   confirmPassword = '';
@@ -135,11 +142,11 @@ export class InvitationAcceptanceViewModel {
   }
 
   /**
-   * Set authentication method
+   * Set authentication method selection
    */
-  setAuthMethod(method: AuthMethod): void {
+  setAuthMethod(method: AuthMethodSelection): void {
     runInAction(() => {
-      this.authMethod = method;
+      this.authMethodSelection = method;
       this.clearFieldErrors();
     });
   }
@@ -190,7 +197,7 @@ export class InvitationAcceptanceViewModel {
     }
 
     // Password validation (only for email/password auth)
-    if (this.authMethod === 'email_password') {
+    if (this.authMethodSelection === 'email_password') {
       if (!this.password) {
         this.passwordError = 'Password is required';
         isValid = false;
@@ -241,26 +248,73 @@ export class InvitationAcceptanceViewModel {
   }
 
   /**
-   * Accept invitation with Google OAuth
+   * Accept invitation via OAuth provider.
    *
-   * @returns Acceptance result or null if failed
+   * Stores invitation context in sessionStorage, then initiates OAuth redirect.
+   * The callback (AuthCallback.tsx) will detect the context and complete acceptance.
+   *
+   * @param provider - OAuth provider (google, github, etc.)
+   * @param authProvider - Auth provider instance for initiating OAuth
+   *
+   * @see documentation/architecture/authentication/oauth-invitation-acceptance.md
+   */
+  async acceptWithOAuth(provider: OAuthProvider, authProvider: IAuthProvider): Promise<void> {
+    if (!this.token) {
+      runInAction(() => {
+        this.acceptanceError = 'Missing invitation token';
+      });
+      log.error('Cannot accept invitation without token');
+      return;
+    }
+
+    // Validate email
+    if (!this.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email)) {
+      runInAction(() => {
+        this.emailError = 'Valid email is required';
+      });
+      return;
+    }
+
+    const platform = detectPlatform();
+    const storage = getAuthContextStorage();
+
+    // Store invitation context BEFORE OAuth redirect
+    const invitationContext: InvitationAuthContext = {
+      token: this.token,
+      email: this.email,
+      flow: 'invitation_acceptance',
+      authMethod: { type: 'oauth', provider },
+      platform,
+      createdAt: Date.now(),  // For TTL validation
+    };
+
+    try {
+      await storage.setItem(INVITATION_CONTEXT_KEY, JSON.stringify(invitationContext));
+
+      log.info('Initiating OAuth for invitation acceptance', {
+        provider,
+        platform,
+        email: this.email,
+      });
+
+      // Initiate OAuth redirect - this will leave the page
+      await authProvider.loginWithOAuth(provider, {
+        redirectTo: getCallbackUrl(platform),
+      });
+    } catch (error) {
+      log.error('Failed to initiate OAuth for invitation', error);
+      runInAction(() => {
+        this.acceptanceError = `Failed to initiate ${provider} sign-in. Please try again.`;
+      });
+    }
+  }
+
+  /**
+   * @deprecated Use acceptWithOAuth() instead
    */
   async acceptWithGoogle(): Promise<AcceptInvitationResult | null> {
-    if (!this.token) {
-      log.error('Cannot accept invitation without token');
-      return null;
-    }
-
-    // Validate email only
-    if (!this.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email)) {
-      this.emailError = 'Valid email is required';
-      return null;
-    }
-
-    return this.acceptInvitation({
-      email: this.email,
-      oauth: 'google'
-    });
+    log.warn('acceptWithGoogle is deprecated - use acceptWithOAuth() instead');
+    return null;
   }
 
   /**
@@ -283,7 +337,7 @@ export class InvitationAcceptanceViewModel {
 
     try {
       log.info('Accepting invitation', {
-        authMethod: this.authMethod,
+        authMethod: this.authMethodSelection,
         email: credentials.email
       });
 
@@ -336,7 +390,7 @@ export class InvitationAcceptanceViewModel {
       this.invitationDetails = null;
       this.isValidatingToken = false;
       this.validationError = null;
-      this.authMethod = 'email_password';
+      this.authMethodSelection = 'email_password';
       this.email = '';
       this.password = '';
       this.confirmPassword = '';
