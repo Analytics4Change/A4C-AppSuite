@@ -313,6 +313,94 @@ WHERE correlation_id = '550e8400-e29b-41d4-a716-446655440000'::uuid
 ORDER BY created_at ASC;
 ```
 
+### Correlation Strategy (Business-Scoped)
+
+**Architectural Principle**: `correlation_id` ties together the ENTIRE business transaction lifecycle, not just a single HTTP request.
+
+#### Pattern
+
+| Scope | Request-Scoped (Old) | Business-Scoped (Current) |
+|-------|---------------------|---------------------------|
+| Generated | Every HTTP request | At business transaction START |
+| Stored | Not persisted | Stored with business entity |
+| Reused | Never | For ALL related events |
+| Query Result | Single request events | Complete lifecycle trace |
+
+#### Implementation
+
+1. **Generate** correlation_id at business transaction START (e.g., invitation created)
+2. **Store** correlation_id with the business entity (e.g., `invitations_projection.correlation_id`)
+3. **Reuse** same correlation_id for ALL related events in the lifecycle
+
+#### Example: Invitation Lifecycle
+
+| Event | correlation_id | Source |
+|-------|---------------|--------|
+| `user.invited` | `abc-123` | Generated, stored in `invitations_projection` |
+| `invitation.resent` | `abc-123` | Looked up from invitation record |
+| `invitation.revoked` | `abc-123` | Looked up from invitation record |
+| `invitation.accepted` | `abc-123` | Looked up from invitation record |
+| `invitation.expired` | `abc-123` | Looked up from invitation record |
+
+#### Implementation Pattern
+
+**Creating entity (generate & store)**:
+```typescript
+// Edge Function or Activity creates invitation
+const correlationId = tracingContext.correlationId;
+
+// Emit event with correlation_id in metadata
+await emitEvent({
+  event_type: 'user.invited',
+  event_metadata: { correlation_id: correlationId, ... }
+});
+
+// Event processor stores correlation_id in projection
+// (handled by process_organization_event)
+```
+
+**Subsequent operations (lookup & reuse)**:
+```typescript
+// Edge Function accepts invitation
+const invitation = await supabase.rpc('get_invitation_by_token', { p_token });
+
+// Reuse stored correlation_id for lifecycle tracing
+if (invitation.correlation_id) {
+  tracingContext.correlationId = invitation.correlation_id;
+}
+
+// All subsequent events use the same correlation_id
+await emitEvent({
+  event_type: 'invitation.accepted',
+  event_metadata: { correlation_id: tracingContext.correlationId, ... }
+});
+```
+
+#### Query Pattern
+
+```sql
+-- Complete business transaction trace with single query
+SELECT event_type, created_at, event_data
+FROM domain_events
+WHERE correlation_id = 'abc-123'::uuid
+ORDER BY created_at ASC;
+
+-- Example results:
+-- user.invited          | 2026-01-08 10:00 | {email: "...", ...}
+-- invitation.resent     | 2026-01-09 14:30 | {previous_token: "...", ...}
+-- invitation.accepted   | 2026-01-09 15:00 | {user_id: "...", ...}
+```
+
+#### Events Using Stored correlation_id
+
+All lifecycle events MUST look up and reuse the stored `correlation_id`:
+
+| Entity | Create Event | Subsequent Events |
+|--------|--------------|-------------------|
+| Invitation | `user.invited` | `invitation.resent`, `invitation.revoked`, `invitation.accepted`, `invitation.expired` |
+| Organization | `organization.created` | `organization.updated`, `organization.activated`, `organization.deactivated` |
+| User | `user.created` | `user.role.assigned`, `user.role.revoked`, `user.deactivated` |
+
 ### Distributed Tracing (W3C Trace Context)
 
 These fields enable end-to-end request tracing across frontend, Edge Functions, Temporal workflows, and database. They support [W3C Trace Context](https://www.w3.org/TR/trace-context/) for APM tool interoperability.

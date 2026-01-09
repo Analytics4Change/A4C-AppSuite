@@ -70,12 +70,13 @@ interface AcceptInvitationResponse {
 }
 
 serve(async (req) => {
-  // Extract tracing context from request headers (W3C traceparent + custom headers)
-  const tracingContext = extractTracingContext(req);
-  const correlationId = tracingContext.correlationId;
+  // Extract initial tracing context from request headers
+  // NOTE: We'll override correlationId with stored value from invitation for lifecycle tracing
+  let tracingContext = extractTracingContext(req);
+  let correlationId = tracingContext.correlationId;
   const span = createSpan(tracingContext, 'accept-invitation');
 
-  console.log(`[accept-invitation v${DEPLOY_VERSION}] Processing ${req.method} request, correlation_id=${correlationId}, trace_id=${tracingContext.traceId}`);
+  console.log(`[accept-invitation v${DEPLOY_VERSION}] Processing ${req.method} request, initial_correlation_id=${correlationId}, trace_id=${tracingContext.traceId}`);
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -152,6 +153,19 @@ serve(async (req) => {
     }
 
     console.log(`[accept-invitation v${DEPLOY_VERSION}] Found invitation: ${invitation.id}`);
+
+    // ========================================================================
+    // BUSINESS-SCOPED CORRELATION ID PATTERN
+    // Use the stored correlation_id from the invitation for lifecycle tracing.
+    // This ties together: user.invited → invitation.resent → invitation.accepted
+    // ========================================================================
+    if (invitation.correlation_id) {
+      correlationId = invitation.correlation_id;
+      tracingContext = { ...tracingContext, correlationId };
+      console.log(`[accept-invitation v${DEPLOY_VERSION}] Using stored correlation_id for lifecycle tracing: ${correlationId}`);
+    } else {
+      console.log(`[accept-invitation v${DEPLOY_VERSION}] No stored correlation_id, using request correlation_id: ${correlationId}`);
+    }
 
     // Validate invitation
     const expiresAt = new Date(invitation.expires_at);

@@ -363,6 +363,44 @@ const { data } = await client
 - `SupabaseOrganizationQueryService` → `api.get_organizations()`, `api.get_organization_by_id()`
 - `SupabaseOrganizationUnitService` → `api.get_organization_units()`
 
+### Correlation ID Pattern (Business-Scoped)
+
+`correlation_id` ties together the ENTIRE business transaction lifecycle, not just a single request.
+
+**Frontend Implementation**:
+- **New transaction** (create org, invite user): Generate new `correlation_id` and pass via `x-correlation-id` header
+- **Continuing transaction** (accept invitation): Let backend use the stored `correlation_id` - do NOT generate new one
+- **Tracing headers**: Always include `x-correlation-id`, `x-session-id`, and `traceparent` in API calls
+
+**Example - Invitation Flow**:
+```typescript
+// Creating invitation - generate new correlation_id
+const correlationId = crypto.randomUUID();
+await fetch('/api/invite', {
+  headers: {
+    'x-correlation-id': correlationId,
+    'x-session-id': sessionId,
+  },
+  body: JSON.stringify({ email, role }),
+});
+
+// Accepting invitation - DO NOT generate correlation_id
+// Backend will use the stored correlation_id from the original invitation
+await supabase.functions.invoke('accept-invitation', {
+  body: { token },
+  // No x-correlation-id header - backend reuses stored one
+});
+```
+
+**Why this matters**: Querying by `correlation_id` returns the complete lifecycle:
+```sql
+SELECT event_type, created_at FROM domain_events
+WHERE correlation_id = 'abc-123'::uuid ORDER BY created_at;
+-- user.invited → invitation.resent → invitation.accepted (same ID)
+```
+
+**See**: `documentation/workflows/reference/event-metadata-schema.md#correlation-strategy-business-scoped`
+
 ### Authentication Architecture
 
 **Status**: ✅ Supabase Auth with smart detection (Updated 2025-01-02)

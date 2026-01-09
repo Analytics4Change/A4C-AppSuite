@@ -32,6 +32,14 @@ components:
       payload:
         $ref: '#/components/schemas/InvitationExpiredEvent'
 
+    InvitationResent:
+      name: invitation.resent
+      title: Invitation Resent
+      summary: An existing invitation was resent to a user (new token generated)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/InvitationResentEvent'
+
   schemas:
     UserInvitedEvent:
       type: object
@@ -369,3 +377,69 @@ components:
           type: string
           format: date-time
           description: Original expiration date from the invitation
+
+    InvitationResentEvent:
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization UUID (invitation lifecycle events keyed by org)
+        stream_type:
+          type: string
+          const: organization
+          description: Events emitted on organization aggregate
+        event_type:
+          type: string
+          const: invitation.resent
+        event_data:
+          $ref: '#/components/schemas/InvitationResentData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    InvitationResentData:
+      type: object
+      required:
+        - invitation_id
+        - org_id
+        - email
+        - token
+        - expires_at
+        - resent_by
+      properties:
+        invitation_id:
+          type: string
+          format: uuid
+          description: The existing invitation ID being resent
+        org_id:
+          type: string
+          format: uuid
+          description: Organization the invitation belongs to
+        email:
+          type: string
+          format: email
+          description: Email address of the invited user
+        token:
+          type: string
+          description: New cryptographically secure token generated for this resend
+        expires_at:
+          type: string
+          format: date-time
+          description: New expiration time (typically 7 days from resend)
+        resent_by:
+          type: string
+          format: uuid
+          description: User ID who triggered the resend
+        previous_token:
+          type: string
+          description: Previous token that was invalidated (for audit trail)
+        resend_count:
+          type: integer
+          minimum: 1
+          description: Number of times this invitation has been resent

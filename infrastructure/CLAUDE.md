@@ -425,6 +425,37 @@ FROM domain_events WHERE stream_id = '<resource_id>'
 ORDER BY created_at DESC;
 ```
 
+### Correlation ID Pattern (Business-Scoped)
+
+`correlation_id` ties together the ENTIRE business transaction lifecycle, not just a single request.
+
+**Edge Function Implementation**:
+- **Creating entity**: Generate and STORE `correlation_id` with the entity
+- **Updating entity**: LOOKUP and REUSE the stored `correlation_id`
+- **Never generate** new `correlation_id` for subsequent lifecycle events
+
+**Example - Invitation Lifecycle**:
+```typescript
+// validate-invitation: Returns stored correlation_id
+const invitation = await supabase.rpc('get_invitation_by_token', { p_token });
+// invitation.correlation_id contains the original ID from user.invited
+
+// accept-invitation: Reuses stored correlation_id
+if (invitation.correlation_id) {
+  tracingContext.correlationId = invitation.correlation_id;
+}
+// All events (user.created, invitation.accepted) use same correlation_id
+```
+
+**Query by correlation_id** returns complete lifecycle:
+```sql
+SELECT event_type, created_at FROM domain_events
+WHERE correlation_id = 'abc-123'::uuid ORDER BY created_at;
+-- user.invited → invitation.resent → invitation.accepted (same ID)
+```
+
+**See**: `documentation/workflows/reference/event-metadata-schema.md#correlation-strategy-business-scoped`
+
 ## Deployment Runbook
 
 ### Overview

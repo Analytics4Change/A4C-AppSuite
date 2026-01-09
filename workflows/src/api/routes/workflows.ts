@@ -10,6 +10,7 @@ import { authMiddleware, requirePermission } from '../middleware/auth.js';
 import type { ContactInfo, AddressInfo, PhoneInfo } from '@shared/types/index.js';
 import { getWorkflowsEnv } from '@shared/config/env-schema.js';
 import { getSupabaseClient } from '@shared/utils/supabase.js';
+import { extractTracingFromHeaders } from '@shared/utils/http-tracing.js';
 
 // Get validated environment (FRONTEND_URL derived from PLATFORM_BASE_DOMAIN if not set)
 const env = getWorkflowsEnv();
@@ -106,6 +107,11 @@ async function bootstrapOrganizationHandler(
   // P1 #6: Start Temporal workflow FIRST (before event emission)
   // This prevents orphaned events if Temporal fails to start
   let temporalWorkflowId: string;
+
+  // Extract tracing context from request headers for end-to-end correlation
+  // This enables tracing from frontend → backend API → Temporal → activities
+  const tracing = extractTracingFromHeaders(request.headers as Record<string, string | string[] | undefined>);
+
   try {
     const connection = await Connection.connect({ address: temporalAddress });
     const client = new Client({ connection, namespace: temporalNamespace });
@@ -121,7 +127,8 @@ async function bootstrapOrganizationHandler(
         subdomain: requestData.subdomain,
         orgData: requestData.orgData,
         users: requestData.users,
-        frontendUrl  // Pass FRONTEND_URL from env to workflow
+        frontendUrl,  // Pass FRONTEND_URL from env to workflow
+        tracing,      // Pass tracing context for end-to-end request correlation
       }]
     });
 
@@ -162,7 +169,12 @@ async function bootstrapOrganizationHandler(
         user_id: request.user!.id,
         organization_id: organizationId,
         initiated_by: request.user!.email,
-        initiated_via: 'backend_api'
+        initiated_via: 'backend_api',
+        // Include tracing context for end-to-end correlation
+        correlation_id: tracing.correlationId,
+        session_id: tracing.sessionId,
+        trace_id: tracing.traceId,
+        span_id: tracing.parentSpanId,  // This span is the API handler
       }
     });
 

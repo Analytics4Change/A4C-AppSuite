@@ -380,6 +380,41 @@ ORDER BY created_at;
 - Validate event_data matches schema before emitting
 - Use TypeScript types generated from AsyncAPI spec
 
+### Correlation ID Pattern (Business-Scoped)
+
+`correlation_id` ties together the ENTIRE business transaction lifecycle, not just a single request.
+
+**Activity Implementation**:
+- **Never generate** new `correlation_id` in activities
+- **Always use** `params.tracing.correlationId` from workflow input
+- Workflow receives `tracing` from API layer (via `extractTracingFromHeaders`)
+
+**Example - Using Tracing in Activities**:
+```typescript
+import { buildTracingForEvent } from '@shared/utils/emit-event.js';
+
+async function sendInvitationEmailsActivity(params: SendInvitationEmailsParams) {
+  await emitEvent({
+    event_type: 'user.invited',
+    aggregate_id: params.invitationId,
+    event_data: { ... },
+    // Use workflow's tracing context - preserves original correlation_id
+    ...buildTracingForEvent(params.tracing, 'sendInvitationEmails'),
+  });
+}
+```
+
+**API Layer** extracts and passes tracing to workflow:
+```typescript
+// workflows/src/api/routes/workflows.ts
+const tracing = extractTracingFromHeaders(request.headers);
+await client.workflow.start('organizationBootstrapWorkflow', {
+  args: [{ ...params, tracing }]  // Pass tracing to workflow
+});
+```
+
+**See**: `documentation/workflows/reference/event-metadata-schema.md#correlation-strategy-business-scoped`
+
 ## Testing Patterns
 
 ### Unit Tests (Mock Mode)

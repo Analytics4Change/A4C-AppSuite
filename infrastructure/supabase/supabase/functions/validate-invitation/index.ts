@@ -36,6 +36,7 @@ interface InvitationValidation {
   expiresAt: string;
   expired: boolean;
   alreadyAccepted: boolean;
+  correlationId?: string;  // Business-scoped correlation ID for lifecycle tracing
 }
 
 serve(async (req) => {
@@ -141,6 +142,9 @@ serve(async (req) => {
       expiresAt: invitation.expires_at,
       expired,
       alreadyAccepted,
+      // Include correlation_id for business-scoped lifecycle tracing
+      // Frontend should pass this to accept-invitation for event correlation
+      correlationId: invitation.correlation_id,
     };
 
     console.log(`[validate-invitation v${DEPLOY_VERSION}] Success - valid: ${response.valid}`);

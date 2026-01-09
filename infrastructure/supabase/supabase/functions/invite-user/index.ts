@@ -33,7 +33,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v12-org-id-fix';
+const DEPLOY_VERSION = 'v13-invitation-id-fix';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -578,33 +578,28 @@ serve(async (req) => {
 
       const orgName = orgData?.[0]?.name || 'Analytics4Change';
 
-      // Emit user.invited event with updated token (event processor will update projection)
+      // Emit invitation.resent event (distinct event type for resend operations)
       // Use proper TracingContext for W3C trace context propagation
-      const eventMetadata = buildEventMetadata(tracingContext, 'user.invited', req, {
+      const eventMetadata = buildEventMetadata(tracingContext, 'invitation.resent', req, {
         user_id: user.id,
-        reason: 'Invitation resent',
-        is_resend: true,
+        reason: 'Invitation resent by administrator',
+        invitation_id: existingInvitation.invitation_id,
       });
 
       const { error: eventError } = await (supabaseAdmin as AnySchemaSupabaseClient)
         .schema('api')
         .rpc('emit_domain_event', {
-          p_stream_id: existingInvitation.id,
-          p_stream_type: 'user',
-          p_event_type: 'user.invited',
+          p_stream_id: orgId,  // Stream ID is org (invitation lifecycle events keyed by org)
+          p_stream_type: 'organization',
+          p_event_type: 'invitation.resent',
           p_event_data: {
-            invitation_id: existingInvitation.id,
-            org_id: orgId,  // Must be org_id to match AsyncAPI contract
+            invitation_id: existingInvitation.invitation_id,
+            org_id: orgId,
             email: existingInvitation.email,
-            first_name: existingInvitation.first_name,
-            last_name: existingInvitation.last_name,
-            roles: existingInvitation.roles || [],
             token: newToken,
             expires_at: newExpiresAt.toISOString(),
-            access_start_date: existingInvitation.access_start_date,
-            access_expiration_date: existingInvitation.access_expiration_date,
-            notification_preferences: existingInvitation.notification_preferences,
-            is_resend: true,
+            resent_by: user.id,
+            // previous_token intentionally omitted for security (don't store old tokens)
           },
           p_event_metadata: eventMetadata,
         });
