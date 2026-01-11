@@ -150,7 +150,7 @@ function createIndexFile() {
  * Last generated: ${new Date().toISOString()}
  */
 
-export * from './events';
+export * from './generated-events';
 `;
 
   fs.writeFileSync(indexPath, content, 'utf8');

@@ -406,16 +406,16 @@ COMMENT ON FUNCTION "public"."process_junction_event"("p_event" "record") IS 'Ma
 -- ============================================================================
 ALTER TABLE "public"."emails_projection" ENABLE ROW LEVEL SECURITY;
 
--- Org admins can view emails in their organization
+-- Org admins can view emails in their organization (JWT-claims pattern)
 CREATE POLICY "emails_org_admin_select" ON "public"."emails_projection"
     FOR SELECT
-    USING (("public"."is_org_admin"("public"."get_current_user_id"(), "organization_id") AND ("deleted_at" IS NULL)));
+    USING (("public"."has_org_admin_permission"() AND "organization_id" = "public"."get_current_org_id"() AND "deleted_at" IS NULL));
 
-COMMENT ON POLICY "emails_org_admin_select" ON "public"."emails_projection" IS 'Allows organization admins to view emails in their organization (excluding soft-deleted)';
+COMMENT ON POLICY "emails_org_admin_select" ON "public"."emails_projection" IS 'Allows organization admins to view emails in their organization (JWT-claims pattern, excluding soft-deleted)';
 
--- Super admins have full access
+-- Platform admins have full access (canonical pattern since Jan 8, 2026)
 CREATE POLICY "emails_super_admin_all" ON "public"."emails_projection"
-    USING ("public"."is_super_admin"("public"."get_current_user_id"()));
+    USING ("public"."has_platform_privilege"());
 
 COMMENT ON POLICY "emails_super_admin_all" ON "public"."emails_projection" IS 'Allows super admins full access to all emails';
 
@@ -431,20 +431,23 @@ COMMENT ON POLICY "emails_projection_service_role_select" ON "public"."emails_pr
 -- ============================================================================
 ALTER TABLE "public"."organization_emails" ENABLE ROW LEVEL SECURITY;
 
--- Org admins can view organization-email links
+-- Org admins can view organization-email links (JWT-claims pattern)
 CREATE POLICY "org_emails_org_admin_select" ON "public"."organization_emails"
     FOR SELECT
-    USING ((EXISTS ( SELECT 1
-       FROM "public"."organizations_projection" "o"
-      WHERE (("o"."id" = "organization_emails"."organization_id") AND "public"."is_org_admin"("public"."get_current_user_id"(), "o"."id")))) AND (EXISTS ( SELECT 1
-       FROM "public"."emails_projection" "e"
-      WHERE (("e"."id" = "organization_emails"."email_id") AND ("e"."organization_id" = "e"."organization_id") AND ("e"."deleted_at" IS NULL)))));
+    USING ((
+      "public"."has_org_admin_permission"()
+      AND "organization_id" = "public"."get_current_org_id"()
+      AND EXISTS (
+        SELECT 1 FROM "public"."emails_projection" "e"
+        WHERE "e"."id" = "organization_emails"."email_id" AND "e"."deleted_at" IS NULL
+      )
+    ));
 
-COMMENT ON POLICY "org_emails_org_admin_select" ON "public"."organization_emails" IS 'Allows organization admins to view organization-email links (both entities must belong to their org)';
+COMMENT ON POLICY "org_emails_org_admin_select" ON "public"."organization_emails" IS 'Allows organization admins to view organization-email links (JWT-claims pattern, email must not be deleted)';
 
--- Super admins have full access
+-- Platform admins have full access (canonical pattern since Jan 8, 2026)
 CREATE POLICY "org_emails_super_admin_all" ON "public"."organization_emails"
-    USING ("public"."is_super_admin"("public"."get_current_user_id"()));
+    USING ("public"."has_platform_privilege"());
 
 COMMENT ON POLICY "org_emails_super_admin_all" ON "public"."organization_emails" IS 'Allows super admins full access to all organization-email links';
 
@@ -453,20 +456,28 @@ COMMENT ON POLICY "org_emails_super_admin_all" ON "public"."organization_emails"
 -- ============================================================================
 ALTER TABLE "public"."contact_emails" ENABLE ROW LEVEL SECURITY;
 
--- Org admins can view contact-email links
+-- Org admins can view contact-email links (JWT-claims pattern)
 CREATE POLICY "contact_emails_org_admin_select" ON "public"."contact_emails"
     FOR SELECT
-    USING ((EXISTS ( SELECT 1
-       FROM "public"."contacts_projection" "c"
-      WHERE (("c"."id" = "contact_emails"."contact_id") AND "public"."is_org_admin"("public"."get_current_user_id"(), "c"."organization_id") AND ("c"."deleted_at" IS NULL)))) AND (EXISTS ( SELECT 1
-       FROM "public"."emails_projection" "e"
-      WHERE (("e"."id" = "contact_emails"."email_id") AND ("e"."deleted_at" IS NULL)))));
+    USING ((
+      EXISTS (
+        SELECT 1 FROM "public"."contacts_projection" "c"
+        WHERE "c"."id" = "contact_emails"."contact_id"
+          AND "public"."has_org_admin_permission"()
+          AND "c"."organization_id" = "public"."get_current_org_id"()
+          AND "c"."deleted_at" IS NULL
+      )
+      AND EXISTS (
+        SELECT 1 FROM "public"."emails_projection" "e"
+        WHERE "e"."id" = "contact_emails"."email_id" AND "e"."deleted_at" IS NULL
+      )
+    ));
 
-COMMENT ON POLICY "contact_emails_org_admin_select" ON "public"."contact_emails" IS 'Allows organization admins to view contact-email links (both contact and email must belong to their org)';
+COMMENT ON POLICY "contact_emails_org_admin_select" ON "public"."contact_emails" IS 'Allows organization admins to view contact-email links (JWT-claims pattern, both contact and email must be active)';
 
--- Super admins have full access
+-- Platform admins have full access (canonical pattern since Jan 8, 2026)
 CREATE POLICY "contact_emails_super_admin_all" ON "public"."contact_emails"
-    USING ("public"."is_super_admin"("public"."get_current_user_id"()));
+    USING ("public"."has_platform_privilege"());
 
 COMMENT ON POLICY "contact_emails_super_admin_all" ON "public"."contact_emails" IS 'Allows super admins full access to all contact-email links';
 
