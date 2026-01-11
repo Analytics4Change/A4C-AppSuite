@@ -18,9 +18,8 @@
 
 import type { RemoveDNSParams } from '@shared/types';
 import { createDNSProvider } from '@shared/providers/dns/factory';
-import { emitEvent, buildTags, getLogger } from '@shared/utils';
+import { getLogger, emitOrganizationDnsRemoved, DnsRemovalStatus } from '@shared/utils';
 import { getWorkflowsEnv } from '@shared/config/env-schema';
-import { AGGREGATE_TYPES } from '@shared/constants';
 
 const log = getLogger('RemoveDNS');
 
@@ -63,17 +62,11 @@ export async function removeDNS(params: RemoveDNSParams): Promise<boolean> {
     if (records.length === 0) {
       log.info('DNS record not found', { fqdn });
 
-      // Emit event even if not found (for event replay)
-      await emitEvent({
-        event_type: 'organization.dns.removed',
-        aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
-        aggregate_id: params.orgId,
-        event_data: {
-          subdomain: params.subdomain,
-          fqdn,
-          status: 'not_found'
-        },
-        tags: buildTags()
+      // Type-safe event using AsyncAPI contract
+      await emitOrganizationDnsRemoved(params.orgId, {
+        subdomain: params.subdomain,
+        fqdn,
+        status: DnsRemovalStatus.NOT_FOUND,
       });
 
       return true;
@@ -90,18 +83,12 @@ export async function removeDNS(params: RemoveDNSParams): Promise<boolean> {
 
     log.info('Deleted DNS record', { recordId: record.id });
 
-    // Emit DNSRemoved event
-    await emitEvent({
-      event_type: 'organization.dns.removed',
-      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
-      aggregate_id: params.orgId,
-      event_data: {
-        subdomain: params.subdomain,
-        fqdn,
-        record_id: record.id,
-        status: 'deleted'
-      },
-      tags: buildTags()
+    // Type-safe event using AsyncAPI contract
+    await emitOrganizationDnsRemoved(params.orgId, {
+      subdomain: params.subdomain,
+      fqdn,
+      record_id: record.id,
+      status: DnsRemovalStatus.DELETED,
     });
 
     log.debug('Emitted organization.dns.removed event', { subdomain: params.subdomain });
@@ -114,18 +101,12 @@ export async function removeDNS(params: RemoveDNSParams): Promise<boolean> {
       log.error('Non-fatal error removing DNS', { error: error.message });
     }
 
-    // Emit event even on error
-    await emitEvent({
-      event_type: 'organization.dns.removed',
-      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
-      aggregate_id: params.orgId,
-      event_data: {
-        subdomain: params.subdomain,
-        fqdn,
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      tags: buildTags()
+    // Type-safe event using AsyncAPI contract
+    await emitOrganizationDnsRemoved(params.orgId, {
+      subdomain: params.subdomain,
+      fqdn,
+      status: DnsRemovalStatus.ERROR,
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
 
     return true; // Don't fail workflow

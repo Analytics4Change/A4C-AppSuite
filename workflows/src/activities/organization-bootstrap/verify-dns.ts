@@ -25,8 +25,7 @@
 
 import { Resolver } from 'dns';
 import type { VerifyDNSParams } from '@shared/types';
-import { emitEvent, buildTags, getLogger, buildTracingForEvent } from '@shared/utils';
-import { AGGREGATE_TYPES } from '@shared/constants';
+import { getLogger, emitSubdomainVerified, VerificationMethod, VerificationMode } from '@shared/utils';
 
 const log = getLogger('VerifyDNS');
 
@@ -113,21 +112,14 @@ export async function verifyDNS(params: VerifyDNSParams): Promise<boolean> {
   if (workflowMode === 'mock' || workflowMode === 'development') {
     log.info('Skipping DNS verification', { mode: workflowMode });
 
-    // Emit DNSVerified event
-    await emitEvent({
-      event_type: 'organization.subdomain.verified',
-      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
-      aggregate_id: params.orgId,
-      event_data: {
-        domain: params.domain,
-        verified: true,
-        verified_at: new Date().toISOString(),
-        verification_method: 'development',
-        mode: workflowMode
-      },
-      tags: buildTags(),
-      ...buildTracingForEvent(params.tracing, 'verifyDNS')
-    });
+    // Type-safe event using AsyncAPI contract
+    await emitSubdomainVerified(params.orgId, {
+      domain: params.domain,
+      verified: true,
+      verified_at: new Date().toISOString(),
+      verification_method: VerificationMethod.DEVELOPMENT,
+      mode: workflowMode === 'mock' ? VerificationMode.MOCK : VerificationMode.DEVELOPMENT,
+    }, params.tracing);
 
     return true;
   }
@@ -175,26 +167,21 @@ export async function verifyDNS(params: VerifyDNSParams): Promise<boolean> {
   // Get IPs from first successful result for event data
   const successfulResult = results.find(r => r.success);
 
-  // Emit DNSVerified event with quorum details
-  await emitEvent({
-    event_type: 'organization.subdomain.verified',
-    aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
-    aggregate_id: params.orgId,
-    event_data: {
-      domain: params.domain,
-      verified: true,
-      verified_at: new Date().toISOString(),
-      verification_method: 'dns_quorum',
-      quorum: `${successCount}/${DNS_SERVERS.length}`,
-      dns_results: results.map(r => ({
-        server: r.server,
-        success: r.success,
-        ips: r.ips
-      })),
-      resolved_ips: successfulResult?.ips || []
-    },
-    tags: buildTags(),
-    ...buildTracingForEvent(params.tracing, 'verifyDNS')
+  // Type-safe event using AsyncAPI contract
+  // Note: dns_results and resolved_ips not in contract, captured in quorum field
+  await emitSubdomainVerified(params.orgId, {
+    domain: params.domain,
+    verified: true,
+    verified_at: new Date().toISOString(),
+    verification_method: VerificationMethod.DNS_QUORUM,
+    verification_attempts: successCount,
+    mode: VerificationMode.PRODUCTION,
+  }, params.tracing);
+
+  log.debug('DNS verification details', {
+    quorum: `${successCount}/${DNS_SERVERS.length}`,
+    dns_results: results.map(r => ({ server: r.server, success: r.success, ips: r.ips })),
+    resolved_ips: successfulResult?.ips || [],
   });
 
   log.info('DNS verified successfully via quorum', { domain: params.domain });

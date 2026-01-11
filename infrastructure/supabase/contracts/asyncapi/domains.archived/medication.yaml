@@ -8,13 +8,13 @@ components:
       payload:
         $ref: '#/components/schemas/MedicationAddedToFormularyEvent'
 
-    MedicationPrescribed:
-      name: medication.prescribed
-      title: Medication Prescribed
-      summary: A medication has been prescribed to a client
+    MedicationAddedToMAR:
+      name: medication.added_to_mar
+      title: Medication Added to MAR
+      summary: An externally-prescribed medication has been added to the client's Medication Administration Record for tracking
       contentType: application/json
       payload:
-        $ref: '#/components/schemas/MedicationPrescribedEvent'
+        $ref: '#/components/schemas/MedicationAddedToMAREvent'
 
     MedicationAdministered:
       name: medication.administered
@@ -197,7 +197,7 @@ components:
           type: string
           maxLength: 2000
 
-    MedicationPrescribedEvent:
+    MedicationAddedToMAREvent:
       type: object
       required:
         - stream_id
@@ -215,9 +215,9 @@ components:
           const: medication_history
         event_type:
           type: string
-          const: medication.prescribed
+          const: medication.added_to_mar
         event_data:
-          $ref: '#/components/schemas/MedicationPrescriptionData'
+          $ref: '#/components/schemas/MedicationMAREntryData'
         event_metadata:
           allOf:
             - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
@@ -227,15 +227,13 @@ components:
               properties:
                 reason:
                   examples:
-                    - "Initial prescription for diagnosed major depressive disorder per DSM-5 criteria"
-                    - "Switching from previous medication due to adverse side effects reported on 2024-01-15"
-                    - "Dosage increase due to insufficient therapeutic response after 4-week trial"
-                approval_chain:
-                  minItems: 1
-                  description: Prescription requires at least one approval
+                    - "Adding medication to MAR per external prescription from Dr. Smith dated 2024-01-15"
+                    - "Recording new medication from pharmacy transfer"
+                    - "Adding PRN medication per standing order"
 
-    MedicationPrescriptionData:
+    MedicationMAREntryData:
       type: object
+      description: Data for adding an externally-prescribed medication to the MAR
       required:
         - organization_id
         - client_id
@@ -253,35 +251,35 @@ components:
         client_id:
           type: string
           format: uuid
-          description: Client receiving the prescription
+          description: Client receiving the medication
         medication_id:
           type: string
           format: uuid
-          description: Medication being prescribed
+          description: Medication from formulary
         prescription_date:
           type: string
           format: date
-          description: Date prescription was written
+          description: Date external prescription was written
         start_date:
           type: string
           format: date
-          description: Date to start medication
+          description: Date to begin administering medication
         end_date:
           type: string
           format: date
-          description: Date to end medication (if known)
+          description: Date to stop administering (if known)
         prescriber_name:
           type: string
           maxLength: 200
-          description: Name of prescribing provider
+          description: Name of external prescribing provider
         prescriber_npi:
           type: string
           pattern: '^\d{10}$'
-          description: National Provider Identifier
+          description: External provider's NPI
         prescriber_license:
           type: string
           maxLength: 50
-          description: Provider's license number
+          description: External provider's license number
         dosage_amount:
           type: number
           minimum: 0
@@ -321,7 +319,7 @@ components:
         instructions:
           type: string
           maxLength: 500
-          description: Special instructions
+          description: Administration instructions
         is_prn:
           type: boolean
           default: false
@@ -329,14 +327,16 @@ components:
         prn_reason:
           type: string
           maxLength: 200
-          description: Reason for PRN use
+          description: Reason/indication for PRN use
         refills_authorized:
           type: integer
           minimum: 0
           maximum: 12
+          description: Refills on external prescription
         pharmacy_name:
           type: string
           maxLength: 200
+          description: Dispensing pharmacy
         notes:
           type: string
           maxLength: 2000

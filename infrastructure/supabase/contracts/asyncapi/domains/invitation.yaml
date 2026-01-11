@@ -11,7 +11,8 @@ components:
     InvitationRevoked:
       name: invitation.revoked
       title: Invitation Revoked
-      summary: A pending invitation has been revoked (typically during workflow compensation)
+      summary: A pending invitation has been revoked (typically during workflow
+        compensation)
       contentType: application/json
       payload:
         $ref: '#/components/schemas/InvitationRevokedEvent'
@@ -40,8 +41,17 @@ components:
       payload:
         $ref: '#/components/schemas/InvitationResentEvent'
 
+    InvitationEmailSent:
+      name: invitation.email.sent
+      title: Invitation Email Sent
+      summary: An invitation email has been successfully sent to a user
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/InvitationEmailSentEvent'
+
   schemas:
     UserInvitedEvent:
+      title: UserInvitedEvent
       type: object
       required:
         - stream_id
@@ -53,11 +63,13 @@ components:
         stream_id:
           type: string
           format: uuid
-          description: Invitation UUID (user lifecycle events keyed by invitation_id before user exists)
+          description: Invitation UUID (user lifecycle events keyed by invitation_id
+            before user exists)
         stream_type:
           type: string
           const: user
-          description: Events emitted on user aggregate (invitation is part of user lifecycle)
+          description: Events emitted on user aggregate (invitation is part of user
+            lifecycle)
         event_type:
           type: string
           const: user.invited
@@ -67,6 +79,7 @@ components:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     UserInvitedData:
+      title: UserInvitedData
       type: object
       required:
         - invitation_id
@@ -110,18 +123,7 @@ components:
             both canonical system roles and custom organization-defined roles.
             Each role includes a denormalized name snapshot for display purposes.
           items:
-            type: object
-            required:
-              - role_id
-            properties:
-              role_id:
-                type: string
-                format: uuid
-                description: UUID of the role to assign
-              role_name:
-                type: string
-                maxLength: 100
-                description: Denormalized role name snapshot for display (e.g., "Program Manager - Aspen")
+            $ref: '#/components/schemas/RoleAssignment'
           examples:
             - - role_id: "11111111-1111-1111-1111-111111111111"
                 role_name: "super_admin"
@@ -131,7 +133,8 @@ components:
                 role_name: "Clinician"
         token:
           type: string
-          description: Cryptographically secure invitation token (256 bits, base64url encoded)
+          description: Cryptographically secure invitation token (256 bits, base64url
+            encoded)
           examples:
             - "xK9m2nP4qR7sT1vW3xY5zA8bC0dE2fG4hI6jK8lM0nO"
         expires_at:
@@ -144,7 +147,8 @@ components:
           type: string
           format: date
           nullable: true
-          description: First date the user can access the org after accepting (NULL = immediate)
+          description: First date the user can access the org after accepting (NULL =
+            immediate)
           examples:
             - "2025-01-15"
             - null
@@ -161,6 +165,7 @@ components:
           description: Initial notification preferences for the user
 
     NotificationPreferences:
+      title: NotificationPreferences
       type: object
       description: User notification preferences (per-org)
       properties:
@@ -169,23 +174,46 @@ components:
           default: true
           description: Whether to send email notifications
         sms:
-          type: object
-          properties:
-            enabled:
-              type: boolean
-              default: false
-              description: Whether to send SMS notifications
-            phone_id:
-              type: string
-              format: uuid
-              nullable: true
-              description: UUID of the phone to use for SMS (from user_phones or user_org_phone_overrides)
+          $ref: '#/components/schemas/SmsNotificationPreference'
         in_app:
           type: boolean
           default: false
           description: Whether to send in-app notifications (future feature)
 
+    SmsNotificationPreference:
+      title: SmsNotificationPreference
+      type: object
+      description: SMS notification settings
+      properties:
+        enabled:
+          type: boolean
+          default: false
+          description: Whether to send SMS notifications
+        phone_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID of the phone to use for SMS (from user_phones or
+            user_org_phone_overrides)
+
+    RoleAssignment:
+      title: RoleAssignment
+      type: object
+      description: Role assignment reference (used in invitations and acceptances)
+      required:
+        - role_id
+      properties:
+        role_id:
+          type: string
+          format: uuid
+          description: UUID of the role to assign
+        role_name:
+          type: string
+          maxLength: 100
+          description: Denormalized role name snapshot for display (e.g., "Program Manager - Aspen")
+
     InvitationRevokedEvent:
+      title: InvitationRevokedEvent
       type: object
       required:
         - stream_id
@@ -211,6 +239,7 @@ components:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     InvitationRevokedData:
+      title: InvitationRevokedData
       type: object
       required:
         - invitation_id
@@ -236,15 +265,22 @@ components:
           format: date-time
           description: Timestamp when the invitation was revoked
         reason:
-          type: string
-          enum: [workflow_failure, manual_revocation, organization_deactivated]
-          description: |
-            Reason for revocation:
-            - workflow_failure: Saga compensation during failed organization bootstrap
-            - manual_revocation: Administrator manually revoked the invitation
-            - organization_deactivated: Organization was deactivated, invalidating invitations
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/InvitationRevocationReason
+            - description: >
+                Reason for revocation:
+
+                - workflow_failure: Saga compensation during failed organization
+                bootstrap
+
+                - manual_revocation: Administrator manually revoked the
+                invitation
+
+                - organization_deactivated: Organization was deactivated,
+                invalidating invitations
 
     InvitationAcceptedEvent:
+      title: InvitationAcceptedEvent
       type: object
       required:
         - stream_id
@@ -269,6 +305,7 @@ components:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     InvitationAcceptedData:
+      title: InvitationAcceptedData
       type: object
       required:
         - invitation_id
@@ -299,18 +336,7 @@ components:
             Empty array = user accepted with no roles (will have no permissions until admin assigns).
             The actual role grants are emitted as separate user.role.assigned events.
           items:
-            type: object
-            required:
-              - role_id
-            properties:
-              role_id:
-                type: string
-                format: uuid
-                description: UUID of the role that was assigned
-              role_name:
-                type: string
-                maxLength: 100
-                description: Denormalized role name snapshot
+            $ref: '#/components/schemas/RoleAssignment'
         accepted_at:
           type: string
           format: date-time
@@ -326,9 +352,11 @@ components:
           description: Date the user's access will expire (copied from invitation)
         notification_preferences:
           $ref: '#/components/schemas/NotificationPreferences'
-          description: Notification preferences (copied from invitation to user_organizations_projection)
+          description: Notification preferences (copied from invitation to
+            user_organizations_projection)
 
     InvitationExpiredEvent:
+      title: InvitationExpiredEvent
       type: object
       required:
         - stream_id
@@ -352,6 +380,7 @@ components:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     InvitationExpiredData:
+      title: InvitationExpiredData
       type: object
       required:
         - invitation_id
@@ -379,6 +408,7 @@ components:
           description: Original expiration date from the invitation
 
     InvitationResentEvent:
+      title: InvitationResentEvent
       type: object
       required:
         - stream_id
@@ -404,6 +434,7 @@ components:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     InvitationResentData:
+      title: InvitationResentData
       type: object
       required:
         - invitation_id
@@ -443,3 +474,55 @@ components:
           type: integer
           minimum: 1
           description: Number of times this invitation has been resent
+
+    InvitationEmailSentEvent:
+      title: InvitationEmailSentEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization UUID (email sent events keyed by org)
+        stream_type:
+          type: string
+          const: organization
+          description: Events emitted on organization aggregate
+        event_type:
+          type: string
+          const: invitation.email.sent
+        event_data:
+          $ref: '#/components/schemas/InvitationEmailSentData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    InvitationEmailSentData:
+      title: InvitationEmailSentData
+      type: object
+      required:
+        - org_id
+        - invitation_id
+        - email
+        - sent_at
+      properties:
+        org_id:
+          type: string
+          format: uuid
+          description: Organization the invitation belongs to
+        invitation_id:
+          type: string
+          format: uuid
+          description: The invitation ID for which email was sent
+        email:
+          type: string
+          format: email
+          description: Email address that received the invitation
+        sent_at:
+          type: string
+          format: date-time
+          description: Timestamp when the email was sent

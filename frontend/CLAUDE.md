@@ -573,6 +573,34 @@ test('user can login with any credentials', async ({ page }) => {
 - Define interfaces for all props and complex data structures
 - Use type inference where possible, explicit types where necessary
 
+### Generated Event Types
+
+**Source of Truth**: Domain event types are generated from AsyncAPI schemas - NEVER hand-write them.
+
+```typescript
+// ✅ GOOD: Import from @/types/events (re-exports from generated)
+import { DomainEvent, EventMetadata, StreamType } from '@/types/events';
+
+// ❌ BAD: Hand-written types (file deleted, don't recreate)
+import { DomainEvent } from '@/types/event-types';  // DOES NOT EXIST
+
+// ❌ BAD: Direct import from generated (bypasses extensions)
+import { DomainEvent } from '@/types/generated/generated-events';
+```
+
+**Regenerating Types** (after AsyncAPI changes):
+```bash
+cd infrastructure/supabase/contracts
+npm run generate:types
+cp types/generated-events.ts ../../../frontend/src/types/generated/
+```
+
+**Key Points**:
+- All event types in `@/types/generated/generated-events.ts` are auto-generated
+- `@/types/events.ts` re-exports from generated and adds app-specific extensions
+- StreamType enum includes all valid aggregate types (user, organization, etc.)
+- EventMetadata includes standard fields (user_id, reason, organization_id, etc.)
+
 ## Configuration Management
 
 ### Application Configuration

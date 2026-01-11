@@ -15,8 +15,7 @@
  */
 
 import type { ActivateOrganizationParams } from '@shared/types';
-import { getSupabaseClient, emitEvent, buildTags, getLogger, buildTracingForEvent } from '@shared/utils';
-import { AGGREGATE_TYPES } from '@shared/constants';
+import { getSupabaseClient, getLogger, emitOrganizationActivated } from '@shared/utils';
 
 const log = getLogger('ActivateOrganization');
 
@@ -52,19 +51,12 @@ export async function activateOrganization(
   if (org.is_active) {
     log.info('Organization already active', { orgId: params.orgId });
 
-    // Emit event even if already active (for event replay)
-    await emitEvent({
-      event_type: 'organization.activated',
-      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
-      aggregate_id: params.orgId,
-      event_data: {
-        org_id: params.orgId,
-        activated_at: new Date().toISOString(),
-        previous_is_active: org.is_active
-      },
-      tags: buildTags(),
-      ...buildTracingForEvent(params.tracing, 'activateOrganization')
-    });
+    // Type-safe event using AsyncAPI contract
+    await emitOrganizationActivated(params.orgId, {
+      org_id: params.orgId,
+      activated_at: new Date().toISOString(),
+      previous_is_active: org.is_active,
+    }, params.tracing);
 
     return true;
   }
@@ -84,20 +76,13 @@ export async function activateOrganization(
 
   log.info('Organization activated', { orgId: params.orgId });
 
-  // Emit OrganizationActivated event
+  // Type-safe event using AsyncAPI contract
   const activatedAt = new Date().toISOString();
-  await emitEvent({
-    event_type: 'organization.activated',
-    aggregate_type: 'Organization',
-    aggregate_id: params.orgId,
-    event_data: {
-      org_id: params.orgId,
-      activated_at: activatedAt,
-      previous_is_active: org.is_active
-    },
-    tags: buildTags(),
-    ...buildTracingForEvent(params.tracing, 'activateOrganization')
-  });
+  await emitOrganizationActivated(params.orgId, {
+    org_id: params.orgId,
+    activated_at: activatedAt,
+    previous_is_active: org.is_active,
+  }, params.tracing);
 
   log.debug('Emitted organization.activated event', { orgId: params.orgId });
 

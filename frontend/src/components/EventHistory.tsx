@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useEventHistory } from '@/hooks/useEventHistory';
-import { StreamType } from '@/types/event-types';
+import { StreamType } from '@/types/events';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, format } from 'date-fns';
 

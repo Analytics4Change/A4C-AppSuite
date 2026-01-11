@@ -443,6 +443,131 @@ export async function sendInvitation(params: SendInvitationParams): Promise<stri
 }
 ```
 
+## TypeScript Type Generation with Modelina
+
+### Source of Truth
+
+**Generated types are the SINGLE source of truth for domain event types.**
+
+- **NEVER** hand-write event type definitions
+- **ALWAYS** regenerate types after modifying AsyncAPI schemas
+- Import from `@/types/events` (frontend) or `@a4c/event-contracts` (workflows)
+
+### Type Generation Pipeline
+
+```bash
+cd infrastructure/supabase/contracts
+npm run generate:types
+# Then copy to frontend:
+cp types/generated-events.ts ../../../frontend/src/types/generated/
+```
+
+The pipeline consists of:
+1. `replace-inline-enums.js` - Extracts single-value enums to const patterns
+2. `asyncapi bundle` - Bundles all YAML files into single spec
+3. `generate-types.js` - Uses Modelina to generate TypeScript interfaces
+4. `dedupe-enums.js` - Deduplicates enum definitions with canonical names
+
+### Critical Configuration Options
+
+```javascript
+// generate-types.js
+const generator = new TypeScriptGenerator({
+  modelType: 'interface',    // Generate interfaces, not classes
+  enumType: 'enum',          // Use TypeScript enums
+  rawPropertyNames: true,    // CRITICAL: Preserve snake_case (matches DB schema)
+});
+
+// IMPORTANT: Pass raw YAML content, not parsed document
+const models = await generator.generate(asyncapiContent);  // ✅ Correct
+// NOT: generator.generate(parsedDocument)  // ❌ Loses property info
+```
+
+### Anonymous Schema Prevention
+
+**Problem**: Schemas without `title` property generate as `AnonymousSchema_XXX`.
+
+**Solution**: Every schema MUST have a `title` property:
+
+```yaml
+# GOOD: Has title, generates as UserCreatedData
+UserCreatedData:
+  title: UserCreatedData
+  type: object
+  properties:
+    email: { type: string, format: email }
+
+# BAD: No title, generates as AnonymousSchema_123
+UserCreatedData:
+  type: object
+  properties:
+    email: { type: string, format: email }
+```
+
+**Inline event_data/event_metadata schemas**: These commonly lack titles and generate
+anonymous types. Accept this tradeoff (20+ anonymous schemas is normal) or extract to
+named schemas if specific type references are needed.
+
+### Enum Handling
+
+**Multi-value enums** use canonical naming via `dedupe-enums.js`:
+- Define in `asyncapi/components/enums.yaml`
+- Reference via `$ref: ../components/enums.yaml#/...`
+- Dedupe script maps values to canonical names
+
+**Single-value enums** (const patterns) stay inline:
+- `replace-inline-enums.js` converts to `const` assertions
+- These don't need deduplication
+
+### Base Types Injection
+
+Modelina doesn't extract `components/schemas` unless referenced by messages.
+The generator injects base types manually:
+
+```javascript
+// generate-types.js
+const BASE_TYPES = `
+export type StreamType = 'user' | 'organization' | ... ;
+
+export interface DomainEvent<TData = Record<string, unknown>> {
+  'id': string;
+  'stream_type': StreamType;
+  ...
+}
+`;
+
+output += BASE_TYPES;  // Injected before Modelina output
+```
+
+### Lessons Learned & Pitfalls
+
+1. **Don't use `constraints` option** - Breaks property extraction
+2. **Must pass raw YAML, not parsed document** - `generator.generate(yamlContent)`
+3. **Add `export` keyword manually** - Modelina generates without export
+4. **Dedupe script must handle `export enum`** - Match full pattern including `export `
+5. **Keep StreamType in sync** - Add new stream types to BASE_TYPES in generator
+6. **EventMetadata fields** - Add new standard fields to AsyncAPI schema, regenerate
+
+### Frontend Import Pattern
+
+```typescript
+// ✅ GOOD: Import from events.ts (which re-exports from generated)
+import { DomainEvent, EventMetadata, StreamType } from '@/types/events';
+
+// ❌ BAD: Direct import from generated (bypasses extensions)
+import { DomainEvent } from '@/types/generated/generated-events';
+
+// ❌ BAD: Hand-written types (DELETED - don't recreate)
+import { DomainEvent } from '@/types/event-types';  // THIS FILE NO LONGER EXISTS
+```
+
+### Workflow Import Pattern
+
+```typescript
+// In workflows/src/ code
+import { UserInvitedEvent, EventMetadata } from '@a4c/event-contracts';
+```
+
 ## Best Practices
 
 1. **Define contracts before implementation** - Contract-first prevents drift
@@ -452,9 +577,10 @@ export async function sendInvitation(params: SendInvitationParams): Promise<stri
 5. **Never include sensitive data** - No passwords, tokens, or credentials
 6. **Keep events immutable** - Append-only, never modify
 7. **Validate with AsyncAPI CLI** - Catch schema errors early
-8. **Generate TypeScript types** - Ensure type safety in activities
+8. **Generate TypeScript types** - ALWAYS regenerate, NEVER hand-write
 9. **Support multiple versions** - Projection triggers handle all versions
 10. **Document metadata requirements** - All events include workflow/activity context
+11. **Add title to all schemas** - Prevents anonymous schema generation
 
 ## Cross-References
 

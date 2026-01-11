@@ -128,18 +128,6 @@ components:
           items:
             type: string
             maxLength: 200
-        blood_type:
-          type: string
-          enum:
-            - A+
-            - A-
-            - B+
-            - B-
-            - AB+
-            - AB-
-            - O+
-            - O-
-          description: Client's blood type
         insurance_provider:
           type: string
           maxLength: 200
@@ -299,8 +287,6 @@ components:
               type: array
               items:
                 type: string
-            blood_type:
-              type: string
             insurance_provider:
               type: string
             insurance_policy_number:

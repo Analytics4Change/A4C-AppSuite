@@ -5,13 +5,15 @@
   "description": "Event schema contracts and code generation",
   "scripts": {
     "bundle": "cd asyncapi && asyncapi bundle asyncapi.yaml -o ../asyncapi-bundled.yaml",
-    "generate": "npm run bundle && npm run generate:typescript && npm run generate:json-schema",
-    "generate:typescript": "asyncapi generate fromTemplate asyncapi-bundled.yaml @asyncapi/ts-nats-template -o generated/typescript --force-write",
-    "generate:json-schema": "asyncapi generate fromTemplate asyncapi-bundled.yaml @asyncapi/json-schema-template -o generated/json-schema --force-write",
     "validate": "asyncapi validate asyncapi/asyncapi.yaml",
-    "clean": "rm -rf generated/typescript/* generated/json-schema/* asyncapi-bundled.yaml"
+    "replace-enums": "node scripts/replace-inline-enums.js",
+    "generate:types": "npm run replace-enums && npm run bundle && node scripts/generate-types.js && node scripts/dedupe-enums.js",
+    "check": "npm run validate && npm run generate:types",
+    "clean": "rm -rf types/generated-events.ts asyncapi-bundled.yaml"
   },
   "devDependencies": {
-    "@asyncapi/cli": "^1.2.0"
+    "@asyncapi/cli": "^1.2.0",
+    "@asyncapi/modelina": "^5.10.1",
+    "@asyncapi/parser": "^3.0.0"
   }
 }

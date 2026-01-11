@@ -1,25 +1,32 @@
 # AsyncAPI Type Generation Decision
 
-**Status**: ✅ Current Decision
-**Last Updated**: 2025-01-14
+**Status**: ✅ IMPLEMENTED (Superseded Original Decision)
+**Last Updated**: 2026-01-11
 **Impact**: Workflows, Infrastructure, Contract Development
-**Pattern**: Manual TypeScript types with AsyncAPI as documentation
-**Decision**: Reject auto-generation, continue with hand-crafted types
+**Pattern**: Auto-generated TypeScript types from AsyncAPI via Modelina
+**Decision**: Successfully implemented auto-generation after solving AnonymousSchema problem
 
 ---
 
 ## Executive Summary
 
-After comprehensive research into auto-generating TypeScript types from AsyncAPI schemas, we have decided to **continue with hand-crafted manual types** rather than adopt code generation.
+**Update (2026-01-11)**: This document originally recommended rejecting auto-generation due to the AnonymousSchema problem. **We have since solved this problem** and successfully implemented Modelina type generation.
 
-**Key reasons**:
-1. **Anonymous schema problem**: Generated types use `AnonymousSchema_1`, `AnonymousSchema_2` instead of semantic names
-2. **Type quality loss**: No discriminated unions, type guards, or domain-specific validation
-3. **Build complexity**: Requires generation orchestration across monorepo (infrastructure, frontend, workflows)
-4. **Slower workflow**: 15-20 minutes per event vs. 5-10 minutes with manual types
-5. **Already tried and rejected**: README.md documents previous attempt with same issues
+**Solution implemented**:
+1. **`title` property on all schemas** - Prevents `AnonymousSchema_XXX` generation
+2. **Centralized enums in `components/enums.yaml`** - Proper TypeScript enum generation
+3. **Custom pipeline** - `replace-inline-enums.js` → `bundle` → `generate-types.js` → `dedupe-enums.js`
+4. **CI validation** - GitHub workflow validates types are in sync with schemas
 
-Our current 591-line hand-crafted type file (`infrastructure/supabase/contracts/types/events.ts`) provides **superior quality** compared to what any code generation tool would produce.
+**Current state**: `types/generated-events.ts` (665+ lines) with proper named types, no AnonymousSchema issues.
+
+**For implementation details**: See [CONTRACT-TYPE-GENERATION.md](../guides/supabase/CONTRACT-TYPE-GENERATION.md)
+
+---
+
+## Historical Context (Original Decision - 2025-01-14)
+
+The sections below document the original research and decision to reject auto-generation. This context is preserved for historical reference, but **the decision has been superseded** by our successful implementation.
 
 ---
 
@@ -598,121 +605,114 @@ test('ClientRegisteredEvent structure matches AsyncAPI schema', async () => {
 
 ## Decision Summary
 
-### ✅ Continue with Manual Hand-Crafted Types
+### ✅ UPDATED: Successfully Implemented Auto-Generation (2026-01-11)
 
-**Rationale**:
+**What changed**: We solved the AnonymousSchema problem and successfully implemented Modelina type generation.
 
-1. **Anonymous schema problem is a dealbreaker**
-   - `AnonymousSchema_1` through `AnonymousSchema_50+` is unacceptable
-   - No fix planned by AsyncAPI Modelina team
+**How we solved it**:
 
-2. **Our manual types are higher quality**
-   - Discriminated unions for type narrowing
-   - Type guards for runtime checking
-   - Event factory with validation
-   - Domain-specific utility types
-   - Clean, semantic names
+1. **Added `title` property to ALL schemas**
+   - Modelina uses `title` for type names
+   - Without `title`, it generates `AnonymousSchema_XXX`
+   - Solution: Every schema now has `title` matching its name
 
-3. **Code generation adds complexity without benefit**
-   - 2-4 hour initial setup
-   - Slower workflow (15-20 min vs 5-10 min per event)
-   - Monorepo build orchestration
-   - CI validation complexity
+2. **Centralized enums in `components/enums.yaml`**
+   - Inline enums also generate anonymous types
+   - Solution: Extract all enums to shared components file
+   - Reference via `$ref: '../components/enums.yaml#/...'`
 
-4. **We already tried and rejected this approach**
-   - Same issues persist in 2025
-   - Previous decision was correct
+3. **Custom processing pipeline**
+   - `replace-inline-enums.js` - Handles single-value enums
+   - `asyncapi bundle` - Resolves all `$ref` references
+   - `generate-types.js` - Modelina with proper config
+   - `dedupe-enums.js` - Deduplicates enum definitions
 
-5. **Better alternative exists**
-   - Validation tests provide drift protection
-   - 1-2 hour setup vs 4+ hours
-   - No build complexity
+4. **CI validation**
+   - GitHub workflow validates types are in sync
+   - Fails if `types/generated-events.ts` differs after regeneration
 
-### ⚠️ Tradeoffs Accepted
+**Current output**: `types/generated-events.ts` (665+ lines) with:
+- Proper named interfaces (no AnonymousSchema)
+- TypeScript enums with semantic names
+- Base types (DomainEvent, EventMetadata, StreamType)
+- snake_case property names (matches database schema)
 
-**We accept**:
-- Manual maintenance burden (updating types when schemas change)
-- Possibility of drift between schema and types (mitigated by validation tests)
-- 5-10 minutes per event for type updates
+### Historical Tradeoffs (No Longer Applicable)
 
-**We reject**:
-- Anonymous schema names
-- Type quality loss
-- Build complexity
-- Slower developer workflow
-- Tool dependencies and churn
+The original decision accepted these tradeoffs:
+- ~~Manual maintenance burden~~ → Now auto-generated
+- ~~Possibility of drift~~ → CI validation prevents drift
+- ~~5-10 minutes per event~~ → Just regenerate types
+
+The original decision rejected:
+- ~~Anonymous schema names~~ → **SOLVED** with `title` property
+- ~~Type quality loss~~ → Custom generator preserves quality
+- ~~Build complexity~~ → Single `npm run generate:types` command
+- ~~Slower developer workflow~~ → Actually faster now
 
 ---
 
 ## Implementation Guidelines
 
-### For Developers Adding New Events
+### UPDATED: Current Workflow (Auto-Generation)
 
-**1. Update AsyncAPI Schema**:
+**For comprehensive guide**: See [CONTRACT-TYPE-GENERATION.md](../guides/supabase/CONTRACT-TYPE-GENERATION.md)
+
+**Quick workflow for adding new events**:
+
+**1. Update AsyncAPI Schema** (ensure `title` property is set):
+
+```yaml
+# infrastructure/supabase/contracts/asyncapi/domains/<domain>.yaml
+NewEventData:
+  title: NewEventData  # CRITICAL: Prevents AnonymousSchema
+  type: object
+  properties:
+    field1: { type: string }
+    field2: { type: number }
+```
+
+**2. Regenerate Types**:
 
 ```bash
-vim infrastructure/supabase/contracts/asyncapi/domains/<domain>.yaml
+cd infrastructure/supabase/contracts
+npm run generate:types
 ```
 
-**2. Update TypeScript Types**:
-
-```typescript
-// infrastructure/supabase/contracts/types/events.ts
-
-// Add event data interface
-export interface NewEventData {
-  field1: string;
-  field2: number;
-}
-
-// Add event interface
-export interface NewEvent extends DomainEvent<NewEventData> {
-  stream_type: 'domain';
-  event_type: 'domain.new_event';
-  event_metadata: EventMetadata & {
-    reason: string;
-  };
-}
-
-// Add to discriminated union
-export type AllDomainEvents =
-  | ClientRegisteredEvent
-  | NewEvent  // ⬅️ Add here
-  // ... other events
-
-// Add type guard
-export function isNewEvent(event: DomainEvent): event is NewEvent {
-  return event.event_type === 'domain.new_event';
-}
-```
-
-**3. Validate**:
+**3. Verify Output**:
 
 ```bash
-npm run validate  # AsyncAPI schema validation
-npm run typecheck  # TypeScript compilation
-npm test  # Run validation tests (if implemented)
+grep "NewEventData" types/generated-events.ts
+# Should show: export interface NewEventData { ... }
 ```
 
-**4. Document**:
+**4. Copy to Frontend**:
 
-Add JSDoc to event interface explaining purpose and usage.
+```bash
+cp types/generated-events.ts ../../../frontend/src/types/generated/
+```
+
+**5. Commit**:
+
+```bash
+git add asyncapi/ types/
+git commit -m "feat: Add new_event domain event"
+```
 
 ### For Reviewers
 
 When reviewing PRs with event changes:
 
 ✅ **Check**:
-- AsyncAPI schema updated
-- TypeScript types updated
-- Event added to `AllDomainEvents` union
-- Type guard function added
-- Reason field documented (why event exists)
+- AsyncAPI schema has `title` on all schemas
+- `npm run generate:types` was run (types match schemas)
+- Enums use `$ref` to `components/enums.yaml`
+- Frontend types were copied
 
 ❌ **Don't**:
-- Merge if schema and types don't match
-- Merge if discriminated union not updated
-- Merge if validation tests fail
+- Merge if `types/generated-events.ts` has `AnonymousSchema_XXX`
+- Merge if CI validation fails
+- Merge if frontend types not updated
 
 ---
 
@@ -796,10 +796,11 @@ Full research findings documented in this decision record:
 
 | Date | Change | Author |
 |------|--------|--------|
-| 2025-01-14 | Initial decision documented | Analytics4Change |
+| 2025-01-14 | Initial decision documented (reject auto-generation) | Analytics4Change |
+| 2026-01-11 | Decision superseded - successfully implemented Modelina with `title` property solution | Analytics4Change |
 
 ---
 
-**Decision Status**: ✅ **CURRENT** - Continue with manual hand-crafted types
+**Decision Status**: ✅ **IMPLEMENTED** - Auto-generation working with Modelina
 
-**Next Review**: 2025-04-14 (Quarterly)
+**Implementation Guide**: [CONTRACT-TYPE-GENERATION.md](../guides/supabase/CONTRACT-TYPE-GENERATION.md)

@@ -471,9 +471,9 @@ export interface AccessGrantCreationData {
   consultant_org_id: string;
   consultant_user_id?: string;
   provider_org_id: string;
-  scope: 'full_org' | 'facility' | 'program' | 'client_specific';
+  scope: 'organization_unit' | 'client_specific';
   scope_id?: string;
-  authorization_type: 'var_contract' | 'court_order' | 'parental_consent' | 'social_services_assignment' | 'emergency_access';
+  authorization_type: 'var_contract' | 'court_order' | 'family_participation' | 'social_services_assignment' | 'emergency_access';
   legal_reference?: string;
   granted_by: string;
   expires_at?: string;
@@ -493,7 +493,7 @@ export interface AccessGrantCreatedEvent extends DomainEvent<AccessGrantCreation
 export interface AccessGrantRevocationData {
   grant_id: string;
   revoked_by: string;
-  revocation_reason: 'contract_expired' | 'legal_basis_withdrawn' | 'security_breach' | 'administrative_decision' | 'user_request';
+  revocation_reason: string;
   revocation_details?: string;
   effective_immediately?: boolean;
   grace_period_hours?: number;
@@ -506,7 +506,7 @@ export interface AccessGrantRevokedEvent extends DomainEvent<AccessGrantRevocati
 
 export interface AccessGrantExpirationData {
   grant_id: string;
-  expiration_type: 'time_based' | 'contract_based' | 'automatic_cleanup';
+  expiration_type: string;
   original_expires_at: string;
   expired_at: string;
   renewal_available?: boolean;

@@ -20,7 +20,7 @@ export class SupabaseOrganizationCommandService implements IOrganizationCommandS
    * Updates an organization via domain event
    *
    * Emits organization.updated event with:
-   * - updated_fields: Array of field names that changed
+   * - updatable_fields: Array of field names that changed
    * - previous_values: Not tracked by frontend (backend handles)
    * - reason: Audit trail for the change
    */
@@ -44,7 +44,7 @@ export class SupabaseOrganizationCommandService implements IOrganizationCommandS
 
       const eventData = {
         ...data,
-        updated_fields: updatedFields,
+        updatable_fields: updatedFields,
         reason,
       };
 

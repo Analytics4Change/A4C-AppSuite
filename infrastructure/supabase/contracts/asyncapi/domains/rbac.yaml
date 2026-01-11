@@ -98,6 +98,7 @@ components:
 
   schemas:
     PermissionDefinedEvent:
+      title: PermissionDefinedEvent
       type: object
       required:
         - stream_id
@@ -151,14 +152,10 @@ components:
                 - View client records
                 - Impersonate users for support operations
             scope_type:
-              type: string
-              enum:
-                - global
-                - org
-                - facility
-                - program
-                - client
-              description: Hierarchical scope level for this permission
+              allOf:
+                - $ref: ../components/enums.yaml#/components/schemas/ScopeType
+                - description: Hierarchical scope level for this permission
+                    (facility/program/client removed - never implemented)
             requires_mfa:
               type: boolean
               description: Whether MFA is required to use this permission
@@ -174,6 +171,7 @@ components:
                     - Defining impersonation permission for Super Admin support
 
     RoleCreatedEvent:
+      title: RoleCreatedEvent
       type: object
       required:
         - stream_id
@@ -230,10 +228,12 @@ components:
                 reason:
                   examples:
                     - Creating super admin role for platform administration
-                    - Creating provider admin role for organization-level management
+                    - Creating provider admin role for organization-level
+                      management
                     - Adding new role for facility-scoped access
 
     RolePermissionGrantedEvent:
+      title: RolePermissionGrantedEvent
       type: object
       required:
         - stream_id
@@ -276,11 +276,13 @@ components:
             - properties:
                 reason:
                   examples:
-                    - Granting medication creation permission to provider_admin role
+                    - Granting medication creation permission to provider_admin
+                      role
                     - Adding impersonation permission to super_admin role
                     - Granting view permission to read-only auditor role
 
     RolePermissionRevokedEvent:
+      title: RolePermissionRevokedEvent
       type: object
       required:
         - stream_id
@@ -321,10 +323,13 @@ components:
             - properties:
                 reason:
                   examples:
-                    - Removing impersonation permission from provider_admin due to security policy change
-                    - Revoking delete permission from role per compliance requirement
+                    - Removing impersonation permission from provider_admin due
+                      to security policy change
+                    - Revoking delete permission from role per compliance
+                      requirement
 
     RoleUpdatedEvent:
+      title: RoleUpdatedEvent
       type: object
       required:
         - stream_id
@@ -369,6 +374,7 @@ components:
                     - Renaming role to match organizational structure
 
     RoleDeactivatedEvent:
+      title: RoleDeactivatedEvent
       type: object
       required:
         - stream_id
@@ -408,6 +414,7 @@ components:
                     - Role deprecated in favor of new role structure
 
     RoleReactivatedEvent:
+      title: RoleReactivatedEvent
       type: object
       required:
         - stream_id
@@ -445,6 +452,7 @@ components:
                     - Role restored per administrator request
 
     RoleDeletedEvent:
+      title: RoleDeletedEvent
       type: object
       required:
         - stream_id
@@ -484,6 +492,7 @@ components:
                     - Role cleanup after organizational restructure
 
     UserRoleAssignedEvent:
+      title: UserRoleAssignedEvent
       type: object
       required:
         - stream_id
@@ -544,11 +553,14 @@ components:
             - properties:
                 reason:
                   examples:
-                    - Granting platform-wide administrative access to new A4C support engineer
-                    - Granting provider administrator access to manage Acme Healthcare organization
+                    - Granting platform-wide administrative access to new A4C
+                      support engineer
+                    - Granting provider administrator access to manage Acme
+                      Healthcare organization
                     - Assigning facility admin role for facility-level management
 
     UserRoleRevokedEvent:
+      title: UserRoleRevokedEvent
       type: object
       required:
         - stream_id
@@ -597,6 +609,7 @@ components:
                     - Temporary role assignment expired
 
     AccessGrantCreatedEvent:
+      title: AccessGrantCreatedEvent
       type: object
       required:
         - stream_id
@@ -635,25 +648,19 @@ components:
               type: string
               description: Target Provider organization ID
             scope:
-              type: string
-              enum:
-                - full_org
-                - facility
-                - client
-              description: Access scope level
+              allOf:
+                - $ref: ../components/enums.yaml#/components/schemas/GrantScope
+                - description: Access scope level (organization_unit for OU hierarchy,
+                    client_specific for individual clients)
             scope_id:
               type: string
               format: uuid
               nullable: true
               description: Specific resource ID if scoped
             authorization_type:
-              type: string
-              enum:
-                - court_order
-                - parental_consent
-                - var_contract
-                - social_services
-              description: Legal basis for cross-tenant access
+              allOf:
+                - $ref: ../components/enums.yaml#/components/schemas/GrantAuthorizationType
+                - description: Legal/business basis for granting cross-tenant access
             legal_reference:
               type: string
               nullable: true
@@ -675,9 +682,11 @@ components:
                   examples:
                     - Granting court access per order #2024-1234 for case review
                     - Creating VAR access grant for partner dashboard analytics
-                    - Granting parental access to minor client records per consent
+                    - Granting parental access to minor client records per
+                      consent
 
     AccessGrantRevokedEvent:
+      title: AccessGrantRevokedEvent
       type: object
       required:
         - stream_id
@@ -724,6 +733,7 @@ components:
             - properties:
                 reason:
                   examples:
-                    - Revoking court access after case closure per provider admin request
+                    - Revoking court access after case closure per provider
+                      admin request
                     - Terminating VAR access due to contract expiration
                     - Withdrawing parental access per custody order

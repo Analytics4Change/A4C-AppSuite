@@ -1,0 +1,206 @@
+components:
+  messages:
+    EmailCreated:
+      name: email.created
+      title: Email Created
+      summary: A new email address has been created for an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/EmailCreatedEvent'
+
+    EmailUpdated:
+      name: email.updated
+      title: Email Updated
+      summary: Email address information has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/EmailUpdatedEvent'
+
+    EmailDeleted:
+      name: email.deleted
+      title: Email Deleted
+      summary: Email address has been logically deleted (soft delete)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/EmailDeletedEvent'
+
+  schemas:
+    EmailCreatedEvent:
+      title: EmailCreatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Email UUID
+        stream_type:
+          type: string
+          const: email
+        event_type:
+          type: string
+          const: email.created
+        event_data:
+          $ref: '#/components/schemas/EmailCreationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    EmailCreationData:
+      title: EmailCreationData
+      type: object
+      required:
+        - organization_id
+        - label
+        - type
+        - address
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: Owning organization UUID
+        label:
+          type: string
+          maxLength: 200
+          description: User-defined email label for identification
+          examples:
+            - "Main Office"
+            - "Billing Department"
+            - "Support Inbox"
+            - "Emergency Contact"
+        type:
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/EmailType
+            - description: |
+                Structured email type:
+                - work: Business/work email address
+                - personal: Personal email address
+                - billing: Billing and invoicing email
+                - support: Support and helpdesk email
+                - main: Primary organizational email
+        address:
+          type: string
+          format: email
+          maxLength: 255
+          description: Email address
+          examples:
+            - "info@acme-healthcare.com"
+            - "billing@acme-healthcare.com"
+            - "support@acme-healthcare.com"
+        is_primary:
+          type: boolean
+          default: false
+          description: Whether this is the primary email for the organization (only one
+            per org)
+        is_active:
+          type: boolean
+          default: true
+          description: Email active status
+        metadata:
+          type: object
+          description: Additional flexible data storage
+
+    EmailUpdatedEvent:
+      title: EmailUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Email UUID
+        stream_type:
+          type: string
+          const: email
+        event_type:
+          type: string
+          const: email.updated
+        event_data:
+          $ref: '#/components/schemas/EmailUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    EmailUpdateData:
+      title: EmailUpdateData
+      type: object
+      description: Partial update data (only fields being updated)
+      properties:
+        label:
+          type: string
+          maxLength: 200
+          description: Updated email label
+        type:
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/EmailType
+            - description: Updated email type
+        address:
+          type: string
+          format: email
+          maxLength: 255
+          description: Updated email address
+        is_primary:
+          type: boolean
+          description: Updated primary email flag
+        is_active:
+          type: boolean
+          description: Updated active status
+        metadata:
+          type: object
+          description: Updated metadata (merges with existing)
+
+    EmailDeletedEvent:
+      title: EmailDeletedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Email UUID being deleted
+        stream_type:
+          type: string
+          const: email
+        event_type:
+          type: string
+          const: email.deleted
+        event_data:
+          $ref: '#/components/schemas/EmailDeletionData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    EmailDeletionData:
+      title: EmailDeletionData
+      type: object
+      required:
+        - email_id
+        - organization_id
+      properties:
+        email_id:
+          type: string
+          format: uuid
+          description: UUID of email being deleted
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization owning this email
+        reason:
+          type: string
+          description: Optional deletion reason
+          examples:
+            - "Email address no longer in use"
+            - "Duplicate email removed"
+            - "Organization cascade deletion"

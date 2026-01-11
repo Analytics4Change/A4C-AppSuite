@@ -14,7 +14,7 @@
  */
 
 import type { DeleteAddressesParams } from '@shared/types';
-import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
+import { getSupabaseClient, getLogger, emitAddressDeleted } from '@shared/utils';
 
 const log = getLogger('DeleteAddresses');
 
@@ -28,7 +28,6 @@ export async function deleteAddresses(params: DeleteAddressesParams): Promise<bo
 
   try {
     const supabase = getSupabaseClient();
-    const tags = buildTags();
 
     // 1. Soft-delete junction records FIRST (prevents orphaned junctions)
     const { data: junctionCount, error: junctionError } = await supabase
@@ -62,17 +61,13 @@ export async function deleteAddresses(params: DeleteAddressesParams): Promise<bo
     }
 
     // 3. Emit address.deleted event for each address (audit trail)
+    // Note: Compensation activities don't have tracing context
     for (const address of addresses) {
       try {
-        await emitEvent({
-          event_type: 'address.deleted',
-          aggregate_type: 'address',
-          aggregate_id: address.id,
-          event_data: {
-            address_id: address.id,
-            organization_id: params.orgId
-          },
-          tags
+        await emitAddressDeleted(address.id, {
+          address_id: address.id,
+          organization_id: params.orgId,
+          reason: 'Organization bootstrap rollback',
         });
 
         log.debug('Emitted address.deleted', { addressId: address.id });

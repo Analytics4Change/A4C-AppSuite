@@ -14,7 +14,7 @@
  */
 
 import type { DeleteContactsParams } from '@shared/types';
-import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
+import { getSupabaseClient, getLogger, emitContactDeleted } from '@shared/utils';
 
 const log = getLogger('DeleteContacts');
 
@@ -28,7 +28,6 @@ export async function deleteContacts(params: DeleteContactsParams): Promise<bool
 
   try {
     const supabase = getSupabaseClient();
-    const tags = buildTags();
 
     // 1. Soft-delete junction records FIRST (prevents orphaned junctions)
     const { data: junctionCount, error: junctionError } = await supabase
@@ -62,17 +61,13 @@ export async function deleteContacts(params: DeleteContactsParams): Promise<bool
     }
 
     // 3. Emit contact.deleted event for each contact (audit trail)
+    // Note: Compensation activities don't have tracing context
     for (const contact of contacts) {
       try {
-        await emitEvent({
-          event_type: 'contact.deleted',
-          aggregate_type: 'contact',
-          aggregate_id: contact.id,
-          event_data: {
-            contact_id: contact.id,
-            organization_id: params.orgId
-          },
-          tags
+        await emitContactDeleted(contact.id, {
+          contact_id: contact.id,
+          organization_id: params.orgId,
+          reason: 'Organization bootstrap rollback',
         });
 
         log.debug('Emitted contact.deleted', { contactId: contact.id });

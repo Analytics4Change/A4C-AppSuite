@@ -1,0 +1,49 @@
+name: Contract Validation
+
+on:
+  pull_request:
+    paths:
+      - 'infrastructure/supabase/contracts/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infrastructure/supabase/contracts
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: infrastructure/supabase/contracts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate AsyncAPI spec
+        run: npm run validate
+
+      - name: Generate TypeScript types
+        run: npm run generate:types
+
+      - name: Check for uncommitted changes
+        run: |
+          if [ -n "$(git status --porcelain types/)" ]; then
+            echo "::error::Generated types are out of sync with AsyncAPI spec"
+            echo ""
+            echo "The following files have uncommitted changes:"
+            git status --porcelain types/
+            echo ""
+            echo "To fix this:"
+            echo "  1. cd infrastructure/supabase/contracts"
+            echo "  2. npm run generate:types"
+            echo "  3. git add types/"
+            echo "  4. git commit -m 'chore: regenerate event types from AsyncAPI'"
+            exit 1
+          fi
+          echo "Generated types are in sync with AsyncAPI spec"

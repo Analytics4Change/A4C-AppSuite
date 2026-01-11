@@ -3,7 +3,8 @@ components:
     AccessGrantCreated:
       name: access_grant.created
       title: Cross-Tenant Access Grant Created
-      summary: Cross-tenant access grant created for provider_partner to access provider data
+      summary: Cross-tenant access grant created for provider_partner to access
+        provider data
       contentType: application/json
       payload:
         $ref: '#/components/schemas/AccessGrantCreatedEvent'
@@ -19,7 +20,8 @@ components:
     AccessGrantExpired:
       name: access_grant.expired
       title: Cross-Tenant Access Grant Expired
-      summary: Cross-tenant access grant automatically expired based on time or contract terms
+      summary: Cross-tenant access grant automatically expired based on time or
+        contract terms
       contentType: application/json
       payload:
         $ref: '#/components/schemas/AccessGrantExpiredEvent'
@@ -42,6 +44,7 @@ components:
 
   schemas:
     AccessGrantCreatedEvent:
+      title: AccessGrantCreatedEvent
       type: object
       required:
         - stream_id
@@ -56,16 +59,17 @@ components:
           description: Access grant UUID
         stream_type:
           type: string
-          enum: [access_grant]
+          const: access_grant
         event_type:
           type: string
-          enum: [access_grant.created]
+          const: access_grant.created
         event_data:
           $ref: '#/components/schemas/AccessGrantCreationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     AccessGrantCreationData:
+      title: AccessGrantCreationData
       type: object
       required:
         - consultant_org_id
@@ -87,17 +91,18 @@ components:
           format: uuid
           description: Organization ID of the data owner (provider)
         scope:
-          type: string
-          enum: [full_org, facility, program, client_specific]
-          description: Scope of data access granted
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/GrantScope
+            - description: Scope of data access granted (organization_unit uses scope_id for
+                OU hierarchy)
         scope_id:
           type: string
           format: uuid
           description: Resource ID if scoped to specific facility/program/client
         authorization_type:
-          type: string
-          enum: [var_contract, court_order, parental_consent, social_services_assignment, emergency_access]
-          description: Legal/business basis for granting cross-tenant access
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/GrantAuthorizationType
+            - description: Legal/business basis for granting cross-tenant access
         legal_reference:
           type: string
           description: Reference to legal document, contract number, case number, etc.
@@ -108,7 +113,8 @@ components:
         granted_by:
           type: string
           format: uuid
-          description: User ID of the person granting this access (typically provider_admin or super_admin)
+          description: User ID of the person granting this access (typically
+            provider_admin or super_admin)
         expires_at:
           type: string
           format: date-time
@@ -117,9 +123,10 @@ components:
           type: array
           items:
             type: string
-          description: Specific permissions granted (default to standard set based on grant type)
+          description: Specific permissions granted (default to standard set based on
+            grant type)
           examples:
-            - ["client.view", "medication.view", "reports.generate"]
+            - [ "client.view", "medication.view", "reports.generate" ]
         terms:
           type: object
           description: Additional terms and conditions
@@ -137,6 +144,7 @@ components:
               description: Whether to notify provider when data is accessed
 
     AccessGrantRevokedEvent:
+      title: AccessGrantRevokedEvent
       type: object
       required:
         - stream_id
@@ -150,16 +158,17 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [access_grant]
+          const: access_grant
         event_type:
           type: string
-          enum: [access_grant.revoked]
+          const: access_grant.revoked
         event_data:
           $ref: '#/components/schemas/AccessGrantRevocationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     AccessGrantRevocationData:
+      title: AccessGrantRevocationData
       type: object
       required:
         - grant_id
@@ -175,7 +184,8 @@ components:
           description: User ID of person revoking access
         revocation_reason:
           type: string
-          enum: [contract_expired, legal_basis_withdrawn, security_breach, administrative_decision, user_request]
+          description: Explanation for why access is being revoked (e.g., contract
+            expired, security breach, user request)
         revocation_details:
           type: string
           description: Additional context for revocation
@@ -188,6 +198,7 @@ components:
           description: Hours of continued access for transition (if not immediate)
 
     AccessGrantExpiredEvent:
+      title: AccessGrantExpiredEvent
       type: object
       required:
         - stream_id
@@ -201,16 +212,17 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [access_grant]
+          const: access_grant
         event_type:
           type: string
-          enum: [access_grant.expired]
+          const: access_grant.expired
         event_data:
           $ref: '#/components/schemas/AccessGrantExpirationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     AccessGrantExpirationData:
+      title: AccessGrantExpirationData
       type: object
       required:
         - grant_id
@@ -222,7 +234,8 @@ components:
           format: uuid
         expiration_type:
           type: string
-          enum: [time_based, contract_based, automatic_cleanup]
+          description: How the grant expired (e.g., time_based, contract_based,
+            automatic_cleanup)
         original_expires_at:
           type: string
           format: date-time
@@ -237,6 +250,7 @@ components:
           description: Whether this grant can be renewed
 
     AccessGrantSuspendedEvent:
+      title: AccessGrantSuspendedEvent
       type: object
       required:
         - stream_id
@@ -250,16 +264,17 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [access_grant]
+          const: access_grant
         event_type:
           type: string
-          enum: [access_grant.suspended]
+          const: access_grant.suspended
         event_data:
           $ref: '#/components/schemas/AccessGrantSuspensionData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     AccessGrantSuspensionData:
+      title: AccessGrantSuspensionData
       type: object
       required:
         - grant_id
@@ -273,8 +288,7 @@ components:
           type: string
           format: uuid
         suspension_reason:
-          type: string
-          enum: [investigation, contract_dispute, security_concern, administrative_hold]
+          $ref: ../components/enums.yaml#/components/schemas/SuspensionReason
         suspension_details:
           type: string
         expected_resolution_date:
@@ -283,6 +297,7 @@ components:
           description: Expected date when suspension will be resolved
 
     AccessGrantReactivatedEvent:
+      title: AccessGrantReactivatedEvent
       type: object
       required:
         - stream_id
@@ -296,16 +311,17 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [access_grant]
+          const: access_grant
         event_type:
           type: string
-          enum: [access_grant.reactivated]
+          const: access_grant.reactivated
         event_data:
           $ref: '#/components/schemas/AccessGrantReactivationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     AccessGrantReactivationData:
+      title: AccessGrantReactivationData
       type: object
       required:
         - grant_id

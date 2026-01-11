@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { getEventEmitter, EventValidationError } from '@/lib/events/event-emitter';
-import { EventMetadata, StreamType, DomainEvent } from '@/types/event-types';
+import { EventMetadata, StreamType, DomainEvent } from '@/types/events';
 
 export interface UseEventsOptions {
   onSuccess?: (event: DomainEvent) => void;

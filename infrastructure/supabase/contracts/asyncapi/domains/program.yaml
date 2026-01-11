@@ -10,6 +10,7 @@ components:
 
   schemas:
     ProgramCreatedEvent:
+      title: ProgramCreatedEvent
       type: object
       required:
         - stream_id
@@ -24,17 +25,18 @@ components:
           description: Organization UUID that owns this program
         stream_type:
           type: string
-          enum: [organization]
           description: Program events use organization as stream type during bootstrap
+          const: organization
         event_type:
           type: string
-          enum: [program.created]
+          const: program.created
         event_data:
           $ref: '#/components/schemas/ProgramCreationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     ProgramCreationData:
+      title: ProgramCreationData
       type: object
       required:
         - program_id

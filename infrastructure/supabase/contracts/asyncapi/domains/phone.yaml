@@ -26,6 +26,7 @@ components:
 
   schemas:
     PhoneCreatedEvent:
+      title: PhoneCreatedEvent
       type: object
       required:
         - stream_id
@@ -40,16 +41,17 @@ components:
           description: Phone UUID
         stream_type:
           type: string
-          enum: [phone]
+          const: phone
         event_type:
           type: string
-          enum: [phone.created]
+          const: phone.created
         event_data:
           $ref: '#/components/schemas/PhoneCreationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     PhoneCreationData:
+      title: PhoneCreationData
       type: object
       required:
         - organization_id
@@ -71,14 +73,14 @@ components:
             - "After Hours - On Call"
             - "Billing Department"
         type:
-          type: string
-          enum: [mobile, office, fax, emergency]
-          description: |
-            Structured phone type:
-            - mobile: Mobile/cell phone number
-            - office: Office landline number
-            - fax: Fax number
-            - emergency: Emergency contact number
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/PhoneType
+            - description: |
+                Structured phone type:
+                - mobile: Mobile/cell phone number
+                - office: Office landline number
+                - fax: Fax number
+                - emergency: Emergency contact number
         number:
           type: string
           maxLength: 20
@@ -102,14 +104,15 @@ components:
           default: "+1"
           description: Country calling code
           examples:
-            - "+1"   # US/Canada
-            - "+44"  # UK
-            - "+33"  # France
-            - "+49"  # Germany
+            - "+1" # US/Canada
+            - "+44" # UK
+            - "+33" # France
+            - "+49" # Germany
         is_primary:
           type: boolean
           default: false
-          description: Whether this is the primary phone for the organization (only one per org)
+          description: Whether this is the primary phone for the organization (only one
+            per org)
         is_active:
           type: boolean
           default: true
@@ -119,6 +122,7 @@ components:
           description: Additional flexible data storage
 
     PhoneUpdatedEvent:
+      title: PhoneUpdatedEvent
       type: object
       required:
         - stream_id
@@ -133,16 +137,17 @@ components:
           description: Phone UUID
         stream_type:
           type: string
-          enum: [phone]
+          const: phone
         event_type:
           type: string
-          enum: [phone.updated]
+          const: phone.updated
         event_data:
           $ref: '#/components/schemas/PhoneUpdateData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     PhoneUpdateData:
+      title: PhoneUpdateData
       type: object
       description: Partial update data (only fields being updated)
       properties:
@@ -151,9 +156,9 @@ components:
           maxLength: 200
           description: Updated phone label
         type:
-          type: string
-          enum: [mobile, office, fax, emergency]
-          description: Updated phone type
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/PhoneType
+            - description: Updated phone type
         number:
           type: string
           maxLength: 20
@@ -177,6 +182,7 @@ components:
           description: Updated metadata (merges with existing)
 
     PhoneDeletedEvent:
+      title: PhoneDeletedEvent
       type: object
       required:
         - stream_id
@@ -191,16 +197,17 @@ components:
           description: Phone UUID being deleted
         stream_type:
           type: string
-          enum: [phone]
+          const: phone
         event_type:
           type: string
-          enum: [phone.deleted]
+          const: phone.deleted
         event_data:
           $ref: '#/components/schemas/PhoneDeletionData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     PhoneDeletionData:
+      title: PhoneDeletionData
       type: object
       required:
         - phone_id

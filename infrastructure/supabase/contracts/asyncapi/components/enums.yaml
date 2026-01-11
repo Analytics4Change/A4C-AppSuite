@@ -1,0 +1,230 @@
+components:
+  schemas:
+    # Demographics
+    Gender:
+      type: string
+      title: Gender
+      enum: [male, female, other, prefer_not_to_say]
+
+    EmergencyContactRelationship:
+      type: string
+      title: EmergencyContactRelationship
+      enum: [parent, guardian, spouse, sibling, child, friend, other]
+
+    BloodType:
+      type: string
+      title: BloodType
+      enum: [A+, A-, B+, B-, AB+, AB-, O+, O-]
+
+    # Medication
+    ApproverRole:
+      type: string
+      title: ApproverRole
+      enum: [physician, nurse_practitioner, pharmacist, administrator, supervisor]
+
+    AdmissionType:
+      type: string
+      title: AdmissionType
+      enum: [scheduled, emergency, transfer, readmission]
+
+    DischargeType:
+      type: string
+      title: DischargeType
+      enum: [planned, against_medical_advice, transfer, administrative, death]
+
+    DischargeDisposition:
+      type: string
+      title: DischargeDisposition
+      enum: [home, home_with_services, skilled_nursing_facility, rehabilitation_facility, acute_care_hospital, psychiatric_hospital, hospice, deceased, left_against_advice, other]
+
+    ControlledSubstanceSchedule:
+      type: string
+      title: ControlledSubstanceSchedule
+      enum: [Schedule I, Schedule II, Schedule III, Schedule IV, Schedule V]
+
+    MedicationForm:
+      type: string
+      title: MedicationForm
+      enum: [tablet, capsule, liquid, injection, cream, ointment, patch, inhaler, suppository]
+
+    AdministrationRoute:
+      type: string
+      title: AdministrationRoute
+      enum: [oral, sublingual, buccal, topical, transdermal, inhalation, nasal, ophthalmic, otic, rectal, subcutaneous, intramuscular, intravenous]
+
+    SkipReason:
+      type: string
+      title: SkipReason
+      enum: [client_absent, client_npo, medication_unavailable, vital_signs_out_of_range, physician_order, clinical_hold, other]
+
+    DiscontinueReasonCategory:
+      type: string
+      title: DiscontinueReasonCategory
+      enum: [treatment_complete, adverse_reaction, ineffective, drug_interaction, cost, client_request, contraindication, other]
+
+    # RBAC & Authorization
+    ScopeType:
+      type: string
+      title: ScopeType
+      enum: [global, org]
+      description: Permission scope type (global for platform-wide, org for organization-scoped)
+
+    GrantScope:
+      type: string
+      title: GrantScope
+      enum: [organization_unit, client_specific]
+      description: Scope of data access granted (organization_unit uses scope_id for OU hierarchy)
+
+    GrantAuthorizationType:
+      type: string
+      title: GrantAuthorizationType
+      enum: [var_contract, court_order, family_participation, social_services_assignment, emergency_access]
+      description: Legal/business basis for granting cross-tenant access
+
+    SuspensionReason:
+      type: string
+      title: SuspensionReason
+      enum: [investigation, contract_dispute, security_concern, administrative_hold]
+
+    DeactivationReason:
+      type: string
+      title: DeactivationReason
+      enum: [billing_suspension, compliance_violation, voluntary_suspension, maintenance]
+
+    # Contact & Communication
+    ContactType:
+      type: string
+      title: ContactType
+      enum: [administrative, billing, technical, emergency, stakeholder]
+
+    AddressType:
+      type: string
+      title: AddressType
+      enum: [physical, mailing, billing]
+
+    PhoneType:
+      type: string
+      title: PhoneType
+      enum: [mobile, office, fax, emergency]
+
+    EmailType:
+      type: string
+      title: EmailType
+      enum: [work, personal, billing, support, main]
+
+    # Data Management
+    RemovalType:
+      type: string
+      title: RemovalType
+      enum: [soft_delete, hard_delete]
+
+    # Impersonation
+    JustificationReason:
+      type: string
+      title: JustificationReason
+      enum: [support_ticket, emergency, audit, training]
+
+    ImpersonationEndReason:
+      type: string
+      title: ImpersonationEndReason
+      enum: [manual_logout, timeout, renewal_declined, forced_by_admin]
+
+    ImpersonationTargetOrgType:
+      type: string
+      title: ImpersonationTargetOrgType
+      enum: [provider, provider_partner]
+
+    # Organization
+    OrganizationType:
+      type: string
+      title: OrganizationType
+      enum: [platform_owner, provider, provider_partner]
+
+    PartnerType:
+      type: string
+      title: PartnerType
+      enum: [var, family, court, other]
+
+    BootstrapFailureStage:
+      type: string
+      title: BootstrapFailureStage
+      enum: [organization_creation, dns_provisioning, admin_user_creation, role_assignment, permission_grants, invitation_email]
+
+    # Authentication & Invitation
+    AuthMethod:
+      type: string
+      title: AuthMethod
+      enum: [email_password, oauth_google, oauth_github, oauth_enterprise_sso]
+
+    InvitationMethod:
+      type: string
+      title: InvitationMethod
+      enum: [organization_bootstrap, manual_invitation]
+
+    AdminRole:
+      type: string
+      title: AdminRole
+      enum: [provider_admin, partner_admin]
+
+    DeletionStrategy:
+      type: string
+      title: DeletionStrategy
+      enum: [cascade_delete, block_if_children]
+
+    # DNS & Subdomain
+    DNSRecordType:
+      type: string
+      title: DNSRecordType
+      enum: [CNAME, A]
+
+    VerificationMethod:
+      type: string
+      title: VerificationMethod
+      enum: [dns_quorum, development]
+
+    VerificationMode:
+      type: string
+      title: VerificationMode
+      enum: [production, development, mock]
+
+    DNSRemovalStatus:
+      type: string
+      title: DNSRemovalStatus
+      description: Status of DNS record removal during cleanup
+      enum: [deleted, not_found, error]
+
+    # Invitation
+    InvitationRevocationReason:
+      type: string
+      title: InvitationRevocationReason
+      enum: [workflow_failure, manual_revocation, organization_deactivated]
+
+    # Validation
+    ValidationErrorCode:
+      type: string
+      title: ValidationErrorCode
+      enum: [required, invalid_format, out_of_range, duplicate, unauthorized, business_rule_violation]
+
+    # Platform Admin
+    SortBy:
+      type: string
+      title: SortBy
+      enum: [created_at, event_type]
+
+    SortOrder:
+      type: string
+      title: SortOrder
+      enum: [asc, desc]
+
+    # Updatable Field Enums
+    OrgUpdatableFields:
+      type: string
+      title: OrgUpdatableFields
+      enum: [name, display_name, timezone, is_active]
+      description: Fields that can be updated on an organization
+
+    OUUpdatableFields:
+      type: string
+      title: OUUpdatableFields
+      enum: [name, display_name, timezone]
+      description: Fields that can be updated on an organization unit

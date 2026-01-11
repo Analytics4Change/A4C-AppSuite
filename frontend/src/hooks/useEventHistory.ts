@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getEventEmitter } from '@/lib/events/event-emitter';
-import { DomainEvent, StreamType } from '@/types/event-types';
+import { DomainEvent, StreamType } from '@/types/events';
 
 export interface EventHistoryItem {
   id: string;

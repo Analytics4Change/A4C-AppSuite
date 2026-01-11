@@ -27,8 +27,7 @@ import type {
   Invitation
 } from '@shared/types';
 import { createEmailProvider } from '@shared/providers/email/factory';
-import { getSupabaseClient, emitEvent, buildTags, getLogger, buildTracingForEvent } from '@shared/utils';
-import { AGGREGATE_TYPES } from '@shared/constants';
+import { getSupabaseClient, getLogger, emitInvitationEmailSent } from '@shared/utils';
 import { getWorkflowsEnv } from '@shared/config/env-schema';
 
 const log = getLogger('SendInvitationEmails');
@@ -156,7 +155,6 @@ export async function sendInvitationEmails(
 
   const supabase = getSupabaseClient();
   const emailProvider = createEmailProvider();
-  const tags = buildTags();
 
   // Get organization details via RPC (PostgREST only exposes 'api' schema)
   const { data: orgName, error: orgError } = await supabase
@@ -197,20 +195,13 @@ export async function sendInvitationEmails(
 
       successCount++;
 
-      // Emit InvitationEmailSent event
-      await emitEvent({
-        event_type: 'invitation.email.sent',
-        aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
-        aggregate_id: params.orgId,
-        event_data: {
-          org_id: params.orgId,
-          invitation_id: invitation.invitationId,
-          email: invitation.email,
-          sent_at: new Date().toISOString()
-        },
-        tags,
-        ...buildTracingForEvent(params.tracing, 'sendInvitationEmail')
-      });
+      // Type-safe event using AsyncAPI contract
+      await emitInvitationEmailSent(params.orgId, {
+        org_id: params.orgId,
+        invitation_id: invitation.invitationId,
+        email: invitation.email,
+        sent_at: new Date().toISOString(),
+      }, params.tracing);
 
       log.debug('Email sent', { email: invitation.email });
     } catch (error) {

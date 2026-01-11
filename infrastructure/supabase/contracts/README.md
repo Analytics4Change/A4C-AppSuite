@@ -9,9 +9,12 @@ contracts/
 ├── asyncapi/              # AsyncAPI specification files (source of truth)
 │   ├── asyncapi.yaml     # Main AsyncAPI document
 │   ├── domains/          # Domain-specific event definitions
-│   │   ├── client.yaml
-│   │   ├── medication.yaml
-│   │   └── user.yaml
+│   │   ├── user.yaml
+│   │   ├── organization.yaml
+│   │   ├── organization-unit.yaml
+│   │   ├── invitation.yaml
+│   │   └── ...
+│   ├── domains.archived/ # Archived domain specs (client, medication removed 2025-01-10)
 │   └── components/       # Shared schemas and components
 │       └── schemas.yaml
 ├── types/                # TypeScript type definitions
@@ -35,7 +38,8 @@ This directory serves as the **single source of truth** for all domain event sch
 The `asyncapi/` directory contains the event specifications in AsyncAPI format:
 
 - **asyncapi.yaml**: Main specification file that references domain files
-- **domains/**: Event definitions organized by domain (client, medication, user)
+- **domains/**: Event definitions organized by domain (user, organization, invitation, etc.)
+- **domains.archived/**: Archived domain specs for removed features (client, medication removed 2025-01-10)
 - **components/**: Shared schemas (EventMetadata, Address, etc.)
 
 ### Validation
@@ -58,29 +62,39 @@ This creates `asyncapi-bundled.yaml` for tools that don't support `$ref` resolut
 
 ## 📦 TypeScript Types
 
-The `types/` directory contains hand-crafted TypeScript type definitions based on the AsyncAPI specs.
+The `types/` directory contains **auto-generated** TypeScript types from AsyncAPI schemas using Modelina.
 
-### Why Hand-Crafted?
+### Type Generation
 
-We initially attempted to use AsyncAPI code generation templates, but:
-- The `@asyncapi/ts-nats-template` generates NATS client code, not clean types
-- Generated types had anonymous schema names (e.g., `AnonymousSchema_561`)
-- The output was too coupled to NATS messaging infrastructure
+Types are automatically generated from AsyncAPI schemas:
 
-**Solution**: Manually maintain TypeScript types based on AsyncAPI specs. The AsyncAPI YAML remains the source of truth, and types are kept in sync during development.
+```bash
+# Generate types from AsyncAPI
+npm run generate:types
 
-> **📖 For complete rationale**: See [AsyncAPI Type Generation Decision](../../../documentation/infrastructure/architecture/asyncapi-type-generation-decision.md) for comprehensive analysis of why we rejected auto-generation in favor of hand-crafted types.
+# Copy to frontend
+cp types/generated-events.ts ../../../frontend/src/types/generated/
+```
+
+### How We Solved the AnonymousSchema Problem
+
+Initial attempts at auto-generation produced `AnonymousSchema_XXX` names. We solved this by:
+
+1. **Adding `title` property to ALL schemas** - Modelina uses `title` for type names
+2. **Centralizing enums in `components/enums.yaml`** - Proper TypeScript enum generation
+3. **Custom pipeline** - Scripts to handle enum replacement and deduplication
+
+> **📖 For implementation details**: See [CONTRACT-TYPE-GENERATION.md](../../../documentation/infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md)
 
 ### Using Types in Frontend
 
-The Frontend repository will sync these types at build time:
+After generating types, copy to frontend:
 
 ```bash
-# In Frontend repo
-npm run sync-schemas
+cp types/generated-events.ts ../../../frontend/src/types/generated/
 ```
 
-This copies `types/events.ts` to `src/types/events.ts` in the Frontend.
+Frontend imports from `@/types/events` (which re-exports from generated).
 
 ## 🔄 Event Structure
 
@@ -121,32 +135,46 @@ event_metadata: {
 
 ## 🎨 Event Domains
 
-### Client Domain
-
-Events related to client lifecycle:
-
-- `client.registered` - New client registration
-- `client.admitted` - Client admitted to facility
-- `client.information_updated` - Client data changes
-- `client.discharged` - Client discharge from facility
-
-### Medication Domain
-
-Events related to medication management:
-
-- `medication.added_to_formulary` - Medication added to system
-- `medication.prescribed` - Medication prescribed to client
-- `medication.administered` - Medication given to client
-- `medication.skipped` - Scheduled dose skipped
-- `medication.refused` - Client refused medication
-- `medication.discontinued` - Medication discontinued
-
 ### User Domain
 
 Events related to user management:
 
-- `user.synced_from_zitadel` - User synchronized from Zitadel
+- `user.synced_from_auth` - User synchronized from Supabase Auth
 - `user.organization_switched` - User switched active organization
+
+### Organization Domain
+
+Events related to organization lifecycle:
+
+- `organization.bootstrap_initiated` - Organization onboarding started
+- `organization.bootstrap_completed` - Organization onboarding completed
+- `organization.bootstrap_failed` - Organization onboarding failed
+- `organization.bootstrap_cancelled` - Organization onboarding cancelled
+
+### Organization Unit Domain
+
+Events related to sub-organizations (locations, departments):
+
+- `organization_unit.created` - Sub-organization created
+- `organization_unit.updated` - Sub-organization metadata updated
+- `organization_unit.deactivated` - Sub-organization deactivated
+- `organization_unit.reactivated` - Sub-organization reactivated
+
+### Invitation Domain
+
+Events related to user invitations:
+
+- `invitation.created` - User invited to organization
+- `invitation.revoked` - Invitation cancelled
+- `invitation.accepted` - Invitation accepted
+- `invitation.expired` - Invitation expired
+
+### Archived Domains
+
+The following domains were removed (2025-01-10) and archived in `domains.archived/`:
+
+- **Client Domain** - Will be redefined with proper event-driven architecture
+- **Medication Domain** - Will be redefined with proper event-driven architecture
 
 ## 🛠️ Development Workflow
 
@@ -158,30 +186,44 @@ Events related to user management:
      name: client.registered
      payload:
        $ref: '#/components/schemas/ClientRegisteredEvent'
+
+   # In components/schemas section - MUST include title!
+   ClientRegisteredEvent:
+     title: ClientRegisteredEvent
+     type: object
+     properties:
+       event_type:
+         type: string
+         const: client.registered
+       event_data:
+         $ref: '#/components/schemas/ClientRegisteredData'
    ```
 
-2. **Add TypeScript Definition** (`types/events.ts`):
-   ```typescript
-   export interface ClientRegisteredEvent extends DomainEvent<ClientRegistrationData> {
-     stream_type: 'client';
-     event_type: 'client.registered';
-   }
-   ```
-
-3. **Validate**:
+2. **Generate TypeScript types**:
    ```bash
-   npm run validate
+   npm run generate:types
    ```
 
-4. **Commit and Push** to trigger Frontend schema sync
+3. **Verify output** (no AnonymousSchema):
+   ```bash
+   grep "ClientRegisteredEvent" types/generated-events.ts
+   ```
+
+4. **Copy to frontend**:
+   ```bash
+   cp types/generated-events.ts ../../../frontend/src/types/generated/
+   ```
+
+5. **Commit all changes** (AsyncAPI + generated types)
 
 ### Modifying Existing Events
 
 1. Update AsyncAPI specification
-2. Update TypeScript types to match
-3. Validate changes
-4. Update version in `package.json` if breaking change
-5. Document breaking changes in PR description
+2. Run `npm run generate:types`
+3. Check diff in `types/generated-events.ts`
+4. Copy to frontend
+5. Update version in `package.json` if breaking change
+6. Document breaking changes in PR description
 
 ## 📚 Additional Resources
 

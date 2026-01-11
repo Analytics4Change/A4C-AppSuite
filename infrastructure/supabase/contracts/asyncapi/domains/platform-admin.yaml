@@ -42,6 +42,7 @@ components:
 
   schemas:
     PlatformAdminFailedEventsViewedEvent:
+      title: PlatformAdminFailedEventsViewedEvent
       type: object
       required:
         - stream_id
@@ -95,15 +96,15 @@ components:
                   description: Whether to include dismissed events
                   default: false
                 sort_by:
-                  type: string
-                  enum: [created_at, event_type]
-                  description: Column to sort by
                   default: created_at
+                  allOf:
+                    - $ref: ../components/enums.yaml#/components/schemas/SortBy
+                    - description: Column to sort by
                 sort_order:
-                  type: string
-                  enum: [asc, desc]
-                  description: Sort direction
                   default: desc
+                  allOf:
+                    - $ref: ../components/enums.yaml#/components/schemas/SortOrder
+                    - description: Sort direction
         event_metadata:
           allOf:
             - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
@@ -113,10 +114,13 @@ components:
                   description: Organization ID from JWT claims (platform owner org)
                 reason:
                   examples:
-                    - Platform admin viewed failed events for observability monitoring
-                    - Platform admin investigated failed event processing for support ticket
+                    - Platform admin viewed failed events for observability
+                      monitoring
+                    - Platform admin investigated failed event processing for
+                      support ticket
 
     PlatformAdminEventRetryAttemptedEvent:
+      title: PlatformAdminEventRetryAttemptedEvent
       type: object
       required:
         - stream_id
@@ -181,6 +185,7 @@ components:
                     - Platform admin retried event for support ticket TICKET-1234
 
     PlatformAdminProcessingStatsViewedEvent:
+      title: PlatformAdminProcessingStatsViewedEvent
       type: object
       required:
         - stream_id
@@ -221,6 +226,7 @@ components:
                     - Platform admin checked system health metrics
 
     PlatformAdminEventDismissedEvent:
+      title: PlatformAdminEventDismissedEvent
       type: object
       required:
         - stream_id
@@ -278,6 +284,7 @@ components:
                     - Platform admin dismissed failed event: Legacy migration artifact
 
     PlatformAdminEventUndismissedEvent:
+      title: PlatformAdminEventUndismissedEvent
       type: object
       required:
         - stream_id

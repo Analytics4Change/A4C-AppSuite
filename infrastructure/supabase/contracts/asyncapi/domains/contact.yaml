@@ -26,6 +26,7 @@ components:
 
   schemas:
     ContactCreatedEvent:
+      title: ContactCreatedEvent
       type: object
       required:
         - stream_id
@@ -40,16 +41,17 @@ components:
           description: Contact UUID
         stream_type:
           type: string
-          enum: [contact]
+          const: contact
         event_type:
           type: string
-          enum: [contact.created]
+          const: contact.created
         event_data:
           $ref: '#/components/schemas/ContactCreationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     ContactCreationData:
+      title: ContactCreationData
       type: object
       required:
         - organization_id
@@ -72,15 +74,15 @@ components:
             - "Emergency Contact - Jane Doe"
             - "Technical Lead - Bob Johnson"
         type:
-          type: string
-          enum: [a4c_admin, billing, technical, emergency, stakeholder]
-          description: |
-            Structured contact type:
-            - a4c_admin: A4C platform administrator contact
-            - billing: Billing and invoicing contact
-            - technical: Technical support contact
-            - emergency: Emergency contact person
-            - stakeholder: General stakeholder contact
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/ContactType
+            - description: |
+                Structured contact type:
+                - administrative: Administrative/platform contact
+                - billing: Billing and invoicing contact
+                - technical: Technical support contact
+                - emergency: Emergency contact person
+                - stakeholder: General stakeholder contact
         first_name:
           type: string
           maxLength: 100
@@ -97,7 +99,8 @@ components:
         phone:
           type: string
           maxLength: 20
-          description: Optional phone number (deprecated - use phones_projection table for structured phone data)
+          description: Optional phone number (deprecated - use phones_projection table for
+            structured phone data)
         title:
           type: string
           maxLength: 100
@@ -109,7 +112,8 @@ components:
         is_primary:
           type: boolean
           default: false
-          description: Whether this is the primary contact for the organization (only one per org)
+          description: Whether this is the primary contact for the organization (only one
+            per org)
         is_active:
           type: boolean
           default: true
@@ -119,6 +123,7 @@ components:
           description: Additional flexible data storage
 
     ContactUpdatedEvent:
+      title: ContactUpdatedEvent
       type: object
       required:
         - stream_id
@@ -133,16 +138,17 @@ components:
           description: Contact UUID
         stream_type:
           type: string
-          enum: [contact]
+          const: contact
         event_type:
           type: string
-          enum: [contact.updated]
+          const: contact.updated
         event_data:
           $ref: '#/components/schemas/ContactUpdateData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     ContactUpdateData:
+      title: ContactUpdateData
       type: object
       description: Partial update data (only fields being updated)
       properties:
@@ -151,9 +157,9 @@ components:
           maxLength: 200
           description: Updated contact label
         type:
-          type: string
-          enum: [a4c_admin, billing, technical, emergency, stakeholder]
-          description: Updated contact type
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/ContactType
+            - description: Updated contact type
         first_name:
           type: string
           maxLength: 100
@@ -190,6 +196,7 @@ components:
           description: Updated metadata (merges with existing)
 
     ContactDeletedEvent:
+      title: ContactDeletedEvent
       type: object
       required:
         - stream_id
@@ -204,16 +211,17 @@ components:
           description: Contact UUID being deleted
         stream_type:
           type: string
-          enum: [contact]
+          const: contact
         event_type:
           type: string
-          enum: [contact.deleted]
+          const: contact.deleted
         event_data:
           $ref: '#/components/schemas/ContactDeletionData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     ContactDeletionData:
+      title: ContactDeletionData
       type: object
       required:
         - contact_id

@@ -1,6 +1,87 @@
 components:
   schemas:
+    # ==========================================================================
+    # Base Event Types - Generic types for querying/displaying events
+    # ==========================================================================
+
+    StreamType:
+      title: StreamType
+      type: string
+      description: Type of aggregate/stream that the event belongs to
+      enum:
+        - user
+        - organization
+        - organization_unit
+        - invitation
+        - program
+        - platform_admin
+        - impersonation
+        - role
+        - permission
+        - contact
+        - address
+        - phone
+        - access_grant
+
+    DomainEvent:
+      title: DomainEvent
+      type: object
+      description: |
+        Generic domain event structure used for querying and displaying events.
+        For type-safe handling of specific events, use the specific event interfaces
+        (UserInvitedEvent, OrganizationBootstrapCompletedEvent, etc.)
+      required:
+        - id
+        - stream_id
+        - stream_type
+        - stream_version
+        - event_type
+        - event_data
+        - event_metadata
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique event identifier
+        stream_id:
+          type: string
+          format: uuid
+          description: The entity/aggregate this event belongs to
+        stream_type:
+          $ref: '#/components/schemas/StreamType'
+        stream_version:
+          type: integer
+          minimum: 1
+          description: Version number within this stream
+        event_type:
+          type: string
+          pattern: '^[a-z_]+\.[a-z_]+$'
+          description: Event type in format domain.action
+          examples:
+            - user.synced_from_auth
+            - organization.bootstrap_initiated
+        event_data:
+          type: object
+          description: The actual event payload
+        event_metadata:
+          $ref: '#/components/schemas/EventMetadata'
+        created_at:
+          type: string
+          format: date-time
+          description: When the event was created
+        processed_at:
+          type: string
+          format: date-time
+          description: When the event was successfully processed
+          nullable: true
+        processing_error:
+          type: string
+          description: Error message if processing failed
+          nullable: true
+
     EventMetadata:
+      title: EventMetadata
       type: object
       required:
         - user_id
@@ -10,6 +91,10 @@ components:
           type: string
           format: uuid
           description: ID of the user who initiated this event
+        organization_id:
+          type: string
+          format: uuid
+          description: ID of the organization context for this event (multi-tenant isolation)
         reason:
           type: string
           minLength: 10
@@ -43,51 +128,13 @@ components:
         user_agent:
           type: string
           description: User agent string of the client
-        approval_chain:
-          type: array
-          description: Chain of approvals for this action
-          items:
-            $ref: '#/components/schemas/Approval'
         notes:
           type: string
           maxLength: 2000
           description: Additional context or notes
 
-    Approval:
-      type: object
-      required:
-        - approver_id
-        - approved_at
-        - role
-      properties:
-        approver_id:
-          type: string
-          format: uuid
-          description: ID of the approver
-        approver_name:
-          type: string
-          description: Name of the approver
-        approver_email:
-          type: string
-          format: email
-        approved_at:
-          type: string
-          format: date-time
-          description: When approval was granted
-        role:
-          type: string
-          enum:
-            - physician
-            - nurse_practitioner
-            - pharmacist
-            - administrator
-            - supervisor
-          description: Role of the approver
-        notes:
-          type: string
-          description: Approval notes or conditions
-
     Address:
+      title: Address
       type: object
       properties:
         street:
@@ -109,6 +156,7 @@ components:
           maxLength: 100
 
     EmergencyContact:
+      title: EmergencyContact
       type: object
       required:
         - name
@@ -119,15 +167,7 @@ components:
           type: string
           maxLength: 200
         relationship:
-          type: string
-          enum:
-            - parent
-            - guardian
-            - spouse
-            - sibling
-            - child
-            - friend
-            - other
+          $ref: ../components/enums.yaml#/components/schemas/EmergencyContactRelationship
         phone:
           type: string
           pattern: '^\+?1?\d{10,14}$'
@@ -139,6 +179,7 @@ components:
           format: email
 
     Vitals:
+      title: Vitals
       type: object
       properties:
         blood_pressure_systolic:
@@ -171,6 +212,7 @@ components:
           maximum: 10
 
     ValidationError:
+      title: ValidationError
       type: object
       required:
         - field
@@ -184,12 +226,6 @@ components:
           type: string
           description: Human-readable error message
         code:
-          type: string
-          description: Machine-readable error code
-          enum:
-            - required
-            - invalid_format
-            - out_of_range
-            - duplicate
-            - unauthorized
-            - business_rule_violation
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/ValidationErrorCode
+            - description: Machine-readable error code

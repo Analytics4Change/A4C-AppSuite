@@ -34,22 +34,26 @@ channels:
       operationId: publishDomainEvent
       message:
         oneOf:
-          - $ref: './domains/client.yaml#/components/messages/ClientRegistered'
-          - $ref: './domains/client.yaml#/components/messages/ClientAdmitted'
-          - $ref: './domains/client.yaml#/components/messages/ClientInformationUpdated'
-          - $ref: './domains/client.yaml#/components/messages/ClientDischarged'
-          - $ref: './domains/medication.yaml#/components/messages/MedicationAddedToFormulary'
-          - $ref: './domains/medication.yaml#/components/messages/MedicationPrescribed'
-          - $ref: './domains/medication.yaml#/components/messages/MedicationAdministered'
-          - $ref: './domains/medication.yaml#/components/messages/MedicationSkipped'
-          - $ref: './domains/medication.yaml#/components/messages/MedicationRefused'
-          - $ref: './domains/medication.yaml#/components/messages/MedicationDiscontinued'
-          - $ref: './domains/user.yaml#/components/messages/UserSyncedFromZitadel'
+          # NOTE: client.yaml and medication.yaml domains removed (2025-01-10)
+          # Legacy CRUD tables dropped - will be redefined with proper event-driven architecture
+          - $ref: './domains/user.yaml#/components/messages/UserSyncedFromAuth'
           - $ref: './domains/user.yaml#/components/messages/UserOrganizationSwitched'
           - $ref: './domains/invitation.yaml#/components/messages/UserInvited'
           - $ref: './domains/invitation.yaml#/components/messages/InvitationRevoked'
           - $ref: './domains/invitation.yaml#/components/messages/InvitationAccepted'
           - $ref: './domains/invitation.yaml#/components/messages/InvitationExpired'
+          - $ref: './domains/invitation.yaml#/components/messages/InvitationResent'
+          - $ref: './domains/invitation.yaml#/components/messages/InvitationEmailSent'
+          # Organization lifecycle events
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationCreated'
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationUpdated'
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationActivated'
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationDeactivated'
+          # Organization DNS events (subdomain provisioning)
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationSubdomainDnsCreated'
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationSubdomainVerified'
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationDnsRemoved'
+          # Organization bootstrap events
           - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapInitiated'
           - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapCompleted'
           - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapFailed'
@@ -68,6 +72,41 @@ channels:
           - $ref: './domains/platform-admin.yaml#/components/messages/PlatformAdminProcessingStatsViewed'
           - $ref: './domains/platform-admin.yaml#/components/messages/PlatformAdminEventDismissed'
           - $ref: './domains/platform-admin.yaml#/components/messages/PlatformAdminEventUndismissed'
+          # Email entity events
+          - $ref: './domains/email.yaml#/components/messages/EmailCreated'
+          - $ref: './domains/email.yaml#/components/messages/EmailUpdated'
+          - $ref: './domains/email.yaml#/components/messages/EmailDeleted'
+          # Contact entity events
+          - $ref: './domains/contact.yaml#/components/messages/ContactCreated'
+          - $ref: './domains/contact.yaml#/components/messages/ContactUpdated'
+          - $ref: './domains/contact.yaml#/components/messages/ContactDeleted'
+          # Phone entity events
+          - $ref: './domains/phone.yaml#/components/messages/PhoneCreated'
+          - $ref: './domains/phone.yaml#/components/messages/PhoneUpdated'
+          - $ref: './domains/phone.yaml#/components/messages/PhoneDeleted'
+          # Address entity events
+          - $ref: './domains/address.yaml#/components/messages/AddressCreated'
+          - $ref: './domains/address.yaml#/components/messages/AddressUpdated'
+          - $ref: './domains/address.yaml#/components/messages/AddressDeleted'
+          # Junction events (organization-entity relationships)
+          - $ref: './domains/junction.yaml#/components/messages/OrganizationContactLinked'
+          - $ref: './domains/junction.yaml#/components/messages/OrganizationContactUnlinked'
+          - $ref: './domains/junction.yaml#/components/messages/OrganizationAddressLinked'
+          - $ref: './domains/junction.yaml#/components/messages/OrganizationAddressUnlinked'
+          - $ref: './domains/junction.yaml#/components/messages/OrganizationPhoneLinked'
+          - $ref: './domains/junction.yaml#/components/messages/OrganizationPhoneUnlinked'
+          - $ref: './domains/junction.yaml#/components/messages/OrganizationEmailLinked'
+          - $ref: './domains/junction.yaml#/components/messages/OrganizationEmailUnlinked'
+          # Junction events (contact-entity relationships)
+          - $ref: './domains/junction.yaml#/components/messages/ContactPhoneLinked'
+          - $ref: './domains/junction.yaml#/components/messages/ContactPhoneUnlinked'
+          - $ref: './domains/junction.yaml#/components/messages/ContactAddressLinked'
+          - $ref: './domains/junction.yaml#/components/messages/ContactAddressUnlinked'
+          - $ref: './domains/junction.yaml#/components/messages/ContactEmailLinked'
+          - $ref: './domains/junction.yaml#/components/messages/ContactEmailUnlinked'
+          # Junction events (phone-address relationship)
+          - $ref: './domains/junction.yaml#/components/messages/PhoneAddressLinked'
+          - $ref: './domains/junction.yaml#/components/messages/PhoneAddressUnlinked'
     subscribe:
       summary: Subscribe to domain events
       operationId: onDomainEvent
@@ -99,10 +138,8 @@ components:
         stream_type:
           type: string
           enum:
-            - client
-            - medication
-            - medication_history
-            - dosage
+            # NOTE: client, medication, medication_history, dosage removed (2025-01-10)
+            # Legacy CRUD tables dropped - will be redefined with proper event-driven architecture
             - user
             - organization
             - organization_unit
@@ -110,6 +147,14 @@ components:
             - program
             - platform_admin
             - impersonation
+            - role
+            - permission
+            - contact
+            - address
+            - phone
+            - email
+            - access_grant
+            - junction
           description: Type of entity this event affects
         stream_version:
           type: integer
@@ -120,8 +165,8 @@ components:
           pattern: '^[a-z_]+\.[a-z_]+$'
           description: Event type in format domain.action
           examples:
-            - client.registered
-            - medication.prescribed
+            - user.synced_from_auth
+            - organization.bootstrap_initiated
         event_data:
           type: object
           description: The actual event payload

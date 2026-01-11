@@ -48,6 +48,22 @@ components:
       payload:
         $ref: '#/components/schemas/OrganizationReactivatedEvent'
 
+    OrganizationActivated:
+      name: organization.activated
+      title: Organization Activated
+      summary: Organization has been activated after successful bootstrap provisioning
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationActivatedEvent'
+
+    OrganizationDnsRemoved:
+      name: organization.dns.removed
+      title: Organization DNS Removed
+      summary: DNS record removed during cleanup or compensation
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationDnsRemovedEvent'
+
     OrganizationDeleted:
       name: organization.deleted
       title: Organization Deleted
@@ -60,7 +76,8 @@ components:
     OrganizationBootstrapInitiated:
       name: organization.bootstrap.initiated
       title: Organization Bootstrap Initiated
-      summary: Bootstrap process started for new provider or provider_partner organization
+      summary: Bootstrap process started for new provider or provider_partner
+        organization
       contentType: application/json
       payload:
         $ref: '#/components/schemas/OrganizationBootstrapInitiatedEvent'
@@ -116,6 +133,7 @@ components:
 
   schemas:
     OrganizationCreatedEvent:
+      title: OrganizationCreatedEvent
       type: object
       required:
         - stream_id
@@ -130,16 +148,17 @@ components:
           description: Organization UUID
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.created]
+          const: organization.created
         event_data:
           $ref: '#/components/schemas/OrganizationCreationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationCreationData:
+      title: OrganizationCreationData
       type: object
       required:
         - name
@@ -167,26 +186,42 @@ components:
             - "acme-healthcare"
             - "north-campus"
         type:
-          type: string
-          enum: [platform_owner, provider, provider_partner]
-          description: |
-            Organization type determining access patterns and capabilities:
-            - platform_owner: A4C internal organization (impersonation capability)
-            - provider: Healthcare organizations serving clients (data owners)
-            - provider_partner: External stakeholders (VARs, families, courts - access via grants)
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/OrganizationType
+            - description: >
+                Organization type determining access patterns and capabilities:
+
+                - platform_owner: A4C internal organization (impersonation
+                capability)
+
+                - provider: Healthcare organizations serving clients (data
+                owners)
+
+                - provider_partner: External stakeholders (VARs, families,
+                courts - access via grants)
         partner_type:
-          type: string
-          enum: [var, family, court, other]
-          description: |
-            Partner organization subtype (required when type=provider_partner):
-            - var: Value-Added Reseller (requires subdomain, gets portal access)
-            - family: Family access partner (no subdomain, limited dashboard views)
-            - court: Court system partner (no subdomain, limited dashboard views)
-            - other: Other stakeholder partner (no subdomain, limited dashboard views)
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/PartnerType
+            - description: >
+                Partner organization subtype (required when
+                type=provider_partner):
+
+                - var: Value-Added Reseller (requires subdomain, gets portal
+                access)
+
+                - family: Family access partner (no subdomain, limited dashboard
+                views)
+
+                - court: Court system partner (no subdomain, limited dashboard
+                views)
+
+                - other: Other stakeholder partner (no subdomain, limited
+                dashboard views)
         referring_partner_id:
           type: string
           format: uuid
-          description: UUID of the partner organization that referred this provider (NULL if not referred)
+          description: UUID of the partner organization that referred this provider (NULL
+            if not referred)
         path:
           type: string
           description: ltree hierarchical path
@@ -213,6 +248,7 @@ components:
           description: Additional flexible data storage
 
     OrganizationBusinessProfileCreatedEvent:
+      title: OrganizationBusinessProfileCreatedEvent
       type: object
       required:
         - stream_id
@@ -227,24 +263,26 @@ components:
           description: Organization UUID
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.business_profile.created]
+          const: organization.business_profile.created
         event_data:
           $ref: '#/components/schemas/OrganizationBusinessProfileData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationBusinessProfileData:
+      title: OrganizationBusinessProfileData
       type: object
       required:
         - organization_type
       properties:
         organization_type:
-          type: string
-          enum: [provider, provider_partner]
-          description: Type of business profile (platform_owner organizations don't have business profiles)
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/ImpersonationTargetOrgType
+            - description: Type of business profile (platform_owner organizations don't have
+                business profiles)
         mailing_address:
           $ref: '../components/schemas.yaml#/components/schemas/Address'
         physical_address:
@@ -255,6 +293,7 @@ components:
           $ref: '#/components/schemas/ProviderPartnerBusinessProfile'
 
     ProviderBusinessProfile:
+      title: ProviderBusinessProfile
       type: object
       description: Business profile for Provider organizations (from Tenant-Management.png)
       required:
@@ -273,7 +312,7 @@ components:
           maxLength: 50
         billing_address:
           $ref: '../components/schemas.yaml#/components/schemas/Address'
-        
+
         # Provider Admin
         administrator_name:
           type: string
@@ -284,7 +323,7 @@ components:
         email_provider:
           type: string
           maxLength: 100
-        
+
         # Contact Information
         main_phone_number:
           type: string
@@ -307,8 +346,10 @@ components:
           description: Services offered by this provider
 
     ProviderPartnerBusinessProfile:
+      title: ProviderPartnerBusinessProfile
       type: object
-      description: Business profile for Provider Partner organizations (from Tenant-Management-Provider-Partner.png)
+      description: Business profile for Provider Partner organizations (from
+        Tenant-Management-Provider-Partner.png)
       required:
         - contact_name
         - contact_email
@@ -328,7 +369,7 @@ components:
         contact_phone:
           type: string
           maxLength: 20
-        
+
         # Provider Partner Admin
         administrator_name:
           type: string
@@ -339,19 +380,20 @@ components:
         email_provider:
           type: string
           maxLength: 100
-        
+
         # Partner-specific metadata
         partner_type:
-          type: string
-          enum: [var, family, court, other]
-          description: |
-            Type of provider partner relationship:
-            - var: Value-Added Reseller (gets portal access)
-            - family: Family access partner (limited dashboard views)
-            - court: Court system partner (limited dashboard views)
-            - other: Other stakeholder partner (limited dashboard views)
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/PartnerType
+            - description: |
+                Type of provider partner relationship:
+                - var: Value-Added Reseller (gets portal access)
+                - family: Family access partner (limited dashboard views)
+                - court: Court system partner (limited dashboard views)
+                - other: Other stakeholder partner (limited dashboard views)
 
     OrganizationDeactivatedEvent:
+      title: OrganizationDeactivatedEvent
       type: object
       required:
         - stream_id
@@ -365,16 +407,17 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.deactivated]
+          const: organization.deactivated
         event_data:
           $ref: '#/components/schemas/OrganizationDeactivationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationDeactivationData:
+      title: OrganizationDeactivationData
       type: object
       required:
         - organization_id
@@ -389,8 +432,7 @@ components:
           type: string
           format: uuid
         deactivation_type:
-          type: string
-          enum: [billing_suspension, compliance_violation, voluntary_suspension, maintenance]
+          $ref: ../components/enums.yaml#/components/schemas/DeactivationReason
         effective_date:
           type: string
           format: date-time
@@ -413,6 +455,7 @@ components:
           description: Conditions that must be met for reactivation
 
     OrganizationDeletedEvent:
+      title: OrganizationDeletedEvent
       type: object
       required:
         - stream_id
@@ -426,16 +469,17 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.deleted]
+          const: organization.deleted
         event_data:
           $ref: '#/components/schemas/OrganizationDeletionData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationDeletionData:
+      title: OrganizationDeletionData
       type: object
       required:
         - organization_id
@@ -452,15 +496,16 @@ components:
           examples:
             - "root.org_acme_healthcare.north_campus"
         deletion_strategy:
-          type: string
-          enum: [cascade_delete, block_if_children]
-          description: How to handle child organizations
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/DeletionStrategy
+            - description: How to handle child organizations
         cascade_confirmed:
           type: boolean
           description: User explicitly confirmed cascade deletion of children
 
     # Organization Update Event - emitted when organization properties change
     OrganizationUpdatedEvent:
+      title: OrganizationUpdatedEvent
       type: object
       required:
         - stream_id
@@ -475,20 +520,21 @@ components:
           description: Organization UUID
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.updated]
+          const: organization.updated
         event_data:
           $ref: '#/components/schemas/OrganizationUpdateData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationUpdateData:
+      title: OrganizationUpdateData
       type: object
       required:
         - organization_id
-        - updated_fields
+        - updatable_fields
       properties:
         organization_id:
           type: string
@@ -512,22 +558,22 @@ components:
         is_active:
           type: boolean
           description: Updated active status (only present if changed)
-        updated_fields:
+        updatable_fields:
           type: array
           items:
-            type: string
-            enum: [name, display_name, timezone, is_active]
-          description: List of fields that were updated in this event
+            $ref: ../components/enums.yaml#/components/schemas/OrgUpdatableFields
+          description: List of fields that can be updated on an organization
           examples:
-            - ["name", "display_name"]
-            - ["timezone"]
-            - ["is_active"]
+            - [ "name", "display_name" ]
+            - [ "timezone" ]
+            - [ "is_active" ]
         previous_values:
           type: object
           description: Previous values of updated fields (for audit trail)
           additionalProperties: true
 
     OrganizationBusinessProfileUpdatedEvent:
+      title: OrganizationBusinessProfileUpdatedEvent
       type: object
       properties:
         stream_id:
@@ -535,12 +581,13 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.business_profile.updated]
+          const: organization.business_profile.updated
 
     OrganizationReactivatedEvent:
+      title: OrganizationReactivatedEvent
       type: object
       properties:
         stream_id:
@@ -548,13 +595,14 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.reactivated]
+          const: organization.reactivated
 
     # Bootstrap Event Schemas
     OrganizationBootstrapInitiatedEvent:
+      title: OrganizationBootstrapInitiatedEvent
       type: object
       required:
         - stream_id
@@ -569,16 +617,17 @@ components:
           description: Organization UUID (generated for new org)
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.bootstrap.initiated]
+          const: organization.bootstrap.initiated
         event_data:
           $ref: '#/components/schemas/OrganizationBootstrapInitiationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationBootstrapInitiationData:
+      title: OrganizationBootstrapInitiationData
       type: object
       required:
         - organization_type
@@ -591,9 +640,9 @@ components:
           format: uuid
           description: Unique identifier for this bootstrap process (for tracking)
         organization_type:
-          type: string
-          enum: [provider, provider_partner]
-          description: Type of organization being bootstrapped
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/ImpersonationTargetOrgType
+            - description: Type of organization being bootstrapped
         organization_name:
           type: string
           maxLength: 200
@@ -615,17 +664,34 @@ components:
           examples:
             - "acme_healthcare"
             - "xyz_consulting"
-        contact_info:
-          type: object
-          description: Optional contact information for the organization
-          properties:
-            phone_number:
-              type: string
-            timezone:
-              type: string
-              default: "America/New_York"
+        timezone:
+          type: string
+          default: "America/New_York"
+          description: Organization timezone (IANA format)
+        # Reference-based entity inputs (with temp_id/contact_ref correlation)
+        contacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/BootstrapContactInput'
+          description: Contacts to create (each has temp_id for correlation)
+        phones:
+          type: array
+          items:
+            $ref: '#/components/schemas/BootstrapPhoneInput'
+          description: Phones to create (contact_ref links to contact temp_id, null = org-level)
+        emails:
+          type: array
+          items:
+            $ref: '#/components/schemas/BootstrapEmailInput'
+          description: Emails to create (contact_ref links to contact temp_id, null = org-level)
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/BootstrapAddressInput'
+          description: Addresses to create (contact_ref links to contact temp_id, null = org-level)
 
     OrganizationBootstrapCompletedEvent:
+      title: OrganizationBootstrapCompletedEvent
       type: object
       required:
         - stream_id
@@ -639,16 +705,17 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.bootstrap.completed]
+          const: organization.bootstrap.completed
         event_data:
           $ref: '#/components/schemas/OrganizationBootstrapCompletionData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationBootstrapCompletionData:
+      title: OrganizationBootstrapCompletionData
       type: object
       required:
         - bootstrap_id
@@ -663,9 +730,9 @@ components:
           type: string
           format: uuid
         admin_role_assigned:
-          type: string
-          enum: [provider_admin, partner_admin]
-          description: Role assigned to the initial administrator
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/AdminRole
+            - description: Role assigned to the initial administrator
         permissions_granted:
           type: integer
           description: Number of permissions granted to the admin role
@@ -676,6 +743,7 @@ components:
             - "root.org_acme_healthcare"
 
     OrganizationBootstrapFailedEvent:
+      title: OrganizationBootstrapFailedEvent
       type: object
       required:
         - stream_id
@@ -689,16 +757,17 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.bootstrap.failed]
+          const: organization.bootstrap.failed
         event_data:
           $ref: '#/components/schemas/OrganizationBootstrapFailureData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationBootstrapFailureData:
+      title: OrganizationBootstrapFailureData
       type: object
       required:
         - bootstrap_id
@@ -709,9 +778,9 @@ components:
           type: string
           format: uuid
         failure_stage:
-          type: string
-          enum: [organization_creation, dns_provisioning, admin_user_creation, role_assignment, permission_grants, invitation_email]
-          description: Stage where bootstrap process failed
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/BootstrapFailureStage
+            - description: Stage where bootstrap process failed
         error_message:
           type: string
           description: Error details for troubleshooting
@@ -721,6 +790,7 @@ components:
           default: false
 
     OrganizationBootstrapCancelledEvent:
+      title: OrganizationBootstrapCancelledEvent
       type: object
       required:
         - stream_id
@@ -734,16 +804,17 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.bootstrap.cancelled]
+          const: organization.bootstrap.cancelled
         event_data:
           $ref: '#/components/schemas/OrganizationBootstrapCancellationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationBootstrapCancellationData:
+      title: OrganizationBootstrapCancellationData
       type: object
       required:
         - bootstrap_id
@@ -770,6 +841,7 @@ components:
 
     # Subdomain Provisioning Event Schemas
     OrganizationSubdomainDnsCreatedEvent:
+      title: OrganizationSubdomainDnsCreatedEvent
       type: object
       required:
         - stream_id
@@ -784,16 +856,17 @@ components:
           description: Organization UUID
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.subdomain.dns_created]
+          const: organization.subdomain.dns_created
         event_data:
           $ref: '#/components/schemas/SubdomainDnsCreatedData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     SubdomainDnsCreatedData:
+      title: SubdomainDnsCreatedData
       type: object
       required:
         - subdomain
@@ -814,9 +887,9 @@ components:
           type: string
           description: Cloudflare zone ID
         dns_record_type:
-          type: string
-          enum: [CNAME, A]
-          description: DNS record type
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/DNSRecordType
+            - description: DNS record type
         dns_record_value:
           type: string
           description: DNS record target value
@@ -824,6 +897,7 @@ components:
             - "a4c.firstovertheline.com"
 
     OrganizationSubdomainVerifiedEvent:
+      title: OrganizationSubdomainVerifiedEvent
       type: object
       required:
         - stream_id
@@ -838,16 +912,17 @@ components:
           description: Organization UUID
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.subdomain.verified]
+          const: organization.subdomain.verified
         event_data:
           $ref: '#/components/schemas/SubdomainVerifiedData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     SubdomainVerifiedData:
+      title: SubdomainVerifiedData
       type: object
       required:
         - domain
@@ -867,18 +942,20 @@ components:
           format: date-time
           description: Timestamp when verification completed
         verification_method:
-          type: string
-          enum: [dns_lookup, mock, development]
-          description: Method used for verification
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/VerificationMethod
+            - description: Method used for verification (dns_quorum for production,
+                development for dev mode)
         verification_attempts:
           type: integer
           description: Number of verification attempts made
         mode:
-          type: string
-          enum: [production, development, mock]
-          description: Workflow execution mode
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/VerificationMode
+            - description: Workflow execution mode
 
     OrganizationSubdomainVerificationFailedEvent:
+      title: OrganizationSubdomainVerificationFailedEvent
       type: object
       required:
         - stream_id
@@ -893,16 +970,17 @@ components:
           description: Organization UUID
         stream_type:
           type: string
-          enum: [organization]
+          const: organization
         event_type:
           type: string
-          enum: [organization.subdomain.verification_failed]
+          const: organization.subdomain.verification_failed
         event_data:
           $ref: '#/components/schemas/SubdomainVerificationFailedData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     SubdomainVerificationFailedData:
+      title: SubdomainVerificationFailedData
       type: object
       required:
         - domain
@@ -924,3 +1002,312 @@ components:
         will_retry:
           type: boolean
           description: Whether verification will be retried
+
+    # Organization Activated Event (bootstrap completion)
+    OrganizationActivatedEvent:
+      title: OrganizationActivatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        stream_type:
+          type: string
+          const: organization
+        event_type:
+          type: string
+          const: organization.activated
+        event_data:
+          $ref: '#/components/schemas/OrganizationActivatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationActivatedData:
+      title: OrganizationActivatedData
+      type: object
+      required:
+        - org_id
+        - activated_at
+      properties:
+        org_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        activated_at:
+          type: string
+          format: date-time
+          description: Timestamp when organization was activated
+        previous_is_active:
+          type: boolean
+          description: Previous active status (for idempotency tracking)
+
+    # Organization DNS Removed Event (compensation/cleanup)
+    OrganizationDnsRemovedEvent:
+      title: OrganizationDnsRemovedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        stream_type:
+          type: string
+          const: organization
+        event_type:
+          type: string
+          const: organization.dns.removed
+        event_data:
+          $ref: '#/components/schemas/OrganizationDnsRemovedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationDnsRemovedData:
+      title: OrganizationDnsRemovedData
+      type: object
+      required:
+        - subdomain
+        - fqdn
+        - status
+      properties:
+        subdomain:
+          type: string
+          description: Subdomain name that was removed
+          examples:
+            - "acme-healthcare"
+        fqdn:
+          type: string
+          description: Fully qualified domain name
+          examples:
+            - "acme-healthcare.firstovertheline.com"
+        record_id:
+          type: string
+          description: Cloudflare DNS record ID (when successfully deleted)
+        status:
+          $ref: '../components/enums.yaml#/components/schemas/DNSRemovalStatus'
+        error:
+          type: string
+          description: Error message (when status is 'error')
+
+    # ==========================================================================
+    # Bootstrap Input Types (with temp_id/contact_ref correlation)
+    # ==========================================================================
+
+    BootstrapContactInput:
+      title: BootstrapContactInput
+      type: object
+      description: Contact input for bootstrap workflow with temp_id for correlation
+      required:
+        - temp_id
+        - label
+        - type
+        - first_name
+        - last_name
+      properties:
+        temp_id:
+          type: string
+          description: Temporary ID for correlation during bootstrap (maps to real UUID)
+          examples:
+            - "contact-1"
+            - "contact-admin"
+        label:
+          type: string
+          maxLength: 200
+          description: User-defined contact label
+          examples:
+            - "Primary Administrator"
+            - "Billing Contact"
+        type:
+          $ref: ../components/enums.yaml#/components/schemas/ContactType
+        first_name:
+          type: string
+          maxLength: 100
+          description: Contact first name
+        last_name:
+          type: string
+          maxLength: 100
+          description: Contact last name
+        email:
+          type: string
+          format: email
+          description: Contact's direct email (for contact record, not separate email entity)
+        title:
+          type: string
+          maxLength: 100
+          description: Job title
+        department:
+          type: string
+          maxLength: 100
+          description: Department
+        is_primary:
+          type: boolean
+          default: false
+          description: Whether this is the primary contact
+
+    BootstrapPhoneInput:
+      title: BootstrapPhoneInput
+      type: object
+      description: Phone input for bootstrap workflow with contact correlation
+      required:
+        - temp_id
+        - label
+        - type
+        - number
+      properties:
+        temp_id:
+          type: string
+          description: Temporary ID for this phone
+          examples:
+            - "phone-1"
+            - "phone-main"
+        contact_ref:
+          type: string
+          nullable: true
+          description: temp_id of contact to link to (null = org-level only)
+          examples:
+            - "contact-1"
+            - null
+        label:
+          type: string
+          maxLength: 200
+          description: Phone label
+          examples:
+            - "Main Office"
+            - "Emergency Hotline"
+        type:
+          $ref: ../components/enums.yaml#/components/schemas/PhoneType
+        number:
+          type: string
+          maxLength: 20
+          description: Phone number
+          examples:
+            - "+1-555-123-4567"
+        extension:
+          type: string
+          maxLength: 10
+          description: Phone extension
+        is_primary:
+          type: boolean
+          default: false
+          description: Whether this is the primary phone
+
+    BootstrapEmailInput:
+      title: BootstrapEmailInput
+      type: object
+      description: Email input for bootstrap workflow with contact correlation
+      required:
+        - temp_id
+        - label
+        - type
+        - address
+      properties:
+        temp_id:
+          type: string
+          description: Temporary ID for this email
+          examples:
+            - "email-1"
+            - "email-info"
+        contact_ref:
+          type: string
+          nullable: true
+          description: temp_id of contact to link to (null = org-level only)
+          examples:
+            - "contact-1"
+            - null
+        label:
+          type: string
+          maxLength: 200
+          description: Email label
+          examples:
+            - "Main Office"
+            - "Billing Department"
+        type:
+          $ref: ../components/enums.yaml#/components/schemas/EmailType
+        address:
+          type: string
+          format: email
+          description: Email address
+          examples:
+            - "info@acme-healthcare.com"
+            - "billing@acme-healthcare.com"
+        is_primary:
+          type: boolean
+          default: false
+          description: Whether this is the primary email
+
+    BootstrapAddressInput:
+      title: BootstrapAddressInput
+      type: object
+      description: Address input for bootstrap workflow with contact correlation
+      required:
+        - temp_id
+        - label
+        - type
+        - street1
+        - city
+        - state
+        - zip_code
+      properties:
+        temp_id:
+          type: string
+          description: Temporary ID for this address
+          examples:
+            - "addr-1"
+            - "addr-main"
+        contact_ref:
+          type: string
+          nullable: true
+          description: temp_id of contact to link to (null = org-level only)
+          examples:
+            - "contact-1"
+            - null
+        label:
+          type: string
+          maxLength: 200
+          description: Address label
+          examples:
+            - "Main Office"
+            - "Billing Address"
+        type:
+          $ref: ../components/enums.yaml#/components/schemas/AddressType
+        street1:
+          type: string
+          maxLength: 255
+          description: Street address line 1
+        street2:
+          type: string
+          maxLength: 255
+          description: Street address line 2
+        city:
+          type: string
+          maxLength: 100
+          description: City
+        state:
+          type: string
+          maxLength: 50
+          description: State/Province
+        zip_code:
+          type: string
+          maxLength: 20
+          description: ZIP/Postal code
+        country:
+          type: string
+          maxLength: 3
+          default: "US"
+          description: Country code (ISO 3166-1 alpha-2 or alpha-3)
+        is_primary:
+          type: boolean
+          default: false
+          description: Whether this is the primary address

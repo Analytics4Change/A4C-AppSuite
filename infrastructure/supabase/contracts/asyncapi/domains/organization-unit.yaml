@@ -47,7 +47,8 @@ components:
     OrganizationUnitMoved:
       name: organization_unit.moved
       title: Organization Unit Moved
-      summary: Organization unit has been reparented to a different parent (future capability)
+      summary: Organization unit has been reparented to a different parent (future
+        capability)
       contentType: application/json
       payload:
         $ref: '#/components/schemas/OrganizationUnitMovedEvent'
@@ -55,6 +56,7 @@ components:
   schemas:
     # Base event structure for organization units
     OrganizationUnitCreatedEvent:
+      title: OrganizationUnitCreatedEvent
       type: object
       required:
         - stream_id
@@ -69,16 +71,17 @@ components:
           description: Organization Unit UUID
         stream_type:
           type: string
-          enum: [organization_unit]
+          const: organization_unit
         event_type:
           type: string
-          enum: [organization_unit.created]
+          const: organization_unit.created
         event_data:
           $ref: '#/components/schemas/OrganizationUnitCreationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationUnitCreationData:
+      title: OrganizationUnitCreationData
       type: object
       required:
         - organization_id
@@ -107,7 +110,8 @@ components:
           type: string
           maxLength: 100
           pattern: '^[a-z0-9_]+$'
-          description: URL-friendly identifier (ltree-safe, underscores only for PG15 compatibility)
+          description: URL-friendly identifier (ltree-safe, underscores only for PG15
+            compatibility)
           examples:
             - "northern_region"
             - "oak_street"
@@ -134,6 +138,7 @@ components:
             - "America/Los_Angeles"
 
     OrganizationUnitUpdatedEvent:
+      title: OrganizationUnitUpdatedEvent
       type: object
       required:
         - stream_id
@@ -148,20 +153,21 @@ components:
           description: Organization Unit UUID
         stream_type:
           type: string
-          enum: [organization_unit]
+          const: organization_unit
         event_type:
           type: string
-          enum: [organization_unit.updated]
+          const: organization_unit.updated
         event_data:
           $ref: '#/components/schemas/OrganizationUnitUpdateData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationUnitUpdateData:
+      title: OrganizationUnitUpdateData
       type: object
       required:
         - organization_unit_id
-        - updated_fields
+        - updatable_fields
       properties:
         organization_unit_id:
           type: string
@@ -178,21 +184,21 @@ components:
         timezone:
           type: string
           description: Updated timezone (only present if changed)
-        updated_fields:
+        updatable_fields:
           type: array
           items:
-            type: string
-            enum: [name, display_name, timezone]
-          description: List of fields that were updated in this event
+            $ref: ../components/enums.yaml#/components/schemas/OUUpdatableFields
+          description: List of fields that can be updated on an organization unit
           examples:
-            - ["name", "display_name"]
-            - ["timezone"]
+            - [ "name", "display_name" ]
+            - [ "timezone" ]
         previous_values:
           type: object
           description: Previous values of updated fields (for audit trail)
           additionalProperties: true
 
     OrganizationUnitDeactivatedEvent:
+      title: OrganizationUnitDeactivatedEvent
       type: object
       required:
         - stream_id
@@ -206,16 +212,17 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [organization_unit]
+          const: organization_unit
         event_type:
           type: string
-          enum: [organization_unit.deactivated]
+          const: organization_unit.deactivated
         event_data:
           $ref: '#/components/schemas/OrganizationUnitDeactivationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationUnitDeactivationData:
+      title: OrganizationUnitDeactivationData
       type: object
       required:
         - organization_unit_id
@@ -231,17 +238,18 @@ components:
             - "root.org_acme_healthcare.northern_region"
         cascade_effect:
           type: string
-          enum: [role_assignment_blocked]
           default: role_assignment_blocked
           description: |
             Effect of deactivation:
             - role_assignment_blocked: New role assignments to this OU and descendants are blocked
+          const: role_assignment_blocked
         descendants_affected:
           type: boolean
           default: true
           description: Whether descendant OUs are also affected (always true via cascade)
 
     OrganizationUnitReactivatedEvent:
+      title: OrganizationUnitReactivatedEvent
       type: object
       required:
         - stream_id
@@ -255,16 +263,17 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [organization_unit]
+          const: organization_unit
         event_type:
           type: string
-          enum: [organization_unit.reactivated]
+          const: organization_unit.reactivated
         event_data:
           $ref: '#/components/schemas/OrganizationUnitReactivationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationUnitReactivationData:
+      title: OrganizationUnitReactivationData
       type: object
       required:
         - organization_unit_id
@@ -278,6 +287,7 @@ components:
           description: ltree path of reactivated unit
 
     OrganizationUnitDeletedEvent:
+      title: OrganizationUnitDeletedEvent
       type: object
       required:
         - stream_id
@@ -291,16 +301,17 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [organization_unit]
+          const: organization_unit
         event_type:
           type: string
-          enum: [organization_unit.deleted]
+          const: organization_unit.deleted
         event_data:
           $ref: '#/components/schemas/OrganizationUnitDeletionData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationUnitDeletionData:
+      title: OrganizationUnitDeletionData
       type: object
       required:
         - organization_unit_id
@@ -321,11 +332,12 @@ components:
           default: false
         deletion_type:
           type: string
-          enum: [soft_delete]
           default: soft_delete
           description: Always soft_delete (sets deleted_at timestamp)
+          const: soft_delete
 
     OrganizationUnitMovedEvent:
+      title: OrganizationUnitMovedEvent
       type: object
       description: Future capability - organization unit reparented to different parent
       required:
@@ -340,16 +352,17 @@ components:
           format: uuid
         stream_type:
           type: string
-          enum: [organization_unit]
+          const: organization_unit
         event_type:
           type: string
-          enum: [organization_unit.moved]
+          const: organization_unit.moved
         event_data:
           $ref: '#/components/schemas/OrganizationUnitMoveData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     OrganizationUnitMoveData:
+      title: OrganizationUnitMoveData
       type: object
       required:
         - organization_unit_id

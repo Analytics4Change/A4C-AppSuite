@@ -110,6 +110,33 @@ node test-google-oauth.js
 - **User shows "viewer" role**: Run `verify-jwt-hook-complete.sql` to diagnose JWT hook configuration
 - **JWT missing custom claims**: Verify hook registered in Dashboard (Authentication → Hooks)
 
+### AsyncAPI Type Generation
+
+**Source of Truth**: Generated TypeScript types from AsyncAPI schemas are the SINGLE source of truth for domain events.
+
+```bash
+# Generate TypeScript types from AsyncAPI schemas
+cd infrastructure/supabase/contracts
+npm run generate:types
+
+# Copy to frontend (required after any AsyncAPI changes)
+cp types/generated-events.ts ../../../frontend/src/types/generated/
+```
+
+**Key Rules**:
+- **NEVER** hand-write event type definitions
+- **ALWAYS** regenerate types after modifying AsyncAPI schemas
+- Every schema MUST have a `title` property (prevents AnonymousSchema generation)
+- Frontend imports from `@/types/events` (not directly from generated)
+
+**Pipeline**: `replace-inline-enums.js` → `asyncapi bundle` → `generate-types.js` → `dedupe-enums.js`
+
+**Full Documentation**: See `.claude/skills/infrastructure-guidelines/resources/asyncapi-contracts.md` for:
+- Modelina configuration options
+- Anonymous schema prevention
+- Enum handling strategy
+- Lessons learned and pitfalls
+
 ## Architecture
 
 ### Directory Structure

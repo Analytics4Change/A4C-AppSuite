@@ -544,7 +544,7 @@ export class MedicationManagementViewModel {
         throw new Error('No authenticated user found');
       }
 
-      // Build event data matching MedicationPrescribedEventData interface
+      // Build event data matching MedicationMAREntryData interface
       const eventData = {
         organization_id: organizationId,
         client_id: clientId,
@@ -579,23 +579,23 @@ export class MedicationManagementViewModel {
 
         // Notes
         notes: this.notes || undefined,
+
+        // Classification
+        controlled_substance: this.isControlled || false,
+        therapeutic_purpose: this.selectedPurpose || undefined,
       };
 
-      // Emit medication.prescribed event
+      // Emit medication.added_to_mar event (externally-prescribed medication added for tracking)
       const streamId = globalThis.crypto.randomUUID();
       await eventEmitter.emit(
         streamId,
         'medication',
-        'medication.prescribed',
+        'medication.added_to_mar',
         eventData,
-        'New Medication Added', // Page-driven reason
-        {
-          controlled_substance: this.isControlled || false,
-          therapeutic_purpose: this.selectedPurpose || undefined,
-        }
+        'New Medication Added' // Page-driven reason
       );
 
-      log.info('Medication prescribed event emitted', { streamId, medication: this.selectedMedication!.name });
+      log.info('Medication added to MAR event emitted', { streamId, medication: this.selectedMedication!.name });
 
       this.reset();
     } catch (error) {

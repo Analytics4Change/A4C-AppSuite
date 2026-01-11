@@ -26,6 +26,7 @@ components:
 
   schemas:
     AddressCreatedEvent:
+      title: AddressCreatedEvent
       type: object
       required:
         - stream_id
@@ -40,16 +41,17 @@ components:
           description: Address UUID
         stream_type:
           type: string
-          enum: [address]
+          const: address
         event_type:
           type: string
-          enum: [address.created]
+          const: address.created
         event_data:
           $ref: '#/components/schemas/AddressCreationData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     AddressCreationData:
+      title: AddressCreationData
       type: object
       required:
         - organization_id
@@ -73,13 +75,13 @@ components:
             - "Billing Department"
             - "Satellite Location - North Campus"
         type:
-          type: string
-          enum: [physical, mailing, billing]
-          description: |
-            Structured address type:
-            - physical: Business location (where services are delivered)
-            - mailing: Mailing address (for correspondence)
-            - billing: Billing address (for invoices and payments)
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/AddressType
+            - description: |
+                Structured address type:
+                - physical: Business location (where services are delivered)
+                - mailing: Mailing address (for correspondence)
+                - billing: Billing address (for invoices and payments)
         street1:
           type: string
           maxLength: 255
@@ -132,7 +134,8 @@ components:
         is_primary:
           type: boolean
           default: false
-          description: Whether this is the primary address for the organization (only one per org)
+          description: Whether this is the primary address for the organization (only one
+            per org)
         is_active:
           type: boolean
           default: true
@@ -142,6 +145,7 @@ components:
           description: Additional flexible data storage
 
     AddressUpdatedEvent:
+      title: AddressUpdatedEvent
       type: object
       required:
         - stream_id
@@ -156,16 +160,17 @@ components:
           description: Address UUID
         stream_type:
           type: string
-          enum: [address]
+          const: address
         event_type:
           type: string
-          enum: [address.updated]
+          const: address.updated
         event_data:
           $ref: '#/components/schemas/AddressUpdateData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     AddressUpdateData:
+      title: AddressUpdateData
       type: object
       description: Partial update data (only fields being updated)
       properties:
@@ -174,9 +179,9 @@ components:
           maxLength: 200
           description: Updated address label
         type:
-          type: string
-          enum: [physical, mailing, billing]
-          description: Updated address type
+          allOf:
+            - $ref: ../components/enums.yaml#/components/schemas/AddressType
+            - description: Updated address type
         street1:
           type: string
           maxLength: 255
@@ -212,6 +217,7 @@ components:
           description: Updated metadata (merges with existing)
 
     AddressDeletedEvent:
+      title: AddressDeletedEvent
       type: object
       required:
         - stream_id
@@ -226,16 +232,17 @@ components:
           description: Address UUID being deleted
         stream_type:
           type: string
-          enum: [address]
+          const: address
         event_type:
           type: string
-          enum: [address.deleted]
+          const: address.deleted
         event_data:
           $ref: '#/components/schemas/AddressDeletionData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     AddressDeletionData:
+      title: AddressDeletionData
       type: object
       required:
         - address_id

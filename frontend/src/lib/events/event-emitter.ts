@@ -97,9 +97,9 @@ export class EventEmitter {
         required: ['discharge_date', 'discharge_type', 'discharge_disposition'],
         description: 'Client discharge data'
       },
-      'medication.prescribed': {
+      'medication.added_to_mar': {
         required: [],
-        description: 'Medication prescription data'
+        description: 'MAR entry data for externally-prescribed medication'
       },
       'medication.administered': {
         required: [],

@@ -4,7 +4,7 @@
  * Exports all activities for organization provisioning workflow.
  *
  * Forward Activities (7):
- * - createOrganization: Create organization record with contacts/addresses/phones
+ * - createOrganization: Create organization record with contacts/addresses/phones/emails
  * - grantProviderAdminPermissions: Create provider_admin role and grant 23 permissions
  * - configureDNS: Create DNS CNAME record (conditional)
  * - verifyDNS: Verify DNS propagation
@@ -12,10 +12,11 @@
  * - sendInvitationEmails: Send invitation emails
  * - activateOrganization: Mark organization as active
  *
- * Compensation Activities (6):
+ * Compensation Activities (7):
  * - revokeInvitations: Revoke pending invitations (rollback)
  * - removeDNS: Delete DNS record (rollback)
  * - deletePhones: Delete phone records (rollback)
+ * - deleteEmails: Delete email records (rollback)
  * - deleteAddresses: Delete address records (rollback)
  * - deleteContacts: Delete contact records (rollback)
  * - deactivateOrganization: Mark organization as failed (rollback)
@@ -34,3 +35,4 @@ export { revokeInvitations } from './revoke-invitations';
 export { deleteContacts } from './delete-contacts';
 export { deleteAddresses } from './delete-addresses';
 export { deletePhones } from './delete-phones';
+export { deleteEmails } from './delete-emails';

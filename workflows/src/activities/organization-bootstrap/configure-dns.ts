@@ -21,8 +21,7 @@
 
 import type { ConfigureDNSParams, ConfigureDNSResult } from '@shared/types';
 import { createDNSProvider } from '@shared/providers/dns/factory';
-import { emitEvent, buildTags, getLogger, buildTracingForEvent } from '@shared/utils';
-import { AGGREGATE_TYPES } from '@shared/constants';
+import { getLogger, emitSubdomainDnsCreated, DNSRecordType } from '@shared/utils';
 import { getWorkflowsEnv } from '@shared/config/env-schema';
 
 const log = getLogger('ConfigureDNS');
@@ -77,24 +76,14 @@ export async function configureDNS(
     log.info('DNS record already exists', { recordId: existing.id });
 
     // Emit event even if record exists (for event replay)
-    // Contract: organization.subdomain.dns_created (AsyncAPI)
-    await emitEvent({
-      event_type: 'organization.subdomain.dns_created',
-      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
-      aggregate_id: params.orgId,
-      event_data: {
-        organization_id: params.orgId,
-        slug: params.subdomain,
-        base_domain: baseDomain,
-        full_subdomain: fqdn,
-        cloudflare_record_id: existing.id,
-        dns_record_type: existing.type,
-        dns_record_value: existing.content,
-        cloudflare_zone_id: zone.id
-      },
-      tags: buildTags(),
-      ...buildTracingForEvent(params.tracing, 'configureDNS')
-    });
+    // Type-safe event using AsyncAPI contract
+    await emitSubdomainDnsCreated(params.orgId, {
+      subdomain: params.subdomain,
+      cloudflare_record_id: existing.id,
+      cloudflare_zone_id: zone.id,
+      dns_record_type: existing.type === 'CNAME' ? DNSRecordType.CNAME : DNSRecordType.A,
+      dns_record_value: existing.content,
+    }, params.tracing);
 
     return {
       fqdn,
@@ -114,24 +103,14 @@ export async function configureDNS(
 
   log.info('Created DNS record', { recordId: record.id });
 
-  // Emit organization.subdomain.dns_created event (contract-compliant)
-  await emitEvent({
-    event_type: 'organization.subdomain.dns_created',
-    aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
-    aggregate_id: params.orgId,
-    event_data: {
-      organization_id: params.orgId,
-      slug: params.subdomain,
-      base_domain: baseDomain,
-      full_subdomain: fqdn,
-      cloudflare_record_id: record.id,
-      dns_record_type: record.type,
-      dns_record_value: record.content,
-      cloudflare_zone_id: zone.id
-    },
-    tags: buildTags(),
-    ...buildTracingForEvent(params.tracing, 'configureDNS')
-  });
+  // Type-safe event using AsyncAPI contract
+  await emitSubdomainDnsCreated(params.orgId, {
+    subdomain: params.subdomain,
+    cloudflare_record_id: record.id,
+    cloudflare_zone_id: zone.id,
+    dns_record_type: record.type === 'CNAME' ? DNSRecordType.CNAME : DNSRecordType.A,
+    dns_record_value: record.content,
+  }, params.tracing);
 
   log.info('Emitted organization.subdomain.dns_created event', { orgId: params.orgId });
 
