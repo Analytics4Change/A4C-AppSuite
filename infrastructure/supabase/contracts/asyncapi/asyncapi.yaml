@@ -107,6 +107,19 @@ channels:
           # Junction events (phone-address relationship)
           - $ref: './domains/junction.yaml#/components/messages/PhoneAddressLinked'
           - $ref: './domains/junction.yaml#/components/messages/PhoneAddressUnlinked'
+          # RBAC events (roles and permissions)
+          - $ref: './domains/rbac.yaml#/components/messages/PermissionDefined'
+          - $ref: './domains/rbac.yaml#/components/messages/RoleCreated'
+          - $ref: './domains/rbac.yaml#/components/messages/RolePermissionGranted'
+          - $ref: './domains/rbac.yaml#/components/messages/RolePermissionRevoked'
+          - $ref: './domains/rbac.yaml#/components/messages/RoleUpdated'
+          - $ref: './domains/rbac.yaml#/components/messages/RoleDeactivated'
+          - $ref: './domains/rbac.yaml#/components/messages/RoleReactivated'
+          - $ref: './domains/rbac.yaml#/components/messages/RoleDeleted'
+          - $ref: './domains/rbac.yaml#/components/messages/UserRoleAssigned'
+          - $ref: './domains/rbac.yaml#/components/messages/UserRoleRevoked'
+          - $ref: './domains/rbac.yaml#/components/messages/AccessGrantCreated'
+          - $ref: './domains/rbac.yaml#/components/messages/AccessGrantRevoked'
     subscribe:
       summary: Subscribe to domain events
       operationId: onDomainEvent

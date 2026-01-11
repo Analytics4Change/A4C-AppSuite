@@ -7622,6 +7622,1492 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
+          - name: permission.defined
+            title: Permission Defined
+            summary: A new permission has been created in the system
+            contentType: application/json
+            payload:
+              title: PermissionDefinedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Permission UUID
+                stream_type:
+                  type: string
+                  const: permission
+                event_type:
+                  type: string
+                  const: permission.defined
+                event_data:
+                  type: object
+                  required:
+                    - applet
+                    - action
+                    - description
+                    - scope_type
+                    - requires_mfa
+                  properties:
+                    applet:
+                      type: string
+                      description: Functional module (medication, provider, client, etc.)
+                      examples:
+                        - medication
+                        - provider
+                        - client
+                        - user
+                    action:
+                      type: string
+                      description: Specific capability within the applet
+                      examples:
+                        - create
+                        - view
+                        - update
+                        - delete
+                        - approve
+                        - impersonate
+                    description:
+                      type: string
+                      description: Human-readable explanation of the permission
+                      examples:
+                        - Create new medication prescriptions
+                        - View client records
+                        - Impersonate users for support operations
+                    scope_type:
+                      allOf:
+                        - type: string
+                          title: ScopeType
+                          enum:
+                            - global
+                            - org
+                          description: >-
+                            Permission scope type (global for platform-wide, org
+                            for organization-scoped)
+                        - description: >-
+                            Hierarchical scope level for this permission
+                            (facility/program/client removed - never
+                            implemented)
+                    requires_mfa:
+                      type: boolean
+                      description: Whether MFA is required to use this permission
+                      default: false
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - >-
+                              Adding new permission for medication approval
+                              workflow
+                            - Creating permission for cross-tenant access grants
+                            - >-
+                              Defining impersonation permission for Super Admin
+                              support
+          - name: role.created
+            title: Role Created
+            summary: A new role has been created
+            contentType: application/json
+            payload:
+              title: RoleCreatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.created
+                event_data:
+                  type: object
+                  required:
+                    - name
+                    - description
+                  properties:
+                    name:
+                      type: string
+                      description: Role identifier
+                      examples:
+                        - super_admin
+                        - provider_admin
+                        - facility_admin
+                        - clinician
+                    description:
+                      type: string
+                      description: Human-readable role description
+                      examples:
+                        - Platform-wide administrator with all permissions
+                        - Organization administrator with org-scoped permissions
+                    zitadel_org_id:
+                      type: string
+                      nullable: true
+                      description: Zitadel organization ID (NULL for super_admin)
+                    org_hierarchy_scope:
+                      type: string
+                      nullable: true
+                      description: >-
+                        ltree path for hierarchical scoping (NULL for
+                        super_admin)
+                      examples:
+                        - org_acme_healthcare_001
+                        - org_acme_healthcare_001.facility_456
+                    display_name:
+                      type: string
+                      nullable: true
+                      description: Human-readable display name for the role
+                      examples:
+                        - Provider Administrator
+                        - Facility Manager
+                        - Clinician
+                    organization_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: >-
+                        Organization UUID for org-scoped roles (NULL for
+                        super_admin)
+                    scope:
+                      type: string
+                      title: RoleScope
+                      description: >-
+                        Scope level of a role (global for super_admin,
+                        organization/unit for org-scoped)
+                      enum:
+                        - global
+                        - organization
+                        - unit
+                    is_system_role:
+                      type: boolean
+                      nullable: true
+                      description: Whether this is a system-defined role (not user-created)
+                      default: false
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - >-
+                              Creating super admin role for platform
+                              administration
+                            - >-
+                              Creating provider admin role for
+                              organization-level management
+                            - Adding new role for facility-scoped access
+          - name: role.permission.granted
+            title: Role Permission Granted
+            summary: A permission has been granted to a role
+            contentType: application/json
+            payload:
+              title: RolePermissionGrantedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.permission.granted
+                event_data:
+                  type: object
+                  required:
+                    - permission_id
+                    - permission_name
+                  properties:
+                    permission_id:
+                      type: string
+                      format: uuid
+                      description: UUID of the permission being granted
+                    permission_name:
+                      type: string
+                      description: Full permission identifier (for logging)
+                      pattern: ^[a-z_]+\.[a-z_]+$
+                      examples:
+                        - medication.create
+                        - provider.impersonate
+                        - client.view
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - >-
+                              Granting medication creation permission to
+                              provider_admin role
+                            - >-
+                              Adding impersonation permission to super_admin
+                              role
+                            - Granting view permission to read-only auditor role
+          - name: role.permission.revoked
+            title: Role Permission Revoked
+            summary: A permission has been revoked from a role
+            contentType: application/json
+            payload:
+              title: RolePermissionRevokedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.permission.revoked
+                event_data:
+                  type: object
+                  required:
+                    - permission_id
+                    - permission_name
+                    - revocation_reason
+                  properties:
+                    permission_id:
+                      type: string
+                      format: uuid
+                    permission_name:
+                      type: string
+                      pattern: ^[a-z_]+\.[a-z_]+$
+                    revocation_reason:
+                      type: string
+                      description: Explanation for permission removal
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - >-
+                              Removing impersonation permission from
+                              provider_admin due to security policy change
+                            - >-
+                              Revoking delete permission from role per
+                              compliance requirement
+          - name: role.updated
+            title: Role Updated
+            summary: A role's name or description has been updated
+            contentType: application/json
+            payload:
+              title: RoleUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.updated
+                event_data:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      description: Updated role name (if changed)
+                      examples:
+                        - provider_admin
+                        - facility_admin
+                        - custom_clinician
+                    description:
+                      type: string
+                      description: Updated role description (if changed)
+                      examples:
+                        - Organization administrator with org-scoped permissions
+                        - Facility-specific administrative role
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - Updating role description for clarity
+                            - Renaming role to match organizational structure
+          - name: role.deactivated
+            title: Role Deactivated
+            summary: A role has been deactivated (frozen)
+            contentType: application/json
+            payload:
+              title: RoleDeactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.deactivated
+                event_data:
+                  type: object
+                  required:
+                    - reason
+                  properties:
+                    reason:
+                      type: string
+                      description: Reason for deactivation
+                      examples:
+                        - >-
+                          Role no longer needed for current organizational
+                          structure
+                        - Temporarily freezing role for security review
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - Deactivating role per administrator request
+                            - Role deprecated in favor of new role structure
+          - name: role.reactivated
+            title: Role Reactivated
+            summary: A role has been reactivated
+            contentType: application/json
+            payload:
+              title: RoleReactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.reactivated
+                event_data:
+                  type: object
+                  properties:
+                    reason:
+                      type: string
+                      description: Reason for reactivation
+                      examples:
+                        - Security review completed, role reinstated
+                        - Role needed again for new hire onboarding
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - Reactivating role after security review
+                            - Role restored per administrator request
+          - name: role.deleted
+            title: Role Deleted
+            summary: A role has been soft-deleted
+            contentType: application/json
+            payload:
+              title: RoleDeletedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.deleted
+                event_data:
+                  type: object
+                  required:
+                    - reason
+                  properties:
+                    reason:
+                      type: string
+                      description: Reason for deletion
+                      examples:
+                        - Role permanently removed after deprecation period
+                        - Custom role no longer needed
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - Deleting deprecated role per administrator request
+                            - Role cleanup after organizational restructure
+          - name: user.role.assigned
+            title: User Role Assigned
+            summary: A role has been assigned to a user
+            contentType: application/json
+            payload:
+              title: UserRoleAssignedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.role.assigned
+                event_data:
+                  type: object
+                  required:
+                    - role_id
+                    - role_name
+                    - org_id
+                    - scope_path
+                    - assigned_by
+                  properties:
+                    role_id:
+                      type: string
+                      format: uuid
+                      description: UUID of the role being assigned
+                    role_name:
+                      type: string
+                      description: Role identifier for logging
+                      examples:
+                        - super_admin
+                        - provider_admin
+                    org_id:
+                      type: string
+                      description: >-
+                        Organization ID ('*' for super_admin, specific org for
+                        others)
+                      examples:
+                        - '*'
+                        - acme_healthcare_001
+                    scope_path:
+                      type: string
+                      description: >-
+                        ltree hierarchy path ('*' for global, specific path for
+                        scoped)
+                      examples:
+                        - '*'
+                        - org_acme_healthcare_001
+                        - org_acme_healthcare_001.facility_456
+                    assigned_by:
+                      type: string
+                      format: uuid
+                      description: User who performed the assignment
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - >-
+                              Granting platform-wide administrative access to
+                              new A4C support engineer
+                            - >-
+                              Granting provider administrator access to manage
+                              Acme Healthcare organization
+                            - >-
+                              Assigning facility admin role for facility-level
+                              management
+          - name: user.role.revoked
+            title: User Role Revoked
+            summary: A role has been revoked from a user
+            contentType: application/json
+            payload:
+              title: UserRoleRevokedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.role.revoked
+                event_data:
+                  type: object
+                  required:
+                    - role_id
+                    - role_name
+                    - org_id
+                    - revoked_by
+                  properties:
+                    role_id:
+                      type: string
+                      format: uuid
+                    role_name:
+                      type: string
+                    org_id:
+                      type: string
+                    revoked_by:
+                      type: string
+                      format: uuid
+                      description: User who performed the revocation
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - User terminated employment, revoking all access
+                            - >-
+                              Downgrading permissions per security audit
+                              recommendation
+                            - Temporary role assignment expired
+          - name: access_grant.created
+            title: Access Grant Created
+            summary: A cross-tenant access grant has been created
+            contentType: application/json
+            payload:
+              title: AccessGrantCreatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Access grant UUID
+                stream_type:
+                  type: string
+                  const: access_grant
+                event_type:
+                  type: string
+                  const: access_grant.created
+                event_data:
+                  type: object
+                  required:
+                    - consultant_org_id
+                    - provider_org_id
+                    - scope
+                    - authorization_type
+                  properties:
+                    consultant_org_id:
+                      type: string
+                      description: Provider Partner organization ID
+                    consultant_user_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: Specific user (NULL for org-wide grant)
+                    provider_org_id:
+                      type: string
+                      description: Target Provider organization ID
+                    scope:
+                      allOf:
+                        - type: string
+                          title: GrantScope
+                          enum:
+                            - organization_unit
+                            - client_specific
+                          description: >-
+                            Scope of data access granted (organization_unit uses
+                            scope_id for OU hierarchy)
+                        - description: >-
+                            Access scope level (organization_unit for OU
+                            hierarchy, client_specific for individual clients)
+                    scope_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: Specific resource ID if scoped
+                    authorization_type:
+                      allOf:
+                        - type: string
+                          title: GrantAuthorizationType
+                          enum:
+                            - var_contract
+                            - court_order
+                            - family_participation
+                            - social_services_assignment
+                            - emergency_access
+                          description: >-
+                            Legal/business basis for granting cross-tenant
+                            access
+                        - description: >-
+                            Legal/business basis for granting cross-tenant
+                            access
+                    legal_reference:
+                      type: string
+                      nullable: true
+                      description: Court order number, consent form ID, contract reference
+                      examples:
+                        - Court Order
+                        - Parental Consent Form
+                        - VAR Contract
+                    expires_at:
+                      type: string
+                      format: date-time
+                      nullable: true
+                      description: Expiration timestamp for time-limited access
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - Granting court access per order
+                            - >-
+                              Creating VAR access grant for partner dashboard
+                              analytics
+                            - >-
+                              Granting parental access to minor client records
+                              per consent
+          - name: access_grant.revoked
+            title: Access Grant Revoked
+            summary: A cross-tenant access grant has been revoked
+            contentType: application/json
+            payload:
+              title: AccessGrantRevokedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Access grant UUID
+                stream_type:
+                  type: string
+                  const: access_grant
+                event_type:
+                  type: string
+                  const: access_grant.revoked
+                event_data:
+                  type: object
+                  required:
+                    - grant_id
+                    - revoked_by
+                    - revocation_reason
+                  properties:
+                    grant_id:
+                      type: string
+                      format: uuid
+                      description: UUID of the grant being revoked
+                    revoked_by:
+                      type: string
+                      format: uuid
+                      description: User who revoked the grant
+                    revocation_reason:
+                      type: string
+                      description: Explanation for revocation
+                      examples:
+                        - Court case closed, access no longer required
+                        - VAR contract terminated
+                        - Parental custody changed, consent withdrawn
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - >-
+                              Revoking court access after case closure per
+                              provider admin request
+                            - Terminating VAR access due to contract expiration
+                            - Withdrawing parental access per custody order
     subscribe:
       summary: Subscribe to domain events
       operationId: onDomainEvent
@@ -15218,6 +16704,1492 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
+          - name: permission.defined
+            title: Permission Defined
+            summary: A new permission has been created in the system
+            contentType: application/json
+            payload:
+              title: PermissionDefinedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Permission UUID
+                stream_type:
+                  type: string
+                  const: permission
+                event_type:
+                  type: string
+                  const: permission.defined
+                event_data:
+                  type: object
+                  required:
+                    - applet
+                    - action
+                    - description
+                    - scope_type
+                    - requires_mfa
+                  properties:
+                    applet:
+                      type: string
+                      description: Functional module (medication, provider, client, etc.)
+                      examples:
+                        - medication
+                        - provider
+                        - client
+                        - user
+                    action:
+                      type: string
+                      description: Specific capability within the applet
+                      examples:
+                        - create
+                        - view
+                        - update
+                        - delete
+                        - approve
+                        - impersonate
+                    description:
+                      type: string
+                      description: Human-readable explanation of the permission
+                      examples:
+                        - Create new medication prescriptions
+                        - View client records
+                        - Impersonate users for support operations
+                    scope_type:
+                      allOf:
+                        - type: string
+                          title: ScopeType
+                          enum:
+                            - global
+                            - org
+                          description: >-
+                            Permission scope type (global for platform-wide, org
+                            for organization-scoped)
+                        - description: >-
+                            Hierarchical scope level for this permission
+                            (facility/program/client removed - never
+                            implemented)
+                    requires_mfa:
+                      type: boolean
+                      description: Whether MFA is required to use this permission
+                      default: false
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - >-
+                              Adding new permission for medication approval
+                              workflow
+                            - Creating permission for cross-tenant access grants
+                            - >-
+                              Defining impersonation permission for Super Admin
+                              support
+          - name: role.created
+            title: Role Created
+            summary: A new role has been created
+            contentType: application/json
+            payload:
+              title: RoleCreatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.created
+                event_data:
+                  type: object
+                  required:
+                    - name
+                    - description
+                  properties:
+                    name:
+                      type: string
+                      description: Role identifier
+                      examples:
+                        - super_admin
+                        - provider_admin
+                        - facility_admin
+                        - clinician
+                    description:
+                      type: string
+                      description: Human-readable role description
+                      examples:
+                        - Platform-wide administrator with all permissions
+                        - Organization administrator with org-scoped permissions
+                    zitadel_org_id:
+                      type: string
+                      nullable: true
+                      description: Zitadel organization ID (NULL for super_admin)
+                    org_hierarchy_scope:
+                      type: string
+                      nullable: true
+                      description: >-
+                        ltree path for hierarchical scoping (NULL for
+                        super_admin)
+                      examples:
+                        - org_acme_healthcare_001
+                        - org_acme_healthcare_001.facility_456
+                    display_name:
+                      type: string
+                      nullable: true
+                      description: Human-readable display name for the role
+                      examples:
+                        - Provider Administrator
+                        - Facility Manager
+                        - Clinician
+                    organization_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: >-
+                        Organization UUID for org-scoped roles (NULL for
+                        super_admin)
+                    scope:
+                      type: string
+                      title: RoleScope
+                      description: >-
+                        Scope level of a role (global for super_admin,
+                        organization/unit for org-scoped)
+                      enum:
+                        - global
+                        - organization
+                        - unit
+                    is_system_role:
+                      type: boolean
+                      nullable: true
+                      description: Whether this is a system-defined role (not user-created)
+                      default: false
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - >-
+                              Creating super admin role for platform
+                              administration
+                            - >-
+                              Creating provider admin role for
+                              organization-level management
+                            - Adding new role for facility-scoped access
+          - name: role.permission.granted
+            title: Role Permission Granted
+            summary: A permission has been granted to a role
+            contentType: application/json
+            payload:
+              title: RolePermissionGrantedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.permission.granted
+                event_data:
+                  type: object
+                  required:
+                    - permission_id
+                    - permission_name
+                  properties:
+                    permission_id:
+                      type: string
+                      format: uuid
+                      description: UUID of the permission being granted
+                    permission_name:
+                      type: string
+                      description: Full permission identifier (for logging)
+                      pattern: ^[a-z_]+\.[a-z_]+$
+                      examples:
+                        - medication.create
+                        - provider.impersonate
+                        - client.view
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - >-
+                              Granting medication creation permission to
+                              provider_admin role
+                            - >-
+                              Adding impersonation permission to super_admin
+                              role
+                            - Granting view permission to read-only auditor role
+          - name: role.permission.revoked
+            title: Role Permission Revoked
+            summary: A permission has been revoked from a role
+            contentType: application/json
+            payload:
+              title: RolePermissionRevokedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.permission.revoked
+                event_data:
+                  type: object
+                  required:
+                    - permission_id
+                    - permission_name
+                    - revocation_reason
+                  properties:
+                    permission_id:
+                      type: string
+                      format: uuid
+                    permission_name:
+                      type: string
+                      pattern: ^[a-z_]+\.[a-z_]+$
+                    revocation_reason:
+                      type: string
+                      description: Explanation for permission removal
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - >-
+                              Removing impersonation permission from
+                              provider_admin due to security policy change
+                            - >-
+                              Revoking delete permission from role per
+                              compliance requirement
+          - name: role.updated
+            title: Role Updated
+            summary: A role's name or description has been updated
+            contentType: application/json
+            payload:
+              title: RoleUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.updated
+                event_data:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      description: Updated role name (if changed)
+                      examples:
+                        - provider_admin
+                        - facility_admin
+                        - custom_clinician
+                    description:
+                      type: string
+                      description: Updated role description (if changed)
+                      examples:
+                        - Organization administrator with org-scoped permissions
+                        - Facility-specific administrative role
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - Updating role description for clarity
+                            - Renaming role to match organizational structure
+          - name: role.deactivated
+            title: Role Deactivated
+            summary: A role has been deactivated (frozen)
+            contentType: application/json
+            payload:
+              title: RoleDeactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.deactivated
+                event_data:
+                  type: object
+                  required:
+                    - reason
+                  properties:
+                    reason:
+                      type: string
+                      description: Reason for deactivation
+                      examples:
+                        - >-
+                          Role no longer needed for current organizational
+                          structure
+                        - Temporarily freezing role for security review
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - Deactivating role per administrator request
+                            - Role deprecated in favor of new role structure
+          - name: role.reactivated
+            title: Role Reactivated
+            summary: A role has been reactivated
+            contentType: application/json
+            payload:
+              title: RoleReactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.reactivated
+                event_data:
+                  type: object
+                  properties:
+                    reason:
+                      type: string
+                      description: Reason for reactivation
+                      examples:
+                        - Security review completed, role reinstated
+                        - Role needed again for new hire onboarding
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - Reactivating role after security review
+                            - Role restored per administrator request
+          - name: role.deleted
+            title: Role Deleted
+            summary: A role has been soft-deleted
+            contentType: application/json
+            payload:
+              title: RoleDeletedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Role UUID
+                stream_type:
+                  type: string
+                  const: role
+                event_type:
+                  type: string
+                  const: role.deleted
+                event_data:
+                  type: object
+                  required:
+                    - reason
+                  properties:
+                    reason:
+                      type: string
+                      description: Reason for deletion
+                      examples:
+                        - Role permanently removed after deprecation period
+                        - Custom role no longer needed
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - Deleting deprecated role per administrator request
+                            - Role cleanup after organizational restructure
+          - name: user.role.assigned
+            title: User Role Assigned
+            summary: A role has been assigned to a user
+            contentType: application/json
+            payload:
+              title: UserRoleAssignedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.role.assigned
+                event_data:
+                  type: object
+                  required:
+                    - role_id
+                    - role_name
+                    - org_id
+                    - scope_path
+                    - assigned_by
+                  properties:
+                    role_id:
+                      type: string
+                      format: uuid
+                      description: UUID of the role being assigned
+                    role_name:
+                      type: string
+                      description: Role identifier for logging
+                      examples:
+                        - super_admin
+                        - provider_admin
+                    org_id:
+                      type: string
+                      description: >-
+                        Organization ID ('*' for super_admin, specific org for
+                        others)
+                      examples:
+                        - '*'
+                        - acme_healthcare_001
+                    scope_path:
+                      type: string
+                      description: >-
+                        ltree hierarchy path ('*' for global, specific path for
+                        scoped)
+                      examples:
+                        - '*'
+                        - org_acme_healthcare_001
+                        - org_acme_healthcare_001.facility_456
+                    assigned_by:
+                      type: string
+                      format: uuid
+                      description: User who performed the assignment
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - >-
+                              Granting platform-wide administrative access to
+                              new A4C support engineer
+                            - >-
+                              Granting provider administrator access to manage
+                              Acme Healthcare organization
+                            - >-
+                              Assigning facility admin role for facility-level
+                              management
+          - name: user.role.revoked
+            title: User Role Revoked
+            summary: A role has been revoked from a user
+            contentType: application/json
+            payload:
+              title: UserRoleRevokedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.role.revoked
+                event_data:
+                  type: object
+                  required:
+                    - role_id
+                    - role_name
+                    - org_id
+                    - revoked_by
+                  properties:
+                    role_id:
+                      type: string
+                      format: uuid
+                    role_name:
+                      type: string
+                    org_id:
+                      type: string
+                    revoked_by:
+                      type: string
+                      format: uuid
+                      description: User who performed the revocation
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - User terminated employment, revoking all access
+                            - >-
+                              Downgrading permissions per security audit
+                              recommendation
+                            - Temporary role assignment expired
+          - name: access_grant.created
+            title: Access Grant Created
+            summary: A cross-tenant access grant has been created
+            contentType: application/json
+            payload:
+              title: AccessGrantCreatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Access grant UUID
+                stream_type:
+                  type: string
+                  const: access_grant
+                event_type:
+                  type: string
+                  const: access_grant.created
+                event_data:
+                  type: object
+                  required:
+                    - consultant_org_id
+                    - provider_org_id
+                    - scope
+                    - authorization_type
+                  properties:
+                    consultant_org_id:
+                      type: string
+                      description: Provider Partner organization ID
+                    consultant_user_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: Specific user (NULL for org-wide grant)
+                    provider_org_id:
+                      type: string
+                      description: Target Provider organization ID
+                    scope:
+                      allOf:
+                        - type: string
+                          title: GrantScope
+                          enum:
+                            - organization_unit
+                            - client_specific
+                          description: >-
+                            Scope of data access granted (organization_unit uses
+                            scope_id for OU hierarchy)
+                        - description: >-
+                            Access scope level (organization_unit for OU
+                            hierarchy, client_specific for individual clients)
+                    scope_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: Specific resource ID if scoped
+                    authorization_type:
+                      allOf:
+                        - type: string
+                          title: GrantAuthorizationType
+                          enum:
+                            - var_contract
+                            - court_order
+                            - family_participation
+                            - social_services_assignment
+                            - emergency_access
+                          description: >-
+                            Legal/business basis for granting cross-tenant
+                            access
+                        - description: >-
+                            Legal/business basis for granting cross-tenant
+                            access
+                    legal_reference:
+                      type: string
+                      nullable: true
+                      description: Court order number, consent form ID, contract reference
+                      examples:
+                        - Court Order
+                        - Parental Consent Form
+                        - VAR Contract
+                    expires_at:
+                      type: string
+                      format: date-time
+                      nullable: true
+                      description: Expiration timestamp for time-limited access
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - Granting court access per order
+                            - >-
+                              Creating VAR access grant for partner dashboard
+                              analytics
+                            - >-
+                              Granting parental access to minor client records
+                              per consent
+          - name: access_grant.revoked
+            title: Access Grant Revoked
+            summary: A cross-tenant access grant has been revoked
+            contentType: application/json
+            payload:
+              title: AccessGrantRevokedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Access grant UUID
+                stream_type:
+                  type: string
+                  const: access_grant
+                event_type:
+                  type: string
+                  const: access_grant.revoked
+                event_data:
+                  type: object
+                  required:
+                    - grant_id
+                    - revoked_by
+                    - revocation_reason
+                  properties:
+                    grant_id:
+                      type: string
+                      format: uuid
+                      description: UUID of the grant being revoked
+                    revoked_by:
+                      type: string
+                      format: uuid
+                      description: User who revoked the grant
+                    revocation_reason:
+                      type: string
+                      description: Explanation for revocation
+                      examples:
+                        - Court case closed, access no longer required
+                        - VAR contract terminated
+                        - Parental custody changed, consent withdrawn
+                event_metadata:
+                  allOf:
+                    - title: EventMetadata
+                      type: object
+                      required:
+                        - user_id
+                        - reason
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: ID of the user who initiated this event
+                        organization_id:
+                          type: string
+                          format: uuid
+                          description: >-
+                            ID of the organization context for this event
+                            (multi-tenant isolation)
+                        reason:
+                          type: string
+                          minLength: 10
+                          maxLength: 500
+                          description: >
+                            Business justification for this action. This field
+                            captures the "WHY"
+
+                            behind every change and is REQUIRED for all events.
+                          examples:
+                            - >-
+                              Patient showed allergic reaction to previous
+                              medication
+                            - >-
+                              Dosage adjustment per physician consultation on
+                              2024-01-15
+                            - >-
+                              Regular intake from emergency department referral
+                              #12345
+                        user_email:
+                          type: string
+                          format: email
+                          description: Email of the user who initiated this event
+                        user_name:
+                          type: string
+                          description: Name of the user who initiated this event
+                        correlation_id:
+                          type: string
+                          format: uuid
+                          description: ID to correlate related events across the system
+                        causation_id:
+                          type: string
+                          format: uuid
+                          description: ID of the event that caused this event
+                        ip_address:
+                          type: string
+                          format: ipv4
+                          description: IP address of the client
+                        user_agent:
+                          type: string
+                          description: User agent string of the client
+                        notes:
+                          type: string
+                          maxLength: 2000
+                          description: Additional context or notes
+                    - properties:
+                        reason:
+                          examples:
+                            - >-
+                              Revoking court access after case closure per
+                              provider admin request
+                            - Terminating VAR access due to contract expiration
+                            - Withdrawing parental access per custody order
 components:
   schemas:
     DomainEvent:

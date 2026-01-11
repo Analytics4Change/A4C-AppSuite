@@ -25,7 +25,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { getSupabaseClient, emitEvent, buildTags, getLogger, buildTracingForEvent } from '@shared/utils';
+import { getSupabaseClient, getLogger, emitRoleCreated, emitRolePermissionGranted, RoleScope } from '@shared/utils';
 import type { GrantProviderAdminPermissionsParams, GrantProviderAdminPermissionsResult } from '@shared/types';
 
 const log = getLogger('GrantProviderAdminPermissions');
@@ -110,7 +110,6 @@ export async function grantProviderAdminPermissions(
   log.info('Starting provider_admin permission grant', { orgId: params.orgId, scopePath: params.scopePath });
 
   const supabase = getSupabaseClient();
-  const tags = buildTags();
 
   // Load permission templates from database (falls back to PROVIDER_ADMIN_PERMISSIONS if not found)
   const templatePermissions = await getTemplatePermissions('provider_admin');
@@ -135,25 +134,18 @@ export async function grantProviderAdminPermissions(
     roleAlreadyExisted = true;
     log.info('provider_admin role already exists', { roleId, orgId: params.orgId });
   } else {
-    // Create provider_admin role via event
+    // Create provider_admin role via typed event
     roleId = uuidv4();
 
-    await emitEvent({
-      event_type: 'role.created',
-      aggregate_type: 'role',
-      aggregate_id: roleId,
-      event_data: {
-        name: 'provider_admin',
-        display_name: 'Provider Administrator',
-        description: 'Organization owner with full control within the organization',
-        organization_id: params.orgId,
-        org_hierarchy_scope: params.scopePath,
-        scope: 'organization',
-        is_system_role: true
-      },
-      tags,
-      ...buildTracingForEvent(params.tracing, 'createProviderAdminRole')
-    });
+    await emitRoleCreated(roleId, {
+      name: 'provider_admin',
+      display_name: 'Provider Administrator',
+      description: 'Organization owner with full control within the organization',
+      organization_id: params.orgId,
+      org_hierarchy_scope: params.scopePath,
+      scope: RoleScope.ORGANIZATION,
+      is_system_role: true
+    }, params.tracing);
 
     log.info('Created provider_admin role', { roleId, orgId: params.orgId });
   }
@@ -201,18 +193,11 @@ export async function grantProviderAdminPermissions(
       continue;
     }
 
-    // Emit role.permission.granted event
-    await emitEvent({
-      event_type: 'role.permission.granted',
-      aggregate_type: 'role',
-      aggregate_id: roleId,
-      event_data: {
-        permission_id: permId,
-        permission_name: permName
-      },
-      tags,
-      ...buildTracingForEvent(params.tracing, 'grantPermission')
-    });
+    // Emit role.permission.granted event (typed)
+    await emitRolePermissionGranted(roleId, {
+      permission_id: permId,
+      permission_name: permName
+    }, params.tracing);
 
     permissionsGranted++;
     log.debug('Granted permission', { roleId, permission: permName });

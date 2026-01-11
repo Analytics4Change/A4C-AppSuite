@@ -221,6 +221,26 @@ components:
               examples:
                 - org_acme_healthcare_001
                 - org_acme_healthcare_001.facility_456
+            display_name:
+              type: string
+              nullable: true
+              description: Human-readable display name for the role
+              examples:
+                - Provider Administrator
+                - Facility Manager
+                - Clinician
+            organization_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: Organization UUID for org-scoped roles (NULL for super_admin)
+            scope:
+              $ref: ../components/enums.yaml#/components/schemas/RoleScope
+            is_system_role:
+              type: boolean
+              nullable: true
+              description: Whether this is a system-defined role (not user-created)
+              default: false
         event_metadata:
           allOf:
             - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'

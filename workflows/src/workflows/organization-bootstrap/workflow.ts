@@ -45,6 +45,7 @@ import type {
   OrganizationBootstrapResult,
   WorkflowState
 } from '@shared/types';
+import type { BootstrapFailureStage } from '@shared/types/generated/events';
 
 // Configure activity options
 const {
@@ -55,6 +56,7 @@ const {
   generateInvitations,
   sendInvitationEmails,
   activateOrganization,
+  emitBootstrapFailedActivity,
   removeDNS,
   deactivateOrganization,
   revokeInvitations,
@@ -364,7 +366,7 @@ export async function organizationBootstrapWorkflow(
 
   } catch (error) {
     // ========================================
-    // Failure - Run Compensation (Saga)
+    // Failure - Emit Failure Event, Then Run Compensation (Saga)
     // ========================================
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     log.error('OrganizationBootstrapWorkflow failed, running compensation', {
@@ -373,6 +375,51 @@ export async function organizationBootstrapWorkflow(
     });
 
     state.errors.push(`Workflow failed: ${errorMessage}`);
+
+    // Determine failure stage based on workflow state
+    // Stage detection order matches workflow execution order
+    // Note: Using type assertions because workflows can only import types, not enum values
+    let failureStage: BootstrapFailureStage;
+    if (!state.orgCreated) {
+      failureStage = 'organization_creation' as BootstrapFailureStage;
+    } else if (params.subdomain && !state.dnsConfigured && !state.dnsSkipped) {
+      failureStage = 'dns_provisioning' as BootstrapFailureStage;
+    } else if (!state.invitations || state.invitations.length === 0) {
+      failureStage = 'admin_user_creation' as BootstrapFailureStage;
+    } else if (!state.invitationsSent) {
+      failureStage = 'invitation_email' as BootstrapFailureStage;
+    } else {
+      // Failed during activation or permissions
+      failureStage = 'role_assignment' as BootstrapFailureStage;
+    }
+
+    // Emit bootstrap failure event BEFORE compensation
+    // This ensures failure is recorded even if compensation fails
+    if (state.orgId) {
+      try {
+        log.info('Emitting bootstrap failure event', {
+          orgId: state.orgId,
+          failureStage,
+          partialCleanupRequired: state.orgCreated || state.dnsConfigured
+        });
+
+        await emitBootstrapFailedActivity({
+          orgId: state.orgId,
+          bootstrapId: params.tracing?.correlationId || state.orgId,
+          failureStage,
+          errorMessage,
+          partialCleanupRequired: state.orgCreated || state.dnsConfigured,
+          tracing: params.tracing
+        });
+
+        log.info('Bootstrap failure event emitted successfully');
+      } catch (emitError) {
+        // Don't fail compensation if event emission fails
+        const emitErrorMsg = emitError instanceof Error ? emitError.message : 'Unknown error';
+        log.error('Failed to emit bootstrap failure event', { error: emitErrorMsg });
+        state.errors.push(`Failed to emit failure event: ${emitErrorMsg}`);
+      }
+    }
 
     // Compensation: Revoke invitations if any were generated
     if (state.invitations && state.invitations.length > 0) {

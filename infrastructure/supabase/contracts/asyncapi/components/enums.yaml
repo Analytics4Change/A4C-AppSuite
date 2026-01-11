@@ -166,6 +166,12 @@ components:
       title: AdminRole
       enum: [provider_admin, partner_admin]
 
+    RoleScope:
+      type: string
+      title: RoleScope
+      description: Scope level of a role (global for super_admin, organization/unit for org-scoped)
+      enum: [global, organization, unit]
+
     DeletionStrategy:
       type: string
       title: DeletionStrategy

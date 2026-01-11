@@ -12,6 +12,9 @@
  * - sendInvitationEmails: Send invitation emails
  * - activateOrganization: Mark organization as active
  *
+ * Failure Tracking Activity (1):
+ * - emitBootstrapFailedActivity: Emit bootstrap failure event (called from catch block)
+ *
  * Compensation Activities (7):
  * - revokeInvitations: Revoke pending invitations (rollback)
  * - removeDNS: Delete DNS record (rollback)
@@ -29,6 +32,7 @@ export { verifyDNS } from './verify-dns';
 export { generateInvitations } from './generate-invitations';
 export { sendInvitationEmails } from './send-invitation-emails';
 export { activateOrganization } from './activate-organization';
+export { emitBootstrapFailedActivity } from './emit-bootstrap-failed';
 export { removeDNS } from './remove-dns';
 export { deactivateOrganization } from './deactivate-organization';
 export { revokeInvitations } from './revoke-invitations';

@@ -43,8 +43,13 @@ export {
   emitSubdomainDnsCreated,
   emitSubdomainVerified,
   emitOrganizationDnsRemoved,
+  // Organization bootstrap failure event emitter
+  emitBootstrapFailed,
   // Invitation event emitters
   emitInvitationEmailSent,
+  // RBAC event emitters
+  emitRoleCreated,
+  emitRolePermissionGranted,
   // Organization-entity junction emitters
   emitOrganizationContactLinked,
   emitOrganizationContactUnlinked,
@@ -75,4 +80,6 @@ export {
   DnsRemovalStatus,
   VerificationMethod,
   VerificationMode,
+  RoleScope,
+  BootstrapFailureStage,
 } from './typed-events';

@@ -32,6 +32,8 @@ import {
   DnsRemovalStatus,
   VerificationMethod,
   VerificationMode,
+  RoleScope,
+  BootstrapFailureStage,
   // Entity creation data types
   ContactCreationData,
   ContactUpdateData,
@@ -50,6 +52,7 @@ import {
   SubdomainDnsCreatedData,
   SubdomainVerifiedData,
   OrganizationDnsRemovedData,
+  OrganizationBootstrapFailureData,
   // Invitation data types
   InvitationEmailSentData,
   // Junction data types
@@ -67,6 +70,9 @@ import {
   ContactAddressUnlinkData,
   ContactEmailLinkData,
   ContactEmailUnlinkData,
+  // Role event data types (using anonymous schema aliases)
+  AnonymousSchema_3031 as RoleCreationData,
+  AnonymousSchema_3057 as RolePermissionGrantData,
 } from '../types/generated/events.js';
 
 // Re-export enums for convenience
@@ -79,6 +85,8 @@ export {
   DnsRemovalStatus,
   VerificationMethod,
   VerificationMode,
+  RoleScope,
+  BootstrapFailureStage,
 };
 
 // Re-export data types for convenience
@@ -91,6 +99,7 @@ export type {
   SubdomainDnsCreatedData,
   SubdomainVerifiedData,
   OrganizationDnsRemovedData,
+  OrganizationBootstrapFailureData,
   InvitationEmailSentData,
   OrganizationContactLinkData,
   OrganizationPhoneLinkData,
@@ -99,6 +108,8 @@ export type {
   ContactPhoneLinkData,
   ContactAddressLinkData,
   ContactEmailLinkData,
+  RoleCreationData,
+  RolePermissionGrantData,
 };
 
 // ============================================================================
@@ -788,5 +799,70 @@ export async function emitInvitationEmailSent(
     event_data: data as unknown as Record<string, unknown>,
     tags,
     ...buildTracingForEvent(tracing, 'emitInvitationEmailSent'),
+  });
+}
+
+// ============================================================================
+// RBAC Events (Roles and Permissions)
+// ============================================================================
+
+/**
+ * Emit a role.created event
+ */
+export async function emitRoleCreated(
+  roleId: string,
+  data: RoleCreationData,
+  tracing?: WorkflowTracingParams
+): Promise<string> {
+  const tags = buildTags();
+  return emitEvent({
+    event_type: 'role.created',
+    aggregate_type: 'role',
+    aggregate_id: roleId,
+    event_data: data as unknown as Record<string, unknown>,
+    tags,
+    ...buildTracingForEvent(tracing, 'emitRoleCreated'),
+  });
+}
+
+/**
+ * Emit a role.permission.granted event
+ */
+export async function emitRolePermissionGranted(
+  roleId: string,
+  data: RolePermissionGrantData,
+  tracing?: WorkflowTracingParams
+): Promise<string> {
+  const tags = buildTags();
+  return emitEvent({
+    event_type: 'role.permission.granted',
+    aggregate_type: 'role',
+    aggregate_id: roleId,
+    event_data: data as unknown as Record<string, unknown>,
+    tags,
+    ...buildTracingForEvent(tracing, 'emitRolePermissionGranted'),
+  });
+}
+
+// ============================================================================
+// Organization Bootstrap Failure Events
+// ============================================================================
+
+/**
+ * Emit an organization.bootstrap.failed event
+ */
+export async function emitBootstrapFailed(
+  orgId: string,
+  data: OrganizationBootstrapFailureData,
+  tracing?: WorkflowTracingParams
+): Promise<string> {
+  const tags = buildTags();
+  return emitEvent({
+    event_type: 'organization.bootstrap.failed',
+    aggregate_type: 'organization',
+    aggregate_id: orgId,
+    event_data: data as unknown as Record<string, unknown>,
+    tags,
+    ...buildTracingForEvent(tracing, 'emitBootstrapFailed'),
   });
 }
