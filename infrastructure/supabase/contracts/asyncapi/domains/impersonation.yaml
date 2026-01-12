@@ -25,6 +25,226 @@ components:
         $ref: '#/components/schemas/ImpersonationEndedEvent'
 
   schemas:
+    # ============================================================================
+    # Nested Data Schemas (for ImpersonationStarted)
+    # ============================================================================
+
+    ImpersonationSuperAdminInfo:
+      title: ImpersonationSuperAdminInfo
+      type: object
+      required:
+        - user_id
+        - email
+        - name
+        - org_id
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        org_id:
+          type: string
+          description: Analytics4Change org ID
+
+    ImpersonationTargetInfo:
+      title: ImpersonationTargetInfo
+      type: object
+      required:
+        - user_id
+        - email
+        - name
+        - org_id
+        - org_name
+        - org_type
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: Target user being impersonated
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        org_id:
+          type: string
+        org_name:
+          type: string
+        org_type:
+          $ref: ../components/enums.yaml#/components/schemas/ImpersonationTargetOrgType
+
+    ImpersonationJustification:
+      title: ImpersonationJustification
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          $ref: ../components/enums.yaml#/components/schemas/JustificationReason
+        reference_id:
+          type: string
+          description: Ticket number, incident ID, audit case number
+        notes:
+          type: string
+          description: Optional free-text explanation
+
+    ImpersonationSessionConfig:
+      title: ImpersonationSessionConfig
+      type: object
+      required:
+        - duration
+        - expires_at
+      properties:
+        duration:
+          type: integer
+          description: Session duration in milliseconds
+          default: 1800000
+        expires_at:
+          type: string
+          format: date-time
+          description: Session expiration timestamp
+
+    ImpersonationSessionSummary:
+      title: ImpersonationSessionSummary
+      type: object
+      required:
+        - started_at
+        - ended_at
+        - target_user
+        - target_org
+      properties:
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+        target_user:
+          type: string
+          format: email
+        target_org:
+          type: string
+
+    # ============================================================================
+    # Event Data Schemas
+    # ============================================================================
+
+    ImpersonationStartedData:
+      title: ImpersonationStartedData
+      type: object
+      required:
+        - session_id
+        - super_admin
+        - target
+        - justification
+        - session_config
+      properties:
+        session_id:
+          type: string
+          description: Unique session identifier
+        super_admin:
+          $ref: '#/components/schemas/ImpersonationSuperAdminInfo'
+        target:
+          $ref: '#/components/schemas/ImpersonationTargetInfo'
+        justification:
+          $ref: '#/components/schemas/ImpersonationJustification'
+        session_config:
+          $ref: '#/components/schemas/ImpersonationSessionConfig'
+        ip_address:
+          type: string
+          description: Super Admin IP address
+        user_agent:
+          type: string
+          description: Browser/client information
+
+    ImpersonationRenewedData:
+      title: ImpersonationRenewedData
+      type: object
+      required:
+        - session_id
+        - renewal_count
+        - previous_expires_at
+        - new_expires_at
+        - total_duration
+        - target_user_id
+        - target_org_id
+      properties:
+        session_id:
+          type: string
+          description: Session identifier
+        renewal_count:
+          type: integer
+          minimum: 1
+          description: Number of renewals (1, 2, 3, ...)
+        previous_expires_at:
+          type: string
+          format: date-time
+          description: Previous expiry timestamp
+        new_expires_at:
+          type: string
+          format: date-time
+          description: New expiry timestamp
+        total_duration:
+          type: integer
+          description: Total session duration in milliseconds
+        target_user_id:
+          type: string
+          format: uuid
+          description: Target user (for query convenience)
+        target_org_id:
+          type: string
+          description: Target org (for query convenience)
+
+    ImpersonationEndedData:
+      title: ImpersonationEndedData
+      type: object
+      required:
+        - session_id
+        - reason
+        - total_duration
+        - renewal_count
+        - actions_performed
+        - target_user_id
+        - target_org_id
+        - summary
+      properties:
+        session_id:
+          type: string
+          description: Session identifier
+        reason:
+          $ref: ../components/enums.yaml#/components/schemas/ImpersonationEndReason
+        total_duration:
+          type: integer
+          description: Total session duration in milliseconds
+        renewal_count:
+          type: integer
+          minimum: 0
+          description: Number of renewals that occurred
+        actions_performed:
+          type: integer
+          minimum: 0
+          description: Count of events emitted during session
+        target_user_id:
+          type: string
+          format: uuid
+        target_org_id:
+          type: string
+        ended_by:
+          type: string
+          format: uuid
+          description: User ID if forced by another admin
+          nullable: true
+        summary:
+          $ref: '#/components/schemas/ImpersonationSessionSummary'
+
+    # ============================================================================
+    # Event Schemas
+    # ============================================================================
+
     ImpersonationStartedEvent:
       title: ImpersonationStartedEvent
       type: object
@@ -46,107 +266,9 @@ components:
           type: string
           const: impersonation.started
         event_data:
-          type: object
-          required:
-            - session_id
-            - super_admin
-            - target
-            - justification
-            - session_config
-          properties:
-            session_id:
-              type: string
-              description: Unique session identifier
-            super_admin:
-              type: object
-              required:
-                - user_id
-                - email
-                - name
-                - org_id
-              properties:
-                user_id:
-                  type: string
-                  format: uuid
-                email:
-                  type: string
-                  format: email
-                name:
-                  type: string
-                org_id:
-                  type: string
-                  description: Analytics4Change org ID
-            target:
-              type: object
-              required:
-                - user_id
-                - email
-                - name
-                - org_id
-                - org_name
-                - org_type
-              properties:
-                user_id:
-                  type: string
-                  format: uuid
-                  description: Target user being impersonated
-                email:
-                  type: string
-                  format: email
-                name:
-                  type: string
-                org_id:
-                  type: string
-                org_name:
-                  type: string
-                org_type:
-                  $ref: ../components/enums.yaml#/components/schemas/ImpersonationTargetOrgType
-            justification:
-              type: object
-              required:
-                - reason
-              properties:
-                reason:
-                  allOf:
-                    - $ref: ../components/enums.yaml#/components/schemas/JustificationReason
-                    - description: Category of justification
-                reference_id:
-                  type: string
-                  description: Ticket number, incident ID, audit case number
-                notes:
-                  type: string
-                  description: Optional free-text explanation
-            session_config:
-              type: object
-              required:
-                - duration
-                - expires_at
-              properties:
-                duration:
-                  type: integer
-                  description: Session duration in milliseconds
-                  default: 1800000
-                expires_at:
-                  type: string
-                  format: date-time
-                  description: Session expiration timestamp
-            ip_address:
-              type: string
-              description: Super Admin IP address
-            user_agent:
-              type: string
-              description: Browser/client information
+          $ref: '#/components/schemas/ImpersonationStartedData'
         event_metadata:
-          allOf:
-            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
-            - properties:
-                reason:
-                  examples:
-                    - Super Admin started impersonation session for support
-                      ticket TICKET-7890
-                    - Emergency impersonation to resolve critical medication
-                      issue
-                    - Compliance audit impersonation to verify RLS policies
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     ImpersonationRenewedEvent:
       title: ImpersonationRenewedEvent
@@ -169,52 +291,9 @@ components:
           type: string
           const: impersonation.renewed
         event_data:
-          type: object
-          required:
-            - session_id
-            - renewal_count
-            - previous_expires_at
-            - new_expires_at
-            - total_duration
-            - target_user_id
-            - target_org_id
-          properties:
-            session_id:
-              type: string
-              description: Session identifier
-            renewal_count:
-              type: integer
-              minimum: 1
-              description: Number of renewals (1, 2, 3, ...)
-            previous_expires_at:
-              type: string
-              format: date-time
-              description: Previous expiry timestamp
-            new_expires_at:
-              type: string
-              format: date-time
-              description: New expiry timestamp
-            total_duration:
-              type: integer
-              description: Total session duration in milliseconds
-            target_user_id:
-              type: string
-              format: uuid
-              description: Target user (for query convenience)
-            target_org_id:
-              type: string
-              description: Target org (for query convenience)
+          $ref: '#/components/schemas/ImpersonationRenewedData'
         event_metadata:
-          allOf:
-            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
-            - properties:
-                impersonation_session_id:
-                  type: string
-                  description: Link to session
-                reason:
-                  examples:
-                    - Impersonation session renewed (renewal #1)
-                    - Impersonation session renewed (renewal #2)
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
     ImpersonationEndedEvent:
       title: ImpersonationEndedEvent
@@ -237,76 +316,6 @@ components:
           type: string
           const: impersonation.ended
         event_data:
-          type: object
-          required:
-            - session_id
-            - reason
-            - total_duration
-            - renewal_count
-            - actions_performed
-            - target_user_id
-            - target_org_id
-            - summary
-          properties:
-            session_id:
-              type: string
-              description: Session identifier
-            reason:
-              allOf:
-                - $ref: ../components/enums.yaml#/components/schemas/ImpersonationEndReason
-                - description: Reason session ended
-            total_duration:
-              type: integer
-              description: Total session duration in milliseconds
-            renewal_count:
-              type: integer
-              minimum: 0
-              description: Number of renewals that occurred
-            actions_performed:
-              type: integer
-              minimum: 0
-              description: Count of events emitted during session
-            target_user_id:
-              type: string
-              format: uuid
-            target_org_id:
-              type: string
-            ended_by:
-              type: string
-              format: uuid
-              description: User ID if forced by another admin
-              nullable: true
-            summary:
-              type: object
-              required:
-                - started_at
-                - ended_at
-                - target_user
-                - target_org
-              properties:
-                started_at:
-                  type: string
-                  format: date-time
-                ended_at:
-                  type: string
-                  format: date-time
-                target_user:
-                  type: string
-                  format: email
-                target_org:
-                  type: string
+          $ref: '#/components/schemas/ImpersonationEndedData'
         event_metadata:
-          allOf:
-            - $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
-            - properties:
-                impersonation_session_id:
-                  type: string
-                  description: Link to session
-                reason:
-                  examples:
-                    - Super Admin manually ended impersonation session after 40
-                      minutes (1 renewal)
-                    - Impersonation session timed out after 30 minutes (no
-                      renewals)
-                    - Impersonation session ended by user declining renewal
-                      prompt
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'

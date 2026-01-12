@@ -3,7 +3,7 @@
  *
  * Generated from AsyncAPI specification by Modelina
  * Source: infrastructure/supabase/contracts/asyncapi/
- * Generated: 2026-01-11T19:59:33.023Z
+ * Generated: 2026-01-12T17:29:02.803Z
  *
  * To regenerate: cd infrastructure/supabase/contracts && npm run generate:types
  *
@@ -787,17 +787,17 @@ export interface PlatformAdminFailedEventsViewedEvent {
   'stream_id': string;
   'stream_type': 'platform_admin';
   'event_type': 'platform.admin.failed_events_viewed';
-  'event_data': AnonymousSchema_2284;
-  'event_metadata': AnonymousSchema_2298;
+  'event_data': PlatformAdminFailedEventsViewedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2284 {
-  'filters': AnonymousSchema_2285;
+export interface PlatformAdminFailedEventsViewedData {
+  'filters': FailedEventsViewedFilters;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2285 {
+export interface FailedEventsViewedFilters {
   'limit'?: number;
   'offset'?: number;
   'event_type'?: string;
@@ -809,30 +809,16 @@ export interface AnonymousSchema_2285 {
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2298 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
-  'additionalProperties'?: Map<string, any>;
-}
-
 export interface PlatformAdminEventRetryAttemptedEvent {
   'stream_id': string;
   'stream_type': 'platform_admin';
   'event_type': 'platform.admin.event_retry_attempted';
-  'event_data': AnonymousSchema_2315;
-  'event_metadata': AnonymousSchema_2323;
+  'event_data': PlatformAdminEventRetryAttemptedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2315 {
+export interface PlatformAdminEventRetryAttemptedData {
   'target_event_id': string;
   'target_event_type': string;
   'target_stream_type': string;
@@ -843,45 +829,17 @@ export interface AnonymousSchema_2315 {
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2323 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
-  'additionalProperties'?: Map<string, any>;
-}
-
 export interface PlatformAdminProcessingStatsViewedEvent {
   'stream_id': string;
   'stream_type': 'platform_admin';
   'event_type': 'platform.admin.processing_stats_viewed';
-  'event_data': AnonymousSchema_2340;
-  'event_metadata': AnonymousSchema_2342;
+  'event_data': PlatformAdminProcessingStatsViewedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2340 {
+export interface PlatformAdminProcessingStatsViewedData {
   'timestamp': string;
-  'additionalProperties'?: Map<string, any>;
-}
-
-export interface AnonymousSchema_2342 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
   'additionalProperties'?: Map<string, any>;
 }
 
@@ -889,12 +847,12 @@ export interface PlatformAdminEventDismissedEvent {
   'stream_id': string;
   'stream_type': 'platform_admin';
   'event_type': 'platform.admin.event_dismissed';
-  'event_data': AnonymousSchema_2359;
-  'event_metadata': AnonymousSchema_2365;
+  'event_data': PlatformAdminEventDismissedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2359 {
+export interface PlatformAdminEventDismissedData {
   'target_event_id': string;
   'target_event_type': string;
   'target_stream_type': string;
@@ -903,50 +861,22 @@ export interface AnonymousSchema_2359 {
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2365 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
-  'additionalProperties'?: Map<string, any>;
-}
-
 export interface PlatformAdminEventUndismissedEvent {
   'stream_id': string;
   'stream_type': 'platform_admin';
   'event_type': 'platform.admin.event_undismissed';
-  'event_data': AnonymousSchema_2382;
-  'event_metadata': AnonymousSchema_2389;
+  'event_data': PlatformAdminEventUndismissedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2382 {
+export interface PlatformAdminEventUndismissedData {
   'target_event_id': string;
   'target_event_type': string;
   'target_stream_type': string;
   'target_stream_id': string;
   'previous_dismissed_by'?: string;
   'previous_dismiss_reason'?: string;
-  'additionalProperties'?: Map<string, any>;
-}
-
-export interface AnonymousSchema_2389 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
   'additionalProperties'?: Map<string, any>;
 }
 
@@ -1454,12 +1384,12 @@ export interface PermissionDefinedEvent {
   'stream_id': string;
   'stream_type': 'permission';
   'event_type': 'permission.defined';
-  'event_data': AnonymousSchema_3006;
-  'event_metadata': AnonymousSchema_3014;
+  'event_data': PermissionDefinedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3006 {
+export interface PermissionDefinedData {
   'applet': string;
   'action': string;
   'description': string;
@@ -1468,30 +1398,16 @@ export interface AnonymousSchema_3006 {
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3014 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
-  'additionalProperties'?: Map<string, any>;
-}
-
 export interface RoleCreatedEvent {
   'stream_id': string;
   'stream_type': 'role';
   'event_type': 'role.created';
-  'event_data': AnonymousSchema_3031;
-  'event_metadata': AnonymousSchema_3040;
+  'event_data': RoleCreatedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3031 {
+export interface RoleCreatedData {
   'name': string;
   'description': string;
   'zitadel_org_id'?: string;
@@ -1503,46 +1419,18 @@ export interface AnonymousSchema_3031 {
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3040 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
-  'additionalProperties'?: Map<string, any>;
-}
-
 export interface RolePermissionGrantedEvent {
   'stream_id': string;
   'stream_type': 'role';
   'event_type': 'role.permission.granted';
-  'event_data': AnonymousSchema_3057;
-  'event_metadata': AnonymousSchema_3060;
+  'event_data': RolePermissionGrantedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3057 {
+export interface RolePermissionGrantedData {
   'permission_id': string;
   'permission_name': string;
-  'additionalProperties'?: Map<string, any>;
-}
-
-export interface AnonymousSchema_3060 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
   'additionalProperties'?: Map<string, any>;
 }
 
@@ -1550,29 +1438,15 @@ export interface RolePermissionRevokedEvent {
   'stream_id': string;
   'stream_type': 'role';
   'event_type': 'role.permission.revoked';
-  'event_data': AnonymousSchema_3077;
-  'event_metadata': AnonymousSchema_3081;
+  'event_data': RolePermissionRevokedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3077 {
+export interface RolePermissionRevokedData {
   'permission_id': string;
   'permission_name': string;
   'revocation_reason': string;
-  'additionalProperties'?: Map<string, any>;
-}
-
-export interface AnonymousSchema_3081 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
   'additionalProperties'?: Map<string, any>;
 }
 
@@ -1580,28 +1454,14 @@ export interface RoleUpdatedEvent {
   'stream_id': string;
   'stream_type': 'role';
   'event_type': 'role.updated';
-  'event_data': AnonymousSchema_3098;
-  'event_metadata': AnonymousSchema_3101;
+  'event_data': RoleUpdatedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3098 {
+export interface RoleUpdatedData {
   'name'?: string;
   'description'?: string;
-  'additionalProperties'?: Map<string, any>;
-}
-
-export interface AnonymousSchema_3101 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
   'additionalProperties'?: Map<string, any>;
 }
 
@@ -1609,27 +1469,13 @@ export interface RoleDeactivatedEvent {
   'stream_id': string;
   'stream_type': 'role';
   'event_type': 'role.deactivated';
-  'event_data': AnonymousSchema_3118;
-  'event_metadata': AnonymousSchema_3120;
+  'event_data': RoleDeactivatedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3118 {
+export interface RoleDeactivatedData {
   'reason': string;
-  'additionalProperties'?: Map<string, any>;
-}
-
-export interface AnonymousSchema_3120 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
   'additionalProperties'?: Map<string, any>;
 }
 
@@ -1637,27 +1483,13 @@ export interface RoleReactivatedEvent {
   'stream_id': string;
   'stream_type': 'role';
   'event_type': 'role.reactivated';
-  'event_data': AnonymousSchema_3137;
-  'event_metadata': AnonymousSchema_3139;
+  'event_data': RoleReactivatedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3137 {
+export interface RoleReactivatedData {
   'reason'?: string;
-  'additionalProperties'?: Map<string, any>;
-}
-
-export interface AnonymousSchema_3139 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
   'additionalProperties'?: Map<string, any>;
 }
 
@@ -1665,27 +1497,13 @@ export interface RoleDeletedEvent {
   'stream_id': string;
   'stream_type': 'role';
   'event_type': 'role.deleted';
-  'event_data': AnonymousSchema_3156;
-  'event_metadata': AnonymousSchema_3158;
+  'event_data': RoleDeletedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3156 {
+export interface RoleDeletedData {
   'reason': string;
-  'additionalProperties'?: Map<string, any>;
-}
-
-export interface AnonymousSchema_3158 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
   'additionalProperties'?: Map<string, any>;
 }
 
@@ -1693,12 +1511,12 @@ export interface UserRoleAssignedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.role.assigned';
-  'event_data': AnonymousSchema_3175;
-  'event_metadata': AnonymousSchema_3181;
+  'event_data': UserRoleAssignedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3175 {
+export interface UserRoleAssignedData {
   'role_id': string;
   'role_name': string;
   'org_id': string;
@@ -1707,30 +1525,16 @@ export interface AnonymousSchema_3175 {
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3181 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
-  'additionalProperties'?: Map<string, any>;
-}
-
 export interface UserRoleRevokedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.role.revoked';
-  'event_data': AnonymousSchema_3198;
-  'event_metadata': AnonymousSchema_3203;
+  'event_data': UserRoleRevokedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3198 {
+export interface UserRoleRevokedData {
   'role_id': string;
   'role_name': string;
   'org_id': string;
@@ -1738,30 +1542,16 @@ export interface AnonymousSchema_3198 {
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3203 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
-  'additionalProperties'?: Map<string, any>;
-}
-
 export interface AccessGrantCreatedEvent {
   'stream_id': string;
   'stream_type': 'access_grant';
   'event_type': 'access_grant.created';
-  'event_data': AnonymousSchema_3220;
-  'event_metadata': AnonymousSchema_3233;
+  'event_data': AccessGrantCreatedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3220 {
+export interface AccessGrantCreatedData {
   'consultant_org_id': string;
   'consultant_user_id'?: string;
   'provider_org_id': string;
@@ -1773,46 +1563,18 @@ export interface AnonymousSchema_3220 {
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3233 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
-  'additionalProperties'?: Map<string, any>;
-}
-
 export interface AccessGrantRevokedEvent {
   'stream_id': string;
   'stream_type': 'access_grant';
   'event_type': 'access_grant.revoked';
-  'event_data': AnonymousSchema_3250;
-  'event_metadata': AnonymousSchema_3254;
+  'event_data': AccessGrantRevokedData;
+  'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3250 {
+export interface AccessGrantRevokedData {
   'grant_id': string;
   'revoked_by': string;
   'revocation_reason': string;
-  'additionalProperties'?: Map<string, any>;
-}
-
-export interface AnonymousSchema_3254 {
-  'user_id': string;
-  'organization_id'?: string;
-  'reason': string;
-  'user_email'?: string;
-  'user_name'?: string;
-  'correlation_id'?: string;
-  'causation_id'?: string;
-  'ip_address'?: string;
-  'user_agent'?: string;
-  'notes'?: string;
   'additionalProperties'?: Map<string, any>;
 }
