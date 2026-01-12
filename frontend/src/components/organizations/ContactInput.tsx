@@ -3,13 +3,14 @@ import * as Select from "@radix-ui/react-select";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ContactFormData } from "@/types/organization.types";
+import { CONTACT_TYPES } from "@/constants/organization.constants";
 
 /**
  * ContactInput - Contact information input component with label and type classification
  *
  * Features:
  * - Label field (user-defined contact identifier)
- * - Type dropdown (Billing, Technical, Emergency, A4C Admin)
+ * - Type dropdown (Administrative, Billing, Technical, Emergency, Stakeholder)
  * - First Name, Last Name, Email (required)
  * - Title, Department (optional)
  * - Full keyboard navigation support
@@ -31,13 +32,6 @@ interface ContactInputProps extends Omit<ComponentPropsWithoutRef<"div">, "onCha
   disabled?: boolean;
   showEmailConfirmation?: boolean;
 }
-
-const CONTACT_TYPES = [
-  { value: "billing", label: "Billing" },
-  { value: "technical", label: "Technical" },
-  { value: "emergency", label: "Emergency" },
-  { value: "a4c_admin", label: "A4C Admin" },
-] as const;
 
 export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
   ({ value, onChange, disabled = false, showEmailConfirmation = false, className, ...props }, ref) => {
