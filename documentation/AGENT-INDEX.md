@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-09
+last_updated: 2026-01-12
 purpose: agent-navigation
 ---
 
@@ -15,6 +15,7 @@ purpose: agent-navigation
 | Task | Start Here | Then Read |
 |------|-----------|-----------|
 | Add database table | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | [table-template.md](infrastructure/reference/database/table-template.md) |
+| Add domain event type | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) |
 | Add Temporal workflow | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | [temporal-overview.md](architecture/workflows/temporal-overview.md) |
 | Add frontend component | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | [DESIGN_PATTERNS_MIGRATION_GUIDE.md](frontend/guides/DESIGN_PATTERNS_MIGRATION_GUIDE.md) |
 | Configure authentication | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) |
@@ -37,6 +38,7 @@ purpose: agent-navigation
 | `apm-integration` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `apiRpc` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | supabase.service.ts |
 | `applet-action` | [permissions_projection.md](infrastructure/reference/database/tables/permissions_projection.md) | rbac-architecture.md |
+| `asyncapi` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, event-sourcing-overview.md |
 | `audit-trail` | [impersonation-architecture.md](architecture/authentication/impersonation-architecture.md) | impersonation-event-schema.md |
 | `authentication` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | supabase-auth-overview.md, custom-claims-setup.md |
 | `bootstrap` | [organization-onboarding-workflow.md](architecture/workflows/organization-onboarding-workflow.md) | provider-onboarding-quickstart.md |
@@ -49,6 +51,7 @@ purpose: agent-navigation
 | `contact-addresses` | [contact_addresses.md](infrastructure/reference/database/tables/contact_addresses.md) | contacts_projection.md |
 | `contact-phones` | [contact_phones.md](infrastructure/reference/database/tables/contact_phones.md) | contacts_projection.md |
 | `contacts` | [contacts_projection.md](infrastructure/reference/database/tables/contacts_projection.md) | provider-partners-architecture.md |
+| `contract-drift` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, workflows/CLAUDE.md |
 | `controlled-substances` | [medications.md](infrastructure/reference/database/tables/medications.md) | dosage_info.md |
 | `cqrs` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md, MIGRATION-FROM-CRUD.md |
 | `correlation-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md, triggering-workflows.md |
@@ -76,6 +79,7 @@ purpose: agent-navigation
 | `failed-events` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md |
 | `hipaa` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | impersonation-security-controls.md |
 | `formulary` | [medications.md](infrastructure/reference/database/tables/medications.md) | medication_history.md |
+| `generated-events` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | workflows/CLAUDE.md, event-sourcing-overview.md |
 | `hierarchy` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | scoping-architecture.md |
 | `idempotency` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | organization-bootstrap-workflow-design.md |
 | `impersonation` | [impersonation-architecture.md](architecture/authentication/impersonation-architecture.md) | impersonation-security-controls.md |
@@ -95,6 +99,7 @@ purpose: agent-navigation
 | `medication-history` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | medications.md |
 | `mfa` | [impersonation-security-controls.md](architecture/authentication/impersonation-security-controls.md) | enterprise-sso-guide.md |
 | `migration` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | DEPLOYMENT_INSTRUCTIONS.md, table-template.md |
+| `modelina` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, infrastructure/CLAUDE.md |
 | `migrations-applied` | [_migrations_applied.md](infrastructure/reference/database/tables/_migrations_applied.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `mobx` | [viewmodels.md](frontend/architecture/viewmodels.md) | frontend/CLAUDE.md, mobx-optimization.md |
 | `multi-role-invitation` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | user_roles_projection.md |
@@ -159,6 +164,7 @@ purpose: agent-navigation
 | `traceparent` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `trace-sampling` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `troubleshooting` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |
+| `type-generation` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | modelina, asyncapi, generated-events |
 | `user-aggregate` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | event-sourcing-overview.md |
 | `var` | [var-partnerships.md](architecture/data/var-partnerships.md) | provider-partners-architecture.md |
 | `viewmodel` | [viewmodels.md](frontend/architecture/viewmodels.md) | viewmodel-testing.md, mobx-patterns.md |
@@ -220,6 +226,7 @@ purpose: agent-navigation
 | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | Google OAuth testing guide | `oauth`, `testing`, `google` | 1400 |
 | [SUPABASE-AUTH-SETUP.md](infrastructure/guides/supabase/SUPABASE-AUTH-SETUP.md) | Auth provider configuration | `supabase`, `auth`, `setup` | 1600 |
 | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | Edge function testing guide | `edge-function`, `testing`, `deno` | 1200 |
+| [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | AsyncAPI → TypeScript type generation with Modelina | `asyncapi`, `modelina`, `type-generation`, `contract-drift`, `generated-events` | 3700 |
 | [event-observability.md](infrastructure/guides/event-observability.md) | Event processing observability, W3C Trace Context, span timing | `observability`, `tracing`, `failed-events`, `correlation-id`, `trace-id`, `span-id`, `session-id`, `w3c-trace-context` | 3200 |
 | [observability-operations.md](infrastructure/guides/observability-operations.md) | **[Aspirational]** Production-scale: retention, sampling, APM integration | `retention-policy`, `trace-sampling`, `apm-integration`, `otlp-export`, `event-archival` | 2000 |
 | [table-template.md](infrastructure/reference/database/table-template.md) | Database table documentation template | `template`, `database`, `schema` | 800 |
