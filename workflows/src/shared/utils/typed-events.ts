@@ -70,9 +70,9 @@ import {
   ContactAddressUnlinkData,
   ContactEmailLinkData,
   ContactEmailUnlinkData,
-  // Role event data types (using anonymous schema aliases)
-  AnonymousSchema_3031 as RoleCreationData,
-  AnonymousSchema_3057 as RolePermissionGrantData,
+  // Role event data types (now properly named)
+  RoleCreatedData as RoleCreationData,
+  RolePermissionGrantedData as RolePermissionGrantData,
 } from '../types/generated/events.js';
 
 // Re-export enums for convenience

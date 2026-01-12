@@ -40,7 +40,7 @@ async function main() {
           email: 'alice@var-partner.com',
           title: 'Account Manager',
           department: 'Sales',
-          type: 'a4c_admin',
+          type: 'administrative',
           label: 'Primary Contact'
         }
       ],
