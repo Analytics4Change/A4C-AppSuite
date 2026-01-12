@@ -38,7 +38,7 @@
  * - Subdomain skipped for: stakeholder partners (family, court), platform owner
  */
 
-import { proxyActivities, sleep, log } from '@temporalio/workflow';
+import { proxyActivities, sleep, log, ActivityFailure, ApplicationFailure } from '@temporalio/workflow';
 import type * as activities from '@activities/organization-bootstrap';
 import type {
   OrganizationBootstrapParams,
@@ -368,7 +368,16 @@ export async function organizationBootstrapWorkflow(
     // ========================================
     // Failure - Emit Failure Event, Then Run Compensation (Saga)
     // ========================================
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    // Extract real error from Temporal's nested failure structure
+    // ActivityFailure wraps the real error in .cause (ApplicationFailure)
+    let errorMessage = 'Unknown error';
+    if (error instanceof ActivityFailure && error.cause instanceof ApplicationFailure) {
+      // Real error is in the cause chain - this is the actual activity error
+      errorMessage = error.cause.message || error.message || 'Unknown error';
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+
     log.error('OrganizationBootstrapWorkflow failed, running compensation', {
       error: errorMessage,
       state
