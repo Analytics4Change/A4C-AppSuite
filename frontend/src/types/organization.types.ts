@@ -16,7 +16,7 @@ import { AuthMethod } from './auth.types';
  */
 export interface ContactFormData {
   label: string;
-  type: 'billing' | 'technical' | 'emergency' | 'a4c_admin';
+  type: 'administrative' | 'billing' | 'technical' | 'emergency' | 'stakeholder';
   firstName: string;
   lastName: string;
   email: string;

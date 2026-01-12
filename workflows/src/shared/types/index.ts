@@ -31,7 +31,7 @@ export interface ContactInfo {
   email: string;
   title?: string;
   department?: string;
-  type: 'a4c_admin' | 'billing' | 'technical' | 'emergency' | 'stakeholder';
+  type: 'administrative' | 'billing' | 'technical' | 'emergency' | 'stakeholder';
   label: string;
 }
 

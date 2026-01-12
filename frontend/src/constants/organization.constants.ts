@@ -41,12 +41,14 @@ export const PARTNER_TYPES = [
 /**
  * Contact Types
  * Classification for contact records
+ * MUST match AsyncAPI ContactType enum (source of truth)
  */
 export const CONTACT_TYPES = [
+  { value: 'administrative', label: 'Administrative' },
   { value: 'billing', label: 'Billing' },
   { value: 'technical', label: 'Technical' },
   { value: 'emergency', label: 'Emergency' },
-  { value: 'a4c_admin', label: 'A4C Admin' }
+  { value: 'stakeholder', label: 'Stakeholder' }
 ] as const;
 
 /**
@@ -132,9 +134,11 @@ export const US_STATES = [
  * Used for labeling contact information in forms
  */
 export const CONTACT_LABELS = {
-  A4C_ADMIN: 'A4C Admin Contact',
+  ADMINISTRATIVE: 'Administrative Contact',
   BILLING: 'Billing Contact',
   TECHNICAL: 'Technical Contact',
+  EMERGENCY: 'Emergency Contact',
+  STAKEHOLDER: 'Stakeholder Contact',
   PRIMARY: 'Primary Contact'
 } as const;
 
@@ -234,7 +238,7 @@ export const DEFAULT_ORGANIZATION_FORM = {
   // Provider Admin Information (Always visible)
   providerAdminContact: {
     label: 'Provider Admin Contact',
-    type: 'a4c_admin' as const,
+    type: 'administrative' as const,
     firstName: '',
     lastName: '',
     email: '',
