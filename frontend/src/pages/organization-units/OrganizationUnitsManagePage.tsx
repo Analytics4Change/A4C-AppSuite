@@ -18,7 +18,7 @@
  * Permission: organization.create_ou
  */
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { StatusFilterTabs, type StatusFilterOption } from '@/components/ui/StatusFilterTabs';
 import { OrganizationTree, OrganizationUnitFormFields } from '@/components/organization-units';
 import { OrganizationUnitsViewModel } from '@/viewModels/organization/OrganizationUnitsViewModel';
 import { OrganizationUnitFormViewModel } from '@/viewModels/organization/OrganizationUnitFormViewModel';
@@ -44,7 +45,9 @@ import {
   CheckCircle,
   XCircle,
   Save,
+  Search,
 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { Logger } from '@/utils/logger';
 import { cn } from '@/components/ui/utils';
 import * as Select from '@radix-ui/react-select';
@@ -94,6 +97,82 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
 
   // Error states
   const [operationError, setOperationError] = useState<string | null>(null);
+
+  // Status filter state - read initial value from URL
+  const statusParam = searchParams.get('status') as 'all' | 'active' | 'inactive' | null;
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>(
+    statusParam || 'all'
+  );
+
+  // Search filter state
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Status filter options with counts
+  const statusOptions: StatusFilterOption<'all' | 'active' | 'inactive'>[] = useMemo(
+    () => [
+      { value: 'all', label: 'All', count: viewModel.unitCount },
+      { value: 'active', label: 'Active', count: viewModel.activeUnitCount },
+      {
+        value: 'inactive',
+        label: 'Inactive',
+        count: viewModel.unitCount - viewModel.activeUnitCount,
+      },
+    ],
+    [viewModel.unitCount, viewModel.activeUnitCount]
+  );
+
+  // Handle status filter change with URL persistence
+  const handleStatusFilterChange = useCallback(
+    (newStatus: 'all' | 'active' | 'inactive') => {
+      setStatusFilter(newStatus);
+      setSearchParams(
+        (prev) => {
+          const newParams = new URLSearchParams(prev);
+          if (newStatus === 'all') {
+            newParams.delete('status');
+          } else {
+            newParams.set('status', newStatus);
+          }
+          return newParams;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  // Filter tree nodes based on search and status
+  const filteredTreeNodes = useMemo(() => {
+    let nodes = viewModel.treeNodes;
+
+    const filterNodes = (nodeList: typeof nodes): typeof nodes => {
+      return nodeList
+        .filter((node) => {
+          // Status filter
+          if (statusFilter === 'active' && !node.isActive) return false;
+          if (statusFilter === 'inactive' && node.isActive) return false;
+
+          // Search filter
+          if (searchTerm.trim()) {
+            const term = searchTerm.toLowerCase();
+            const nameMatch = node.name.toLowerCase().includes(term);
+            const displayNameMatch = node.displayName?.toLowerCase().includes(term);
+            const hasMatchingChild = node.children.some(
+              (child) => filterNodes([child]).length > 0
+            );
+            return nameMatch || displayNameMatch || hasMatchingChild;
+          }
+
+          return true;
+        })
+        .map((node) => ({
+          ...node,
+          children: filterNodes(node.children),
+        }));
+    };
+
+    return filterNodes(nodes);
+  }, [viewModel.treeNodes, statusFilter, searchTerm]);
 
   // Load units on mount
   useEffect(() => {
@@ -499,6 +578,32 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     </Button>
                   </div>
                 </div>
+
+                {/* Status Filter Tabs */}
+                <StatusFilterTabs
+                  options={statusOptions}
+                  value={statusFilter}
+                  onChange={handleStatusFilterChange}
+                  ariaLabel="Filter organization units by status"
+                  className="mt-4"
+                />
+
+                {/* Search Bar */}
+                <div className="relative mt-3">
+                  <Search
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                    size={18}
+                    aria-hidden="true"
+                  />
+                  <Input
+                    type="search"
+                    placeholder="Search by name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                    aria-label="Search organization units"
+                  />
+                </div>
               </CardHeader>
               <CardContent className="p-6">
                 {/* Loading State */}
@@ -514,7 +619,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                 {/* Tree View */}
                 {(!viewModel.isLoading || viewModel.unitCount > 0) && (
                   <OrganizationTree
-                    nodes={viewModel.treeNodes}
+                    nodes={filteredTreeNodes}
                     selectedId={viewModel.selectedUnitId}
                     expandedIds={viewModel.expandedNodeIds}
                     onSelect={handleTreeSelect}

@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,13 +26,37 @@ const log = Logger.getLogger('component');
  */
 export const RolesPage: React.FC = observer(() => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Create ViewModel on mount
   const viewModel = useMemo(() => new RolesViewModel(), []);
 
-  // Local state
+  // Local state - read initial status from URL
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const statusParam = searchParams.get('status') as 'all' | 'active' | 'inactive' | null;
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>(
+    statusParam || 'all'
+  );
+
+  // Handle status filter change with URL persistence
+  const handleStatusFilterChange = useCallback(
+    (newStatus: 'all' | 'active' | 'inactive') => {
+      setStatusFilter(newStatus);
+      setSearchParams(
+        (prev) => {
+          const newParams = new URLSearchParams(prev);
+          if (newStatus === 'all') {
+            newParams.delete('status');
+          } else {
+            newParams.set('status', newStatus);
+          }
+          return newParams;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     roleId: string;
@@ -76,8 +100,10 @@ export const RolesPage: React.FC = observer(() => {
     return roles;
   }, [viewModel.roles, statusFilter, searchTerm]);
 
+  // Navigation handlers - preserve status filter in URL
   const handleCreateClick = () => {
-    navigate('/roles/manage');
+    const params = statusFilter !== 'all' ? `?status=${statusFilter}` : '';
+    navigate(`/roles/manage${params}`);
   };
 
   const handleDeactivate = (roleId: string) => {
@@ -143,28 +169,43 @@ export const RolesPage: React.FC = observer(() => {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4" role="group" aria-label="Filter by status">
         <Button
           variant={statusFilter === 'all' ? 'default' : 'outline'}
           size="sm"
-          onClick={() => setStatusFilter('all')}
+          onClick={() => handleStatusFilterChange('all')}
           aria-pressed={statusFilter === 'all'}
+          className={
+            statusFilter === 'all'
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'hover:bg-gray-100'
+          }
         >
           All ({viewModel.roleCount})
         </Button>
         <Button
           variant={statusFilter === 'active' ? 'default' : 'outline'}
           size="sm"
-          onClick={() => setStatusFilter('active')}
+          onClick={() => handleStatusFilterChange('active')}
           aria-pressed={statusFilter === 'active'}
+          className={
+            statusFilter === 'active'
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'hover:bg-gray-100'
+          }
         >
           Active ({viewModel.activeRoleCount})
         </Button>
         <Button
           variant={statusFilter === 'inactive' ? 'default' : 'outline'}
           size="sm"
-          onClick={() => setStatusFilter('inactive')}
+          onClick={() => handleStatusFilterChange('inactive')}
           aria-pressed={statusFilter === 'inactive'}
+          className={
+            statusFilter === 'inactive'
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'hover:bg-gray-100'
+          }
         >
           Inactive ({viewModel.roleCount - viewModel.activeRoleCount})
         </Button>

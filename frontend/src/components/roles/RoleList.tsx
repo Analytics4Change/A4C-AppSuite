@@ -19,6 +19,7 @@ import { observer } from 'mobx-react-lite';
 import { cn } from '@/components/ui/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Search, Users, Shield, Building2 } from 'lucide-react';
 import type { Role, RoleFilterOptions } from '@/types/role.types';
 import { Logger } from '@/utils/logger';
@@ -191,7 +192,6 @@ export const RoleList = observer(
     className,
   }: RoleListProps) => {
     const searchId = useId();
-    const statusId = useId();
 
     log.debug('RoleList render', {
       roleCount: roles.length,
@@ -204,13 +204,6 @@ export const RoleList = observer(
         onSearchChange(e.target.value);
       },
       [onSearchChange]
-    );
-
-    const handleStatusChange = useCallback(
-      (e: React.ChangeEvent<HTMLSelectElement>) => {
-        onStatusChange(e.target.value as 'all' | 'active' | 'inactive');
-      },
-      [onStatusChange]
     );
 
     return (
@@ -239,27 +232,28 @@ export const RoleList = observer(
             </div>
           </div>
 
-          {/* Status filter */}
-          <div className="flex items-center gap-2">
-            <Label htmlFor={statusId} className="text-sm text-gray-600">
-              Status:
-            </Label>
-            <select
-              id={statusId}
-              value={filters.status || 'all'}
-              onChange={handleStatusChange}
-              className={cn(
-                'flex-1 h-9 rounded-md border border-gray-300 bg-white px-3 py-1',
-                'text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-              )}
-              aria-label="Filter by role status"
-            >
-              {STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
+          {/* Status filter tabs */}
+          <div className="flex gap-2 flex-wrap" role="group" aria-label="Filter by status">
+            {STATUS_OPTIONS.map((option) => {
+              const isSelected = (filters.status || 'all') === option.value;
+              return (
+                <Button
+                  key={option.value}
+                  size="sm"
+                  variant={isSelected ? 'default' : 'outline'}
+                  onClick={() => onStatusChange(option.value)}
+                  className={cn(
+                    'flex items-center gap-1.5 transition-all',
+                    isSelected
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'hover:bg-gray-100'
+                  )}
+                  aria-pressed={isSelected}
+                >
                   {option.label}
-                </option>
-              ))}
-            </select>
+                </Button>
+              );
+            })}
           </div>
         </div>
 

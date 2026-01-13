@@ -19,7 +19,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -69,6 +69,10 @@ type DialogState =
  */
 export const RolesManagePage: React.FC = observer(() => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Read initial status from URL param
+  const initialStatus = searchParams.get('status') as 'all' | 'active' | 'inactive' | null;
 
   // List ViewModel - manages role list state
   const [viewModel] = useState(() => new RolesViewModel());
@@ -95,8 +99,12 @@ export const RolesManagePage: React.FC = observer(() => {
   // Load roles and permissions on mount
   useEffect(() => {
     log.debug('RolesManagePage mounted, loading data');
+    // Set initial status filter from URL if present
+    if (initialStatus && initialStatus !== 'all') {
+      viewModel.setStatusFilter(initialStatus);
+    }
     viewModel.loadAll();
-  }, [viewModel]);
+  }, [viewModel, initialStatus]);
 
   // Load OU tree data on mount
   useEffect(() => {
@@ -403,8 +411,21 @@ export const RolesManagePage: React.FC = observer(() => {
   const handleStatusChange = useCallback(
     async (status: 'all' | 'active' | 'inactive') => {
       await viewModel.setStatusFilter(status);
+      // Update URL to persist filter
+      setSearchParams(
+        (prev) => {
+          const newParams = new URLSearchParams(prev);
+          if (status === 'all') {
+            newParams.delete('status');
+          } else {
+            newParams.set('status', status);
+          }
+          return newParams;
+        },
+        { replace: true }
+      );
     },
-    [viewModel]
+    [viewModel, setSearchParams]
   );
 
   return (

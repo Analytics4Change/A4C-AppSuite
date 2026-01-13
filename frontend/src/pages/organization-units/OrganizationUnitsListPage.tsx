@@ -16,9 +16,9 @@
  * Permission: organization.view_ou
  */
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { observer } from 'mobx-react-lite';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,11 +43,35 @@ const log = Logger.getLogger('component');
  */
 export const OrganizationUnitsListPage: React.FC = observer(() => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [viewModel] = useState(() => new OrganizationUnitsViewModel());
 
-  // Local state for search and filter
+  // Local state for search and filter - read initial status from URL
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const statusParam = searchParams.get('status') as 'all' | 'active' | 'inactive' | null;
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>(
+    statusParam || 'all'
+  );
+
+  // Handle status filter change with URL persistence
+  const handleStatusFilterChange = useCallback(
+    (newStatus: 'all' | 'active' | 'inactive') => {
+      setStatusFilter(newStatus);
+      setSearchParams(
+        (prev) => {
+          const newParams = new URLSearchParams(prev);
+          if (newStatus === 'all') {
+            newParams.delete('status');
+          } else {
+            newParams.set('status', newStatus);
+          }
+          return newParams;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
 
   // Load units on mount
   useEffect(() => {
@@ -89,9 +113,10 @@ export const OrganizationUnitsListPage: React.FC = observer(() => {
     return filterNodes(nodes);
   }, [viewModel.treeNodes, statusFilter, searchTerm]);
 
-  // Navigation handlers
+  // Navigation handlers - preserve status filter in URL
   const handleManageClick = () => {
-    navigate('/organization-units/manage');
+    const params = statusFilter !== 'all' ? `?status=${statusFilter}` : '';
+    navigate(`/organization-units/manage${params}`);
   };
 
   const handleRefresh = async () => {
@@ -131,28 +156,43 @@ export const OrganizationUnitsListPage: React.FC = observer(() => {
       </div>
 
       {/* Status Filter Tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4" role="group" aria-label="Filter by status">
         <Button
           variant={statusFilter === 'all' ? 'default' : 'outline'}
           size="sm"
-          onClick={() => setStatusFilter('all')}
+          onClick={() => handleStatusFilterChange('all')}
           aria-pressed={statusFilter === 'all'}
+          className={
+            statusFilter === 'all'
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'hover:bg-gray-100'
+          }
         >
           All ({totalCount})
         </Button>
         <Button
           variant={statusFilter === 'active' ? 'default' : 'outline'}
           size="sm"
-          onClick={() => setStatusFilter('active')}
+          onClick={() => handleStatusFilterChange('active')}
           aria-pressed={statusFilter === 'active'}
+          className={
+            statusFilter === 'active'
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'hover:bg-gray-100'
+          }
         >
           Active ({activeCount})
         </Button>
         <Button
           variant={statusFilter === 'inactive' ? 'default' : 'outline'}
           size="sm"
-          onClick={() => setStatusFilter('inactive')}
+          onClick={() => handleStatusFilterChange('inactive')}
           aria-pressed={statusFilter === 'inactive'}
+          className={
+            statusFilter === 'inactive'
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'hover:bg-gray-100'
+          }
         >
           Inactive ({inactiveCount})
         </Button>
