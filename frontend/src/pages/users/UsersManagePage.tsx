@@ -183,44 +183,58 @@ export const UsersManagePage: React.FC = observer(() => {
         const item = viewModel.items.find((u: UserListItem) => u.id === itemId);
 
         if (item) {
+          // Clear old form immediately to prevent showing stale data
+          setFormViewModel(null);
           setCurrentItem(item);
           setPanelMode('edit');
 
-          // AWAIT the detail load to prevent race condition
+          // Try to load detailed data (async)
           await viewModel.selectItem(itemId);
 
-          // Use loaded details for form (not stale list data)
-          const details = item.isInvitation
+          // Use loaded details if available, otherwise fall back to list item data
+          const loadedDetails = item.isInvitation
             ? viewModel.selectedInvitationDetails
             : viewModel.selectedUserDetails;
 
-          if (details) {
-            // Convert Role[] to RoleReference[]
-            const roleRefs = availableRoles.map((r: Role) => ({
-              roleId: r.id,
-              roleName: r.name,
-            }));
-            const form = new UserFormViewModel(roleRefs);
-            // Initialize with loaded details (not list item data)
-            form.setEmail(details.email);
-            form.setFirstName(details.firstName || '');
-            form.setLastName(details.lastName || '');
+          // Convert Role[] to RoleReference[]
+          const roleRefs = availableRoles.map((r: Role) => ({
+            roleId: r.id,
+            roleName: r.name,
+          }));
+          const form = new UserFormViewModel(roleRefs);
+
+          if (loadedDetails) {
+            // Use loaded details (preferred - most up-to-date)
+            form.setEmail(loadedDetails.email);
+            form.setFirstName(loadedDetails.firstName || '');
+            form.setLastName(loadedDetails.lastName || '');
             // UserWithRoles.roles is Role[] (with .id), Invitation.roles is RoleReference[] (with .roleId)
             const roleIds = item.isInvitation
-              ? (details.roles as RoleReference[])?.map((r) => r.roleId) || []
-              : (details.roles as Role[])?.map((r) => r.id) || [];
+              ? (loadedDetails.roles as RoleReference[])?.map((r) => r.roleId) || []
+              : (loadedDetails.roles as Role[])?.map((r) => r.id) || [];
             form.setRoles(roleIds);
-            setFormViewModel(form);
-            log.debug('User/invitation loaded for editing', {
+            log.debug('User/invitation loaded from details', {
               itemId,
               isInvitation: item.isInvitation,
-              firstName: details.firstName,
-              lastName: details.lastName,
+              firstName: loadedDetails.firstName,
+              lastName: loadedDetails.lastName,
             });
           } else {
-            log.warn('Failed to load user details after selectItem', { itemId });
-            setOperationError('Failed to load user details');
+            // Fallback to list item data (may be less complete but better than nothing)
+            log.warn('Detail load returned null, using list item data', { itemId });
+            form.setEmail(item.email);
+            form.setFirstName(item.firstName || '');
+            form.setLastName(item.lastName || '');
+            form.setRoles(item.roles.map((r) => r.roleId));
+            log.debug('User/invitation loaded from list item', {
+              itemId,
+              isInvitation: item.isInvitation,
+              firstName: item.firstName,
+              lastName: item.lastName,
+            });
           }
+
+          setFormViewModel(form);
         }
       } catch (error) {
         log.error('Failed to load user/invitation', error);
