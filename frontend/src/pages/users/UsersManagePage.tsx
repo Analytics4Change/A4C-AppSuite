@@ -30,7 +30,7 @@ import { UsersViewModel } from '@/viewModels/users/UsersViewModel';
 import { UserFormViewModel } from '@/viewModels/users/UserFormViewModel';
 import { getUserQueryService, getUserCommandService } from '@/services/users';
 import { getRoleService } from '@/services/roles';
-import type { UserListItem, UserDisplayStatus } from '@/types/user.types';
+import type { UserListItem, UserDisplayStatus, RoleReference } from '@/types/user.types';
 import type { Role } from '@/types/role.types';
 import {
   Plus,
@@ -184,24 +184,43 @@ export const UsersManagePage: React.FC = observer(() => {
 
         if (item) {
           setCurrentItem(item);
-          // Convert Role[] to RoleReference[]
-          const roleRefs = availableRoles.map((r: Role) => ({
-            roleId: r.id,
-            roleName: r.name,
-          }));
-          const form = new UserFormViewModel(roleRefs);
-          // Initialize with existing data
-          form.setEmail(item.email);
-          form.setFirstName(item.firstName || '');
-          form.setLastName(item.lastName || '');
-          form.setRoles(item.roles.map((r) => r.roleId));
-          setFormViewModel(form);
           setPanelMode('edit');
-          viewModel.selectItem(itemId);
-          log.debug('User/invitation loaded for editing', {
-            itemId,
-            isInvitation: item.isInvitation,
-          });
+
+          // AWAIT the detail load to prevent race condition
+          await viewModel.selectItem(itemId);
+
+          // Use loaded details for form (not stale list data)
+          const details = item.isInvitation
+            ? viewModel.selectedInvitationDetails
+            : viewModel.selectedUserDetails;
+
+          if (details) {
+            // Convert Role[] to RoleReference[]
+            const roleRefs = availableRoles.map((r: Role) => ({
+              roleId: r.id,
+              roleName: r.name,
+            }));
+            const form = new UserFormViewModel(roleRefs);
+            // Initialize with loaded details (not list item data)
+            form.setEmail(details.email);
+            form.setFirstName(details.firstName || '');
+            form.setLastName(details.lastName || '');
+            // UserWithRoles.roles is Role[] (with .id), Invitation.roles is RoleReference[] (with .roleId)
+            const roleIds = item.isInvitation
+              ? (details.roles as RoleReference[])?.map((r) => r.roleId) || []
+              : (details.roles as Role[])?.map((r) => r.id) || [];
+            form.setRoles(roleIds);
+            setFormViewModel(form);
+            log.debug('User/invitation loaded for editing', {
+              itemId,
+              isInvitation: item.isInvitation,
+              firstName: details.firstName,
+              lastName: details.lastName,
+            });
+          } else {
+            log.warn('Failed to load user details after selectItem', { itemId });
+            setOperationError('Failed to load user details');
+          }
         }
       } catch (error) {
         log.error('Failed to load user/invitation', error);
@@ -746,6 +765,21 @@ export const UsersManagePage: React.FC = observer(() => {
                       </Button>
                     </div>
                   </form>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Loading State - while user details are being fetched */}
+            {panelMode === 'edit' && currentItem && !formViewModel && viewModel.isLoadingDetails && (
+              <Card className="shadow-lg">
+                <CardContent className="p-12 text-center">
+                  <RefreshCw className="w-12 h-12 text-blue-500 mx-auto mb-4 animate-spin" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Loading User Details
+                  </h3>
+                  <p className="text-gray-500">
+                    Please wait while we fetch the user information...
+                  </p>
                 </CardContent>
               </Card>
             )}
