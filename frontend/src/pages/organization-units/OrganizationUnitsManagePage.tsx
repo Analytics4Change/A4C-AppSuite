@@ -691,7 +691,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     onSelectLast={viewModel.selectLast.bind(viewModel)}
                     ariaLabel="Organization hierarchy - select a unit to edit"
                     activeStatusFilter={statusFilter}
-                    className="border rounded-lg p-4 bg-white min-h-[400px]"
+                    className="border rounded-lg p-4 min-h-[400px]"
                   />
                 )}
 
