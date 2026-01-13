@@ -82,6 +82,9 @@ export interface OrganizationTreeProps {
 
   /** Callback when Enter/Space is pressed on selected node */
   onActivate?: (nodeId: string) => void;
+
+  /** Active status filter - affects node styling when filtering by inactive */
+  activeStatusFilter?: 'all' | 'active' | 'inactive';
 }
 
 /**
@@ -107,6 +110,7 @@ export const OrganizationTree = observer(
     readOnly = false,
     className,
     onActivate,
+    activeStatusFilter = 'all',
   }: OrganizationTreeProps) => {
     // Ref map for managing focus on nodes
     const nodeRefs = useRef<Map<string, HTMLLIElement | null>>(new Map());
@@ -363,6 +367,7 @@ export const OrganizationTree = observer(
             isLastChild={index === nodes.length - 1}
             expandedIds={expandedIds}
             selectedId={selectedId}
+            activeStatusFilter={activeStatusFilter}
           />
         ))}
       </ul>

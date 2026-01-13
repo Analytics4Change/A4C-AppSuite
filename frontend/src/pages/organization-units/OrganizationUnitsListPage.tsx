@@ -16,7 +16,7 @@
  * Permission: organization.view_ou
  */
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -78,6 +78,19 @@ export const OrganizationUnitsListPage: React.FC = observer(() => {
     log.debug('OrganizationUnitsListPage mounted, loading units');
     viewModel.loadUnits();
   }, [viewModel]);
+
+  // Track previous filter to detect when it changes to 'inactive'
+  const prevStatusFilterRef = useRef(statusFilter);
+  useEffect(() => {
+    // When filter changes to 'inactive' and tree is mostly collapsed, expand inactive paths
+    if (statusFilter === 'inactive' && prevStatusFilterRef.current !== 'inactive') {
+      if (viewModel.expandedNodeIds.size <= 1) {
+        viewModel.expandToInactiveNodes();
+        log.debug('Auto-expanded paths to inactive nodes');
+      }
+    }
+    prevStatusFilterRef.current = statusFilter;
+  }, [statusFilter, viewModel]);
 
   // Filter tree nodes based on search and status
   const filteredTreeNodes = useMemo(() => {
@@ -314,6 +327,7 @@ export const OrganizationUnitsListPage: React.FC = observer(() => {
                 onSelectLast={viewModel.selectLast.bind(viewModel)}
                 ariaLabel="Organization hierarchy (read-only)"
                 readOnly
+                activeStatusFilter={statusFilter}
                 className="border rounded-lg p-4 bg-white"
               />
             )}

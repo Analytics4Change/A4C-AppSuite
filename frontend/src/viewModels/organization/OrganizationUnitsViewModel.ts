@@ -264,10 +264,9 @@ export class OrganizationUnitsViewModel {
           this.rootPath = rootOrg.path;
           log.debug('Auto-detected root path', { rootPath: this.rootPath });
 
-          // Auto-expand root organization
-          if (!this.expandedNodeIds.has(rootOrg.id)) {
-            this.expandedNodeIds.add(rootOrg.id);
-          }
+          // Auto-expand all nodes on initial load
+          this.expandedNodeIds = new Set(units.map((u) => u.id));
+          log.debug('Auto-expanded all nodes', { count: units.length });
         }
 
         log.info('Loaded organizational units', { count: units.length, rootPath: this.rootPath });
@@ -404,6 +403,36 @@ export class OrganizationUnitsViewModel {
       }
       this.expandedNodeIds = new Set(this.expandedNodeIds);
       log.debug('Expanded path to node', { unitId });
+    });
+  }
+
+  /**
+   * Expand all paths leading to inactive nodes.
+   * Used when switching to 'inactive' filter with a collapsed tree.
+   * Reveals the full hierarchy path to each inactive node.
+   */
+  expandToInactiveNodes(): void {
+    runInAction(() => {
+      const inactiveUnits = this.rawUnits.filter((u) => !u.isActive);
+      const pathsToExpand = new Set<string>();
+
+      inactiveUnits.forEach((unit) => {
+        // Add the inactive unit itself
+        pathsToExpand.add(unit.id);
+
+        // Add all ancestors to expand set
+        let currentId: string | null = unit.parentId;
+        while (currentId) {
+          pathsToExpand.add(currentId);
+          const parent = this.rawUnits.find((u) => u.id === currentId);
+          currentId = parent?.parentId ?? null;
+        }
+      });
+
+      // Merge with existing expanded nodes
+      pathsToExpand.forEach((id) => this.expandedNodeIds.add(id));
+      this.expandedNodeIds = new Set(this.expandedNodeIds);
+      log.debug('Expanded paths to inactive nodes', { count: inactiveUnits.length });
     });
   }
 

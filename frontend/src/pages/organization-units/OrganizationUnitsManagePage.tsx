@@ -180,6 +180,19 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
     viewModel.loadUnits();
   }, [viewModel]);
 
+  // Track previous filter to detect when it changes to 'inactive'
+  const prevStatusFilterRef = useRef(statusFilter);
+  useEffect(() => {
+    // When filter changes to 'inactive' and tree is mostly collapsed, expand inactive paths
+    if (statusFilter === 'inactive' && prevStatusFilterRef.current !== 'inactive') {
+      if (viewModel.expandedNodeIds.size <= 1) {
+        viewModel.expandToInactiveNodes();
+        log.debug('Auto-expanded paths to inactive nodes');
+      }
+    }
+    prevStatusFilterRef.current = statusFilter;
+  }, [statusFilter, viewModel]);
+
   // Handle query parameters for deep linking and auto-expand
   useEffect(() => {
     const selectId = searchParams.get('select');
@@ -292,6 +305,12 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
     setFormViewModel(vm);
     setCurrentUnit(null);
     setPanelMode('create');
+
+    // Auto-focus Unit Name input after form renders
+    setTimeout(() => {
+      document.getElementById('create-unit-name')?.focus();
+    }, 0);
+
     log.debug('Entered create mode', { parentId: viewModel.selectedUnitId });
   }, [viewModel]);
 
@@ -631,6 +650,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     onSelectFirst={viewModel.selectFirst.bind(viewModel)}
                     onSelectLast={viewModel.selectLast.bind(viewModel)}
                     ariaLabel="Organization hierarchy - select a unit to edit"
+                    activeStatusFilter={statusFilter}
                     className="border rounded-lg p-4 bg-white min-h-[400px]"
                   />
                 )}

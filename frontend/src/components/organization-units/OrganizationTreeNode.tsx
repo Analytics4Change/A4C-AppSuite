@@ -62,6 +62,9 @@ export interface OrganizationTreeNodeProps {
 
   /** Currently selected node ID (for recursive children to check selection state) */
   selectedId?: string | null;
+
+  /** Active status filter - affects styling when filtering by inactive */
+  activeStatusFilter?: 'all' | 'active' | 'inactive';
 }
 
 /**
@@ -91,10 +94,12 @@ export const OrganizationTreeNode = observer(
         isLastChild = false,
         expandedIds,
         selectedId,
+        activeStatusFilter = 'all',
       },
       ref
     ) => {
       const hasChildren = node.children.length > 0;
+      const isInactiveFilterActive = activeStatusFilter === 'inactive';
 
       // Handle toggle button click (stop propagation to prevent selection)
       const handleToggleClick = useCallback(
@@ -186,7 +191,8 @@ export const OrganizationTreeNode = observer(
               'focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-1',
               isSelected && 'bg-blue-100 border border-blue-300',
               !isSelected && 'hover:bg-gray-50',
-              !node.isActive && 'opacity-60'
+              // Only dim inactive nodes when NOT filtering by inactive
+              !node.isActive && !isInactiveFilterActive && 'opacity-60'
             )}
           >
             {/* Expand/Collapse Toggle */}
@@ -217,8 +223,14 @@ export const OrganizationTreeNode = observer(
             <NodeIcon
               className={cn(
                 'w-5 h-5 mr-2 flex-shrink-0',
-                node.isRootOrganization ? 'text-blue-600' : 'text-gray-500',
-                !node.isActive && 'text-gray-400'
+                // Default: root=blue, others=gray
+                node.isRootOrganization && !isInactiveFilterActive && 'text-blue-600',
+                !node.isRootOrganization && !isInactiveFilterActive && 'text-gray-500',
+                // Inactive nodes dimmed when NOT filtering inactive
+                !node.isActive && !isInactiveFilterActive && 'text-gray-400',
+                // When filtering inactive: active parents gray, inactive nodes normal
+                isInactiveFilterActive && node.isActive && 'text-gray-400',
+                isInactiveFilterActive && !node.isActive && (node.isRootOrganization ? 'text-blue-600' : 'text-gray-500')
               )}
             />
 
@@ -227,9 +239,15 @@ export const OrganizationTreeNode = observer(
               data-testid="ou-name"
               className={cn(
                 'flex-grow text-sm font-medium truncate',
+                // Selected state
                 isSelected && 'text-blue-900',
-                !isSelected && 'text-gray-900',
-                !node.isActive && 'text-gray-500 italic'
+                // Default unselected state
+                !isSelected && !isInactiveFilterActive && 'text-gray-900',
+                // Inactive nodes when NOT filtering inactive: muted + italic
+                !node.isActive && !isInactiveFilterActive && 'text-gray-500 italic',
+                // When filtering inactive: active parents gray, inactive nodes normal
+                !isSelected && isInactiveFilterActive && node.isActive && 'text-gray-400',
+                !isSelected && isInactiveFilterActive && !node.isActive && 'text-gray-900'
               )}
             >
               {node.displayName || node.name}
@@ -244,9 +262,16 @@ export const OrganizationTreeNode = observer(
                 </span>
               )}
 
-              {/* Inactive Badge */}
+              {/* Inactive Badge - darker when filtering by inactive */}
               {!node.isActive && (
-                <span className="flex items-center gap-1 text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full">
+                <span
+                  className={cn(
+                    'flex items-center gap-1 text-xs px-2 py-0.5 rounded-full',
+                    isInactiveFilterActive
+                      ? 'bg-orange-200 text-orange-800' // Darker/more saturated
+                      : 'bg-orange-100 text-orange-700' // Default
+                  )}
+                >
                   <AlertCircle className="w-3 h-3" />
                   Inactive
                 </span>
@@ -280,6 +305,7 @@ export const OrganizationTreeNode = observer(
                   isLastChild={index === node.children.length - 1}
                   expandedIds={expandedIds}
                   selectedId={selectedId}
+                  activeStatusFilter={activeStatusFilter}
                 />
               ))}
             </ul>
