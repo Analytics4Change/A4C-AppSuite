@@ -1,14 +1,15 @@
 /**
  * Manage User Edge Function
  *
- * Handles user lifecycle operations: deactivate and reactivate.
+ * Handles user lifecycle operations: deactivate, reactivate, and delete.
  *
  * Operations:
  * - deactivate: Deactivate a user within the organization
  * - reactivate: Reactivate a deactivated user
+ * - delete: Permanently delete a deactivated user (soft-delete via deleted_at)
  *
- * CQRS-compliant: Emits user.deactivated / user.reactivated domain events.
- * Permission required: user.update
+ * CQRS-compliant: Emits user.deactivated / user.reactivated / user.deleted domain events.
+ * Permission required: user.update (deactivate/reactivate), user.delete (delete)
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -30,7 +31,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v4-tracing';
+const DEPLOY_VERSION = 'v5-delete';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -38,7 +39,7 @@ const corsHeaders = standardCorsHeaders;
 /**
  * Supported operations
  */
-type Operation = 'deactivate' | 'reactivate';
+type Operation = 'deactivate' | 'reactivate' | 'delete';
 
 /**
  * Request format from frontend
@@ -199,13 +200,27 @@ serve(async (req) => {
       );
     }
 
-    // Check user.update permission
-    if (!permissions.includes('user.update')) {
-      console.log(`[manage-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} lacks user.update`);
-      return new Response(
-        JSON.stringify({ error: 'Permission denied: user.update required' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Check permissions based on operation
+    // Note: Permission check happens before parsing body, so we extract operation from request
+    const bodyText = await req.text();
+    const preCheckData = JSON.parse(bodyText) as ManageUserRequest;
+
+    if (preCheckData.operation === 'delete') {
+      if (!permissions.includes('user.delete')) {
+        console.log(`[manage-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} lacks user.delete`);
+        return new Response(
+          JSON.stringify({ error: 'Permission denied: user.delete required' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } else {
+      if (!permissions.includes('user.update')) {
+        console.log(`[manage-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} lacks user.update`);
+        return new Response(
+          JSON.stringify({ error: 'Permission denied: user.update required' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     console.log(`[manage-user v${DEPLOY_VERSION}] User ${user.id} authorized for org ${orgId}`);
@@ -213,7 +228,8 @@ serve(async (req) => {
     // ==========================================================================
     // REQUEST VALIDATION
     // ==========================================================================
-    const requestData: ManageUserRequest = await req.json();
+    // Note: Body already parsed above for permission check
+    const requestData: ManageUserRequest = preCheckData;
 
     if (!requestData.operation) {
       return new Response(
@@ -222,9 +238,9 @@ serve(async (req) => {
       );
     }
 
-    if (!['deactivate', 'reactivate'].includes(requestData.operation)) {
+    if (!['deactivate', 'reactivate', 'delete'].includes(requestData.operation)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid operation. Must be "deactivate" or "reactivate"' }),
+        JSON.stringify({ error: 'Invalid operation. Must be "deactivate", "reactivate", or "delete"' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -236,10 +252,11 @@ serve(async (req) => {
       );
     }
 
-    // Prevent self-deactivation
-    if (requestData.operation === 'deactivate' && requestData.userId === user.id) {
+    // Prevent self-deactivation and self-deletion
+    if ((requestData.operation === 'deactivate' || requestData.operation === 'delete') && requestData.userId === user.id) {
+      const action = requestData.operation === 'delete' ? 'delete' : 'deactivate';
       return new Response(
-        JSON.stringify({ error: 'Cannot deactivate yourself' }),
+        JSON.stringify({ error: `Cannot ${action} yourself` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -281,12 +298,36 @@ serve(async (req) => {
       );
     }
 
+    // Delete requires user to be deactivated first (soft-delete pattern)
+    if (requestData.operation === 'delete' && userDetails.isActive) {
+      return new Response(
+        JSON.stringify({ error: 'Cannot delete active user. Deactivate first.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // ==========================================================================
     // EMIT DOMAIN EVENT
     // ==========================================================================
     const now = new Date().toISOString();
-    const eventType = requestData.operation === 'deactivate' ? 'user.deactivated' : 'user.reactivated';
-    const timestampField = requestData.operation === 'deactivate' ? 'deactivated_at' : 'reactivated_at';
+
+    // Determine event type and timestamp field based on operation
+    let eventType: string;
+    let timestampField: string;
+    switch (requestData.operation) {
+      case 'delete':
+        eventType = 'user.deleted';
+        timestampField = 'deleted_at';
+        break;
+      case 'deactivate':
+        eventType = 'user.deactivated';
+        timestampField = 'deactivated_at';
+        break;
+      case 'reactivate':
+        eventType = 'user.reactivated';
+        timestampField = 'reactivated_at';
+        break;
+    }
 
     console.log(`[manage-user v${DEPLOY_VERSION}] Emitting ${eventType} event...`);
 

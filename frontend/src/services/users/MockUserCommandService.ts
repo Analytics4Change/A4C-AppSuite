@@ -357,6 +357,34 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true };
   }
 
+  async deleteUser(userId: string, reason?: string): Promise<UserOperationResult> {
+    await this.simulateDelay();
+    log.debug('Mock: Deleting user', { userId, reason });
+
+    const user = await this.queryService.getUserById(userId);
+    if (!user) {
+      return {
+        success: false,
+        error: 'User not found',
+        errorDetails: { code: 'NOT_FOUND', message: 'User not found' },
+      };
+    }
+
+    if (user.isActive) {
+      return {
+        success: false,
+        error: 'Cannot delete active user. Deactivate first.',
+        errorDetails: { code: 'USER_ACTIVE', message: 'User must be deactivated before deletion' },
+      };
+    }
+
+    // Soft delete - remove from mock data
+    this.queryService.deleteUser(userId);
+
+    log.info('Mock: Deleted user', { userId, email: user.email, reason });
+    return { success: true };
+  }
+
   async updateUser(request: UpdateUserRequest): Promise<UserOperationResult> {
     await this.simulateDelay();
     log.debug('Mock: Updating user', { userId: request.userId });

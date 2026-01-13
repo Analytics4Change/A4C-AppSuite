@@ -251,6 +251,341 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
+          - name: user.deactivated
+            title: User Deactivated
+            summary: A user has been deactivated within an organization
+            contentType: application/json
+            payload:
+              title: UserDeactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.deactivated
+                event_data:
+                  title: UserDeactivatedData
+                  type: object
+                  required:
+                    - user_id
+                    - org_id
+                    - deactivated_at
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization from which the user is being deactivated
+                    deactivated_at:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                      description: Optional reason for deactivation
+                      examples:
+                        - Account suspended
+                        - End of contract
+                        - User requested
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.reactivated
+            title: User Reactivated
+            summary: A deactivated user has been reactivated within an organization
+            contentType: application/json
+            payload:
+              title: UserReactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.reactivated
+                event_data:
+                  title: UserReactivatedData
+                  type: object
+                  required:
+                    - user_id
+                    - org_id
+                    - reactivated_at
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization in which the user is being reactivated
+                    reactivated_at:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                      description: Optional reason for reactivation
+                      examples:
+                        - Account restored
+                        - Contract renewed
+                        - Admin decision
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.deleted
+            title: User Deleted
+            summary: >-
+              A deactivated user has been permanently deleted from an
+              organization
+            contentType: application/json
+            payload:
+              title: UserDeletedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.deleted
+                event_data:
+                  title: UserDeletedData
+                  type: object
+                  required:
+                    - user_id
+                    - org_id
+                    - deleted_at
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization from which the user is being deleted
+                    deleted_at:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                      description: Optional reason for deletion
+                      examples:
+                        - User requested account deletion
+                        - Inactive account cleanup
+                        - Policy violation
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
           - name: user.invited
             title: User Invited
             summary: An invitation has been sent to a user to join an organization
@@ -9113,6 +9448,341 @@ channels:
                         - User selected different organization from dropdown
                         - Automatic switch after single org access granted
                         - Session initialization with default organization
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.deactivated
+            title: User Deactivated
+            summary: A user has been deactivated within an organization
+            contentType: application/json
+            payload:
+              title: UserDeactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.deactivated
+                event_data:
+                  title: UserDeactivatedData
+                  type: object
+                  required:
+                    - user_id
+                    - org_id
+                    - deactivated_at
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization from which the user is being deactivated
+                    deactivated_at:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                      description: Optional reason for deactivation
+                      examples:
+                        - Account suspended
+                        - End of contract
+                        - User requested
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.reactivated
+            title: User Reactivated
+            summary: A deactivated user has been reactivated within an organization
+            contentType: application/json
+            payload:
+              title: UserReactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.reactivated
+                event_data:
+                  title: UserReactivatedData
+                  type: object
+                  required:
+                    - user_id
+                    - org_id
+                    - reactivated_at
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization in which the user is being reactivated
+                    reactivated_at:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                      description: Optional reason for reactivation
+                      examples:
+                        - Account restored
+                        - Contract renewed
+                        - Admin decision
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.deleted
+            title: User Deleted
+            summary: >-
+              A deactivated user has been permanently deleted from an
+              organization
+            contentType: application/json
+            payload:
+              title: UserDeletedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.deleted
+                event_data:
+                  title: UserDeletedData
+                  type: object
+                  required:
+                    - user_id
+                    - org_id
+                    - deleted_at
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization from which the user is being deleted
+                    deleted_at:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                      description: Optional reason for deletion
+                      examples:
+                        - User requested account deletion
+                        - Inactive account cleanup
+                        - Policy violation
                 event_metadata:
                   title: EventMetadata
                   type: object

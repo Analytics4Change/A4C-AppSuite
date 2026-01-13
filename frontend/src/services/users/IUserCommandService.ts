@@ -153,6 +153,32 @@ export interface IUserCommandService {
   reactivateUser(userId: string): Promise<UserOperationResult>;
 
   /**
+   * Permanently deletes a deactivated user from the organization
+   *
+   * This is a soft-delete operation: sets deleted_at timestamp, removes
+   * the user from organization projections and role assignments.
+   * The Supabase Auth user is NOT deleted (user may belong to other orgs).
+   *
+   * Precondition: User must be deactivated before deletion.
+   *
+   * Events emitted:
+   * - user.deleted
+   *
+   * @param userId - ID of the user to delete
+   * @param reason - Optional reason for deletion (stored in event metadata)
+   * @returns Promise resolving to operation result
+   *
+   * @example
+   * const result = await service.deleteUser(userId, 'User requested account removal');
+   * if (result.success) {
+   *   showSuccess('User deleted');
+   * } else if (result.errorDetails?.code === 'USER_ACTIVE') {
+   *   showError('Cannot delete active user. Deactivate first.');
+   * }
+   */
+  deleteUser(userId: string, reason?: string): Promise<UserOperationResult>;
+
+  /**
    * Updates a user's profile information
    *
    * Updates first name and/or last name. Email changes are not supported

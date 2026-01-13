@@ -733,6 +733,7 @@ export type UserOperationErrorCode =
   | 'ALREADY_MEMBER'
   | 'ALREADY_ACTIVE'
   | 'ALREADY_INACTIVE'
+  | 'USER_ACTIVE'     // User must be deactivated before deletion
   | 'INVITATION_EXPIRED'
   | 'INVITATION_REVOKED'
   | 'SUBSET_ONLY_VIOLATION'

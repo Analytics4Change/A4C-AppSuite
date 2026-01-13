@@ -38,6 +38,9 @@ channels:
           # Legacy CRUD tables dropped - will be redefined with proper event-driven architecture
           - $ref: './domains/user.yaml#/components/messages/UserSyncedFromAuth'
           - $ref: './domains/user.yaml#/components/messages/UserOrganizationSwitched'
+          - $ref: './domains/user.yaml#/components/messages/UserDeactivated'
+          - $ref: './domains/user.yaml#/components/messages/UserReactivated'
+          - $ref: './domains/user.yaml#/components/messages/UserDeleted'
           - $ref: './domains/invitation.yaml#/components/messages/UserInvited'
           - $ref: './domains/invitation.yaml#/components/messages/InvitationRevoked'
           - $ref: './domains/invitation.yaml#/components/messages/InvitationAccepted'

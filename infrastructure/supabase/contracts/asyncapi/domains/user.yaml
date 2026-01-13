@@ -112,6 +112,14 @@ components:
       payload:
         $ref: '#/components/schemas/UserReactivatedEvent'
 
+    UserDeleted:
+      name: user.deleted
+      title: User Deleted
+      summary: A deactivated user has been permanently deleted from an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserDeletedEvent'
+
   schemas:
     UserCreatedEvent:
       title: UserCreatedEvent
@@ -897,3 +905,54 @@ components:
             - "Account restored"
             - "Contract renewed"
             - "Admin decision"
+
+    UserDeletedEvent:
+      title: UserDeletedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.deleted
+        event_data:
+          $ref: '#/components/schemas/UserDeletedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserDeletedData:
+      title: UserDeletedData
+      type: object
+      required:
+        - user_id
+        - org_id
+        - deleted_at
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        org_id:
+          type: string
+          format: uuid
+          description: Organization from which the user is being deleted
+        deleted_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          description: Optional reason for deletion
+          examples:
+            - "User requested account deletion"
+            - "Inactive account cleanup"
+            - "Policy violation"

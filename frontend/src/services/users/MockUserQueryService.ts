@@ -952,6 +952,17 @@ export class MockUserQueryService implements IUserQueryService {
   }
 
   /**
+   * Delete a user (used by MockUserCommandService)
+   */
+  deleteUser(userId: string): void {
+    const userIndex = this.users.findIndex((u) => u.id === userId);
+    if (userIndex !== -1) {
+      this.users.splice(userIndex, 1);
+      this.saveToStorage();
+    }
+  }
+
+  /**
    * Add an invitation (used by MockUserCommandService)
    */
   addInvitation(invitation: Invitation): void {

@@ -10,11 +10,12 @@
  * - Select user → shows editable form
  * - Create mode for new invitations
  * - Smart email lookup with contextual actions
- * - Deactivate/Reactivate/Revoke operations
+ * - Deactivate/Reactivate/Delete operations for users
+ * - Resend/Revoke operations for invitations
  * - Unsaved changes warning
  *
  * Route: /users/manage
- * Permission: user.create
+ * Permission: user.create, user.delete
  */
 
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -63,7 +64,9 @@ type DialogState =
   | { type: 'deactivate'; isLoading: boolean }
   | { type: 'reactivate'; isLoading: boolean }
   | { type: 'resend'; isLoading: boolean }
-  | { type: 'revoke'; isLoading: boolean };
+  | { type: 'revoke'; isLoading: boolean }
+  | { type: 'delete'; isLoading: boolean }
+  | { type: 'delete-warning' };
 
 /**
  * Users Management Page Component
@@ -449,6 +452,46 @@ export const UsersManagePage: React.FC = observer(() => {
       setDialogState({ type: 'none' });
       setOperationError(
         error instanceof Error ? error.message : 'Failed to revoke invitation'
+      );
+    }
+  }, [currentItem, viewModel]);
+
+  // Delete handlers
+  const handleDeleteClick = useCallback(() => {
+    if (!currentItem || currentItem.isInvitation) return;
+
+    setOperationError(null);
+    // If user is active, show warning that they must be deactivated first
+    if (currentItem.displayStatus === 'active') {
+      setDialogState({ type: 'delete-warning' });
+    } else if (currentItem.displayStatus === 'deactivated') {
+      setDialogState({ type: 'delete', isLoading: false });
+    }
+  }, [currentItem]);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!currentItem) return;
+
+    setDialogState({ type: 'delete', isLoading: true });
+    setOperationError(null);
+    try {
+      const result = await viewModel.deleteUser(currentItem.id);
+
+      if (result.success) {
+        setDialogState({ type: 'none' });
+        log.info('User deleted successfully', { userId: currentItem.id });
+        setPanelMode('empty');
+        setFormViewModel(null);
+        setCurrentItem(null);
+        // List refresh is handled by the viewModel.deleteUser method
+      } else {
+        setDialogState({ type: 'none' });
+        setOperationError(result.error || 'Failed to delete user');
+      }
+    } catch (error) {
+      setDialogState({ type: 'none' });
+      setOperationError(
+        error instanceof Error ? error.message : 'Failed to delete user'
       );
     }
   }, [currentItem, viewModel]);
@@ -923,8 +966,9 @@ export const UsersManagePage: React.FC = observer(() => {
                   </CardContent>
                 </Card>
 
-                {/* Danger Zone (for active users only) */}
-                {!currentItem.isInvitation && currentItem.displayStatus === 'active' && (
+                {/* Danger Zone (for active and deactivated users) */}
+                {!currentItem.isInvitation &&
+                 (currentItem.displayStatus === 'active' || currentItem.displayStatus === 'deactivated') && (
                   <section aria-labelledby="danger-zone-heading">
                     <Card className="shadow-lg border-red-200">
                       <CardHeader className="border-b border-red-200 bg-red-50 py-3">
@@ -935,30 +979,66 @@ export const UsersManagePage: React.FC = observer(() => {
                           Danger Zone
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="p-4">
-                        <h4 className="text-sm font-medium text-gray-900">
-                          Deactivate this user
-                        </h4>
-                        <p className="text-xs text-gray-600 mt-1">
-                          Deactivating will prevent the user from accessing the
-                          application. They can be reactivated later.
-                        </p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleDeactivateClick}
-                          disabled={
-                            formViewModel?.isSubmitting ||
-                            (dialogState.type === 'deactivate' && dialogState.isLoading)
-                          }
-                          className="mt-2 text-orange-600 border-orange-300 hover:bg-orange-50"
-                        >
-                          <PowerOff className="w-3 h-3 mr-1" />
-                          {dialogState.type === 'deactivate' && dialogState.isLoading
-                            ? 'Deactivating...'
-                            : 'Deactivate User'}
-                        </Button>
+                      <CardContent className="p-4 space-y-4">
+                        {/* Deactivate Section (for active users) */}
+                        {currentItem.displayStatus === 'active' && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-900">
+                              Deactivate this user
+                            </h4>
+                            <p className="text-xs text-gray-600 mt-1">
+                              Deactivating will prevent the user from accessing the
+                              application. They can be reactivated later.
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleDeactivateClick}
+                              disabled={
+                                formViewModel?.isSubmitting ||
+                                (dialogState.type === 'deactivate' && dialogState.isLoading)
+                              }
+                              className="mt-2 text-orange-600 border-orange-300 hover:bg-orange-50"
+                            >
+                              <PowerOff className="w-3 h-3 mr-1" />
+                              {dialogState.type === 'deactivate' && dialogState.isLoading
+                                ? 'Deactivating...'
+                                : 'Deactivate User'}
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Delete Section */}
+                        <div className={currentItem.displayStatus === 'active' ? 'pt-4 border-t border-red-200' : ''}>
+                          <h4 className="text-sm font-medium text-gray-900">
+                            Delete this user
+                          </h4>
+                          <p className="text-xs text-gray-600 mt-1">
+                            Permanently remove this user from the organization.
+                            {currentItem.displayStatus === 'active' && (
+                              <span className="block text-orange-600 mt-1">
+                                User must be deactivated before deletion.
+                              </span>
+                            )}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleDeleteClick}
+                            disabled={
+                              formViewModel?.isSubmitting ||
+                              (dialogState.type === 'delete' && dialogState.isLoading)
+                            }
+                            className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            {dialogState.type === 'delete' && dialogState.isLoading
+                              ? 'Deleting...'
+                              : 'Delete User'}
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   </section>
@@ -1031,6 +1111,34 @@ export const UsersManagePage: React.FC = observer(() => {
         onCancel={() => setDialogState({ type: 'none' })}
         isLoading={dialogState.type === 'revoke' && dialogState.isLoading}
         variant="danger"
+      />
+
+      {/* Delete User Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={dialogState.type === 'delete'}
+        title="Delete User"
+        message={`Are you sure you want to permanently delete "${getDisplayName(currentItem)}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDialogState({ type: 'none' })}
+        isLoading={dialogState.type === 'delete' && dialogState.isLoading}
+        variant="danger"
+      />
+
+      {/* Cannot Delete Active User Warning Dialog */}
+      <ConfirmDialog
+        isOpen={dialogState.type === 'delete-warning'}
+        title="Cannot Delete Active User"
+        message={`"${getDisplayName(currentItem)}" is currently active. You must deactivate the user before they can be deleted.`}
+        confirmLabel="Deactivate First"
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          setDialogState({ type: 'none' });
+          handleDeactivateClick();
+        }}
+        onCancel={() => setDialogState({ type: 'none' })}
+        variant="warning"
       />
     </div>
   );

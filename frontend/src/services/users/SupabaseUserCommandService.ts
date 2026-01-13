@@ -524,6 +524,79 @@ export class SupabaseUserCommandService implements IUserCommandService {
   }
 
   /**
+   * Permanently delete a deactivated user from the organization
+   *
+   * Calls the manage-user Edge Function which:
+   * 1. Validates permissions (user.delete)
+   * 2. Checks user is deactivated
+   * 3. Emits user.deleted event
+   */
+  async deleteUser(userId: string, reason?: string): Promise<UserOperationResult> {
+    // Set up tracing context for this operation
+    const tracingContext = await createTracingContext();
+    Logger.pushTracingContext(tracingContext);
+
+    try {
+      log.info('Deleting user', { userId, reason });
+
+      const client = supabaseService.getClient();
+      const headers = buildHeadersFromContext(tracingContext);
+      const { data, error } = await client.functions.invoke(
+        EDGE_FUNCTIONS.MANAGE_USER,
+        {
+          body: {
+            operation: 'delete',
+            userId,
+            reason,
+          },
+          headers,
+        }
+      );
+
+      if (error) {
+        const errorInfo = await extractEdgeFunctionError(error, 'Delete user');
+        const errorMessage = errorInfo.correlationId
+          ? `${errorInfo.message} (Ref: ${errorInfo.correlationId})`
+          : errorInfo.message;
+        return {
+          success: false,
+          error: errorMessage,
+          errorDetails: {
+            code: errorInfo.code,
+            message: errorInfo.message,
+            context: errorInfo.details ? { details: errorInfo.details } : undefined,
+            correlationId: errorInfo.correlationId,
+          },
+        };
+      }
+
+      if (!data?.success) {
+        return {
+          success: false,
+          error: data?.error ?? 'Failed to delete user',
+          errorDetails: {
+            code: data?.error?.includes('active')
+              ? 'USER_ACTIVE'
+              : 'UNKNOWN',
+            message: data?.error ?? 'Unknown error',
+          },
+        };
+      }
+
+      log.info('User deleted successfully', { userId });
+      return { success: true };
+    } catch (error) {
+      log.error('Error in deleteUser', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    } finally {
+      Logger.popTracingContext();
+    }
+  }
+
+  /**
    * Update user profile
    *
    * TODO: Implement via RPC function when available

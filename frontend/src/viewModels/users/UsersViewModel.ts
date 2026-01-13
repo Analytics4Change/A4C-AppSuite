@@ -249,6 +249,13 @@ export class UsersViewModel {
   }
 
   /**
+   * Whether a user can be deleted (must be deactivated first)
+   */
+  get canDelete(): boolean {
+    return this.isSelectedItemDeactivated;
+  }
+
+  /**
    * Whether an invitation can be resent
    */
   get canResendInvitation(): boolean {
@@ -1037,6 +1044,62 @@ export class UsersViewModel {
       });
 
       log.error('Error reactivating user', error);
+
+      return {
+        success: false,
+        error: errorMessage,
+        errorDetails: { code: 'UNKNOWN', message: errorMessage },
+      };
+    }
+  }
+
+  /**
+   * Delete a deactivated user from the organization
+   *
+   * This is a soft-delete that removes the user from the organization
+   * but preserves the Supabase Auth user (they may belong to other orgs).
+   *
+   * Precondition: User must be deactivated before deletion.
+   */
+  async deleteUser(userId: string, reason?: string): Promise<UserOperationResult> {
+    log.debug('Deleting user', { userId, reason });
+
+    runInAction(() => {
+      this.isSubmitting = true;
+      this.error = null;
+    });
+
+    try {
+      const result = await this.commandService.deleteUser(userId, reason);
+
+      runInAction(() => {
+        this.isSubmitting = false;
+
+        if (result.success) {
+          this.successMessage = 'User deleted';
+          this.clearSelection(); // User is removed, clear selection
+          log.info('User deleted', { userId });
+        } else {
+          this.error = result.error ?? 'Failed to delete user';
+          log.warn('Failed to delete user', { error: result.error });
+        }
+      });
+
+      // Refresh list on success (user will no longer appear)
+      if (result.success) {
+        await this.loadUsers();
+      }
+
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete user';
+
+      runInAction(() => {
+        this.isSubmitting = false;
+        this.error = errorMessage;
+      });
+
+      log.error('Error deleting user', error);
 
       return {
         success: false,

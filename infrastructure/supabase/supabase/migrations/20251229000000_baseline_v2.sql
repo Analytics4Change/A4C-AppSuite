@@ -1136,25 +1136,19 @@ CREATE OR REPLACE FUNCTION "api"."get_bootstrap_status"("p_bootstrap_id" "uuid")
 DECLARE
   v_user_id UUID;
 BEGIN
-  -- Get current user from JWT (P1 #5: Authorization check)
+  -- Get current user from JWT
   v_user_id := auth.uid();
 
   -- Allow access if:
-  -- 1. User is super_admin (global access)
+  -- 1. User has platform.admin permission (platform-wide access)
   -- 2. User has a role in the organization being queried
   -- 3. User initiated the bootstrap (found in event metadata)
   IF v_user_id IS NOT NULL THEN
     IF NOT (
-      -- Super admin can view any organization
-      EXISTS (
-        SELECT 1 FROM user_roles_projection ur
-        JOIN roles_projection r ON r.id = ur.role_id
-        WHERE ur.user_id = v_user_id
-          AND r.name = 'super_admin'
-          AND ur.organization_id IS NULL
-      )
+      -- Tier 1: Platform admin can view any organization
+      public.has_platform_privilege()
       OR
-      -- User has role in the organization being queried
+      -- Tier 3: User has role in the organization being queried
       EXISTS (
         SELECT 1 FROM user_roles_projection
         WHERE user_id = v_user_id
@@ -1957,13 +1951,13 @@ DECLARE
   v_user_id UUID;
   v_org_id UUID;
   v_org_type TEXT;
-  v_is_super_admin BOOLEAN;
+  v_has_platform_privilege BOOLEAN;
 BEGIN
   -- Get current user context (called ONCE, not per row)
   v_user_id := public.get_current_user_id();
   v_org_id := public.get_current_org_id();
   v_org_type := (auth.jwt()->>'org_type')::text;
-  v_is_super_admin := public.is_super_admin(v_user_id);
+  v_has_platform_privilege := public.has_platform_privilege();
 
   RETURN QUERY
   SELECT
@@ -1991,14 +1985,14 @@ BEGIN
   ) uc ON uc.role_id = r.id
   WHERE
     r.deleted_at IS NULL
-    -- Authorization: Replaces per-row RLS with single check
+    -- Authorization: Three-tier check
     AND (
-      -- Global roles ONLY visible to platform_owner org type
-      (r.organization_id IS NULL AND v_org_type = 'platform_owner')
-      -- User's organization roles
-      OR r.organization_id = v_org_id
-      -- Super admin override: sees all roles
-      OR v_is_super_admin
+      -- Tier 3: User's organization roles (baseline tenant access)
+      r.organization_id = v_org_id
+      -- Tier 1: Global roles ONLY visible to platform_owner org type
+      OR (r.organization_id IS NULL AND v_org_type = 'platform_owner')
+      -- Tier 1: Platform admin override - sees all roles across all orgs
+      OR v_has_platform_privilege
     )
     -- Status filter
     AND (p_status = 'all'
