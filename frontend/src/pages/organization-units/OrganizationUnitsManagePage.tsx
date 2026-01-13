@@ -1,26 +1,36 @@
 /**
  * Organization Units Management Page (Unified)
  *
- * Single-page interface for managing organizational units with split view layout.
+ * Single-page interface for managing organizational units with permission-based UI.
  * Left panel: Interactive tree view with selection
- * Right panel: Always-editable form for selected unit OR create form
+ * Right panel: Read-only details, editable form, or create form (based on permissions)
+ *
+ * Permission-Based UI Behavior:
+ * - view_ou only: Full-width tree, read-only detail panel on click
+ * - view_ou + create_ou: Split view with Create button
+ * - view_ou + update_ou: Split view with editable form (no danger zone)
+ * - view_ou + deactivate_ou: Shows Deactivate option in danger zone
+ * - view_ou + reactivate_ou: Shows Reactivate button for inactive units
+ * - view_ou + delete_ou: Shows Delete button in danger zone
  *
  * Features:
- * - Split view layout (tree + editable form panel)
- * - Select unit → immediately shows editable form (no separate edit page)
+ * - Permission-based layout (full-width vs split view)
+ * - Read-only detail panel for view-only users
+ * - Select unit → immediately shows editable form (if has update_ou permission)
  * - Inline create mode (form clears for new unit creation)
  * - Unsaved changes warning when switching units
  * - Deactivate/Reactivate with cascade to children
  * - Delete (requires deactivation first)
  * - Query parameter support: ?select=uuid for deep links
  *
- * Route: /organization-units/manage
- * Permission: organization.create_ou
+ * Route: /organization-units
+ * Permission: organization.view_ou (minimum)
  */
 
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -37,7 +47,6 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
-  ArrowLeft,
   Building2,
   MapPin,
   AlertTriangle,
@@ -55,8 +64,8 @@ import type { OrganizationUnit } from '@/types/organization-unit.types';
 
 const log = Logger.getLogger('component');
 
-/** Panel mode: empty (no selection), edit (unit selected), create (creating new unit) */
-type PanelMode = 'empty' | 'edit' | 'create';
+/** Panel mode: empty (no selection), view (read-only detail), edit (unit selected), create (creating new unit) */
+type PanelMode = 'empty' | 'view' | 'edit' | 'create';
 
 /**
  * Discriminated union for dialog state.
@@ -75,8 +84,24 @@ type DialogState =
  * Organization Units Management Page Component
  */
 export const OrganizationUnitsManagePage: React.FC = observer(() => {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { session } = useAuth();
+
+  // Permission checks - synchronous check against session claims
+  const permissions = useMemo(() => {
+    const userPermissions = session?.claims.permissions ?? [];
+    return {
+      canCreate: userPermissions.includes('organization.create_ou'),
+      canUpdate: userPermissions.includes('organization.update_ou'),
+      canDelete: userPermissions.includes('organization.delete_ou'),
+      canDeactivate: userPermissions.includes('organization.deactivate_ou'),
+      canReactivate: userPermissions.includes('organization.reactivate_ou'),
+    };
+  }, [session?.claims.permissions]);
+
+  // Determine if user has any write permissions (controls layout width)
+  const hasAnyWritePermission = permissions.canCreate || permissions.canUpdate ||
+    permissions.canDelete || permissions.canDeactivate || permissions.canReactivate;
 
   // Tree ViewModel - manages tree state, selection, expansion
   const [viewModel] = useState(() => new OrganizationUnitsViewModel());
@@ -236,7 +261,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
     }
   }, [searchParams, viewModel.unitCount, viewModel, setSearchParams]);
 
-  // Select and load a unit for editing
+  // Select and load a unit for viewing or editing (based on permissions)
   const selectAndLoadUnit = useCallback(
     async (unitId: string) => {
       setOperationError(null);
@@ -252,17 +277,28 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         const fullUnit = await service.getUnitById(unitId);
         if (fullUnit) {
           setCurrentUnit(fullUnit);
-          setFormViewModel(new OrganizationUnitFormViewModel(service, 'edit', fullUnit));
-          setPanelMode('edit');
+
+          // Determine panel mode based on permissions
+          if (permissions.canUpdate) {
+            // User can edit - show editable form
+            setFormViewModel(new OrganizationUnitFormViewModel(service, 'edit', fullUnit));
+            setPanelMode('edit');
+            log.debug('Unit loaded for editing', { unitId, name: fullUnit.name });
+          } else {
+            // User can only view - show read-only panel
+            setFormViewModel(null);
+            setPanelMode('view');
+            log.debug('Unit loaded for viewing (read-only)', { unitId, name: fullUnit.name });
+          }
+
           viewModel.selectNode(unitId);
-          log.debug('Unit loaded for editing', { unitId, name: fullUnit.name });
         }
       } catch (error) {
         log.error('Failed to load unit', error);
         setOperationError('Failed to load unit details');
       }
     },
-    [viewModel]
+    [viewModel, permissions.canUpdate]
   );
 
   // Handle tree node selection with dirty check
@@ -385,11 +421,6 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
       }
     }
   }, [panelMode, viewModel.selectedUnitId, selectAndLoadUnit]);
-
-  // Navigation handlers
-  const handleBackClick = () => {
-    navigate('/organization-units');
-  };
 
   // Deactivate handlers
   const handleDeactivateClick = useCallback(() => {
@@ -518,25 +549,16 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
       <div className="max-w-7xl mx-auto">
         {/* Page Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleBackClick}
-              className="text-gray-600"
-            >
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Back to Overview
-            </Button>
-          </div>
           <div className="flex items-center gap-3">
             <Building2 className="w-8 h-8 text-blue-600" />
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                Manage Organization Units
+                Organization Units
               </h1>
               <p className="text-gray-600 mt-1">
-                Create, edit, and organize your departments and locations
+                {hasAnyWritePermission
+                  ? 'Create, edit, and organize your departments and locations'
+                  : 'View your organization hierarchy'}
               </p>
             </div>
           </div>
@@ -571,10 +593,13 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
           </div>
         )}
 
-        {/* Split View Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Layout: Full-width for view-only users, split view for users with write permissions */}
+        <div className={cn(
+          "grid grid-cols-1 gap-6",
+          hasAnyWritePermission && "lg:grid-cols-3"
+        )}>
           {/* Left Panel: Tree View */}
-          <div className="lg:col-span-2">
+          <div className={hasAnyWritePermission ? "lg:col-span-2" : "lg:col-span-1"}>
             <Card className="shadow-lg h-[calc(100vh-280px)]">
               <CardHeader className="border-b border-gray-200 pb-4">
                 <div className="flex items-center justify-between">
@@ -678,9 +703,11 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
             </Card>
           </div>
 
-          {/* Right Panel: Form Panel */}
+          {/* Right Panel: Form Panel (only shown if user has write permissions) */}
+          {hasAnyWritePermission && (
           <div className="lg:col-span-1">
-            {/* Create Button - Always visible at top */}
+            {/* Create Button - Only visible if user has create_ou permission */}
+            {permissions.canCreate && (
             <Button
               onClick={handleCreateClick}
               disabled={viewModel.isLoading}
@@ -692,6 +719,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                 <span className="ml-auto text-xs opacity-75">(under selected)</span>
               )}
             </Button>
+            )}
 
             {/* Empty State */}
             {panelMode === 'empty' && (
@@ -702,9 +730,88 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     No Unit Selected
                   </h3>
                   <p className="text-gray-500 max-w-md mx-auto">
-                    Select a unit from the tree to view and edit its details, or click
-                    "Create New Unit" to add a new one.
+                    {permissions.canCreate
+                      ? 'Select a unit from the tree to view and edit its details, or click "Create New Unit" to add a new one.'
+                      : 'Select a unit from the tree to view its details.'}
                   </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* View Mode (read-only detail panel for users without update permission) */}
+            {panelMode === 'view' && currentUnit && (
+              <Card className="shadow-lg">
+                <CardHeader className="border-b border-gray-200">
+                  <CardTitle className="text-xl font-semibold text-gray-900">
+                    Unit Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  {/* Status Badge */}
+                  <div className="flex items-center gap-2">
+                    {currentUnit.isActive ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Active
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        <XCircle className="w-3 h-3 mr-1" />
+                        Inactive
+                      </span>
+                    )}
+                    {currentUnit.isRootOrganization && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        <Building2 className="w-3 h-3 mr-1" />
+                        Root Organization
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Name */}
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-gray-500">Unit Name</Label>
+                    <p className="text-gray-900">{currentUnit.name}</p>
+                  </div>
+
+                  {/* Display Name */}
+                  {currentUnit.displayName && (
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium text-gray-500">Display Name</Label>
+                      <p className="text-gray-900">{currentUnit.displayName}</p>
+                    </div>
+                  )}
+
+                  {/* Hierarchy Path */}
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-gray-500">Hierarchy Path</Label>
+                    <p className="text-sm text-gray-700 font-mono bg-gray-50 px-3 py-2 rounded-md border border-gray-200 break-all">
+                      {currentUnit.path}
+                    </p>
+                  </div>
+
+                  {/* Timezone */}
+                  {currentUnit.timeZone && (
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium text-gray-500">Timezone</Label>
+                      <p className="text-gray-900">{currentUnit.timeZone}</p>
+                    </div>
+                  )}
+
+                  {/* Child Count */}
+                  {currentUnit.childCount > 0 && (
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium text-gray-500">Child Units</Label>
+                      <p className="text-gray-900">{currentUnit.childCount} unit(s)</p>
+                    </div>
+                  )}
+
+                  {/* Read-only notice */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 text-center">
+                      You have view-only access to organization units.
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -900,8 +1007,11 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                         idPrefix="edit"
                       />
 
-                      {/* Active Status Toggle (not for root org) */}
+                      {/* Active Status Toggle (not for root org, only if user has deactivate or reactivate permission) */}
                       {!currentUnit.isRootOrganization && (
+                        (currentUnit.isActive && permissions.canDeactivate) ||
+                        (!currentUnit.isActive && permissions.canReactivate)
+                      ) && (
                         <div className="flex items-start gap-2 p-3 rounded-lg bg-gray-50 border border-gray-200">
                           <Checkbox
                             id="is-active"
@@ -963,8 +1073,8 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                   </CardContent>
                 </Card>
 
-                {/* Danger Zone - only for non-root orgs */}
-                {!currentUnit.isRootOrganization && (
+                {/* Danger Zone - only for non-root orgs and if user has deactivate, reactivate, or delete permissions */}
+                {!currentUnit.isRootOrganization && (permissions.canDeactivate || permissions.canReactivate || permissions.canDelete) && (
                   <section className="mt-4" aria-labelledby="danger-zone-heading">
                     <Card className="shadow-lg border-red-200">
                       <CardHeader className="border-b border-red-200 bg-red-50 py-3">
@@ -973,9 +1083,9 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-4 space-y-4">
-                        {/* Reactivate Section - Only for inactive units */}
-                        {!currentUnit.isActive && (
-                          <div className="pb-4 border-b border-gray-200">
+                        {/* Reactivate Section - Only for inactive units and if user has reactivate_ou permission */}
+                        {!currentUnit.isActive && permissions.canReactivate && (
+                          <div className={permissions.canDelete ? "pb-4 border-b border-gray-200" : ""}>
                             <h4 className="text-sm font-medium text-gray-900">Reactivate this unit</h4>
                             <p className="text-xs text-gray-600 mt-1">
                               Reactivating allows new role assignments.
@@ -991,7 +1101,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                               size="sm"
                               onClick={handleReactivateClick}
                               disabled={
-                                formViewModel.isSubmitting ||
+                                formViewModel?.isSubmitting ||
                                 (dialogState.type === 'reactivate' && dialogState.isLoading)
                               }
                               className="mt-2 text-green-600 border-green-300 hover:bg-green-50"
@@ -1004,7 +1114,8 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                           </div>
                         )}
 
-                        {/* Delete Section */}
+                        {/* Delete Section - Only if user has delete_ou permission */}
+                        {permissions.canDelete && (
                         <div>
                           <h4 className="text-sm font-medium text-gray-900">Delete this unit</h4>
                           <p className="text-xs text-gray-600 mt-1">
@@ -1021,7 +1132,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                             size="sm"
                             onClick={handleDeleteClick}
                             disabled={
-                              formViewModel.isSubmitting ||
+                              formViewModel?.isSubmitting ||
                               (dialogState.type === 'delete' && dialogState.isLoading)
                             }
                             className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
@@ -1032,6 +1143,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                               : 'Delete Unit'}
                           </Button>
                         </div>
+                        )}
                       </CardContent>
                     </Card>
                   </section>
@@ -1039,6 +1151,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
               </>
             )}
           </div>
+          )}
         </div>
       </div>
 

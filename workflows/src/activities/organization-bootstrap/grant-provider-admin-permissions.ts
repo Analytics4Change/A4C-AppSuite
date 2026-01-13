@@ -1,12 +1,12 @@
 /**
  * GrantProviderAdminPermissionsActivity
  *
- * Creates a provider_admin role for the organization and grants the 23 canonical permissions.
+ * Creates a provider_admin role for the organization and grants the 27 canonical permissions.
  * This activity is called during organization bootstrap to ensure the initial admin user
  * has the correct permissions.
  *
- * Canonical provider_admin Permissions (23 total):
- * - Organization (4): view_ou, create_ou, view, update
+ * Canonical provider_admin Permissions (27 total):
+ * - Organization (8): view_ou, create_ou, update_ou, delete_ou, deactivate_ou, reactivate_ou, view, update
  * - Client (4): create, view, update, delete
  * - Medication (5): create, view, update, delete, administer
  * - Role (4): create, view, update, delete
@@ -19,7 +19,7 @@
  *
  * Events Emitted:
  * - role.created: When provider_admin role is created
- * - role.permission.granted: For each permission granted (23 max)
+ * - role.permission.granted: For each permission granted (27 max)
  *
  * See: documentation/architecture/authorization/permissions-reference.md
  */
@@ -39,9 +39,13 @@ const log = getLogger('GrantProviderAdminPermissions');
  * See: infrastructure/supabase/sql/99-seeds/012-role-permission-templates.sql
  */
 export const PROVIDER_ADMIN_PERMISSIONS = [
-  // Organization (4) - OUs and org management within hierarchy
+  // Organization (8) - OUs and org management within hierarchy
   'organization.view_ou',
   'organization.create_ou',
+  'organization.update_ou',
+  'organization.delete_ou',
+  'organization.deactivate_ou',
+  'organization.reactivate_ou',
   'organization.view',
   'organization.update',
   // Client (4)

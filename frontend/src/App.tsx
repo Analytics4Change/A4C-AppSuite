@@ -18,10 +18,7 @@ import { OrganizationCreatePage } from '@/pages/organizations/OrganizationCreate
 import { OrganizationBootstrapStatusPage } from '@/pages/organizations/OrganizationBootstrapStatusPage';
 import { OrganizationDashboard } from '@/pages/organizations/OrganizationDashboard';
 import { AcceptInvitationPage } from '@/pages/organizations/AcceptInvitationPage';
-import {
-  OrganizationUnitsListPage,
-  OrganizationUnitsManagePage,
-} from '@/pages/organization-units';
+import { OrganizationUnitsManagePage } from '@/pages/organization-units';
 import { RolesPage, RolesManagePage } from '@/pages/roles';
 import { UserListPage, UsersManagePage } from '@/pages/users';
 import { DebugControlPanel } from '@/components/debug/DebugControlPanel';
@@ -101,18 +98,14 @@ function App() {
                 <Route path="/organizations/:orgId/dashboard" element={<OrganizationDashboard />} />
                 <Route path="/organizations/:orgId/edit" element={<div>Organization Edit - Coming Soon</div>} />
 
-                {/* Organization Units routes (internal hierarchy management) */}
+                {/* Organization Units route (single consolidated view with permission-based UI) */}
                 <Route path="/organization-units" element={
-                  <RequirePermission permission="organization.view_ou" fallback="/clients">
-                    <OrganizationUnitsListPage />
-                  </RequirePermission>
-                } />
-                <Route path="/organization-units/manage" element={
                   <RequirePermission permission="organization.view_ou" fallback="/clients">
                     <OrganizationUnitsManagePage />
                   </RequirePermission>
                 } />
-                {/* Create and Edit routes removed - functionality consolidated into ManagePage */}
+                {/* Legacy /manage route redirects to main route */}
+                <Route path="/organization-units/manage" element={<Navigate to="/organization-units" replace />} />
 
                 {/* Role Management routes */}
                 <Route path="/roles" element={

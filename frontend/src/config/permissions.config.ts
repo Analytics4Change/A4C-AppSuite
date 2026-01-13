@@ -5,9 +5,9 @@
  * IMPORTANT: This file is aligned to the database permissions_projection table.
  * Do NOT add permissions here that don't exist in the database.
  *
- * Canonical permissions (31 total in database):
+ * Canonical permissions (35 total in database):
  * - Organization Global (7): activate, create, create_root, deactivate, delete, search, suspend
- * - Organization Org (4): view, update, view_ou, create_ou
+ * - Organization Org (8): view, update, view_ou, create_ou, update_ou, delete_ou, deactivate_ou, reactivate_ou
  * - Permission (3): grant, revoke, view
  * - Client (4): create, view, update, delete
  * - Medication (5): administer, create, view, update, delete
@@ -140,6 +140,46 @@ export const PERMISSIONS: Record<string, Permission> = {
     description: 'Create organization units within hierarchy',
     scope: 'organization',
     riskLevel: 'medium'
+  },
+  'organization.update_ou': {
+    id: 'organization.update_ou',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'update_ou',
+    displayName: 'Update Unit',
+    description: 'Update organization unit details',
+    scope: 'organization',
+    riskLevel: 'low'
+  },
+  'organization.delete_ou': {
+    id: 'organization.delete_ou',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'delete_ou',
+    displayName: 'Delete Unit',
+    description: 'Delete organization units',
+    scope: 'organization',
+    riskLevel: 'high'
+  },
+  'organization.deactivate_ou': {
+    id: 'organization.deactivate_ou',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'deactivate_ou',
+    displayName: 'Deactivate Unit',
+    description: 'Deactivate organization units (cascade to children)',
+    scope: 'organization',
+    riskLevel: 'medium'
+  },
+  'organization.reactivate_ou': {
+    id: 'organization.reactivate_ou',
+    category: 'Organization Management',
+    resource: 'organization',
+    action: 'reactivate_ou',
+    displayName: 'Reactivate Unit',
+    description: 'Reactivate organization units (cascade to children)',
+    scope: 'organization',
+    riskLevel: 'low'
   },
   'organization.view': {
     id: 'organization.view',
@@ -381,6 +421,10 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
     permissions: [
       'organization.view_ou',
       'organization.create_ou',
+      'organization.update_ou',
+      'organization.delete_ou',
+      'organization.deactivate_ou',
+      'organization.reactivate_ou',
       'organization.view',
       'organization.update',
       'client.create',

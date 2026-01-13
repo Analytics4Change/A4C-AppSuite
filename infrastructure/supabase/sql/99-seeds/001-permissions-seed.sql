@@ -1,7 +1,7 @@
 -- ============================================
 -- AUTHORITATIVE PERMISSIONS SEED FILE
 -- ============================================
--- This file defines ALL 31 permissions for the A4C platform.
+-- This file defines ALL 35 permissions for the A4C platform.
 -- It emits permission.defined domain events which trigger projection updates.
 --
 -- IMPORTANT: This is the SINGLE SOURCE OF TRUTH for permission definitions.
@@ -11,8 +11,9 @@
 --   'global' - Platform-level permissions (platform_owner only)
 --   'org'    - Organization-level permissions (org admins)
 --
--- Last Updated: 2025-12-29
+-- Last Updated: 2026-01-13
 -- Changes:
+--   - 2026-01-13: Added granular OU permissions (update_ou, delete_ou, deactivate_ou, reactivate_ou)
 --   - Removed a4c_role.* (5 permissions) - not used
 --   - Removed medication.prescribe - not needed
 --   - Added medication.update, medication.delete
@@ -129,7 +130,7 @@ EXCEPTION WHEN unique_violation THEN NULL;
 END $$;
 
 -- ============================================
--- ORG SCOPE PERMISSIONS (21 total)
+-- ORG SCOPE PERMISSIONS (25 total)
 -- Organization-level operations for org admins
 -- ============================================
 
@@ -228,9 +229,9 @@ DO $$ BEGIN
 EXCEPTION WHEN unique_violation THEN NULL;
 END $$;
 
--- Organization Management (Org-scoped) - 4 permissions
+-- Organization Management (Org-scoped) - 8 permissions
 -- NOTE: Removed business_profile_create, business_profile_update, create_sub
--- Updated descriptions for clarity
+-- 2026-01-13: Added granular OU permissions (update_ou, delete_ou, deactivate_ou, reactivate_ou)
 DO $$ BEGIN
   INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
   VALUES (
@@ -266,6 +267,46 @@ DO $$ BEGIN
   VALUES (
     gen_random_uuid(), 'permission', 1, 'permission.defined',
     '{"applet": "organization", "action": "view_ou", "description": "View organization unit hierarchy", "scope_type": "org", "requires_mfa": false}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Organization hierarchy management"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "organization", "action": "update_ou", "description": "Update organization unit details", "scope_type": "org", "requires_mfa": false}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Organization hierarchy management"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "organization", "action": "delete_ou", "description": "Delete organization units", "scope_type": "org", "requires_mfa": false}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Organization hierarchy management"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "organization", "action": "deactivate_ou", "description": "Deactivate organization units (cascade to children)", "scope_type": "org", "requires_mfa": false}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Organization hierarchy management"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "organization", "action": "reactivate_ou", "description": "Reactivate organization units (cascade to children)", "scope_type": "org", "requires_mfa": false}'::jsonb,
     '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Organization hierarchy management"}'::jsonb
   );
 EXCEPTION WHEN unique_violation THEN NULL;
@@ -376,5 +417,5 @@ END $$;
 
 -- ============================================
 -- END OF PERMISSIONS SEED FILE
--- Total: 31 permissions (10 global + 21 org)
+-- Total: 35 permissions (10 global + 25 org)
 -- ============================================
