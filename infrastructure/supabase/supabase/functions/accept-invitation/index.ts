@@ -26,7 +26,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v14-fix-duplicate-user-created';
+const DEPLOY_VERSION = 'v15-add-user-names-to-event';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -340,6 +340,8 @@ serve(async (req) => {
             p_event_data: {
               user_id: userId,
               email: invitation.email,
+              first_name: invitation.first_name,
+              last_name: invitation.last_name,
               organization_id: invitation.organization_id,
               invited_via: 'organization_bootstrap',
               auth_method: authMethod.type,
@@ -405,6 +407,8 @@ serve(async (req) => {
           p_event_data: {
             user_id: userId,
             email: invitation.email,
+            first_name: invitation.first_name,
+            last_name: invitation.last_name,
             organization_id: invitation.organization_id,
             invited_via: 'organization_bootstrap',
             auth_method: 'email_password',
