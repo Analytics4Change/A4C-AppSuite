@@ -174,7 +174,12 @@ export class SupabaseUserCommandService implements IUserCommandService {
             email: request.email,
             firstName: request.firstName,
             lastName: request.lastName,
-            roles: request.roles,
+            // Transform camelCase to snake_case for Edge Function contract
+            roles: request.roles?.map((r) => ({
+              role_id: r.roleId,
+              role_name: r.roleName,
+              org_hierarchy_scope: r.orgHierarchyScope,
+            })),
             accessStartDate: request.accessStartDate,
             accessExpirationDate: request.accessExpirationDate,
             notificationPreferences: request.notificationPreferences,
