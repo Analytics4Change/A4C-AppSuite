@@ -600,7 +600,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         )}>
           {/* Left Panel: Tree View */}
           <div className={hasAnyWritePermission ? "lg:col-span-2" : "lg:col-span-1"}>
-            <Card className="shadow-lg h-[calc(100vh-280px)]">
+            <Card className="shadow-lg">
               <CardHeader className="border-b border-gray-200 pb-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-xl font-semibold text-gray-900">
@@ -691,7 +691,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     onSelectLast={viewModel.selectLast.bind(viewModel)}
                     ariaLabel="Organization hierarchy - select a unit to edit"
                     activeStatusFilter={statusFilter}
-                    className="border rounded-lg p-4 min-h-[400px]"
+                    className="border rounded-lg p-4 min-h-[300px] max-h-[calc(100vh-400px)] overflow-y-auto"
                   />
                 )}
 
