@@ -145,12 +145,27 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
   const filteredTreeNodes = useMemo(() => {
     let nodes = viewModel.treeNodes;
 
+    // Helper: Check if node or any descendant matches the status filter
+    // This preserves ancestor nodes that lead to matching descendants
+    const hasMatchingDescendant = (
+      node: (typeof nodes)[0],
+      filter: 'active' | 'inactive'
+    ): boolean => {
+      const matchesSelf = filter === 'active' ? node.isActive : !node.isActive;
+      if (matchesSelf) return true;
+      return node.children.some((child) => hasMatchingDescendant(child, filter));
+    };
+
     const filterNodes = (nodeList: typeof nodes): typeof nodes => {
       return nodeList
         .filter((node) => {
-          // Status filter
-          if (statusFilter === 'active' && !node.isActive) return false;
-          if (statusFilter === 'inactive' && node.isActive) return false;
+          // Status filter - keep node if it matches OR has matching descendants
+          if (statusFilter === 'active') {
+            if (!node.isActive && !hasMatchingDescendant(node, 'active')) return false;
+          }
+          if (statusFilter === 'inactive') {
+            if (node.isActive && !hasMatchingDescendant(node, 'inactive')) return false;
+          }
 
           // Search filter
           if (searchTerm.trim()) {
