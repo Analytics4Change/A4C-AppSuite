@@ -351,6 +351,18 @@ export class UserFormViewModel {
     this.setRoles([]);
   }
 
+  /**
+   * Sync originalData to current formData.
+   * Call after programmatically loading user data for editing
+   * to prevent false "unsaved changes" indicators.
+   */
+  syncOriginalData(): void {
+    runInAction(() => {
+      this.originalData = { ...this.formData };
+      this.touchedFields.clear();
+    });
+  }
+
   // ============================================
   // Actions - Extended Data Fields
   // ============================================

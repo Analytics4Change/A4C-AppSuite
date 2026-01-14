@@ -195,6 +195,7 @@ export const UsersManagePage: React.FC = observer(() => {
           form.setFirstName(item.firstName || '');
           form.setLastName(item.lastName || '');
           form.setRoles(item.roles.map((r) => r.roleId));
+          form.syncOriginalData(); // Sync baseline to prevent false "unsaved changes"
           setFormViewModel(form);
           setPanelMode('edit');
           // Ensure viewModel state is synced
