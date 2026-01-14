@@ -358,7 +358,13 @@ export class UserFormViewModel {
    */
   syncOriginalData(): void {
     runInAction(() => {
-      this.originalData = { ...this.formData };
+      this.originalData = {
+        ...this.formData,
+        roleIds: [...this.formData.roleIds],
+        notificationPreferences: this.formData.notificationPreferences
+          ? { ...this.formData.notificationPreferences }
+          : undefined,
+      };
       this.touchedFields.clear();
     });
   }
