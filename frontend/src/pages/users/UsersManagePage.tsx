@@ -25,7 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { UserList, UserFormFields } from '@/components/users';
-import { AccessDatesForm, NotificationPreferencesForm } from '@/components/users';
+import { AccessDatesForm, NotificationPreferencesForm, UserPhonesSection } from '@/components/users';
 import { UsersViewModel } from '@/viewModels/users/UsersViewModel';
 import { UserFormViewModel } from '@/viewModels/users/UserFormViewModel';
 import { getUserQueryService, getUserCommandService } from '@/services/users';
@@ -982,6 +982,14 @@ export const UsersManagePage: React.FC = observer(() => {
                     </form>
                   </CardContent>
                 </Card>
+
+                {/* Phone Numbers Section (for active users only) */}
+                {!currentItem.isInvitation && currentItem.displayStatus === 'active' && (
+                  <UserPhonesSection
+                    userId={currentItem.id}
+                    editable={true}
+                  />
+                )}
 
                 {/* Danger Zone (for active and deactivated users) */}
                 {!currentItem.isInvitation &&

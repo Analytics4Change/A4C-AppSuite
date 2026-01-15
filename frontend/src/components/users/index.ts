@@ -41,3 +41,7 @@ export type { NotificationPreferencesFormProps } from './NotificationPreferences
 
 export { AccessDatesForm } from './AccessDatesForm';
 export type { AccessDatesFormProps, AccessDatesFormData } from './AccessDatesForm';
+
+// Section components (orchestrate multiple sub-components)
+export { UserPhonesSection } from './UserPhonesSection';
+export type { UserPhonesSectionProps } from './UserPhonesSection';
