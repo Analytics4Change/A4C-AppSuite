@@ -127,7 +127,7 @@ interface DbUserAddressRow {
   updated_at: string;
 }
 
-/** User phone row from user_phones */
+/** User phone row from user_phones table (direct query) */
 interface DbUserPhoneRow {
   id: string;
   user_id: string;
@@ -142,6 +142,21 @@ interface DbUserPhoneRow {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** User phone from api.get_user_phones RPC (camelCase keys) */
+interface UserPhoneRow {
+  id: string;
+  label: string;
+  type: string;
+  number: string;
+  extension: string | null;
+  countryCode: string;
+  smsCapable: boolean;
+  isPrimary: boolean;
+  isActive: boolean;
+  isMirrored: boolean;
+  source: string; // 'global' | 'org'
 }
 
 /** User org access row from user_organizations_projection (via api.get_user_org_access RPC) */
@@ -1000,38 +1015,59 @@ export class SupabaseUserQueryService implements IUserQueryService {
     }
   }
 
+  /**
+   * Get user's phones using the api.get_user_phones RPC
+   *
+   * Returns both global phones (user_phones table) and org-specific phones
+   * (user_org_phone_overrides table) for the current organization.
+   */
   async getUserPhones(userId: string): Promise<UserPhone[]> {
     const client = supabaseService.getClient();
 
     try {
-      const { data, error } = await client
-        .from('user_phones')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .order('is_primary', { ascending: false });
-
-      if (error) {
-        log.error('Failed to fetch user phones', error);
+      // Get organization ID from JWT claims
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+      if (!session) {
+        log.error('No authenticated session');
         return [];
       }
 
-      const phones = (data ?? []) as unknown as DbUserPhoneRow[];
+      const claims = this.decodeJWT(session.access_token);
+      const orgId = claims.org_id;
 
-      return phones.map((phone) => ({
+      // Use the RPC that returns both global and org-specific phones
+      const { data, error } = await supabaseService.apiRpc<UserPhoneRow[]>(
+        'get_user_phones',
+        {
+          p_user_id: userId,
+          p_organization_id: orgId ?? null,
+        }
+      );
+
+      if (error) {
+        log.error('Failed to fetch user phones via RPC', error);
+        return [];
+      }
+
+      // Map RPC response to UserPhone type
+      return (data ?? []).map((phone: UserPhoneRow) => ({
         id: phone.id,
-        userId: phone.user_id,
-        orgId: phone.org_id ?? null,
+        userId: userId,
+        orgId: phone.source === 'org' ? (orgId ?? null) : null,
         label: phone.label,
         type: phone.type as UserPhone['type'],
-        countryCode: phone.country_code,
+        countryCode: phone.countryCode ?? '+1',
         number: phone.number,
         extension: phone.extension ?? null,
-        smsCapable: phone.sms_capable,
-        isPrimary: phone.is_primary,
-        isActive: phone.is_active,
-        createdAt: new Date(phone.created_at),
-        updatedAt: new Date(phone.updated_at),
+        smsCapable: phone.smsCapable ?? false,
+        isPrimary: phone.isPrimary ?? false,
+        isActive: phone.isActive ?? true,
+        isMirrored: phone.isMirrored ?? false,
+        source: phone.source as 'global' | 'org',
+        createdAt: new Date(),
+        updatedAt: new Date(),
       }));
     } catch (error) {
       log.error('Error in getUserPhones', error);

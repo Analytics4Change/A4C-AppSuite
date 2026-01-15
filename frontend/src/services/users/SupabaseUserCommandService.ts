@@ -739,37 +739,210 @@ export class SupabaseUserCommandService implements IUserCommandService {
     };
   }
 
+  /**
+   * Add a phone number for a user
+   *
+   * Calls api.add_user_phone RPC which emits user.phone.added event.
+   * If orgId is null, creates a global phone. If set, creates org-specific phone.
+   */
   async addUserPhone(
     request: AddUserPhoneRequest
   ): Promise<UserOperationResult> {
-    log.warn('addUserPhone not yet implemented for Supabase');
-    return {
-      success: false,
-      error: 'addUserPhone not yet implemented',
-      errorDetails: { code: 'UNKNOWN', message: 'Coming soon' },
-    };
+    try {
+      log.info('Adding user phone', {
+        userId: request.userId,
+        label: request.label,
+        orgId: request.orgId,
+      });
+
+      const { data, error } = await supabaseService.apiRpc<{
+        success: boolean;
+        phoneId: string;
+        eventId: string;
+      }>('add_user_phone', {
+        p_user_id: request.userId,
+        p_label: request.label,
+        p_type: request.type,
+        p_number: request.number,
+        p_extension: request.extension ?? null,
+        p_country_code: request.countryCode ?? '+1',
+        p_is_primary: request.isPrimary ?? false,
+        p_sms_capable: request.smsCapable ?? false,
+        p_org_id: request.orgId ?? null,
+      });
+
+      if (error) {
+        log.error('Failed to add user phone via RPC', error);
+
+        if (error.code === '42501') {
+          return {
+            success: false,
+            error: 'Access denied - insufficient permissions',
+            errorDetails: { code: 'FORBIDDEN', message: error.message },
+          };
+        }
+
+        return {
+          success: false,
+          error: `Failed to add phone: ${error.message}`,
+          errorDetails: { code: 'UNKNOWN', message: error.message },
+        };
+      }
+
+      log.info('User phone added successfully', {
+        userId: request.userId,
+        phoneId: data?.phoneId,
+      });
+
+      return { success: true, phoneId: data?.phoneId };
+    } catch (error) {
+      log.error('Error in addUserPhone', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorDetails: {
+          code: 'UNKNOWN',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
   }
 
+  /**
+   * Update an existing user phone
+   *
+   * Calls api.update_user_phone RPC which emits user.phone.updated event.
+   */
   async updateUserPhone(
     request: UpdateUserPhoneRequest
   ): Promise<UserOperationResult> {
-    log.warn('updateUserPhone not yet implemented for Supabase');
-    return {
-      success: false,
-      error: 'updateUserPhone not yet implemented',
-      errorDetails: { code: 'UNKNOWN', message: 'Coming soon' },
-    };
+    try {
+      log.info('Updating user phone', {
+        phoneId: request.phoneId,
+        orgId: request.orgId,
+      });
+
+      const { data, error } = await supabaseService.apiRpc<{
+        success: boolean;
+        phoneId: string;
+        eventId: string;
+      }>('update_user_phone', {
+        p_phone_id: request.phoneId,
+        p_label: request.updates.label ?? null,
+        p_type: request.updates.type ?? null,
+        p_number: request.updates.number ?? null,
+        p_extension: request.updates.extension ?? null,
+        p_country_code: request.updates.countryCode ?? null,
+        p_is_primary: request.updates.isPrimary ?? null,
+        p_sms_capable: request.updates.smsCapable ?? null,
+        p_org_id: request.orgId ?? null,
+      });
+
+      if (error) {
+        log.error('Failed to update user phone via RPC', error);
+
+        if (error.code === '42501') {
+          return {
+            success: false,
+            error: 'Access denied - insufficient permissions',
+            errorDetails: { code: 'FORBIDDEN', message: error.message },
+          };
+        }
+        if (error.code === 'P0002') {
+          return {
+            success: false,
+            error: 'Phone not found',
+            errorDetails: { code: 'NOT_FOUND', message: error.message },
+          };
+        }
+
+        return {
+          success: false,
+          error: `Failed to update phone: ${error.message}`,
+          errorDetails: { code: 'UNKNOWN', message: error.message },
+        };
+      }
+
+      log.info('User phone updated successfully', { phoneId: request.phoneId });
+
+      return { success: true };
+    } catch (error) {
+      log.error('Error in updateUserPhone', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorDetails: {
+          code: 'UNKNOWN',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
   }
 
+  /**
+   * Remove (soft or hard delete) a user phone
+   *
+   * Calls api.remove_user_phone RPC which emits user.phone.removed event.
+   */
   async removeUserPhone(
     request: RemoveUserPhoneRequest
   ): Promise<UserOperationResult> {
-    log.warn('removeUserPhone not yet implemented for Supabase');
-    return {
-      success: false,
-      error: 'removeUserPhone not yet implemented',
-      errorDetails: { code: 'UNKNOWN', message: 'Coming soon' },
-    };
+    try {
+      log.info('Removing user phone', {
+        phoneId: request.phoneId,
+        hardDelete: request.hardDelete,
+        orgId: request.orgId,
+      });
+
+      const { data, error } = await supabaseService.apiRpc<{
+        success: boolean;
+        phoneId: string;
+        eventId: string;
+      }>('remove_user_phone', {
+        p_phone_id: request.phoneId,
+        p_org_id: request.orgId ?? null,
+        p_hard_delete: request.hardDelete ?? false,
+      });
+
+      if (error) {
+        log.error('Failed to remove user phone via RPC', error);
+
+        if (error.code === '42501') {
+          return {
+            success: false,
+            error: 'Access denied - insufficient permissions',
+            errorDetails: { code: 'FORBIDDEN', message: error.message },
+          };
+        }
+        if (error.code === 'P0002') {
+          return {
+            success: false,
+            error: 'Phone not found',
+            errorDetails: { code: 'NOT_FOUND', message: error.message },
+          };
+        }
+
+        return {
+          success: false,
+          error: `Failed to remove phone: ${error.message}`,
+          errorDetails: { code: 'UNKNOWN', message: error.message },
+        };
+      }
+
+      log.info('User phone removed successfully', { phoneId: request.phoneId });
+
+      return { success: true };
+    } catch (error) {
+      log.error('Error in removeUserPhone', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorDetails: {
+          code: 'UNKNOWN',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
   }
 
   /**

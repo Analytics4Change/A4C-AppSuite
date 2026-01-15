@@ -215,6 +215,18 @@ export interface UserPhone {
   /** Whether this phone can receive SMS notifications */
   smsCapable: boolean;
 
+  /**
+   * Whether this phone was auto-copied from a contact profile.
+   * Mirrored phones have source_contact_phone_id set in the database.
+   */
+  isMirrored?: boolean;
+
+  /**
+   * Source of the phone: 'global' for user_phones table,
+   * 'org' for user_org_phone_overrides table
+   */
+  source?: 'global' | 'org';
+
   /** When the phone was created */
   createdAt: Date;
 
@@ -705,6 +717,9 @@ export interface UpdateUserPhoneRequest {
   /** Phone ID */
   phoneId: string;
 
+  /** Organization ID (null for global phone, set for org-specific) */
+  orgId?: string | null;
+
   /** Fields to update (partial) */
   updates: Partial<Omit<AddUserPhoneRequest, 'userId' | 'orgId'>>;
 }
@@ -715,6 +730,9 @@ export interface UpdateUserPhoneRequest {
 export interface RemoveUserPhoneRequest {
   /** Phone ID */
   phoneId: string;
+
+  /** Organization ID (null for global phone, set for org-specific) */
+  orgId?: string | null;
 
   /** Whether to hard delete (true) or soft delete/deactivate (false) */
   hardDelete?: boolean;
@@ -761,6 +779,12 @@ export interface UserOperationResult {
 
   /** The resulting invitation (if applicable) */
   invitation?: Invitation;
+
+  /** The created phone ID (for addUserPhone) */
+  phoneId?: string;
+
+  /** The created address ID (for addUserAddress) */
+  addressId?: string;
 
   /** Error message (if failed) */
   error?: string;
