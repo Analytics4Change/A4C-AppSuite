@@ -612,6 +612,9 @@ export interface UpdateNotificationPreferencesRequest {
 
   /** New notification preferences */
   notificationPreferences: NotificationPreferences;
+
+  /** Optional audit reason for the change */
+  reason?: string;
 }
 
 /**
@@ -708,6 +711,9 @@ export interface AddUserPhoneRequest {
 
   /** Whether this phone can receive SMS */
   smsCapable?: boolean;
+
+  /** Optional audit reason for the change */
+  reason?: string;
 }
 
 /**
@@ -721,7 +727,10 @@ export interface UpdateUserPhoneRequest {
   orgId?: string | null;
 
   /** Fields to update (partial) */
-  updates: Partial<Omit<AddUserPhoneRequest, 'userId' | 'orgId'>>;
+  updates: Partial<Omit<AddUserPhoneRequest, 'userId' | 'orgId' | 'reason'>>;
+
+  /** Optional audit reason for the change */
+  reason?: string;
 }
 
 /**
@@ -736,6 +745,9 @@ export interface RemoveUserPhoneRequest {
 
   /** Whether to hard delete (true) or soft delete/deactivate (false) */
   hardDelete?: boolean;
+
+  /** Optional audit reason for the change */
+  reason?: string;
 }
 
 // ============================================================================

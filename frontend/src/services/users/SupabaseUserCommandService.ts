@@ -769,6 +769,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
         p_is_primary: request.isPrimary ?? false,
         p_sms_capable: request.smsCapable ?? false,
         p_org_id: request.orgId ?? null,
+        p_reason: request.reason ?? null,
       });
 
       if (error) {
@@ -836,6 +837,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
         p_is_primary: request.updates.isPrimary ?? null,
         p_sms_capable: request.updates.smsCapable ?? null,
         p_org_id: request.orgId ?? null,
+        p_reason: request.reason ?? null,
       });
 
       if (error) {
@@ -902,6 +904,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
         p_phone_id: request.phoneId,
         p_org_id: request.orgId ?? null,
         p_hard_delete: request.hardDelete ?? false,
+        p_reason: request.reason ?? null,
       });
 
       if (error) {
@@ -1045,6 +1048,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
           p_user_id: request.userId,
           p_org_id: request.orgId,
           p_notification_preferences: request.notificationPreferences,
+          p_reason: request.reason ?? null,
         }
       );
 
