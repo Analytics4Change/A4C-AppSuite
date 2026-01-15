@@ -28,6 +28,7 @@ import type {
   UserAddress,
   UserPhone,
   UserOrgAccess,
+  NotificationPreferences,
 } from '@/types/user.types';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/user.types';
 import type { Role } from '@/types/role.types';
@@ -925,6 +926,26 @@ export class MockUserQueryService implements IUserQueryService {
     }
 
     return access || null;
+  }
+
+  async getUserNotificationPreferences(userId: string): Promise<NotificationPreferences> {
+    await this.simulateDelay();
+    log.debug('Mock: Fetching user notification preferences', { userId });
+
+    // Try to find preferences from user org access
+    const access = this.userOrgAccess.find((a) => a.userId === userId);
+
+    if (access?.notificationPreferences) {
+      log.info('Mock: Found notification preferences', {
+        userId,
+        emailEnabled: access.notificationPreferences.email,
+        smsEnabled: access.notificationPreferences.sms.enabled,
+      });
+      return access.notificationPreferences;
+    }
+
+    log.debug('Mock: Using default notification preferences', { userId });
+    return DEFAULT_NOTIFICATION_PREFERENCES;
   }
 
   // ============================================================================

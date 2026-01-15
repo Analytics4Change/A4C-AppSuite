@@ -26,6 +26,7 @@ import type {
   UserAddress,
   UserPhone,
   UserOrgAccess,
+  NotificationPreferences,
 } from '@/types/user.types';
 
 export interface IUserQueryService {
@@ -230,4 +231,21 @@ export interface IUserQueryService {
    * }
    */
   getUserOrgAccess(userId: string, orgId: string): Promise<UserOrgAccess | null>;
+
+  /**
+   * Retrieves user's notification preferences for the current organization
+   *
+   * Uses the dedicated notification preferences projection table for reads.
+   * Returns defaults if no preferences have been set.
+   *
+   * @param userId - User UUID
+   * @returns Promise resolving to notification preferences
+   *
+   * @example
+   * const prefs = await service.getUserNotificationPreferences(userId);
+   * if (prefs.sms.enabled && prefs.sms.phoneId) {
+   *   await sendSmsNotification(prefs.sms.phoneId, message);
+   * }
+   */
+  getUserNotificationPreferences(userId: string): Promise<NotificationPreferences>;
 }

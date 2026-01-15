@@ -30,7 +30,9 @@ import { UsersViewModel } from '@/viewModels/users/UsersViewModel';
 import { UserFormViewModel } from '@/viewModels/users/UserFormViewModel';
 import { getUserQueryService, getUserCommandService } from '@/services/users';
 import { getRoleService } from '@/services/roles';
-import type { UserListItem, UserDisplayStatus } from '@/types/user.types';
+import { useAuth } from '@/contexts/AuthContext';
+import type { UserListItem, UserDisplayStatus, NotificationPreferences, UserPhone } from '@/types/user.types';
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/user.types';
 import type { Role } from '@/types/role.types';
 import {
   Plus,
@@ -74,6 +76,8 @@ type DialogState =
 export const UsersManagePage: React.FC = observer(() => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { session } = useAuth();
+  const organizationId = session?.claims?.org_id ?? '';
 
   // List ViewModel - manages user list state
   const [viewModel] = useState(
@@ -105,6 +109,12 @@ export const UsersManagePage: React.FC = observer(() => {
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<UserDisplayStatus | 'all'>('all');
+
+  // Notification preferences state (for selected user)
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
+  const [userPhones, setUserPhones] = useState<UserPhone[]>([]);
+  const [isLoadingPrefs, setIsLoadingPrefs] = useState(false);
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   // Load users and roles on mount
   useEffect(() => {
@@ -200,6 +210,37 @@ export const UsersManagePage: React.FC = observer(() => {
           setPanelMode('edit');
           // Ensure viewModel state is synced
           await viewModel.selectItem(itemId);
+
+          // Load notification preferences and phones for active users
+          if (!item.isInvitation && item.displayStatus === 'active') {
+            setIsLoadingPrefs(true);
+            try {
+              const queryService = getUserQueryService();
+              const [prefs, phones] = await Promise.all([
+                queryService.getUserNotificationPreferences(item.id),
+                queryService.getUserPhones(item.id),
+              ]);
+              setNotificationPrefs(prefs);
+              setUserPhones(phones);
+              log.debug('Loaded notification preferences and phones', {
+                userId: item.id,
+                smsEnabled: prefs.sms.enabled,
+                phoneCount: phones.length,
+              });
+            } catch (prefsError) {
+              log.error('Failed to load notification preferences', prefsError);
+              // Don't block - use defaults
+              setNotificationPrefs(DEFAULT_NOTIFICATION_PREFERENCES);
+              setUserPhones([]);
+            } finally {
+              setIsLoadingPrefs(false);
+            }
+          } else {
+            // Reset for invitations or inactive users
+            setNotificationPrefs(DEFAULT_NOTIFICATION_PREFERENCES);
+            setUserPhones([]);
+          }
+
           log.debug('User/invitation loaded for editing', {
             itemId,
             isInvitation: item.isInvitation,
@@ -497,6 +538,39 @@ export const UsersManagePage: React.FC = observer(() => {
       );
     }
   }, [currentItem, viewModel]);
+
+  // Save notification preferences handler
+  const handleSaveNotificationPreferences = useCallback(
+    async (preferences: NotificationPreferences) => {
+      if (!currentItem || currentItem.isInvitation || !organizationId) return;
+
+      setIsSavingPrefs(true);
+      setOperationError(null);
+      try {
+        const commandService = getUserCommandService();
+        const result = await commandService.updateNotificationPreferences({
+          userId: currentItem.id,
+          orgId: organizationId,
+          notificationPreferences: preferences,
+        });
+
+        if (result.success) {
+          setNotificationPrefs(preferences);
+          log.info('Notification preferences saved', { userId: currentItem.id });
+        } else {
+          setOperationError(result.error || 'Failed to save notification preferences');
+        }
+      } catch (error) {
+        log.error('Error saving notification preferences', error);
+        setOperationError(
+          error instanceof Error ? error.message : 'Failed to save notification preferences'
+        );
+      } finally {
+        setIsSavingPrefs(false);
+      }
+    },
+    [currentItem, organizationId]
+  );
 
   // Get display name for current item
   const getDisplayName = (item: UserListItem | null): string => {
@@ -989,6 +1063,27 @@ export const UsersManagePage: React.FC = observer(() => {
                     userId={currentItem.id}
                     editable={true}
                   />
+                )}
+
+                {/* Notification Preferences Section (for active users only) */}
+                {!currentItem.isInvitation && currentItem.displayStatus === 'active' && (
+                  <Card className="shadow-lg">
+                    <CardContent className="p-6">
+                      {isLoadingPrefs ? (
+                        <div className="flex items-center justify-center py-8 text-gray-500">
+                          <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+                          Loading notification preferences...
+                        </div>
+                      ) : (
+                        <NotificationPreferencesForm
+                          preferences={notificationPrefs}
+                          availablePhones={userPhones}
+                          onSave={handleSaveNotificationPreferences}
+                          isSaving={isSavingPrefs}
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
                 )}
 
                 {/* Danger Zone (for active and deactivated users) */}

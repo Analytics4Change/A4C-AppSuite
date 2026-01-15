@@ -27,6 +27,7 @@ import type {
   UserAddress,
   UserPhone,
   UserOrgAccess,
+  NotificationPreferences,
 } from '@/types/user.types';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/user.types';
 import type { Role } from '@/types/role.types';
@@ -1121,6 +1122,55 @@ export class SupabaseUserQueryService implements IUserQueryService {
     } catch (error) {
       log.error('Error in getUserOrgAccess', error);
       return null;
+    }
+  }
+
+  /**
+   * Get user's notification preferences for the current organization
+   *
+   * Uses api.get_user_notification_preferences RPC to read from the
+   * normalized notification preferences projection table.
+   */
+  async getUserNotificationPreferences(userId: string): Promise<NotificationPreferences> {
+    const client = supabaseService.getClient();
+
+    try {
+      // Get organization ID from JWT claims
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+      if (!session) {
+        log.error('No authenticated session for getUserNotificationPreferences');
+        return DEFAULT_NOTIFICATION_PREFERENCES;
+      }
+
+      const claims = this.decodeJWT(session.access_token);
+      const orgId = claims.org_id;
+
+      if (!orgId) {
+        log.error('No organization context for getUserNotificationPreferences');
+        return DEFAULT_NOTIFICATION_PREFERENCES;
+      }
+
+      // Use RPC to get notification preferences from normalized table
+      const { data, error } = await supabaseService.apiRpc<NotificationPreferences>(
+        'get_user_notification_preferences',
+        {
+          p_user_id: userId,
+          p_organization_id: orgId,
+        }
+      );
+
+      if (error) {
+        log.error('Failed to fetch notification preferences via RPC', error);
+        return DEFAULT_NOTIFICATION_PREFERENCES;
+      }
+
+      // RPC returns properly structured preferences or defaults
+      return data ?? DEFAULT_NOTIFICATION_PREFERENCES;
+    } catch (error) {
+      log.error('Error in getUserNotificationPreferences', error);
+      return DEFAULT_NOTIFICATION_PREFERENCES;
     }
   }
 
