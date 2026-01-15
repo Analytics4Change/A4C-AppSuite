@@ -18,7 +18,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import type { CreateOrganizationParams } from '@shared/types';
+import type { CreateOrganizationParams, CreateOrganizationResult } from '@shared/types';
 import {
   getSupabaseClient,
   emitEvent,
@@ -51,11 +51,11 @@ const log = getLogger('CreateOrganization');
 /**
  * Create organization activity
  * @param params - Organization creation parameters (includes pre-generated organizationId)
- * @returns Created organization ID (same as input organizationId)
+ * @returns Created organization ID and contactsByEmail map for invitation linking
  */
 export async function createOrganization(
   params: CreateOrganizationParams
-): Promise<string> {
+): Promise<CreateOrganizationResult> {
   const displayName = params.subdomain || params.name;
   log.info('Starting organization creation', {
     displayName,
@@ -100,7 +100,9 @@ export async function createOrganization(
     });
     // Return the requested organizationId to maintain unified ID system
     // This ensures status polling works even on activity retries
-    return params.organizationId;
+    // Note: contactsByEmail is empty because we don't have the contact IDs from a prior run
+    // This is acceptable because idempotent retries will skip invitation generation if already done
+    return { orgId: params.organizationId, contactsByEmail: {} };
   }
 
   // Use the pre-generated organization ID from the API
@@ -134,31 +136,43 @@ export async function createOrganization(
   log.debug('Emitted organization.created event', { orgId });
 
   // Determine which mode to use: bootstrap (with temp_id correlation) or legacy
+  let contactsByEmail: Record<string, string>;
   if (params.bootstrapContacts || params.bootstrapPhones || params.bootstrapEmails || params.bootstrapAddresses) {
-    await createEntitiesWithCorrelation(orgId, params);
+    contactsByEmail = await createEntitiesWithCorrelation(orgId, params);
   } else {
-    await createEntitiesLegacy(orgId, params);
+    contactsByEmail = await createEntitiesLegacy(orgId, params);
   }
 
-  log.info('Successfully created organization with all related entities', { orgId });
-  return orgId;
+  log.info('Successfully created organization with all related entities', {
+    orgId,
+    contactCount: Object.keys(contactsByEmail).length
+  });
+  return { orgId, contactsByEmail };
 }
 
 /**
  * Create entities using bootstrap mode with temp_id → UUID correlation.
  * This mode supports contact↔entity relationships via contact_ref.
+ * @returns Map of contact email → contactId for linking invitations to contacts
  */
 async function createEntitiesWithCorrelation(
   orgId: string,
   params: CreateOrganizationParams
-): Promise<void> {
+): Promise<Record<string, string>> {
   // Build temp_id → real UUID map for contacts
   const contactIdMap = new Map<string, string>();
+  // Build email → contactId map for invitation linking
+  const contactsByEmail: Record<string, string> = {};
 
   // 1. Create contacts first (so we can resolve contact_ref later)
   for (const contact of params.bootstrapContacts ?? []) {
     const contactId = uuidv4();
     contactIdMap.set(contact.temp_id, contactId);
+
+    // Track email → contactId mapping for invitation linking
+    if (contact.email) {
+      contactsByEmail[contact.email.toLowerCase()] = contactId;
+    }
 
     // Type-safe contact.created event
     // Note: ContactCreationData requires email, but bootstrap input allows optional email
@@ -184,7 +198,8 @@ async function createEntitiesWithCorrelation(
   log.debug('Created contacts with correlation', {
     count: contactIdMap.size,
     orgId,
-    tempIds: Array.from(contactIdMap.keys())
+    tempIds: Array.from(contactIdMap.keys()),
+    emailCount: Object.keys(contactsByEmail).length
   });
 
   // 2. Create phones with contact_ref resolution
@@ -314,22 +329,33 @@ async function createEntitiesWithCorrelation(
   }
 
   log.debug('Created addresses', { count: addressIds.length, orgId });
+
+  return contactsByEmail;
 }
 
 /**
  * Create entities using legacy mode (no contact correlation).
  * All entities are linked to org only, not to each other.
  * @deprecated Use bootstrap mode with temp_id/contact_ref for new code
+ * @returns Map of contact email → contactId for linking invitations to contacts
  */
 async function createEntitiesLegacy(
   orgId: string,
   params: CreateOrganizationParams
-): Promise<void> {
+): Promise<Record<string, string>> {
   // Create contacts and emit events (using type-safe emitters)
   const contactIds: string[] = [];
+  // Build email → contactId map for invitation linking
+  const contactsByEmail: Record<string, string> = {};
+
   for (const contact of params.contacts) {
     const contactId = uuidv4();
     contactIds.push(contactId);
+
+    // Track email → contactId mapping for invitation linking
+    if (contact.email) {
+      contactsByEmail[contact.email.toLowerCase()] = contactId;
+    }
 
     // Type-safe contact.created event
     await emitContactCreated(contactId, {
@@ -350,7 +376,11 @@ async function createEntitiesLegacy(
     }, params.tracing);
   }
 
-  log.debug('Created contacts (legacy)', { count: contactIds.length, orgId });
+  log.debug('Created contacts (legacy)', {
+    count: contactIds.length,
+    orgId,
+    emailCount: Object.keys(contactsByEmail).length
+  });
 
   // Create addresses and emit events (using type-safe emitters)
   const addressIds: string[] = [];
@@ -427,4 +457,6 @@ async function createEntitiesLegacy(
 
     log.debug('Created emails (legacy)', { count: emailIds.length, orgId });
   }
+
+  return contactsByEmail;
 }

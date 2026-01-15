@@ -249,6 +249,19 @@ export interface CreateOrganizationParams {
 }
 
 /**
+ * CreateOrganizationActivity result
+ */
+export interface CreateOrganizationResult {
+  /** Created organization ID */
+  orgId: string;
+  /**
+   * Map of email → contact_id for contacts created.
+   * Used to link invitations to contacts for contact-user unification.
+   */
+  contactsByEmail: Record<string, string>;
+}
+
+/**
  * ConfigureDNSActivity parameters
  */
 export interface ConfigureDNSParams {
@@ -292,6 +305,11 @@ export interface GenerateInvitationsParams {
     lastName: string;
     role: string;
   }>;
+  /**
+   * Map of email → contact_id for contact-user linking.
+   * When provided, contact_id is stored in invitation for later linking.
+   */
+  contactsByEmail?: Record<string, string>;
   /** Optional tracing context for end-to-end request correlation */
   tracing?: WorkflowTracingParams;
 }
@@ -304,6 +322,8 @@ export interface Invitation {
   email: string;
   token: string;
   expiresAt: Date;
+  /** Contact ID if invitation is for a person who is also a contact */
+  contactId?: string;
 }
 
 /**

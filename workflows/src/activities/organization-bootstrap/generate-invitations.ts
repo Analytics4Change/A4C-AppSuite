@@ -45,7 +45,8 @@ export async function generateInvitations(
 ): Promise<Invitation[]> {
   log.info('Starting invitation generation', {
     orgId: params.orgId,
-    count: params.users.length
+    count: params.users.length,
+    contactCount: params.contactsByEmail ? Object.keys(params.contactsByEmail).length : 0
   });
 
   const supabase = getSupabaseClient();
@@ -57,7 +58,9 @@ export async function generateInvitations(
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   for (const user of params.users) {
-    log.debug('Processing invitation', { email: user.email });
+    // Look up contact_id for this user's email (if contact was created during org bootstrap)
+    const contactId = params.contactsByEmail?.[user.email.toLowerCase()];
+    log.debug('Processing invitation', { email: user.email, contactId });
 
     // Check if invitation already exists (idempotency) via RPC
     const { data: existingData } = await supabase
@@ -75,7 +78,8 @@ export async function generateInvitations(
         invitationId: existing.invitation_id,
         email: existing.email,
         token: existing.token,
-        expiresAt: new Date(existing.expires_at)
+        expiresAt: new Date(existing.expires_at),
+        contactId: existing.contact_id ?? undefined
       });
       continue;
     }
@@ -86,6 +90,7 @@ export async function generateInvitations(
 
     // Emit UserInvited event (triggers projection update via process_user_event)
     // Routes to USER aggregate with invitation_id as stream_id (user_id doesn't exist yet)
+    // Include contact_id when user is also a contact (for contact-user linking)
     await emitEvent({
       event_type: 'user.invited',
       aggregate_type: AGGREGATE_TYPES.USER,
@@ -98,19 +103,22 @@ export async function generateInvitations(
         last_name: user.lastName,
         roles: [{ role_id: null, role_name: user.role }],
         token,
-        expires_at: expiresAt.toISOString()
+        expires_at: expiresAt.toISOString(),
+        // Include contact_id for contact-user linking when user accepts invitation
+        ...(contactId ? { contact_id: contactId } : {})
       },
       tags,
       ...buildTracingForEvent(params.tracing, 'generateInvitation')
     });
 
-    log.debug('Generated invitation', { email: user.email });
+    log.debug('Generated invitation', { email: user.email, contactId });
 
     invitations.push({
       invitationId,
       email: user.email,
       token,
-      expiresAt
+      expiresAt,
+      contactId
     });
   }
 

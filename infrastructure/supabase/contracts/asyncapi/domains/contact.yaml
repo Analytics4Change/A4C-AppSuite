@@ -24,6 +24,22 @@ components:
       payload:
         $ref: '#/components/schemas/ContactDeletedEvent'
 
+    ContactUserLinked:
+      name: contact.user.linked
+      title: Contact User Linked
+      summary: Contact has been linked to a user (same person is both contact and user)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ContactUserLinkedEvent'
+
+    ContactUserUnlinked:
+      name: contact.user.unlinked
+      title: Contact User Unlinked
+      summary: Contact has been unlinked from a user
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ContactUserUnlinkedEvent'
+
   schemas:
     ContactCreatedEvent:
       title: ContactCreatedEvent
@@ -242,3 +258,113 @@ components:
             - "Contact no longer with organization"
             - "Duplicate contact removed"
             - "Organization cascade deletion"
+
+    ContactUserLinkedEvent:
+      title: ContactUserLinkedEvent
+      type: object
+      description: Emitted when a contact is linked to a user (same person is both)
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Contact UUID
+        stream_type:
+          type: string
+          const: contact
+        event_type:
+          type: string
+          const: contact.user.linked
+        event_data:
+          $ref: '#/components/schemas/ContactUserLinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ContactUserLinkData:
+      title: ContactUserLinkData
+      type: object
+      description: Data for linking a contact to a user
+      required:
+        - contact_id
+        - user_id
+        - organization_id
+      properties:
+        contact_id:
+          type: string
+          format: uuid
+          description: Contact being linked
+        user_id:
+          type: string
+          format: uuid
+          description: User being linked to contact
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization context for this link
+        linked_reason:
+          type: string
+          description: Reason for linking (invitation acceptance, manual link, etc.)
+          examples:
+            - "invitation_accepted"
+            - "manual_link"
+            - "bootstrap_auto_link"
+
+    ContactUserUnlinkedEvent:
+      title: ContactUserUnlinkedEvent
+      type: object
+      description: Emitted when a contact is unlinked from a user
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Contact UUID
+        stream_type:
+          type: string
+          const: contact
+        event_type:
+          type: string
+          const: contact.user.unlinked
+        event_data:
+          $ref: '#/components/schemas/ContactUserUnlinkData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ContactUserUnlinkData:
+      title: ContactUserUnlinkData
+      type: object
+      description: Data for unlinking a contact from a user
+      required:
+        - contact_id
+        - user_id
+        - organization_id
+      properties:
+        contact_id:
+          type: string
+          format: uuid
+          description: Contact being unlinked
+        user_id:
+          type: string
+          format: uuid
+          description: User being unlinked from contact
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization context for this unlink
+        unlinked_reason:
+          type: string
+          description: Reason for unlinking
+          examples:
+            - "user_deleted"
+            - "manual_unlink"
+            - "duplicate_resolution"

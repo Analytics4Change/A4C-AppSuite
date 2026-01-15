@@ -172,7 +172,8 @@ export async function organizationBootstrapWorkflow(
     });
 
     // Create organization using the pre-generated organizationId from the API
-    await createOrganization({
+    // Returns contactsByEmail map for linking invitations to contacts
+    const createOrgResult = await createOrganization({
       organizationId: params.organizationId,
       name: params.orgData.name,
       type: params.orgData.type,
@@ -187,11 +188,14 @@ export async function organizationBootstrapWorkflow(
     });
 
     state.orgCreated = true;
+    // Store contactsByEmail for use in generateInvitations
+    const contactsByEmail = createOrgResult.contactsByEmail;
     log.info('Organization created', {
       orgId: state.orgId,
       contactCount: params.orgData.contacts.length,
       addressCount: params.orgData.addresses.length,
-      phoneCount: params.orgData.phones.length
+      phoneCount: params.orgData.phones.length,
+      contactsWithEmail: Object.keys(contactsByEmail).length
     });
 
     // ========================================
@@ -301,6 +305,7 @@ export async function organizationBootstrapWorkflow(
     state.invitations = await generateInvitations({
       orgId: state.orgId!,
       users: params.users,
+      contactsByEmail,  // Pass contact mapping for contact-user linking
       tracing: params.tracing
     });
 

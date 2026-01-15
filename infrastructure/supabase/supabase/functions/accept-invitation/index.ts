@@ -26,7 +26,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v15-add-user-names-to-event';
+const DEPLOY_VERSION = 'v16-contact-user-linking';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -347,6 +347,8 @@ serve(async (req) => {
               auth_method: authMethod.type,
               auth_provider: provider,
               platform: requestData.platform || 'web',
+              // Include contact_id for contact-user linking (if user is also a contact)
+              ...(invitation.contact_id ? { contact_id: invitation.contact_id } : {}),
             },
             p_event_metadata: buildEventMetadata(tracingContext, 'user.created', req, {
               user_id: userId,
@@ -359,7 +361,36 @@ serve(async (req) => {
           console.error(`[accept-invitation v${DEPLOY_VERSION}] Failed to emit user.created for OAuth user:`, oauthEventError);
           return handleRpcError(oauthEventError, correlationId, corsHeaders, 'Emit user.created event (OAuth)');
         }
-        console.log(`[accept-invitation v${DEPLOY_VERSION}] user.created event emitted for new ${provider} user`);
+        console.log(`[accept-invitation v${DEPLOY_VERSION}] user.created event emitted for new ${provider} user, contact_id=${invitation.contact_id || 'none'}`);
+
+        // Emit contact.user.linked if user is also a contact
+        if (invitation.contact_id) {
+          const { error: linkEventError } = await supabase
+            .rpc('emit_domain_event', {
+              p_stream_id: invitation.contact_id,
+              p_stream_type: 'contact',
+              p_event_type: 'contact.user.linked',
+              p_event_data: {
+                contact_id: invitation.contact_id,
+                user_id: userId,
+                organization_id: invitation.organization_id,
+                linked_reason: 'User accepted invitation for contact email',
+              },
+              p_event_metadata: buildEventMetadata(tracingContext, 'contact.user.linked', req, {
+                user_id: userId,
+                organization_id: invitation.organization_id,
+                invitation_id: invitation.id,
+                automated: true,
+              })
+            });
+
+          if (linkEventError) {
+            console.error(`[accept-invitation v${DEPLOY_VERSION}] Failed to emit contact.user.linked:`, linkEventError);
+            // Non-fatal: user is created but contact link failed
+          } else {
+            console.log(`[accept-invitation v${DEPLOY_VERSION}] contact.user.linked event emitted: contact=${invitation.contact_id}, user=${userId}`);
+          }
+        }
       } else {
         console.log(`[accept-invitation v${DEPLOY_VERSION}] Existing user (Sally scenario) - skipping user.created event`);
       }
@@ -397,7 +428,7 @@ serve(async (req) => {
     }));
 
     // Emit user.created event for email/password users only
-    // OAuth users already have this event emitted in the OAuth block above (lines 335-363)
+    // OAuth users already have this event emitted in the OAuth block above (lines 335-393)
     if (isEmailPassword) {
       const { data: _eventId, error: eventError } = await supabase
         .rpc('emit_domain_event', {
@@ -412,6 +443,8 @@ serve(async (req) => {
             organization_id: invitation.organization_id,
             invited_via: 'organization_bootstrap',
             auth_method: 'email_password',
+            // Include contact_id for contact-user linking (if user is also a contact)
+            ...(invitation.contact_id ? { contact_id: invitation.contact_id } : {}),
           },
           p_event_metadata: buildEventMetadata(tracingContext, 'user.created', req, {
             user_id: userId,
@@ -427,7 +460,36 @@ serve(async (req) => {
         // User account exists but has no role - return error to prevent silent failure
         return handleRpcError(eventError, correlationId, corsHeaders, 'Emit user.created event');
       }
-      console.log(`User created event emitted successfully: event_id=${_eventId}, user_id=${userId}, org_id=${invitation.organization_id}`);
+      console.log(`[accept-invitation v${DEPLOY_VERSION}] user.created event emitted: event_id=${_eventId}, user_id=${userId}, org_id=${invitation.organization_id}, contact_id=${invitation.contact_id || 'none'}`);
+
+      // Emit contact.user.linked if user is also a contact
+      if (invitation.contact_id) {
+        const { error: linkEventError } = await supabase
+          .rpc('emit_domain_event', {
+            p_stream_id: invitation.contact_id,
+            p_stream_type: 'contact',
+            p_event_type: 'contact.user.linked',
+            p_event_data: {
+              contact_id: invitation.contact_id,
+              user_id: userId,
+              organization_id: invitation.organization_id,
+              linked_reason: 'User accepted invitation for contact email',
+            },
+            p_event_metadata: buildEventMetadata(tracingContext, 'contact.user.linked', req, {
+              user_id: userId,
+              organization_id: invitation.organization_id,
+              invitation_id: invitation.id,
+              automated: true,
+            })
+          });
+
+        if (linkEventError) {
+          console.error(`[accept-invitation v${DEPLOY_VERSION}] Failed to emit contact.user.linked:`, linkEventError);
+          // Non-fatal: user is created but contact link failed
+        } else {
+          console.log(`[accept-invitation v${DEPLOY_VERSION}] contact.user.linked event emitted: contact=${invitation.contact_id}, user=${userId}`);
+        }
+      }
     }
 
     // ==========================================================================

@@ -83,6 +83,8 @@ channels:
           - $ref: './domains/contact.yaml#/components/messages/ContactCreated'
           - $ref: './domains/contact.yaml#/components/messages/ContactUpdated'
           - $ref: './domains/contact.yaml#/components/messages/ContactDeleted'
+          - $ref: './domains/contact.yaml#/components/messages/ContactUserLinked'
+          - $ref: './domains/contact.yaml#/components/messages/ContactUserUnlinked'
           # Phone entity events
           - $ref: './domains/phone.yaml#/components/messages/PhoneCreated'
           - $ref: './domains/phone.yaml#/components/messages/PhoneUpdated'
