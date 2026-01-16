@@ -569,7 +569,7 @@ $$;
 
 ALTER FUNCTION "public"."process_user_event"("record") OWNER TO "postgres";
 
-COMMENT ON FUNCTION "public"."process_user_event" IS
+COMMENT ON FUNCTION "public"."process_user_event"("record") IS
 'Process user-related domain events and update projections.
 
 Handles event types:
