@@ -150,18 +150,33 @@ export class UserFormViewModel {
 
   /**
    * Whether the form has unsaved changes
+   *
+   * Defensive implementation to prevent MobX errors if data is in inconsistent state.
    */
   get isDirty(): boolean {
-    return (
-      this.formData.email !== this.originalData.email ||
-      this.formData.firstName !== this.originalData.firstName ||
-      this.formData.lastName !== this.originalData.lastName ||
-      JSON.stringify(this.formData.roleIds.sort()) !== JSON.stringify(this.originalData.roleIds.sort()) ||
-      this.formData.accessStartDate !== this.originalData.accessStartDate ||
-      this.formData.accessExpirationDate !== this.originalData.accessExpirationDate ||
-      JSON.stringify(this.formData.notificationPreferences) !== JSON.stringify(this.originalData.notificationPreferences) ||
-      JSON.stringify(this.formData.phones) !== JSON.stringify(this.originalData.phones)
-    );
+    try {
+      // Guard against undefined/null data
+      if (!this.formData || !this.originalData) {
+        return false;
+      }
+
+      return (
+        this.formData.email !== this.originalData.email ||
+        this.formData.firstName !== this.originalData.firstName ||
+        this.formData.lastName !== this.originalData.lastName ||
+        JSON.stringify(this.formData.roleIds?.slice().sort() ?? []) !==
+          JSON.stringify(this.originalData.roleIds?.slice().sort() ?? []) ||
+        this.formData.accessStartDate !== this.originalData.accessStartDate ||
+        this.formData.accessExpirationDate !== this.originalData.accessExpirationDate ||
+        JSON.stringify(this.formData.notificationPreferences ?? {}) !==
+          JSON.stringify(this.originalData.notificationPreferences ?? {}) ||
+        JSON.stringify(this.formData.phones ?? []) !==
+          JSON.stringify(this.originalData.phones ?? [])
+      );
+    } catch {
+      // If any error occurs during dirty check, assume not dirty to prevent crashes
+      return false;
+    }
   }
 
   /**

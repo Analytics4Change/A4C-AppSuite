@@ -112,16 +112,21 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             </div>
 
             <p className="text-gray-600 mb-4">
-              An unexpected error occurred. We apologize for the inconvenience.
+              {this.state.error?.message || 'An unexpected error occurred. We apologize for the inconvenience.'}
             </p>
 
-            {/* Show error message in development */}
-            {import.meta.env.DEV && this.state.error && (
-              <div className="mb-4 p-3 bg-gray-100 rounded-lg">
-                <p className="text-sm font-mono text-red-700 break-words">
-                  {this.state.error.message}
-                </p>
-              </div>
+            {/* Show stack trace in development only */}
+            {import.meta.env.DEV && this.state.error?.stack && (
+              <details className="mb-4">
+                <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
+                  Technical details
+                </summary>
+                <div className="mt-2 p-3 bg-gray-100 rounded-lg">
+                  <pre className="text-xs font-mono text-red-700 whitespace-pre-wrap break-words overflow-auto max-h-48">
+                    {this.state.error.stack}
+                  </pre>
+                </div>
+              </details>
             )}
 
             <div className="flex gap-3">
