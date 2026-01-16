@@ -44,6 +44,9 @@ export interface UserPhonesSectionProps {
 
   /** Additional CSS classes */
   className?: string;
+
+  /** Callback when phones are added, edited, or removed */
+  onPhonesChange?: (phones: UserPhone[]) => void;
 }
 
 /**
@@ -55,7 +58,7 @@ type SectionMode = 'list' | 'add' | 'edit';
  * UserPhonesSection - Manage user phone numbers
  */
 export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
-  ({ userId, editable = true, className }) => {
+  ({ userId, editable = true, className, onPhonesChange }) => {
     const { session } = useAuth();
     const organizationId = session?.claims?.org_id ?? '';
 
@@ -77,13 +80,15 @@ export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
       try {
         const result = await queryService.getUserPhones(userId);
         setPhones(result);
+        // Notify parent of phone changes (for SMS notification preferences sync)
+        onPhonesChange?.(result);
       } catch (err) {
         log.error('Failed to load phones', err);
         setError('Failed to load phone numbers');
       } finally {
         setIsLoading(false);
       }
-    }, [userId, queryService]);
+    }, [userId, queryService, onPhonesChange]);
 
     useEffect(() => {
       loadPhones();

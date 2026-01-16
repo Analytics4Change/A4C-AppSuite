@@ -1098,6 +1098,7 @@ export const UsersManagePage: React.FC = observer(() => {
                   <UserPhonesSection
                     userId={currentItem.id}
                     editable={true}
+                    onPhonesChange={setUserPhones}
                   />
                 )}
 
