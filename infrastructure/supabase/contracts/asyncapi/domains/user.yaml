@@ -24,6 +24,14 @@ components:
       payload:
         $ref: '#/components/schemas/UserRoleAssignedEvent'
 
+    UserProfileUpdated:
+      name: user.profile.updated
+      title: User Profile Updated
+      summary: User profile information (first_name, last_name) has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserProfileUpdatedEvent'
+
     UserOrganizationSwitched:
       name: user.organization_switched
       title: User Organization Switched
@@ -328,6 +336,61 @@ components:
           examples:
             - "2025-12-31"
             - null
+
+    # =========================================================================
+    # User Profile Update Event
+    # =========================================================================
+
+    UserProfileUpdatedEvent:
+      title: UserProfileUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.profile.updated
+        event_data:
+          $ref: '#/components/schemas/UserProfileUpdatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserProfileUpdatedData:
+      title: UserProfileUpdatedData
+      type: object
+      required:
+        - user_id
+        - organization_id
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: UUID of the user being updated
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization context for the update (used for authorization)
+        first_name:
+          type: string
+          maxLength: 100
+          nullable: true
+          description: New first name (NULL to keep existing)
+        last_name:
+          type: string
+          maxLength: 100
+          nullable: true
+          description: New last name (NULL to keep existing)
 
     UserOrgSwitchedEvent:
       title: UserOrgSwitchedEvent

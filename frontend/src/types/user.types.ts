@@ -815,6 +815,10 @@ export type UserOperationErrorCode =
   | 'HTTP_ERROR'      // Edge Function returned non-2xx status
   | 'RELAY_ERROR'     // Network relay error (Supabase infrastructure)
   | 'FETCH_ERROR'     // Connection/fetch error
+  | 'AUTH_ERROR'      // Authentication error (no session, missing claims)
+  | 'RPC_ERROR'       // Database RPC function error
+  | 'UPDATE_FAILED'   // Update operation failed
+  | 'MISSING_USER_ID' // Edit mode requires user ID
   | 'UNKNOWN';
 
 /**

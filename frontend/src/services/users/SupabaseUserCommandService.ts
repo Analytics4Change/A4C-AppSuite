@@ -143,6 +143,16 @@ const EDGE_FUNCTIONS = {
 } as const;
 
 /**
+ * JWT Claims extracted from access token
+ */
+interface DecodedJWTClaims {
+  org_id?: string;
+  user_role?: string;
+  permissions?: string[];
+  sub?: string;
+}
+
+/**
  * Supabase User Command Service Implementation
  */
 export class SupabaseUserCommandService implements IUserCommandService {
@@ -599,20 +609,110 @@ export class SupabaseUserCommandService implements IUserCommandService {
   }
 
   /**
-   * Update user profile
+   * Update user profile (first_name, last_name)
    *
-   * TODO: Implement via RPC function when available
+   * Calls api.update_user() RPC which:
+   * 1. Validates user belongs to org
+   * 2. Emits user.profile.updated event
+   * 3. Event processor updates users table
    */
   async updateUser(request: UpdateUserRequest): Promise<UserOperationResult> {
-    log.warn('updateUser not yet implemented for Supabase');
-    return {
-      success: false,
-      error: 'updateUser not yet implemented',
-      errorDetails: {
-        code: 'UNKNOWN',
-        message: 'This feature is not yet available',
-      },
-    };
+    try {
+      log.info('Updating user profile', { userId: request.userId });
+
+      const client = supabaseService.getClient();
+
+      // Get session directly from Supabase - it manages auth state automatically
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+      if (!session) {
+        log.error('No authenticated session for updateUser');
+        return {
+          success: false,
+          error: 'Not authenticated',
+          errorDetails: { code: 'AUTH_ERROR', message: 'No active session' },
+        };
+      }
+
+      // Decode JWT to extract custom claims (org_id)
+      const claims = this.decodeJWT(session.access_token);
+      if (!claims.org_id) {
+        log.error('No organization context in JWT claims');
+        return {
+          success: false,
+          error: 'No organization context',
+          errorDetails: { code: 'AUTH_ERROR', message: 'Missing org_id in JWT' },
+        };
+      }
+
+      // Call the RPC function via supabaseService helper (handles api schema typing)
+      const { data, error } = await supabaseService.apiRpc<{
+        success: boolean;
+        error?: string;
+        event_id?: string;
+      }>('update_user', {
+        p_user_id: request.userId,
+        p_org_id: claims.org_id,
+        p_first_name: request.firstName ?? null,
+        p_last_name: request.lastName ?? null,
+      });
+
+      if (error) {
+        log.error('RPC error updating user', { error });
+        return {
+          success: false,
+          error: error.message,
+          errorDetails: { code: 'RPC_ERROR', message: error.message },
+        };
+      }
+
+      // RPC returns {success: boolean, error?: string, event_id?: string}
+      if (!data?.success) {
+        log.warn('User update failed', { error: data?.error });
+        return {
+          success: false,
+          error: data?.error || 'Update failed',
+          errorDetails: {
+            code: 'UPDATE_FAILED',
+            message: data?.error || 'Unknown error',
+          },
+        };
+      }
+
+      log.info('User profile updated successfully', {
+        userId: request.userId,
+        eventId: data.event_id,
+      });
+      return { success: true };
+    } catch (err) {
+      log.error('Error updating user profile', err);
+      const message = err instanceof Error ? err.message : 'Failed to update user';
+      return {
+        success: false,
+        error: message,
+        errorDetails: { code: 'UNKNOWN', message },
+      };
+    }
+  }
+
+  /**
+   * Decode JWT token to extract claims
+   * Uses same approach as SupabaseUserQueryService.decodeJWT()
+   */
+  private decodeJWT(token: string): DecodedJWTClaims {
+    try {
+      const payload = token.split('.')[1];
+      const decoded = JSON.parse(globalThis.atob(payload));
+      return {
+        org_id: decoded.org_id,
+        user_role: decoded.user_role,
+        permissions: decoded.permissions || [],
+        sub: decoded.sub,
+      };
+    } catch {
+      return {};
+    }
   }
 
   /**

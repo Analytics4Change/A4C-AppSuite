@@ -28,11 +28,13 @@ import type { IUserCommandService } from '@/services/users/IUserCommandService';
 import type {
   InviteUserFormData,
   InviteUserRequest,
+  UpdateUserRequest,
   RoleReference,
   UserOperationResult,
   EmailLookupResult,
   NotificationPreferences,
   InvitationPhone,
+  UserListItem,
 } from '@/types/user.types';
 import {
   validateEmail,
@@ -44,6 +46,11 @@ import {
 } from '@/types/user.types';
 
 const log = Logger.getLogger('viewmodel');
+
+/**
+ * Form mode: create new user invitation or edit existing user
+ */
+export type FormMode = 'create' | 'edit';
 
 /**
  * Form field keys
@@ -109,6 +116,12 @@ export class UserFormViewModel {
   /** Available roles for selection */
   readonly assignableRoles: RoleReference[];
 
+  /** Form mode (create or edit) */
+  readonly mode: FormMode;
+
+  /** User ID being edited (edit mode only) */
+  readonly editingUserId: string | null;
+
   // ============================================
   // Constructor
   // ============================================
@@ -117,11 +130,50 @@ export class UserFormViewModel {
    * Constructor
    *
    * @param assignableRoles - Roles available for assignment
+   * @param mode - Form mode (create or edit)
+   * @param existingUser - Existing user to edit (required for edit mode)
    */
-  constructor(assignableRoles: RoleReference[] = []) {
+  constructor(
+    assignableRoles: RoleReference[] = [],
+    mode: FormMode = 'create',
+    existingUser?: UserListItem
+  ) {
     this.assignableRoles = assignableRoles;
+    this.mode = mode;
+    this.editingUserId = existingUser?.id ?? null;
+
+    // Initialize form data based on mode
+    if (mode === 'edit' && existingUser) {
+      this.formData = {
+        email: existingUser.email,
+        firstName: existingUser.firstName ?? '',
+        lastName: existingUser.lastName ?? '',
+        roleIds: existingUser.roles.map((r) => r.roleId),
+        accessStartDate: undefined,
+        accessExpirationDate: undefined,
+        notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
+        phones: [],
+      };
+      // Copy to original for dirty tracking
+      this.originalData = {
+        ...this.formData,
+        roleIds: [...this.formData.roleIds],
+        // Spread DEFAULT first to ensure all required properties are defined,
+        // then override with any existing values
+        notificationPreferences: {
+          ...DEFAULT_NOTIFICATION_PREFERENCES,
+          ...this.formData.notificationPreferences,
+        },
+        phones: [],
+      };
+    }
+
     makeAutoObservable(this);
-    log.debug('UserFormViewModel initialized', { roleCount: assignableRoles.length });
+    log.debug('UserFormViewModel initialized', {
+      mode,
+      roleCount: assignableRoles.length,
+      editingUserId: this.editingUserId,
+    });
   }
 
   /**
@@ -810,6 +862,9 @@ export class UserFormViewModel {
 
   /**
    * Submit the form
+   *
+   * In create mode: Sends invitation via commandService.inviteUser()
+   * In edit mode: Updates user profile via commandService.updateUser()
    */
   async submit(commandService: IUserCommandService): Promise<UserOperationResult> {
     // Touch all fields to show validation errors
@@ -825,12 +880,22 @@ export class UserFormViewModel {
       };
     }
 
-    // Check email lookup blocking conditions
-    if (this.emailLookupResult?.status === 'active_member') {
+    // Check email lookup blocking conditions (create mode only)
+    if (this.mode === 'create' && this.emailLookupResult?.status === 'active_member') {
       return {
         success: false,
         error: 'User is already a member of this organization',
         errorDetails: { code: 'ALREADY_MEMBER', message: 'User already has access' },
+      };
+    }
+
+    // Validate edit mode has user ID
+    if (this.mode === 'edit' && !this.editingUserId) {
+      log.error('Edit mode requires editingUserId');
+      return {
+        success: false,
+        error: 'Cannot update user: missing user ID',
+        errorDetails: { code: 'MISSING_USER_ID', message: 'No user ID for edit mode' },
       };
     }
 
@@ -840,16 +905,33 @@ export class UserFormViewModel {
     });
 
     try {
-      const request = this.buildRequest();
-      log.debug('Submitting invitation', { email: request.email });
+      let result: UserOperationResult;
 
-      const result = await commandService.inviteUser(request);
+      if (this.mode === 'create') {
+        // Create mode: Send invitation
+        const request = this.buildRequest();
+        log.debug('Submitting invitation', { email: request.email });
+        result = await commandService.inviteUser(request);
+      } else {
+        // Edit mode: Update user profile
+        const updateRequest: UpdateUserRequest = {
+          userId: this.editingUserId!,
+          firstName: this.formData.firstName.trim(),
+          lastName: this.formData.lastName.trim(),
+        };
+        log.debug('Updating user profile', { userId: updateRequest.userId });
+        result = await commandService.updateUser(updateRequest);
+      }
 
       runInAction(() => {
         this.isSubmitting = false;
 
         if (result.success) {
-          log.info('Invitation submitted successfully', { email: request.email });
+          if (this.mode === 'create') {
+            log.info('Invitation submitted successfully', { email: this.formData.email });
+          } else {
+            log.info('User profile updated successfully', { userId: this.editingUserId });
+          }
         } else {
           this.submissionError = result.error ?? 'An error occurred';
           // Extract detailed error info for display
@@ -863,20 +945,29 @@ export class UserFormViewModel {
           } else {
             this.submissionErrorDetails = null;
           }
-          log.warn('Invitation submission failed', { error: result.error, errorDetails: result.errorDetails });
+          log.warn('Form submission failed', {
+            mode: this.mode,
+            error: result.error,
+            errorDetails: result.errorDetails,
+          });
         }
       });
 
       return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send invitation';
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : this.mode === 'create'
+            ? 'Failed to send invitation'
+            : 'Failed to update user';
 
       runInAction(() => {
         this.isSubmitting = false;
         this.submissionError = errorMessage;
       });
 
-      log.error('Invitation submission error', error);
+      log.error('Form submission error', { mode: this.mode, error });
 
       return {
         success: false,

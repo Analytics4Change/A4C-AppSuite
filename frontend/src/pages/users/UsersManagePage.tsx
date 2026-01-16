@@ -199,13 +199,8 @@ export const UsersManagePage: React.FC = observer(() => {
             roleId: r.id,
             roleName: r.name,
           }));
-          const form = new UserFormViewModel(roleRefs);
-          // Initialize form with list item data
-          form.setEmail(item.email);
-          form.setFirstName(item.firstName || '');
-          form.setLastName(item.lastName || '');
-          form.setRoles(item.roles.map((r) => r.roleId));
-          form.syncOriginalData(); // Sync baseline to prevent false "unsaved changes"
+          // Pass 'edit' mode and existing user - constructor initializes form data
+          const form = new UserFormViewModel(roleRefs, 'edit', item);
           setFormViewModel(form);
           setPanelMode('edit');
           // Ensure viewModel state is synced
@@ -301,7 +296,8 @@ export const UsersManagePage: React.FC = observer(() => {
       roleId: r.id,
       roleName: r.name,
     }));
-    setFormViewModel(new UserFormViewModel(roleRefs));
+    // Explicit 'create' mode for new invitation
+    setFormViewModel(new UserFormViewModel(roleRefs, 'create'));
     setCurrentItem(null);
     setPanelMode('create');
     viewModel.clearSelection();
