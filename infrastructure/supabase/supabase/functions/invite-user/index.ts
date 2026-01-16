@@ -62,6 +62,18 @@ interface NotificationPreferences {
 }
 
 /**
+ * Phone number to create when invitation is accepted (Phase 6)
+ */
+interface InvitationPhone {
+  label: string;           // e.g., "Mobile", "Work"
+  type: 'mobile' | 'office' | 'fax' | 'emergency';
+  number: string;          // Phone number
+  countryCode?: string;    // Default: '+1'
+  smsCapable?: boolean;    // Can receive SMS?
+  isPrimary?: boolean;     // Primary phone?
+}
+
+/**
  * Supported operations
  */
 type Operation = 'create' | 'resend' | 'revoke';
@@ -79,6 +91,7 @@ interface InviteUserRequest {
   accessStartDate?: string | null;    // ISO date (YYYY-MM-DD) or null
   accessExpirationDate?: string | null; // ISO date (YYYY-MM-DD) or null
   notificationPreferences?: NotificationPreferences;
+  phones?: InvitationPhone[];         // Phase 6: phones to create on accept
 }
 
 /**
@@ -809,6 +822,10 @@ serve(async (req) => {
     }
     if (requestData.notificationPreferences) {
       eventData.notification_preferences = requestData.notificationPreferences;
+    }
+    // Phase 6: Include phones if provided
+    if (requestData.phones && requestData.phones.length > 0) {
+      eventData.phones = requestData.phones;
     }
 
     // Emit user.invited event - routes to USER aggregate via process_user_event()

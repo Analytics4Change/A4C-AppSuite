@@ -758,6 +758,63 @@ channels:
                           description: >-
                             Whether to send in-app notifications (future
                             feature)
+                    phones:
+                      type: array
+                      items:
+                        title: InvitationPhone
+                        type: object
+                        description: Phone number to create when invitation is accepted
+                        required:
+                          - label
+                          - type
+                          - number
+                        properties:
+                          label:
+                            type: string
+                            description: Human-readable label (e.g., "Mobile", "Work")
+                            examples:
+                              - Mobile
+                              - Work
+                              - Home
+                          type:
+                            type: string
+                            title: PhoneType
+                            enum:
+                              - mobile
+                              - office
+                              - fax
+                              - emergency
+                          number:
+                            type: string
+                            description: Phone number (E.164 format recommended)
+                            examples:
+                              - '+15551234567'
+                              - 555-123-4567
+                          countryCode:
+                            type: string
+                            default: '+1'
+                            description: Country code prefix
+                            examples:
+                              - '+1'
+                              - '+44'
+                          smsCapable:
+                            type: boolean
+                            default: false
+                            description: Whether this phone can receive SMS notifications
+                          isPrimary:
+                            type: boolean
+                            default: false
+                            description: Whether this is the primary phone
+                      description: >-
+                        Phone numbers to create when invitation is accepted
+                        (optional)
+                      examples:
+                        - - label: Mobile
+                            type: mobile
+                            number: '+15551234567'
+                            countryCode: '+1'
+                            smsCapable: true
+                            isPrimary: true
                 event_metadata:
                   title: EventMetadata
                   type: object
@@ -10251,6 +10308,63 @@ channels:
                           description: >-
                             Whether to send in-app notifications (future
                             feature)
+                    phones:
+                      type: array
+                      items:
+                        title: InvitationPhone
+                        type: object
+                        description: Phone number to create when invitation is accepted
+                        required:
+                          - label
+                          - type
+                          - number
+                        properties:
+                          label:
+                            type: string
+                            description: Human-readable label (e.g., "Mobile", "Work")
+                            examples:
+                              - Mobile
+                              - Work
+                              - Home
+                          type:
+                            type: string
+                            title: PhoneType
+                            enum:
+                              - mobile
+                              - office
+                              - fax
+                              - emergency
+                          number:
+                            type: string
+                            description: Phone number (E.164 format recommended)
+                            examples:
+                              - '+15551234567'
+                              - 555-123-4567
+                          countryCode:
+                            type: string
+                            default: '+1'
+                            description: Country code prefix
+                            examples:
+                              - '+1'
+                              - '+44'
+                          smsCapable:
+                            type: boolean
+                            default: false
+                            description: Whether this phone can receive SMS notifications
+                          isPrimary:
+                            type: boolean
+                            default: false
+                            description: Whether this is the primary phone
+                      description: >-
+                        Phone numbers to create when invitation is accepted
+                        (optional)
+                      examples:
+                        - - label: Mobile
+                            type: mobile
+                            number: '+15551234567'
+                            countryCode: '+1'
+                            smsCapable: true
+                            isPrimary: true
                 event_metadata:
                   title: EventMetadata
                   type: object

@@ -778,6 +778,8 @@ export const UsersManagePage: React.FC = observer(() => {
                         });
                       }}
                       disabled={formViewModel.isSubmitting}
+                      phones={formViewModel.formData.phones}
+                      onPhonesChange={formViewModel.setPhones.bind(formViewModel)}
                     />
 
                     {/* Access Dates (Optional) */}

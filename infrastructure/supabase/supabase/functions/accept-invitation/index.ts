@@ -26,7 +26,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v16-contact-user-linking';
+const DEPLOY_VERSION = 'v17-phase6-phones-prefs';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -571,6 +571,124 @@ serve(async (req) => {
       } else {
         console.log(`[accept-invitation v${DEPLOY_VERSION}] ✓ Role assigned: ${roleName} (${roleId}) to user ${userId}, event_id=${roleEventId}`);
       }
+    }
+
+    // ==========================================================================
+    // PHASE 6: EMIT user.phone.added EVENTS FOR PHONES FROM INVITATION
+    // This populates user_phones via process_user_event() trigger
+    // ==========================================================================
+    interface InvitationPhone {
+      label: string;
+      type: 'mobile' | 'office' | 'fax' | 'emergency';
+      number: string;
+      countryCode?: string;
+      smsCapable?: boolean;
+      isPrimary?: boolean;
+    }
+
+    const phones: InvitationPhone[] = invitation.phones || [];
+    console.log(`[accept-invitation v${DEPLOY_VERSION}] Processing ${phones.length} phone(s) from invitation`);
+
+    // Track created phone IDs for potential SMS phone selection
+    const createdPhoneIds: { phoneId: string; phone: InvitationPhone }[] = [];
+
+    for (const phone of phones) {
+      const phoneId = crypto.randomUUID();
+
+      const { data: phoneEventId, error: phoneError } = await supabase
+        .rpc('emit_domain_event', {
+          p_stream_id: userId,
+          p_stream_type: 'user',
+          p_event_type: 'user.phone.added',
+          p_event_data: {
+            phone_id: phoneId,
+            user_id: userId,
+            org_id: null, // Global phone, not org-specific override
+            label: phone.label,
+            type: phone.type,
+            number: phone.number,
+            country_code: phone.countryCode || '+1',
+            is_primary: phone.isPrimary || false,
+            is_active: true,
+            sms_capable: phone.smsCapable || false,
+          },
+          p_event_metadata: buildEventMetadata(tracingContext, 'user.phone.added', req, {
+            user_id: userId,
+            organization_id: invitation.organization_id,
+            invitation_id: invitation.id,
+            reason: 'Phone added via invitation acceptance',
+          })
+        });
+
+      if (phoneError) {
+        console.error(`[accept-invitation v${DEPLOY_VERSION}] Failed to emit user.phone.added for ${phone.label}:`, phoneError);
+        // Non-fatal: continue with other phones
+      } else {
+        console.log(`[accept-invitation v${DEPLOY_VERSION}] ✓ Phone added: ${phone.label} (${phoneId}) to user ${userId}, event_id=${phoneEventId}`);
+        createdPhoneIds.push({ phoneId, phone });
+      }
+    }
+
+    // ==========================================================================
+    // PHASE 6: EMIT user.notification_preferences.updated EVENT
+    // This populates user_notification_preferences_projection via trigger
+    // ==========================================================================
+    interface NotificationPreferences {
+      email?: boolean;
+      sms?: {
+        enabled?: boolean;
+        phoneId?: string | null;
+      };
+      inApp?: boolean;
+    }
+
+    const prefs: NotificationPreferences = invitation.notification_preferences || {
+      email: true,
+      sms: { enabled: false, phoneId: null },
+      inApp: false,
+    };
+
+    // If SMS is enabled but no phoneId specified, use first SMS-capable phone
+    if (prefs.sms?.enabled && !prefs.sms?.phoneId) {
+      const smsCapablePhone = createdPhoneIds.find(p => p.phone.smsCapable);
+      if (smsCapablePhone) {
+        prefs.sms.phoneId = smsCapablePhone.phoneId;
+        console.log(`[accept-invitation v${DEPLOY_VERSION}] Auto-selected SMS phone: ${smsCapablePhone.phone.label} (${smsCapablePhone.phoneId})`);
+      }
+    }
+
+    console.log(`[accept-invitation v${DEPLOY_VERSION}] Setting notification preferences:`, JSON.stringify(prefs));
+
+    const { data: prefsEventId, error: prefsError } = await supabase
+      .rpc('emit_domain_event', {
+        p_stream_id: userId,
+        p_stream_type: 'user',
+        p_event_type: 'user.notification_preferences.updated',
+        p_event_data: {
+          user_id: userId,
+          org_id: invitation.organization_id,
+          notification_preferences: {
+            email: prefs.email ?? true,
+            sms: {
+              enabled: prefs.sms?.enabled ?? false,
+              phoneId: prefs.sms?.phoneId ?? null,
+            },
+            inApp: prefs.inApp ?? false,
+          },
+        },
+        p_event_metadata: buildEventMetadata(tracingContext, 'user.notification_preferences.updated', req, {
+          user_id: userId,
+          organization_id: invitation.organization_id,
+          invitation_id: invitation.id,
+          reason: 'Notification preferences set via invitation acceptance',
+        })
+      });
+
+    if (prefsError) {
+      console.error(`[accept-invitation v${DEPLOY_VERSION}] Failed to emit user.notification_preferences.updated:`, prefsError);
+      // Non-fatal: user is created but preferences not set (will use defaults)
+    } else {
+      console.log(`[accept-invitation v${DEPLOY_VERSION}] ✓ Notification preferences set for user ${userId}, event_id=${prefsEventId}`);
     }
 
     // Emit invitation.accepted event per AsyncAPI contract

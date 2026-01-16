@@ -183,6 +183,8 @@ export class SupabaseUserCommandService implements IUserCommandService {
             accessStartDate: request.accessStartDate,
             accessExpirationDate: request.accessExpirationDate,
             notificationPreferences: request.notificationPreferences,
+            // Phase 6: Include phones if provided
+            phones: request.phones,
           },
           headers,
         }

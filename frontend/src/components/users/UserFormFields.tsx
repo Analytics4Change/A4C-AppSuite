@@ -39,9 +39,11 @@ import type {
   EmailLookupResult,
   EmailLookupStatus,
   RoleReference,
+  InvitationPhone,
 } from '@/types/user.types';
 import type { Role } from '@/types/role.types';
 import { Logger } from '@/utils/logger';
+import { InvitationPhoneInput } from './InvitationPhoneInput';
 
 const log = Logger.getLogger('component');
 
@@ -97,6 +99,22 @@ export interface UserFormFieldsProps {
    * @default false
    */
   rolesFiltered?: boolean;
+
+  /**
+   * Current phones list (Phase 6)
+   * When provided, phone input section is displayed
+   */
+  phones?: InvitationPhone[];
+
+  /**
+   * Called when phones list changes (Phase 6)
+   */
+  onPhonesChange?: (phones: InvitationPhone[]) => void;
+
+  /**
+   * Phone validation errors by index and field (Phase 6)
+   */
+  phoneErrors?: Record<number, Record<string, string>>;
 
   /** Additional CSS classes */
   className?: string;
@@ -341,6 +359,9 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
     disabled = false,
     isEditMode = false,
     rolesFiltered = false,
+    phones,
+    onPhonesChange,
+    phoneErrors,
     className,
   }) => {
     const baseId = useId();
@@ -629,6 +650,16 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
             </p>
           )}
         </div>
+
+        {/* Phone Numbers Section (Phase 6) */}
+        {onPhonesChange && (
+          <InvitationPhoneInput
+            phones={phones ?? []}
+            onChange={onPhonesChange}
+            errors={phoneErrors}
+            disabled={shouldDisableFields}
+          />
+        )}
       </div>
     );
   }

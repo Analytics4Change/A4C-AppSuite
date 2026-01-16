@@ -32,6 +32,7 @@ import type {
   UserOperationResult,
   EmailLookupResult,
   NotificationPreferences,
+  InvitationPhone,
 } from '@/types/user.types';
 import {
   validateEmail,
@@ -69,6 +70,7 @@ export class UserFormViewModel {
     accessStartDate: undefined,
     accessExpirationDate: undefined,
     notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
+    phones: [],
   };
 
   /** Original form data (for dirty detection) */
@@ -80,6 +82,7 @@ export class UserFormViewModel {
     accessStartDate: undefined,
     accessExpirationDate: undefined,
     notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
+    phones: [],
   };
 
   /** Validation errors by field */
@@ -156,7 +159,8 @@ export class UserFormViewModel {
       JSON.stringify(this.formData.roleIds.sort()) !== JSON.stringify(this.originalData.roleIds.sort()) ||
       this.formData.accessStartDate !== this.originalData.accessStartDate ||
       this.formData.accessExpirationDate !== this.originalData.accessExpirationDate ||
-      JSON.stringify(this.formData.notificationPreferences) !== JSON.stringify(this.originalData.notificationPreferences)
+      JSON.stringify(this.formData.notificationPreferences) !== JSON.stringify(this.originalData.notificationPreferences) ||
+      JSON.stringify(this.formData.phones) !== JSON.stringify(this.originalData.phones)
     );
   }
 
@@ -364,6 +368,7 @@ export class UserFormViewModel {
         notificationPreferences: this.formData.notificationPreferences
           ? { ...this.formData.notificationPreferences }
           : undefined,
+        phones: this.formData.phones ? [...this.formData.phones] : [],
       };
       this.touchedFields.clear();
     });
@@ -482,6 +487,90 @@ export class UserFormViewModel {
     });
   }
 
+  // ============================================
+  // Actions - Phone Management (Phase 6)
+  // ============================================
+
+  /**
+   * Set all phones
+   */
+  setPhones(phones: InvitationPhone[]): void {
+    runInAction(() => {
+      this.formData.phones = [...phones];
+      this.touchedFields.add('phones');
+      this.submissionError = null;
+    });
+  }
+
+  /**
+   * Add a new phone entry
+   */
+  addPhone(phone: InvitationPhone): void {
+    runInAction(() => {
+      const phones = this.formData.phones ?? [];
+      // If this is the first phone, set it as primary
+      const newPhone = phones.length === 0 ? { ...phone, isPrimary: true } : phone;
+      this.formData.phones = [...phones, newPhone];
+      this.touchedFields.add('phones');
+      this.submissionError = null;
+    });
+  }
+
+  /**
+   * Update a phone entry at index
+   */
+  updatePhone(index: number, updates: Partial<InvitationPhone>): void {
+    runInAction(() => {
+      const phones = [...(this.formData.phones ?? [])];
+      if (index >= 0 && index < phones.length) {
+        // If setting as primary, clear primary from others
+        if (updates.isPrimary) {
+          phones.forEach((p, i) => {
+            if (i !== index) {
+              phones[i] = { ...p, isPrimary: false };
+            }
+          });
+        }
+        phones[index] = { ...phones[index], ...updates };
+        this.formData.phones = phones;
+        this.touchedFields.add('phones');
+        this.submissionError = null;
+      }
+    });
+  }
+
+  /**
+   * Remove a phone entry at index
+   */
+  removePhone(index: number): void {
+    runInAction(() => {
+      const phones = [...(this.formData.phones ?? [])];
+      if (index >= 0 && index < phones.length) {
+        const wasRemovingPrimary = phones[index].isPrimary;
+        phones.splice(index, 1);
+
+        // If removed phone was primary, make first remaining phone primary
+        if (wasRemovingPrimary && phones.length > 0) {
+          phones[0] = { ...phones[0], isPrimary: true };
+        }
+
+        this.formData.phones = phones;
+        this.touchedFields.add('phones');
+        this.submissionError = null;
+      }
+    });
+  }
+
+  /**
+   * Clear all phones
+   */
+  clearPhones(): void {
+    runInAction(() => {
+      this.formData.phones = [];
+      this.touchedFields.add('phones');
+    });
+  }
+
   /**
    * Mark a field as touched
    */
@@ -505,6 +594,7 @@ export class UserFormViewModel {
         'accessStartDate',
         'accessExpirationDate',
         'notificationPreferences',
+        'phones',
       ];
       fields.forEach((field) => this.touchedFields.add(field));
       this.validateAll();
@@ -596,6 +686,12 @@ export class UserFormViewModel {
         // Notification preferences are always valid (no required fields)
         error = null;
         break;
+
+      case 'phones':
+        // Phone validation is handled by InvitationPhoneInput component
+        // Phones are optional, so no ViewModel-level validation required
+        error = null;
+        break;
     }
 
     runInAction(() => {
@@ -621,6 +717,7 @@ export class UserFormViewModel {
       'accessStartDate',
       'accessExpirationDate',
       'notificationPreferences',
+      'phones',
     ];
 
     let allValid = true;
@@ -692,6 +789,7 @@ export class UserFormViewModel {
       accessStartDate: this.formData.accessStartDate ?? undefined,
       accessExpirationDate: this.formData.accessExpirationDate ?? undefined,
       notificationPreferences: this.formData.notificationPreferences,
+      phones: this.formData.phones,
     };
   }
 
@@ -790,12 +888,14 @@ export class UserFormViewModel {
         accessStartDate: undefined,
         accessExpirationDate: undefined,
         notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
+        phones: [],
       };
       this.originalData = {
         ...this.formData,
         notificationPreferences: this.formData.notificationPreferences
           ? { ...this.formData.notificationPreferences }
           : undefined,
+        phones: [],
       };
       this.errors.clear();
       this.touchedFields.clear();
@@ -831,12 +931,14 @@ export class UserFormViewModel {
         accessStartDate: undefined,
         accessExpirationDate: undefined,
         notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
+        phones: [],
       };
       this.originalData = {
         ...this.formData,
         notificationPreferences: this.formData.notificationPreferences
           ? { ...this.formData.notificationPreferences }
           : undefined,
+        phones: [],
       };
       this.errors.clear();
       this.touchedFields.clear();

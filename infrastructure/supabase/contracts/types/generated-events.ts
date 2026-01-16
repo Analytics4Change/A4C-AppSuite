@@ -3,7 +3,7 @@
  *
  * Generated from AsyncAPI specification by Modelina
  * Source: infrastructure/supabase/contracts/asyncapi/
- * Generated: 2026-01-15T21:44:02.277Z
+ * Generated: 2026-01-16T00:09:19.264Z
  *
  * To regenerate: cd infrastructure/supabase/contracts && npm run generate:types
  *
@@ -58,6 +58,13 @@ export interface DomainEvent<TData = Record<string, unknown>> {
 // =============================================================================
 // Enums
 // =============================================================================
+
+export enum PhoneType {
+  MOBILE = "mobile",
+  OFFICE = "office",
+  FAX = "fax",
+  EMERGENCY = "emergency",
+}
 
 export enum InvitationRevocationReason {
   WORKFLOW_FAILURE = "workflow_failure",
@@ -119,13 +126,6 @@ export enum ContactType {
   TECHNICAL = "technical",
   EMERGENCY = "emergency",
   STAKEHOLDER = "stakeholder",
-}
-
-export enum PhoneType {
-  MOBILE = "mobile",
-  OFFICE = "office",
-  FAX = "fax",
-  EMERGENCY = "emergency",
 }
 
 export enum EmailType {
@@ -329,6 +329,7 @@ export interface UserInvitedData {
   'access_start_date'?: string;
   'access_expiration_date'?: string;
   'notification_preferences'?: NotificationPreferences;
+  'phones'?: InvitationPhone[];
   'additionalProperties'?: Map<string, any>;
 }
 
@@ -348,6 +349,16 @@ export interface NotificationPreferences {
 export interface SmsNotificationPreference {
   'enabled'?: boolean;
   'phone_id'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface InvitationPhone {
+  'label': string;
+  'type': PhoneType;
+  'number': string;
+  'countryCode'?: string;
+  'smsCapable'?: boolean;
+  'isPrimary'?: boolean;
   'additionalProperties'?: Map<string, any>;
 }
 

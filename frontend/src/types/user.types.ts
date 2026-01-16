@@ -172,6 +172,32 @@ export interface UserAddress {
 export type PhoneType = 'mobile' | 'office' | 'fax' | 'emergency';
 
 /**
+ * Phone data for invitation form (Phase 6)
+ *
+ * Phones added during invitation are created when the invitation is accepted.
+ * These become global user phones (not org-specific overrides).
+ */
+export interface InvitationPhone {
+  /** Human-readable label (e.g., "Mobile", "Work") */
+  label: string;
+
+  /** Phone type */
+  type: PhoneType;
+
+  /** Phone number (E.164 format recommended) */
+  number: string;
+
+  /** Country code prefix (default: "+1") */
+  countryCode?: string;
+
+  /** Whether this phone can receive SMS notifications */
+  smsCapable?: boolean;
+
+  /** Whether this is the primary phone */
+  isPrimary?: boolean;
+}
+
+/**
  * User phone (global or org-specific override)
  *
  * Supports hybrid scope model:
@@ -515,6 +541,12 @@ export interface InviteUserFormData {
 
   /** Initial notification preferences */
   notificationPreferences?: NotificationPreferences;
+
+  /**
+   * Phone numbers to create when invitation is accepted (Phase 6)
+   * These become global user phones (not org-specific overrides)
+   */
+  phones?: InvitationPhone[];
 }
 
 /**
@@ -553,6 +585,12 @@ export interface InviteUserRequest {
 
   /** Initial notification preferences */
   notificationPreferences?: NotificationPreferences;
+
+  /**
+   * Phone numbers to create when invitation is accepted (Phase 6)
+   * These become global user phones (not org-specific overrides)
+   */
+  phones?: InvitationPhone[];
 }
 
 /**
