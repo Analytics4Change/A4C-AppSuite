@@ -804,6 +804,40 @@ export const UsersManagePage: React.FC = observer(() => {
                       />
                     </div>
 
+                    {/* Notification Preferences (Optional) */}
+                    <div className="border-t border-gray-200 pt-6">
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">
+                        Notification Preferences (Optional)
+                      </h4>
+                      <NotificationPreferencesForm
+                        preferences={formViewModel.formData.notificationPreferences ?? DEFAULT_NOTIFICATION_PREFERENCES}
+                        availablePhones={
+                          // Map InvitationPhone[] to UserPhone[] with temporary IDs
+                          // Backend will map these to real IDs on invitation acceptance
+                          formViewModel.formData.phones
+                            ?.filter((p) => p.smsCapable)
+                            .map((p, index) => ({
+                              id: `invitation-phone-${index}`,
+                              userId: '',
+                              orgId: null,
+                              label: p.label,
+                              type: p.type,
+                              number: p.number,
+                              extension: null,
+                              countryCode: p.countryCode ?? '+1',
+                              isPrimary: p.isPrimary ?? false,
+                              isActive: true,
+                              smsCapable: p.smsCapable ?? false,
+                              createdAt: new Date(),
+                              updatedAt: new Date(),
+                            })) ?? []
+                        }
+                        onSave={(prefs) => formViewModel.setNotificationPreferences(prefs)}
+                        inline
+                        isSaving={formViewModel.isSubmitting}
+                      />
+                    </div>
+
                     {/* Form Actions */}
                     <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
                       <Button
