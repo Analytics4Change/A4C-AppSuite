@@ -487,6 +487,7 @@ export class UsersViewModel {
     runInAction(() => {
       this.isLoadingDetails = true;
       this.selectedUserDetails = null;
+      this.error = null; // Clear previous error
     });
 
     try {
@@ -497,13 +498,20 @@ export class UsersViewModel {
         this.isLoadingDetails = false;
         if (user) {
           log.info('Loaded user details', { userId, email: user.email });
+        } else {
+          // User not found or query returned null - set user-friendly error
+          this.error =
+            'Failed to load user details. The user may not exist or you may not have permission to view them.';
         }
       });
     } catch (error) {
-      log.error('Failed to load user details', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      log.error('Failed to load user details', { userId, error: errorMessage });
 
       runInAction(() => {
         this.isLoadingDetails = false;
+        // User-friendly message instead of technical error
+        this.error = 'Failed to load user details. Please try again.';
       });
     }
   }

@@ -517,52 +517,91 @@ export class SupabaseUserQueryService implements IUserQueryService {
 
   /**
    * Get user by ID with role assignments
+   *
+   * Uses api.get_user_by_id() RPC function (CQRS pattern).
+   * CRITICAL: Never use direct table queries with PostgREST embedding - causes 406 errors.
    */
   async getUserById(userId: string): Promise<UserWithRoles | null> {
     const client = supabaseService.getClient();
 
-    try {
-      const { data, error } = await client
-        .from('users')
-        .select(
-          `
-          id, email, first_name, last_name, name, is_active, created_at, updated_at, last_login_at, current_organization_id,
-          user_roles_projection (
-            role_id,
-            organization_id,
-            scope_path,
-            role_valid_from,
-            role_valid_until,
-            roles_projection (id, name, description, organization_id, org_hierarchy_scope, is_active, created_at, updated_at, permission_count, user_count)
-          )
-        `
-        )
-        .eq('id', userId)
-        .single();
+    // Get session from Supabase client (already authenticated)
+    const { data: { session } } = await client.auth.getSession();
+    if (!session) {
+      log.error('No authenticated session for getUserById');
+      return null;
+    }
 
-      if (error || !data) {
-        log.error('Failed to fetch user by ID', error);
+    // Decode JWT to get org_id
+    const claims = this.decodeJWT(session.access_token);
+    if (!claims.org_id) {
+      log.error('No organization context for getUserById');
+      return null;
+    }
+
+    try {
+      // RPC response row type
+      interface RpcUserByIdRow {
+        id: string;
+        email: string;
+        first_name: string | null;
+        last_name: string | null;
+        name: string | null;
+        is_active: boolean;
+        created_at: string;
+        updated_at: string;
+        last_login_at: string | null;
+        current_organization_id: string | null;
+        roles: Array<{
+          role_id: string;
+          role_name: string;
+          role_description: string | null;
+          organization_id: string;
+          scope_path: string | null;
+          role_valid_from: string | null;
+          role_valid_until: string | null;
+          org_hierarchy_scope: string | null;
+          is_active: boolean;
+          permission_count: number;
+          user_count: number;
+        }> | null;
+      }
+
+      // Use RPC function (CQRS pattern) - NEVER use direct table queries with PostgREST embedding
+      const { data, error } = await supabaseService.apiRpc<RpcUserByIdRow[]>(
+        'get_user_by_id',
+        {
+          p_user_id: userId,
+          p_org_id: claims.org_id,
+        }
+      );
+
+      if (error) {
+        log.error('Failed to fetch user by ID via RPC', error);
         return null;
       }
 
-      const user = data as unknown as DbUserRow;
-      const roles: Role[] =
-        user.user_roles_projection?.map((urp) => ({
-          id: urp.roles_projection?.id ?? urp.role_id,
-          name: urp.roles_projection?.name ?? 'Unknown',
-          description: urp.roles_projection?.description ?? '',
-          organizationId: urp.roles_projection?.organization_id ?? null,
-          orgHierarchyScope: urp.roles_projection?.org_hierarchy_scope ?? null,
-          isActive: urp.roles_projection?.is_active ?? true,
-          createdAt: urp.roles_projection?.created_at
-            ? new Date(urp.roles_projection.created_at)
-            : new Date(),
-          updatedAt: urp.roles_projection?.updated_at
-            ? new Date(urp.roles_projection.updated_at)
-            : new Date(),
-          permissionCount: urp.roles_projection?.permission_count ?? 0,
-          userCount: urp.roles_projection?.user_count ?? 0,
-        })) ?? [];
+      // RPC returns array, get first row (or null if empty)
+      const rows = data ?? [];
+      if (rows.length === 0) {
+        log.debug('User not found or not a member of organization', { userId, orgId: claims.org_id });
+        return null;
+      }
+
+      const user = rows[0];
+
+      // Map roles from JSONB array to Role[] type
+      const roles: Role[] = (user.roles ?? []).map((r) => ({
+        id: r.role_id,
+        name: r.role_name,
+        description: r.role_description ?? '',
+        organizationId: r.organization_id ?? null,
+        orgHierarchyScope: r.org_hierarchy_scope ?? null,
+        isActive: r.is_active ?? true,
+        createdAt: new Date(), // Not returned by RPC, use current date
+        updatedAt: new Date(), // Not returned by RPC, use current date
+        permissionCount: r.permission_count ?? 0,
+        userCount: r.user_count ?? 0,
+      }));
 
       return {
         id: user.id,
