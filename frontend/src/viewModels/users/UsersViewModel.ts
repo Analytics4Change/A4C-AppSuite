@@ -480,6 +480,9 @@ export class UsersViewModel {
 
   /**
    * Load user details by ID
+   *
+   * Uses structured result from service to display actual error messages
+   * instead of generic "unexpected error" from ErrorBoundary.
    */
   async loadUserDetails(userId: string): Promise<void> {
     log.debug('Loading user details', { userId });
@@ -491,27 +494,30 @@ export class UsersViewModel {
     });
 
     try {
-      const user = await this.queryService.getUserById(userId);
+      const result = await this.queryService.getUserById(userId);
 
       runInAction(() => {
-        this.selectedUserDetails = user;
         this.isLoadingDetails = false;
-        if (user) {
-          log.info('Loaded user details', { userId, email: user.email });
+        if (result.user) {
+          this.selectedUserDetails = result.user;
+          log.info('Loaded user details', { userId, email: result.user.email });
         } else {
-          // User not found or query returned null - set user-friendly error
-          this.error =
+          this.selectedUserDetails = null;
+          // Use actual error message from service for visibility
+          this.error = result.errorMessage ||
             'Failed to load user details. The user may not exist or you may not have permission to view them.';
+          log.warn('User details load failed', { userId, errorMessage: result.errorMessage });
         }
       });
     } catch (error) {
+      // This catch handles unexpected exceptions (e.g., network failures)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      log.error('Failed to load user details', { userId, error: errorMessage });
+      log.error('Failed to load user details (exception)', { userId, error: errorMessage });
 
       runInAction(() => {
         this.isLoadingDetails = false;
-        // User-friendly message instead of technical error
-        this.error = 'Failed to load user details. Please try again.';
+        // Show actual error message for visibility
+        this.error = `Failed to load user details: ${errorMessage}`;
       });
     }
   }

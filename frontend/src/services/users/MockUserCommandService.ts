@@ -301,8 +301,8 @@ export class MockUserCommandService implements IUserCommandService {
     await this.simulateDelay();
     log.debug('Mock: Deactivating user', { userId });
 
-    const user = await this.queryService.getUserById(userId);
-    if (!user) {
+    const result = await this.queryService.getUserById(userId);
+    if (!result.user) {
       return {
         success: false,
         error: 'User not found',
@@ -310,7 +310,7 @@ export class MockUserCommandService implements IUserCommandService {
       };
     }
 
-    if (!user.isActive) {
+    if (!result.user.isActive) {
       return {
         success: false,
         error: 'User is already deactivated',
@@ -323,7 +323,7 @@ export class MockUserCommandService implements IUserCommandService {
       updatedAt: new Date(),
     });
 
-    log.info('Mock: Deactivated user', { userId, email: user.email });
+    log.info('Mock: Deactivated user', { userId, email: result.user.email });
     return { success: true };
   }
 
@@ -331,8 +331,8 @@ export class MockUserCommandService implements IUserCommandService {
     await this.simulateDelay();
     log.debug('Mock: Reactivating user', { userId });
 
-    const user = await this.queryService.getUserById(userId);
-    if (!user) {
+    const result = await this.queryService.getUserById(userId);
+    if (!result.user) {
       return {
         success: false,
         error: 'User not found',
@@ -340,7 +340,7 @@ export class MockUserCommandService implements IUserCommandService {
       };
     }
 
-    if (user.isActive) {
+    if (result.user.isActive) {
       return {
         success: false,
         error: 'User is already active',
@@ -353,7 +353,7 @@ export class MockUserCommandService implements IUserCommandService {
       updatedAt: new Date(),
     });
 
-    log.info('Mock: Reactivated user', { userId, email: user.email });
+    log.info('Mock: Reactivated user', { userId, email: result.user.email });
     return { success: true };
   }
 
@@ -361,8 +361,8 @@ export class MockUserCommandService implements IUserCommandService {
     await this.simulateDelay();
     log.debug('Mock: Deleting user', { userId, reason });
 
-    const user = await this.queryService.getUserById(userId);
-    if (!user) {
+    const result = await this.queryService.getUserById(userId);
+    if (!result.user) {
       return {
         success: false,
         error: 'User not found',
@@ -370,7 +370,7 @@ export class MockUserCommandService implements IUserCommandService {
       };
     }
 
-    if (user.isActive) {
+    if (result.user.isActive) {
       return {
         success: false,
         error: 'Cannot delete active user. Deactivate first.',
@@ -381,7 +381,7 @@ export class MockUserCommandService implements IUserCommandService {
     // Soft delete - remove from mock data
     this.queryService.deleteUser(userId);
 
-    log.info('Mock: Deleted user', { userId, email: user.email, reason });
+    log.info('Mock: Deleted user', { userId, email: result.user.email, reason });
     return { success: true };
   }
 
@@ -389,8 +389,8 @@ export class MockUserCommandService implements IUserCommandService {
     await this.simulateDelay();
     log.debug('Mock: Updating user', { userId: request.userId });
 
-    const user = await this.queryService.getUserById(request.userId);
-    if (!user) {
+    const result = await this.queryService.getUserById(request.userId);
+    if (!result.user) {
       return {
         success: false,
         error: 'User not found',
@@ -411,8 +411,8 @@ export class MockUserCommandService implements IUserCommandService {
 
     // Update concatenated name if either name part changed
     if (updates.firstName !== undefined || updates.lastName !== undefined) {
-      const firstName = updates.firstName ?? user.firstName ?? '';
-      const lastName = updates.lastName ?? user.lastName ?? '';
+      const firstName = updates.firstName ?? result.user.firstName ?? '';
+      const lastName = updates.lastName ?? result.user.lastName ?? '';
       updates.name = `${firstName} ${lastName}`.trim() || null;
     }
 
@@ -426,8 +426,8 @@ export class MockUserCommandService implements IUserCommandService {
     await this.simulateDelay();
     log.debug('Mock: Assigning roles', { userId: request.userId });
 
-    const user = await this.queryService.getUserById(request.userId);
-    if (!user) {
+    const result = await this.queryService.getUserById(request.userId);
+    if (!result.user) {
       return {
         success: false,
         error: 'User not found',

@@ -29,6 +29,15 @@ import type {
   NotificationPreferences,
 } from '@/types/user.types';
 
+/**
+ * Result type for getUserById - includes error details for user-visible error display.
+ * This ensures errors are not swallowed and users see meaningful messages.
+ */
+export interface GetUserByIdResult {
+  user: UserWithRoles | null;
+  errorMessage: string | null;
+}
+
 export interface IUserQueryService {
   /**
    * Retrieves a unified list of users and invitations for the current organization
@@ -62,15 +71,17 @@ export interface IUserQueryService {
    * Retrieves a single user by ID with their role assignments
    *
    * @param userId - User UUID
-   * @returns Promise resolving to user with roles or null if not found
+   * @returns Promise resolving to result with user data or error message
    *
    * @example
-   * const user = await service.getUserById('123e4567-e89b-12d3-a456-426614174000');
-   * if (user) {
-   *   console.log(user.firstName, user.roles.length);
+   * const result = await service.getUserById('123e4567-e89b-12d3-a456-426614174000');
+   * if (result.user) {
+   *   console.log(result.user.firstName, result.user.roles.length);
+   * } else {
+   *   console.error(result.errorMessage);
    * }
    */
-  getUserById(userId: string): Promise<UserWithRoles | null>;
+  getUserById(userId: string): Promise<GetUserByIdResult>;
 
   /**
    * Retrieves all pending invitations for the current organization

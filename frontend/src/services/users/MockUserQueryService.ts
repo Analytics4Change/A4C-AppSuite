@@ -32,7 +32,7 @@ import type {
 } from '@/types/user.types';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/user.types';
 import type { Role } from '@/types/role.types';
-import type { IUserQueryService } from './IUserQueryService';
+import type { IUserQueryService, GetUserByIdResult } from './IUserQueryService';
 
 const log = Logger.getLogger('api');
 
@@ -749,18 +749,24 @@ export class MockUserQueryService implements IUserQueryService {
     };
   }
 
-  async getUserById(userId: string): Promise<UserWithRoles | null> {
+  async getUserById(userId: string): Promise<GetUserByIdResult> {
     await this.simulateDelay();
     log.debug('Mock: Fetching user by ID', { userId });
 
     const user = this.users.find((u) => u.id === userId);
     if (!user) {
       log.debug('Mock: User not found', { userId });
-      return null;
+      return {
+        user: null,
+        errorMessage: 'User not found or you do not have permission to view this user.',
+      };
     }
 
     log.info('Mock: Found user', { userId, email: user.email });
-    return this.toUserWithRoles(user);
+    return {
+      user: this.toUserWithRoles(user),
+      errorMessage: null,
+    };
   }
 
   async getInvitations(): Promise<Invitation[]> {

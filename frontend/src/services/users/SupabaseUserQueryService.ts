@@ -13,7 +13,7 @@
  * @see IUserQueryService for interface documentation
  */
 
-import type { IUserQueryService } from './IUserQueryService';
+import type { IUserQueryService, GetUserByIdResult } from './IUserQueryService';
 import type {
   UserWithRoles,
   UserListItem,
@@ -520,22 +520,24 @@ export class SupabaseUserQueryService implements IUserQueryService {
    *
    * Uses api.get_user_by_id() RPC function (CQRS pattern).
    * CRITICAL: Never use direct table queries with PostgREST embedding - causes 406 errors.
+   *
+   * Returns structured result with error message for user-visible error display.
    */
-  async getUserById(userId: string): Promise<UserWithRoles | null> {
+  async getUserById(userId: string): Promise<GetUserByIdResult> {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client (already authenticated)
     const { data: { session } } = await client.auth.getSession();
     if (!session) {
       log.error('No authenticated session for getUserById');
-      return null;
+      return { user: null, errorMessage: 'Not authenticated. Please log in again.' };
     }
 
     // Decode JWT to get org_id
     const claims = this.decodeJWT(session.access_token);
     if (!claims.org_id) {
       log.error('No organization context for getUserById');
-      return null;
+      return { user: null, errorMessage: 'No organization context. Please select an organization.' };
     }
 
     try {
@@ -549,7 +551,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
         is_active: boolean;
         created_at: string;
         updated_at: string;
-        last_login_at: string | null;
+        last_login: string | null;  // Fixed: column is 'last_login' not 'last_login_at'
         current_organization_id: string | null;
         roles: Array<{
           role_id: string;
@@ -575,16 +577,37 @@ export class SupabaseUserQueryService implements IUserQueryService {
         }
       );
 
+      // Log full response for debugging
+      log.info('apiRpc get_user_by_id response', {
+        hasData: !!data,
+        dataLength: Array.isArray(data) ? data.length : 'not array',
+        hasError: !!error,
+        errorObject: error,
+      });
+
       if (error) {
-        log.error('Failed to fetch user by ID via RPC', error);
-        return null;
+        log.error('Failed to fetch user by ID via RPC', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        // Return actual error message for user visibility
+        const hint = error.hint ? ` (Hint: ${error.hint})` : '';
+        return {
+          user: null,
+          errorMessage: `Failed to load user: ${error.message}${hint}`,
+        };
       }
 
       // RPC returns array, get first row (or null if empty)
       const rows = data ?? [];
       if (rows.length === 0) {
         log.debug('User not found or not a member of organization', { userId, orgId: claims.org_id });
-        return null;
+        return {
+          user: null,
+          errorMessage: 'User not found or you do not have permission to view this user.',
+        };
       }
 
       const user = rows[0];
@@ -604,22 +627,30 @@ export class SupabaseUserQueryService implements IUserQueryService {
       }));
 
       return {
-        id: user.id,
-        email: user.email,
-        firstName: user.first_name ?? null,
-        lastName: user.last_name ?? null,
-        name: user.name ?? null,
-        currentOrganizationId: user.current_organization_id ?? null,
-        isActive: user.is_active,
-        createdAt: new Date(user.created_at),
-        updatedAt: new Date(user.updated_at),
-        lastLoginAt: user.last_login_at ? new Date(user.last_login_at) : null,
-        roles,
-        displayStatus: computeUserDisplayStatus(user.is_active),
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name ?? null,
+          lastName: user.last_name ?? null,
+          name: user.name ?? null,
+          currentOrganizationId: user.current_organization_id ?? null,
+          isActive: user.is_active,
+          createdAt: new Date(user.created_at),
+          updatedAt: new Date(user.updated_at),
+          lastLoginAt: user.last_login ? new Date(user.last_login) : null,
+          roles,
+          displayStatus: computeUserDisplayStatus(user.is_active),
+        },
+        errorMessage: null,
       };
-    } catch (error) {
-      log.error('Error in getUserById', error);
-      return null;
+    } catch (rpcException) {
+      // Supabase client threw an exception instead of returning { error }
+      const exMsg = rpcException instanceof Error ? rpcException.message : String(rpcException);
+      log.error('apiRpc get_user_by_id THREW EXCEPTION', rpcException);
+      return {
+        user: null,
+        errorMessage: `Failed to load user: ${exMsg}`,
+      };
     }
   }
 
