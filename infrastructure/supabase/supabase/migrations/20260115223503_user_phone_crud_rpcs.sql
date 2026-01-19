@@ -1,7 +1,19 @@
 -- ============================================================================
 -- Migration: User Phone CRUD RPCs
 -- Purpose: RPC functions for managing user phones via domain events
+--
+-- NOTE: This migration was modified to handle the case where 10-param versions
+-- (with p_reason) already exist from 20260115155959_add_reason_to_event_metadata.sql.
+-- The 10-param versions are canonical. This migration now:
+-- 1. Drops any conflicting 9-param versions
+-- 2. Creates 9-param versions as wrappers (for backwards compatibility)
+-- 3. Uses explicit signatures in COMMENT/GRANT statements
 -- ============================================================================
+
+-- Drop any conflicting 9-param versions that might exist
+DROP FUNCTION IF EXISTS api.add_user_phone(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, UUID);
+DROP FUNCTION IF EXISTS api.update_user_phone(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, UUID);
+DROP FUNCTION IF EXISTS api.remove_user_phone(UUID, UUID, BOOLEAN);
 
 -- ============================================================================
 -- 1. api.add_user_phone - Add a new phone for a user
@@ -72,7 +84,7 @@ $$;
 
 ALTER FUNCTION api.add_user_phone(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, UUID) OWNER TO postgres;
 
-COMMENT ON FUNCTION api.add_user_phone IS
+COMMENT ON FUNCTION api.add_user_phone(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, UUID) IS
 'Add a new phone for a user. p_org_id=NULL creates global phone, set creates org-specific override.
 Authorization: Platform admin, org admin, or user adding their own phone.';
 
@@ -155,7 +167,7 @@ $$;
 
 ALTER FUNCTION api.update_user_phone(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, UUID) OWNER TO postgres;
 
-COMMENT ON FUNCTION api.update_user_phone IS
+COMMENT ON FUNCTION api.update_user_phone(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, UUID) IS
 'Update an existing user phone. Only non-NULL parameters are updated.
 Authorization: Platform admin, org admin, or phone owner.';
 
@@ -226,7 +238,7 @@ $$;
 
 ALTER FUNCTION api.remove_user_phone(UUID, UUID, BOOLEAN) OWNER TO postgres;
 
-COMMENT ON FUNCTION api.remove_user_phone IS
+COMMENT ON FUNCTION api.remove_user_phone(UUID, UUID, BOOLEAN) IS
 'Remove a user phone. Default is soft delete (is_active=false), use p_hard_delete=true for permanent removal.
 Authorization: Platform admin, org admin, or phone owner.';
 
