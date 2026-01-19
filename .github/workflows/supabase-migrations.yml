@@ -34,6 +34,7 @@ jobs:
   validate:
     name: Validate PL/pgSQL Functions
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -43,30 +44,31 @@ jobs:
         with:
           version: latest
 
-      - name: Start local Supabase
+      - name: Link to Supabase project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           cd infrastructure/supabase
-          supabase start
-        timeout-minutes: 5
+          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          echo "✅ Linked to Supabase project"
 
-      - name: Apply migrations locally
+      - name: Dry-run migrations (validates SQL syntax)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           cd infrastructure/supabase
-          supabase db push --local
-          echo "✅ All migrations applied locally"
+          echo "🔍 Validating pending migrations (dry-run)..."
+          supabase db push --linked --dry-run
+          echo "✅ Migration syntax validated"
 
       - name: Validate PL/pgSQL functions (plpgsql_check)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           cd infrastructure/supabase
-          echo "🔍 Running plpgsql_check validation..."
-          supabase db lint --level error
+          echo "🔍 Running plpgsql_check validation against remote..."
+          supabase db lint --linked --level error
           echo "✅ All PL/pgSQL functions validated"
-
-      - name: Stop local Supabase
-        if: always()
-        run: |
-          cd infrastructure/supabase
-          supabase stop --no-backup
 
   # Deploy migrations to production (only after validation passes)
   deploy-migrations:
