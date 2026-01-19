@@ -1095,6 +1095,7 @@ export const UsersManagePage: React.FC = observer(() => {
                     userId={currentItem.id}
                     editable={true}
                     onPhonesChange={setUserPhones}
+                    smsLinkedPhoneId={notificationPrefs.sms.phoneId}
                   />
                 )}
 

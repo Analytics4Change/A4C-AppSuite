@@ -47,6 +47,13 @@ export interface UserPhonesSectionProps {
 
   /** Callback when phones are added, edited, or removed */
   onPhonesChange?: (phones: UserPhone[]) => void;
+
+  /**
+   * Phone ID currently linked to SMS notification preferences.
+   * If provided and the user attempts to delete this phone, a warning
+   * will be displayed that SMS notifications will be disabled.
+   */
+  smsLinkedPhoneId?: string | null;
 }
 
 /**
@@ -58,7 +65,7 @@ type SectionMode = 'list' | 'add' | 'edit';
  * UserPhonesSection - Manage user phone numbers
  */
 export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
-  ({ userId, editable = true, className, onPhonesChange }) => {
+  ({ userId, editable = true, className, onPhonesChange, smsLinkedPhoneId }) => {
     const { session } = useAuth();
     const organizationId = session?.claims?.org_id ?? '';
 
@@ -351,7 +358,11 @@ export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
             isOpen={phoneToRemove !== null}
             onCancel={() => setPhoneToRemove(null)}
             title="Remove Phone"
-            message={`Are you sure you want to remove "${phoneToRemove?.label}"? This phone will be deactivated and can be restored later.`}
+            message={
+              phoneToRemove?.id === smsLinkedPhoneId
+                ? `Are you sure you want to remove "${phoneToRemove?.label}"? This phone is currently used for SMS notifications. Removing it will automatically disable SMS notifications for this user.`
+                : `Are you sure you want to remove "${phoneToRemove?.label}"? This phone will be deactivated and can be restored later.`
+            }
             confirmLabel="Remove"
             cancelLabel="Cancel"
             variant="danger"
