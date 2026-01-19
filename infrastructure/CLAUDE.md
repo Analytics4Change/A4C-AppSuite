@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-01-19
 ---
 
 <!-- TL;DR-START -->
@@ -10,6 +10,7 @@ last_updated: 2025-12-30
 
 **When to read**:
 - Running database migrations (`supabase db push`)
+- Validating PL/pgSQL functions (`supabase db lint`)
 - Deploying Temporal workers to Kubernetes
 - Configuring OAuth or JWT custom claims
 - Setting up Resend email provider
@@ -17,7 +18,7 @@ last_updated: 2025-12-30
 
 **Prerequisites**: Access to Supabase project, kubectl configured for k3s cluster
 
-**Key topics**: `supabase`, `migrations`, `kubernetes`, `temporal`, `deployment`, `oauth`, `jwt-claims`, `resend`, `email`, `rls`, `troubleshooting`
+**Key topics**: `supabase`, `migrations`, `plpgsql_check`, `validation`, `kubernetes`, `temporal`, `deployment`, `oauth`, `jwt-claims`, `resend`, `email`, `rls`, `troubleshooting`
 
 **Estimated read time**: 20 minutes (full), 5 minutes (relevant sections)
 <!-- TL;DR-END -->
@@ -93,6 +94,56 @@ supabase migration repair --status reverted <version>
 > 4. Commit to git
 
 **Note**: Docker/Podman is required for some Supabase CLI commands. Set `DOCKER_HOST=unix:///run/user/1000/podman/podman.sock` if using Podman.
+
+### PL/pgSQL Validation (plpgsql_check)
+
+The CI/CD pipeline validates all PL/pgSQL functions before deploying migrations. This catches column name mismatches, type errors, and other issues before they reach production.
+
+**CI/CD Validation** (automatic):
+- GitHub Actions runs `supabase db lint --level error` before every deployment
+- Validation failures block deployment to production
+- PRs with migration changes are validated automatically
+
+**Manual Validation** (for local debugging):
+```bash
+# Start local Supabase
+cd infrastructure/supabase
+supabase start
+
+# Apply migrations locally
+supabase db push --local
+
+# Validate all PL/pgSQL functions
+supabase db lint --level error
+
+# Show warnings too
+supabase db lint --level warning
+
+# Stop local Supabase when done
+supabase stop --no-backup
+```
+
+**Raw SQL Validation** (advanced):
+```sql
+-- Check a specific function
+SELECT * FROM plpgsql_check_function('process_user_event(record)'::regprocedure);
+
+-- Check ALL functions in public/api schemas
+SELECT p.proname, plpgsql_check_function(p.oid)
+FROM pg_proc p
+JOIN pg_namespace n ON p.pronamespace = n.oid
+WHERE p.prolang = (SELECT oid FROM pg_language WHERE lanname = 'plpgsql')
+  AND n.nspname IN ('public', 'api');
+```
+
+**What plpgsql_check catches**:
+- Column name mismatches (e.g., `org_id` when table has `organization_id`)
+- Type errors in assignments
+- Unused/uninitialized variables
+- Dead code paths
+- Missing RETURN statements
+
+**Limitation**: plpgsql_check cannot validate JSONB field access (e.g., `p_event.event_data->>'field'`). It validates SQL column names, not JSONB structure.
 
 ### Kubernetes Commands
 ```bash
