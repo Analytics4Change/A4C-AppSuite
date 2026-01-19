@@ -158,6 +158,46 @@ CREATE TRIGGER organization_projection_trigger
   EXECUTE FUNCTION update_organization_projection();
 ```
 
+### Split Handler Pattern (Recommended)
+
+Since January 2026, A4C uses **split handlers** instead of monolithic processors for better maintainability and independent validation:
+
+```sql
+-- Router (thin CASE dispatcher, ~50 lines)
+CREATE OR REPLACE FUNCTION process_user_event(p_event record)
+RETURNS void AS $$
+BEGIN
+  CASE p_event.event_type
+    WHEN 'user.created' THEN PERFORM handle_user_created(p_event);
+    WHEN 'user.phone.added' THEN PERFORM handle_user_phone_added(p_event);
+    WHEN 'user.phone.updated' THEN PERFORM handle_user_phone_updated(p_event);
+    -- ... one line per event type
+    ELSE RAISE WARNING 'Unknown user event type: %', p_event.event_type;
+  END CASE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Handler (focused logic, 20-50 lines)
+CREATE OR REPLACE FUNCTION handle_user_phone_added(p_event record)
+RETURNS void AS $$
+DECLARE
+  v_phone_id UUID := (p_event.event_data->>'phone_id')::UUID;
+BEGIN
+  INSERT INTO user_phones (id, user_id, label, type, number, ...)
+  VALUES (v_phone_id, ...)
+  ON CONFLICT (id) DO NOTHING;  -- Idempotent
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Benefits of split handlers**:
+- Adding new event = add handler + 1 CASE line (not replace 500+ line function)
+- plpgsql_check validates each handler independently
+- Bugs isolated to one event type
+- Easier code review (diff shows only changed handler)
+
+**See**: [event-handler-pattern.md](../../../../documentation/infrastructure/patterns/event-handler-pattern.md) for complete implementation guide.
+
 ### Idempotency with ON CONFLICT
 
 **Critical**: Triggers must be idempotent to support event replay:

@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-12
+last_updated: 2026-01-19
 purpose: agent-navigation
 ---
 
@@ -16,6 +16,7 @@ purpose: agent-navigation
 |------|-----------|-----------|
 | Add database table | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | [table-template.md](infrastructure/reference/database/table-template.md) |
 | Add domain event type | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) |
+| Add event handler | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | [cqrs-projections.md](../.claude/skills/infrastructure-guidelines/resources/cqrs-projections.md) |
 | Add Temporal workflow | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | [temporal-overview.md](architecture/workflows/temporal-overview.md) |
 | Add frontend component | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | [DESIGN_PATTERNS_MIGRATION_GUIDE.md](frontend/guides/DESIGN_PATTERNS_MIGRATION_GUIDE.md) |
 | Configure authentication | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) |
@@ -75,11 +76,13 @@ purpose: agent-navigation
 | `event-processing` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md, DEPLOYMENT_INSTRUCTIONS.md |
 | `event-types` | [event_types.md](infrastructure/reference/database/tables/event_types.md) | event-sourcing-overview.md |
 | `enterprise-sso` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
+| `event-handler` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md, event-sourcing-overview.md |
 | `events` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md |
 | `failed-events` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md |
 | `hipaa` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | impersonation-security-controls.md |
 | `formulary` | [medications.md](infrastructure/reference/database/tables/medications.md) | medication_history.md |
 | `generated-events` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | workflows/CLAUDE.md, event-sourcing-overview.md |
+| `handler` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md, event-sourcing-overview.md |
 | `hierarchy` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | scoping-architecture.md |
 | `idempotency` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | organization-bootstrap-workflow-design.md |
 | `impersonation` | [impersonation-architecture.md](architecture/authentication/impersonation-architecture.md) | impersonation-security-controls.md |
@@ -125,6 +128,7 @@ purpose: agent-navigation
 | `polling` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | integration-testing.md |
 | `postgres-notify` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-driven-workflow-triggering.md |
 | `prescriptions` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | dosage_info.md |
+| `process_event` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md |
 | `projection` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | organizations_projection.md, table-template.md |
 | `provider-admin` | [provider-admin-permissions-architecture.md](architecture/authorization/provider-admin-permissions-architecture.md) | role_permission_templates.md |
 | `provider-onboarding` | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | organization-bootstrap-workflow-design.md |
@@ -140,6 +144,7 @@ purpose: agent-navigation
 | `role-templates` | [role_permission_templates.md](infrastructure/reference/database/tables/role_permission_templates.md) | provider-admin-permissions-architecture.md |
 | `role-validity` | [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | rbac-architecture.md |
 | `roles` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | roles_projection.md |
+| `router` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md |
 | `rxnorm` | [medications.md](infrastructure/reference/database/tables/medications.md) | rxnorm-medication-autocomplete.md |
 | `saga` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
 | `saga-pattern` | [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | organization-bootstrap-workflow-design.md |
@@ -151,6 +156,7 @@ purpose: agent-navigation
 | `session-management` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | auth-provider-architecture.md, frontend/CLAUDE.md |
 | `getSession` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | auth-provider-architecture.md |
 | `span-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
+| `split-handlers` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md |
 | `social-login` | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) | OAUTH-TESTING.md |
 | `soft-delete` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | clients.md |
 | `supabase` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | DEPLOYMENT_INSTRUCTIONS.md, SUPABASE-AUTH-SETUP.md |

@@ -145,6 +145,29 @@ WHERE p.prolang = (SELECT oid FROM pg_language WHERE lanname = 'plpgsql')
 
 **Limitation**: plpgsql_check cannot validate JSONB field access (e.g., `p_event.event_data->>'field'`). It validates SQL column names, not JSONB structure.
 
+### Event Handler Architecture
+
+Event processing uses **split handlers** (not monolithic processors):
+
+**Routers** (4 total):
+- `process_user_event()`, `process_organization_event()`, `process_organization_unit_event()`, `process_rbac_event()`
+- Thin CASE dispatchers (~50 lines each)
+- Dispatch to individual handlers based on `event_type`
+
+**Handlers** (37 total):
+- `handle_user_phone_added()`, `handle_organization_created()`, etc.
+- One function per event type
+- 20-50 lines each, single responsibility
+- Validated independently by plpgsql_check
+
+**Adding a new event handler**:
+1. Create handler: `handle_<aggregate>_<action>(p_event record)`
+2. Add CASE line to appropriate router: `WHEN 'event.type' THEN PERFORM handle_...();`
+3. Deploy via `supabase migration new <name>` then `supabase db push --linked`
+4. CI validates with plpgsql_check automatically
+
+**See**: [`documentation/infrastructure/patterns/event-handler-pattern.md`](../documentation/infrastructure/patterns/event-handler-pattern.md) for complete implementation guide.
+
 ### Kubernetes Commands
 ```bash
 # Deploy Temporal workers
