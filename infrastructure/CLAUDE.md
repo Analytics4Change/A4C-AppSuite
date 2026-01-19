@@ -61,6 +61,37 @@ supabase migration repair --status applied <version>
 supabase migration repair --status reverted <version>
 ```
 
+> **⚠️ CRITICAL: Always use `supabase migration new` - NEVER manually create migration files**
+>
+> The Supabase CLI generates the correct UTC timestamp. Manually creating files with
+> hand-typed timestamps causes migration ordering errors that break CI/CD.
+>
+> ```bash
+> # ✅ CORRECT: CLI generates timestamp
+> supabase migration new feature_name
+>
+> # ❌ WRONG: Manual file creation
+> touch supabase/migrations/20251223120000_feature.sql
+> ```
+
+> **⚠️ MCP Tool Warning: `mcp__supabase__apply_migration` generates its own timestamp**
+>
+> If you use the MCP `apply_migration` tool, it auto-generates a timestamp that won't
+> match a manually-created local file. This causes CI/CD failures with:
+> `"Remote migration versions not found in local migrations directory"`
+>
+> **Correct workflow when using MCP:**
+> 1. Apply via MCP first (note the returned timestamp, e.g., `20260118023619`)
+> 2. Create local file with **matching** timestamp:
+>    `git mv old_name.sql supabase/migrations/20260118023619_feature.sql`
+> 3. Commit to git
+>
+> **Or better - use CLI workflow:**
+> 1. `supabase migration new feature_name` (generates timestamp)
+> 2. Edit the generated file
+> 3. `supabase db push --linked` (applies to remote)
+> 4. Commit to git
+
 **Note**: Docker/Podman is required for some Supabase CLI commands. Set `DOCKER_HOST=unix:///run/user/1000/podman/podman.sock` if using Podman.
 
 ### Kubernetes Commands
