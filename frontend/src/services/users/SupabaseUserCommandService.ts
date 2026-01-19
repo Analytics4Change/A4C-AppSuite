@@ -1143,13 +1143,25 @@ export class SupabaseUserCommandService implements IUserCommandService {
         orgId: request.orgId,
       });
 
+      // Transform to AsyncAPI snake_case format for event emission
+      // Frontend uses camelCase internally (TypeScript convention)
+      // but AsyncAPI contract uses snake_case (phone_id, in_app)
+      const asyncApiPreferences = {
+        email: request.notificationPreferences.email,
+        sms: {
+          enabled: request.notificationPreferences.sms.enabled,
+          phone_id: request.notificationPreferences.sms.phoneId, // camelCase → snake_case
+        },
+        in_app: request.notificationPreferences.inApp, // camelCase → snake_case
+      };
+
       // Use RPC function to update notification preferences
       const { error } = await supabaseService.apiRpc<void>(
         'update_user_notification_preferences',
         {
           p_user_id: request.userId,
           p_org_id: request.orgId,
-          p_notification_preferences: request.notificationPreferences,
+          p_notification_preferences: asyncApiPreferences,
           p_reason: request.reason ?? null,
         }
       );
