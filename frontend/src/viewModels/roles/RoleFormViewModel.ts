@@ -32,7 +32,6 @@ import { Logger } from '@/utils/logger';
 import type { IRoleService } from '@/services/roles/IRoleService';
 import { getRoleService } from '@/services/roles/RoleServiceFactory';
 import type {
-  Role,
   RoleWithPermissions,
   Permission,
   PermissionGroup,

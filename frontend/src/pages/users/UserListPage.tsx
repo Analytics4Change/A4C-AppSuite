@@ -18,7 +18,7 @@ import { observer } from 'mobx-react-lite';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { UserCard, InvitationList } from '@/components/users';
+import { UserCard } from '@/components/users';
 import { UsersViewModel } from '@/viewModels/users/UsersViewModel';
 import { getUserQueryService, getUserCommandService } from '@/services/users';
 import {

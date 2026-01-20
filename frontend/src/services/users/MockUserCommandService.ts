@@ -440,7 +440,7 @@ export class MockUserCommandService implements IUserCommandService {
     const currentRoleIds = currentRoles.map((r) => r.id);
 
     // Remove roles
-    let updatedRoles = currentRoles.filter(
+    const updatedRoles = currentRoles.filter(
       (r) => !request.roleIdsToRemove.includes(r.id)
     );
 

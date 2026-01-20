@@ -174,7 +174,7 @@ export function validateEnvironment(): FrontendEnv {
     const forceMock = rawEnv.VITE_FORCE_MOCK === 'true';
     const effectiveMode = (hasCredentials && !forceMock) ? 'real' : 'mock';
 
-    const errorMessage = `
+    const _errorMessage = `
 ╔══════════════════════════════════════════════════════════════════╗
 ║                 ENVIRONMENT VALIDATION FAILED                     ║
 ╠══════════════════════════════════════════════════════════════════╣

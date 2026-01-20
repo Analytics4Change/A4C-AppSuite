@@ -168,7 +168,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
 
   // Filter tree nodes based on search and status
   const filteredTreeNodes = useMemo(() => {
-    let nodes = viewModel.treeNodes;
+    const nodes = viewModel.treeNodes;
 
     // Helper: Check if node or any descendant matches the status filter
     // This preserves ancestor nodes that lead to matching descendants
@@ -259,6 +259,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
       }
       setSearchParams({}, { replace: true });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- selectAndLoadUnit excluded to prevent re-running on callback change
   }, [searchParams, viewModel.unitCount, viewModel, setSearchParams]);
 
   // Select and load a unit for viewing or editing (based on permissions)
@@ -346,6 +347,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
     } else if (pending?.type === 'create') {
       enterCreateMode();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- enterCreateMode defined after, avoids circular deps
   }, [selectAndLoadUnit]);
 
   // Handle cancel discard - stay on current unit

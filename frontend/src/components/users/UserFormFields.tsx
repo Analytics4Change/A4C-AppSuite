@@ -38,7 +38,6 @@ import type {
   InviteUserFormData,
   EmailLookupResult,
   EmailLookupStatus,
-  RoleReference,
   InvitationPhone,
 } from '@/types/user.types';
 import type { Role } from '@/types/role.types';
@@ -354,7 +353,7 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
     emailLookup,
     isEmailLookupLoading = false,
     onEmailBlur,
-    suggestedAction,
+    suggestedAction: _suggestedAction,
     onSuggestedAction,
     disabled = false,
     isEditMode = false,

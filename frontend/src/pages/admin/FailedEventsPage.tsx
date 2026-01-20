@@ -47,7 +47,6 @@ import {
   RotateCcw,
   Search,
   Filter,
-  Activity,
   CheckCircle,
   XCircle,
   Clock,
@@ -460,7 +459,7 @@ const EventRow: React.FC<EventRowProps> = ({
 export const FailedEventsPage: React.FC = () => {
   // Stats state
   const [stats, setStats] = useState<EventProcessingStats | null>(null);
-  const [statsLoading, setStatsLoading] = useState(true);
+  const [_statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
 
   // Events state

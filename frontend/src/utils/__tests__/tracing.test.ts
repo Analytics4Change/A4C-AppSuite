@@ -8,7 +8,7 @@
  * - Context creation and propagation
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   generateCorrelationId,
   generateTraceId,
@@ -235,7 +235,7 @@ describe('Tracing Utilities', () => {
         session_id: 'session-456',
         exp: Math.floor(Date.now() / 1000) + 3600,
       };
-      const mockToken = `header.${btoa(JSON.stringify(mockPayload))}.signature`;
+      const mockToken = `header.${globalThis.btoa(JSON.stringify(mockPayload))}.signature`;
 
       vi.mocked(supabaseService.getClient).mockReturnValue({
         auth: {
@@ -274,7 +274,7 @@ describe('Tracing Utilities', () => {
         exp: Math.floor(Date.now() / 1000) + 3600,
         // No session_id
       };
-      const mockToken = `header.${btoa(JSON.stringify(mockPayload))}.signature`;
+      const mockToken = `header.${globalThis.btoa(JSON.stringify(mockPayload))}.signature`;
 
       vi.mocked(supabaseService.getClient).mockReturnValue({
         auth: {
@@ -390,7 +390,7 @@ describe('Tracing Utilities', () => {
         sub: 'user-123',
         session_id: 'sess-789',
       };
-      const mockToken = `header.${btoa(JSON.stringify(mockPayload))}.signature`;
+      const mockToken = `header.${globalThis.btoa(JSON.stringify(mockPayload))}.signature`;
 
       vi.mocked(supabaseService.getClient).mockReturnValue({
         auth: {
@@ -452,7 +452,7 @@ describe('Tracing Utilities', () => {
         sub: 'user-123',
         session_id: 'sess-456',
       };
-      const mockToken = `header.${btoa(JSON.stringify(mockPayload))}.signature`;
+      const mockToken = `header.${globalThis.btoa(JSON.stringify(mockPayload))}.signature`;
 
       vi.mocked(supabaseService.getClient).mockReturnValue({
         auth: {

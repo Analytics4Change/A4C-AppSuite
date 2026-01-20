@@ -45,7 +45,6 @@ import {
   XCircle,
   Save,
   Mail,
-  Power,
   PowerOff,
   Trash2,
 } from 'lucide-react';
@@ -149,6 +148,7 @@ export const UsersManagePage: React.FC = observer(() => {
     } else if (invitationId) {
       selectAndLoadUser(invitationId, true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- enterCreateMode/selectAndLoadUser excluded to prevent re-running on callback change
   }, [searchParams, viewModel.items]);
 
   // Sync roles to ViewModel when they load (handles async timing)
@@ -187,7 +187,7 @@ export const UsersManagePage: React.FC = observer(() => {
 
   // Select and load a user or invitation for editing
   const selectAndLoadUser = useCallback(
-    async (itemId: string, isInvitation: boolean) => {
+    async (itemId: string, _isInvitation: boolean) => {
       setOperationError(null);
       try {
         const item = viewModel.items.find((u: UserListItem) => u.id === itemId);
@@ -280,6 +280,7 @@ export const UsersManagePage: React.FC = observer(() => {
     } else if (pending?.type === 'create') {
       enterCreateMode();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- enterCreateMode defined after, avoids circular deps
   }, [selectAndLoadUser, viewModel.items]);
 
   // Handle cancel discard

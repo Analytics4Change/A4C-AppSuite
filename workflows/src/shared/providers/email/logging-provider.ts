@@ -27,7 +27,7 @@ export class LoggingEmailProvider implements IEmailProvider {
    * @param params - Email parameters
    * @returns Simulated email result
    */
-  async sendEmail(params: EmailParams): Promise<EmailResult> {
+  sendEmail(params: EmailParams): Promise<EmailResult> {
     const messageId = `simulated_${this.messageIdCounter++}_${Date.now()}`;
 
     console.log('\n' + '='.repeat(60));
@@ -65,19 +65,19 @@ export class LoggingEmailProvider implements IEmailProvider {
     console.log('\n💡 In production mode, this would send a real email via Resend or SMTP');
     console.log('='.repeat(60) + '\n');
 
-    return {
+    return Promise.resolve({
       messageId,
       accepted: [params.to],
       rejected: []
-    };
+    });
   }
 
   /**
    * Verify connection (always succeeds)
    * @returns true
    */
-  async verifyConnection(): Promise<boolean> {
+  verifyConnection(): Promise<boolean> {
     console.log('\n[Email Provider] Connection verification (logging mode - always succeeds)\n');
-    return true;
+    return Promise.resolve(true);
   }
 }

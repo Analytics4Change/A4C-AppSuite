@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RolesViewModel } from '../RolesViewModel';
 import type { IRoleService } from '@/services/roles/IRoleService';
-import type { Role, Permission, RoleOperationResult } from '@/types/role.types';
+import type { Role, Permission } from '@/types/role.types';
 
 // Sample test data
 const mockRoles: Role[] = [

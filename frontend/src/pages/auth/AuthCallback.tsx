@@ -187,7 +187,7 @@ async function completeOAuthInvitationAcceptance(
 
 export const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
-  const { handleOAuthCallback, session } = useAuth();
+  const { handleOAuthCallback, session: _session } = useAuth();
   const [error, setError] = useState<CallbackError | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState('Please wait while we verify your credentials...');

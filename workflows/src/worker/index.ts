@@ -19,9 +19,9 @@
 // Load dotenv before any other code runs (development only)
 // =============================================================================
 if (process.env.NODE_ENV !== 'production') {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
   require('dotenv').config({ path: '.env.local' });
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
   require('dotenv').config();
 }
 
@@ -124,7 +124,7 @@ async function run() {
 
     try {
       console.log('  Shutting down worker...');
-      await worker.shutdown();
+      worker.shutdown();
       console.log('  ✅ Worker shutdown complete');
 
       console.log('  Closing Temporal connection...');
@@ -145,8 +145,8 @@ async function run() {
   };
 
   // Register shutdown handlers
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
 
   // Log startup complete
   console.log('='.repeat(60));

@@ -136,6 +136,7 @@ export const TreeSelectDropdown = observer(
           expandAncestors(node.id);
         }
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- expandAncestors is stable (defined after this effect)
     }, [selectedPath, allNodes, findNodeByPath]);
 
     // Expand ancestors of a node

@@ -15,6 +15,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '../../types/database.types.js';
 
 /**
  * Domain Event structure from database
@@ -68,10 +69,10 @@ export interface WorkflowSummary {
 }
 
 export class EventQueries {
-  private supabase: SupabaseClient;
+  private supabase: SupabaseClient<Database>;
 
   constructor(supabaseUrl: string, supabaseKey: string) {
-    this.supabase = createClient(supabaseUrl, supabaseKey);
+    this.supabase = createClient<Database>(supabaseUrl, supabaseKey);
   }
 
   /**
@@ -146,10 +147,12 @@ export class EventQueries {
       return null;
     }
 
+    // Cast event_metadata to the expected shape
+    const metadata = data.event_metadata as DomainEvent['event_metadata'] | null;
     return {
-      workflow_id: data.event_metadata?.workflow_id || null,
-      workflow_run_id: data.event_metadata?.workflow_run_id || null,
-      workflow_type: data.event_metadata?.workflow_type || null
+      workflow_id: metadata?.workflow_id ?? null,
+      workflow_run_id: metadata?.workflow_run_id ?? null,
+      workflow_type: metadata?.workflow_type ?? null
     };
   }
 

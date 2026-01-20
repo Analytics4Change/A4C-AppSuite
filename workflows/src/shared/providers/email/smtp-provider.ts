@@ -20,10 +20,11 @@
 
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import type { IEmailProvider, EmailParams, EmailResult } from '../../types';
 
 export class SMTPEmailProvider implements IEmailProvider {
-  private transporter: Transporter;
+  private transporter: Transporter<SMTPTransport.SentMessageInfo>;
 
   constructor() {
     const host = process.env.SMTP_HOST;
@@ -73,8 +74,8 @@ export class SMTPEmailProvider implements IEmailProvider {
 
       return {
         messageId: info.messageId,
-        accepted: info.accepted as string[],
-        rejected: info.rejected as string[]
+        accepted: info.accepted.map(addr => typeof addr === 'string' ? addr : addr.address),
+        rejected: info.rejected.map(addr => typeof addr === 'string' ? addr : addr.address)
       };
     } catch (error) {
       if (error instanceof Error) {

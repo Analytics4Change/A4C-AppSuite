@@ -68,11 +68,14 @@ export function createDNSProvider(): IDNSProvider {
     case 'logging':
       return new LoggingDNSProvider();
 
-    default:
+    default: {
+      // Exhaustive check - providerType is never here
+      const _exhaustive: never = providerType;
       throw new Error(
-        `Invalid DNS_PROVIDER: ${providerType}. ` +
+        `Invalid DNS_PROVIDER: ${String(_exhaustive)}. ` +
         `Valid options: cloudflare, mock, logging, auto`
       );
+    }
   }
 }
 

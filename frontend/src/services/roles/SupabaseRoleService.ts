@@ -337,7 +337,7 @@ export class SupabaseRoleService implements IRoleService {
    * Creates a new role with permissions
    */
   async createRole(request: CreateRoleRequest): Promise<RoleOperationResult> {
-    const requestId = crypto.randomUUID().slice(0, 8);
+    const requestId = globalThis.crypto.randomUUID().slice(0, 8);
     const startTime = Date.now();
 
     log.info(`[DIAG:createRole:ENTRY] requestId=${requestId}`, {

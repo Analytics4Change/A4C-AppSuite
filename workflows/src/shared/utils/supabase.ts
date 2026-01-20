@@ -21,15 +21,18 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '../../types/database.types.js';
 
-let supabaseClient: SupabaseClient | null = null;
+export type TypedSupabaseClient = SupabaseClient<Database>;
+
+let supabaseClient: TypedSupabaseClient | null = null;
 
 /**
  * Get or create Supabase client (singleton)
  * @returns Configured Supabase client with service role
  * @throws Error if environment variables not set
  */
-export function getSupabaseClient(): SupabaseClient {
+export function getSupabaseClient(): TypedSupabaseClient {
   if (supabaseClient) {
     console.log('[Supabase] Returning cached client instance');
     return supabaseClient;
@@ -76,7 +79,7 @@ export function getSupabaseClient(): SupabaseClient {
 
   console.log('[Supabase] Client config:', JSON.stringify(clientConfig, null, 2));
 
-  supabaseClient = createClient(supabaseUrl, serviceRoleKey, clientConfig);
+  supabaseClient = createClient<Database>(supabaseUrl, serviceRoleKey, clientConfig);
 
   console.log('[Supabase] ✅ Client created successfully');
 

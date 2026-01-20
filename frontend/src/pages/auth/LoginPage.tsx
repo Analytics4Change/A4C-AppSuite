@@ -39,7 +39,8 @@ export const LoginPage: React.FC = () => {
       sessionOrgId: session?.claims?.org_id,
       locationState: location.state,
     });
-  }, []); // Only log once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional: log only once on mount
+  }, []);
 
   /**
    * Handle post-login redirect with priority:

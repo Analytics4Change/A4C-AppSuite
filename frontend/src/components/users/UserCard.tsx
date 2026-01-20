@@ -2,7 +2,6 @@ import React from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
-  User as UserIcon,
   Mail,
   Clock,
   Power,

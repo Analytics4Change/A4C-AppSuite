@@ -801,8 +801,8 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * TODO: Implement via Edge Function or RPC when available
    */
   async addUserToOrganization(
-    userId: string,
-    roles: Array<{ roleId: string; roleName: string }>
+    _userId: string,
+    _roles: Array<{ roleId: string; roleName: string }>
   ): Promise<UserOperationResult> {
     log.warn('addUserToOrganization not yet implemented for Supabase');
     return {
@@ -821,7 +821,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * TODO: Implement org context switching
    */
   async switchOrganization(
-    organizationId: string
+    _organizationId: string
   ): Promise<UserOperationResult> {
     log.warn('switchOrganization not yet implemented for Supabase');
     return {
@@ -872,7 +872,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
   // ============================================================================
 
   async addUserAddress(
-    request: AddUserAddressRequest
+    _request: AddUserAddressRequest
   ): Promise<UserOperationResult> {
     log.warn('addUserAddress not yet implemented for Supabase');
     return {
@@ -883,7 +883,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
   }
 
   async updateUserAddress(
-    request: UpdateUserAddressRequest
+    _request: UpdateUserAddressRequest
   ): Promise<UserOperationResult> {
     log.warn('updateUserAddress not yet implemented for Supabase');
     return {
@@ -894,7 +894,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
   }
 
   async removeUserAddress(
-    request: RemoveUserAddressRequest
+    _request: RemoveUserAddressRequest
   ): Promise<UserOperationResult> {
     log.warn('removeUserAddress not yet implemented for Supabase');
     return {
@@ -988,7 +988,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
         orgId: request.orgId,
       });
 
-      const { data, error } = await supabaseService.apiRpc<{
+      const { data: _data, error } = await supabaseService.apiRpc<{
         success: boolean;
         phoneId: string;
         eventId: string;
@@ -1061,7 +1061,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
         orgId: request.orgId,
       });
 
-      const { data, error } = await supabaseService.apiRpc<{
+      const { data: _removeData, error } = await supabaseService.apiRpc<{
         success: boolean;
         phoneId: string;
         eventId: string;

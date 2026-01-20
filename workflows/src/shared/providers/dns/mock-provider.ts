@@ -56,16 +56,16 @@ export class MockDNSProvider implements IDNSProvider {
    * @param domain - Domain name
    * @returns Array of matching zones
    */
-  async listZones(domain: string): Promise<DNSZone[]> {
+  listZones(domain: string): Promise<DNSZone[]> {
     const zone = this.zones.get(domain);
     if (!zone) {
-      return [];
+      return Promise.resolve([]);
     }
 
-    return [{
+    return Promise.resolve([{
       id: zone.id,
       name: zone.name
-    }];
+    }]);
   }
 
   /**
@@ -74,14 +74,14 @@ export class MockDNSProvider implements IDNSProvider {
    * @param filter - Optional filter (name, type)
    * @returns Array of DNS records
    */
-  async listRecords(
+  listRecords(
     zoneId: string,
     filter?: DNSRecordFilter
   ): Promise<DNSRecord[]> {
     // Find zone by ID
     const zone = Array.from(this.zones.values()).find(z => z.id === zoneId);
     if (!zone) {
-      throw new Error(`Zone not found: ${zoneId}`);
+      return Promise.reject(new Error(`Zone not found: ${zoneId}`));
     }
 
     let records = Array.from(zone.records.values());
@@ -94,7 +94,7 @@ export class MockDNSProvider implements IDNSProvider {
       records = records.filter(r => r.type === filter.type);
     }
 
-    return records;
+    return Promise.resolve(records);
   }
 
   /**
@@ -103,14 +103,14 @@ export class MockDNSProvider implements IDNSProvider {
    * @param params - DNS record parameters
    * @returns Created DNS record
    */
-  async createRecord(
+  createRecord(
     zoneId: string,
     params: CreateDNSRecordParams
   ): Promise<DNSRecord> {
     // Find zone by ID
     const zone = Array.from(this.zones.values()).find(z => z.id === zoneId);
     if (!zone) {
-      throw new Error(`Zone not found: ${zoneId}`);
+      return Promise.reject(new Error(`Zone not found: ${zoneId}`));
     }
 
     // Check for duplicate record (same name and type)
@@ -120,7 +120,7 @@ export class MockDNSProvider implements IDNSProvider {
 
     if (existingRecord) {
       // Return existing record (idempotent behavior)
-      return existingRecord;
+      return Promise.resolve(existingRecord);
     }
 
     // Create new record
@@ -135,7 +135,7 @@ export class MockDNSProvider implements IDNSProvider {
     };
 
     zone.records.set(recordId, record);
-    return record;
+    return Promise.resolve(record);
   }
 
   /**
@@ -143,18 +143,16 @@ export class MockDNSProvider implements IDNSProvider {
    * @param zoneId - Zone ID
    * @param recordId - DNS record ID to delete
    */
-  async deleteRecord(zoneId: string, recordId: string): Promise<void> {
+  deleteRecord(zoneId: string, recordId: string): Promise<void> {
     // Find zone by ID
     const zone = Array.from(this.zones.values()).find(z => z.id === zoneId);
     if (!zone) {
-      throw new Error(`Zone not found: ${zoneId}`);
+      return Promise.reject(new Error(`Zone not found: ${zoneId}`));
     }
 
-    const deleted = zone.records.delete(recordId);
-    if (!deleted) {
-      // Idempotent: Don't throw if record doesn't exist
-      return;
-    }
+    zone.records.delete(recordId);
+    // Idempotent: Don't reject if record doesn't exist
+    return Promise.resolve();
   }
 
   /**

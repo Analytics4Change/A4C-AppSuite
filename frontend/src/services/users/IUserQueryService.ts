@@ -15,7 +15,6 @@
  */
 
 import type {
-  User,
   UserWithRoles,
   UserListItem,
   Invitation,

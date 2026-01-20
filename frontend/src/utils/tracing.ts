@@ -50,8 +50,8 @@ export interface TraceparentComponents {
  * @returns UUID v4 string (e.g., "550e8400-e29b-41d4-a716-446655440000")
  */
 export function generateCorrelationId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
+  if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.randomUUID) {
+    return globalThis.crypto.randomUUID();
   }
 
   // Fallback for older browsers
@@ -87,8 +87,8 @@ export function generateTraceId(): string {
 export function generateSpanId(): string {
   // Generate 16 hex characters (64 bits)
   const bytes = new Uint8Array(8);
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    crypto.getRandomValues(bytes);
+  if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
   } else {
     // Fallback
     for (let i = 0; i < 8; i++) {

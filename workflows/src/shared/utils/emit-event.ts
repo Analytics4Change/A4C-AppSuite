@@ -262,7 +262,7 @@ export async function emitEvent(params: EmitEventParams): Promise<string> {
   }
 
   // The function returns the generated event UUID
-  const emittedEventId = returnedEventId as string;
+  const emittedEventId = returnedEventId;
   console.log(`[Event Emitter] Emitted ${params.event_type} event: ${emittedEventId}`);
   return emittedEventId;
 }

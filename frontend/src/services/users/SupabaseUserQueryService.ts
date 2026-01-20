@@ -15,11 +15,9 @@
 
 import type { IUserQueryService, GetUserByIdResult } from './IUserQueryService';
 import type {
-  UserWithRoles,
   UserListItem,
   Invitation,
   EmailLookupResult,
-  EmailLookupStatus,
   UserQueryOptions,
   PaginatedResult,
   RoleReference,
@@ -52,7 +50,7 @@ interface DecodedJWTClaims {
 // ============================================================================
 
 /** User row from users table */
-interface DbUserRow {
+interface _DbUserRow {
   id: string;
   email: string;
   first_name: string | null;
@@ -113,7 +111,6 @@ interface DbInvitationRow {
 interface DbUserAddressRow {
   id: string;
   user_id: string;
-  org_id: string | null;
   label: string;
   type: string;
   street1: string;
@@ -124,12 +121,13 @@ interface DbUserAddressRow {
   country: string;
   is_primary: boolean;
   is_active: boolean;
+  metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
 
 /** User phone row from user_phones table (direct query) */
-interface DbUserPhoneRow {
+interface _DbUserPhoneRow {
   id: string;
   user_id: string;
   org_id: string | null;
@@ -174,6 +172,7 @@ interface DbUserOrgAccessRow {
 /** User org access list item from api.list_user_org_access RPC */
 interface DbUserOrgAccessListItem extends DbUserOrgAccessRow {
   org_name: string;
+  org_type: string;
   is_currently_active: boolean;
 }
 
@@ -202,7 +201,7 @@ interface DbUserExistsResult {
 }
 
 /** Simple role row for assignable roles query */
-interface DbSimpleRoleRow {
+interface _DbSimpleRoleRow {
   id: string;
   name: string;
 }
@@ -815,7 +814,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
 
     try {
       // Check if user has membership in this org
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const { data: membershipData, error: membershipError } = await (client.rpc as any)(
         'check_user_org_membership',
         {
@@ -840,7 +839,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
       }
 
       // Check for pending invitation
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const { data: pendingData, error: pendingError } = await (client.rpc as any)(
         'check_pending_invitation',
         {
@@ -868,7 +867,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
       }
 
       // Check if user exists in system (other org)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const { data: existsData, error: existsError } = await (client.rpc as any)(
         'check_user_exists',
         {
@@ -1009,32 +1008,15 @@ export class SupabaseUserQueryService implements IUserQueryService {
 
       const accessList = (data ?? []) as DbUserOrgAccessListItem[];
 
-      // Filter to only active organizations and fetch org details
-      // Note: The RPC returns org_name directly, but we need org_type
-      // For now, do a secondary query for type. TODO: Add org_type to RPC
-      const orgIds = accessList
+      // Filter to only active organizations and map directly from RPC result
+      // org_type is now included in the RPC response (CQRS-compliant)
+      return accessList
         .filter((uoa) => uoa.is_currently_active)
-        .map((uoa) => uoa.org_id);
-
-      if (orgIds.length === 0) {
-        return [];
-      }
-
-      const { data: orgs, error: orgsError } = await client
-        .from('organizations_projection')
-        .select('id, name, type')
-        .in('id', orgIds);
-
-      if (orgsError) {
-        log.error('Failed to fetch organization details', orgsError);
-        return [];
-      }
-
-      return (orgs ?? []).map((org: { id: string; name: string; type: string }) => ({
-        id: org.id,
-        name: org.name,
-        type: org.type,
-      }));
+        .map((uoa) => ({
+          id: uoa.org_id,
+          name: uoa.org_name,
+          type: uoa.org_type,
+        }));
     } catch (error) {
       log.error('Error in getUserOrganizations', error);
       return [];
@@ -1046,27 +1028,24 @@ export class SupabaseUserQueryService implements IUserQueryService {
   // ============================================================================
 
   async getUserAddresses(userId: string): Promise<UserAddress[]> {
-    const client = supabaseService.getClient();
-
     try {
-      const { data, error } = await client
-        .from('user_addresses')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .order('is_primary', { ascending: false });
+      // Use RPC function for CQRS compliance
+      const { data, error } = await supabaseService.apiRpc<DbUserAddressRow[]>(
+        'get_user_addresses',
+        { p_user_id: userId }
+      );
 
       if (error) {
-        log.error('Failed to fetch user addresses', error);
+        log.error('Failed to fetch user addresses via RPC', error);
         return [];
       }
 
-      const addresses = (data ?? []) as unknown as DbUserAddressRow[];
+      const addresses = (data ?? []) as DbUserAddressRow[];
 
       return addresses.map((addr) => ({
         id: addr.id,
         userId: addr.user_id,
-        orgId: addr.org_id ?? null,
+        orgId: null, // user_addresses table doesn't have org_id
         label: addr.label,
         type: addr.type as UserAddress['type'],
         street1: addr.street1,

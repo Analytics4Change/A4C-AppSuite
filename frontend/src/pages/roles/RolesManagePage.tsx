@@ -196,6 +196,7 @@ export const RolesManagePage: React.FC = observer(() => {
     } else if (pending?.type === 'create') {
       enterCreateMode();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- enterCreateMode defined after, avoids circular deps
   }, [selectAndLoadRole]);
 
   // Handle cancel discard

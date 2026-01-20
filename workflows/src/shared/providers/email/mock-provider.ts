@@ -34,7 +34,7 @@ export class MockEmailProvider implements IEmailProvider {
    * @param params - Email parameters
    * @returns Simulated email result
    */
-  async sendEmail(params: EmailParams): Promise<EmailResult> {
+  sendEmail(params: EmailParams): Promise<EmailResult> {
     const messageId = `mock_${this.messageIdCounter++}_${Date.now()}`;
 
     // Store email in memory
@@ -44,19 +44,19 @@ export class MockEmailProvider implements IEmailProvider {
       sentAt: new Date()
     });
 
-    return {
+    return Promise.resolve({
       messageId,
       accepted: [params.to],
       rejected: []
-    };
+    });
   }
 
   /**
    * Verify connection (always succeeds)
    * @returns true
    */
-  async verifyConnection(): Promise<boolean> {
-    return true;
+  verifyConnection(): Promise<boolean> {
+    return Promise.resolve(true);
   }
 
   /**

@@ -93,11 +93,14 @@ export function createEmailProvider(): IEmailProvider {
     case 'logging':
       return new LoggingEmailProvider();
 
-    default:
+    default: {
+      // Exhaustive check - providerType is never here
+      const _exhaustive: never = providerType;
       throw new Error(
-        `Invalid EMAIL_PROVIDER: ${providerType}. ` +
+        `Invalid EMAIL_PROVIDER: ${String(_exhaustive)}. ` +
         `Valid options: resend, smtp, mock, logging, auto`
       );
+    }
   }
 }
 

@@ -28,6 +28,17 @@ import { AGGREGATE_TYPES } from '@shared/constants';
 const log = getLogger('GenerateInvitations');
 
 /**
+ * RPC result from api.get_invitation_by_org_and_email
+ */
+interface InvitationRpcResult {
+  invitation_id: string;
+  email: string;
+  token: string;
+  expires_at: string;
+  contact_id: string | null;
+}
+
+/**
  * Generate secure invitation token
  * @returns URL-safe base64 token (256 bits)
  */
@@ -70,7 +81,9 @@ export async function generateInvitations(
         p_email: user.email
       });
 
-    const existing = existingData && existingData.length > 0 ? existingData[0] : null;
+    const existing = existingData && existingData.length > 0
+      ? (existingData[0] as InvitationRpcResult)
+      : null;
 
     if (existing) {
       log.debug('Invitation already exists', { email: user.email });

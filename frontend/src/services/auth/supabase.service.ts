@@ -15,7 +15,7 @@ const log = Logger.getLogger('api');
  *
  * Matches the pattern used in Edge Functions (_shared/types.ts).
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type AnySchemaSupabaseClient = SupabaseClient<any, any, any>;
 
 export interface Database {

@@ -33,7 +33,7 @@ export class LoggingDNSProvider implements IDNSProvider {
    * @param domain - Domain name
    * @returns Array of simulated zones
    */
-  async listZones(domain: string): Promise<DNSZone[]> {
+  listZones(domain: string): Promise<DNSZone[]> {
     console.log('\n' + '='.repeat(60));
     console.log('🌐 DNS Provider: listZones()');
     console.log('='.repeat(60));
@@ -54,7 +54,7 @@ export class LoggingDNSProvider implements IDNSProvider {
     });
     console.log('='.repeat(60) + '\n');
 
-    return zones;
+    return Promise.resolve(zones);
   }
 
   /**
@@ -63,7 +63,7 @@ export class LoggingDNSProvider implements IDNSProvider {
    * @param filter - Optional filter (name, type)
    * @returns Array of simulated DNS records
    */
-  async listRecords(
+  listRecords(
     zoneId: string,
     filter?: DNSRecordFilter
   ): Promise<DNSRecord[]> {
@@ -84,7 +84,7 @@ export class LoggingDNSProvider implements IDNSProvider {
     console.log(`\n✅ Found ${records.length} record(s)`);
     console.log('='.repeat(60) + '\n');
 
-    return records;
+    return Promise.resolve(records);
   }
 
   /**
@@ -93,7 +93,7 @@ export class LoggingDNSProvider implements IDNSProvider {
    * @param params - DNS record parameters
    * @returns Simulated DNS record
    */
-  async createRecord(
+  createRecord(
     zoneId: string,
     params: CreateDNSRecordParams
   ): Promise<DNSRecord> {
@@ -124,7 +124,7 @@ export class LoggingDNSProvider implements IDNSProvider {
     console.log('\n💡 In production mode, this would create a real DNS record in Cloudflare');
     console.log('='.repeat(60) + '\n');
 
-    return record;
+    return Promise.resolve(record);
   }
 
   /**
@@ -132,7 +132,7 @@ export class LoggingDNSProvider implements IDNSProvider {
    * @param zoneId - Zone ID
    * @param recordId - DNS record ID to delete
    */
-  async deleteRecord(zoneId: string, recordId: string): Promise<void> {
+  deleteRecord(zoneId: string, recordId: string): Promise<void> {
     console.log('\n' + '='.repeat(60));
     console.log('🌐 DNS Provider: deleteRecord()');
     console.log('='.repeat(60));
@@ -143,5 +143,6 @@ export class LoggingDNSProvider implements IDNSProvider {
     console.log('\n✅ Record would be deleted');
     console.log('\n💡 In production mode, this would delete a real DNS record from Cloudflare');
     console.log('='.repeat(60) + '\n');
+    return Promise.resolve();
   }
 }
