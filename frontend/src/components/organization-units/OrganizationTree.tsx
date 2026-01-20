@@ -270,15 +270,18 @@ export const OrganizationTree = observer(
             break;
 
           case 'Enter':
+            // Enter key loads details (activates the node)
+            e.preventDefault();
+            if (onActivate && selectedId) {
+              onActivate(selectedId);
+            }
+            break;
+
           case ' ':
+            // Space key toggles expand/collapse only
             e.preventDefault();
             if (selectedId) {
-              if (onActivate) {
-                onActivate(selectedId);
-              } else {
-                // Default behavior: toggle expansion
-                onToggle(selectedId);
-              }
+              onToggle(selectedId);
             }
             break;
 

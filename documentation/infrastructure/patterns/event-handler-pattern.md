@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-19
+last_updated: 2026-01-20
 ---
 
 <!-- TL;DR-START -->
@@ -281,7 +281,10 @@ The GitHub Actions workflow automatically:
 | `organization.deactivated` | `handle_organization_deactivated` |
 | `organization.reactivated` | `handle_organization_reactivated` |
 | `organization.deleted` | `handle_organization_deleted` |
-| `organization.subdomain.status_changed` | `handle_organization_subdomain_status_changed` |
+| `organization.subdomain_status.changed` | `handle_organization_subdomain_status_changed` |
+| `organization.subdomain.verified` | `handle_organization_subdomain_verified` |
+| `organization.subdomain.dns_created` | `handle_organization_subdomain_dns_created` |
+| `organization.subdomain.failed` | `handle_organization_subdomain_failed` |
 | `organization.bootstrap.completed` | `handle_bootstrap_completed` |
 | `organization.bootstrap.failed` | `handle_bootstrap_failed` |
 | `organization.bootstrap.cancelled` | `handle_bootstrap_cancelled` |

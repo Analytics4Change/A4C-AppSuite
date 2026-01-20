@@ -682,6 +682,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     selectedId={viewModel.selectedUnitId}
                     expandedIds={viewModel.expandedNodeIds}
                     onSelect={handleTreeSelect}
+                    onActivate={handleTreeSelect}
                     onToggle={viewModel.toggleNode.bind(viewModel)}
                     onMoveDown={viewModel.moveSelectionDown.bind(viewModel)}
                     onMoveUp={viewModel.moveSelectionUp.bind(viewModel)}
