@@ -23,7 +23,7 @@
 import type {
   InviteUserRequest,
   UpdateUserRequest,
-  AssignRolesRequest,
+  ModifyRolesRequest,
   UserOperationResult,
   AddUserAddressRequest,
   UpdateUserAddressRequest,
@@ -200,7 +200,7 @@ export interface IUserCommandService {
   updateUser(request: UpdateUserRequest): Promise<UserOperationResult>;
 
   /**
-   * Assigns and/or revokes roles for a user
+   * Modifies roles for a user (add and/or remove)
    *
    * Modifies the user's role assignments within the organization.
    * Role assignments are subject to subset-only delegation rule.
@@ -218,7 +218,7 @@ export interface IUserCommandService {
    * @returns Promise resolving to operation result
    *
    * @example
-   * const result = await service.assignRoles({
+   * const result = await service.modifyRoles({
    *   userId: user.id,
    *   roleIdsToAdd: ['role-uuid-1'],
    *   roleIdsToRemove: ['role-uuid-2']
@@ -228,7 +228,7 @@ export interface IUserCommandService {
    *   showError('Cannot assign role outside your organizational scope');
    * }
    */
-  assignRoles(request: AssignRolesRequest): Promise<UserOperationResult>;
+  modifyRoles(request: ModifyRolesRequest): Promise<UserOperationResult>;
 
   /**
    * Adds an existing user to the current organization

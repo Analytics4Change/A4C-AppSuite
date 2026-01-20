@@ -379,11 +379,18 @@
   - [x] Reactivate user operation with event emission
   - [x] Emit `user.deactivated` / `user.reactivated` events
 
-### 6.2 Role Reassignment ⏸️ PENDING
-- [ ] Implement role change in command service
-  - [ ] Validate subset-only delegation
-  - [ ] Emit `user.role.revoked` event
-  - [ ] Emit `user.role.assigned` event
+### 6.2 Role Reassignment ✅ COMPLETE (2026-01-20)
+- [x] Implement role change in command service
+  - [x] Rename `AssignRolesRequest` → `ModifyRolesRequest`, `assignRoles()` → `modifyRoles()`
+  - [x] Implement `modifyRoles()` in `SupabaseUserCommandService` calling manage-user Edge Function
+  - [x] Add `modify_roles` operation to `manage-user` Edge Function
+  - [x] Validate subset-only delegation via `api.validate_role_assignment()` RPC
+  - [x] Emit `user.role.revoked` event for removed roles
+  - [x] Emit `user.role.assigned` event for added roles
+- [x] Add role change tracking to `UserFormViewModel`
+  - [x] Original role tracking already in place via `originalData.roleIds`
+  - [x] Added computed properties: `rolesToAdd`, `rolesToRemove`, `hasRoleChanges`
+  - [x] Updated `submit()` to call `modifyRoles()` after `updateUser()` when roles change
 
 ### 6.3 Event Processors
 - [x] Add `user.deactivated` handler (done in Phase 5.5)
@@ -392,8 +399,10 @@
 - [x] Add `user.reactivated` handler (done in Phase 5.5)
   - [x] Update `users.is_active = true`
   - [x] Update `user_org_access.is_active = true`
-- [ ] Add `user.role.revoked` handler
-  - [ ] Delete from `user_roles_projection`
+- [x] Add `user.role.revoked` handler (2026-01-20)
+  - [x] Delete from `user_roles_projection`
+  - [x] Update `users.roles` array (remove role_name)
+  - [x] Added routing case in `process_user_event`
 
 ## Phase 7: Org Selector (Minimal Viable) ⏸️ PENDING
 
@@ -591,10 +600,21 @@
 
 ## Current Status
 
-**Phase**: Phase 5.11 - Session Management Pattern Standardization
-**Status**: ✅ COMPLETE (Code changes done, manual testing pending)
-**Last Updated**: 2026-01-06
-**Next Step**: Manual testing of users list to verify fix works
+**Phase**: Phase 6.2 - Role Reassignment
+**Status**: ✅ COMPLETE
+**Last Updated**: 2026-01-20
+**Next Step**: Phase 7 (Org Selector) or manual end-to-end testing of role reassignment
+
+### Phase 6.2 Completion Summary (2026-01-20)
+- Renamed `AssignRolesRequest` → `ModifyRolesRequest`, `assignRoles()` → `modifyRoles()` across all services
+- Implemented `modifyRoles()` in `SupabaseUserCommandService` calling `manage-user` Edge Function
+- Added `modify_roles` operation to `manage-user` Edge Function (v6)
+- Edge Function emits `user.role.revoked` for removed roles, `user.role.assigned` for added roles
+- Created migration `20260120173607_user_role_revoked_routing.sql` to:
+  - Update `handle_user_role_revoked()` to also update `users.roles` array
+  - Add routing case for `user.role.revoked` in `process_user_event`
+- Updated `UserFormViewModel` with `rolesToAdd`, `rolesToRemove`, `hasRoleChanges` computed properties
+- Updated `submit()` to call `modifyRoles()` after `updateUser()` when roles change
 
 ## Notes
 

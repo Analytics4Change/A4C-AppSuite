@@ -608,9 +608,9 @@ export interface UpdateUserRequest {
 }
 
 /**
- * Request payload for assigning roles to a user
+ * Request payload for modifying roles for a user (add and/or remove)
  */
-export interface AssignRolesRequest {
+export interface ModifyRolesRequest {
   /** User ID */
   userId: string;
 

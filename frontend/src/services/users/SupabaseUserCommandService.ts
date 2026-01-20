@@ -23,7 +23,7 @@ import type { IUserCommandService } from './IUserCommandService';
 import type {
   InviteUserRequest,
   UpdateUserRequest,
-  AssignRolesRequest,
+  ModifyRolesRequest,
   UserOperationResult,
   AddUserAddressRequest,
   UpdateUserAddressRequest,
@@ -716,20 +716,83 @@ export class SupabaseUserCommandService implements IUserCommandService {
   }
 
   /**
-   * Assign or revoke roles for a user
+   * Modify roles for a user (add and/or remove)
    *
-   * TODO: Implement via RPC function when available
+   * Calls manage-user Edge Function with modify_roles operation.
+   * Emits user.role.assigned for each added role and user.role.revoked for each removed role.
    */
-  async assignRoles(request: AssignRolesRequest): Promise<UserOperationResult> {
-    log.warn('assignRoles not yet implemented for Supabase');
-    return {
-      success: false,
-      error: 'assignRoles not yet implemented',
-      errorDetails: {
-        code: 'UNKNOWN',
-        message: 'This feature is not yet available',
-      },
-    };
+  async modifyRoles(request: ModifyRolesRequest): Promise<UserOperationResult> {
+    const client = supabaseService.getClient();
+    const tracingContext = await createTracingContext();
+    const headers = buildHeadersFromContext(tracingContext);
+
+    log.debug('Modifying user roles', {
+      userId: request.userId,
+      toAdd: request.roleIdsToAdd.length,
+      toRemove: request.roleIdsToRemove.length,
+    });
+
+    try {
+      const { data, error } = await client.functions.invoke(
+        EDGE_FUNCTIONS.MANAGE_USER,
+        {
+          body: {
+            operation: 'modify_roles',
+            userId: request.userId,
+            roleIdsToAdd: request.roleIdsToAdd,
+            roleIdsToRemove: request.roleIdsToRemove,
+          },
+          headers,
+        }
+      );
+
+      if (error) {
+        const errorInfo = await extractEdgeFunctionError(error, 'Modify roles');
+        const errorMessage = errorInfo.correlationId
+          ? `${errorInfo.message} (Ref: ${errorInfo.correlationId})`
+          : errorInfo.message;
+        return {
+          success: false,
+          error: errorMessage,
+          errorDetails: {
+            code: errorInfo.code,
+            message: errorInfo.message,
+            context: errorInfo.errorDetails ?? (errorInfo.details ? { details: errorInfo.details } : undefined),
+            correlationId: errorInfo.correlationId,
+          },
+        };
+      }
+
+      if (!data?.success) {
+        return {
+          success: false,
+          error: data?.error ?? 'Failed to modify roles',
+          errorDetails: {
+            code: (data?.errorDetails?.code as UserOperationErrorCode) ?? 'UNKNOWN',
+            message: data?.error ?? 'Unknown error',
+            context: data?.errorDetails,
+          },
+        };
+      }
+
+      log.info('User roles modified successfully', {
+        userId: request.userId,
+        rolesAdded: request.roleIdsToAdd.length,
+        rolesRemoved: request.roleIdsToRemove.length,
+      });
+
+      return { success: true };
+    } catch (err) {
+      log.error('Unexpected error modifying user roles', { error: err });
+      return {
+        success: false,
+        error: 'An unexpected error occurred while modifying roles',
+        errorDetails: {
+          code: 'UNKNOWN' as UserOperationErrorCode,
+          message: err instanceof Error ? err.message : 'Unknown error',
+        },
+      };
+    }
   }
 
   /**

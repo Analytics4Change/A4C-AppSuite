@@ -18,7 +18,7 @@ import { Logger } from '@/utils/logger';
 import type {
   InviteUserRequest,
   UpdateUserRequest,
-  AssignRolesRequest,
+  ModifyRolesRequest,
   UserOperationResult,
   User,
   Invitation,
@@ -422,9 +422,9 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true };
   }
 
-  async assignRoles(request: AssignRolesRequest): Promise<UserOperationResult> {
+  async modifyRoles(request: ModifyRolesRequest): Promise<UserOperationResult> {
     await this.simulateDelay();
-    log.debug('Mock: Assigning roles', { userId: request.userId });
+    log.debug('Mock: Modifying roles', { userId: request.userId });
 
     const result = await this.queryService.getUserById(request.userId);
     if (!result.user) {
@@ -465,15 +465,7 @@ export class MockUserCommandService implements IUserCommandService {
       updatedRoles.push(roleToAdd);
     }
 
-    // Ensure at least one role remains
-    if (updatedRoles.length === 0) {
-      return {
-        success: false,
-        error: 'User must have at least one role',
-        errorDetails: { code: 'VALIDATION_ERROR', message: 'Cannot remove all roles' },
-      };
-    }
-
+    // Zero roles is allowed per design decision
     this.queryService.setUserRoles(request.userId, updatedRoles);
     log.info('Mock: Updated user roles', {
       userId: request.userId,

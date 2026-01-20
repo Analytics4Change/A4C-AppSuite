@@ -48,7 +48,7 @@ import type {
   UserDisplayStatus,
   UserOperationResult,
   InviteUserRequest,
-  AssignRolesRequest,
+  ModifyRolesRequest,
   UserAddress,
   UserPhone,
   UserOrgAccess,
@@ -1124,14 +1124,14 @@ export class UsersViewModel {
   }
 
   // ============================================
-  // Actions - Role Assignment
+  // Actions - Role Modification
   // ============================================
 
   /**
-   * Assign roles to a user
+   * Modify roles for a user (add and/or remove)
    */
-  async assignRoles(request: AssignRolesRequest): Promise<UserOperationResult> {
-    log.debug('Assigning roles', { userId: request.userId });
+  async modifyRoles(request: ModifyRolesRequest): Promise<UserOperationResult> {
+    log.debug('Modifying roles', { userId: request.userId });
 
     runInAction(() => {
       this.isSubmitting = true;
@@ -1139,17 +1139,17 @@ export class UsersViewModel {
     });
 
     try {
-      const result = await this.commandService.assignRoles(request);
+      const result = await this.commandService.modifyRoles(request);
 
       runInAction(() => {
         this.isSubmitting = false;
 
         if (result.success) {
           this.successMessage = 'Roles updated';
-          log.info('Roles assigned', { userId: request.userId });
+          log.info('Roles modified', { userId: request.userId });
         } else {
-          this.error = result.error ?? 'Failed to assign roles';
-          log.warn('Failed to assign roles', { error: result.error });
+          this.error = result.error ?? 'Failed to modify roles';
+          log.warn('Failed to modify roles', { error: result.error });
         }
       });
 
@@ -1160,14 +1160,14 @@ export class UsersViewModel {
 
       return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to assign roles';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to modify roles';
 
       runInAction(() => {
         this.isSubmitting = false;
         this.error = errorMessage;
       });
 
-      log.error('Error assigning roles', error);
+      log.error('Error modifying roles', error);
 
       return {
         success: false,

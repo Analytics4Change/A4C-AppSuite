@@ -1,15 +1,16 @@
 /**
  * Manage User Edge Function
  *
- * Handles user lifecycle operations: deactivate, reactivate, and delete.
+ * Handles user lifecycle operations: deactivate, reactivate, delete, and role modification.
  *
  * Operations:
  * - deactivate: Deactivate a user within the organization
  * - reactivate: Reactivate a deactivated user
  * - delete: Permanently delete a deactivated user (soft-delete via deleted_at)
+ * - modify_roles: Add and/or remove roles for a user
  *
- * CQRS-compliant: Emits user.deactivated / user.reactivated / user.deleted domain events.
- * Permission required: user.update (deactivate/reactivate), user.delete (delete)
+ * CQRS-compliant: Emits user.deactivated / user.reactivated / user.deleted / user.role.assigned / user.role.revoked domain events.
+ * Permission required: user.update (deactivate/reactivate), user.delete (delete), user.role_assign (modify_roles)
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -31,7 +32,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v5-delete';
+const DEPLOY_VERSION = 'v6-modify-roles';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -39,7 +40,7 @@ const corsHeaders = standardCorsHeaders;
 /**
  * Supported operations
  */
-type Operation = 'deactivate' | 'reactivate' | 'delete';
+type Operation = 'deactivate' | 'reactivate' | 'delete' | 'modify_roles';
 
 /**
  * Request format from frontend
@@ -48,6 +49,9 @@ interface ManageUserRequest {
   operation: Operation;
   userId: string;
   reason?: string;
+  // For modify_roles operation only
+  roleIdsToAdd?: string[];
+  roleIdsToRemove?: string[];
 }
 
 /**
@@ -213,6 +217,14 @@ serve(async (req) => {
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+    } else if (preCheckData.operation === 'modify_roles') {
+      if (!permissions.includes('user.role_assign')) {
+        console.log(`[manage-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} lacks user.role_assign`);
+        return new Response(
+          JSON.stringify({ error: 'Permission denied: user.role_assign required' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     } else {
       if (!permissions.includes('user.update')) {
         console.log(`[manage-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} lacks user.update`);
@@ -238,9 +250,9 @@ serve(async (req) => {
       );
     }
 
-    if (!['deactivate', 'reactivate', 'delete'].includes(requestData.operation)) {
+    if (!['deactivate', 'reactivate', 'delete', 'modify_roles'].includes(requestData.operation)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid operation. Must be "deactivate", "reactivate", or "delete"' }),
+        JSON.stringify({ error: 'Invalid operation. Must be "deactivate", "reactivate", "delete", or "modify_roles"' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -250,6 +262,19 @@ serve(async (req) => {
         JSON.stringify({ error: 'Missing userId' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Validate modify_roles specific fields
+    if (requestData.operation === 'modify_roles') {
+      const hasRolesToAdd = requestData.roleIdsToAdd && requestData.roleIdsToAdd.length > 0;
+      const hasRolesToRemove = requestData.roleIdsToRemove && requestData.roleIdsToRemove.length > 0;
+
+      if (!hasRolesToAdd && !hasRolesToRemove) {
+        return new Response(
+          JSON.stringify({ error: 'At least one of roleIdsToAdd or roleIdsToRemove must be provided' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Prevent self-deactivation and self-deletion
@@ -306,8 +331,115 @@ serve(async (req) => {
       );
     }
 
+    // Modify roles requires user to be active
+    if (requestData.operation === 'modify_roles' && !userDetails.isActive) {
+      return new Response(
+        JSON.stringify({ error: 'Cannot modify roles for deactivated user' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // ==========================================================================
-    // EMIT DOMAIN EVENT
+    // HANDLE MODIFY_ROLES OPERATION (separate flow)
+    // ==========================================================================
+    if (requestData.operation === 'modify_roles') {
+      const roleIdsToAdd = requestData.roleIdsToAdd || [];
+      const roleIdsToRemove = requestData.roleIdsToRemove || [];
+      const now = new Date().toISOString();
+      const emittedEvents: string[] = [];
+
+      console.log(`[manage-user v${DEPLOY_VERSION}] Processing modify_roles: add=${roleIdsToAdd.length}, remove=${roleIdsToRemove.length}`);
+
+      // Validate roles being added using the existing validation RPC
+      if (roleIdsToAdd.length > 0) {
+        console.log(`[manage-user v${DEPLOY_VERSION}] Validating ${roleIdsToAdd.length} roles to add...`);
+        const { error: validationError } = await supabaseAdmin
+          .rpc('validate_role_assignment', {
+            p_user_id: user.id,
+            p_target_user_id: requestData.userId,
+            p_role_ids: roleIdsToAdd,
+          });
+
+        if (validationError) {
+          console.error(`[manage-user v${DEPLOY_VERSION}] Role validation failed:`, validationError);
+          return handleRpcError(validationError, correlationId, corsHeaders, 'validate role assignment');
+        }
+      }
+
+      // Emit user.role.revoked events for removed roles
+      for (const roleId of roleIdsToRemove) {
+        console.log(`[manage-user v${DEPLOY_VERSION}] Emitting user.role.revoked for role ${roleId}...`);
+        const { data: eventId, error: eventError } = await supabaseAdmin
+          .rpc('emit_domain_event', {
+            p_stream_id: requestData.userId,
+            p_stream_type: 'user',
+            p_event_type: 'user.role.revoked',
+            p_event_data: {
+              user_id: requestData.userId,
+              role_id: roleId,
+              org_id: orgId,
+              revoked_at: now,
+            },
+            p_event_metadata: buildEventMetadata(tracingContext, 'user.role.revoked', req, {
+              user_id: user.id,
+              reason: requestData.reason || 'Role removed via User Management',
+            }),
+          });
+
+        if (eventError) {
+          console.error(`[manage-user v${DEPLOY_VERSION}] Failed to emit user.role.revoked:`, eventError);
+          return handleRpcError(eventError, correlationId, corsHeaders, 'revoke role');
+        }
+        emittedEvents.push(eventId as string);
+      }
+
+      // Emit user.role.assigned events for added roles
+      for (const roleId of roleIdsToAdd) {
+        console.log(`[manage-user v${DEPLOY_VERSION}] Emitting user.role.assigned for role ${roleId}...`);
+        const { data: eventId, error: eventError } = await supabaseAdmin
+          .rpc('emit_domain_event', {
+            p_stream_id: requestData.userId,
+            p_stream_type: 'user',
+            p_event_type: 'user.role.assigned',
+            p_event_data: {
+              user_id: requestData.userId,
+              role_id: roleId,
+              org_id: orgId,
+              assigned_at: now,
+            },
+            p_event_metadata: buildEventMetadata(tracingContext, 'user.role.assigned', req, {
+              user_id: user.id,
+              reason: requestData.reason || 'Role added via User Management',
+            }),
+          });
+
+        if (eventError) {
+          console.error(`[manage-user v${DEPLOY_VERSION}] Failed to emit user.role.assigned:`, eventError);
+          return handleRpcError(eventError, correlationId, corsHeaders, 'assign role');
+        }
+        emittedEvents.push(eventId as string);
+      }
+
+      console.log(`[manage-user v${DEPLOY_VERSION}] Successfully emitted ${emittedEvents.length} role events`);
+
+      // Success response for modify_roles
+      const response: ManageUserResponse = {
+        success: true,
+        userId: requestData.userId,
+        operation: 'modify_roles',
+      };
+
+      const completedSpan = endSpan(span, 'ok');
+      console.log(`[manage-user v${DEPLOY_VERSION}] Completed in ${completedSpan.durationMs}ms, correlation_id=${correlationId}`);
+
+      return new Response(
+        JSON.stringify(response),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ==========================================================================
+    // EMIT DOMAIN EVENT (for deactivate/reactivate/delete operations)
     // ==========================================================================
     const now = new Date().toISOString();
 

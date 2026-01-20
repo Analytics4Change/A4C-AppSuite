@@ -181,6 +181,22 @@
       - `ProductionOrganizationService.ts` - 3 methods updated (also changed import from `getAuthProvider` to `supabaseService`)
     - **Why not sync the cache**: Syncing two session sources is fragile. Better to use Supabase's built-in session management directly.
 
+27. **Role Reassignment for Existing Users (Phase 6.2)** (2026-01-20):
+    - **Problem**: Role assignment for existing users failed silently - `assignRoles()` was not implemented
+    - **Design choices made**:
+      - Rename: `AssignRolesRequest` → `ModifyRolesRequest`, `assignRoles()` → `modifyRoles()` (reflects bidirectional add/remove)
+      - Atomicity: Independent operations - name and role changes update separately. If roles fail, name persists.
+      - Self-modification: Allowed with permission - users can modify their own roles if they have `user.role_assign`
+      - Minimum roles: Zero allowed - users can have no roles (matches invitation behavior)
+    - **Implementation**:
+      - `manage-user` Edge Function extended with `modify_roles` operation
+      - Validates `user.role_assign` permission
+      - Calls `api.validate_role_assignment()` for roles being added (subset-only delegation)
+      - Emits `user.role.revoked` event for each removed role
+      - Emits `user.role.assigned` event for each added role
+    - **Event handler fix**: `handle_user_role_revoked()` existed but wasn't routed - added case in `process_user_event`
+    - **ViewModel changes**: `UserFormViewModel.submit()` now calls `modifyRoles()` after `updateUser()` when roles change
+
 ## Technical Context
 
 ### Architecture
@@ -324,6 +340,11 @@ This feature spans frontend (React + MobX) and backend (Supabase Edge Functions)
   - Helper: `check_scope_containment(p_target_scope ltree, p_user_scopes ltree[])` - ltree check
   - RPC: `api.get_assignable_roles(p_org_id UUID)` - filtered role list for UI
   - RPC: `api.validate_role_assignment(p_role_ids UUID[])` - validation with error codes
+
+**Backend Database (Migration - 2026-01-20)**
+- `20260120173607_user_role_revoked_routing.sql` - Role revocation event handling:
+  - Updates `handle_user_role_revoked()` to also update `users.roles` array
+  - Adds routing case for `user.role.revoked` in `process_user_event`
 
 **Backend RPC Functions** (Phase 5 - Deployed 2026-01-01)
 - `api.check_user_org_membership(email, org_id)` - Check user-org membership

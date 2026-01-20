@@ -277,6 +277,27 @@ export class UserFormViewModel {
   }
 
   /**
+   * Roles to add (in current selection but not in original)
+   */
+  get rolesToAdd(): string[] {
+    return this.formData.roleIds.filter((id) => !this.originalData.roleIds.includes(id));
+  }
+
+  /**
+   * Roles to remove (in original but not in current selection)
+   */
+  get rolesToRemove(): string[] {
+    return this.originalData.roleIds.filter((id) => !this.formData.roleIds.includes(id));
+  }
+
+  /**
+   * Whether roles have been modified (edit mode)
+   */
+  get hasRoleChanges(): boolean {
+    return this.rolesToAdd.length > 0 || this.rolesToRemove.length > 0;
+  }
+
+  /**
    * Get error message for a specific field
    */
   getFieldError(field: FormField): string | null {
@@ -921,6 +942,35 @@ export class UserFormViewModel {
         };
         log.debug('Updating user profile', { userId: updateRequest.userId });
         result = await commandService.updateUser(updateRequest);
+
+        // Handle role changes (if profile update succeeded and roles changed)
+        if (result.success && this.hasRoleChanges) {
+          log.debug('Processing role changes', {
+            userId: this.editingUserId,
+            rolesToAdd: this.rolesToAdd,
+            rolesToRemove: this.rolesToRemove,
+          });
+          const roleResult = await commandService.modifyRoles({
+            userId: this.editingUserId!,
+            roleIdsToAdd: this.rolesToAdd,
+            roleIdsToRemove: this.rolesToRemove,
+          });
+
+          if (!roleResult.success) {
+            // Role modification failed - return role error instead
+            result = roleResult;
+            log.warn('Role modification failed', {
+              userId: this.editingUserId,
+              error: roleResult.error,
+            });
+          } else {
+            log.info('Role modification successful', {
+              userId: this.editingUserId,
+              added: this.rolesToAdd.length,
+              removed: this.rolesToRemove.length,
+            });
+          }
+        }
       }
 
       runInAction(() => {
