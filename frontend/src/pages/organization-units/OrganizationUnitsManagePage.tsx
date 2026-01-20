@@ -320,6 +320,21 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
     [viewModel.selectedUnitId, panelMode, formViewModel, selectAndLoadUnit]
   );
 
+  // Handle Enter key activation - always proceeds (no early-return for same unit)
+  // This is separate from handleTreeSelect which blocks re-clicking the same unit
+  const handleTreeActivate = useCallback(
+    (selectedId: string) => {
+      // Check for unsaved changes
+      if (formViewModel?.isDirty) {
+        pendingActionRef.current = { type: 'select', unitId: selectedId };
+        setDialogState({ type: 'discard' });
+      } else {
+        selectAndLoadUnit(selectedId);
+      }
+    },
+    [formViewModel, selectAndLoadUnit]
+  );
+
   // Handle discard changes - proceed with pending action
   const handleDiscardChanges = useCallback(() => {
     const pending = pendingActionRef.current;
@@ -682,7 +697,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     selectedId={viewModel.selectedUnitId}
                     expandedIds={viewModel.expandedNodeIds}
                     onSelect={handleTreeSelect}
-                    onActivate={handleTreeSelect}
+                    onActivate={handleTreeActivate}
                     onToggle={viewModel.toggleNode.bind(viewModel)}
                     onMoveDown={viewModel.moveSelectionDown.bind(viewModel)}
                     onMoveUp={viewModel.moveSelectionUp.bind(viewModel)}
