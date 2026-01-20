@@ -67,7 +67,7 @@ export async function activateOrganization(
     .rpc('update_organization_status', {
       p_org_id: params.orgId,
       p_is_active: true,
-      p_deactivated_at: null
+      p_deactivated_at: undefined
     });
 
   if (updateError) {

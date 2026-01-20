@@ -1,3 +1,4 @@
+// @ts-nocheck - Uses dynamic table names not supported by typed client
 /**
  * System Validation Script
  *

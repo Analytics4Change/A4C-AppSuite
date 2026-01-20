@@ -112,7 +112,7 @@ export class EventQueries {
     const lastEvent = events?.[events.length - 1];
 
     return {
-      events: events || [],
+      events: (events || []) as DomainEvent[],
       total_count: events?.length || 0,
       has_errors: hasErrors,
       first_event_at: firstEvent?.created_at || null,
@@ -178,7 +178,7 @@ export class EventQueries {
       return null;
     }
 
-    return data;
+    return data as DomainEvent;
   }
 
   /**
@@ -244,7 +244,7 @@ export class EventQueries {
       throw new Error(`Failed to query events: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []) as DomainEvent[];
   }
 
   /**
@@ -272,7 +272,7 @@ export class EventQueries {
       throw new Error(`Failed to query events by activity: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []) as DomainEvent[];
   }
 
   /**

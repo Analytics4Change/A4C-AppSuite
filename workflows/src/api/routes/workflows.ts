@@ -11,6 +11,7 @@ import type { ContactInfo, AddressInfo, PhoneInfo } from '@shared/types/index.js
 import { getWorkflowsEnv } from '@shared/config/env-schema.js';
 import { getSupabaseClient } from '@shared/utils/supabase.js';
 import { extractTracingFromHeaders } from '@shared/utils/http-tracing.js';
+import type { Json } from '../../types/database.types.js';
 
 // Get validated environment (FRONTEND_URL derived from PLATFORM_BASE_DOMAIN if not set)
 const env = getWorkflowsEnv();
@@ -164,7 +165,7 @@ async function bootstrapOrganizationHandler(
         orgData: requestData.orgData,
         users: requestData.users,
         temporal_workflow_id: temporalWorkflowId  // Include for traceability
-      },
+      } as unknown as Json,
       p_event_metadata: {
         user_id: request.user!.id,
         organization_id: organizationId,
@@ -175,7 +176,7 @@ async function bootstrapOrganizationHandler(
         session_id: tracing.sessionId,
         trace_id: tracing.traceId,
         span_id: tracing.parentSpanId,  // This span is the API handler
-      }
+      } as unknown as Json
     });
 
   if (eventError) {

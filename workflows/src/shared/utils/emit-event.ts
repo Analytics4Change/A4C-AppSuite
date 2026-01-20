@@ -56,6 +56,7 @@
 import { getSupabaseClient } from './supabase';
 import { randomBytes } from 'crypto';
 import type { WorkflowTracingParams, TracingContext } from '../types';
+import type { Json } from '../../types/database.types.js';
 
 export interface EmitEventParams {
   /** Event type in dot-notation (e.g., 'organization.created', 'user.invited', 'invitation.accepted') */
@@ -253,8 +254,8 @@ export async function emitEvent(params: EmitEventParams): Promise<string> {
       p_stream_id: params.aggregate_id,
       p_stream_type: params.aggregate_type,
       p_event_type: params.event_type,
-      p_event_data: params.event_data,
-      p_event_metadata: metadata
+      p_event_data: params.event_data as Json,
+      p_event_metadata: metadata as Json
     });
 
   if (error) {
