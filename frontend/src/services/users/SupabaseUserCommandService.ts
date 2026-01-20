@@ -1194,17 +1194,26 @@ export class SupabaseUserCommandService implements IUserCommandService {
   /**
    * Update user's notification preferences for the organization
    *
-   * Uses api.update_user_notification_preferences RPC to update
-   * the user_organizations_projection directly.
+   * Calls the manage-user Edge Function with update_notification_preferences operation.
+   * This provides full tracing context (correlation_id, trace_id, etc.) for observability.
+   *
+   * Phase 6.4: Migrated from RPC to Edge Function pattern for architectural consistency.
    */
   async updateNotificationPreferences(
     request: UpdateNotificationPreferencesRequest
   ): Promise<UserOperationResult> {
+    // Set up tracing context for this operation
+    const tracingContext = await createTracingContext();
+    Logger.pushTracingContext(tracingContext);
+
     try {
       log.info('Updating user notification preferences', {
         userId: request.userId,
         orgId: request.orgId,
       });
+
+      const client = supabaseService.getClient();
+      const headers = buildHeadersFromContext(tracingContext);
 
       // Transform to AsyncAPI snake_case format for event emission
       // Frontend uses camelCase internally (TypeScript convention)
@@ -1218,40 +1227,44 @@ export class SupabaseUserCommandService implements IUserCommandService {
         in_app: request.notificationPreferences.inApp, // camelCase → snake_case
       };
 
-      // Use RPC function to update notification preferences
-      const { error } = await supabaseService.apiRpc<void>(
-        'update_user_notification_preferences',
+      const { data, error } = await client.functions.invoke(
+        EDGE_FUNCTIONS.MANAGE_USER,
         {
-          p_user_id: request.userId,
-          p_org_id: request.orgId,
-          p_notification_preferences: asyncApiPreferences,
-          p_reason: request.reason ?? null,
+          body: {
+            operation: 'update_notification_preferences',
+            userId: request.userId,
+            notificationPreferences: asyncApiPreferences,
+            reason: request.reason,
+          },
+          headers,
         }
       );
 
       if (error) {
-        log.error('Failed to update notification preferences via RPC', error);
-
-        // Handle specific error codes
-        if (error.code === '42501') {
-          return {
-            success: false,
-            error: 'Access denied - insufficient permissions',
-            errorDetails: { code: 'FORBIDDEN', message: error.message },
-          };
-        }
-        if (error.code === 'P0002') {
-          return {
-            success: false,
-            error: 'User organization access record not found',
-            errorDetails: { code: 'NOT_FOUND', message: error.message },
-          };
-        }
-
+        const errorInfo = await extractEdgeFunctionError(error, 'Update notification preferences');
+        const errorMessage = errorInfo.correlationId
+          ? `${errorInfo.message} (Ref: ${errorInfo.correlationId})`
+          : errorInfo.message;
         return {
           success: false,
-          error: `Failed to update notification preferences: ${error.message}`,
-          errorDetails: { code: 'UNKNOWN', message: error.message },
+          error: errorMessage,
+          errorDetails: {
+            code: errorInfo.code,
+            message: errorInfo.message,
+            context: errorInfo.details ? { details: errorInfo.details } : undefined,
+            correlationId: errorInfo.correlationId,
+          },
+        };
+      }
+
+      if (!data?.success) {
+        return {
+          success: false,
+          error: data?.error ?? 'Failed to update notification preferences',
+          errorDetails: {
+            code: 'UNKNOWN',
+            message: data?.error ?? 'Unknown error',
+          },
         };
       }
 
@@ -1271,6 +1284,8 @@ export class SupabaseUserCommandService implements IUserCommandService {
           message: error instanceof Error ? error.message : 'Unknown error',
         },
       };
+    } finally {
+      Logger.popTracingContext();
     }
   }
 }

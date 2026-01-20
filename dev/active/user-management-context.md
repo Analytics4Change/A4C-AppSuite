@@ -197,6 +197,28 @@
     - **Event handler fix**: `handle_user_role_revoked()` existed but wasn't routed - added case in `process_user_event`
     - **ViewModel changes**: `UserFormViewModel.submit()` now calls `modifyRoles()` after `updateUser()` when roles change
 
+28. **Notification Preferences Edge Function Standardization (Phase 6.4)** (2026-01-20):
+    - **Investigation**: Notification preferences uses RPC pattern (`api.update_user_notification_preferences`) while user management uses Edge Functions (`manage-user`)
+    - **Finding**: Both patterns ARE event-driven - both emit domain events via `api.emit_domain_event()`. The difference is only the entry point (RPC vs Edge Function), not the underlying CQRS pattern.
+    - **Decision**: Standardize on Edge Function pattern for architectural consistency:
+      - Consistent authorization pattern (JWT claims checked in Edge Function code)
+      - Easier security auditing (all user operations in one place)
+      - Follows established `manage-user` pattern
+    - **Approach chosen**: Extend existing `manage-user` Edge Function (Option A) vs creating new function (Option B)
+      - Less code duplication (~80 LOC vs ~400 LOC)
+      - Single deployment unit for all user command operations
+    - **Security critical**: MUST use `orgId` from JWT claims, NOT from request body (prevents cross-tenant attacks)
+    - **Keep read RPCs**: `api.get_user_notification_preferences()` and `api.get_user_sms_phones()` follow CQRS query pattern correctly
+    - **Effort estimate**: 4-6 hours, medium complexity
+
+29. **Edge Function Documentation Standardization** (2026-01-20):
+    - Created `documentation/infrastructure/reference/edge-functions/manage-user.md` as comprehensive API reference
+    - Documents all 5 operations: deactivate, reactivate, delete, modify_roles, update_notification_preferences
+    - Includes permission requirements, request/response formats, error codes, frontend integration examples
+    - Updated `documentation/AGENT-INDEX.md` with new keywords: `manage-user`, `notification-preferences`, `role-modification`, `user-deactivation`, `user-lifecycle`
+    - Searched documentation for old RPC pattern references - none found (no cleanup needed)
+    - Follows AGENT-GUIDELINES.md structure (frontmatter, TL;DR, related docs section)
+
 ## Technical Context
 
 ### Architecture
@@ -345,6 +367,16 @@ This feature spans frontend (React + MobX) and backend (Supabase Edge Functions)
 - `20260120173607_user_role_revoked_routing.sql` - Role revocation event handling:
   - Updates `handle_user_role_revoked()` to also update `users.roles` array
   - Adds routing case for `user.role.revoked` in `process_user_event`
+- `20260120181034_remove_notification_prefs_update_rpc.sql` - Cleanup migration:
+  - Drops `api.update_user_notification_preferences()` RPC (replaced by Edge Function)
+  - Keeps read RPCs for CQRS query pattern
+
+**Documentation (Created 2026-01-20)**
+- `documentation/infrastructure/reference/edge-functions/manage-user.md` - Edge Function API reference
+  - All 5 operations: deactivate, reactivate, delete, modify_roles, update_notification_preferences
+  - Permission matrix, request/response formats, error codes
+  - Frontend integration examples with SupabaseUserCommandService
+  - Event flow diagram and observability guidance
 
 **Backend RPC Functions** (Phase 5 - Deployed 2026-01-01)
 - `api.check_user_org_membership(email, org_id)` - Check user-org membership

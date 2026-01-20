@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-19
+last_updated: 2026-01-20
 purpose: agent-navigation
 ---
 
@@ -96,6 +96,7 @@ purpose: agent-navigation
 | `kubernetes` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | KUBECONFIG_UPDATE_GUIDE.md |
 | `logging` | [logging-standards.md](architecture/logging-standards.md) | frontend/CLAUDE.md, workflows/CLAUDE.md |
 | `ltree` | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | organization_units_projection.md |
+| `manage-user` | [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | edge-functions-deployment.md, rbac-architecture.md |
 | `mar` | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | medication_history.md |
 | `medication` | [medications.md](infrastructure/reference/database/tables/medications.md) | medication-search-implementation.md |
 | `medication-administration` | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | medications.md |
@@ -107,6 +108,7 @@ purpose: agent-navigation
 | `mobx` | [viewmodels.md](frontend/architecture/viewmodels.md) | frontend/CLAUDE.md, mobx-optimization.md |
 | `multi-role-invitation` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | user_roles_projection.md |
 | `multi-tenancy` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | tenants-as-organizations.md |
+| `notification-preferences` | [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | users.md, event-sourcing-overview.md |
 | `oauth` | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | supabase-auth-overview.md, oauth-invitation-acceptance.md |
 | `observability` | [event-observability.md](infrastructure/guides/event-observability.md) | logging-standards.md, infrastructure/CLAUDE.md |
 | `okta` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
@@ -140,6 +142,7 @@ purpose: agent-navigation
 | `rls` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | table-template.md, SQL_IDEMPOTENCY_AUDIT.md |
 | `rls-gap` | [clients.md](infrastructure/reference/database/tables/clients.md) | medications.md |
 | `role-access-dates` | [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | rbac-architecture.md |
+| `role-modification` | [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | user_roles_projection.md, rbac-architecture.md |
 | `role-permissions` | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | roles_projection.md |
 | `role-templates` | [role_permission_templates.md](infrastructure/reference/database/tables/role_permission_templates.md) | provider-admin-permissions-architecture.md |
 | `role-validity` | [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | rbac-architecture.md |
@@ -172,6 +175,8 @@ purpose: agent-navigation
 | `troubleshooting` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |
 | `type-generation` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | modelina, asyncapi, generated-events |
 | `user-aggregate` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | event-sourcing-overview.md |
+| `user-deactivation` | [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | users.md, event-sourcing-overview.md |
+| `user-lifecycle` | [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | users.md, rbac-architecture.md |
 | `var` | [var-partnerships.md](architecture/data/var-partnerships.md) | provider-partners-architecture.md |
 | `viewmodel` | [viewmodels.md](frontend/architecture/viewmodels.md) | viewmodel-testing.md, mobx-patterns.md |
 | `vite` | [DEVELOPMENT.md](frontend/guides/DEVELOPMENT.md) | frontend/CLAUDE.md |
@@ -232,6 +237,7 @@ purpose: agent-navigation
 | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | Google OAuth testing guide | `oauth`, `testing`, `google` | 1400 |
 | [SUPABASE-AUTH-SETUP.md](infrastructure/guides/supabase/SUPABASE-AUTH-SETUP.md) | Auth provider configuration | `supabase`, `auth`, `setup` | 1600 |
 | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | Edge function testing guide | `edge-function`, `testing`, `deno` | 1200 |
+| [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | User lifecycle Edge Function API (deactivate, roles, notification prefs) | `manage-user`, `user-lifecycle`, `notification-preferences`, `role-modification` | 1000 |
 | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | AsyncAPI → TypeScript type generation with Modelina | `asyncapi`, `modelina`, `type-generation`, `contract-drift`, `generated-events` | 3700 |
 | [event-observability.md](infrastructure/guides/event-observability.md) | Event processing observability, W3C Trace Context, span timing | `observability`, `tracing`, `failed-events`, `correlation-id`, `trace-id`, `span-id`, `session-id`, `w3c-trace-context` | 3200 |
 | [observability-operations.md](infrastructure/guides/observability-operations.md) | **[Aspirational]** Production-scale: retention, sampling, APM integration | `retention-policy`, `trace-sampling`, `apm-integration`, `otlp-export`, `event-archival` | 2000 |

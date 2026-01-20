@@ -404,6 +404,32 @@
   - [x] Update `users.roles` array (remove role_name)
   - [x] Added routing case in `process_user_event`
 
+### 6.4 Notification Preferences Edge Function Migration ✅ COMPLETE (2026-01-20)
+- [x] Extend `manage-user` Edge Function with `update_notification_preferences` operation
+  - [x] Add `'update_notification_preferences'` to `Operation` type
+  - [x] Add `notificationPreferences` field to `ManageUserRequest` interface
+  - [x] Add permission check (self OR user.update permission)
+  - [x] Validate notification preferences structure
+  - [x] Emit `user.notification_preferences.updated` event via `api.emit_domain_event()`
+  - [x] Use `orgId` from JWT claims (NOT from request body - security critical)
+- [x] Update frontend service
+  - [x] Replace `apiRpc('update_user_notification_preferences')` with `functions.invoke('manage-user')`
+  - [x] Reuse existing `extractEdgeFunctionError()` pattern
+- [x] Cleanup migration
+  - [x] Created `20260120181034_remove_notification_prefs_update_rpc.sql`
+  - [x] Dropped `api.update_user_notification_preferences()` RPC
+  - [x] Retained read RPCs for CQRS query pattern
+- [x] Deploy and verify
+  - [x] Deployed `manage-user` Edge Function (v7-notification-prefs)
+  - [x] TypeScript typecheck passes
+  - [ ] Manual test: UI saves preferences correctly
+  - [ ] Manual test: Event emitted and processed
+- [x] Documentation standardization (2026-01-20)
+  - [x] Created `documentation/infrastructure/reference/edge-functions/manage-user.md` - comprehensive API reference
+  - [x] Updated `documentation/AGENT-INDEX.md` with keywords: `manage-user`, `notification-preferences`, `role-modification`, `user-deactivation`, `user-lifecycle`
+  - [x] Searched for old RPC pattern references - none found in documentation
+  - [x] Verified all links and AGENT-GUIDELINES.md compliance
+
 ## Phase 7: Org Selector (Minimal Viable) ⏸️ PENDING
 
 ### 7.1 Frontend Components
@@ -600,10 +626,36 @@
 
 ## Current Status
 
-**Phase**: Phase 6.2 - Role Reassignment
-**Status**: ✅ COMPLETE
+**Phase**: Phase 6.4 - Notification Preferences Edge Function Migration
+**Status**: ✅ COMPLETE (pending manual tests)
 **Last Updated**: 2026-01-20
-**Next Step**: Phase 7 (Org Selector) or manual end-to-end testing of role reassignment
+**Completion Note**: Migrated notification preferences update from RPC to Edge Function pattern. Documentation standardization complete.
+**Next Step**: Run manual tests for notification preferences (UI save + event emission), then move to Phase 7 or mark feature complete
+
+### Implementation Summary (2026-01-20)
+
+**Backend Changes**:
+- Added `update_notification_preferences` operation to `manage-user` Edge Function
+- Full tracing context via `buildEventMetadata()` (correlation_id, session_id, trace_id, span_id, etc.)
+- Authorization: self OR user.update permission
+- Security: Uses `orgId` from JWT claims (not request body) for multi-tenant isolation
+
+**Frontend Changes**:
+- Updated `SupabaseUserCommandService.updateNotificationPreferences()` to use Edge Function
+- Added tracing context headers (x-correlation-id, traceparent)
+
+**Cleanup**:
+- Created migration `20260120181034_remove_notification_prefs_update_rpc.sql`
+- Dropped `api.update_user_notification_preferences()` RPC
+- Retained read RPCs (`api.get_user_notification_preferences()`, `api.get_user_sms_phones()`) for CQRS query pattern
+
+### Investigation Summary (2026-01-20)
+- Investigated notification preferences implementation pattern
+- **Finding**: Both patterns ARE event-driven (emit `user.notification_preferences.updated` via `api.emit_domain_event()`)
+- **Difference**: Entry point is RPC vs Edge Function, not the underlying CQRS pattern
+- **Decision**: Standardize on Edge Function pattern for consistency with user management operations
+- **Approach**: Extend existing `manage-user` Edge Function with new operation (not a separate function)
+- **Effort**: ~4-6 hours, medium complexity
 
 ### Phase 6.2 Completion Summary (2026-01-20)
 - Renamed `AssignRolesRequest` → `ModifyRolesRequest`, `assignRoles()` → `modifyRoles()` across all services

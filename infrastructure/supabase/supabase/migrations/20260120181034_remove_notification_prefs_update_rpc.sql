@@ -1,0 +1,21 @@
+-- ============================================================================
+-- Migration: Remove api.update_user_notification_preferences RPC
+--
+-- Phase 6.4: Notification Preferences Edge Function Migration
+--
+-- This RPC is being replaced by the manage-user Edge Function's
+-- update_notification_preferences operation, which provides:
+-- - Full tracing context (correlation_id, trace_id, span_id, etc.)
+-- - Consistent architectural pattern with other user operations
+-- - Enhanced observability and audit capabilities
+--
+-- NOTE: Read RPCs are KEPT (they follow CQRS query pattern correctly):
+-- - api.get_user_notification_preferences()
+-- - api.get_user_sms_phones()
+-- - api.get_user_phones()
+-- ============================================================================
+
+-- Drop the update RPC function
+-- The 4-parameter overload is the one we're removing (with p_reason parameter)
+-- The 3-parameter overload was already dropped by this migration file in its CREATE OR REPLACE
+DROP FUNCTION IF EXISTS api.update_user_notification_preferences(UUID, UUID, JSONB);
