@@ -254,13 +254,11 @@ export class OrganizationUnitFormViewModel {
       this.formData.name = value;
       this.touchedFields.add('name');
 
-      // Auto-generate display name if:
-      // - Create mode: displayName hasn't been manually edited (tracked by touchedFields)
-      // - Edit mode: displayName still matches original name (user hasn't customized it)
-      const shouldAutoPopulate =
-        this.mode === 'create'
-          ? !this.touchedFields.has('displayName') // Create: sync until user edits displayName
-          : this.formData.displayName === this.originalData.name; // Edit: sync if unchanged
+      // Auto-generate display name until user directly edits the displayName field.
+      // This works for both create and edit modes because:
+      // - updateName() auto-populates displayName WITHOUT adding to touchedFields
+      // - updateField() (direct edits) DOES add to touchedFields
+      const shouldAutoPopulate = !this.touchedFields.has('displayName');
 
       if (!this.formData.displayName || shouldAutoPopulate) {
         this.formData.displayName = value;
