@@ -1,7 +1,7 @@
 -- ============================================
 -- AUTHORITATIVE PERMISSIONS SEED FILE
 -- ============================================
--- This file defines ALL 35 permissions for the A4C platform.
+-- This file defines ALL 38 permissions for the A4C platform.
 -- It emits permission.defined domain events which trigger projection updates.
 --
 -- IMPORTANT: This is the SINGLE SOURCE OF TRUTH for permission definitions.
@@ -11,8 +11,9 @@
 --   'global' - Platform-level permissions (platform_owner only)
 --   'org'    - Organization-level permissions (org admins)
 --
--- Last Updated: 2026-01-13
+-- Last Updated: 2026-01-20
 -- Changes:
+--   - 2026-01-20: Day 0 v3 reconciliation - added platform.admin (was in DB but missing from seed)
 --   - 2026-01-13: Added granular OU permissions (update_ou, delete_ou, deactivate_ou, reactivate_ou)
 --   - Removed a4c_role.* (5 permissions) - not used
 --   - Removed medication.prescribe - not needed
@@ -23,9 +24,20 @@
 -- ============================================
 
 -- ============================================
--- GLOBAL SCOPE PERMISSIONS (10 total)
+-- GLOBAL SCOPE PERMISSIONS (11 total)
 -- Platform-level operations visible only to platform_owner
 -- ============================================
+
+-- Platform Administration (Global) - 1 permission
+DO $$ BEGIN
+  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "platform", "action": "admin", "description": "Full platform administrative access including observability, cross-tenant operations, and system management. Required for Event Monitor, audit log access, and platform-level features.", "scope_type": "global", "requires_mfa": false, "display_name": "Platform Administration"}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Platform administration"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
 
 -- Organization Management (Global) - 7 permissions
 DO $$ BEGIN

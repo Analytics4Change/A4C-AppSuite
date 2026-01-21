@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-01-20
 ---
 
 <!-- TL;DR-START -->
@@ -255,13 +255,51 @@ supabase db push --linked
 
 | File | Purpose |
 |------|---------|
-| `infrastructure/supabase/supabase/migrations/20251229000000_baseline_v2.sql` | Day 0 v2 baseline (current) |
+| `infrastructure/supabase/supabase/migrations/20260121000918_baseline_v3.sql` | Day 0 v3 baseline (current) |
+| `infrastructure/supabase/supabase/migrations.archived/2026-january-cleanup/` | Archived migrations from v2 baseline through Jan 2026 |
 | `infrastructure/supabase/supabase/migrations.archived/2025-december-cleanup/` | Archived migrations from v1 baseline through Dec 2025 |
 | `infrastructure/supabase/sql.archived/` | Original granular SQL files (reference only) |
+| `infrastructure/supabase/sql/99-seeds/` | Authoritative seed files (permissions, role templates) |
 | `infrastructure/supabase/backup_*.sql` | Pre-migration backups |
 | `.github/workflows/supabase-migrations.yml` | CI/CD migration workflow |
 
 ## Decision Records
+
+### Day 0 v3 Baseline (2026-01-20)
+
+**Date**: 2026-01-20
+**Decision**: Create Day 0 v3 baseline consolidating 79 migrations
+
+**Context**:
+- Day 0 v2 baseline (2025-12-29) followed by 79 incremental migrations
+- User management, notification preferences, event handlers all finalized
+- Seed data reconciliation revealed drift: `platform.admin` missing from seed file
+- Role permission templates not captured in seed files
+
+**Migrations Consolidated** (79 total):
+- `20251229000000_baseline_v2.sql` (Day 0 v2)
+- `20251229-20251231*.sql` - User management schema (11 migrations)
+- `20260101-20260110*.sql` - User RPCs, event processing (27 migrations)
+- `20260111-20260116*.sql` - Email, contacts, notification prefs (23 migrations)
+- `20260118-20260120*.sql` - Phone columns, event handlers (18 migrations)
+
+**Seed Data Reconciliation**:
+- Fixed drift: Added `platform.admin` to `001-permissions-seed.sql` (38 permissions total)
+- Created `002-role-permission-templates-seed.sql` from DB (38 entries across 4 roles)
+- DB confirmed as authoritative source for seed data
+
+**Outcome**:
+- Created `20260121000918_baseline_v3.sql` from production dump (14,648 lines, 500 KB)
+- Archived all 79 old migrations to `migrations.archived/2026-january-cleanup/`
+- Marked old migrations as reverted, new baseline as applied
+- Schema: 34 tables, 217 functions, 102 policies, 168 indexes
+
+**Verification**:
+- `supabase migration list --linked` shows only baseline_v3
+- `supabase db push --linked --dry-run` reports "Remote database is up to date"
+- Seed file count: 38 permissions (11 global + 27 org)
+
+---
 
 ### Day 0 v2 Baseline (2025-12-29)
 
@@ -292,6 +330,8 @@ supabase db push --linked
 - `supabase migration list --linked` shows only baseline_v2
 - `supabase db push --linked --dry-run` reports "Remote database is up to date"
 - Audit queries confirm: 33 permissions, 0 orphaned records
+
+**Status**: Superseded by Day 0 v3 baseline (2026-01-20)
 
 ---
 
