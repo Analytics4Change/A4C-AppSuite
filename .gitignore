@@ -34,6 +34,7 @@ Temporary Items
 *.backup
 *.old
 *.orig
+infrastructure/supabase/backup_*.sql
 
 # Claude Code
 .claude/tsc-cache/

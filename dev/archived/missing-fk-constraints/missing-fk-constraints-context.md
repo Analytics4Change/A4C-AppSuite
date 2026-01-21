@@ -44,6 +44,7 @@ These tables are CQRS projections derived from domain events:
 | `impersonation_sessions_projection` | `target_org_id` | Missing FK | **Add FK** (oversight) |
 | `cross_tenant_access_grants_projection` | `provider_org_id` | Missing FK | **Add FK** (recommended) |
 | `cross_tenant_access_grants_projection` | `consultant_org_id` | Missing FK | **Add FK** (recommended) |
+| `user_notification_preferences_projection` | `organization_id` | Missing FK | **Add FK** (found during 2026-01-21 analysis) |
 | `domain_events` | `stream_id` | Missing FK | Keep as-is (by design) |
 | `workflow_queue_projection` | `stream_id` | Missing FK | Keep as-is (by design) |
 | `unprocessed_events` | `stream_id` | Missing FK | Keep as-is (by design) |
@@ -59,6 +60,12 @@ These tables are CQRS projections derived from domain events:
 - May have been intentional to allow grants referencing external/pending orgs
 - However, orphaned grants after org deletion cause data inconsistency
 - Both columns reference internal organizations, so FKs are appropriate
+
+**user_notification_preferences_projection** (found 2026-01-21):
+- Has `organization_id NOT NULL` but no FK constraint
+- Has FK on `user_id` (ON DELETE CASCADE) and `sms_phone_id` (ON DELETE SET NULL)
+- Missing FK on `organization_id` is inconsistent with similar tables
+- Should CASCADE delete when organization is deleted
 
 **Event store tables (intentional)**:
 - `stream_id` is a polymorphic reference used with `stream_type`
@@ -130,6 +137,22 @@ BEGIN
     ON DELETE CASCADE;
   END IF;
 END $$;
+
+-- 4. user_notification_preferences_projection.organization_id
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'fk_user_notification_prefs_org'
+      AND table_name = 'user_notification_preferences_projection'
+  ) THEN
+    ALTER TABLE user_notification_preferences_projection
+    ADD CONSTRAINT fk_user_notification_prefs_org
+    FOREIGN KEY (organization_id)
+    REFERENCES organizations_projection(id)
+    ON DELETE CASCADE;
+  END IF;
+END $$;
 ```
 
 ### Verification Query
@@ -144,7 +167,8 @@ JOIN information_schema.constraint_column_usage ccu
   ON tc.constraint_name = ccu.constraint_name
 WHERE tc.constraint_type = 'FOREIGN KEY'
   AND tc.table_name IN ('impersonation_sessions_projection',
-                        'cross_tenant_access_grants_projection');
+                        'cross_tenant_access_grants_projection',
+                        'user_notification_preferences_projection');
 ```
 
 ## Orphan Detection for Non-FK Tables
