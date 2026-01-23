@@ -31,7 +31,7 @@ AS $$
       )
     ) ep
     WHERE ep->>'p' = p_permission
-      AND (ep->>'s')::ltree @> p_target_path
+      AND (ep->>'s')::extensions.ltree @> p_target_path
   );
 $$;
 
@@ -93,7 +93,7 @@ RETURNS extensions.ltree
 LANGUAGE sql
 STABLE
 AS $$
-  SELECT (ep->>'s')::ltree
+  SELECT (ep->>'s')::extensions.ltree
   FROM jsonb_array_elements(
     COALESCE(
       (current_setting('request.jwt.claims', true)::jsonb)->'effective_permissions',
