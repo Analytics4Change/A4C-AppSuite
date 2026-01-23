@@ -40,13 +40,14 @@ CREATE TABLE IF NOT EXISTS user_client_assignments_projection (
 -- =============================================================================
 
 -- For Temporal workflow queries: "Find staff assigned to client X"
+-- Note: assigned_until is checked at query time (now() can't be in index predicate)
 CREATE INDEX IF NOT EXISTS idx_user_client_assignments_user
-ON user_client_assignments_projection(user_id)
-WHERE is_active = true AND (assigned_until IS NULL OR assigned_until > now());
+ON user_client_assignments_projection(user_id, assigned_until)
+WHERE is_active = true;
 
 CREATE INDEX IF NOT EXISTS idx_user_client_assignments_client
-ON user_client_assignments_projection(client_id)
-WHERE is_active = true AND (assigned_until IS NULL OR assigned_until > now());
+ON user_client_assignments_projection(client_id, assigned_until)
+WHERE is_active = true;
 
 -- For organization-level queries
 CREATE INDEX IF NOT EXISTS idx_user_client_assignments_org
