@@ -21,6 +21,7 @@ CREATE OR REPLACE FUNCTION has_effective_permission(
 ) RETURNS boolean
 LANGUAGE sql
 STABLE
+SET search_path = public, extensions
 AS $$
   SELECT EXISTS (
     SELECT 1
@@ -31,7 +32,7 @@ AS $$
       )
     ) ep
     WHERE ep->>'p' = p_permission
-      AND (ep->>'s')::extensions.ltree @> p_target_path
+      AND (ep->>'s')::ltree @> p_target_path
   );
 $$;
 
@@ -92,8 +93,9 @@ CREATE OR REPLACE FUNCTION get_permission_scope(p_permission text)
 RETURNS extensions.ltree
 LANGUAGE sql
 STABLE
+SET search_path = public, extensions
 AS $$
-  SELECT (ep->>'s')::extensions.ltree
+  SELECT (ep->>'s')::ltree
   FROM jsonb_array_elements(
     COALESCE(
       (current_setting('request.jwt.claims', true)::jsonb)->'effective_permissions',
