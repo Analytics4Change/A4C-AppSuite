@@ -72,6 +72,14 @@ components:
       payload:
         $ref: '#/components/schemas/OrganizationDeletedEvent'
 
+    OrganizationDirectCareSettingsUpdated:
+      name: organization.direct_care_settings_updated
+      title: Organization Direct Care Settings Updated
+      summary: Direct care workflow routing settings updated for an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationDirectCareSettingsUpdatedEvent'
+
     # Bootstrap Events - Organization creation via platform management
     OrganizationBootstrapInitiated:
       name: organization.bootstrap.initiated
@@ -1311,3 +1319,66 @@ components:
           type: boolean
           default: false
           description: Whether this is the primary address
+
+    # ==========================================================================
+    # Direct Care Settings Event Schemas
+    # ==========================================================================
+
+    OrganizationDirectCareSettingsUpdatedEvent:
+      title: OrganizationDirectCareSettingsUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        stream_type:
+          type: string
+          const: organization
+        event_type:
+          type: string
+          const: organization.direct_care_settings_updated
+        event_data:
+          $ref: '#/components/schemas/DirectCareSettingsUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    DirectCareSettingsUpdateData:
+      title: DirectCareSettingsUpdateData
+      type: object
+      required:
+        - organization_id
+        - settings
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization UUID
+        settings:
+          $ref: '#/components/schemas/DirectCareSettings'
+        previous_settings:
+          $ref: '#/components/schemas/DirectCareSettings'
+
+    DirectCareSettings:
+      title: DirectCareSettings
+      type: object
+      description: Feature flags for direct care workflow routing
+      properties:
+        enable_staff_client_mapping:
+          type: boolean
+          default: false
+          description: |
+            When true: Notifications go only to staff assigned to the specific client.
+            When false: Notifications go to all staff at the client's org unit.
+        enable_schedule_enforcement:
+          type: boolean
+          default: false
+          description: |
+            When true: Only staff currently on schedule receive notifications.
+            When false: Any staff (assigned or at OU) receive notifications.

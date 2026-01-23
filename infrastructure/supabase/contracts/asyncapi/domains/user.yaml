@@ -128,6 +128,48 @@ components:
       payload:
         $ref: '#/components/schemas/UserDeletedEvent'
 
+    # Schedule Events
+    UserScheduleCreated:
+      name: user.schedule.created
+      title: User Schedule Created
+      summary: A recurring weekly schedule policy has been created for a user
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserScheduleCreatedEvent'
+
+    UserScheduleUpdated:
+      name: user.schedule.updated
+      title: User Schedule Updated
+      summary: A user's schedule policy has been modified
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserScheduleUpdatedEvent'
+
+    UserScheduleDeactivated:
+      name: user.schedule.deactivated
+      title: User Schedule Deactivated
+      summary: A user's schedule policy has been deactivated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserScheduleDeactivatedEvent'
+
+    # Client Assignment Events
+    UserClientAssigned:
+      name: user.client.assigned
+      title: User Client Assigned
+      summary: A staff member has been assigned to a client for direct care
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserClientAssignedEvent'
+
+    UserClientUnassigned:
+      name: user.client.unassigned
+      title: User Client Unassigned
+      summary: A staff member has been unassigned from a client
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserClientUnassignedEvent'
+
   schemas:
     UserCreatedEvent:
       title: UserCreatedEvent
@@ -1019,3 +1061,285 @@ components:
             - "User requested account deletion"
             - "Inactive account cleanup"
             - "Policy violation"
+
+    # =========================================================================
+    # Schedule Policy Events
+    # =========================================================================
+
+    UserScheduleCreatedEvent:
+      title: UserScheduleCreatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.schedule.created
+        event_data:
+          $ref: '#/components/schemas/UserScheduleData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserScheduleUpdatedEvent:
+      title: UserScheduleUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.schedule.updated
+        event_data:
+          allOf:
+            - $ref: '#/components/schemas/UserScheduleData'
+            - type: object
+              properties:
+                previous_schedule:
+                  $ref: '#/components/schemas/WeeklySchedule'
+                  description: Previous schedule pattern (for audit trail)
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserScheduleDeactivatedEvent:
+      title: UserScheduleDeactivatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.schedule.deactivated
+        event_data:
+          type: object
+          required:
+            - organization_id
+          properties:
+            organization_id:
+              type: string
+              format: uuid
+            org_unit_id:
+              type: string
+              format: uuid
+              nullable: true
+            reason:
+              type: string
+              description: Optional reason for deactivation
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserScheduleData:
+      title: UserScheduleData
+      type: object
+      description: Schedule policy data for a user
+      required:
+        - organization_id
+        - schedule
+      properties:
+        schedule_id:
+          type: string
+          format: uuid
+          description: Optional explicit ID for the schedule policy
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization where this schedule applies
+        org_unit_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            Optional OU scope. If set, schedule only applies to this OU.
+            NULL means schedule applies to all OUs in the organization.
+        schedule:
+          $ref: '#/components/schemas/WeeklySchedule'
+        effective_from:
+          type: string
+          format: date
+          nullable: true
+          description: First date this schedule is active (NULL = immediate)
+        effective_until:
+          type: string
+          format: date
+          nullable: true
+          description: Last date this schedule is active (NULL = no expiration)
+
+    WeeklySchedule:
+      title: WeeklySchedule
+      type: object
+      description: |
+        Weekly recurring schedule pattern.
+        Keys are lowercase day names. Values are time windows or null (day off).
+        Times in 24-hour HHMM format (local to org timezone).
+      properties:
+        monday:
+          $ref: '#/components/schemas/DaySchedule'
+        tuesday:
+          $ref: '#/components/schemas/DaySchedule'
+        wednesday:
+          $ref: '#/components/schemas/DaySchedule'
+        thursday:
+          $ref: '#/components/schemas/DaySchedule'
+        friday:
+          $ref: '#/components/schemas/DaySchedule'
+        saturday:
+          $ref: '#/components/schemas/DaySchedule'
+        sunday:
+          $ref: '#/components/schemas/DaySchedule'
+
+    DaySchedule:
+      title: DaySchedule
+      type: object
+      nullable: true
+      description: Schedule window for a single day. Null means day off.
+      required:
+        - begin
+        - end
+      properties:
+        begin:
+          type: string
+          pattern: '^[0-2][0-9][0-5][0-9]$'
+          description: Start time in HHMM format (e.g., "0800" for 8:00 AM)
+          examples:
+            - "0800"
+            - "0900"
+            - "1200"
+        end:
+          type: string
+          pattern: '^[0-2][0-9][0-5][0-9]$'
+          description: End time in HHMM format (e.g., "1600" for 4:00 PM)
+          examples:
+            - "1600"
+            - "1700"
+            - "2100"
+
+    # =========================================================================
+    # Client Assignment Events
+    # =========================================================================
+
+    UserClientAssignedEvent:
+      title: UserClientAssignedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID (staff member)
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.client.assigned
+        event_data:
+          $ref: '#/components/schemas/UserClientAssignmentData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserClientUnassignedEvent:
+      title: UserClientUnassignedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: User UUID (staff member)
+        stream_type:
+          type: string
+          const: user
+        event_type:
+          type: string
+          const: user.client.unassigned
+        event_data:
+          type: object
+          required:
+            - client_id
+            - organization_id
+          properties:
+            client_id:
+              type: string
+              format: uuid
+            organization_id:
+              type: string
+              format: uuid
+            reason:
+              type: string
+              description: Optional reason for unassignment
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserClientAssignmentData:
+      title: UserClientAssignmentData
+      type: object
+      description: Assignment of staff to client for direct care
+      required:
+        - client_id
+        - organization_id
+      properties:
+        assignment_id:
+          type: string
+          format: uuid
+          description: Optional explicit ID for the assignment
+        client_id:
+          type: string
+          format: uuid
+          description: Client being assigned to this staff member
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization context for the assignment
+        assigned_until:
+          type: string
+          format: date-time
+          nullable: true
+          description: Optional end date for temporary assignments
+        notes:
+          type: string
+          description: Optional notes about the assignment
+          examples:
+            - "Primary caregiver"
+            - "Backup for medication administration"
