@@ -17,7 +17,7 @@
 --   AND get_current_scope_path() @> target_path
 CREATE OR REPLACE FUNCTION has_effective_permission(
   p_permission text,
-  p_target_path ltree
+  p_target_path extensions.ltree
 ) RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -35,7 +35,7 @@ AS $$
   );
 $$;
 
-COMMENT ON FUNCTION has_effective_permission(text, ltree) IS
+COMMENT ON FUNCTION has_effective_permission(text, extensions.ltree) IS
 'Check if the current user has a permission at or above the target scope path.
 
 Usage in RLS policies:
@@ -89,7 +89,7 @@ This function is for global/unscoped permissions only.';
 -- Get the user's effective scope for a specific permission
 -- Returns NULL if user doesn't have the permission
 CREATE OR REPLACE FUNCTION get_permission_scope(p_permission text)
-RETURNS ltree
+RETURNS extensions.ltree
 LANGUAGE sql
 STABLE
 AS $$
@@ -148,7 +148,7 @@ Will be DROPPED in Phase 4 after RLS policy migration.';
 -- GRANT PERMISSIONS
 -- =============================================================================
 
-GRANT EXECUTE ON FUNCTION has_effective_permission(text, ltree) TO authenticated;
+GRANT EXECUTE ON FUNCTION has_effective_permission(text, extensions.ltree) TO authenticated;
 GRANT EXECUTE ON FUNCTION has_permission(text) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_permission_scope(text) TO authenticated;
 

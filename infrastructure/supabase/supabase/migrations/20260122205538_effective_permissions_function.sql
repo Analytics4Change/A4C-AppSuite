@@ -8,7 +8,7 @@
 -- It computes effective permissions for JWT generation and permission checks
 
 CREATE OR REPLACE FUNCTION compute_effective_permissions(p_user_id uuid, p_org_id uuid)
-RETURNS TABLE(permission_name text, effective_scope ltree)
+RETURNS TABLE(permission_name text, effective_scope extensions.ltree)
 LANGUAGE sql
 STABLE
 SECURITY DEFINER

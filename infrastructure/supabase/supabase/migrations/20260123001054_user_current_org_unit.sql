@@ -115,7 +115,7 @@ CREATE OR REPLACE FUNCTION api.get_current_org_unit()
 RETURNS TABLE(
   id uuid,
   name text,
-  path ltree,
+  path extensions.ltree,
   organization_id uuid
 )
 LANGUAGE sql
