@@ -27,8 +27,7 @@ explicit_grants AS (
   WHERE ur.user_id = p_user_id
     -- Include roles for this org OR org-agnostic roles (platform-level)
     AND (ur.organization_id = p_org_id OR ur.organization_id IS NULL)
-    AND ur.is_active = true
-    -- Respect temporal validity dates on role assignments
+    -- Respect temporal validity dates on role assignments (determines "active" status)
     AND (ur.role_valid_from IS NULL OR ur.role_valid_from <= CURRENT_DATE)
     AND (ur.role_valid_until IS NULL OR ur.role_valid_until >= CURRENT_DATE)
 ),
