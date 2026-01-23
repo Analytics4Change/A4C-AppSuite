@@ -14,7 +14,7 @@
 
 CREATE TABLE IF NOT EXISTS user_client_assignments_projection (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES users_projection(id),
+  user_id uuid NOT NULL REFERENCES users(id),
   client_id uuid NOT NULL,  -- Will reference clients table when created
   organization_id uuid NOT NULL REFERENCES organizations_projection(id),
 

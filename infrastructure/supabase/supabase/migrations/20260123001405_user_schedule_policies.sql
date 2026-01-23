@@ -14,7 +14,7 @@
 
 CREATE TABLE IF NOT EXISTS user_schedule_policies_projection (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES users_projection(id),
+  user_id uuid NOT NULL REFERENCES users(id),
   organization_id uuid NOT NULL REFERENCES organizations_projection(id),
 
   -- Recurring schedule as JSONB
