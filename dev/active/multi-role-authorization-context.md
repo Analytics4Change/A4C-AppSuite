@@ -165,22 +165,25 @@ const canAccess = await spicedb.check({
 
 ## File Structure
 
-### Migrations Created (2026-01-22 to 2026-01-23)
+### Migrations Created and Deployed (2026-01-22 to 2026-01-23)
 
 | Order | Migration Name | Purpose | Status |
 |-------|---------------|---------|--------|
-| 1 | `20260122204331_permission_implications.sql` | Permission implications table | ✅ Created |
-| 2 | `20260122204647_permission_implications_seed.sql` | Seed CRUD implications | ✅ Created |
-| 3 | `20260122205538_effective_permissions_function.sql` | `compute_effective_permissions()` | ✅ Created |
-| 4 | `20260122215348_jwt_hook_v3.sql` | Update `custom_access_token_hook` | ✅ Created |
-| 5 | `20260122222249_rls_helpers_v3.sql` | `has_effective_permission()`, deprecate old helpers | ✅ Created |
-| 6 | `20260123001054_user_current_org_unit.sql` | User session OU context (`current_org_unit_id`) | ✅ Created |
-| 7 | `20260123001155_jwt_hook_v3_org_unit_claims.sql` | Add OU claims to JWT | ✅ Created |
-| 8 | `20260123001246_organization_direct_care_settings.sql` | Add `direct_care_settings` to orgs | ✅ Created |
-| 9 | `20260123001405_user_schedule_policies.sql` | Event-sourced schedule projection | ✅ Created |
-| 10 | `20260123001542_user_client_assignments.sql` | Event-sourced assignment projection | ✅ Created |
+| 1 | `20260122204331_permission_implications.sql` | Permission implications table | ✅ Deployed |
+| 2 | `20260122204647_permission_implications_seed.sql` | Seed CRUD implications | ✅ Deployed |
+| 3 | `20260122205538_effective_permissions_function.sql` | `compute_effective_permissions()` | ✅ Deployed |
+| 4 | `20260122215348_jwt_hook_v3.sql` | Update `custom_access_token_hook` | ✅ Deployed |
+| 5 | `20260122222249_rls_helpers_v3.sql` | `has_effective_permission()`, deprecate old helpers | ✅ Deployed |
+| 6 | `20260123001054_user_current_org_unit.sql` | User session OU context (`current_org_unit_id`) | ✅ Deployed |
+| 7 | `20260123001155_jwt_hook_v3_org_unit_claims.sql` | Add OU claims to JWT | ✅ Deployed |
+| 8 | `20260123001246_organization_direct_care_settings.sql` | Add `direct_care_settings` to orgs | ✅ Deployed |
+| 9 | `20260123001405_user_schedule_policies.sql` | Event-sourced schedule projection | ✅ Deployed |
+| 10 | `20260123001542_user_client_assignments.sql` | Event-sourced assignment projection | ✅ Deployed |
+| 11 | `20260123181951_user_schedule_client_event_routing.sql` | Event routing for Phase 3 events | ✅ Deployed |
 
 **Key Decision**: Old RLS helpers are **DEPRECATED** not dropped in Phase 2D because existing RLS policies depend on them. Phase 4 will update RLS policies then drop old helpers.
+
+**Deployment Date**: 2026-01-23 (all 11 migrations successfully applied via GitHub Actions)
 
 ### AsyncAPI Schemas Updated (2026-01-23)
 
@@ -251,6 +254,117 @@ Old helpers (`get_current_scope_path()`, `get_current_user_role()`, `get_current
 1. Phase 2D: Create new `has_effective_permission()` helper (DONE)
 2. Phase 4: Update all RLS policies to use new helper
 3. Phase 4 (final step): Drop old helpers
+
+### 1b. ltree Type Qualification in Function Signatures (CRITICAL)
+
+PostgreSQL function signatures (RETURNS, parameters, COMMENT ON, GRANT) evaluate **BEFORE** `SET search_path` takes effect.
+
+**ERROR**: `type "ltree" does not exist (SQLSTATE 42704)`
+
+**FIX**: Use fully-qualified type `extensions.ltree` in ALL function signatures:
+
+```sql
+-- ❌ WRONG: search_path doesn't help signatures
+CREATE OR REPLACE FUNCTION has_effective_permission(
+  p_permission text,
+  p_target_path ltree  -- FAILS
+) RETURNS boolean ...
+
+-- ✅ CORRECT: Qualify the type
+CREATE OR REPLACE FUNCTION has_effective_permission(
+  p_permission text,
+  p_target_path extensions.ltree  -- WORKS
+) RETURNS boolean ...
+
+-- Also qualify in COMMENT ON and GRANT:
+COMMENT ON FUNCTION has_effective_permission(text, extensions.ltree) IS ...
+GRANT EXECUTE ON FUNCTION has_effective_permission(text, extensions.ltree) TO authenticated;
+```
+
+### 1c. SET search_path for ltree Operators (CRITICAL)
+
+SQL functions using ltree operators (`@>`, `<@`, etc.) must set search_path so PostgreSQL can find the operators.
+
+**ERROR**: `operator does not exist: extensions.ltree @> extensions.ltree`
+
+**FIX**: Add `SET search_path = public, extensions` to SQL functions:
+
+```sql
+CREATE OR REPLACE FUNCTION has_effective_permission(
+  p_permission text,
+  p_target_path extensions.ltree
+) RETURNS boolean
+LANGUAGE sql
+STABLE
+SET search_path = public, extensions  -- REQUIRED for @> operator
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM ...
+    WHERE (ep->>'s')::ltree @> p_target_path  -- Uses unqualified ::ltree
+  );
+$$;
+```
+
+**Key Insight**: With search_path set, casts inside function body use unqualified `::ltree` (NOT `::extensions.ltree`).
+
+### 1d. Index Predicates Must Be IMMUTABLE
+
+PostgreSQL requires index WHERE clauses to use only IMMUTABLE functions. `now()` is STABLE.
+
+**ERROR**: `functions in index predicate must be marked IMMUTABLE (SQLSTATE 42P17)`
+
+**FIX**: Don't use `now()` in index predicates. Move time filtering to query:
+
+```sql
+-- ❌ WRONG: now() is STABLE, not IMMUTABLE
+CREATE INDEX idx_user_client_assignments_user
+ON user_client_assignments_projection(user_id)
+WHERE is_active = true AND (assigned_until IS NULL OR assigned_until > now());
+
+-- ✅ CORRECT: Include assigned_until as column, filter at query time
+CREATE INDEX idx_user_client_assignments_user
+ON user_client_assignments_projection(user_id, assigned_until)
+WHERE is_active = true;
+
+-- Query filters expired assignments:
+SELECT * FROM user_client_assignments_projection
+WHERE user_id = $1
+  AND is_active = true
+  AND (assigned_until IS NULL OR assigned_until > now());
+```
+
+### 1e. Table Name: `users` Not `users_projection`
+
+The users table is named `users` (not `users_projection` like other projections).
+
+**ERROR**: `relation "users_projection" does not exist (SQLSTATE 42P01)`
+
+**FIX**: Use `REFERENCES users(id)` not `users_projection(id)`:
+
+```sql
+-- ❌ WRONG
+user_id uuid NOT NULL REFERENCES users_projection(id)
+
+-- ✅ CORRECT
+user_id uuid NOT NULL REFERENCES users(id)
+```
+
+### 1f. user_roles_projection Has No is_active Column
+
+The `user_roles_projection` table does NOT have an `is_active` column. Role validity is determined by `role_valid_from` and `role_valid_until` dates.
+
+**ERROR**: `column ur.is_active does not exist (SQLSTATE 42703)`
+
+**FIX**: Use temporal validity dates instead:
+
+```sql
+-- ❌ WRONG
+WHERE ur.is_active = true
+
+-- ✅ CORRECT
+WHERE (ur.role_valid_from IS NULL OR ur.role_valid_from <= CURRENT_DATE)
+  AND (ur.role_valid_until IS NULL OR ur.role_valid_until >= CURRENT_DATE)
+```
 
 ### 2. User Session OU Context (Gap Identified)
 

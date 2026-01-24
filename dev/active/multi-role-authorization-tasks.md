@@ -71,7 +71,7 @@
 - [x] Create event handlers: `handle_user_schedule_created/updated/deactivated()`
 - [x] Create helper function: `is_user_on_schedule(user_id, org_id, org_unit_id, check_time)`
 - [x] Create RLS policies (org-scoped read, permission-gated modify)
-- [ ] Add schedule event routing to `process_user_event()` router
+- [x] Add schedule event routing to `process_user_event()` router (`20260123181951_user_schedule_client_event_routing.sql`)
 - [ ] Run `npm run generate:types` after AsyncAPI schemas
 
 ## Phase 3C: User Client Assignments ✅ COMPLETE
@@ -88,7 +88,7 @@
 - [x] Create event handlers: `handle_user_client_assigned/unassigned()`
 - [x] Create helper functions: `is_user_assigned_to_client()`, `get_staff_assigned_to_client()`, `get_clients_assigned_to_user()`
 - [x] Create RLS policies (org-scoped read, permission-gated modify)
-- [ ] Add client assignment event routing to `process_user_event()` router
+- [x] Add client assignment event routing to `process_user_event()` router (`20260123181951_user_schedule_client_event_routing.sql`)
 - [ ] Run `npm run generate:types` after AsyncAPI schemas
 
 ## Phase 4: RLS Policy Migration ⏸️ PENDING
@@ -177,30 +177,33 @@
 
 ## Current Status
 
-**Phase**: 3 - Direct Care Infrastructure ✅ COMPLETE
-**Status**: ✅ All Phase 2 and Phase 3 migrations created and validated
+**Phase**: 3 - Direct Care Infrastructure ✅ DEPLOYED
+**Status**: ✅ All 11 migrations deployed to production via GitHub Actions (2026-01-23)
 **Last Updated**: 2026-01-23
 **Next Step**:
-1. Deploy migrations: `supabase db push --linked`
+1. ~~Deploy migrations: `supabase db push --linked`~~ ✅ DONE
 2. Run `npm run generate:types` in `infrastructure/supabase/contracts/`
-3. Add event routing to `process_user_event()` for new event types
-4. Proceed to Phase 4 (RLS Policy Migration)
+3. ~~Add event routing to `process_user_event()` for new event types~~ ✅ DONE (migration #11)
+4. Proceed to Phase 4 (RLS Policy Migration) - Update existing RLS policies to use `has_effective_permission()`
 
 ### Implementation Summary (2026-01-23)
 
-**Migrations Created (10 total):**
-| Phase | Migration | Purpose |
-|-------|-----------|---------|
-| 2A | `20260122204331_permission_implications.sql` | Permission implications table |
-| 2A | `20260122204647_permission_implications_seed.sql` | CRUD implications seed |
-| 2B | `20260122205538_effective_permissions_function.sql` | `compute_effective_permissions()` |
-| 2C | `20260122215348_jwt_hook_v3.sql` | JWT hook with effective_permissions |
-| 2D | `20260122222249_rls_helpers_v3.sql` | `has_effective_permission()` helper |
-| 3A-0 | `20260123001054_user_current_org_unit.sql` | User session OU context |
-| 3A-0 | `20260123001155_jwt_hook_v3_org_unit_claims.sql` | OU claims in JWT |
-| 3A | `20260123001246_organization_direct_care_settings.sql` | Direct care feature flags |
-| 3B | `20260123001405_user_schedule_policies.sql` | User schedule projection |
-| 3C | `20260123001542_user_client_assignments.sql` | User client assignment projection |
+**Migrations Deployed (11 total):**
+| Phase | Migration | Purpose | Status |
+|-------|-----------|---------|--------|
+| 2A | `20260122204331_permission_implications.sql` | Permission implications table | ✅ Deployed |
+| 2A | `20260122204647_permission_implications_seed.sql` | CRUD implications seed | ✅ Deployed |
+| 2B | `20260122205538_effective_permissions_function.sql` | `compute_effective_permissions()` | ✅ Deployed |
+| 2C | `20260122215348_jwt_hook_v3.sql` | JWT hook with effective_permissions | ✅ Deployed |
+| 2D | `20260122222249_rls_helpers_v3.sql` | `has_effective_permission()` helper | ✅ Deployed |
+| 3A-0 | `20260123001054_user_current_org_unit.sql` | User session OU context | ✅ Deployed |
+| 3A-0 | `20260123001155_jwt_hook_v3_org_unit_claims.sql` | OU claims in JWT | ✅ Deployed |
+| 3A | `20260123001246_organization_direct_care_settings.sql` | Direct care feature flags | ✅ Deployed |
+| 3B | `20260123001405_user_schedule_policies.sql` | User schedule projection | ✅ Deployed |
+| 3C | `20260123001542_user_client_assignments.sql` | User client assignment projection | ✅ Deployed |
+| 3-Event | `20260123181951_user_schedule_client_event_routing.sql` | Event routing for Phase 3 | ✅ Deployed |
+
+**Deployment Date**: 2026-01-23 (via GitHub Actions, after 6 iterative fixes for PostgreSQL gotchas)
 
 **AsyncAPI Schemas Updated:**
 - `contracts/asyncapi/domains/organization.yaml` - Added `organization.direct_care_settings.updated`
