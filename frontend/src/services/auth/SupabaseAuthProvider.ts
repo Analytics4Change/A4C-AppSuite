@@ -20,7 +20,7 @@
  * See documentation/architecture/authentication/frontend-auth-architecture.md
  */
 
-import { SupabaseClient, Session as SupabaseSession } from '@supabase/supabase-js';
+import { SupabaseClient, Session as SupabaseSession, RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { IAuthProvider } from './IAuthProvider';
 import {
@@ -32,6 +32,7 @@ import {
   PermissionCheckResult,
   JWTClaims,
 } from '@/types/auth.types';
+import { isPathContained } from '@/utils/permission-utils';
 import { getEnv } from '@/config/env-validation';
 import { Logger } from '@/utils/logger';
 
@@ -54,6 +55,8 @@ export class SupabaseAuthProvider implements IAuthProvider {
   private config: SupabaseAuthConfig;
   private initialized: boolean = false;
   private currentSession: Session | null = null;
+  private roleChangeChannel: RealtimeChannel | null = null;
+  private refreshDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(config?: SupabaseAuthConfig) {
     // Use config or fall back to validated environment variables
@@ -105,6 +108,7 @@ export class SupabaseAuthProvider implements IAuthProvider {
         log.error('SupabaseAuthProvider: Failed to get session', error);
       } else if (data.session) {
         this.currentSession = this.convertSupabaseSession(data.session);
+        this.subscribeToRoleChanges(data.session.user.id);
         log.info('✅ SupabaseAuthProvider: Existing session restored', {
           user: this.currentSession.user.email,
         });
@@ -118,8 +122,12 @@ export class SupabaseAuthProvider implements IAuthProvider {
 
         if (session) {
           this.currentSession = this.convertSupabaseSession(session);
+          if (event === 'SIGNED_IN') {
+            this.subscribeToRoleChanges(session.user.id);
+          }
         } else {
           this.currentSession = null;
+          this.unsubscribeFromRoleChanges();
         }
       });
 
@@ -301,8 +309,11 @@ export class SupabaseAuthProvider implements IAuthProvider {
 
   /**
    * Check if user has a specific permission
+   *
+   * When targetPath is provided and effective_permissions exist (v3),
+   * performs scope-aware checking. Otherwise falls back to flat permissions[].
    */
-  async hasPermission(permission: string): Promise<PermissionCheckResult> {
+  async hasPermission(permission: string, targetPath?: string): Promise<PermissionCheckResult> {
     const session = await this.getSession();
 
     if (!session) {
@@ -312,19 +323,30 @@ export class SupabaseAuthProvider implements IAuthProvider {
       };
     }
 
-    const hasPermission = session.claims.permissions.includes(permission);
+    let hasIt: boolean;
+
+    if (targetPath && session.claims.effective_permissions?.length > 0) {
+      // Scope-aware check: permission exists AND scope contains target path
+      hasIt = session.claims.effective_permissions.some(
+        (ep) => ep.p === permission && isPathContained(ep.s, targetPath)
+      );
+    } else {
+      // Simple check: permission exists at any scope (backward compat)
+      hasIt = session.claims.permissions.includes(permission);
+    }
 
     if (this.config.debug) {
       log.debug('SupabaseAuthProvider: Permission check', {
         permission,
-        hasPermission,
-        userPermissions: session.claims.permissions,
+        targetPath,
+        hasPermission: hasIt,
+        usedEffectivePermissions: !!(targetPath && session.claims.effective_permissions?.length),
       });
     }
 
     return {
-      hasPermission,
-      reason: hasPermission ? undefined : `Permission '${permission}' not granted`,
+      hasPermission: hasIt,
+      reason: hasIt ? undefined : `Permission '${permission}' not granted`,
     };
   }
 
@@ -384,6 +406,61 @@ export class SupabaseAuthProvider implements IAuthProvider {
   }
 
   /**
+   * Subscribe to role changes for the current user via Supabase Realtime.
+   * When user_roles_projection changes, debounce and refresh session to
+   * get updated JWT with new effective_permissions.
+   */
+  private subscribeToRoleChanges(userId: string): void {
+    this.unsubscribeFromRoleChanges();
+
+    this.roleChangeChannel = this.client
+      .channel('auth-role-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_roles_projection',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          // Debounce: bulk role assignments may fire multiple changes
+          if (this.refreshDebounceTimer) {
+            clearTimeout(this.refreshDebounceTimer);
+          }
+          this.refreshDebounceTimer = setTimeout(() => {
+            log.info('Role change detected, refreshing session');
+            this.refreshSession().catch((err) =>
+              log.error('Failed to refresh session after role change', err)
+            );
+          }, 2000);
+        }
+      )
+      .subscribe();
+  }
+
+  /**
+   * Unsubscribe from role change notifications
+   */
+  private unsubscribeFromRoleChanges(): void {
+    if (this.refreshDebounceTimer) {
+      clearTimeout(this.refreshDebounceTimer);
+      this.refreshDebounceTimer = null;
+    }
+    if (this.roleChangeChannel) {
+      this.roleChangeChannel.unsubscribe();
+      this.roleChangeChannel = null;
+    }
+  }
+
+  /**
+   * Cleanup provider resources (Realtime subscriptions, timers)
+   */
+  dispose(): void {
+    this.unsubscribeFromRoleChanges();
+  }
+
+  /**
    * Convert Supabase session to our Session type with decoded JWT claims
    */
   private convertSupabaseSession(supabaseSession: SupabaseSession): Session {
@@ -431,6 +508,14 @@ export class SupabaseAuthProvider implements IAuthProvider {
         session_id: decoded.session_id,
         org_id: decoded.org_id || '',
         org_type: decoded.org_type || 'provider',
+        // v3 fields
+        effective_permissions: decoded.effective_permissions || [],
+        claims_version: decoded.claims_version,
+        access_blocked: decoded.access_blocked,
+        access_block_reason: decoded.access_block_reason,
+        current_org_unit_id: decoded.current_org_unit_id || null,
+        current_org_unit_path: decoded.current_org_unit_path || null,
+        // deprecated but still parsed for backward compat
         user_role: decoded.user_role || 'viewer',
         permissions: decoded.permissions || [],
         scope_path: decoded.scope_path || '',

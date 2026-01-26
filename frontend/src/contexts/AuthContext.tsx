@@ -51,7 +51,7 @@ interface AuthContextType {
   refreshSession: () => Promise<void>;
 
   /** Permission and role checks */
-  hasPermission: (permission: string) => Promise<boolean>;
+  hasPermission: (permission: string, targetPath?: string) => Promise<boolean>;
   hasRole: (role: UserRole) => boolean;
 
   /** Organization management */
@@ -148,6 +148,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvid
     };
 
     initializeAuth();
+
+    return () => {
+      authProvider.dispose();
+    };
   }, [authProvider]);
 
   /**
@@ -312,9 +316,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvid
 
   /**
    * Check if user has a specific permission
+   * Optionally scope-aware when targetPath is provided (JWT v3)
    */
-  const hasPermission = async (permission: string): Promise<boolean> => {
-    const result = await authProvider.hasPermission(permission);
+  const hasPermission = async (permission: string, targetPath?: string): Promise<boolean> => {
+    const result = await authProvider.hasPermission(permission, targetPath);
     return result.hasPermission;
   };
 

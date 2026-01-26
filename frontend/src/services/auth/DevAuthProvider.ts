@@ -27,6 +27,7 @@ import {
   OAuthOptions,
   PermissionCheckResult,
 } from '@/types/auth.types';
+import { isPathContained } from '@/utils/permission-utils';
 import {
   DevAuthConfig,
   createMockSession,
@@ -185,8 +186,11 @@ export class DevAuthProvider implements IAuthProvider {
 
   /**
    * Check if user has a specific permission
+   *
+   * When targetPath is provided and effective_permissions exist (v3),
+   * performs scope-aware checking. Otherwise falls back to flat permissions[].
    */
-  async hasPermission(permission: string): Promise<PermissionCheckResult> {
+  async hasPermission(permission: string, targetPath?: string): Promise<PermissionCheckResult> {
     if (!this.currentSession) {
       return {
         hasPermission: false,
@@ -194,19 +198,27 @@ export class DevAuthProvider implements IAuthProvider {
       };
     }
 
-    const hasPermission = this.currentSession.claims.permissions.includes(permission);
+    let hasIt: boolean;
+
+    if (targetPath && this.currentSession.claims.effective_permissions?.length > 0) {
+      hasIt = this.currentSession.claims.effective_permissions.some(
+        (ep) => ep.p === permission && isPathContained(ep.s, targetPath)
+      );
+    } else {
+      hasIt = this.currentSession.claims.permissions.includes(permission);
+    }
 
     if (this.config.debug) {
       log.debug('DevAuthProvider: Permission check', {
         permission,
-        hasPermission,
-        userPermissions: this.currentSession.claims.permissions,
+        targetPath,
+        hasPermission: hasIt,
       });
     }
 
     return {
-      hasPermission,
-      reason: hasPermission ? undefined : `Permission '${permission}' not granted`,
+      hasPermission: hasIt,
+      reason: hasIt ? undefined : `Permission '${permission}' not granted`,
     };
   }
 
@@ -272,5 +284,13 @@ export class DevAuthProvider implements IAuthProvider {
     }
 
     return this.currentSession;
+  }
+
+  /**
+   * Cleanup provider resources
+   * No subscriptions to clean up in dev mode
+   */
+  dispose(): void {
+    // No-op: mock provider has no subscriptions
   }
 }

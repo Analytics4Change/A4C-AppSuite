@@ -91,12 +91,24 @@ export interface IAuthProvider {
    * - "client.view"
    * - "organization.manage"
    *
-   * See .plans/rbac-permissions/architecture.md for permission catalog
+   * When targetPath is provided, performs scope-aware checking against
+   * effective_permissions (JWT v3). Without targetPath, falls back to
+   * flat permissions[] check for backward compatibility.
    *
    * @param permission - Permission string to check
+   * @param targetPath - Optional ltree path to check scope containment against
    * @returns Promise resolving to permission check result
    */
-  hasPermission(permission: string): Promise<PermissionCheckResult>;
+  hasPermission(permission: string, targetPath?: string): Promise<PermissionCheckResult>;
+
+  /**
+   * Cleanup provider resources (subscriptions, timers)
+   *
+   * Called when the auth context unmounts or provider changes.
+   * Implementations should unsubscribe from Realtime channels,
+   * clear timers, etc.
+   */
+  dispose(): void;
 
   /**
    * Check if the current user has a specific role

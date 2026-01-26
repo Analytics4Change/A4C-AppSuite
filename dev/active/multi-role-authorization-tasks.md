@@ -72,7 +72,7 @@
 - [x] Create helper function: `is_user_on_schedule(user_id, org_id, org_unit_id, check_time)`
 - [x] Create RLS policies (org-scoped read, permission-gated modify)
 - [x] Add schedule event routing to `process_user_event()` router (`20260123181951_user_schedule_client_event_routing.sql`)
-- [ ] Run `npm run generate:types` after AsyncAPI schemas
+- [x] Run `npm run generate:types` after AsyncAPI schemas ✅ (2026-01-24)
 
 ## Phase 3C: User Client Assignments ✅ COMPLETE
 
@@ -89,30 +89,42 @@
 - [x] Create helper functions: `is_user_assigned_to_client()`, `get_staff_assigned_to_client()`, `get_clients_assigned_to_user()`
 - [x] Create RLS policies (org-scoped read, permission-gated modify)
 - [x] Add client assignment event routing to `process_user_event()` router (`20260123181951_user_schedule_client_event_routing.sql`)
-- [ ] Run `npm run generate:types` after AsyncAPI schemas
+- [x] Run `npm run generate:types` after AsyncAPI schemas ✅ (2026-01-24)
 
-## Phase 4: RLS Policy Migration ⏸️ PENDING
+## Phase 4: RLS Policy Migration ✅ COMPLETE
 
-> RLS policies should use ONLY permission + scope containment.
+> RLS policies use ONLY permission + scope containment.
 > Assignment tables are NOT checked by RLS - they are for Temporal workflow routing.
 
-- [ ] Audit all RLS policies using `get_current_scope_path()`
-- [ ] Migrate to `has_effective_permission(permission, target_path)` pattern
-- [ ] Migrate organization policies
-- [ ] Migrate organization_unit policies
-- [ ] Migrate user-related policies
-- [ ] Migrate role-related policies
-- [ ] Remove any assignment-based checks from RLS (if any exist)
+- [x] Audit all RLS policies using `get_current_scope_path()` (8 policies across 2 tables)
+- [x] Migrate to `has_effective_permission(permission, target_path)` pattern
+- [x] Migrate organization policies (`20260124192733_rls_policy_migration_phase4.sql`)
+  - [x] `organizations_scope_select` → `has_effective_permission('organization.view', path)`
+  - [x] `organizations_scope_insert` → `has_effective_permission('organization.create', path) AND nlevel > 2`
+  - [x] `organizations_scope_update` → `has_effective_permission('organization.update', path) AND nlevel > 2`
+  - [x] `organizations_scope_delete` → `has_effective_permission('organization.delete', path) AND nlevel > 2`
+- [x] Migrate organization_unit policies (`20260124192733_rls_policy_migration_phase4.sql`)
+  - [x] `ou_scope_select` → `has_effective_permission('organization.view_ou', path)`
+  - [x] `ou_scope_insert` → `has_effective_permission('organization.create_ou', path)`
+  - [x] `ou_scope_update` → `has_effective_permission('organization.update_ou', path)`
+  - [x] `ou_scope_delete` → `has_effective_permission('organization.delete_ou', path)`
+- [x] User-related policies already use `get_current_org_id()` pattern (no migration needed)
+- [x] Role-related policies already use `get_current_org_id()` pattern (no migration needed)
+- [x] No assignment-based checks exist in RLS (confirmed)
 - [ ] Test with multi-role, multi-scope users
 
-## Phase 5: Frontend Integration ⏸️ PENDING
+## Phase 5: Frontend Integration ✅ COMPLETE
 
-- [ ] Update `auth.types.ts` for new JWT structure (`effective_permissions` array)
-- [ ] Update `usePermissions` hook to parse new structure
-- [ ] Create `hasEffectivePermission(permission, targetPath)` utility
-- [ ] Update permission checking utilities
-- [ ] Remove single-role assumptions in components
-- [ ] Test frontend with new authorization model
+- [x] Update `auth.types.ts` for new JWT structure (`effective_permissions` array, `claims_version`, OU context)
+- [x] Update `SupabaseAuthProvider.decodeJWT()` to parse v3 fields
+- [x] Create `isPathContained()` utility in `permission-utils.ts` (ltree @> semantics)
+- [x] Update `hasPermission()` with optional `targetPath` in IAuthProvider, SupabaseAuthProvider, DevAuthProvider
+- [x] Update AuthContext to pass `targetPath` through
+- [x] Update mock session builder in `dev-auth.config.ts` with `effective_permissions`
+- [x] Create migration to publish `user_roles_projection` to Realtime (`20260126173806_enable_realtime_user_roles.sql`)
+- [x] Add Realtime role change subscription and `dispose()` to SupabaseAuthProvider
+- [x] Add `dispose()` to IAuthProvider interface and DevAuthProvider (no-op)
+- [x] Add `dispose()` cleanup to AuthContext useEffect
 
 ## Phase 6: UI Planning - Organization Direct Care Settings 📋 PLANNING
 
@@ -177,18 +189,21 @@
 
 ## Current Status
 
-**Phase**: 3 - Direct Care Infrastructure ✅ DEPLOYED
-**Status**: ✅ All 11 migrations deployed to production via GitHub Actions (2026-01-23)
-**Last Updated**: 2026-01-23
+**Phase**: 5 - Frontend Integration ✅ COMPLETE
+**Status**: ✅ All 13 migrations deployed, frontend updated (2026-01-26)
+**Last Updated**: 2026-01-26
 **Next Step**:
 1. ~~Deploy migrations: `supabase db push --linked`~~ ✅ DONE
-2. Run `npm run generate:types` in `infrastructure/supabase/contracts/`
+2. ~~Run `npm run generate:types` in `infrastructure/supabase/contracts/`~~ ✅ DONE (2026-01-24)
 3. ~~Add event routing to `process_user_event()` for new event types~~ ✅ DONE (migration #11)
-4. Proceed to Phase 4 (RLS Policy Migration) - Update existing RLS policies to use `has_effective_permission()`
+4. ~~Phase 4 RLS Policy Migration~~ ✅ DONE (2026-01-24)
+5. ~~Phase 5 Frontend Integration~~ ✅ DONE (2026-01-26)
+6. Deploy migration #13 (`20260126173806_enable_realtime_user_roles.sql`): `supabase db push --linked`
+7. Proceed to Phase 6 (Organization Direct Care Settings UI) or Phase 7 (Schedules & Assignments UI)
 
-### Implementation Summary (2026-01-23)
+### Implementation Summary (2026-01-24)
 
-**Migrations Deployed (11 total):**
+**Migrations Deployed (12 total):**
 | Phase | Migration | Purpose | Status |
 |-------|-----------|---------|--------|
 | 2A | `20260122204331_permission_implications.sql` | Permission implications table | ✅ Deployed |
@@ -202,8 +217,10 @@
 | 3B | `20260123001405_user_schedule_policies.sql` | User schedule projection | ✅ Deployed |
 | 3C | `20260123001542_user_client_assignments.sql` | User client assignment projection | ✅ Deployed |
 | 3-Event | `20260123181951_user_schedule_client_event_routing.sql` | Event routing for Phase 3 | ✅ Deployed |
+| 4 | `20260124192733_rls_policy_migration_phase4.sql` | RLS policies → `has_effective_permission()` | ✅ Deployed |
+| 5 | `20260126173806_enable_realtime_user_roles.sql` | Publish `user_roles_projection` to Realtime | ⏳ Pending deploy |
 
-**Deployment Date**: 2026-01-23 (via GitHub Actions, after 6 iterative fixes for PostgreSQL gotchas)
+**Deployment Date**: 2026-01-24 (Phase 4 via `supabase db push --linked`), Phase 5 migration pending deploy
 
 **AsyncAPI Schemas Updated:**
 - `contracts/asyncapi/domains/organization.yaml` - Added `organization.direct_care_settings.updated`

@@ -10,7 +10,7 @@
  * See .plans/supabase-auth-integration/frontend-auth-architecture.md
  */
 
-import { Session, User, JWTClaims, UserRole, Permission, OrganizationType } from '@/types/auth.types';
+import { Session, User, JWTClaims, UserRole, Permission, OrganizationType, EffectivePermission } from '@/types/auth.types';
 import { getRolePermissions } from './roles.config';
 import { PERMISSIONS } from './permissions.config';
 
@@ -216,6 +216,12 @@ export function createMockJWTClaims(profile: DevUserProfile): JWTClaims {
   const now = Math.floor(Date.now() / 1000);
   const expiresIn = 3600; // 1 hour
 
+  // Build effective_permissions from profile permissions + scope
+  const effective_permissions: EffectivePermission[] = profile.permissions.map((p) => ({
+    p,
+    s: profile.scope_path === '*' ? '' : profile.scope_path,
+  }));
+
   return {
     sub: profile.id,
     email: profile.email,
@@ -224,6 +230,13 @@ export function createMockJWTClaims(profile: DevUserProfile): JWTClaims {
     session_id: `mock-session-${Date.now()}`,
     org_id: profile.org_id,
     org_type: profile.org_type,
+    // v3 fields
+    effective_permissions,
+    claims_version: 3,
+    access_blocked: false,
+    current_org_unit_id: null,
+    current_org_unit_path: null,
+    // deprecated fields still present for backward compat
     user_role: profile.role,
     permissions: profile.permissions,
     scope_path: profile.scope_path,

@@ -43,6 +43,22 @@ export type UserRole =
 export type Permission = string;
 
 /**
+ * Single effective permission with scope binding (JWT v3)
+ *
+ * Each entry represents a permission the user has at a specific organizational scope.
+ * Short keys ('p', 's') minimize JWT size.
+ *
+ * Example: { p: "organization.view", s: "acme.pediatrics" }
+ * means the user can view organizations at or below the 'acme.pediatrics' scope.
+ */
+export interface EffectivePermission {
+  /** Permission name (e.g., "organization.view") */
+  p: string;
+  /** Scope path (ltree, e.g., "acme.pediatrics") - empty string = global scope */
+  s: string;
+}
+
+/**
  * Organization types for UI feature gating
  * Used to conditionally show/hide features based on organization type
  *
@@ -82,14 +98,37 @@ export interface JWTClaims {
   /** User's role within the organization */
   user_role: UserRole;
 
-  /** Array of permission strings (e.g., ["medication.create", "client.view"]) */
+  /** Array of permission strings (e.g., ["medication.create", "client.view"])
+   * @deprecated Use effective_permissions for scope-aware checks (claims_version >= 3)
+   */
   permissions: Permission[];
 
   /** Hierarchical ltree path for organizational scope
    * Example: "org_acme_healthcare.facility_a.unit_1"
-   * See .plans/rbac-permissions/architecture.md for scope_path explanation
+   * @deprecated Use effective_permissions[].s for per-permission scopes (claims_version >= 3)
    */
   scope_path: string;
+
+  /** Effective permissions with per-permission scopes (JWT v3)
+   * Each entry binds a permission to the widest scope at which it's granted.
+   * Replaces flat permissions[] + single scope_path for multi-role users.
+   */
+  effective_permissions: EffectivePermission[];
+
+  /** Claims version (3 = effective permissions model) */
+  claims_version?: number;
+
+  /** Whether access is blocked (date-based role validity) */
+  access_blocked?: boolean;
+
+  /** Block reason if access is blocked */
+  access_block_reason?: string;
+
+  /** Current org unit ID for user-centric workflows */
+  current_org_unit_id?: string | null;
+
+  /** Current org unit ltree path */
+  current_org_unit_path?: string | null;
 
   /** Token issued at timestamp */
   iat?: number;
