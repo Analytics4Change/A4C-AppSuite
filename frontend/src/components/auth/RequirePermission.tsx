@@ -38,7 +38,6 @@ export const RequirePermission: React.FC<RequirePermissionProps> = ({
     const checkPermission = async () => {
       // Debug logging (stripped in production - devLog compiles to no-op)
       devLog.debug(`Checking permission: ${permission}`, {
-        role: session?.claims.user_role,
         orgId: session?.claims.org_id
       });
 

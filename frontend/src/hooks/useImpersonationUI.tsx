@@ -52,7 +52,9 @@ export function useImpersonationUI() {
     };
   }, [refreshKey]);
 
-  const canImpersonate = authSession?.claims.user_role === 'super_admin';
+  // super_admin is identified by platform_owner org type + having organization.create permission
+  const canImpersonate = authSession?.claims.org_type === 'platform_owner' &&
+    authSession?.claims.effective_permissions?.some(ep => ep.p === 'users.impersonate');
 
   const openImpersonationModal = () => {
     if (canImpersonate && !session) {

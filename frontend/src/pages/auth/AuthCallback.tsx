@@ -218,7 +218,7 @@ export const AuthCallback: React.FC = () => {
     const client = supabaseService.getClient();
     const { data: { session: freshSession } } = await client.auth.getSession();
 
-    // Decode JWT to get custom claims (org_id, user_role, permissions, etc.)
+    // Decode JWT to get custom claims (org_id, effective_permissions, etc.)
     let orgId: string | null = null;
     if (freshSession?.access_token) {
       try {
@@ -227,7 +227,6 @@ export const AuthCallback: React.FC = () => {
         orgId = claims.org_id;
         log.info('[AuthCallback] Decoded JWT claims for redirect', {
           org_id: claims.org_id,
-          user_role: claims.user_role,
         });
       } catch (err) {
         log.error('[AuthCallback] Failed to decode JWT', err);

@@ -95,23 +95,9 @@ export interface JWTClaims {
   /** Organization type for UI feature gating */
   org_type: OrganizationType;
 
-  /** User's role within the organization */
-  user_role: UserRole;
-
-  /** Array of permission strings (e.g., ["medication.create", "client.view"])
-   * @deprecated Use effective_permissions for scope-aware checks (claims_version >= 3)
-   */
-  permissions: Permission[];
-
-  /** Hierarchical ltree path for organizational scope
-   * Example: "org_acme_healthcare.facility_a.unit_1"
-   * @deprecated Use effective_permissions[].s for per-permission scopes (claims_version >= 3)
-   */
-  scope_path: string;
-
-  /** Effective permissions with per-permission scopes (JWT v3)
+  /** Effective permissions with per-permission scopes (JWT v4)
    * Each entry binds a permission to the widest scope at which it's granted.
-   * Replaces flat permissions[] + single scope_path for multi-role users.
+   * This is the sole authorization mechanism. Use .some(ep => ep.p === perm).
    */
   effective_permissions: EffectivePermission[];
 
@@ -310,9 +296,6 @@ export interface OrganizationContext {
 
   /** Organization type */
   type?: 'provider' | 'partner' | 'platform';
-
-  /** Hierarchical scope path */
-  scope_path: string;
 }
 
 /**

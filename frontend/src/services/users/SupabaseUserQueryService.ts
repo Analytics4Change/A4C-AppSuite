@@ -40,8 +40,6 @@ const log = Logger.getLogger('api');
 
 interface DecodedJWTClaims {
   org_id?: string;
-  user_role?: string;
-  permissions?: string[];
   sub?: string;
 }
 
@@ -1237,8 +1235,6 @@ export class SupabaseUserQueryService implements IUserQueryService {
       const decoded = JSON.parse(globalThis.atob(payload));
       return {
         org_id: decoded.org_id,
-        user_role: decoded.user_role,
-        permissions: decoded.permissions || [],
         sub: decoded.sub,
       };
     } catch {

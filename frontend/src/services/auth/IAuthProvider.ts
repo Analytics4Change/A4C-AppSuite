@@ -91,9 +91,8 @@ export interface IAuthProvider {
    * - "client.view"
    * - "organization.manage"
    *
-   * When targetPath is provided, performs scope-aware checking against
-   * effective_permissions (JWT v3). Without targetPath, falls back to
-   * flat permissions[] check for backward compatibility.
+   * Checks effective_permissions for a matching entry. When targetPath
+   * is provided, also verifies scope containment (ltree @> semantics).
    *
    * @param permission - Permission string to check
    * @param targetPath - Optional ltree path to check scope containment against
@@ -111,18 +110,10 @@ export interface IAuthProvider {
   dispose(): void;
 
   /**
-   * Check if the current user has a specific role
-   *
-   * @param role - Role to check (e.g., "provider_admin", "super_admin")
-   * @returns Promise resolving to boolean indicating role membership
-   */
-  hasRole(role: string): Promise<boolean>;
-
-  /**
    * Switch the user's active organization context
    *
    * Updates the session to reflect the new organization, triggers JWT refresh
-   * to include new org_id, permissions, and scope_path claims.
+   * to include new org_id and effective_permissions claims.
    *
    * For users with multiple organization memberships, this changes which
    * organization's data they can access.

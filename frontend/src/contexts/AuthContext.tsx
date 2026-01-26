@@ -25,7 +25,6 @@ import {
   LoginCredentials,
   OAuthProvider,
   OAuthOptions,
-  UserRole,
 } from '@/types/auth.types';
 import { Logger } from '@/utils/logger';
 
@@ -50,9 +49,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
 
-  /** Permission and role checks */
+  /** Permission checks */
   hasPermission: (permission: string, targetPath?: string) => Promise<boolean>;
-  hasRole: (role: UserRole) => boolean;
 
   /** Organization management */
   switchOrganization: (orgId: string) => Promise<void>;
@@ -115,7 +113,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvid
         if (session) {
           log.info('AuthProvider: Existing session found', {
             user: session.user.email,
-            role: session.claims.user_role,
+            orgType: session.claims.org_type,
           });
 
           setAuthState({
@@ -174,7 +172,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvid
 
       log.info('AuthProvider: Login successful', {
         user: session.user.email,
-        role: session.claims.user_role,
+        orgType: session.claims.org_type,
       });
     } catch (error) {
       log.error('AuthProvider: Login failed', error);
@@ -210,7 +208,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvid
 
         log.info('AuthProvider: OAuth login successful', {
           user: result.user.email,
-          role: result.claims.user_role,
+          orgType: result.claims.org_type,
         });
       } else {
         // OAuth redirect initiated, keep loading state
@@ -248,7 +246,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvid
 
       log.info('AuthProvider: OAuth callback processed successfully', {
         user: session.user.email,
-        role: session.claims.user_role,
+        orgType: session.claims.org_type,
       });
     } catch (error) {
       log.error('AuthProvider: OAuth callback processing failed', error);
@@ -324,13 +322,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvid
   };
 
   /**
-   * Check if user has a specific role
-   */
-  const hasRole = (role: UserRole): boolean => {
-    return authState.session?.claims.user_role === role;
-  };
-
-  /**
    * Switch user's active organization
    */
   const switchOrganization = async (orgId: string): Promise<void> => {
@@ -349,7 +340,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvid
 
       log.info('AuthProvider: Organization switched', {
         orgId: session.claims.org_id,
-        orgName: session.claims.scope_path,
       });
     } catch (error) {
       log.error('AuthProvider: Organization switch failed', error);
@@ -375,7 +365,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvid
     logout,
     refreshSession,
     hasPermission,
-    hasRole,
     switchOrganization,
     providerType: getDeploymentConfig().authProvider,
   };

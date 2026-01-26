@@ -230,16 +230,11 @@ export function createMockJWTClaims(profile: DevUserProfile): JWTClaims {
     session_id: `mock-session-${Date.now()}`,
     org_id: profile.org_id,
     org_type: profile.org_type,
-    // v3 fields
     effective_permissions,
-    claims_version: 3,
+    claims_version: 4,
     access_blocked: false,
     current_org_unit_id: null,
     current_org_unit_path: null,
-    // deprecated fields still present for backward compat
-    user_role: profile.role,
-    permissions: profile.permissions,
-    scope_path: profile.scope_path,
     iat: now,
     exp: now + expiresIn,
   };

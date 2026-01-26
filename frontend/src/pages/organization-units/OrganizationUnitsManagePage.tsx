@@ -87,17 +87,17 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { session } = useAuth();
 
-  // Permission checks - synchronous check against session claims
+  // Permission checks - synchronous check against effective_permissions
   const permissions = useMemo(() => {
-    const userPermissions = session?.claims.permissions ?? [];
+    const eps = session?.claims.effective_permissions ?? [];
     return {
-      canCreate: userPermissions.includes('organization.create_ou'),
-      canUpdate: userPermissions.includes('organization.update_ou'),
-      canDelete: userPermissions.includes('organization.delete_ou'),
-      canDeactivate: userPermissions.includes('organization.deactivate_ou'),
-      canReactivate: userPermissions.includes('organization.reactivate_ou'),
+      canCreate: eps.some(ep => ep.p === 'organization.create_ou'),
+      canUpdate: eps.some(ep => ep.p === 'organization.update_ou'),
+      canDelete: eps.some(ep => ep.p === 'organization.delete_ou'),
+      canDeactivate: eps.some(ep => ep.p === 'organization.deactivate_ou'),
+      canReactivate: eps.some(ep => ep.p === 'organization.reactivate_ou'),
     };
-  }, [session?.claims.permissions]);
+  }, [session?.claims.effective_permissions]);
 
   // Determine if user has any write permissions (controls layout width)
   const hasAnyWritePermission = permissions.canCreate || permissions.canUpdate ||

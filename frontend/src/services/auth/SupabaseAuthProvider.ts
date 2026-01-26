@@ -308,10 +308,9 @@ export class SupabaseAuthProvider implements IAuthProvider {
   }
 
   /**
-   * Check if user has a specific permission
-   *
-   * When targetPath is provided and effective_permissions exist (v3),
-   * performs scope-aware checking. Otherwise falls back to flat permissions[].
+   * Check if user has a specific permission.
+   * Uses effective_permissions exclusively (JWT v4).
+   * When targetPath is provided, also checks scope containment.
    */
   async hasPermission(permission: string, targetPath?: string): Promise<PermissionCheckResult> {
     const session = await this.getSession();
@@ -323,16 +322,15 @@ export class SupabaseAuthProvider implements IAuthProvider {
       };
     }
 
+    const eps = session.claims.effective_permissions || [];
     let hasIt: boolean;
 
-    if (targetPath && session.claims.effective_permissions?.length > 0) {
-      // Scope-aware check: permission exists AND scope contains target path
-      hasIt = session.claims.effective_permissions.some(
+    if (targetPath) {
+      hasIt = eps.some(
         (ep) => ep.p === permission && isPathContained(ep.s, targetPath)
       );
     } else {
-      // Simple check: permission exists at any scope (backward compat)
-      hasIt = session.claims.permissions.includes(permission);
+      hasIt = eps.some((ep) => ep.p === permission);
     }
 
     if (this.config.debug) {
@@ -340,7 +338,6 @@ export class SupabaseAuthProvider implements IAuthProvider {
         permission,
         targetPath,
         hasPermission: hasIt,
-        usedEffectivePermissions: !!(targetPath && session.claims.effective_permissions?.length),
       });
     }
 
@@ -348,29 +345,6 @@ export class SupabaseAuthProvider implements IAuthProvider {
       hasPermission: hasIt,
       reason: hasIt ? undefined : `Permission '${permission}' not granted`,
     };
-  }
-
-  /**
-   * Check if user has a specific role
-   */
-  async hasRole(role: string): Promise<boolean> {
-    const session = await this.getSession();
-
-    if (!session) {
-      return false;
-    }
-
-    const hasRole = session.claims.user_role === role;
-
-    if (this.config.debug) {
-      log.debug('SupabaseAuthProvider: Role check', {
-        requestedRole: role,
-        userRole: session.claims.user_role,
-        hasRole,
-      });
-    }
-
-    return hasRole;
   }
 
   /**
@@ -508,17 +482,12 @@ export class SupabaseAuthProvider implements IAuthProvider {
         session_id: decoded.session_id,
         org_id: decoded.org_id || '',
         org_type: decoded.org_type || 'provider',
-        // v3 fields
         effective_permissions: decoded.effective_permissions || [],
         claims_version: decoded.claims_version,
         access_blocked: decoded.access_blocked,
         access_block_reason: decoded.access_block_reason,
         current_org_unit_id: decoded.current_org_unit_id || null,
         current_org_unit_path: decoded.current_org_unit_path || null,
-        // deprecated but still parsed for backward compat
-        user_role: decoded.user_role || 'viewer',
-        permissions: decoded.permissions || [],
-        scope_path: decoded.scope_path || '',
         iat: decoded.iat,
         exp: decoded.exp,
       };

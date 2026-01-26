@@ -86,7 +86,7 @@ class SupabaseService {
    * - Manages session persistence
    * - Processes OAuth callbacks
    *
-   * RLS policies on the database read org_id, user_role, and permissions
+   * RLS policies on the database read org_id and effective_permissions
    * directly from the JWT claims, so manual header injection is unnecessary
    * and can cause concurrency issues.
    */
@@ -97,7 +97,6 @@ class SupabaseService {
       log.info('Session reference updated', {
         user: session.user.email,
         org_id: session.claims.org_id,
-        role: session.claims.user_role,
       });
     } else {
       log.info('Session reference cleared');

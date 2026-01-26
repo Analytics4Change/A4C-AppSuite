@@ -6,8 +6,6 @@ const log = Logger.getLogger('main');
 
 interface DecodedJWTClaims {
   org_id?: string;
-  user_role?: string;
-  permissions?: string[];
   sub?: string;
 }
 
@@ -34,8 +32,6 @@ export class ProductionOrganizationService implements IOrganizationService {
       const decoded = JSON.parse(globalThis.atob(payload));
       return {
         org_id: decoded.org_id,
-        user_role: decoded.user_role,
-        permissions: decoded.permissions || [],
         sub: decoded.sub,
       };
     } catch {

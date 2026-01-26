@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { RequirePermission } from '@/components/auth/RequirePermission';
-import { RequireRole } from '@/components/auth/RequireRole';
 import { FailedEventsPage } from '@/pages/admin/FailedEventsPage';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { AuthCallback } from '@/pages/auth/AuthCallback';
@@ -138,9 +137,9 @@ function App() {
 
                 {/* Admin routes - platform-owner only */}
                 <Route path="/admin/events" element={
-                  <RequireRole role="super_admin" fallback="/clients">
+                  <RequirePermission permission="organization.create" fallback="/clients">
                     <FailedEventsPage />
-                  </RequireRole>
+                  </RequirePermission>
                 } />
               </Route>
             </Route>

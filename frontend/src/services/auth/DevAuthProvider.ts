@@ -185,10 +185,9 @@ export class DevAuthProvider implements IAuthProvider {
   }
 
   /**
-   * Check if user has a specific permission
-   *
-   * When targetPath is provided and effective_permissions exist (v3),
-   * performs scope-aware checking. Otherwise falls back to flat permissions[].
+   * Check if user has a specific permission.
+   * Uses effective_permissions exclusively (JWT v4).
+   * When targetPath is provided, also checks scope containment.
    */
   async hasPermission(permission: string, targetPath?: string): Promise<PermissionCheckResult> {
     if (!this.currentSession) {
@@ -198,14 +197,15 @@ export class DevAuthProvider implements IAuthProvider {
       };
     }
 
+    const eps = this.currentSession.claims.effective_permissions || [];
     let hasIt: boolean;
 
-    if (targetPath && this.currentSession.claims.effective_permissions?.length > 0) {
-      hasIt = this.currentSession.claims.effective_permissions.some(
+    if (targetPath) {
+      hasIt = eps.some(
         (ep) => ep.p === permission && isPathContained(ep.s, targetPath)
       );
     } else {
-      hasIt = this.currentSession.claims.permissions.includes(permission);
+      hasIt = eps.some((ep) => ep.p === permission);
     }
 
     if (this.config.debug) {
@@ -220,27 +220,6 @@ export class DevAuthProvider implements IAuthProvider {
       hasPermission: hasIt,
       reason: hasIt ? undefined : `Permission '${permission}' not granted`,
     };
-  }
-
-  /**
-   * Check if user has a specific role
-   */
-  async hasRole(role: string): Promise<boolean> {
-    if (!this.currentSession) {
-      return false;
-    }
-
-    const hasRole = this.currentSession.claims.user_role === role;
-
-    if (this.config.debug) {
-      log.debug('DevAuthProvider: Role check', {
-        requestedRole: role,
-        userRole: this.currentSession.claims.user_role,
-        hasRole,
-      });
-    }
-
-    return hasRole;
   }
 
   /**

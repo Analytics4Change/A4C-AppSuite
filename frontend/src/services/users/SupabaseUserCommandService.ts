@@ -147,8 +147,6 @@ const EDGE_FUNCTIONS = {
  */
 interface DecodedJWTClaims {
   org_id?: string;
-  user_role?: string;
-  permissions?: string[];
   sub?: string;
 }
 
@@ -706,8 +704,6 @@ export class SupabaseUserCommandService implements IUserCommandService {
       const decoded = JSON.parse(globalThis.atob(payload));
       return {
         org_id: decoded.org_id,
-        user_role: decoded.user_role,
-        permissions: decoded.permissions || [],
         sub: decoded.sub,
       };
     } catch {
