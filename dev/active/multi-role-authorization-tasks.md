@@ -126,6 +126,24 @@
 - [x] Add `dispose()` to IAuthProvider interface and DevAuthProvider (no-op)
 - [x] Add `dispose()` cleanup to AuthContext useEffect
 
+## Phase 5B: Strip Deprecated Claims (claims_version 4) ✅ COMPLETE
+
+> Remove backward-compat deprecated fields from JWT hook and all frontend code.
+
+- [x] Migration: Strip `user_role`, `permissions`, `scope_path` from `custom_access_token_hook` (`20260126180004_strip_deprecated_jwt_claims.sql`)
+- [x] Bump `claims_version` from 3 to 4
+- [x] Delete `RequireRole.tsx` component
+- [x] Remove `hasRole()` from IAuthProvider, SupabaseAuthProvider, DevAuthProvider, AuthContext
+- [x] Remove `user_role`, `permissions`, `scope_path` from `JWTClaims` type
+- [x] Convert MainLayout from role-based to permission+orgType filtering
+- [x] Convert impersonation check from `user_role === 'super_admin'` to permission-based
+- [x] Update all service JWT decoders to drop deprecated fields
+- [x] Convert OrganizationUnitsManagePage to `effective_permissions`
+- [x] Bump mock `claims_version` from 3 to 4 in `dev-auth.config.ts`
+- [x] Update documentation (CLAUDE.md, frontend/CLAUDE.md, rbac-architecture.md, AGENT-INDEX.md)
+- [x] Update JWT-CLAIMS-SETUP.md, frontend-auth-architecture.md, custom-claims-setup.md
+- [x] TypeScript check + build pass with zero errors
+
 ## Phase 6: UI Planning - Organization Direct Care Settings 📋 PLANNING
 
 > Admin UI for configuring organization-level feature flags.
@@ -189,8 +207,8 @@
 
 ## Current Status
 
-**Phase**: 5 - Frontend Integration ✅ COMPLETE
-**Status**: ✅ All 13 migrations deployed, frontend updated (2026-01-26)
+**Phase**: 5B - Strip Deprecated Claims ✅ COMPLETE
+**Status**: ✅ All 14 migrations created, JWT v4 fully enforced, deprecated fields removed (2026-01-26)
 **Last Updated**: 2026-01-26
 **Next Step**:
 1. ~~Deploy migrations: `supabase db push --linked`~~ ✅ DONE
@@ -198,8 +216,9 @@
 3. ~~Add event routing to `process_user_event()` for new event types~~ ✅ DONE (migration #11)
 4. ~~Phase 4 RLS Policy Migration~~ ✅ DONE (2026-01-24)
 5. ~~Phase 5 Frontend Integration~~ ✅ DONE (2026-01-26)
-6. Deploy migration #13 (`20260126173806_enable_realtime_user_roles.sql`): `supabase db push --linked`
-7. Proceed to Phase 6 (Organization Direct Care Settings UI) or Phase 7 (Schedules & Assignments UI)
+6. ~~Phase 5B Strip Deprecated Claims~~ ✅ DONE (2026-01-26)
+7. Deploy migrations #13-14 (`enable_realtime_user_roles.sql`, `strip_deprecated_jwt_claims.sql`): `supabase db push --linked`
+8. Proceed to Phase 6 (Organization Direct Care Settings UI) or Phase 7 (Schedules & Assignments UI)
 
 ### Implementation Summary (2026-01-24)
 
@@ -219,8 +238,9 @@
 | 3-Event | `20260123181951_user_schedule_client_event_routing.sql` | Event routing for Phase 3 | ✅ Deployed |
 | 4 | `20260124192733_rls_policy_migration_phase4.sql` | RLS policies → `has_effective_permission()` | ✅ Deployed |
 | 5 | `20260126173806_enable_realtime_user_roles.sql` | Publish `user_roles_projection` to Realtime | ⏳ Pending deploy |
+| 5B | `20260126180004_strip_deprecated_jwt_claims.sql` | Strip deprecated claims, bump to v4 | ⏳ Pending deploy |
 
-**Deployment Date**: 2026-01-24 (Phase 4 via `supabase db push --linked`), Phase 5 migration pending deploy
+**Deployment Date**: 2026-01-24 (Phase 4 via `supabase db push --linked`), Phase 5/5B migrations pending deploy
 
 **AsyncAPI Schemas Updated:**
 - `contracts/asyncapi/domains/organization.yaml` - Added `organization.direct_care_settings.updated`

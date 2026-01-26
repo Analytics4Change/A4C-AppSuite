@@ -171,7 +171,7 @@ Workflows use path filters to run only when relevant files change.
 
 #### Production Flow
 1. Frontend authenticates users via **Supabase Auth** (OAuth2 PKCE for social login, SAML 2.0 for enterprise SSO)
-2. Supabase Auth issues JWT tokens with custom claims (org_id, permissions, role, scope_path)
+2. Supabase Auth issues JWT tokens with custom claims (org_id, org_type, effective_permissions)
 3. Custom claims added via PostgreSQL database hook
 4. Row-level security (RLS) enforces multi-tenant data isolation using JWT claims
 5. Frontend uses provider interface pattern for authentication abstraction
@@ -201,7 +201,7 @@ The frontend supports three authentication modes for different development needs
 
 - **Provider Interface**: `IAuthProvider` interface with dependency injection
 - **Factory Pattern**: `AuthProviderFactory` selects provider based on environment
-- **JWT Claims**: `org_id`, `user_role`, `permissions`, `scope_path` in all modes
+- **JWT Claims**: `org_id`, `org_type`, `effective_permissions` (v4) in all modes
 - **Session Management**: Unified `Session` type across all providers
 - **Testing**: Easy mocking via injected auth provider
 

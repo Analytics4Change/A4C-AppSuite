@@ -1,22 +1,22 @@
 ---
 status: current
-last_updated: 2026-01-06
+last_updated: 2026-01-26
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Smart detection authentication system using dependency injection with `IAuthProvider` interface. Auth mode is auto-detected: credentials present = real Supabase auth, credentials missing = mock auth. Subdomain routing disabled on localhost.
+**Summary**: Smart detection authentication system using dependency injection with `IAuthProvider` interface. Auth mode is auto-detected: credentials present = real Supabase auth, credentials missing = mock auth. JWT claims v4 uses scope-aware permissions with `effective_permissions` array. Subdomain routing disabled on localhost.
 
 **When to read**:
 - Setting up local development authentication
 - Adding new OAuth providers
 - Testing permission-based UI components
-- Understanding JWT custom claims (`org_id`, `permissions`, `user_role`, `scope_path`)
+- Understanding JWT custom claims v4 (`org_id`, `org_type`, `effective_permissions`, `current_org_unit_id`, `current_org_unit_path`)
 
 **Prerequisites**: Familiarity with React context, JWT tokens
 
-**Key topics**: `authentication`, `oauth`, `jwt`, `mock-auth`, `supabase-auth`, `dependency-injection`, `smart-detection`
+**Key topics**: `authentication`, `oauth`, `jwt`, `mock-auth`, `supabase-auth`, `dependency-injection`, `smart-detection`, `jwt-v4`, `scope-aware-permissions`
 
 **Estimated read time**: 15 minutes
 <!-- TL;DR-END -->
@@ -52,7 +52,7 @@ The frontend authentication system uses a **dependency injection pattern** with 
 - ✅ **Interface-based design**: All auth providers implement `IAuthProvider`
 - ✅ **Smart detection**: Auth mode auto-detected from credentials and hostname
 - ✅ **Two modes**: Mock (no credentials) and Real (Supabase credentials present)
-- ✅ **Complete JWT claims**: Mock mode includes full RBAC/RLS structure
+- ✅ **Complete JWT claims v4**: Mock mode includes full RBAC/RLS structure with scope-aware permissions
 - ✅ **Localhost awareness**: Subdomain routing disabled on localhost
 - ✅ **Single escape hatch**: `VITE_FORCE_MOCK=true` to force mock mode
 
@@ -112,14 +112,14 @@ Each provider handles **only** authentication concerns:
 
 ### 3. Consistent Session Model
 
-Both providers return the same `Session` type with complete JWT claims structure:
+Both providers return the same `Session` type with complete JWT claims v4 structure:
 
 ```typescript
 interface Session {
   access_token: string;
   refresh_token?: string;
   user: User;
-  claims: JWTClaims;  // Always present, even in mock mode
+  claims: JWTClaims;  // Always present (v4), even in mock mode
 }
 ```
 
@@ -161,7 +161,7 @@ const useRealServices = env.hasSupabaseCredentials && !env.forceMock;
 |---------|-----------|-----------|
 | **Provider** | DevAuthProvider | SupabaseAuthProvider |
 | **OAuth Flow** | ❌ Instant | ✅ Real |
-| **JWT Claims** | ✅ Full Mock | ✅ Real from DB |
+| **JWT Claims** | ✅ Full Mock (v4) | ✅ Real from DB (v4) |
 | **Network Calls** | ❌ None | ✅ Real |
 | **Login Speed** | Instant | 2-5 seconds |
 | **Use Case** | UI development | Auth testing & Production |
@@ -182,7 +182,7 @@ npm run dev:mock   # Forces mock mode even with credentials
 - ✅ Instant login (no network calls)
 - ✅ Any email/password accepted
 - ✅ OAuth buttons work instantly
-- ✅ Complete JWT claims for RLS testing
+- ✅ Complete JWT claims v4 with scope-aware permissions
 - ✅ Customizable test user profiles
 - ⚠️ No real authentication validation
 - ⚠️ Database RLS not enforced (mock org_id used)
@@ -193,12 +193,11 @@ npm run dev:mock   # Forces mock mode even with credentials
 
 # Optional: Customize mock user
 VITE_DEV_USER_EMAIL=dev@example.com
-VITE_DEV_USER_ROLE=provider_admin
 VITE_DEV_ORG_ID=dev-org-uuid
-VITE_DEV_SCOPE_PATH=org_dev_organization
+VITE_DEV_ORG_TYPE=provider  # or platform_owner
 
-# Or use predefined profiles
-VITE_DEV_PROFILE=super_admin  # or provider_admin, clinician, viewer
+# Or use predefined profiles (automatically include v4 claims)
+VITE_DEV_PROFILE=provider_admin  # or clinician, viewer
 ```
 
 **Visual Indicator**: Mock mode shows banner in UI:
@@ -221,8 +220,8 @@ npm run preview    # Test production build locally
 
 **Behavior**:
 - ✅ Real OAuth redirects (Google, GitHub, etc.)
-- ✅ Real JWT tokens from Supabase
-- ✅ Custom claims from database hook
+- ✅ Real JWT tokens from Supabase with v4 claims
+- ✅ Custom claims v4 from database hook
 - ✅ RLS policies enforced
 - ✅ Organization switching with JWT refresh
 - ✅ Stays on localhost (no subdomain redirect in development)
@@ -259,9 +258,8 @@ export interface IAuthProvider {
   getUser(): Promise<User | null>;
   refreshSession(): Promise<Session>;
 
-  // Authorization
-  hasPermission(permission: string): Promise<PermissionCheckResult>;
-  hasRole(role: string): Promise<boolean>;
+  // Authorization (JWT v4)
+  hasPermission(permission: string, targetPath?: string): Promise<PermissionCheckResult>;
 
   // Organization
   switchOrganization(orgId: string): Promise<Session>;
@@ -280,20 +278,22 @@ export interface IAuthProvider {
 **Location**: `src/types/auth.types.ts`
 
 ```typescript
-export type UserRole =
-  | 'super_admin'
-  | 'provider_admin'
-  | 'clinician'
-  | 'nurse'
-  | 'viewer';
+// JWT Claims Version 4 (current)
+export interface EffectivePermission {
+  p: string;   // Permission (e.g., "medication.view")
+  s: string;   // Scope path (e.g., "acme.pediatrics.unit1")
+}
 
 export interface JWTClaims {
-  sub: string;                    // User UUID
+  sub: string;                              // User UUID
   email: string;
-  org_id: string;                 // Organization UUID
-  user_role: UserRole;
-  permissions: Permission[];       // Array of permission strings
-  scope_path: string;             // ltree path for hierarchical scope
+  org_id: string;                           // Organization UUID
+  org_type: 'platform_owner' | 'provider';  // Organization type
+  access_blocked: boolean;                  // Access control flag
+  claims_version: 4;                        // Current version
+  current_org_unit_id: string | null;       // Current org unit UUID
+  current_org_unit_path: string;            // Dotted path (e.g., "acme.pediatrics.unit1")
+  effective_permissions: EffectivePermission[];  // Scope-aware permissions
   iat?: number;
   exp?: number;
 }
@@ -347,10 +347,10 @@ src/
 
 **Key Features**:
 - Instant authentication (no async delays)
-- Complete JWT claims structure for RLS testing
-- Predefined user profiles (super_admin, provider_admin, etc.)
+- Complete JWT claims v4 structure with scope-aware permissions
+- Predefined user profiles with effective_permissions
 - Customizable via environment variables
-- Permission checking works identically to production
+- Permission checking with optional scope validation
 
 **Implementation Highlights**:
 
@@ -370,14 +370,34 @@ export class DevAuthProvider implements IAuthProvider {
     return createMockSession(this.config.profile);
   }
 
-  async hasPermission(permission: string): Promise<PermissionCheckResult> {
-    const hasPermission = this.currentSession?.claims.permissions
-      .includes(permission) ?? false;
+  async hasPermission(permission: string, targetPath?: string): Promise<PermissionCheckResult> {
+    if (!this.currentSession) {
+      return { hasPermission: false };
+    }
+
+    const effectivePerms = this.currentSession.claims.effective_permissions;
+
+    // Check if user has the permission at any scope
+    const matchingPerms = effectivePerms.filter(ep => ep.p === permission);
+    if (matchingPerms.length === 0) {
+      return { hasPermission: false };
+    }
+
+    // If no target path specified, permission exists somewhere
+    if (!targetPath) {
+      return { hasPermission: true };
+    }
+
+    // Check if any scope contains the target path
+    const hasPermission = matchingPerms.some(ep =>
+      isPathContained(ep.s, targetPath)
+    );
+
     return { hasPermission };
   }
 
   async switchOrganization(orgId: string): Promise<Session> {
-    // Update mock session with new org
+    // Update mock session with new org (would reload permissions in production)
     this.currentSession = createMockSession({
       ...this.config.profile,
       org_id: orgId,
@@ -393,10 +413,10 @@ export class DevAuthProvider implements IAuthProvider {
 
 **Key Features**:
 - Real OAuth flows with redirect
-- JWT decoding to extract custom claims
+- JWT decoding to extract custom claims v4
 - Session refresh handling
 - Organization switching triggers JWT refresh
-- Permission checking via JWT claims
+- Permission checking via JWT effective_permissions with scope validation
 
 **Implementation Highlights**:
 
@@ -451,9 +471,12 @@ export class SupabaseAuthProvider implements IAuthProvider {
       sub: payload.sub,
       email: payload.email,
       org_id: payload.org_id,
-      user_role: payload.user_role,
-      permissions: payload.permissions || [],
-      scope_path: payload.scope_path,
+      org_type: payload.org_type || 'provider',
+      access_blocked: payload.access_blocked || false,
+      claims_version: payload.claims_version || 4,
+      current_org_unit_id: payload.current_org_unit_id || null,
+      current_org_unit_path: payload.current_org_unit_path || '',
+      effective_permissions: payload.effective_permissions || [],
       iat: payload.iat,
       exp: payload.exp,
     };
@@ -543,8 +566,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     });
   };
 
-  const hasPermission = async (permission: string): Promise<boolean> => {
-    const result = await authProvider.hasPermission(permission);
+  const hasPermission = async (permission: string, targetPath?: string): Promise<boolean> => {
+    const result = await authProvider.hasPermission(permission, targetPath);
     return result.hasPermission;
   };
 
@@ -566,52 +589,77 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
 **Location**: `src/config/dev-auth.config.ts`
 
-Provides predefined user profiles for common testing scenarios:
+Provides predefined user profiles for common testing scenarios with JWT v4 claims:
 
 ```typescript
 export const PREDEFINED_PROFILES: Record<string, DevUserProfile> = {
-  super_admin: {
-    id: 'super-admin-uuid',
-    email: 'superadmin@example.com',
-    name: 'Super Admin',
-    role: 'super_admin',
-    org_id: 'platform-org-uuid',
-    org_name: 'Platform Administration',
-    scope_path: 'org_platform',
-    permissions: getAllPermissions(),
-  },
-
   provider_admin: {
     id: 'provider-admin-uuid',
     email: 'admin@acmehealthcare.com',
     name: 'Provider Admin',
-    role: 'provider_admin',
     org_id: 'acme-org-uuid',
+    org_type: 'provider',
     org_name: 'Acme Healthcare',
-    scope_path: 'org_acme_healthcare',
-    permissions: getProviderAdminPermissions(),
+    current_org_unit_id: null,
+    current_org_unit_path: 'acme',
+    effective_permissions: [
+      { p: 'organization.view', s: 'acme' },
+      { p: 'organization.edit', s: 'acme' },
+      { p: 'medication.view', s: 'acme' },
+      { p: 'medication.create', s: 'acme' },
+      { p: 'users.view', s: 'acme' },
+      { p: 'users.invite', s: 'acme' },
+    ],
   },
 
   clinician: {
     id: 'clinician-uuid',
     email: 'doctor@acmehealthcare.com',
     name: 'Dr. Smith',
-    role: 'clinician',
     org_id: 'acme-org-uuid',
-    org_name: 'Acme Healthcare',
-    scope_path: 'org_acme_healthcare.facility_a',
-    permissions: getClinicianPermissions(),
+    org_type: 'provider',
+    org_name: 'Acme Healthcare - Pediatrics',
+    current_org_unit_id: 'pediatrics-unit-uuid',
+    current_org_unit_path: 'acme.pediatrics',
+    effective_permissions: [
+      { p: 'medication.view', s: 'acme.pediatrics' },
+      { p: 'medication.create', s: 'acme.pediatrics' },
+      { p: 'medication.edit', s: 'acme.pediatrics' },
+      { p: 'clients.view', s: 'acme.pediatrics' },
+    ],
   },
 
   viewer: {
     id: 'viewer-uuid',
     email: 'viewer@acmehealthcare.com',
     name: 'Read Only User',
-    role: 'viewer',
     org_id: 'acme-org-uuid',
+    org_type: 'provider',
     org_name: 'Acme Healthcare',
-    scope_path: 'org_acme_healthcare',
-    permissions: getViewerPermissions(),
+    current_org_unit_id: null,
+    current_org_unit_path: 'acme',
+    effective_permissions: [
+      { p: 'organization.view', s: 'acme' },
+      { p: 'medication.view', s: 'acme' },
+      { p: 'clients.view', s: 'acme' },
+    ],
+  },
+
+  platform_admin: {
+    id: 'platform-admin-uuid',
+    email: 'admin@analytics4change.com',
+    name: 'Platform Administrator',
+    org_id: 'platform-org-uuid',
+    org_type: 'platform_owner',
+    org_name: 'Analytics4Change Platform',
+    current_org_unit_id: null,
+    current_org_unit_path: 'platform',
+    effective_permissions: [
+      { p: 'users.impersonate', s: 'platform' },
+      { p: 'organization.view', s: 'platform' },
+      { p: 'organization.create', s: 'platform' },
+      { p: 'system.admin', s: 'platform' },
+    ],
   },
 };
 
@@ -627,9 +675,12 @@ export function createMockSession(profile: DevUserProfile): Session {
       sub: profile.id,
       email: profile.email,
       org_id: profile.org_id,
-      user_role: profile.role,
-      permissions: profile.permissions,
-      scope_path: profile.scope_path,
+      org_type: profile.org_type,
+      access_blocked: false,
+      claims_version: 4,
+      current_org_unit_id: profile.current_org_unit_id,
+      current_org_unit_path: profile.current_org_unit_path,
+      effective_permissions: profile.effective_permissions,
       iat: Date.now() / 1000,
       exp: Date.now() / 1000 + 3600,
     },
@@ -657,7 +708,7 @@ class SupabaseService {
       (this.client as any).rest.headers = {
         Authorization: `Bearer ${session.access_token}`,
         'X-Organization-Id': session.claims.org_id,
-        'X-User-Role': session.claims.user_role,
+        'X-Organization-Type': session.claims.org_type,
       };
     }
   }
@@ -740,13 +791,16 @@ async getUsersPaginated(): Promise<PaginatedResult<UserListItem>> {
 
 **JWT Claims Decoding Helper:**
 
-Every service that needs JWT claims should include this helper method:
+Every service that needs JWT claims should include this helper method for v4 claims:
 
 ```typescript
 interface DecodedJWTClaims {
   org_id?: string;
-  user_role?: string;
-  permissions?: string[];
+  org_type?: 'platform_owner' | 'provider';
+  effective_permissions?: Array<{ p: string; s: string }>;
+  current_org_unit_id?: string | null;
+  current_org_unit_path?: string;
+  claims_version?: number;
   sub?: string;
 }
 
@@ -756,8 +810,11 @@ private decodeJWT(token: string): DecodedJWTClaims {
     const decoded = JSON.parse(globalThis.atob(payload));
     return {
       org_id: decoded.org_id,
-      user_role: decoded.user_role,
-      permissions: decoded.permissions || [],
+      org_type: decoded.org_type,
+      effective_permissions: decoded.effective_permissions || [],
+      current_org_unit_id: decoded.current_org_unit_id,
+      current_org_unit_path: decoded.current_org_unit_path,
+      claims_version: decoded.claims_version,
       sub: decoded.sub,
     };
   } catch {
@@ -914,14 +971,32 @@ test.describe('Authentication Flow', () => {
 ### Permission Testing
 
 ```typescript
-describe('Permission Checks', () => {
-  it('allows admin to create medications', async () => {
+describe('Permission Checks (JWT v4)', () => {
+  it('allows admin to create medications at org level', async () => {
     const adminProvider = new DevAuthProvider({
       profile: PREDEFINED_PROFILES.provider_admin,
     });
 
-    const hasPermission = await adminProvider.hasPermission('medication.create');
-    expect(hasPermission.hasPermission).toBe(true);
+    const result = await adminProvider.hasPermission('medication.create', 'acme');
+    expect(result.hasPermission).toBe(true);
+  });
+
+  it('allows clinician to create medications in their unit', async () => {
+    const clinicianProvider = new DevAuthProvider({
+      profile: PREDEFINED_PROFILES.clinician,
+    });
+
+    const result = await clinicianProvider.hasPermission('medication.create', 'acme.pediatrics');
+    expect(result.hasPermission).toBe(true);
+  });
+
+  it('blocks clinician from creating medications in other units', async () => {
+    const clinicianProvider = new DevAuthProvider({
+      profile: PREDEFINED_PROFILES.clinician,
+    });
+
+    const result = await clinicianProvider.hasPermission('medication.create', 'acme.cardiology');
+    expect(result.hasPermission).toBe(false);
   });
 
   it('blocks viewer from creating medications', async () => {
@@ -929,8 +1004,8 @@ describe('Permission Checks', () => {
       profile: PREDEFINED_PROFILES.viewer,
     });
 
-    const hasPermission = await viewerProvider.hasPermission('medication.create');
-    expect(hasPermission.hasPermission).toBe(false);
+    const result = await viewerProvider.hasPermission('medication.create');
+    expect(result.hasPermission).toBe(false);
   });
 });
 ```
@@ -960,13 +1035,23 @@ describe('Permission Checks', () => {
 2. **ProductionOrganizationService.ts**: Uses auth provider instead of Zitadel service
 3. **MedicationManagementViewModel.ts**: Replaced `zitadelService.getUser()` with auth provider
 4. **ProviderFormViewModel.ts**: Removed Zitadel organization creation
+5. **JWT Claims v4**: Migrated from `user_role`, `permissions` (flat array), `scope_path` to `org_type`, `effective_permissions` (scope-aware), `current_org_unit_path`
+6. **Permission Checking**: `hasPermission()` now supports optional `targetPath` for scope validation
+7. **Role Checking**: `hasRole()` method removed from `IAuthProvider` interface - use `org_type` and permissions instead
 
 #### Breaking Changes
 - Bootstrap page removed (role management moved to database)
 - Organization creation workflow needs Temporal implementation
 - User invitation system requires new implementation
+- `hasRole()` method removed from auth providers - use JWT `org_type` and `effective_permissions` instead
+- `RequireRole` component removed - use permission-based checks with `hasPermission()`
+- JWT claims structure changed: no more `user_role`, `permissions` (flat), or `scope_path`
+- Navigation filtering changed from role-based to permission + org_type based
+- Impersonation check changed from `user_role === 'super_admin'` to checking `org_type === 'platform_owner'` and `users.impersonate` permission
 
 #### Migration Path for Existing Code
+
+**Zitadel to Supabase:**
 ```typescript
 // OLD: Zitadel Service
 import { zitadelService } from '@/services/auth/zitadel.service';
@@ -976,6 +1061,31 @@ const user = await zitadelService.getUser();
 import { getAuthProvider } from '@/services/auth/AuthProviderFactory';
 const authProvider = getAuthProvider();
 const user = await authProvider.getUser();
+```
+
+**JWT v3 to v4:**
+```typescript
+// OLD: Role-based checks (v3)
+const hasRole = await authProvider.hasRole('provider_admin');
+if (session.claims.user_role === 'super_admin') {
+  // Enable impersonation
+}
+
+// NEW: Permission and org_type checks (v4)
+const canImpersonate = session.claims.org_type === 'platform_owner' &&
+  session.claims.effective_permissions.some(ep => ep.p === 'users.impersonate');
+
+// OLD: Flat permissions check (v3)
+const canCreate = session.claims.permissions.includes('medication.create');
+
+// NEW: Scope-aware permission check (v4)
+const result = await authProvider.hasPermission('medication.create', 'acme.pediatrics');
+const canCreate = result.hasPermission;
+
+// Access JWT fields
+const orgType = session.claims.org_type;  // 'platform_owner' or 'provider'
+const currentPath = session.claims.current_org_unit_path;  // 'acme.pediatrics.unit1'
+const permissions = session.claims.effective_permissions;  // [{ p: '...', s: '...' }]
 ```
 
 ---
@@ -1002,6 +1112,6 @@ const user = await authProvider.getUser();
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-10-27
+**Document Version**: 1.1 (JWT v4)
+**Last Updated**: 2026-01-26
 **Status**: Implementation Complete

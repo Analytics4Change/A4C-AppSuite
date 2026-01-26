@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2026-01-05
+last_updated: 2026-01-26
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Step-by-step guide to deploy the PostgreSQL database hook that enriches JWT tokens with org_id, user_role, permissions, and scope_path for RBAC and multi-tenant RLS.
+**Summary**: Step-by-step guide to deploy the PostgreSQL database hook that enriches JWT tokens with org_id, org_type, effective_permissions (scope-aware), and current_org_unit context for RBAC and multi-tenant RLS.
 
 **When to read**:
 - Setting up JWT custom claims in a new environment
@@ -16,7 +16,7 @@ last_updated: 2026-01-05
 
 **Prerequisites**: Supabase project access, deployed RBAC schema (roles, permissions tables)
 
-**Key topics**: `jwt`, `custom-claims`, `database-hook`, `rbac`, `rls`, `org_id`, `permissions`, `scope_path`
+**Key topics**: `jwt`, `custom-claims`, `database-hook`, `rbac`, `rls`, `org_id`, `effective_permissions`, `claims-v4`
 
 **Estimated read time**: 10 minutes
 <!-- TL;DR-END -->
@@ -26,17 +26,20 @@ last_updated: 2026-01-05
 **Purpose**: Configure Supabase Auth to enrich JWT tokens with custom claims for RBAC and multi-tenant isolation.
 
 **Status**: Ready for deployment
-**Last Updated**: 2025-10-27
+**Last Updated**: 2026-01-26
 
 ---
 
 ## Overview
 
-This guide walks through deploying the JWT custom claims hook that adds:
+This guide walks through deploying the JWT custom claims hook that adds (claims version 4):
 - `org_id`: Organization UUID for multi-tenant RLS
-- `user_role`: User's primary role (super_admin, provider_admin, etc.)
-- `permissions`: Array of permission strings for RBAC
-- `scope_path`: Hierarchical organization scope (ltree)
+- `org_type`: Organization type (provider, network, etc.)
+- `access_blocked`: User access status
+- `current_org_unit_id`: Current organizational unit UUID (or null)
+- `current_org_unit_path`: Hierarchical organization unit path (ltree)
+- `effective_permissions`: Array of scope-aware permissions with format `[{p: "permission", s: "scope"}, ...]`
+- `claims_version`: Version number (4)
 
 ---
 
@@ -105,22 +108,24 @@ Status: Enabled
 ### Test 1: Preview Claims for User
 
 ```sql
--- Test Lars Tice's claims
+-- Test user's claims
 SELECT public.get_user_claims_preview('your-user-uuid');
 
--- Expected output:
+-- Expected output (claims version 4):
 {
   "org_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-  "user_role": "super_admin",
-  "permissions": [
-    "organization.create_root",
-    "organization.view",
-    "role.create",
-    "user.create",
+  "org_type": "provider",
+  "access_blocked": false,
+  "claims_version": 4,
+  "current_org_unit_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  "current_org_unit_path": "acme.pediatrics.unit1",
+  "effective_permissions": [
+    {"p": "organization.create_root", "s": "acme"},
+    {"p": "organization.view", "s": "acme"},
+    {"p": "role.create", "s": "acme.pediatrics"},
+    {"p": "user.create", "s": "acme.pediatrics"},
     ...
-  ],
-  "scope_path": null,
-  "claims_version": 1
+  ]
 }
 ```
 
@@ -131,17 +136,20 @@ Using the frontend application:
 ```typescript
 // Login with Supabase Auth
 const { data: { session } } = await supabase.auth.signInWithPassword({
-  email: 'lars.tice@gmail.com',
+  email: 'user@example.com',
   password: 'your-password'
 });
 
-// Decode JWT to verify custom claims
+// Decode JWT to verify custom claims (version 4)
 const payload = JSON.parse(atob(session.access_token.split('.')[1]));
 console.log('Custom Claims:', {
   org_id: payload.org_id,
-  user_role: payload.user_role,
-  permissions: payload.permissions,
-  scope_path: payload.scope_path
+  org_type: payload.org_type,
+  access_blocked: payload.access_blocked,
+  claims_version: payload.claims_version,
+  current_org_unit_id: payload.current_org_unit_id,
+  current_org_unit_path: payload.current_org_unit_path,
+  effective_permissions: payload.effective_permissions
 });
 ```
 
@@ -154,14 +162,14 @@ SET app.current_user = 'your-user-uuid';
 -- Test org_id extraction
 SELECT get_current_org_id();  -- Should return user's org UUID
 
--- Test role extraction
-SELECT get_current_user_role();  -- Should return 'super_admin' or role name
+-- Test scope-aware permission check (v4)
+SELECT has_effective_permission('organization.view', 'acme');  -- Should return true/false
 
--- Test permissions extraction
-SELECT get_current_permissions();  -- Should return array of permissions
+-- Test permission at specific scope
+SELECT has_effective_permission('medication.create', 'acme.pediatrics');  -- Should return true/false
 
--- Test permission check
-SELECT has_permission('organization.view');  -- Should return true/false
+-- Note: get_current_user_role() and get_current_permissions() are deprecated in v4
+-- Use has_effective_permission() for permission checks instead
 ```
 
 ### Test 4: Switch Organization Context
@@ -228,15 +236,19 @@ SELECT * FROM clients;  -- Should return ALL clients (bypasses RLS)
 ### Test Permission-Based Access
 
 ```sql
--- User without 'client.create' permission
+-- User without 'client.create' permission at the required scope
 SET app.current_user = 'viewer-user-uuid';
 INSERT INTO clients (name, organization_id) VALUES ('Test', 'some-org-uuid');
 -- Should FAIL with permission denied
 
--- User with 'client.create' permission
+-- User with 'client.create' permission at the required scope
 SET app.current_user = 'admin-user-uuid';
 INSERT INTO clients (name, organization_id) VALUES ('Test', 'some-org-uuid');
 -- Should SUCCEED
+
+-- Test scope-aware permission (v4)
+SELECT has_effective_permission('client.create', 'acme.pediatrics');
+-- Should return true/false based on effective_permissions in JWT
 ```
 
 ---
@@ -263,21 +275,49 @@ import { useAuth } from '@/contexts/AuthContext';
 const MyComponent = () => {
   const { session } = useAuth();
 
-  // Custom claims are available in session.claims
+  // Custom claims are available in session.claims (v4 structure)
   const orgId = session?.claims.org_id;
-  const role = session?.claims.user_role;
-  const permissions = session?.claims.permissions;
-  const scopePath = session?.claims.scope_path;
+  const orgType = session?.claims.org_type;
+  const currentOrgUnitPath = session?.claims.current_org_unit_path;
+  const effectivePermissions = session?.claims.effective_permissions;
 
   return (
     <div>
       <p>Organization: {orgId}</p>
-      <p>Role: {role}</p>
-      <p>Permissions: {permissions.length}</p>
+      <p>Organization Type: {orgType}</p>
+      <p>Current Unit Path: {currentOrgUnitPath}</p>
+      <p>Effective Permissions: {effectivePermissions?.length}</p>
     </div>
   );
 };
 ```
+
+### Check Permissions in Frontend
+
+```typescript
+import { useAuth } from '@/contexts/AuthContext';
+
+const MyComponent = () => {
+  const { hasPermission } = useAuth();
+
+  // Simple permission check (checks if user has permission anywhere)
+  const canViewOrg = hasPermission('organization.view');
+
+  // Scope-aware permission check (checks at specific org path)
+  const canEditMeds = hasPermission('medication.edit', 'acme.pediatrics');
+
+  return (
+    <div>
+      {canViewOrg && <ViewOrgButton />}
+      {canEditMeds && <EditMedicationButton />}
+    </div>
+  );
+};
+```
+
+**Frontend Permission API**:
+- `hasPermission(permission)`: Check if permission exists at any scope
+- `hasPermission(permission, targetPath)`: Check if permission exists at specific scope or ancestor scopes
 
 ### Switch Organization in Frontend
 
@@ -295,8 +335,9 @@ const switchOrg = async (newOrgId: string) => {
   // Refresh session to get new JWT with updated claims
   const { data: { session } } = await supabase.auth.refreshSession();
 
-  // New session will have updated org_id in claims
+  // New session will have updated org_id and effective_permissions in claims (v4)
   console.log('New org_id:', session?.claims.org_id);
+  console.log('Effective permissions:', session?.claims.effective_permissions);
 };
 ```
 
@@ -363,9 +404,9 @@ const { data: { session } } = await supabase.auth.refreshSession();
 
 **JWT tokens are immutable** - must refresh to get new claims.
 
-### Issue: Edge Functions Reading Wrong JWT Claims (2026-01-05)
+### Issue: Edge Functions Reading Wrong JWT Claims
 
-**Symptom**: Edge Functions return `user_role: 'viewer'` instead of actual role, or missing `org_id`/`permissions`.
+**Symptom**: Edge Functions are missing JWT claims or reading incorrect values.
 
 **Root Cause**: Reading claims from wrong source. JWT claims are in the token **payload**, not in `user.app_metadata`.
 
@@ -376,7 +417,7 @@ const { data: { user } } = await supabase.auth.getUser();
 const claims = user?.app_metadata;  // Empty or wrong!
 ```
 
-**✅ CORRECT - Decode JWT payload**:
+**✅ CORRECT - Decode JWT payload (v4 structure)**:
 ```typescript
 // Get the access token and decode it
 const authHeader = req.headers.get('Authorization');
@@ -388,12 +429,15 @@ const token = authHeader.replace('Bearer ', '');
 // Decode JWT payload (second segment, base64)
 const payload = JSON.parse(atob(token.split('.')[1]));
 
-// Custom claims are in the payload
+// Custom claims are in the payload (v4 structure)
 const claims = {
-  org_id: payload.org_id,           // UUID string
-  user_role: payload.user_role,      // 'super_admin', 'provider_admin', etc.
-  permissions: payload.permissions,  // Array of permission strings
-  scope_path: payload.scope_path,    // ltree path or null
+  org_id: payload.org_id,                           // UUID string
+  org_type: payload.org_type,                       // 'provider', 'network', etc.
+  access_blocked: payload.access_blocked,           // boolean
+  current_org_unit_id: payload.current_org_unit_id, // UUID or null
+  current_org_unit_path: payload.current_org_unit_path, // ltree path string
+  effective_permissions: payload.effective_permissions, // [{p: "perm", s: "scope"}, ...]
+  claims_version: payload.claims_version,           // 4
 };
 ```
 
@@ -435,6 +479,12 @@ Custom claims enable efficient RLS policies:
 -- FAST - Uses JWT claim directly
 CREATE POLICY org_isolation ON clients
 USING (org_id = (auth.jwt()->>'org_id')::uuid);
+
+-- FAST - Scope-aware permission check (v4)
+CREATE POLICY medication_access ON medications
+USING (
+  has_effective_permission('medication.view', organization_path)
+);
 
 -- SLOW - Requires database lookup
 CREATE POLICY org_isolation_legacy ON clients

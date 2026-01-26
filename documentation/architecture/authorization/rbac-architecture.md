@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2026-01-08
+last_updated: 2026-01-26
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Permission-based RBAC system built on event sourcing. Permissions are stored in JWT claims (`permissions`, `user_role`, `org_id`, `scope_path`). RLS policies enforce access at database layer.
+**Summary**: Permission-based RBAC system built on event sourcing. Permissions are stored in JWT claims as `effective_permissions` (scoped `[{p, s}]` array) with `org_id` and `org_type`. RLS policies enforce access via `has_effective_permission()` helper.
 
 **When to read**:
 - Implementing permission checks in frontend or backend
@@ -38,21 +38,19 @@ A4C AppSuite implements a **permission-based Role-Based Access Control (RBAC)** 
 
 **IMPORTANT**: This RBAC system is integrated with **Supabase Auth** (not Zitadel). Key integration points:
 
-1. **JWT Custom Claims**: User permissions are added to JWT tokens via database hook
-   - `permissions`: Array of permission strings (e.g., `["medication.create", "client.view"]`)
-   - `user_role`: User's primary role (e.g., `"provider_admin"`)
+1. **JWT Custom Claims (v4)**: User permissions are added to JWT tokens via `custom_access_token_hook`
+   - `effective_permissions`: Array of scoped permissions (e.g., `[{"p": "medication.create", "s": "acme"}, {"p": "client.view", "s": "acme.pediatrics"}]`)
    - `org_id`: User's active organization for RLS isolation
-   - `scope_path`: Hierarchical scope for ltree queries
+   - `org_type`: Organization type (`platform_owner`, `provider`, `partner`)
+   - `claims_version`: Currently `4`
 
-2. **RLS Policies**: Row-level security policies use JWT claims for authorization
+2. **RLS Policies**: Row-level security policies use `has_effective_permission()` helper
    ```sql
-   -- Example: Permission-based access
-   CREATE POLICY "medication_create"
-   ON medications FOR INSERT
+   -- Example: Scope-aware permission check
+   CREATE POLICY "medication_scope_access"
+   ON medications FOR ALL
    USING (
-     'medication.create' = ANY(
-       string_to_array(auth.jwt()->>'permissions', ',')
-     )
+     has_effective_permission('medication.view', path)
    );
    ```
 

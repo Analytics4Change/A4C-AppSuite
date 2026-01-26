@@ -1,24 +1,24 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-01-26
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Architecture spec for the PostgreSQL database hook that adds org_id, user_role, permissions, and scope_path to Supabase JWT tokens for multi-tenant RLS and RBAC.
+**Summary**: Architecture spec for the PostgreSQL database hook that adds custom claims (org_id, org_type, effective_permissions, current_org_unit_id, current_org_unit_path) to Supabase JWT tokens for multi-tenant RLS and RBAC. JWT claims version 4 uses scope-aware permissions with permission implication expansion at JWT generation time.
 
 **When to read**:
-- Understanding the JWT custom claims implementation
+- Understanding the JWT custom claims v4 implementation
 - Debugging RLS policies that rely on JWT claims
 - Reviewing security model for multi-tenant isolation
-- Writing new RLS policies using custom claims
+- Writing new RLS policies using effective_permissions and scope-aware helpers
 
 **Prerequisites**: [JWT-CLAIMS-SETUP.md](../../infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) for deployment steps
 
-**Key topics**: `jwt`, `custom-claims`, `database-hook`, `rls`, `multi-tenant`, `rbac`, `security-definer`
+**Key topics**: `jwt`, `custom-claims`, `database-hook`, `rls`, `multi-tenant`, `rbac`, `effective-permissions`, `scope-aware-permissions`
 
-**Estimated read time**: 12 minutes
+**Estimated read time**: 14 minutes
 <!-- TL;DR-END -->
 
 # Supabase Auth - Custom JWT Claims Setup
@@ -50,21 +50,22 @@ Supabase JWT tokens include standard claims (sub, email, role) but require custo
 
 **Why Custom Claims Are Critical**:
 - 🔐 **Multi-tenant isolation**: `org_id` enforces tenant boundaries in RLS policies
-- 🔐 **RBAC enforcement**: `permissions` array enables fine-grained access control
-- 🔐 **Hierarchical scoping**: `scope_path` supports organizational hierarchies
-- 🔐 **Role-based logic**: `user_role` enables role-specific UI/API behavior
+- 🔐 **RBAC enforcement**: `effective_permissions` array enables fine-grained, scope-aware access control
+- 🔐 **Hierarchical scoping**: `current_org_unit_path` supports organizational unit hierarchies
+- 🔐 **Permission implications**: Permissions expanded at JWT generation time (e.g., update implies view)
+- 🔐 **Scope conflict resolution**: Widest scope wins when same permission exists at multiple scopes
 
 **Security Model**:
 - Custom claims are **server-side only** (never trust client input)
-- RLS policies **must** use JWT claims, not request parameters
-- Hook function runs with **SECURITY DEFINER** (elevated privileges)
+- RLS policies **must** use JWT claims via helper functions (`has_effective_permission`, `has_permission`)
+- Hook function computes permissions using `compute_effective_permissions(user_id, org_id)`
 - Any bug in the hook compromises multi-tenant isolation
 
 ---
 
 ## Custom Claims Structure
 
-### Enhanced JWT Payload
+### Enhanced JWT Payload (Version 4)
 
 After implementing the custom claims hook, Supabase JWTs will include:
 
@@ -78,11 +79,19 @@ After implementing the custom claims hook, Supabase JWTs will include:
   "aal": "aal1",
   "session_id": "session-uuid",
 
-  // Custom claims (added by hook)
+  // Custom claims v4 (added by hook)
   "org_id": "org-uuid",
-  "user_role": "provider_admin",
-  "permissions": ["medication.create", "client.view", "organization.manage"],
-  "scope_path": "org_acme_healthcare",
+  "org_type": "provider",
+  "access_blocked": false,
+  "claims_version": 4,
+  "current_org_unit_id": "org-unit-uuid-or-null",
+  "current_org_unit_path": "acme.pediatrics.unit1",
+  "effective_permissions": [
+    {"p": "organization.view", "s": "acme"},
+    {"p": "medication.view", "s": "acme.pediatrics"},
+    {"p": "medication.update", "s": "acme.pediatrics"},
+    {"p": "client.view", "s": "acme.pediatrics.unit1"}
+  ],
 
   // Token metadata
   "iat": 1234567890,
@@ -90,25 +99,37 @@ After implementing the custom claims hook, Supabase JWTs will include:
 }
 ```
 
-### Claims Definitions
+### Claims Definitions (Version 4)
 
 | Claim | Type | Source | Purpose |
 |-------|------|--------|---------|
 | `org_id` | UUID | `user_roles_projection.org_id` | Primary tenant identifier for RLS |
-| `user_role` | String | `user_roles_projection.role` | User's role within organization |
-| `permissions` | String[] | `user_permissions_projection` | Fine-grained permission strings |
-| `scope_path` | ltree | `organizations_projection.path` | Hierarchical scope for inheritance |
+| `org_type` | String | `organizations_projection.org_type` | Organization type (provider, payer, etc.) |
+| `access_blocked` | Boolean | `user_roles_projection.access_blocked` | Whether user access is blocked |
+| `claims_version` | Integer | Hard-coded (4) | JWT schema version for backward compatibility |
+| `current_org_unit_id` | UUID or null | `user_roles_projection.current_org_unit_id` | Current organizational unit context |
+| `current_org_unit_path` | ltree or null | Resolved from org unit | Hierarchical path of current org unit |
+| `effective_permissions` | Object[] | `compute_effective_permissions()` | Scope-aware permissions with implications expanded |
+
+**Key Changes in Version 4**:
+- **Removed**: `user_role`, `permissions` (flat array), `scope_path`
+- **Added**: `effective_permissions` with scope objects `{"p": "permission", "s": "scope"}`
+- **Permission implication expansion**: `medication.update` automatically includes `medication.view`
+- **Scope conflict resolution**: Widest scope wins (e.g., `acme` > `acme.pediatrics`)
+- **New RLS helpers**: `has_effective_permission(permission, target_path)`, `has_permission(permission)`
 
 **Note**: These claims reflect the user's **active organization**. Users with multiple org memberships must switch context (triggers new JWT generation).
 
 ---
 
-## Database Hook Implementation
+## Database Hook Implementation (Version 4)
 
-The JWT hook function is included in `infrastructure/supabase/DEPLOY_TO_SUPABASE_STUDIO.sql` (lines 516-619). The implementation:
+The JWT hook function is included in `infrastructure/supabase/supabase/migrations/` and calls `compute_effective_permissions(user_id, org_id)` to build scope-aware permissions with implications expanded.
+
+**Key Implementation Details**:
 
 ```sql
--- File: infrastructure/supabase/DEPLOY_TO_SUPABASE_STUDIO.sql (lines 516-619)
+-- File: infrastructure/supabase/supabase/migrations/...
 
 CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
 RETURNS jsonb
@@ -119,54 +140,44 @@ DECLARE
   v_user_id uuid;
   v_claims jsonb;
   v_org_id uuid;
-  v_user_role text;
-  v_permissions text[];
-  v_scope_path text;
+  v_org_type text;
+  v_access_blocked boolean;
+  v_current_org_unit_id uuid;
+  v_current_org_unit_path ltree;
+  v_effective_permissions jsonb;
 BEGIN
   v_user_id := (event->>'user_id')::uuid;
 
-  -- Query user's organization and role
+  -- Query user's organization and role information
   SELECT
-    u.current_organization_id,
-    COALESCE(
-      (SELECT r.name
-       FROM user_roles_projection ur
-       JOIN roles_projection r ON r.id = ur.role_id
-       WHERE ur.user_id = u.id
-       ORDER BY CASE WHEN r.name = 'super_admin' THEN 1 ELSE 2 END
-       LIMIT 1
-      ),
-      'viewer'
-    ),
-    NULL
-  INTO v_org_id, v_user_role, v_scope_path
-  FROM users u
-  WHERE u.id = v_user_id;
+    ur.org_id,
+    o.org_type,
+    COALESCE(ur.access_blocked, false),
+    ur.current_org_unit_id,
+    CASE
+      WHEN ur.current_org_unit_id IS NOT NULL
+      THEN (SELECT path FROM organizational_units WHERE id = ur.current_org_unit_id)
+      ELSE NULL
+    END
+  INTO v_org_id, v_org_type, v_access_blocked, v_current_org_unit_id, v_current_org_unit_path
+  FROM user_roles_projection ur
+  JOIN organizations_projection o ON o.org_id = ur.org_id
+  WHERE ur.user_id = v_user_id
+    AND ur.is_active = true
+  LIMIT 1;
 
-  -- Get permissions based on role
-  IF v_user_role = 'super_admin' THEN
-    SELECT array_agg(p.name)
-    INTO v_permissions
-    FROM permissions_projection p;
-  ELSE
-    SELECT array_agg(DISTINCT p.name)
-    INTO v_permissions
-    FROM user_roles_projection ur
-    JOIN role_permissions_projection rp ON rp.role_id = ur.role_id
-    JOIN permissions_projection p ON p.id = rp.permission_id
-    WHERE ur.user_id = v_user_id
-      AND (ur.org_id = v_org_id OR ur.org_id IS NULL);
-  END IF;
+  -- Compute effective permissions (with implications expanded)
+  v_effective_permissions := compute_effective_permissions(v_user_id, v_org_id);
 
-  v_permissions := COALESCE(v_permissions, ARRAY[]::text[]);
-
-  -- Build custom claims
+  -- Build custom claims v4
   v_claims := jsonb_build_object(
     'org_id', v_org_id,
-    'user_role', v_user_role,
-    'permissions', to_jsonb(v_permissions),
-    'scope_path', v_scope_path,
-    'claims_version', 1
+    'org_type', v_org_type,
+    'access_blocked', v_access_blocked,
+    'claims_version', 4,
+    'current_org_unit_id', v_current_org_unit_id,
+    'current_org_unit_path', v_current_org_unit_path::text,
+    'effective_permissions', COALESCE(v_effective_permissions, '[]'::jsonb)
   );
 
   -- Merge into event
@@ -184,9 +195,12 @@ EXCEPTION
       '{claims}',
       jsonb_build_object(
         'org_id', NULL,
-        'user_role', 'viewer',
-        'permissions', '[]'::jsonb,
-        'scope_path', NULL,
+        'org_type', NULL,
+        'access_blocked', true,
+        'claims_version', 4,
+        'current_org_unit_id', NULL,
+        'current_org_unit_path', NULL,
+        'effective_permissions', '[]'::jsonb,
         'claims_error', SQLERRM
       )
     );
@@ -195,25 +209,34 @@ $$;
 
 -- Required permission grants
 GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION public.compute_effective_permissions TO supabase_auth_admin;
 GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
-GRANT SELECT ON TABLE users TO supabase_auth_admin;
 GRANT SELECT ON TABLE user_roles_projection TO supabase_auth_admin;
-GRANT SELECT ON TABLE roles_projection TO supabase_auth_admin;
-GRANT SELECT ON TABLE role_permissions_projection TO supabase_auth_admin;
-GRANT SELECT ON TABLE permissions_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE organizations_projection TO supabase_auth_admin;
+GRANT SELECT ON TABLE organizational_units TO supabase_auth_admin;
 ```
+
+**Key Features**:
+- Calls `compute_effective_permissions(user_id, org_id)` for permission computation
+- Permission implications expanded at JWT generation time
+- Widest scope wins for duplicate permissions
+- Returns scope-aware permissions as `{"p": "permission", "s": "scope"}` objects
 
 ### Deployment
 
-Deploy the function via SQL:
+Deploy the function via Supabase migrations:
 
 ```bash
-# Via Supabase MCP
+# Via Supabase CLI
+supabase db push
+
 # Or via SQL Editor in Dashboard
-# Or via CLI: supabase db push
+# Or via Supabase MCP tool
 ```
 
 Then register the hook via Dashboard (Authentication > Hooks > Custom Access Token).
+
+**Important**: The hook depends on `compute_effective_permissions()` function being deployed first.
 
 ---
 
@@ -244,18 +267,21 @@ GRANT SELECT ON TABLE users TO supabase_auth_admin;
 
 ### Step 1: Deploy Function via SQL
 
-The function is already included in `infrastructure/supabase/DEPLOY_TO_SUPABASE_STUDIO.sql` (lines 516-619). Deploy it via:
+The function is included in Supabase migrations. Deploy it via:
 
 ```bash
-# Via Supabase MCP
+# Via Supabase CLI
+supabase db push
+
 # Or via SQL Editor in Dashboard
-# Or via CLI: supabase db push
+# Or via Supabase MCP tool
 ```
 
-The deployment script creates:
+The deployment creates:
 - Function: `public.custom_access_token_hook(event jsonb)`
 - Permission grants to `supabase_auth_admin`
-- Table access grants (SELECT on users, roles, permissions projections)
+- Depends on: `compute_effective_permissions(user_id, org_id)` function
+- Table access grants (SELECT on user_roles_projection, organizations_projection, organizational_units)
 
 ### Step 2: Register Hook via Dashboard
 
@@ -296,11 +322,11 @@ supabase db push
 
 ### Deployment Script Reference
 
-The `infrastructure/supabase/DEPLOY_TO_SUPABASE_STUDIO.sql` script includes the JWT hook function (lines 516-619):
+The JWT hook function is included in Supabase migrations:
 
 ```sql
 -- ============================================================================
--- JWT CUSTOM CLAIMS HOOK
+-- JWT CUSTOM CLAIMS HOOK (VERSION 4)
 -- ============================================================================
 -- Creates hook in PUBLIC schema (not auth schema due to 2025 restrictions)
 -- Must be registered in Dashboard: Authentication > Hooks > Custom Access Token
@@ -317,10 +343,13 @@ $$;
 
 -- Grant permissions to supabase_auth_admin (required for hook execution)
 GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION public.compute_effective_permissions TO supabase_auth_admin;
 -- ... additional grants
 ```
 
-The function is deployed via SQL and then registered via Dashboard or CLI configuration.
+The function is deployed via migrations and then registered via Dashboard or CLI configuration.
+
+**Dependencies**: Requires `compute_effective_permissions(user_id, org_id)` function to be deployed first.
 
 ---
 
@@ -363,7 +392,7 @@ WHERE hook_name = 'custom_access_token_hook';
 -- auth            | custom_access_token_hook | 2025-10-24 12:34:56+00
 ```
 
-### Test 3: Test Claims Generation
+### Test 3: Test Claims Generation (Version 4)
 
 Create a test user and verify claims:
 
@@ -381,21 +410,22 @@ VALUES (
 ON CONFLICT (email) DO NOTHING;
 
 -- Create test organization
-INSERT INTO organizations_projection (org_id, name, path)
+INSERT INTO organizations_projection (org_id, name, org_type, path)
 VALUES (
   '660e8400-e29b-41d4-a716-446655440000'::uuid,
   'Test Organization',
+  'provider',
   'test_org'::ltree
 )
 ON CONFLICT (org_id) DO NOTHING;
 
 -- Assign user to organization
-INSERT INTO user_roles_projection (user_id, org_id, role, is_active)
+INSERT INTO user_roles_projection (user_id, org_id, is_active, access_blocked)
 VALUES (
   '550e8400-e29b-41d4-a716-446655440000'::uuid,
   '660e8400-e29b-41d4-a716-446655440000'::uuid,
-  'provider_admin',
-  true
+  true,
+  false
 )
 ON CONFLICT (user_id, org_id) DO UPDATE SET is_active = true;
 
@@ -407,18 +437,25 @@ SELECT public.custom_access_token_hook(
   )
 );
 
--- Expected result should contain merged claims:
+-- Expected result should contain merged claims v4:
 -- {
 --   "claims": {
 --     "org_id": "660e8400-e29b-41d4-a716-446655440000",
---     "user_role": "provider_admin",
---     "permissions": ["medication.create", "client.view", ...],
---     "scope_path": "test_org"
+--     "org_type": "provider",
+--     "access_blocked": false,
+--     "claims_version": 4,
+--     "current_org_unit_id": null,
+--     "current_org_unit_path": null,
+--     "effective_permissions": [
+--       {"p": "organization.view", "s": "test_org"},
+--       {"p": "medication.view", "s": "test_org"},
+--       ...
+--     ]
 --   }
 -- }
 ```
 
-### Test 4: Verify JWT Contains Custom Claims
+### Test 4: Verify JWT Contains Custom Claims (Version 4)
 
 **Frontend Test** (after hook is deployed):
 
@@ -440,28 +477,38 @@ if (session) {
   // Decode JWT (Base64)
   const payload = JSON.parse(atob(session.access_token.split('.')[1]))
 
-  console.log('Custom Claims:', {
+  console.log('Custom Claims v4:', {
     org_id: payload.org_id,
-    user_role: payload.user_role,
-    permissions: payload.permissions,
-    scope_path: payload.scope_path
+    org_type: payload.org_type,
+    access_blocked: payload.access_blocked,
+    claims_version: payload.claims_version,
+    current_org_unit_id: payload.current_org_unit_id,
+    current_org_unit_path: payload.current_org_unit_path,
+    effective_permissions: payload.effective_permissions
   })
 
   // Expected output:
-  // Custom Claims: {
+  // Custom Claims v4: {
   //   org_id: "660e8400-e29b-41d4-a716-446655440000",
-  //   user_role: "provider_admin",
-  //   permissions: ["medication.create", "client.view", ...],
-  //   scope_path: "test_org"
+  //   org_type: "provider",
+  //   access_blocked: false,
+  //   claims_version: 4,
+  //   current_org_unit_id: null,
+  //   current_org_unit_path: null,
+  //   effective_permissions: [
+  //     {"p": "organization.view", "s": "test_org"},
+  //     {"p": "medication.view", "s": "test_org"},
+  //     ...
+  //   ]
   // }
 }
 ```
 
 ---
 
-## RLS Policy Examples
+## RLS Policy Examples (Version 4)
 
-Once custom claims are in the JWT, use them in RLS policies:
+Once custom claims v4 are in the JWT, use them in RLS policies via helper functions:
 
 ### Example 1: Basic Tenant Isolation
 
@@ -476,58 +523,54 @@ USING (
 );
 ```
 
-### Example 2: Permission-Based Access
+### Example 2: Permission-Based Access (Scope-Aware)
 
 ```sql
--- Only users with 'medication.create' permission can insert
+-- Only users with 'medication.create' permission at appropriate scope can insert
 CREATE POLICY "medication_create_permission"
 ON medications
 FOR INSERT
 TO authenticated
 WITH CHECK (
-  'medication.create' = ANY(
-    string_to_array(
-      auth.jwt()->>'permissions',
-      ','
-    )
-  )
+  -- Check permission against resource's org_unit_path
+  has_effective_permission('medication.create', org_unit_path::text)
 );
 ```
 
-### Example 3: Role-Based Access
+### Example 3: Permission-Based Access (Scope-Free)
 
 ```sql
--- Only provider admins can delete
-CREATE POLICY "admin_delete_only"
-ON clients
-FOR DELETE
+-- Only users with 'organization.manage' permission (at any scope) can update
+CREATE POLICY "organization_manage_permission"
+ON organizations_projection
+FOR UPDATE
 TO authenticated
 USING (
-  (auth.jwt()->>'user_role') IN ('provider_admin', 'super_admin')
+  -- Check permission without scope validation
+  has_permission('organization.manage')
+  AND org_id = (auth.jwt()->>'org_id')::uuid
 );
 ```
 
 ### Example 4: Hierarchical Scope Access
 
 ```sql
--- Users can access their organization and all descendants
-CREATE POLICY "hierarchical_org_access"
-ON organizations_projection
+-- Users can access data within their current org unit hierarchy
+CREATE POLICY "hierarchical_org_unit_access"
+ON client_data
 FOR SELECT
 TO authenticated
 USING (
-  -- User's scope encompasses this organization
-  path <@ (auth.jwt()->>'scope_path')::ltree
-  OR
-  -- This organization encompasses user's scope (ancestors)
-  (auth.jwt()->>'scope_path')::ltree <@ path
+  -- Resource path must be within user's current org unit scope
+  org_unit_path <@ (auth.jwt()->>'current_org_unit_path')::ltree
+  AND has_effective_permission('client.view', org_unit_path::text)
 );
 ```
 
 ### Example 5: Combined Conditions
 
 ```sql
--- Complex policy: tenant + permission + role
+-- Complex policy: tenant + permission with scope + access control
 CREATE POLICY "complex_access"
 ON sensitive_data
 FOR SELECT
@@ -535,16 +578,20 @@ TO authenticated
 USING (
   -- Must be in same organization
   org_id = (auth.jwt()->>'org_id')::uuid
-  AND (
-    -- Either has specific permission
-    'sensitive_data.view' = ANY(
-      string_to_array(auth.jwt()->>'permissions', ',')
-    )
-    -- OR is an admin
-    OR (auth.jwt()->>'user_role') = 'provider_admin'
-  )
+  -- Access not blocked
+  AND (auth.jwt()->>'access_blocked')::boolean = false
+  -- Has permission at appropriate scope
+  AND has_effective_permission('sensitive_data.view', org_unit_path::text)
 );
 ```
+
+### Key Differences from Version 3
+
+- **Use `has_effective_permission(permission, target_path)` instead of string matching on flat permissions array**
+- **Use `has_permission(permission)` for scope-free permission checks**
+- **Deprecated helpers**: `get_current_user_role()`, `get_current_permissions()`, `get_current_scope_path()`
+- **No more `user_role` field**: Use permissions instead of role checks
+- **Scope-aware**: Permissions are evaluated against resource's ltree path
 
 ---
 
@@ -565,28 +612,47 @@ USING (
    USING (org_id = (auth.jwt()->>'org_id')::uuid);
    ```
 
-2. **Validate Hook Function Logic Thoroughly**
+2. **Always Use Helper Functions for Permission Checks**
+   ```sql
+   -- ❌ WRONG: Direct JSON parsing of effective_permissions
+   CREATE POLICY "bad_permission_check"
+   ON medications FOR SELECT
+   USING (
+     (auth.jwt()->'effective_permissions')::jsonb @>
+     '[{"p": "medication.view"}]'::jsonb
+   );
+
+   -- ✅ CORRECT: Use has_effective_permission helper
+   CREATE POLICY "good_permission_check"
+   ON medications FOR SELECT
+   USING (
+     has_effective_permission('medication.view', org_unit_path::text)
+   );
+   ```
+
+3. **Validate Hook Function Logic Thoroughly**
    - Test with users having no organization membership
    - Test with users having multiple organization memberships
    - Test with inactive/deleted organizations
-   - Test with revoked permissions
+   - Test with access_blocked = true
+   - Test permission implication expansion (e.g., update includes view)
 
-3. **Monitor Hook Performance**
+4. **Monitor Hook Performance**
    - Hook runs on EVERY authentication
+   - `compute_effective_permissions()` can be expensive with many roles/permissions
    - Slow queries impact user experience
-   - Consider caching strategies for permissions (if query is slow)
-   - Use indexes on `user_roles_projection` and `user_permissions_projection`
+   - Use indexes on `user_roles_projection`, `role_permissions`, and `organizational_units`
 
-4. **Handle Hook Errors Gracefully**
+5. **Handle Hook Errors Gracefully**
    - Hook errors should NOT block authentication
    - Log errors for monitoring/debugging
-   - Return safe defaults (no claims) rather than blocking login
+   - Return safe defaults (access_blocked = true, empty permissions) rather than blocking login
 
-5. **Audit Hook Changes**
+6. **Audit Hook Changes**
    - Any change to hook function affects ALL users
    - Test in staging before deploying to production
-   - Version control all hook SQL code
-   - Document hook behavior in event log
+   - Version control all hook SQL code and migration files
+   - Document hook behavior and version changes
 
 ### Required Database Indexes
 
@@ -600,9 +666,13 @@ CREATE INDEX IF NOT EXISTS idx_user_roles_user_active
 CREATE INDEX IF NOT EXISTS idx_user_roles_org
   ON user_roles_projection(org_id);
 
--- Indexes for user_permissions_projection
-CREATE INDEX IF NOT EXISTS idx_user_permissions_user_org
-  ON user_permissions_projection(user_id, org_id) WHERE is_active = true;
+-- Indexes for organizational_units
+CREATE INDEX IF NOT EXISTS idx_org_units_path
+  ON organizational_units USING gist(path);
+
+-- Indexes for role_permissions (used by compute_effective_permissions)
+CREATE INDEX IF NOT EXISTS idx_role_permissions_role_id
+  ON role_permissions(role_id);
 
 -- Indexes for organizations_projection
 CREATE INDEX IF NOT EXISTS idx_organizations_path
@@ -695,15 +765,18 @@ WHERE tablename IN ('user_roles_projection', 'user_permissions_projection', 'org
 
 ### Issue: Claims Out of Sync with Database
 
-**Symptoms**: User's permissions changed but JWT still has old permissions
+**Symptoms**: User's permissions changed but JWT still has old effective_permissions
 
 **Diagnosis**: JWTs are **stateless** and have 1-hour expiration by default
 
 **Solutions**:
 1. Force session refresh: `supabase.auth.refreshSession()`
 2. Reduce JWT expiration time (in Supabase Dashboard → Auth → Settings)
-3. Implement active revocation via blocklist (if real-time revocation required)
-4. Document to users: "Changes take effect after re-login"
+3. Use `access_blocked` flag for immediate access revocation
+4. Implement active revocation via blocklist (if real-time revocation required)
+5. Document to users: "Permission changes take effect after re-login"
+
+**Note**: Permission implication changes (e.g., adding new implications) require JWT refresh to take effect.
 
 ---
 
@@ -747,24 +820,29 @@ async function switchOrganization(userId: string, newOrgId: string) {
 Before deploying to production:
 
 - [ ] Hook function deployed and registered
+- [ ] `compute_effective_permissions()` function deployed
 - [ ] Test with user having no organization (returns empty claims gracefully)
-- [ ] Test with user having one organization (correct org_id, role, permissions)
+- [ ] Test with user having one organization (correct org_id, org_type, effective_permissions)
 - [ ] Test with user having multiple organizations (only active org in claims)
-- [ ] Test with user having no permissions (empty permissions array)
-- [ ] Test RLS policies using JWT claims
+- [ ] Test with user having no permissions (empty effective_permissions array)
+- [ ] Test with user having access_blocked = true (access denied)
+- [ ] Test permission implication expansion (e.g., update includes view)
+- [ ] Test scope conflict resolution (widest scope wins)
+- [ ] Test RLS policies using `has_effective_permission()` helper
 - [ ] Verify JWT expiration and refresh works correctly
 - [ ] Performance test: Hook execution time < 100ms
 - [ ] All recommended indexes created
 - [ ] Hook error handling logs warnings without blocking auth
+- [ ] Verify `claims_version` = 4 in all JWTs
 - [ ] Documentation updated with hook SQL location and version
 
 ---
 
-## Frontend Integration
+## Frontend Integration (Version 4)
 
 ### Accessing Custom Claims
 
-The frontend automatically receives and decodes custom JWT claims through the auth provider:
+The frontend automatically receives and decodes custom JWT claims v4 through the auth provider:
 
 ```typescript
 import { useAuth } from '@/contexts/AuthContext';
@@ -772,17 +850,22 @@ import { useAuth } from '@/contexts/AuthContext';
 const MyComponent = () => {
   const { session } = useAuth();
 
-  // Custom claims available in session.claims
+  // Custom claims v4 available in session.claims
   const orgId = session?.claims.org_id;
-  const role = session?.claims.user_role;
-  const permissions = session?.claims.permissions;
-  const scopePath = session?.claims.scope_path;
+  const orgType = session?.claims.org_type;
+  const accessBlocked = session?.claims.access_blocked;
+  const claimsVersion = session?.claims.claims_version; // Should be 4
+  const currentOrgUnitId = session?.claims.current_org_unit_id;
+  const currentOrgUnitPath = session?.claims.current_org_unit_path;
+  const effectivePermissions = session?.claims.effective_permissions;
 
   return (
     <div>
-      <p>Organization: {orgId}</p>
-      <p>Role: {role}</p>
-      <p>Permissions: {permissions.join(', ')}</p>
+      <p>Organization: {orgId} ({orgType})</p>
+      <p>Claims Version: {claimsVersion}</p>
+      <p>Current Org Unit: {currentOrgUnitPath || 'None'}</p>
+      <p>Access Blocked: {accessBlocked ? 'Yes' : 'No'}</p>
+      <p>Permissions: {effectivePermissions.length} effective permissions</p>
     </div>
   );
 };
@@ -790,13 +873,29 @@ const MyComponent = () => {
 
 ### Organization Switching
 
-Frontend triggers organization switch which refreshes JWT:
+Frontend triggers organization switch which refreshes JWT with new org context:
 
 ```typescript
 const { switchOrganization } = useAuth();
 
-// Updates database + refreshes JWT with new org_id
+// Updates database + refreshes JWT with new org_id and effective_permissions
 await switchOrganization('new-org-uuid');
+```
+
+### Permission Checking in Frontend
+
+```typescript
+import { hasPermission } from '@/utils/permissions';
+
+// Check if user has permission at a specific scope
+const canViewMedications = hasPermission(
+  session.claims.effective_permissions,
+  'medication.view',
+  'acme.pediatrics.unit1' // target scope
+);
+
+// Permission implications are already expanded in JWT
+// e.g., medication.update automatically includes medication.view
 ```
 
 See `frontend-auth-architecture.md` for complete frontend implementation details.
@@ -814,6 +913,6 @@ See `frontend-auth-architecture.md` for complete frontend implementation details
 
 ---
 
-**Document Version**: 1.1
-**Last Updated**: 2025-10-27
-**Status**: Ready for Implementation (Frontend Complete)
+**Document Version**: 2.0 (JWT Claims v4)
+**Last Updated**: 2026-01-26
+**Status**: Production (JWT Claims Version 4 Active)

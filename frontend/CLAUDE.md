@@ -304,7 +304,7 @@ if (!session?.claims.org_id) {
 3. Supabase already manages session state automatically - don't duplicate it
 4. The Supabase client's `auth.getSession()` always returns the current valid session
 
-**When you need JWT claims** (org_id, permissions, role, scope_path):
+**When you need JWT claims** (org_id, effective_permissions, org_type):
 - Call `client.auth.getSession()` to get the session
 - Decode the `access_token` to extract custom claims
 - Use the same `decodeJWT()` pattern shown above
@@ -456,18 +456,27 @@ import { SupabaseAuthProvider } from './SupabaseAuthProvider';
 - `src/contexts/AuthContext.tsx` - React context wrapper
 - `src/config/dev-auth.config.ts` - Mock user configuration
 
-#### JWT Custom Claims
+#### JWT Custom Claims (v4)
 
-The application uses custom JWT claims for multi-tenant isolation and RBAC:
+The application uses custom JWT claims for multi-tenant isolation and RBAC.
+As of `claims_version: 4`, deprecated fields (`user_role`, `permissions`, `scope_path`) have been removed.
 
 ```typescript
 interface JWTClaims {
-  sub: string;              // User UUID
+  sub: string;                           // User UUID
   email: string;
-  org_id: string;          // Organization UUID (for RLS)
-  user_role: UserRole;     // User's role
-  permissions: string[];   // Permission strings
-  scope_path: string;      // Hierarchical scope (ltree)
+  org_id: string;                        // Organization UUID (for RLS)
+  org_type: string;                      // Organization type (platform_owner, provider, partner)
+  effective_permissions: EffectivePermission[]; // Scoped permissions [{p, s}]
+  claims_version: number;                // Currently 4
+  access_blocked?: boolean;
+  current_org_unit_id?: string | null;
+  current_org_unit_path?: string | null;
+}
+
+interface EffectivePermission {
+  p: string;  // Permission name (e.g., "medication.create")
+  s: string;  // Scope path (ltree, e.g., "acme.pediatrics")
 }
 ```
 
@@ -481,16 +490,19 @@ const MyComponent = () => {
 
   // Access claims
   const orgId = session?.claims.org_id;
-  const role = session?.claims.user_role;
-  const permissions = session?.claims.permissions;
+  const orgType = session?.claims.org_type;
+  const eps = session?.claims.effective_permissions;
 
-  // Check permission
+  // Check permission (simple - any scope)
   const canCreate = await hasPermission('medication.create');
+
+  // Check permission (scope-aware)
+  const canViewUnit = await hasPermission('organization.view_ou', 'acme.pediatrics');
 
   return (
     <div>
       <p>Organization: {orgId}</p>
-      <p>Role: {role}</p>
+      <p>Type: {orgType}</p>
     </div>
   );
 };

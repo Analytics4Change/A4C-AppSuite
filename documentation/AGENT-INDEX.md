@@ -154,7 +154,8 @@ purpose: agent-navigation
 | `schema-registry` | [event_types.md](infrastructure/reference/database/tables/event_types.md) | event-sourcing-overview.md |
 | `saml` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
 | `session-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
-| `scope_path` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | organization_units_projection.md |
+| `scope_path` | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | organization_units_projection.md, JWT-CLAIMS-SETUP.md |
+| `effective_permissions` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | rbac-architecture.md, frontend-auth-architecture.md |
 | `scoping` | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | organization_units_projection.md |
 | `session-management` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | auth-provider-architecture.md, frontend/CLAUDE.md |
 | `getSession` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | auth-provider-architecture.md |
