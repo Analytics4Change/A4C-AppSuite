@@ -20,6 +20,7 @@ import { AcceptInvitationPage } from '@/pages/organizations/AcceptInvitationPage
 import { OrganizationUnitsManagePage } from '@/pages/organization-units';
 import { RolesPage, RolesManagePage } from '@/pages/roles';
 import { UserListPage, UsersManagePage } from '@/pages/users';
+import { SettingsPage, OrganizationSettingsPage } from '@/pages/settings';
 import { DebugControlPanel } from '@/components/debug/DebugControlPanel';
 import { LogOverlay } from '@/components/debug/LogOverlay';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -43,12 +44,7 @@ const ReportsPage = () => (
   </div>
 );
 
-const SettingsPage = () => (
-  <div>
-    <h1 className="text-2xl font-bold mb-4">Settings</h1>
-    <p>Coming soon...</p>
-  </div>
-);
+// SettingsPage imported from @/pages/settings
 
 function App() {
   log.info('Application starting');
@@ -134,6 +130,11 @@ function App() {
                 <Route path="/medications" element={<MedicationsPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/settings/organization" element={
+                  <RequirePermission permission="organization.update" fallback="/settings">
+                    <OrganizationSettingsPage />
+                  </RequirePermission>
+                } />
 
                 {/* Admin routes - platform-owner only */}
                 <Route path="/admin/events" element={

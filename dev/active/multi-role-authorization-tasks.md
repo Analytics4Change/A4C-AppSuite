@@ -52,7 +52,7 @@
 - [x] Create AsyncAPI event schema: `organization.direct_care_settings.updated`
 - [x] Add API function `api.update_organization_direct_care_settings()`
 - [x] Add API function `api.get_organization_direct_care_settings()`
-- [ ] Update organization event processor to handle settings event
+- [x] Update organization event processor to handle settings event
 - [ ] Test feature flags behavior
 
 ## Phase 3B: User Schedule Policies ✅ COMPLETE
@@ -144,16 +144,29 @@
 - [x] Update JWT-CLAIMS-SETUP.md, frontend-auth-architecture.md, custom-claims-setup.md
 - [x] TypeScript check + build pass with zero errors
 
-## Phase 6: UI Planning - Organization Direct Care Settings 📋 PLANNING
+## Phase 6: Organization Direct Care Settings UI ✅ COMPLETE
 
 > Admin UI for configuring organization-level feature flags.
 
-- [ ] Create `dev/active/org-direct-care-settings-ui-context.md`
-- [ ] Create `dev/active/org-direct-care-settings-ui-plan.md`
-- [ ] Create `dev/active/org-direct-care-settings-ui-tasks.md`
-- [ ] Design settings form in organization settings page
-- [ ] Toggle switches for `enable_staff_client_mapping` and `enable_schedule_enforcement`
-- [ ] Permission gating (`organization.settings_manage`)
+- [x] DB Migration: Add `p_reason` to `api.update_organization_direct_care_settings()` (`20260126205504_add_reason_to_direct_care_settings_rpc.sql`)
+- [x] Fix AsyncAPI channel reference for `OrganizationDirectCareSettingsUpdated` (was missing from `asyncapi.yaml`)
+- [x] Regenerate TypeScript event types (163 → 166 interfaces)
+- [x] Install `@radix-ui/react-switch` dependency
+- [x] Create `Switch` UI component (`components/ui/switch.tsx`)
+- [x] Create `DirectCareSettings` type (`types/direct-care-settings.types.ts`)
+- [x] Create service layer (4 files in `services/direct-care/`):
+  - [x] `IDirectCareSettingsService.ts` — interface
+  - [x] `SupabaseDirectCareSettingsService.ts` — production impl via `.schema('api').rpc()`
+  - [x] `MockDirectCareSettingsService.ts` — in-memory mock
+  - [x] `DirectCareSettingsServiceFactory.ts` — smart detection via `getDeploymentConfig()`
+- [x] Create `DirectCareSettingsViewModel` (MobX, `makeAutoObservable`)
+- [x] Create ViewModel unit tests (29 tests, all pass)
+- [x] Create `DirectCareSettingsSection.tsx` — toggle switches with reason input, WCAG AA compliant
+- [x] Create `OrganizationSettingsPage.tsx` — `/settings/organization` page with loading/error states
+- [x] Create `SettingsPage.tsx` — settings hub with conditional org card
+- [x] Update `index.ts` barrel export
+- [x] Update `App.tsx` — import from `@/pages/settings`, add `/settings/organization` route with `RequirePermission`
+- [x] Validation: TypeScript 0 errors, lint 0 errors, 29/29 tests pass, build succeeds
 
 ## Phase 7: UI Planning - Schedules & Client Assignments 📋 PLANNING
 
@@ -207,8 +220,8 @@
 
 ## Current Status
 
-**Phase**: 5B - Strip Deprecated Claims ✅ COMPLETE
-**Status**: ✅ All 14 migrations created, JWT v4 fully enforced, deprecated fields removed (2026-01-26)
+**Phase**: 6 - Organization Direct Care Settings UI ✅ COMPLETE
+**Status**: ✅ All 15 migrations deployed, Phase 6 frontend UI complete (2026-01-26)
 **Last Updated**: 2026-01-26
 **Next Step**:
 1. ~~Deploy migrations: `supabase db push --linked`~~ ✅ DONE
@@ -217,8 +230,10 @@
 4. ~~Phase 4 RLS Policy Migration~~ ✅ DONE (2026-01-24)
 5. ~~Phase 5 Frontend Integration~~ ✅ DONE (2026-01-26)
 6. ~~Phase 5B Strip Deprecated Claims~~ ✅ DONE (2026-01-26)
-7. Deploy migrations #13-14 (`enable_realtime_user_roles.sql`, `strip_deprecated_jwt_claims.sql`): `supabase db push --linked`
-8. Proceed to Phase 6 (Organization Direct Care Settings UI) or Phase 7 (Schedules & Assignments UI)
+7. ~~Deploy migrations #13-15~~ ✅ DONE (2026-01-26, deployed via `supabase db push --linked`)
+8. ~~Phase 6 Organization Direct Care Settings UI~~ ✅ DONE (2026-01-26)
+9. Commit Phase 6 changes (12 new files, 4 modified files)
+10. Proceed to Phase 7 (Schedules & Assignments UI)
 
 ### Implementation Summary (2026-01-24)
 
@@ -237,10 +252,11 @@
 | 3C | `20260123001542_user_client_assignments.sql` | User client assignment projection | ✅ Deployed |
 | 3-Event | `20260123181951_user_schedule_client_event_routing.sql` | Event routing for Phase 3 | ✅ Deployed |
 | 4 | `20260124192733_rls_policy_migration_phase4.sql` | RLS policies → `has_effective_permission()` | ✅ Deployed |
-| 5 | `20260126173806_enable_realtime_user_roles.sql` | Publish `user_roles_projection` to Realtime | ⏳ Pending deploy |
-| 5B | `20260126180004_strip_deprecated_jwt_claims.sql` | Strip deprecated claims, bump to v4 | ⏳ Pending deploy |
+| 5 | `20260126173806_enable_realtime_user_roles.sql` | Publish `user_roles_projection` to Realtime | ✅ Deployed |
+| 5B | `20260126180004_strip_deprecated_jwt_claims.sql` | Strip deprecated claims, bump to v4 | ✅ Deployed |
+| 6 | `20260126205504_add_reason_to_direct_care_settings_rpc.sql` | Add `p_reason` to update RPC | ✅ Deployed |
 
-**Deployment Date**: 2026-01-24 (Phase 4 via `supabase db push --linked`), Phase 5/5B migrations pending deploy
+**Deployment Date**: 2026-01-24 (Phase 4), 2026-01-26 (Phase 5/5B/6 via `supabase db push --linked`)
 
 **AsyncAPI Schemas Updated:**
 - `contracts/asyncapi/domains/organization.yaml` - Added `organization.direct_care_settings.updated`

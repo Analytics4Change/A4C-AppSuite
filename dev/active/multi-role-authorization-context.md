@@ -181,9 +181,14 @@ const canAccess = await spicedb.check({
 | 10 | `20260123001542_user_client_assignments.sql` | Event-sourced assignment projection | ✅ Deployed |
 | 11 | `20260123181951_user_schedule_client_event_routing.sql` | Event routing for Phase 3 events | ✅ Deployed |
 
+| 12 | `20260124192733_rls_policy_migration_phase4.sql` | RLS policies → `has_effective_permission()` | ✅ Deployed |
+| 13 | `20260126173806_enable_realtime_user_roles.sql` | Publish `user_roles_projection` to Realtime | ✅ Deployed |
+| 14 | `20260126180004_strip_deprecated_jwt_claims.sql` | Strip deprecated claims, bump to v4 | ✅ Deployed |
+| 15 | `20260126205504_add_reason_to_direct_care_settings_rpc.sql` | Add `p_reason` param to update RPC | ✅ Deployed |
+
 **Key Decision**: Old RLS helpers are **DEPRECATED** not dropped in Phase 2D because existing RLS policies depend on them. Phase 4 will update RLS policies then drop old helpers.
 
-**Deployment Date**: 2026-01-23 (all 11 migrations successfully applied via GitHub Actions)
+**Deployment Date**: 2026-01-23 (Phase 1-3), 2026-01-24 (Phase 4), 2026-01-26 (Phase 5/5B/6)
 
 ### AsyncAPI Schemas Updated (2026-01-23)
 
@@ -192,13 +197,38 @@ const canAccess = await spicedb.check({
 | `contracts/asyncapi/domains/organization.yaml` | `organization.direct_care_settings_updated` |
 | `contracts/asyncapi/domains/user.yaml` | `user.schedule.created/updated/deactivated`, `user.client.assigned/unassigned` |
 
-### Frontend Files to Modify
+### Phase 6 Frontend Files (Created 2026-01-26)
 
 | File | Purpose |
 |------|---------|
-| `frontend/src/types/auth.types.ts` | New JWT structure with `effective_permissions` |
-| `frontend/src/hooks/usePermissions.ts` | Parse effective_permissions array |
-| `frontend/src/services/auth/*` | Auth service updates |
+| `frontend/src/components/ui/switch.tsx` | Radix UI Switch wrapper (follows `checkbox.tsx` pattern) |
+| `frontend/src/types/direct-care-settings.types.ts` | `DirectCareSettings` interface |
+| `frontend/src/services/direct-care/IDirectCareSettingsService.ts` | Service interface |
+| `frontend/src/services/direct-care/SupabaseDirectCareSettingsService.ts` | Production impl via `.schema('api').rpc()` |
+| `frontend/src/services/direct-care/MockDirectCareSettingsService.ts` | In-memory mock |
+| `frontend/src/services/direct-care/DirectCareSettingsServiceFactory.ts` | Smart detection via `getDeploymentConfig()` |
+| `frontend/src/viewModels/settings/DirectCareSettingsViewModel.ts` | MobX ViewModel with reason validation |
+| `frontend/src/viewModels/settings/__tests__/DirectCareSettingsViewModel.test.ts` | 29 unit tests |
+| `frontend/src/pages/settings/DirectCareSettingsSection.tsx` | Toggle switches, reason input, save/reset |
+| `frontend/src/pages/settings/OrganizationSettingsPage.tsx` | `/settings/organization` page |
+| `frontend/src/pages/settings/SettingsPage.tsx` | Settings hub with conditional org card |
+| `frontend/src/pages/settings/index.ts` | Barrel export |
+
+### Phase 6 Modified Files
+
+| File | Change |
+|------|--------|
+| `frontend/src/App.tsx` | Import from `@/pages/settings`, add `/settings/organization` route with `RequirePermission` |
+| `frontend/package.json` | Add `@radix-ui/react-switch` dependency |
+| `infrastructure/supabase/contracts/asyncapi/asyncapi.yaml` | Add channel reference for `OrganizationDirectCareSettingsUpdated` |
+| `infrastructure/supabase/contracts/types/generated-events.ts` | Regenerated (163 → 166 interfaces) |
+
+### Phase 5 Frontend Files Modified (2026-01-26)
+
+| File | Purpose |
+|------|---------|
+| `frontend/src/types/auth.types.ts` | `effective_permissions` array, `claims_version: 4` |
+| `frontend/src/services/auth/*` | Auth service updates for v4 claims |
 
 ### Key Existing Files (Reference)
 
@@ -406,6 +436,41 @@ WHEN 'user.schedule.updated' THEN PERFORM handle_user_schedule_updated(NEW);
 `user_schedule_policies_projection` has unique constraint: `(user_id, organization_id, org_unit_id)`.
 
 Since `org_unit_id` can be NULL (org-wide schedule), PostgreSQL 15+ `NULLS NOT DISTINCT` treats NULLs as equal for uniqueness.
+
+### 8. AsyncAPI Bundler Only Includes Reachable Schemas (Phase 6)
+
+Schemas defined in `organization.yaml` (messages + schemas) were NOT included in the bundled output and thus NOT in generated TypeScript types.
+
+**Root Cause**: The `asyncapi bundle` step only includes schemas reachable from channels defined in `asyncapi.yaml`. The `OrganizationDirectCareSettingsUpdated` message was defined in `organization.yaml` but NOT referenced in any channel in `asyncapi.yaml`.
+
+**Fix**: Add channel reference in `asyncapi.yaml`:
+```yaml
+- $ref: './domains/organization.yaml#/components/messages/OrganizationDirectCareSettingsUpdated'
+```
+
+After fix: regeneration produced 166 interfaces (up from 163), including `OrganizationDirectCareSettingsUpdatedEvent`, `DirectCareSettingsUpdateData`, and `DirectCareSettings`.
+
+### 9. `useAuth().hasPermission()` Returns `Promise<boolean>`, Not an Object (Phase 6)
+
+The frontend `useAuth().hasPermission()` method (in `AuthContext.tsx`) returns `Promise<boolean>` — it already unwraps the result internally. Do not confuse with the PostgreSQL RLS helper `has_effective_permission(permission, path)` which is a different function at the database layer.
+
+**ERROR**: `Property 'granted' does not exist on type 'boolean'`
+
+**Fix**: Use the boolean result directly:
+```typescript
+// ❌ WRONG — hasPermission() does not return an object
+const { hasPermission } = useAuth();
+hasPermission('organization.update').then((result) => setCanUpdate(result.granted));
+
+// ✅ CORRECT — result is already a boolean
+hasPermission('organization.update').then((result) => setCanUpdate(result));
+```
+
+### 10. PostgreSQL Function Overloading for Backward Compatibility (Phase 6)
+
+`CREATE OR REPLACE FUNCTION` with a different parameter signature creates an **overload** (second function), not a replacement.
+
+After adding `p_reason text DEFAULT NULL` to `api.update_organization_direct_care_settings()`, both the old 3-param and new 4-param signatures coexist. This is acceptable for backward compatibility since the new param has a DEFAULT.
 
 ### 7. Client FK Deferred
 

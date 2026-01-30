@@ -2488,6 +2488,149 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
+          - name: organization.direct_care_settings_updated
+            title: Organization Direct Care Settings Updated
+            summary: Direct care workflow routing settings updated for an organization
+            contentType: application/json
+            payload:
+              title: OrganizationDirectCareSettingsUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Organization UUID
+                stream_type:
+                  type: string
+                  const: organization
+                event_type:
+                  type: string
+                  const: organization.direct_care_settings_updated
+                event_data:
+                  title: DirectCareSettingsUpdateData
+                  type: object
+                  required:
+                    - organization_id
+                    - settings
+                  properties:
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: Organization UUID
+                    settings:
+                      title: DirectCareSettings
+                      type: object
+                      description: Feature flags for direct care workflow routing
+                      properties:
+                        enable_staff_client_mapping:
+                          type: boolean
+                          default: false
+                          description: >
+                            When true: Notifications go only to staff assigned
+                            to the specific client.
+
+                            When false: Notifications go to all staff at the
+                            client's org unit.
+                        enable_schedule_enforcement:
+                          type: boolean
+                          default: false
+                          description: >
+                            When true: Only staff currently on schedule receive
+                            notifications.
+
+                            When false: Any staff (assigned or at OU) receive
+                            notifications.
+                    previous_settings:
+                      title: DirectCareSettings
+                      type: object
+                      description: Feature flags for direct care workflow routing
+                      properties:
+                        enable_staff_client_mapping:
+                          type: boolean
+                          default: false
+                          description: >
+                            When true: Notifications go only to staff assigned
+                            to the specific client.
+
+                            When false: Notifications go to all staff at the
+                            client's org unit.
+                        enable_schedule_enforcement:
+                          type: boolean
+                          default: false
+                          description: >
+                            When true: Only staff currently on schedule receive
+                            notifications.
+
+                            When false: Any staff (assigned or at OU) receive
+                            notifications.
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
           - name: organization.bootstrap.initiated
             title: Organization Bootstrap Initiated
             summary: >-
@@ -11976,6 +12119,149 @@ channels:
                     error:
                       type: string
                       description: Error message (when status is 'error')
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: organization.direct_care_settings_updated
+            title: Organization Direct Care Settings Updated
+            summary: Direct care workflow routing settings updated for an organization
+            contentType: application/json
+            payload:
+              title: OrganizationDirectCareSettingsUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Organization UUID
+                stream_type:
+                  type: string
+                  const: organization
+                event_type:
+                  type: string
+                  const: organization.direct_care_settings_updated
+                event_data:
+                  title: DirectCareSettingsUpdateData
+                  type: object
+                  required:
+                    - organization_id
+                    - settings
+                  properties:
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: Organization UUID
+                    settings:
+                      title: DirectCareSettings
+                      type: object
+                      description: Feature flags for direct care workflow routing
+                      properties:
+                        enable_staff_client_mapping:
+                          type: boolean
+                          default: false
+                          description: >
+                            When true: Notifications go only to staff assigned
+                            to the specific client.
+
+                            When false: Notifications go to all staff at the
+                            client's org unit.
+                        enable_schedule_enforcement:
+                          type: boolean
+                          default: false
+                          description: >
+                            When true: Only staff currently on schedule receive
+                            notifications.
+
+                            When false: Any staff (assigned or at OU) receive
+                            notifications.
+                    previous_settings:
+                      title: DirectCareSettings
+                      type: object
+                      description: Feature flags for direct care workflow routing
+                      properties:
+                        enable_staff_client_mapping:
+                          type: boolean
+                          default: false
+                          description: >
+                            When true: Notifications go only to staff assigned
+                            to the specific client.
+
+                            When false: Notifications go to all staff at the
+                            client's org unit.
+                        enable_schedule_enforcement:
+                          type: boolean
+                          default: false
+                          description: >
+                            When true: Only staff currently on schedule receive
+                            notifications.
+
+                            When false: Any staff (assigned or at OU) receive
+                            notifications.
                 event_metadata:
                   title: EventMetadata
                   type: object

@@ -56,6 +56,8 @@ channels:
           - $ref: './domains/organization.yaml#/components/messages/OrganizationSubdomainDnsCreated'
           - $ref: './domains/organization.yaml#/components/messages/OrganizationSubdomainVerified'
           - $ref: './domains/organization.yaml#/components/messages/OrganizationDnsRemoved'
+          # Organization settings events
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationDirectCareSettingsUpdated'
           # Organization bootstrap events
           - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapInitiated'
           - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapCompleted'
