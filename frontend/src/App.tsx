@@ -22,6 +22,7 @@ import { RolesPage, RolesManagePage } from '@/pages/roles';
 import { UserListPage, UsersManagePage } from '@/pages/users';
 import { SettingsPage, OrganizationSettingsPage } from '@/pages/settings';
 import { ScheduleListPage, ScheduleEditPage } from '@/pages/schedules';
+import { AssignmentListPage, UserCaseloadPage } from '@/pages/assignments';
 import { DebugControlPanel } from '@/components/debug/DebugControlPanel';
 import { LogOverlay } from '@/components/debug/LogOverlay';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -136,6 +137,18 @@ function App() {
                 <Route path="/schedules/:userId" element={
                   <RequirePermission permission="user.schedule_manage" fallback="/clients">
                     <ScheduleEditPage />
+                  </RequirePermission>
+                } />
+
+                {/* Client Assignment routes */}
+                <Route path="/assignments" element={
+                  <RequirePermission permission="user.client_assign" fallback="/clients">
+                    <AssignmentListPage />
+                  </RequirePermission>
+                } />
+                <Route path="/assignments/:userId" element={
+                  <RequirePermission permission="user.client_assign" fallback="/clients">
+                    <UserCaseloadPage />
                   </RequirePermission>
                 } />
 

@@ -2,10 +2,10 @@
 
 ## Current Status
 
-**Phase**: 7A complete, 7B not started
-**Status**: Phase 7A ✅ COMPLETE (pending commit), Phase 7B ⏸️ PENDING
+**Phase**: 7A + 7B complete, 7C pending
+**Status**: Phase 7A ✅ COMPLETE, Phase 7B ✅ COMPLETE, Phase 7C ⏸️ PENDING
 **Last Updated**: 2026-02-02
-**Next Step**: Commit Phase 7A, then begin Phase 7B (Assignment service layer, ViewModels, pages)
+**Next Step**: Commit Phase 7B, then Phase 7C (unit tests)
 
 ## Phase 7 Prerequisites ✅ COMPLETE
 
@@ -40,20 +40,20 @@
 - [x] Fix pre-existing lint errors (duplicate Address, unused eslint-disable)
 - [x] Validate: typecheck, lint, build all pass
 
-## Phase 7B: Client Assignments UI ⏸️ PENDING
+## Phase 7B: Client Assignments UI ✅ COMPLETE
 
-- [ ] Create assignment service layer (4 files)
-  - [ ] `IAssignmentService.ts`
-  - [ ] `SupabaseAssignmentService.ts`
-  - [ ] `MockAssignmentService.ts`
-  - [ ] `AssignmentServiceFactory.ts`
-- [ ] Create `AssignmentListViewModel`
-- [ ] Create `AssignmentListPage` (overview of all assignments)
-- [ ] Create `UserCaseloadPage` (individual user's client assignments)
-- [ ] Add feature flag check: `direct_care_settings.enable_staff_client_mapping`
-- [ ] Add `/assignments` and `/assignments/:userId` routes to App.tsx
-- [ ] Add "Client Assignments" nav item to MainLayout (UserCheck icon)
-- [ ] Validate: typecheck, lint, build
+- [x] Create assignment service layer (4 files)
+  - [x] `IAssignmentService.ts`
+  - [x] `SupabaseAssignmentService.ts`
+  - [x] `MockAssignmentService.ts`
+  - [x] `AssignmentServiceFactory.ts`
+- [x] Create `AssignmentListViewModel`
+- [x] Create `AssignmentListPage` (overview grouped by user, with search/filter)
+- [x] Create `UserCaseloadPage` (individual user's assignments with assign/unassign)
+- [ ] Add feature flag check: `direct_care_settings.enable_staff_client_mapping` (deferred — feature flag gating not yet wired, route/permission gating in place)
+- [x] Add `/assignments` and `/assignments/:userId` routes to App.tsx
+- [x] Add "Client Assignments" nav item to MainLayout (UserCheck icon)
+- [x] Validate: typecheck, lint, build
 
 ## Phase 7C: Testing ⏸️ PENDING
 

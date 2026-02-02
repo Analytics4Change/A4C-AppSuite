@@ -19,6 +19,7 @@ import {
   Shield,
   AlertTriangle,
   Calendar,
+  UserCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ImpersonationBanner } from '@/components/auth/ImpersonationBanner';
@@ -83,6 +84,7 @@ export const MainLayout: React.FC = () => {
     { to: '/roles', icon: Shield, label: 'Roles', permission: 'role.create', showForOrgTypes: ['provider'] },
     { to: '/users', icon: UsersRound, label: 'User Management', permission: 'user.view', showForOrgTypes: ['provider'] },
     { to: '/schedules', icon: Calendar, label: 'Staff Schedules', permission: 'user.schedule_manage', showForOrgTypes: ['provider'] },
+    { to: '/assignments', icon: UserCheck, label: 'Client Assignments', permission: 'user.client_assign', showForOrgTypes: ['provider'] },
     { to: '/medications', icon: Pill, label: 'Medication Management', hideForOrgTypes: ['platform_owner', 'provider_partner'] },
     { to: '/reports', icon: FileText, label: 'Reports' },
     { to: '/settings', icon: Settings, label: 'Settings' },

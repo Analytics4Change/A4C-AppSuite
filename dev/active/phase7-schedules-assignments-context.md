@@ -4,7 +4,7 @@
 
 Phase 7 adds admin UIs for managing staff work schedules and client-staff assignment mappings. Split into 7A (Schedules) and 7B (Assignments).
 
-Phase 7A is **complete** (pending commit). Phase 7B is planned but not started.
+Phase 7A and 7B are **complete**. Phase 7C (testing) is pending.
 
 ## Key Decisions
 
@@ -41,9 +41,23 @@ Phase 7A is **complete** (pending commit). Phase 7B is planned but not started.
 - `frontend/src/pages/schedules/WeeklyScheduleGrid.tsx` — 7-row grid component
 - `frontend/src/pages/schedules/index.ts`
 
+### Frontend service layer (Phase 7B)
+- `frontend/src/services/assignment/IAssignmentService.ts`
+- `frontend/src/services/assignment/SupabaseAssignmentService.ts`
+- `frontend/src/services/assignment/MockAssignmentService.ts`
+- `frontend/src/services/assignment/AssignmentServiceFactory.ts`
+
+### Frontend ViewModels (Phase 7B)
+- `frontend/src/viewModels/assignment/AssignmentListViewModel.ts` — list/filter/assign/unassign
+
+### Frontend pages (Phase 7B)
+- `frontend/src/pages/assignments/AssignmentListPage.tsx` — grouped-by-user card overview with search
+- `frontend/src/pages/assignments/UserCaseloadPage.tsx` — individual caseload with assign/unassign forms
+- `frontend/src/pages/assignments/index.ts`
+
 ### Files Modified
-- `frontend/src/App.tsx` — Added `/schedules` and `/schedules/:userId` routes with `RequirePermission`
-- `frontend/src/components/layouts/MainLayout.tsx` — Added "Staff Schedules" nav item (Calendar icon, `user.schedule_manage`, provider only)
+- `frontend/src/App.tsx` — Added schedule + assignment routes with `RequirePermission`
+- `frontend/src/components/layouts/MainLayout.tsx` — Added "Staff Schedules" + "Client Assignments" nav items
 - `infrastructure/supabase/contracts/asyncapi/asyncapi.yaml` — Added 5 channel refs for schedule/assignment events
 - `infrastructure/supabase/sql/99-seeds/001-permissions-seed.sql` — Added 2 permissions (updated counts)
 - `infrastructure/supabase/sql/99-seeds/002-role-permission-templates-seed.sql` — Added 2 provider_admin entries (updated counts)
@@ -66,7 +80,7 @@ Phase 7A is **complete** (pending commit). Phase 7B is planned but not started.
 
 ## Validation Status
 
-- Typecheck: clean
-- Build: passes
-- Lint: 0 errors, 0 warnings (after fixing 2 pre-existing generated file issues)
-- Tests: not run (no new tests written for Phase 7A — planned for later)
+- Typecheck: clean (Phase 7A + 7B)
+- Build: passes (Phase 7A + 7B)
+- Lint: 0 errors, 0 warnings
+- Tests: not run (planned for Phase 7C)
