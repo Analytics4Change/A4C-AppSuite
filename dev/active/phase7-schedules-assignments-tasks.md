@@ -5,7 +5,7 @@
 **Phase**: 7A + 7B complete, 7C pending
 **Status**: Phase 7A ✅ COMPLETE, Phase 7B ✅ COMPLETE, Phase 7C ⏸️ PENDING
 **Last Updated**: 2026-02-02
-**Next Step**: Commit Phase 7B, then Phase 7C (unit tests)
+**Next Step**: Phase 7C (unit tests for ScheduleEditViewModel + AssignmentListViewModel)
 
 ## Phase 7 Prerequisites ✅ COMPLETE
 
@@ -50,7 +50,7 @@
 - [x] Create `AssignmentListViewModel`
 - [x] Create `AssignmentListPage` (overview grouped by user, with search/filter)
 - [x] Create `UserCaseloadPage` (individual user's assignments with assign/unassign)
-- [ ] Add feature flag check: `direct_care_settings.enable_staff_client_mapping` (deferred — feature flag gating not yet wired, route/permission gating in place)
+- [x] Add feature flag check: `direct_care_settings.enable_staff_client_mapping` — amber banner on both pages when disabled, linking to Organization Settings
 - [x] Add `/assignments` and `/assignments/:userId` routes to App.tsx
 - [x] Add "Client Assignments" nav item to MainLayout (UserCheck icon)
 - [x] Validate: typecheck, lint, build

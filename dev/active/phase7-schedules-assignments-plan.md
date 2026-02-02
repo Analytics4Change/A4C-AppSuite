@@ -24,9 +24,9 @@ Add admin UIs for managing staff work schedules (Phase 7A) and client-staff assi
 
 Backend RPCs deployed, frontend schedules UI complete. See tasks.md for details.
 
-## Phase 7B: Pending
+## Phase 7B: Complete
 
-Client assignments UI. Same service layer pattern as schedules. Feature flag check against `direct_care_settings.enable_staff_client_mapping`.
+Client assignments UI with feature flag check. Amber banner when `enable_staff_client_mapping` is disabled. See tasks.md for details.
 
 ## Backend RPCs (all deployed)
 

@@ -14,6 +14,7 @@ Phase 7A and 7B are **complete**. Phase 7C (testing) is pending.
 4. **Permission seeding via domain events**: Permissions defined by emitting `permission.defined` events (NOT direct INSERT into projection) — follows `001-permissions-seed.sql` pattern
 5. **AsyncAPI bundler reachability**: Schedule/assignment messages had to be added to `asyncapi.yaml` channels for Modelina to include them in generated types — gotcha from Phase 6
 6. **Weekly schedule format**: JSONB with days as keys, `{begin: "HHMM", end: "HHMM"}` values, null for days off
+7. **Feature flag UX**: When `enable_staff_client_mapping` is `false` in `organizations_projection.direct_care_settings`, assignment pages show amber banner explaining assignments won't affect routing until enabled in Organization Settings. Pages remain fully functional for data entry. — decided 2026-02-02
 
 ## Files Created (Phase 7A)
 
@@ -48,7 +49,7 @@ Phase 7A and 7B are **complete**. Phase 7C (testing) is pending.
 - `frontend/src/services/assignment/AssignmentServiceFactory.ts`
 
 ### Frontend ViewModels (Phase 7B)
-- `frontend/src/viewModels/assignment/AssignmentListViewModel.ts` — list/filter/assign/unassign
+- `frontend/src/viewModels/assignment/AssignmentListViewModel.ts` — list/filter/assign/unassign + feature flag check via DirectCareSettingsService
 
 ### Frontend pages (Phase 7B)
 - `frontend/src/pages/assignments/AssignmentListPage.tsx` — grouped-by-user card overview with search
@@ -70,6 +71,7 @@ Phase 7A and 7B are **complete**. Phase 7C (testing) is pending.
 - **No clients table**: `client_id` in assignments is a UUID with no FK. Display as raw UUID for now until client domain is rebuilt with event-driven architecture.
 - **Schedule uniqueness**: `user_schedule_policies_projection` has UNIQUE on `(user_id, organization_id, org_unit_id)` — one active schedule per user/org/OU combination.
 - **Assignment upsert**: Event handler uses `ON CONFLICT (user_id, client_id) DO UPDATE` — re-assigning reactivates.
+- **Feature flag default**: `enable_staff_client_mapping` defaults to `false` in `organizations_projection.direct_care_settings` JSONB column. New orgs will see the amber banner until a provider_admin enables it in Settings.
 
 ## Reference Patterns
 
