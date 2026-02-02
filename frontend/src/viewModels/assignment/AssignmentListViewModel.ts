@@ -8,7 +8,9 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import type { UserClientAssignment } from '@/types/client-assignment.types';
 import type { IAssignmentService } from '@/services/assignment/IAssignmentService';
+import type { IDirectCareSettingsService } from '@/services/direct-care/IDirectCareSettingsService';
 import { getAssignmentService } from '@/services/assignment/AssignmentServiceFactory';
+import { getDirectCareSettingsService } from '@/services/direct-care/DirectCareSettingsServiceFactory';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('viewmodel');
@@ -18,14 +20,39 @@ export class AssignmentListViewModel {
   isLoading = false;
   error: string | null = null;
 
+  /** Whether enable_staff_client_mapping is on for this org */
+  featureEnabled: boolean | null = null;
+  featureCheckLoading = false;
+
   filterUserId: string | null = null;
   filterClientId: string | null = null;
   showInactive = false;
 
   constructor(
-    private service: IAssignmentService = getAssignmentService()
+    private service: IAssignmentService = getAssignmentService(),
+    private settingsService: IDirectCareSettingsService = getDirectCareSettingsService(),
   ) {
     makeAutoObservable(this);
+  }
+
+  /** Check whether the org has enable_staff_client_mapping enabled */
+  async checkFeatureFlag(orgId: string): Promise<void> {
+    runInAction(() => { this.featureCheckLoading = true; });
+
+    try {
+      const settings = await this.settingsService.getSettings(orgId);
+      runInAction(() => {
+        this.featureEnabled = settings.enable_staff_client_mapping;
+        this.featureCheckLoading = false;
+      });
+      log.debug('Feature flag checked', { enable_staff_client_mapping: this.featureEnabled });
+    } catch (error) {
+      log.warn('Failed to check feature flag, assuming enabled', { error });
+      runInAction(() => {
+        this.featureEnabled = true;
+        this.featureCheckLoading = false;
+      });
+    }
   }
 
   async loadAssignments(): Promise<void> {

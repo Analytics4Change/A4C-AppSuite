@@ -8,17 +8,23 @@
 import React, { useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useNavigate } from 'react-router-dom';
-import { UserCheck, Search, X } from 'lucide-react';
+import { UserCheck, Search, X, AlertTriangle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { AssignmentListViewModel } from '@/viewModels/assignment/AssignmentListViewModel';
 
 export const AssignmentListPage: React.FC = observer(() => {
   const [vm] = useState(() => new AssignmentListViewModel());
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const { session } = useAuth();
 
   useEffect(() => {
+    const orgId = session?.claims?.org_id;
+    if (orgId) {
+      vm.checkFeatureFlag(orgId);
+    }
     vm.loadAssignments();
-  }, [vm]);
+  }, [vm, session]);
 
   const filteredAssignments = searchTerm
     ? vm.assignments.filter(
@@ -84,6 +90,26 @@ export const AssignmentListPage: React.FC = observer(() => {
           Show inactive
         </label>
       </div>
+
+      {/* Feature flag banner */}
+      {vm.featureEnabled === false && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 flex items-start gap-3" role="status">
+          <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+          <div>
+            <p className="text-sm font-medium text-amber-800">Staff-Client Mapping is not enabled</p>
+            <p className="text-sm text-amber-700 mt-1">
+              Assignments can be managed here, but they won&apos;t affect notification routing until
+              &quot;Staff-Client Mapping&quot; is enabled in{' '}
+              <button
+                onClick={() => navigate('/settings/organization')}
+                className="underline font-medium hover:text-amber-900"
+              >
+                Organization Settings
+              </button>.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Loading state */}
       {vm.isLoading && (
