@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-20
+last_updated: 2026-02-02
 purpose: agent-navigation
 ---
 
@@ -34,6 +34,7 @@ purpose: agent-navigation
 |---------|-----------------|---------|
 | `accessibility` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | TESTING.md, component docs |
 | `activities-reference` | [activities-reference.md](workflows/reference/activities-reference.md) | error-handling-and-compensation.md |
+| `assignment` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | user_schedule_policies_projection.md, organizations_projection.md |
 | `activity` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | activities-reference.md |
 | `addresses` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | phones_projection.md |
 | `apm-integration` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
@@ -46,6 +47,8 @@ purpose: agent-navigation
 | `bootstrap-workflow-design` | [organization-bootstrap-workflow-design.md](workflows/architecture/organization-bootstrap-workflow-design.md) | activities-reference.md |
 | `business-profile` | [organization_business_profiles_projection.md](infrastructure/reference/database/tables/organization_business_profiles_projection.md) | organizations_projection.md |
 | `cascade-deactivation` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | user_roles_projection.md |
+| `caseload` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | user_schedule_policies_projection.md |
+| `client-assignment` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | organizations_projection.md |
 | `clients` | [clients.md](infrastructure/reference/database/tables/clients.md) | medication_history.md |
 | `compensation` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
 | `compliance` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | dosage_info.md |
@@ -62,6 +65,7 @@ purpose: agent-navigation
 | `deployment` | [DEPLOYMENT_INSTRUCTIONS.md](infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) | infrastructure/CLAUDE.md |
 | `determinism` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | temporal-overview.md |
 | `development` | [DEVELOPMENT.md](frontend/guides/DEVELOPMENT.md) | frontend/CLAUDE.md |
+| `direct-care-settings` | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | user_client_assignments_projection.md |
 | `dns-provisioning` | [organization-onboarding-workflow.md](architecture/workflows/organization-onboarding-workflow.md) | event-driven-workflow-triggering.md |
 | `dns-verification` | [activities-reference.md](workflows/reference/activities-reference.md) | organization-bootstrap-workflow-design.md |
 | `domain-events` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-metadata-schema.md |
@@ -80,6 +84,7 @@ purpose: agent-navigation
 | `events` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md |
 | `failed-events` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md |
 | `hipaa` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | impersonation-security-controls.md |
+| `feature-flag` | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | user_client_assignments_projection.md |
 | `formulary` | [medications.md](infrastructure/reference/database/tables/medications.md) | medication_history.md |
 | `generated-events` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | workflows/CLAUDE.md, event-sourcing-overview.md |
 | `handler` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md, event-sourcing-overview.md |
@@ -150,6 +155,8 @@ purpose: agent-navigation
 | `router` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md |
 | `rxnorm` | [medications.md](infrastructure/reference/database/tables/medications.md) | rxnorm-medication-autocomplete.md |
 | `saga` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
+| `schedule` | [user_schedule_policies_projection.md](infrastructure/reference/database/tables/user_schedule_policies_projection.md) | user_client_assignments_projection.md, organizations_projection.md |
+| `staff-schedule` | [user_schedule_policies_projection.md](infrastructure/reference/database/tables/user_schedule_policies_projection.md) | organization_units_projection.md |
 | `saga-pattern` | [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | organization-bootstrap-workflow-design.md |
 | `schema-registry` | [event_types.md](infrastructure/reference/database/tables/event_types.md) | event-sourcing-overview.md |
 | `saml` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
@@ -278,6 +285,8 @@ purpose: agent-navigation
 | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | Prescription records | `prescriptions`, `compliance`, `controlled-substances` | 720 |
 | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | MAR tracking | `dosage-info`, `mar`, `medication-administration` | 800 |
 | [clients.md](infrastructure/reference/database/tables/clients.md) | Client/patient records | `clients`, `phi`, `hipaa` | 550 |
+| [user_schedule_policies_projection.md](infrastructure/reference/database/tables/user_schedule_policies_projection.md) | Staff weekly schedule policies | `schedule`, `staff-schedule`, `weekly-schedule` | 450 |
+| [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | Client-staff assignment mappings | `assignment`, `client-assignment`, `caseload`, `feature-flag` | 450 |
 | [event_types.md](infrastructure/reference/database/tables/event_types.md) | Event schema registry | `event-types`, `schema-registry`, `json-schema` | 500 |
 
 ## Sync Instructions

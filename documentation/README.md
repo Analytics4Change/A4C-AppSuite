@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-02-02
 ---
 
 <!-- TL;DR-START -->
@@ -43,7 +43,7 @@ Use the TL;DR section at the top of each document to quickly assess relevance be
 ### Frequently Accessed Documentation
 - **[Frontend Authentication Architecture](./architecture/authentication/frontend-auth-architecture.md)** - Three-mode auth system (mock/integration/production)
 - **[RBAC Architecture](./architecture/authorization/rbac-architecture.md)** - Role-based access control, permissions
-- **[Database Table Reference](./infrastructure/reference/database/tables/)** - Complete schema documentation (29 tables)
+- **[Database Table Reference](./infrastructure/reference/database/tables/)** - Complete schema documentation (31 tables)
 - **[JWT Custom Claims Setup](./infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md)** - Configure custom claims in Supabase
 - **[Event-Driven Guide](./frontend/guides/EVENT-DRIVEN-GUIDE.md)** - CQRS patterns in React
 - **[Deployment Instructions](./infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md)** - Deploy database migrations
@@ -130,9 +130,10 @@ Terraform IaC, Kubernetes deployments, Supabase resources
   - [Kubernetes](./infrastructure/guides/kubernetes/) - K8s deployments and configuration
 - **[Reference](./infrastructure/reference/)** - Quick lookup for schemas and configs
   - **[Database Reference](./infrastructure/reference/database/)**
-    - **[Table Documentation](./infrastructure/reference/database/tables/)** - Schema documentation (29 tables documented)
+    - **[Table Documentation](./infrastructure/reference/database/tables/)** - Schema documentation (31 tables documented)
       - **Infrastructure & Auth**: [organizations_projection](./infrastructure/reference/database/tables/organizations_projection.md) • [organization_units_projection](./infrastructure/reference/database/tables/organization_units_projection.md) • [users](./infrastructure/reference/database/tables/users.md)
       - **Clinical Operations**: [clients](./infrastructure/reference/database/tables/clients.md) • [medications](./infrastructure/reference/database/tables/medications.md) • [medication_history](./infrastructure/reference/database/tables/medication_history.md) • [dosage_info](./infrastructure/reference/database/tables/dosage_info.md)
+      - **Staff Operations**: [user_schedule_policies_projection](./infrastructure/reference/database/tables/user_schedule_policies_projection.md) • [user_client_assignments_projection](./infrastructure/reference/database/tables/user_client_assignments_projection.md)
       - **RBAC**: [permissions_projection](./infrastructure/reference/database/tables/permissions_projection.md) • [roles_projection](./infrastructure/reference/database/tables/roles_projection.md) • [user_roles_projection](./infrastructure/reference/database/tables/user_roles_projection.md) • [role_permissions_projection](./infrastructure/reference/database/tables/role_permissions_projection.md) • [role_permission_templates](./infrastructure/reference/database/tables/role_permission_templates.md)
       - **Events & Workflows**: [domain_events](./infrastructure/reference/database/tables/domain_events.md) • [event_types](./infrastructure/reference/database/tables/event_types.md) • [workflow_queue_projection](./infrastructure/reference/database/tables/workflow_queue_projection.md)
       - **Contacts & Addresses**: [contacts_projection](./infrastructure/reference/database/tables/contacts_projection.md) • [addresses_projection](./infrastructure/reference/database/tables/addresses_projection.md) • [phones_projection](./infrastructure/reference/database/tables/phones_projection.md)
