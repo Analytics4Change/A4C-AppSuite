@@ -11,8 +11,9 @@
 --   'global' - Platform-level permissions (platform_owner only)
 --   'org'    - Organization-level permissions (org admins)
 --
--- Last Updated: 2026-01-20
+-- Last Updated: 2026-02-02
 -- Changes:
+--   - 2026-02-02: Added user.schedule_manage, user.client_assign (Phase 7 - staff schedules & assignments)
 --   - 2026-01-20: Day 0 v3 reconciliation - added platform.admin (was in DB but missing from seed)
 --   - 2026-01-13: Added granular OU permissions (update_ou, delete_ou, deactivate_ou, reactivate_ou)
 --   - Removed a4c_role.* (5 permissions) - not used
@@ -366,7 +367,7 @@ DO $$ BEGIN
 EXCEPTION WHEN unique_violation THEN NULL;
 END $$;
 
--- User Management (Org) - 6 permissions
+-- User Management (Org) - 8 permissions
 DO $$ BEGIN
   INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
   VALUES (
@@ -427,7 +428,29 @@ DO $$ BEGIN
 EXCEPTION WHEN unique_violation THEN NULL;
 END $$;
 
+-- Staff Schedule Management
+DO $$ BEGIN
+  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "user", "action": "schedule_manage", "description": "Create, update, and deactivate staff work schedules", "scope_type": "org", "requires_mfa": false, "display_name": "Manage Staff Schedules"}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Staff schedule management"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
+-- Client Assignment Management
+DO $$ BEGIN
+  INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "user", "action": "client_assign", "description": "Assign and unassign clients to/from staff members", "scope_type": "org", "requires_mfa": false, "display_name": "Assign Clients to Staff"}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Seed: Client assignment management"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
 -- ============================================
 -- END OF PERMISSIONS SEED FILE
--- Total: 35 permissions (10 global + 25 org)
+-- Total: 37 permissions (10 global + 27 org)
 -- ============================================

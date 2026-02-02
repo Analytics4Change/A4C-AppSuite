@@ -207,14 +207,6 @@ export interface MedicationDiscontinuedEvent extends DomainEvent {
 
 export type OrganizationType = 'platform_owner' | 'provider' | 'provider_partner';
 
-export interface Address {
-  street?: string;
-  city?: string;
-  state?: string;
-  zip_code?: string;
-  country?: string;
-}
-
 export interface OrganizationCreationData {
   name: string;
   display_name?: string;

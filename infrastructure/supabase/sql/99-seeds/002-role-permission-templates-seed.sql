@@ -8,8 +8,10 @@
 -- IMPORTANT: This is the SINGLE SOURCE OF TRUTH for role permission templates.
 -- DB is authoritative - regenerate this file if DB changes.
 --
--- Last Updated: 2026-01-20
+-- Last Updated: 2026-02-02
 -- Source: Generated from production DB during Day 0 v3 reconciliation
+-- Changes:
+--   - 2026-02-02: Added user.schedule_manage, user.client_assign to provider_admin (Phase 7)
 -- ============================================
 
 -- ============================================
@@ -55,7 +57,7 @@ VALUES ('partner_admin', 'user.view', true)
 ON CONFLICT (role_name, permission_name) DO NOTHING;
 
 -- ============================================
--- PROVIDER_ADMIN ROLE (27 permissions)
+-- PROVIDER_ADMIN ROLE (29 permissions)
 -- Full organization administrator with all org-scoped permissions
 -- ============================================
 
@@ -165,6 +167,14 @@ ON CONFLICT (role_name, permission_name) DO NOTHING;
 
 INSERT INTO role_permission_templates (role_name, permission_name, is_active)
 VALUES ('provider_admin', 'user.view', true)
+ON CONFLICT (role_name, permission_name) DO NOTHING;
+
+INSERT INTO role_permission_templates (role_name, permission_name, is_active)
+VALUES ('provider_admin', 'user.schedule_manage', true)
+ON CONFLICT (role_name, permission_name) DO NOTHING;
+
+INSERT INTO role_permission_templates (role_name, permission_name, is_active)
+VALUES ('provider_admin', 'user.client_assign', true)
 ON CONFLICT (role_name, permission_name) DO NOTHING;
 
 -- ============================================

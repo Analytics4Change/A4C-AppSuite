@@ -3,16 +3,13 @@
  *
  * Generated from AsyncAPI specification by Modelina
  * Source: infrastructure/supabase/contracts/asyncapi/
- * Generated: 2026-01-26T20:57:10.264Z
+ * Generated: 2026-02-02T18:14:37.019Z
  *
  * To regenerate: cd infrastructure/supabase/contracts && npm run generate:types
  *
  * IMPORTANT: These types are the source of truth for domain events.
  * If you need to change event structure, modify the AsyncAPI spec and regenerate.
  */
-
-/* eslint-disable */
-/* tslint:disable */
 
 // =============================================================================
 // Base Types (from components/schemas.yaml)
@@ -206,7 +203,7 @@ export enum RoleScope {
 // Interfaces
 // =============================================================================
 
-export type DomainEvents = UserSyncedFromAuthEvent | UserOrgSwitchedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent;
+export type DomainEvents = UserSyncedFromAuthEvent | UserOrgSwitchedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | UserScheduleCreatedEvent | UserScheduleUpdatedEvent | UserScheduleDeactivatedEvent | UserClientAssignedEvent | UserClientUnassignedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent;
 
 export interface UserSyncedFromAuthEvent {
   'stream_id': string;
@@ -304,6 +301,112 @@ export interface UserDeletedData {
   'user_id': string;
   'org_id': string;
   'deleted_at': string;
+  'reason'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface UserScheduleCreatedEvent {
+  'stream_id': string;
+  'stream_type': 'user';
+  'event_type': 'user.schedule.created';
+  'event_data': UserScheduleData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface UserScheduleData {
+  'schedule_id'?: string;
+  'organization_id': string;
+  'org_unit_id'?: string;
+  'schedule': WeeklySchedule;
+  'effective_from'?: string;
+  'effective_until'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface WeeklySchedule {
+  'monday'?: DaySchedule;
+  'tuesday'?: DaySchedule;
+  'wednesday'?: DaySchedule;
+  'thursday'?: DaySchedule;
+  'friday'?: DaySchedule;
+  'saturday'?: DaySchedule;
+  'sunday'?: DaySchedule;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface DaySchedule {
+  'begin': string;
+  'end': string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface UserScheduleUpdatedEvent {
+  'stream_id': string;
+  'stream_type': 'user';
+  'event_type': 'user.schedule.updated';
+  'event_data': AnonymousSchema_2042;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface AnonymousSchema_2042 {
+  'schedule_id'?: string;
+  'organization_id': string;
+  'org_unit_id'?: string;
+  'schedule': WeeklySchedule;
+  'effective_from'?: string;
+  'effective_until'?: string;
+  'previous_schedule'?: WeeklySchedule;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface UserScheduleDeactivatedEvent {
+  'stream_id': string;
+  'stream_type': 'user';
+  'event_type': 'user.schedule.deactivated';
+  'event_data': AnonymousSchema_2109;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface AnonymousSchema_2109 {
+  'organization_id': string;
+  'org_unit_id'?: string;
+  'reason'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface UserClientAssignedEvent {
+  'stream_id': string;
+  'stream_type': 'user';
+  'event_type': 'user.client.assigned';
+  'event_data': UserClientAssignmentData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface UserClientAssignmentData {
+  'assignment_id'?: string;
+  'client_id': string;
+  'organization_id': string;
+  'assigned_until'?: string;
+  'notes'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface UserClientUnassignedEvent {
+  'stream_id': string;
+  'stream_type': 'user';
+  'event_type': 'user.client.unassigned';
+  'event_data': AnonymousSchema_2149;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface AnonymousSchema_2149 {
+  'client_id': string;
+  'organization_id': string;
   'reason'?: string;
   'additionalProperties'?: Map<string, any>;
 }

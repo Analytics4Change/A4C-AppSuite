@@ -41,6 +41,13 @@ channels:
           - $ref: './domains/user.yaml#/components/messages/UserDeactivated'
           - $ref: './domains/user.yaml#/components/messages/UserReactivated'
           - $ref: './domains/user.yaml#/components/messages/UserDeleted'
+          # User schedule events (staff work schedules)
+          - $ref: './domains/user.yaml#/components/messages/UserScheduleCreated'
+          - $ref: './domains/user.yaml#/components/messages/UserScheduleUpdated'
+          - $ref: './domains/user.yaml#/components/messages/UserScheduleDeactivated'
+          # User client assignment events (staff-client mapping)
+          - $ref: './domains/user.yaml#/components/messages/UserClientAssigned'
+          - $ref: './domains/user.yaml#/components/messages/UserClientUnassigned'
           - $ref: './domains/invitation.yaml#/components/messages/UserInvited'
           - $ref: './domains/invitation.yaml#/components/messages/InvitationRevoked'
           - $ref: './domains/invitation.yaml#/components/messages/InvitationAccepted'
