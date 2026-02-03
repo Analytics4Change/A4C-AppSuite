@@ -159,6 +159,9 @@ export const RolesManagePage: React.FC = observer(() => {
           setPanelMode('edit');
           viewModel.selectRole(roleId);
           log.debug('Role loaded for editing', { roleId, name: fullRole.name });
+        } else {
+          log.warn('Role not found', { roleId });
+          setOperationError('Role could not be loaded. Please refresh the page.');
         }
       } catch (error) {
         log.error('Failed to load role', error);
@@ -268,13 +271,20 @@ export const RolesManagePage: React.FC = observer(() => {
           roleId: result.role.id,
         });
 
-        await viewModel.refresh();
+        try {
+          await viewModel.refresh();
 
-        if (panelMode === 'create') {
-          await selectAndLoadRole(result.role.id);
-        } else {
-          await selectAndLoadRole(result.role.id);
+          if (panelMode === 'create') {
+            await selectAndLoadRole(result.role.id);
+          } else {
+            await selectAndLoadRole(result.role.id);
+          }
+        } catch (err) {
+          log.error('Failed to transition after save', err);
+          setOperationError('Role was saved but failed to reload. Please refresh the page.');
         }
+      } else if (!result.success) {
+        setOperationError(result.error || 'Failed to save role');
       }
     },
     [formViewModel, panelMode, viewModel, selectAndLoadRole]
