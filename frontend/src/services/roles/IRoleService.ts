@@ -28,6 +28,13 @@ import type {
   RoleOperationResult,
 } from '@/types/role.types';
 
+import type {
+  BulkAssignmentResult,
+  SelectableUser,
+  ListUsersForBulkAssignmentParams,
+  BulkAssignRoleParams,
+} from '@/types/bulk-assignment.types';
+
 export interface IRoleService {
   /**
    * Retrieves all roles within the user's organization scope
@@ -191,4 +198,61 @@ export interface IRoleService {
    * }
    */
   deleteRole(roleId: string): Promise<RoleOperationResult>;
+
+  // =========================================================================
+  // BULK ROLE ASSIGNMENT
+  // =========================================================================
+
+  /**
+   * Lists users eligible for bulk role assignment
+   *
+   * Returns users within the organization at the specified scope who can be
+   * assigned to the given role. Users already assigned to the role at the
+   * same scope are flagged but included (for display purposes).
+   *
+   * Permission Required: user.role_assign at the specified scope
+   *
+   * @param params - Parameters including roleId, scopePath, and optional search/pagination
+   * @returns Promise resolving to array of selectable users
+   *
+   * @example
+   * const users = await service.listUsersForBulkAssignment({
+   *   roleId: 'role-uuid',
+   *   scopePath: 'acme.pediatrics',
+   *   searchTerm: 'john',
+   *   limit: 50,
+   * });
+   *
+   * // Filter out already-assigned users for selection UI
+   * const assignable = users.filter(u => !u.isAlreadyAssigned);
+   */
+  listUsersForBulkAssignment(params: ListUsersForBulkAssignmentParams): Promise<SelectableUser[]>;
+
+  /**
+   * Assigns a role to multiple users in a single operation
+   *
+   * Each successful assignment emits a `user.role.assigned` event.
+   * All events from the same bulk operation are linked via correlation_id.
+   * Partial failures are allowed - successful assignments are committed
+   * even if some users fail.
+   *
+   * Permission Required: user.role_assign at the specified scope
+   *
+   * @param params - Parameters including roleId, userIds, scopePath, and optional reason
+   * @returns Promise resolving to detailed result with successes and failures
+   *
+   * @example
+   * const result = await service.bulkAssignRole({
+   *   roleId: 'role-uuid',
+   *   userIds: ['user-1', 'user-2', 'user-3'],
+   *   scopePath: 'acme.pediatrics',
+   *   reason: 'New hire onboarding batch',
+   * });
+   *
+   * if (result.totalFailed > 0) {
+   *   console.log('Partial success:', result.failed);
+   * }
+   * console.log(`Reference: ${result.correlationId}`);
+   */
+  bulkAssignRole(params: BulkAssignRoleParams): Promise<BulkAssignmentResult>;
 }

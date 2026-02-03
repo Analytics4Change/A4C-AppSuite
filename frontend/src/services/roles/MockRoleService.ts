@@ -23,6 +23,12 @@ import type {
   UpdateRoleRequest,
   RoleOperationResult,
 } from '@/types/role.types';
+import type {
+  BulkAssignmentResult,
+  SelectableUser,
+  ListUsersForBulkAssignmentParams,
+  BulkAssignRoleParams,
+} from '@/types/bulk-assignment.types';
 import type { IRoleService } from './IRoleService';
 
 const log = Logger.getLogger('api');
@@ -30,6 +36,30 @@ const log = Logger.getLogger('api');
 /** localStorage keys for persisting mock data */
 const ROLES_STORAGE_KEY = 'mock_roles';
 const ROLE_PERMISSIONS_STORAGE_KEY = 'mock_role_permissions';
+const USER_ROLES_STORAGE_KEY = 'mock_user_roles';
+
+/**
+ * Mock users for bulk assignment testing
+ */
+interface MockUser {
+  id: string;
+  email: string;
+  displayName: string;
+  isActive: boolean;
+}
+
+const MOCK_USERS: MockUser[] = [
+  { id: 'user-alice', email: 'alice@example.com', displayName: 'Alice Johnson', isActive: true },
+  { id: 'user-bob', email: 'bob@example.com', displayName: 'Bob Smith', isActive: true },
+  { id: 'user-carol', email: 'carol@example.com', displayName: 'Carol Davis', isActive: true },
+  { id: 'user-dan', email: 'dan@example.com', displayName: 'Dan Wilson', isActive: true },
+  { id: 'user-eve', email: 'eve@example.com', displayName: 'Eve Brown', isActive: true },
+  { id: 'user-frank', email: 'frank@example.com', displayName: 'Frank Miller', isActive: true },
+  { id: 'user-grace', email: 'grace@example.com', displayName: 'Grace Lee', isActive: true },
+  { id: 'user-henry', email: 'henry@example.com', displayName: 'Henry Taylor', isActive: true },
+  { id: 'user-iris', email: 'iris@example.com', displayName: 'Iris Anderson', isActive: false }, // Inactive
+  { id: 'user-jack', email: 'jack@example.com', displayName: 'Jack Thomas', isActive: true },
+];
 
 /**
  * Generate a mock UUID
@@ -165,6 +195,12 @@ export class MockRoleService implements IRoleService {
   private roles: Role[];
   private rolePermissions: Map<string, string[]>;
 
+  /**
+   * Mock user-role assignments: Map<"userId:roleId:scopePath", assignmentData>
+   * Used for tracking which users are assigned to which roles at which scopes
+   */
+  private userRoleAssignments: Map<string, { userId: string; roleId: string; scopePath: string }>;
+
   /** Mock current user's permissions (Provider Admin has all) */
   private currentUserPermissions: string[] = MOCK_PERMISSIONS.map((p) => p.id);
 
@@ -172,7 +208,44 @@ export class MockRoleService implements IRoleService {
     const loaded = this.loadFromStorage();
     this.roles = loaded.roles;
     this.rolePermissions = loaded.rolePermissions;
+    this.userRoleAssignments = this.loadUserRoleAssignments();
     log.info('MockRoleService initialized', { roleCount: this.roles.length });
+  }
+
+  /**
+   * Load user-role assignments from localStorage
+   */
+  private loadUserRoleAssignments(): Map<string, { userId: string; roleId: string; scopePath: string }> {
+    try {
+      const json = localStorage.getItem(USER_ROLES_STORAGE_KEY);
+      if (json) {
+        const obj = JSON.parse(json);
+        return new Map(Object.entries(obj));
+      }
+    } catch {
+      log.warn('Failed to load mock user-role assignments, using defaults');
+    }
+    // Initialize with some default assignments
+    const defaults = new Map<string, { userId: string; roleId: string; scopePath: string }>();
+    // Dan is already a clinician
+    defaults.set('user-dan:role-clinician:root.provider.acme_healthcare', {
+      userId: 'user-dan',
+      roleId: 'role-clinician',
+      scopePath: 'root.provider.acme_healthcare',
+    });
+    return defaults;
+  }
+
+  /**
+   * Save user-role assignments to localStorage
+   */
+  private saveUserRoleAssignments(): void {
+    try {
+      const obj = Object.fromEntries(this.userRoleAssignments);
+      localStorage.setItem(USER_ROLES_STORAGE_KEY, JSON.stringify(obj));
+    } catch (error) {
+      log.error('Failed to save mock user-role assignments', { error });
+    }
   }
 
   /**
@@ -518,5 +591,181 @@ export class MockRoleService implements IRoleService {
   setCurrentUserPermissions(permissionIds: string[]): void {
     this.currentUserPermissions = [...permissionIds];
     log.info('Mock: Updated current user permissions', { count: permissionIds.length });
+  }
+
+  // =========================================================================
+  // BULK ROLE ASSIGNMENT
+  // =========================================================================
+
+  /**
+   * Lists users eligible for bulk role assignment
+   */
+  async listUsersForBulkAssignment(
+    params: ListUsersForBulkAssignmentParams
+  ): Promise<SelectableUser[]> {
+    await this.simulateDelay();
+    log.debug('Mock: Listing users for bulk assignment', { params });
+
+    const limit = params.limit || 100;
+    const offset = params.offset || 0;
+    const searchTerm = params.searchTerm?.toLowerCase();
+
+    // Get users, applying search filter
+    let filteredUsers = [...MOCK_USERS];
+
+    if (searchTerm) {
+      filteredUsers = filteredUsers.filter(
+        (u) =>
+          u.displayName.toLowerCase().includes(searchTerm) ||
+          u.email.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // Map to SelectableUser with role assignment info
+    const selectableUsers: SelectableUser[] = filteredUsers.map((user) => {
+      // Get current roles for this user
+      const currentRoleNames: string[] = [];
+      for (const [_key, assignment] of this.userRoleAssignments) {
+        if (assignment.userId === user.id) {
+          const role = this.roles.find((r) => r.id === assignment.roleId);
+          if (role) {
+            currentRoleNames.push(role.name);
+          }
+        }
+      }
+
+      // Check if already assigned to target role at target scope
+      const assignmentKey = `${user.id}:${params.roleId}:${params.scopePath}`;
+      const isAlreadyAssigned = this.userRoleAssignments.has(assignmentKey);
+
+      return {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        isActive: user.isActive,
+        currentRoles: currentRoleNames,
+        isAlreadyAssigned,
+      };
+    });
+
+    // Sort: non-assigned active users first, then already-assigned
+    selectableUsers.sort((a, b) => {
+      if (a.isAlreadyAssigned !== b.isAlreadyAssigned) {
+        return a.isAlreadyAssigned ? 1 : -1;
+      }
+      return a.displayName.localeCompare(b.displayName);
+    });
+
+    // Apply pagination
+    const result = selectableUsers.slice(offset, offset + limit);
+
+    log.info(`Mock: Returning ${result.length} users for bulk assignment`);
+    return result;
+  }
+
+  /**
+   * Assigns a role to multiple users in a single operation
+   */
+  async bulkAssignRole(params: BulkAssignRoleParams): Promise<BulkAssignmentResult> {
+    await this.simulateDelay();
+
+    const correlationId = params.correlationId || generateId();
+
+    log.info('Mock: Starting bulk role assignment', {
+      roleId: params.roleId,
+      userCount: params.userIds.length,
+      scopePath: params.scopePath,
+      correlationId,
+    });
+
+    const successful: string[] = [];
+    const failed: Array<{ userId: string; reason: string; sqlstate?: string }> = [];
+
+    // Verify role exists
+    const role = this.roles.find((r) => r.id === params.roleId);
+    if (!role) {
+      return {
+        successful: [],
+        failed: params.userIds.map((id) => ({
+          userId: id,
+          reason: 'Role not found',
+          sqlstate: 'P0002',
+        })),
+        totalRequested: params.userIds.length,
+        totalSucceeded: 0,
+        totalFailed: params.userIds.length,
+        correlationId,
+      };
+    }
+
+    // Process each user
+    for (const userId of params.userIds) {
+      const user = MOCK_USERS.find((u) => u.id === userId);
+
+      if (!user) {
+        failed.push({
+          userId,
+          reason: 'User not found or not in organization',
+        });
+        continue;
+      }
+
+      if (!user.isActive) {
+        failed.push({
+          userId,
+          reason: 'User is not active',
+        });
+        continue;
+      }
+
+      const assignmentKey = `${userId}:${params.roleId}:${params.scopePath}`;
+      if (this.userRoleAssignments.has(assignmentKey)) {
+        failed.push({
+          userId,
+          reason: 'User already has this role at this scope',
+          sqlstate: '23505',
+        });
+        continue;
+      }
+
+      // Success! Add the assignment
+      this.userRoleAssignments.set(assignmentKey, {
+        userId,
+        roleId: params.roleId,
+        scopePath: params.scopePath,
+      });
+
+      successful.push(userId);
+
+      log.debug('Mock: Assigned role to user', {
+        userId,
+        roleId: params.roleId,
+        scopePath: params.scopePath,
+      });
+    }
+
+    // Update role's userCount
+    role.userCount = role.userCount + successful.length;
+
+    // Save changes
+    this.saveUserRoleAssignments();
+    this.saveToStorage();
+
+    const result: BulkAssignmentResult = {
+      successful,
+      failed,
+      totalRequested: params.userIds.length,
+      totalSucceeded: successful.length,
+      totalFailed: failed.length,
+      correlationId,
+    };
+
+    log.info('Mock: Bulk assignment completed', {
+      totalSucceeded: result.totalSucceeded,
+      totalFailed: result.totalFailed,
+      correlationId,
+    });
+
+    return result;
   }
 }

@@ -264,7 +264,7 @@ describe('ScheduleEditViewModel', () => {
       vm.setReason('Creating new schedule');
 
       // After save, loadSchedule is called which returns existing schedule
-      const result = await vm.save();
+      const _result = await vm.save();
 
       // save calls loadSchedule internally but userId is null until set
       // We need to set userId first via loadSchedule

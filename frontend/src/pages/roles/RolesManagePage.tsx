@@ -17,15 +17,16 @@
  * Permission: role.create
  */
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { RoleList, RoleFormFields, PermissionSelector } from '@/components/roles';
+import { RoleList, RoleFormFields, PermissionSelector, BulkAssignmentDialog } from '@/components/roles';
 import { RolesViewModel } from '@/viewModels/roles/RolesViewModel';
 import { RoleFormViewModel } from '@/viewModels/roles/RoleFormViewModel';
+import { BulkRoleAssignmentViewModel } from '@/viewModels/roles/BulkRoleAssignmentViewModel';
 import { getRoleService } from '@/services/roles';
 import { getOrganizationUnitService } from '@/services/organization/OrganizationUnitServiceFactory';
 import type { RoleWithPermissions } from '@/types/role.types';
@@ -43,6 +44,7 @@ import {
   XCircle,
   Save,
   Copy,
+  UserPlus,
 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
 import { cn } from '@/components/ui/utils';
@@ -95,6 +97,22 @@ export const RolesManagePage: React.FC = observer(() => {
 
   // OU tree nodes for scope selection
   const [ouNodes, setOuNodes] = useState<OrganizationUnitNode[]>([]);
+
+  // Bulk assignment dialog state
+  const [showBulkAssignDialog, setShowBulkAssignDialog] = useState(false);
+
+  // BulkRoleAssignmentViewModel - memoized based on current role
+  const bulkAssignViewModel = useMemo(() => {
+    if (!currentRole) return null;
+    const service = getRoleService();
+    // Use the root scope path for now - could be enhanced with scope selector
+    const rootScopePath = ouNodes.length > 0 ? ouNodes[0].path : '';
+    return new BulkRoleAssignmentViewModel(
+      service,
+      { id: currentRole.id, name: currentRole.name, description: currentRole.description },
+      rootScopePath
+    );
+  }, [currentRole, ouNodes]);
 
   // Load roles and permissions on mount
   useEffect(() => {
@@ -411,6 +429,25 @@ export const RolesManagePage: React.FC = observer(() => {
     setDialogState({ type: 'deactivate', isLoading: false });
   }, []);
 
+  // Bulk assign handlers
+  const handleBulkAssignClick = useCallback(() => {
+    if (!currentRole || !currentRole.isActive) return;
+    setShowBulkAssignDialog(true);
+  }, [currentRole]);
+
+  const handleBulkAssignClose = useCallback(() => {
+    setShowBulkAssignDialog(false);
+  }, []);
+
+  const handleBulkAssignSuccess = useCallback(async () => {
+    // Refresh the role data to show updated assignment counts
+    if (currentRole) {
+      await selectAndLoadRole(currentRole.id);
+    }
+    await viewModel.refresh();
+    log.info('Bulk assignment succeeded, refreshed role data');
+  }, [currentRole, selectAndLoadRole, viewModel]);
+
   // Filter handlers
   const handleSearchChange = useCallback(
     async (searchTerm: string) => {
@@ -707,6 +744,17 @@ export const RolesManagePage: React.FC = observer(() => {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={handleBulkAssignClick}
+                          disabled={formViewModel.isSubmitting || !currentRole.isActive}
+                          className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                          title={!currentRole.isActive ? 'Activate role to assign users' : 'Assign multiple users to this role'}
+                        >
+                          <UserPlus className="w-4 h-4 mr-1" />
+                          Bulk Assign Users
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={handleDuplicateRole}
                           disabled={formViewModel.isSubmitting}
                           className="text-gray-600"
@@ -982,6 +1030,16 @@ export const RolesManagePage: React.FC = observer(() => {
         isLoading={dialogState.type === 'delete' && dialogState.isLoading}
         variant="danger"
       />
+
+      {/* Bulk Assignment Dialog */}
+      {bulkAssignViewModel && (
+        <BulkAssignmentDialog
+          viewModel={bulkAssignViewModel}
+          isOpen={showBulkAssignDialog}
+          onClose={handleBulkAssignClose}
+          onSuccess={handleBulkAssignSuccess}
+        />
+      )}
     </div>
   );
 });

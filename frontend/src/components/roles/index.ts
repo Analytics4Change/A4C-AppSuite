@@ -17,3 +17,7 @@ export type { PermissionSelectorProps } from './PermissionSelector';
 
 export { RoleFormFields } from './RoleFormFields';
 export type { RoleFormFieldsProps } from './RoleFormFields';
+
+export { BulkAssignmentDialog } from './BulkAssignmentDialog';
+
+export { UserSelectionList } from './UserSelectionList';

@@ -38,6 +38,13 @@ import type {
   RoleOperationResult,
 } from '@/types/role.types';
 
+import type {
+  BulkAssignmentResult,
+  SelectableUser,
+  ListUsersForBulkAssignmentParams,
+  BulkAssignRoleParams,
+} from '@/types/bulk-assignment.types';
+
 const log = Logger.getLogger('supabase-role-service');
 
 /**
@@ -626,6 +633,119 @@ export class SupabaseRoleService implements IRoleService {
           message: err instanceof Error ? err.message : 'Unknown error',
         },
       };
+    }
+  }
+
+  // =========================================================================
+  // BULK ROLE ASSIGNMENT
+  // =========================================================================
+
+  /**
+   * Lists users eligible for bulk role assignment
+   */
+  async listUsersForBulkAssignment(
+    params: ListUsersForBulkAssignmentParams
+  ): Promise<SelectableUser[]> {
+    log.debug('listUsersForBulkAssignment called', { params });
+
+    try {
+      const { data, error } = await supabase.schema('api').rpc('list_users_for_bulk_assignment', {
+        p_role_id: params.roleId,
+        p_scope_path: params.scopePath,
+        p_search_term: params.searchTerm || null,
+        p_limit: params.limit || 100,
+        p_offset: params.offset || 0,
+      });
+
+      if (error) {
+        log.error('Error listing users for bulk assignment', error);
+        throw new Error(`Failed to list users: ${error.message}`);
+      }
+
+      const rows = (data as Array<{
+        id: string;
+        email: string;
+        display_name: string;
+        is_active: boolean;
+        current_roles: string[];
+        is_already_assigned: boolean;
+      }>) || [];
+
+      log.debug(`Fetched ${rows.length} users for bulk assignment`);
+
+      return rows.map((row) => ({
+        id: row.id,
+        email: row.email,
+        displayName: row.display_name,
+        isActive: row.is_active,
+        currentRoles: row.current_roles || [],
+        isAlreadyAssigned: row.is_already_assigned,
+      }));
+    } catch (err) {
+      log.error('Exception in listUsersForBulkAssignment', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Assigns a role to multiple users in a single operation
+   */
+  async bulkAssignRole(params: BulkAssignRoleParams): Promise<BulkAssignmentResult> {
+    const correlationId = params.correlationId || globalThis.crypto.randomUUID();
+
+    log.info('Starting bulk role assignment', {
+      roleId: params.roleId,
+      userCount: params.userIds.length,
+      scopePath: params.scopePath,
+      correlationId,
+    });
+
+    try {
+      const { data, error } = await supabase.schema('api').rpc('bulk_assign_role', {
+        p_role_id: params.roleId,
+        p_user_ids: params.userIds,
+        p_scope_path: params.scopePath,
+        p_correlation_id: correlationId,
+        p_reason: params.reason || 'Bulk role assignment',
+      });
+
+      if (error) {
+        log.error('Error in bulk assign role', {
+          error: error.message,
+          correlationId,
+        });
+        throw new Error(`Bulk assignment failed (Ref: ${correlationId}): ${error.message}`);
+      }
+
+      const response = data as {
+        successful: string[];
+        failed: Array<{ userId: string; reason: string; sqlstate?: string }>;
+        totalRequested: number;
+        totalSucceeded: number;
+        totalFailed: number;
+        correlationId: string;
+      };
+
+      log.info('Bulk assignment completed', {
+        totalSucceeded: response.totalSucceeded,
+        totalFailed: response.totalFailed,
+        correlationId: response.correlationId,
+      });
+
+      return {
+        successful: response.successful || [],
+        failed: response.failed || [],
+        totalRequested: response.totalRequested || params.userIds.length,
+        totalSucceeded: response.totalSucceeded || 0,
+        totalFailed: response.totalFailed || 0,
+        correlationId: response.correlationId || correlationId,
+      };
+    } catch (err) {
+      log.error('Exception in bulkAssignRole', {
+        error: err instanceof Error ? err.message : String(err),
+        correlationId,
+      });
+      throw err;
     }
   }
 }
