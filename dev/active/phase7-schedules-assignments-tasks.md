@@ -2,10 +2,10 @@
 
 ## Current Status
 
-**Phase**: 7A + 7B complete, 7C pending
-**Status**: Phase 7A ✅ COMPLETE, Phase 7B ✅ COMPLETE, Phase 7C ⏸️ PENDING
+**Phase**: 7A + 7B + 7C complete
+**Status**: Phase 7A ✅ COMPLETE, Phase 7B ✅ COMPLETE, Phase 7C ✅ COMPLETE
 **Last Updated**: 2026-02-02
-**Next Step**: Phase 7C (unit tests for ScheduleEditViewModel + AssignmentListViewModel)
+**Next Step**: Phase 7 complete — archive when ready
 
 ## Phase 7 Prerequisites ✅ COMPLETE
 
@@ -55,8 +55,8 @@
 - [x] Add "Client Assignments" nav item to MainLayout (UserCheck icon)
 - [x] Validate: typecheck, lint, build
 
-## Phase 7C: Testing ⏸️ PENDING
+## Phase 7C: Testing ✅ COMPLETE
 
-- [ ] Write ScheduleEditViewModel unit tests
-- [ ] Write AssignmentListViewModel unit tests
-- [ ] Manual E2E testing with real schedules
+- [x] Write ScheduleEditViewModel unit tests (36 tests)
+- [x] Write AssignmentListViewModel unit tests (18 tests)
+- [ ] Manual E2E testing with real schedules (deferred — requires production data)
