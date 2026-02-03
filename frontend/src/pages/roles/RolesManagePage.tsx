@@ -73,8 +73,9 @@ export const RolesManagePage: React.FC = observer(() => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Read initial status from URL param
+  // Read initial params from URL
   const initialStatus = searchParams.get('status') as 'all' | 'active' | 'inactive' | null;
+  const initialRoleId = searchParams.get('roleId');
 
   // List ViewModel - manages role list state
   const [viewModel] = useState(() => new RolesViewModel());
@@ -188,6 +189,15 @@ export const RolesManagePage: React.FC = observer(() => {
     },
     [viewModel]
   );
+
+  // Handle roleId from URL (e.g., when clicking a role card from /roles page)
+  useEffect(() => {
+    // Wait until roles are loaded and we have a roleId in URL
+    if (initialRoleId && !viewModel.isLoading && viewModel.roles.length > 0 && panelMode === 'empty') {
+      log.debug('Loading role from URL param', { roleId: initialRoleId });
+      selectAndLoadRole(initialRoleId);
+    }
+  }, [initialRoleId, viewModel.isLoading, viewModel.roles.length, panelMode, selectAndLoadRole]);
 
   // Handle role list selection with dirty check
   const handleRoleSelect = useCallback(
