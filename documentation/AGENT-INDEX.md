@@ -37,6 +37,7 @@ purpose: agent-navigation
 | `assignment` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | user_schedule_policies_projection.md, organizations_projection.md |
 | `activity` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | activities-reference.md |
 | `addresses` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | phones_projection.md |
+| `adr` | [adr-multi-role-effective-permissions.md](architecture/authorization/adr-multi-role-effective-permissions.md) | rbac-architecture.md, scoping-architecture.md |
 | `apm-integration` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `apiRpc` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | supabase.service.ts |
 | `applet-action` | [permissions_projection.md](infrastructure/reference/database/tables/permissions_projection.md) | rbac-architecture.md |
@@ -111,6 +112,7 @@ purpose: agent-navigation
 | `modelina` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, infrastructure/CLAUDE.md |
 | `migrations-applied` | [_migrations_applied.md](infrastructure/reference/database/tables/_migrations_applied.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `mobx` | [viewmodels.md](frontend/architecture/viewmodels.md) | frontend/CLAUDE.md, mobx-optimization.md |
+| `multi-role` | [adr-multi-role-effective-permissions.md](architecture/authorization/adr-multi-role-effective-permissions.md) | rbac-architecture.md, scoping-architecture.md |
 | `multi-role-invitation` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | user_roles_projection.md |
 | `multi-tenancy` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | tenants-as-organizations.md |
 | `notification-preferences` | [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | users.md, event-sourcing-overview.md |
@@ -219,6 +221,7 @@ purpose: agent-navigation
 | [custom-claims-setup.md](architecture/authentication/custom-claims-setup.md) | JWT custom claims via database hook | `jwt`, `claims`, `database-hook` | 1500 |
 | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | Permission-based RBAC with event sourcing | `rbac`, `permissions`, `roles` | 3100 |
 | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | Hierarchical permission scoping with ltree | `scoping`, `ltree`, `permissions` | 2800 |
+| [adr-multi-role-effective-permissions.md](architecture/authorization/adr-multi-role-effective-permissions.md) | ADR: RBAC + Effective Permissions over ReBAC | `adr`, `multi-role`, `effective-permissions`, `capability-accountability` | 2500 |
 | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | Organization isolation via RLS and JWT claims | `rls`, `multi-tenant`, `org_id` | 2800 |
 | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | CQRS pattern, domain events, projections | `cqrs`, `events`, `projections` | 2500 |
 | [temporal-overview.md](architecture/workflows/temporal-overview.md) | Workflow orchestration concepts and patterns | `temporal`, `workflow`, `saga` | 3200 |

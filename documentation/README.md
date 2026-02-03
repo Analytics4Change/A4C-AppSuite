@@ -166,6 +166,7 @@ Cross-cutting architectural decisions that span multiple components
 - **[Authorization](./architecture/authorization/)**
   - [RBAC Architecture](./architecture/authorization/rbac-architecture.md) - Role-based access control, permission models ✅
   - [RBAC Implementation Guide](./architecture/authorization/rbac-implementation-guide.md) - Step-by-step RBAC setup
+  - [ADR: Multi-Role Effective Permissions](./architecture/authorization/adr-multi-role-effective-permissions.md) - Architecture decision: RBAC + Effective Permissions over ReBAC ✅
   - [Organizational Deletion UX](./architecture/authorization/organizational-deletion-ux.md) - Organization deletion workflow
 - **[Data](./architecture/data/)**
   - [Multi-Tenancy Architecture](./architecture/data/multi-tenancy-architecture.md) - Organization-based isolation with RLS

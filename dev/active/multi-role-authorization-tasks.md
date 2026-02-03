@@ -14,7 +14,7 @@
 - [x] Remove Policy-as-Data from architecture - RLS is fixed (2026-01-22)
 - [x] Evaluate Option A (RBAC + Effective Permissions) vs Option B (ReBAC) against scenarios
 - [x] Make final architecture decision → **Option A selected** (RBAC + Effective Permissions)
-- [ ] Create ADR (Architecture Decision Record)
+- [x] Create ADR (Architecture Decision Record) → `documentation/architecture/authorization/adr-multi-role-effective-permissions.md`
 
 ## Phase 2: JWT Restructure + Effective Permissions ✅ COMPLETE
 
