@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-02-04
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Configuration table (NOT a CQRS projection) defining canonical permissions for each role type. Queried during organization bootstrap to grant permissions to new roles. Platform owners can modify. Default templates: provider_admin (16 perms), partner_admin (4), clinician (4), viewer (3).
+**Summary**: Configuration table (NOT a CQRS projection) defining canonical permissions for each role type. Queried during organization bootstrap to grant permissions to new roles. Platform owners can modify. Default templates: provider_admin (29 perms), partner_admin (4), clinician (4), viewer (3).
 
 **When to read**:
 - Customizing default role permissions for new organizations
@@ -134,18 +134,18 @@ The table is seeded with templates for the following role types:
 
 | Role | Permission Count | Description |
 |------|------------------|-------------|
-| `provider_admin` | 16 | Organization owner with full control |
+| `provider_admin` | 29 | Organization owner with full control |
 | `partner_admin` | 4 | Read-only access for partner organizations |
 | `clinician` | 4 | Core clinical permissions |
 | `viewer` | 3 | Read-only access |
 
-### provider_admin (16 permissions)
+### provider_admin (29 permissions)
 
-- Organization: `view_ou`, `create_ou`, `view`, `update`
-- Client: `create`, `view`, `update`, `delete`
-- Medication: `create`, `view`
-- Role: `create`, `assign`, `view`
-- User: `create`, `view`, `update`
+- **Organization (8)**: `view`, `update`, `view_ou`, `create_ou`, `update_ou`, `delete_ou`, `deactivate_ou`, `reactivate_ou`
+- **Client (4)**: `create`, `view`, `update`, `delete`
+- **Medication (5)**: `create`, `view`, `update`, `delete`, `administer`
+- **Role (4)**: `create`, `view`, `update`, `delete`
+- **User (8)**: `create`, `view`, `update`, `delete`, `role_assign`, `role_revoke`, `schedule_manage`, `client_assign`
 
 ### partner_admin (4 permissions)
 
@@ -185,3 +185,5 @@ The table is seeded with templates for the following role types:
 |---------|------|--------|
 | 006-role_permission_templates.sql | 2025-12-20 | Initial table creation |
 | 012-role-permission-templates.sql | 2025-12-20 | Seed templates for 4 role types |
+| 20260202181252_seed_schedule_assignment_permissions.sql | 2026-02-02 | Added user.schedule_manage, user.client_assign to provider_admin |
+| 20260204213125_backfill_provider_admin_schedule_permissions.sql | 2026-02-04 | Backfilled permissions for existing provider_admin roles |
