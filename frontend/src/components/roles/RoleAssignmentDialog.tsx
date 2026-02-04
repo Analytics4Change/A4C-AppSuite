@@ -337,7 +337,7 @@ const SyncResult: React.FC<{
 
       {/* Note about JWT refresh */}
       <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
-        <strong>Note:</strong> Users must log out and back in to see their permission changes.
+        <strong>Note:</strong> Permission changes take effect automatically within a few seconds.
       </div>
 
       {/* Action Buttons */}
