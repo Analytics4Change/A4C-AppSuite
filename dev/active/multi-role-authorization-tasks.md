@@ -220,10 +220,10 @@
 
 ## Current Status
 
-**Phase**: 6 - Organization Direct Care Settings UI ✅ COMPLETE
-**Status**: ✅ All 15 migrations deployed, Phase 6 frontend UI complete (2026-01-26)
-**Last Updated**: 2026-01-26
-**Next Step**:
+**Phase**: Bug Fixes Complete - Ready for Phase 7
+**Status**: ✅ All 16 migrations deployed, all bug fixes complete (2026-02-04)
+**Last Updated**: 2026-02-04
+**Completed Steps**:
 1. ~~Deploy migrations: `supabase db push --linked`~~ ✅ DONE
 2. ~~Run `npm run generate:types` in `infrastructure/supabase/contracts/`~~ ✅ DONE (2026-01-24)
 3. ~~Add event routing to `process_user_event()` for new event types~~ ✅ DONE (migration #11)
@@ -232,8 +232,48 @@
 6. ~~Phase 5B Strip Deprecated Claims~~ ✅ DONE (2026-01-26)
 7. ~~Deploy migrations #13-15~~ ✅ DONE (2026-01-26, deployed via `supabase db push --linked`)
 8. ~~Phase 6 Organization Direct Care Settings UI~~ ✅ DONE (2026-01-26)
-9. Commit Phase 6 changes (12 new files, 4 modified files)
+9. ~~Phase 5C Bug Fixes~~ ✅ DONE (2026-02-04, see below)
 10. Proceed to Phase 7 (Schedules & Assignments UI)
+
+## Phase 5C: Bug Fixes ✅ COMPLETE (2026-02-04)
+
+> Fixes discovered during real-world testing of Realtime JWT refresh.
+
+### Bug 1: Replica Identity for DELETE Operations ✅ FIXED
+- **Issue**: `cannot delete from table "user_roles_projection" because it does not have a replica identity`
+- **Root Cause**: Table added to `supabase_realtime` publication (migration #13) but only has UNIQUE constraint, not PRIMARY KEY
+- **Fix**: `ALTER TABLE public.user_roles_projection REPLICA IDENTITY FULL;`
+- **Migration**: `20260204013108_fix_user_roles_replica_identity_full.sql`
+
+### Bug 2: CSP Blocking WebSocket Connections ✅ FIXED
+- **Issue**: `Connecting to 'wss://...supabase.co' violates CSP directive`
+- **Root Cause**: TWO CSP definitions exist (`index.html` meta tag AND `nginx/default.conf`) - both needed update
+- **Fix**: Added `wss://*.supabase.co` to `connect-src` in both files
+- **Files Modified**: `frontend/index.html`, `frontend/nginx/default.conf`
+
+### Bug 3: ViewModel Recreation Breaking State ✅ FIXED
+- **Issue**: Role assignment checkbox states reverted after saving
+- **Root Cause**: `useMemo` dependency on `currentRole` object caused ViewModel recreation when role data refreshed
+- **Fix**: Changed dependency to primitive `currentRoleId` instead of object reference
+- **File Modified**: `frontend/src/components/roles/RoleAssignmentDialog.tsx`
+
+### Bug 4: Modal Content Cut Off ✅ FIXED
+- **Issue**: "Make More Changes" and "Done" buttons not visible in completion dialog
+- **Root Cause**: Content overflow without proper flexbox layout
+- **Fix**: Restructured `SyncResult` with `flex-1 overflow-y-auto` content and `flex-shrink-0` footer
+- **File Modified**: `frontend/src/components/roles/RoleAssignmentDialog.tsx`
+
+### Bug 5: Incorrect User Feedback ✅ FIXED
+- **Issue**: Note said "Users must log out and back in to see permission changes"
+- **Root Cause**: Outdated text from before Realtime JWT refresh implementation
+- **Fix**: Changed to "Permission changes take effect automatically within a few seconds"
+- **File Modified**: `frontend/src/components/roles/RoleAssignmentDialog.tsx`
+
+### Commits Made
+- `d74f4c8d` - fix(realtime): Enable DELETE operations through Supabase Realtime
+- `83e1b3c1` - fix(roles): Update permission change note to reflect automatic JWT refresh
+- `ddd9baea` - fix(csp): Add wss://*.supabase.co to index.html meta tag CSP
+- `c0b30333` - fix(roles): Ensure action buttons always visible in completion dialog
 
 ### Implementation Summary (2026-01-24)
 
@@ -255,8 +295,9 @@
 | 5 | `20260126173806_enable_realtime_user_roles.sql` | Publish `user_roles_projection` to Realtime | ✅ Deployed |
 | 5B | `20260126180004_strip_deprecated_jwt_claims.sql` | Strip deprecated claims, bump to v4 | ✅ Deployed |
 | 6 | `20260126205504_add_reason_to_direct_care_settings_rpc.sql` | Add `p_reason` to update RPC | ✅ Deployed |
+| 5C | `20260204013108_fix_user_roles_replica_identity_full.sql` | Fix DELETE through Realtime | ✅ Deployed |
 
-**Deployment Date**: 2026-01-24 (Phase 4), 2026-01-26 (Phase 5/5B/6 via `supabase db push --linked`)
+**Deployment Date**: 2026-01-24 (Phase 4), 2026-01-26 (Phase 5/5B/6), 2026-02-04 (Phase 5C bug fixes)
 
 **AsyncAPI Schemas Updated:**
 - `contracts/asyncapi/domains/organization.yaml` - Added `organization.direct_care_settings.updated`

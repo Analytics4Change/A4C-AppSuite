@@ -185,10 +185,11 @@ const canAccess = await spicedb.check({
 | 13 | `20260126173806_enable_realtime_user_roles.sql` | Publish `user_roles_projection` to Realtime | ✅ Deployed |
 | 14 | `20260126180004_strip_deprecated_jwt_claims.sql` | Strip deprecated claims, bump to v4 | ✅ Deployed |
 | 15 | `20260126205504_add_reason_to_direct_care_settings_rpc.sql` | Add `p_reason` param to update RPC | ✅ Deployed |
+| 16 | `20260204013108_fix_user_roles_replica_identity_full.sql` | Fix DELETE through Realtime (replica identity) | ✅ Deployed |
 
 **Key Decision**: Old RLS helpers are **DEPRECATED** not dropped in Phase 2D because existing RLS policies depend on them. Phase 4 will update RLS policies then drop old helpers.
 
-**Deployment Date**: 2026-01-23 (Phase 1-3), 2026-01-24 (Phase 4), 2026-01-26 (Phase 5/5B/6)
+**Deployment Date**: 2026-01-23 (Phase 1-3), 2026-01-24 (Phase 4), 2026-01-26 (Phase 5/5B/6), 2026-02-04 (Bug fixes)
 
 ### AsyncAPI Schemas Updated (2026-01-23)
 
@@ -471,6 +472,93 @@ hasPermission('organization.update').then((result) => setCanUpdate(result));
 `CREATE OR REPLACE FUNCTION` with a different parameter signature creates an **overload** (second function), not a replacement.
 
 After adding `p_reason text DEFAULT NULL` to `api.update_organization_direct_care_settings()`, both the old 3-param and new 4-param signatures coexist. This is acceptable for backward compatibility since the new param has a DEFAULT.
+
+### 11. Replica Identity Required for Realtime DELETE Operations (Phase 5 Bug Fix - 2026-02-04)
+
+When publishing a table to `supabase_realtime` for DELETE tracking, the table MUST have proper replica identity.
+
+**ERROR**: `cannot delete from table "user_roles_projection" because it does not have a replica identity and publishes deletes`
+
+**Root Cause**: `user_roles_projection` was added to `supabase_realtime` publication (migration #13) but the table only has a UNIQUE constraint, not a PRIMARY KEY. PostgreSQL default replica identity looks for PRIMARY KEY.
+
+**FIX**: Use `REPLICA IDENTITY FULL` when table has nullable columns in its unique constraint:
+
+```sql
+-- The table has UNIQUE(user_id, role_id, organization_id) but organization_id is nullable
+-- Cannot use REPLICA IDENTITY USING INDEX because of nullable column
+ALTER TABLE public.user_roles_projection REPLICA IDENTITY FULL;
+```
+
+**Migration**: `20260204013108_fix_user_roles_replica_identity_full.sql`
+
+### 12. CSP Must Include wss:// for Supabase Realtime WebSockets (Phase 5 Bug Fix - 2026-02-04)
+
+Supabase Realtime uses WebSocket connections (`wss://`), not just HTTPS. CSP `connect-src` must include both protocols.
+
+**ERROR**: `Connecting to 'wss://...supabase.co' violates CSP directive: "connect-src ... https://*.supabase.co"`
+
+**GOTCHA**: There are TWO CSP definitions in the frontend:
+1. `index.html` (meta tag) - Browser uses this primarily
+2. `nginx/default.conf` (HTTP header) - Applied by nginx in production
+
+**FIX**: Add `wss://*.supabase.co` to BOTH files:
+
+```html
+<!-- index.html -->
+connect-src 'self' ws://localhost:* wss://*.supabase.co http://localhost:* https://*.supabase.co ...
+```
+
+```nginx
+# nginx/default.conf
+connect-src 'self' https://*.supabase.co wss://*.supabase.co ...
+```
+
+### 13. React useMemo Dependencies: Use Primitives, Not Objects (Phase 5 Bug Fix - 2026-02-04)
+
+When creating a ViewModel with `useMemo`, depend on primitive IDs not object references.
+
+**BUG**: Role assignment checkbox states reverted after saving because:
+1. `onSuccess` callback refreshed role data with `selectAndLoadRole()`
+2. This created a new `currentRole` object reference
+3. `useMemo` depending on `currentRole` recreated the ViewModel
+4. New ViewModel had fresh state, losing saved changes
+
+**FIX**: Extract primitives for useMemo dependency:
+
+```typescript
+// ❌ WRONG - Object reference changes on refresh
+const viewModel = useMemo(() => {
+  if (!currentRole) return null;
+  return new RoleAssignmentViewModel(service, currentRole, scopePath);
+}, [currentRole, scopePath]);
+
+// ✅ CORRECT - Primitive doesn't change unless ID actually changes
+const currentRoleId = currentRole?.id;
+const viewModel = useMemo(() => {
+  if (!currentRoleId) return null;
+  return new RoleAssignmentViewModel(service, { id: currentRoleId, ... }, scopePath);
+}, [currentRoleId, scopePath]);
+```
+
+### 14. Modal Content Must Not Cut Off Action Buttons (UX Bug Fix - 2026-02-04)
+
+If modal content can exceed available height, action buttons at the bottom may be hidden.
+
+**FIX**: Use flexbox layout with scrollable content area and fixed footer:
+
+```tsx
+<div className="flex flex-col h-full">
+  {/* Scrollable content */}
+  <div className="flex-1 overflow-y-auto min-h-0">
+    {/* ... content ... */}
+  </div>
+  {/* Fixed footer - always visible */}
+  <div className="flex-shrink-0 pt-4 mt-4 border-t">
+    <Button>Make More Changes</Button>
+    <Button>Done</Button>
+  </div>
+</div>
+```
 
 ### 7. Client FK Deferred
 
