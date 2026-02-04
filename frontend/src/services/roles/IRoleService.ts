@@ -33,6 +33,10 @@ import type {
   SelectableUser,
   ListUsersForBulkAssignmentParams,
   BulkAssignRoleParams,
+  ManageableUser,
+  ListUsersForRoleManagementParams,
+  SyncRoleAssignmentsParams,
+  SyncRoleAssignmentsResult,
 } from '@/types/bulk-assignment.types';
 
 export interface IRoleService {
@@ -255,4 +259,66 @@ export interface IRoleService {
    * console.log(`Reference: ${result.correlationId}`);
    */
   bulkAssignRole(params: BulkAssignRoleParams): Promise<BulkAssignmentResult>;
+
+  // =========================================================================
+  // UNIFIED ROLE ASSIGNMENT MANAGEMENT
+  // Allows both adding and removing role assignments in a single operation
+  // =========================================================================
+
+  /**
+   * Lists ALL users for role assignment management
+   *
+   * Unlike listUsersForBulkAssignment which excludes already-assigned users,
+   * this returns ALL users with their current assignment status (isAssigned).
+   * This enables the unified "Manage User Assignments" UI where users can
+   * both add and remove assignments by toggling checkboxes.
+   *
+   * Permission Required: user.role_assign at the specified scope
+   *
+   * @param params - Parameters including roleId, scopePath, and optional search/pagination
+   * @returns Promise resolving to array of manageable users with assignment status
+   *
+   * @example
+   * const users = await service.listUsersForRoleManagement({
+   *   roleId: 'role-uuid',
+   *   scopePath: 'acme.pediatrics',
+   * });
+   *
+   * // Initially assigned users should have their checkbox checked
+   * users.filter(u => u.isAssigned).forEach(u => {
+   *   checkboxStates[u.id] = true;
+   * });
+   */
+  listUsersForRoleManagement(params: ListUsersForRoleManagementParams): Promise<ManageableUser[]>;
+
+  /**
+   * Syncs role assignments by adding and removing users in a single operation
+   *
+   * This is the unified assignment management function that handles both:
+   * - Adding users to the role (emits `user.role.assigned` events)
+   * - Removing users from the role (emits `user.role.revoked` events)
+   *
+   * All events are linked via the same correlation_id for traceability.
+   * Partial failures are allowed - successful operations are committed
+   * even if some fail.
+   *
+   * Permission Required: user.role_assign at the specified scope
+   *
+   * @param params - Parameters including roleId, userIdsToAdd, userIdsToRemove, scopePath
+   * @returns Promise resolving to detailed result with successes/failures for both operations
+   *
+   * @example
+   * const result = await service.syncRoleAssignments({
+   *   roleId: 'role-uuid',
+   *   userIdsToAdd: ['user-3', 'user-4'],
+   *   userIdsToRemove: ['user-1'],
+   *   scopePath: 'acme.pediatrics',
+   *   reason: 'Team reorganization',
+   * });
+   *
+   * console.log(`Added: ${result.added.successful.length}`);
+   * console.log(`Removed: ${result.removed.successful.length}`);
+   * console.log(`Reference: ${result.correlationId}`);
+   */
+  syncRoleAssignments(params: SyncRoleAssignmentsParams): Promise<SyncRoleAssignmentsResult>;
 }

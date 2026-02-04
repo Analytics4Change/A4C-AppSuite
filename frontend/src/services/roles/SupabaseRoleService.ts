@@ -43,6 +43,10 @@ import type {
   SelectableUser,
   ListUsersForBulkAssignmentParams,
   BulkAssignRoleParams,
+  ManageableUser,
+  ListUsersForRoleManagementParams,
+  SyncRoleAssignmentsParams,
+  SyncRoleAssignmentsResult,
 } from '@/types/bulk-assignment.types';
 
 const log = Logger.getLogger('supabase-role-service');
@@ -742,6 +746,129 @@ export class SupabaseRoleService implements IRoleService {
       };
     } catch (err) {
       log.error('Exception in bulkAssignRole', {
+        error: err instanceof Error ? err.message : String(err),
+        correlationId,
+      });
+      throw err;
+    }
+  }
+
+  // =========================================================================
+  // UNIFIED ROLE ASSIGNMENT MANAGEMENT
+  // =========================================================================
+
+  /**
+   * Lists ALL users for role management with their current assignment status
+   */
+  async listUsersForRoleManagement(
+    params: ListUsersForRoleManagementParams
+  ): Promise<ManageableUser[]> {
+    log.debug('listUsersForRoleManagement called', { params });
+
+    try {
+      const { data, error } = await supabase.schema('api').rpc('list_users_for_role_management', {
+        p_role_id: params.roleId,
+        p_scope_path: params.scopePath,
+        p_search_term: params.searchTerm || null,
+        p_limit: params.limit || 100,
+        p_offset: params.offset || 0,
+      });
+
+      if (error) {
+        log.error('Error listing users for role management', error);
+        throw new Error(`Failed to list users: ${error.message}`);
+      }
+
+      const rows = (data as Array<{
+        id: string;
+        email: string;
+        display_name: string;
+        is_active: boolean;
+        current_roles: string[];
+        is_assigned: boolean;
+      }>) || [];
+
+      log.debug(`Fetched ${rows.length} users for role management`);
+
+      return rows.map((row) => ({
+        id: row.id,
+        email: row.email,
+        displayName: row.display_name,
+        isActive: row.is_active,
+        currentRoles: row.current_roles || [],
+        isAssigned: row.is_assigned,
+      }));
+    } catch (err) {
+      log.error('Exception in listUsersForRoleManagement', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Syncs role assignments by adding and removing users in a single operation
+   */
+  async syncRoleAssignments(params: SyncRoleAssignmentsParams): Promise<SyncRoleAssignmentsResult> {
+    const correlationId = params.correlationId || globalThis.crypto.randomUUID();
+
+    log.info('Starting sync role assignments', {
+      roleId: params.roleId,
+      addCount: params.userIdsToAdd.length,
+      removeCount: params.userIdsToRemove.length,
+      scopePath: params.scopePath,
+      correlationId,
+    });
+
+    try {
+      const { data, error } = await supabase.schema('api').rpc('sync_role_assignments', {
+        p_role_id: params.roleId,
+        p_user_ids_to_add: params.userIdsToAdd,
+        p_user_ids_to_remove: params.userIdsToRemove,
+        p_scope_path: params.scopePath,
+        p_correlation_id: correlationId,
+        p_reason: params.reason || 'Role assignment update',
+      });
+
+      if (error) {
+        log.error('Error in sync role assignments', {
+          error: error.message,
+          correlationId,
+        });
+        throw new Error(`Sync assignment failed (Ref: ${correlationId}): ${error.message}`);
+      }
+
+      const response = data as {
+        added: {
+          successful: string[];
+          failed: Array<{ userId: string; reason: string; sqlstate?: string }>;
+        };
+        removed: {
+          successful: string[];
+          failed: Array<{ userId: string; reason: string; sqlstate?: string }>;
+        };
+        correlationId: string;
+      };
+
+      log.info('Sync assignments completed', {
+        addedSuccessful: response.added.successful.length,
+        addedFailed: response.added.failed.length,
+        removedSuccessful: response.removed.successful.length,
+        removedFailed: response.removed.failed.length,
+        correlationId: response.correlationId,
+      });
+
+      return {
+        added: {
+          successful: response.added.successful || [],
+          failed: response.added.failed || [],
+        },
+        removed: {
+          successful: response.removed.successful || [],
+          failed: response.removed.failed || [],
+        },
+        correlationId: response.correlationId || correlationId,
+      };
+    } catch (err) {
+      log.error('Exception in syncRoleAssignments', {
         error: err instanceof Error ? err.message : String(err),
         correlationId,
       });

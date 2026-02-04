@@ -20,4 +20,6 @@ export type { RoleFormFieldsProps } from './RoleFormFields';
 
 export { BulkAssignmentDialog } from './BulkAssignmentDialog';
 
+export { RoleAssignmentDialog } from './RoleAssignmentDialog';
+
 export { UserSelectionList } from './UserSelectionList';

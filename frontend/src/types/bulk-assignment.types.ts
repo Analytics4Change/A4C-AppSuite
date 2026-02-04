@@ -239,3 +239,191 @@ export interface AssignmentResultDisplayProps {
   /** Callback to retry failed assignments only */
   onRetryFailed?: () => void;
 }
+
+// =============================================================================
+// UNIFIED ROLE ASSIGNMENT MANAGEMENT TYPES
+// Used by the "Manage User Assignments" feature that allows both adding and
+// removing role assignments in a single operation.
+// =============================================================================
+
+/**
+ * Failed assignment/removal details
+ */
+export interface FailedAssignment {
+  /** UUID of the user that failed */
+  userId: string;
+  /** Human-readable error message */
+  reason: string;
+  /** PostgreSQL error state code (e.g., 'P0002', '23505') */
+  sqlstate?: string;
+}
+
+/**
+ * Request parameters for listing users for role management
+ *
+ * Unlike ListUsersForBulkAssignmentParams, this returns ALL users
+ * with their current assignment status.
+ */
+export interface ListUsersForRoleManagementParams {
+  /** UUID of the role being managed */
+  roleId: string;
+
+  /**
+   * Ltree scope path for the assignment
+   * Example: "acme.pediatrics"
+   */
+  scopePath: string;
+
+  /**
+   * Optional search term to filter users by name or email
+   * Case-insensitive substring match
+   */
+  searchTerm?: string;
+
+  /**
+   * Maximum number of users to return (default: 100)
+   */
+  limit?: number;
+
+  /**
+   * Offset for pagination (default: 0)
+   */
+  offset?: number;
+}
+
+/**
+ * A user with their current assignment status for role management
+ *
+ * Similar to SelectableUser but with isAssigned instead of isAlreadyAssigned,
+ * as this is used for the unified management where we show all users.
+ */
+export interface ManageableUser {
+  /** User UUID */
+  id: string;
+
+  /** User's display name */
+  displayName: string;
+
+  /** User's email address */
+  email: string;
+
+  /** Whether the user is currently active */
+  isActive: boolean;
+
+  /**
+   * Names of roles currently assigned to this user
+   * Used for display context in the selection list
+   */
+  currentRoles: string[];
+
+  /**
+   * Whether this user is currently assigned to the target role at the target scope
+   * TRUE = checkbox should be checked initially
+   * FALSE = checkbox should be unchecked initially
+   */
+  isAssigned: boolean;
+}
+
+/**
+ * Request parameters for syncing role assignments (add + remove)
+ */
+export interface SyncRoleAssignmentsParams {
+  /** UUID of the role to manage */
+  roleId: string;
+
+  /** Array of user UUIDs to ADD to the role */
+  userIdsToAdd: string[];
+
+  /** Array of user UUIDs to REMOVE from the role */
+  userIdsToRemove: string[];
+
+  /**
+   * Ltree scope path for the assignment
+   * Example: "acme.pediatrics"
+   */
+  scopePath: string;
+
+  /**
+   * Optional correlation ID to link all events from this operation
+   * If not provided, one will be generated server-side
+   */
+  correlationId?: string;
+
+  /**
+   * Optional reason for the assignment change (for audit trail)
+   * Defaults to "Role assignment update" if not provided
+   */
+  reason?: string;
+}
+
+/**
+ * Result from the sync role assignments operation
+ *
+ * Contains detailed information about both additions and removals,
+ * allowing partial success handling in the UI.
+ */
+export interface SyncRoleAssignmentsResult {
+  /** Results for users added to the role */
+  added: {
+    /** User IDs that were successfully assigned */
+    successful: string[];
+    /** Users that failed to be assigned, with reasons */
+    failed: FailedAssignment[];
+  };
+
+  /** Results for users removed from the role */
+  removed: {
+    /** User IDs that were successfully removed */
+    successful: string[];
+    /** Users that failed to be removed, with reasons */
+    failed: FailedAssignment[];
+  };
+
+  /**
+   * Correlation ID linking all events from this sync operation
+   * Use for support tickets and debugging
+   */
+  correlationId: string;
+}
+
+/**
+ * Role assignment management dialog state
+ */
+export type RoleAssignmentDialogState =
+  | 'idle'           // Dialog closed
+  | 'loading'        // Loading user list
+  | 'managing'       // User is managing assignments (checking/unchecking)
+  | 'confirming'     // User is reviewing changes before save
+  | 'saving'         // Save in progress
+  | 'completed'      // Save finished (show results)
+  | 'error';         // Fatal error occurred
+
+/**
+ * Props for the RoleAssignmentDialog component
+ */
+export interface RoleAssignmentDialogProps {
+  /** Whether the dialog is open */
+  isOpen: boolean;
+
+  /** Callback when the dialog should close */
+  onClose: () => void;
+
+  /** The role being managed */
+  role: {
+    id: string;
+    name: string;
+    description?: string;
+  };
+
+  /**
+   * Scope path for the assignments
+   * Pre-populated from the role's orgHierarchyScope or user's scope
+   */
+  scopePath: string;
+
+  /**
+   * Callback after successful save
+   * Used to refresh the role's assignment list
+   */
+  onSuccess?: () => void;
+}

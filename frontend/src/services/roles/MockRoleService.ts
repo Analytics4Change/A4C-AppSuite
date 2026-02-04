@@ -28,6 +28,10 @@ import type {
   SelectableUser,
   ListUsersForBulkAssignmentParams,
   BulkAssignRoleParams,
+  ManageableUser,
+  ListUsersForRoleManagementParams,
+  SyncRoleAssignmentsParams,
+  SyncRoleAssignmentsResult,
 } from '@/types/bulk-assignment.types';
 import type { IRoleService } from './IRoleService';
 
@@ -763,6 +767,229 @@ export class MockRoleService implements IRoleService {
     log.info('Mock: Bulk assignment completed', {
       totalSucceeded: result.totalSucceeded,
       totalFailed: result.totalFailed,
+      correlationId,
+    });
+
+    return result;
+  }
+
+  // =========================================================================
+  // UNIFIED ROLE ASSIGNMENT MANAGEMENT
+  // =========================================================================
+
+  /**
+   * Lists ALL users for role management with their current assignment status
+   */
+  async listUsersForRoleManagement(
+    params: ListUsersForRoleManagementParams
+  ): Promise<ManageableUser[]> {
+    await this.simulateDelay();
+    log.debug('Mock: Listing users for role management', { params });
+
+    const limit = params.limit || 100;
+    const offset = params.offset || 0;
+    const searchTerm = params.searchTerm?.toLowerCase();
+
+    // Get users, applying search filter
+    let filteredUsers = [...MOCK_USERS];
+
+    if (searchTerm) {
+      filteredUsers = filteredUsers.filter(
+        (u) =>
+          u.displayName.toLowerCase().includes(searchTerm) ||
+          u.email.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // Map to ManageableUser with role assignment info
+    const manageableUsers: ManageableUser[] = filteredUsers.map((user) => {
+      // Get current roles for this user
+      const currentRoleNames: string[] = [];
+      for (const [_key, assignment] of this.userRoleAssignments) {
+        if (assignment.userId === user.id) {
+          const role = this.roles.find((r) => r.id === assignment.roleId);
+          if (role) {
+            currentRoleNames.push(role.name);
+          }
+        }
+      }
+
+      // Check if assigned to target role at target scope
+      const assignmentKey = `${user.id}:${params.roleId}:${params.scopePath}`;
+      const isAssigned = this.userRoleAssignments.has(assignmentKey);
+
+      return {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        isActive: user.isActive,
+        currentRoles: currentRoleNames,
+        isAssigned,
+      };
+    });
+
+    // Sort: assigned users first (for easy review), then by name
+    manageableUsers.sort((a, b) => {
+      if (a.isAssigned !== b.isAssigned) {
+        return a.isAssigned ? -1 : 1;
+      }
+      return a.displayName.localeCompare(b.displayName);
+    });
+
+    // Apply pagination
+    const result = manageableUsers.slice(offset, offset + limit);
+
+    log.info(`Mock: Returning ${result.length} users for role management`);
+    return result;
+  }
+
+  /**
+   * Syncs role assignments by adding and removing users in a single operation
+   */
+  async syncRoleAssignments(params: SyncRoleAssignmentsParams): Promise<SyncRoleAssignmentsResult> {
+    await this.simulateDelay();
+
+    const correlationId = params.correlationId || generateId();
+
+    log.info('Mock: Starting sync role assignments', {
+      roleId: params.roleId,
+      addCount: params.userIdsToAdd.length,
+      removeCount: params.userIdsToRemove.length,
+      scopePath: params.scopePath,
+      correlationId,
+    });
+
+    const addedSuccessful: string[] = [];
+    const addedFailed: Array<{ userId: string; reason: string; sqlstate?: string }> = [];
+    const removedSuccessful: string[] = [];
+    const removedFailed: Array<{ userId: string; reason: string; sqlstate?: string }> = [];
+
+    // Verify role exists
+    const role = this.roles.find((r) => r.id === params.roleId);
+    if (!role) {
+      return {
+        added: {
+          successful: [],
+          failed: params.userIdsToAdd.map((id) => ({
+            userId: id,
+            reason: 'Role not found',
+            sqlstate: 'P0002',
+          })),
+        },
+        removed: {
+          successful: [],
+          failed: params.userIdsToRemove.map((id) => ({
+            userId: id,
+            reason: 'Role not found',
+            sqlstate: 'P0002',
+          })),
+        },
+        correlationId,
+      };
+    }
+
+    // Process ADDITIONS
+    for (const userId of params.userIdsToAdd) {
+      const user = MOCK_USERS.find((u) => u.id === userId);
+
+      if (!user) {
+        addedFailed.push({
+          userId,
+          reason: 'User not found or not in organization',
+        });
+        continue;
+      }
+
+      if (!user.isActive) {
+        addedFailed.push({
+          userId,
+          reason: 'User is not active',
+        });
+        continue;
+      }
+
+      const assignmentKey = `${userId}:${params.roleId}:${params.scopePath}`;
+      if (this.userRoleAssignments.has(assignmentKey)) {
+        addedFailed.push({
+          userId,
+          reason: 'User already has this role at this scope',
+          sqlstate: '23505',
+        });
+        continue;
+      }
+
+      // Success! Add the assignment
+      this.userRoleAssignments.set(assignmentKey, {
+        userId,
+        roleId: params.roleId,
+        scopePath: params.scopePath,
+      });
+
+      addedSuccessful.push(userId);
+
+      log.debug('Mock: Assigned role to user', {
+        userId,
+        roleId: params.roleId,
+        scopePath: params.scopePath,
+      });
+    }
+
+    // Process REMOVALS
+    for (const userId of params.userIdsToRemove) {
+      const user = MOCK_USERS.find((u) => u.id === userId);
+
+      if (!user) {
+        removedFailed.push({
+          userId,
+          reason: 'User not found or not in organization',
+        });
+        continue;
+      }
+
+      const assignmentKey = `${userId}:${params.roleId}:${params.scopePath}`;
+      if (!this.userRoleAssignments.has(assignmentKey)) {
+        removedFailed.push({
+          userId,
+          reason: 'User does not have this role at this scope',
+        });
+        continue;
+      }
+
+      // Success! Remove the assignment
+      this.userRoleAssignments.delete(assignmentKey);
+      removedSuccessful.push(userId);
+
+      log.debug('Mock: Removed role from user', {
+        userId,
+        roleId: params.roleId,
+        scopePath: params.scopePath,
+      });
+    }
+
+    // Update role's userCount
+    role.userCount = Math.max(0, role.userCount + addedSuccessful.length - removedSuccessful.length);
+
+    // Save changes
+    this.saveUserRoleAssignments();
+    this.saveToStorage();
+
+    const result: SyncRoleAssignmentsResult = {
+      added: {
+        successful: addedSuccessful,
+        failed: addedFailed,
+      },
+      removed: {
+        successful: removedSuccessful,
+        failed: removedFailed,
+      },
+      correlationId,
+    };
+
+    log.info('Mock: Sync assignments completed', {
+      addedSuccessful: result.added.successful.length,
+      addedFailed: result.added.failed.length,
+      removedSuccessful: result.removed.successful.length,
+      removedFailed: result.removed.failed.length,
       correlationId,
     });
 
