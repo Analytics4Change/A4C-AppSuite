@@ -33,12 +33,13 @@ BEGIN
   buffer := E'\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000'::bytea;
 
   -- Set timestamp bytes (48 bits = 6 bytes, big-endian)
-  buffer := set_byte(buffer, 0, (unix_ts_ms >> 40)::int & 255);
-  buffer := set_byte(buffer, 1, (unix_ts_ms >> 32)::int & 255);
-  buffer := set_byte(buffer, 2, (unix_ts_ms >> 24)::int & 255);
-  buffer := set_byte(buffer, 3, (unix_ts_ms >> 16)::int & 255);
-  buffer := set_byte(buffer, 4, (unix_ts_ms >> 8)::int & 255);
-  buffer := set_byte(buffer, 5, unix_ts_ms::int & 255);
+  -- Note: Apply mask to BIGINT first, then cast to INT to avoid overflow
+  buffer := set_byte(buffer, 0, ((unix_ts_ms >> 40) & 255)::int);
+  buffer := set_byte(buffer, 1, ((unix_ts_ms >> 32) & 255)::int);
+  buffer := set_byte(buffer, 2, ((unix_ts_ms >> 24) & 255)::int);
+  buffer := set_byte(buffer, 3, ((unix_ts_ms >> 16) & 255)::int);
+  buffer := set_byte(buffer, 4, ((unix_ts_ms >> 8) & 255)::int);
+  buffer := set_byte(buffer, 5, (unix_ts_ms & 255)::int);
 
   -- Fill remaining 10 bytes with cryptographically random data
   buffer := overlay(buffer PLACING gen_random_bytes(10) FROM 7);
