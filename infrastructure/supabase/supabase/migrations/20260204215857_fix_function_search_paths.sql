@@ -5,6 +5,10 @@
 -- Reference: Supabase advisor - "Function Search Path Mutable" warning
 -- =============================================================================
 
+-- Set search_path for migration execution so ltree type is visible
+-- This is required because check_scope_containment uses ltree from extensions schema
+SET search_path = public, extensions, pg_temp;
+
 -- =============================================================================
 -- API SCHEMA FUNCTIONS (SECURITY DEFINER - HIGH PRIORITY)
 -- =============================================================================
