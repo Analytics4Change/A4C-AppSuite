@@ -102,18 +102,25 @@ export const RolesManagePage: React.FC = observer(() => {
   // Role assignment dialog state
   const [showRoleAssignDialog, setShowRoleAssignDialog] = useState(false);
 
-  // RoleAssignmentViewModel - memoized based on current role
+  // RoleAssignmentViewModel - memoized based on role ID only
+  // IMPORTANT: Only depend on currentRole?.id, not the whole object!
+  // Otherwise, when onSuccess refreshes the role data, the ViewModel is recreated
+  // and loses its state (causing the "checkbox revert" bug).
+  const currentRoleId = currentRole?.id;
+  const currentRoleName = currentRole?.name;
+  const currentRoleDescription = currentRole?.description;
+  const rootScopePath = ouNodes.length > 0 ? ouNodes[0].path : '';
+
   const roleAssignViewModel = useMemo(() => {
-    if (!currentRole) return null;
+    if (!currentRoleId) return null;
     const service = getRoleService();
-    // Use the root scope path for now - could be enhanced with scope selector
-    const rootScopePath = ouNodes.length > 0 ? ouNodes[0].path : '';
     return new RoleAssignmentViewModel(
       service,
-      { id: currentRole.id, name: currentRole.name, description: currentRole.description },
+      { id: currentRoleId, name: currentRoleName || '', description: currentRoleDescription },
       rootScopePath
     );
-  }, [currentRole, ouNodes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally only depend on ID to prevent recreation
+  }, [currentRoleId, rootScopePath]);
 
   // Load roles and permissions on mount
   useEffect(() => {
