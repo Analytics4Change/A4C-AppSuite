@@ -168,19 +168,19 @@
 - [x] Update `App.tsx` — import from `@/pages/settings`, add `/settings/organization` route with `RequirePermission`
 - [x] Validation: TypeScript 0 errors, lint 0 errors, 29/29 tests pass, build succeeds
 
-## Phase 7: UI Planning - Schedules & Client Assignments 📋 PLANNING
+## Phase 7: UI - Schedules & Client Assignments ✅ COMPLETE
 
 > Admin UIs for managing staff schedules and client assignments.
 
-- [ ] Create `dev/active/staff-scheduling-ui-context.md`
-- [ ] Create `dev/active/staff-scheduling-ui-plan.md`
-- [ ] Create `dev/active/staff-scheduling-ui-tasks.md`
-- [ ] Create `dev/active/client-assignments-ui-context.md`
-- [ ] Create `dev/active/client-assignments-ui-plan.md`
-- [ ] Create `dev/active/client-assignments-ui-tasks.md`
-- [ ] Design weekly schedule grid/form
-- [ ] Design client assignment management UI
-- [ ] Permission gating (`user.schedule_manage`, `user.client_assign`)
+- [x] Create `dev/active/staff-scheduling-ui-context.md`
+- [x] Create `dev/active/staff-scheduling-ui-plan.md`
+- [x] Create `dev/active/staff-scheduling-ui-tasks.md`
+- [x] Create `dev/active/client-assignments-ui-context.md`
+- [x] Create `dev/active/client-assignments-ui-plan.md`
+- [x] Create `dev/active/client-assignments-ui-tasks.md`
+- [x] Design weekly schedule grid/form
+- [x] Design client assignment management UI
+- [x] Permission gating (`user.schedule_manage`, `user.client_assign`)
 
 ## DISCARDED: ReBAC Implementation (Option B) ❌
 
@@ -220,9 +220,9 @@
 
 ## Current Status
 
-**Phase**: Bug Fixes Complete - Ready for Phase 7
-**Status**: ✅ All 16 migrations deployed, all bug fixes complete (2026-02-04)
-**Last Updated**: 2026-02-04
+**Phase**: All Phases Complete
+**Status**: ✅ All 16 migrations deployed, all phases complete (2026-02-05)
+**Last Updated**: 2026-02-05
 **Completed Steps**:
 1. ~~Deploy migrations: `supabase db push --linked`~~ ✅ DONE
 2. ~~Run `npm run generate:types` in `infrastructure/supabase/contracts/`~~ ✅ DONE (2026-01-24)
@@ -232,8 +232,10 @@
 6. ~~Phase 5B Strip Deprecated Claims~~ ✅ DONE (2026-01-26)
 7. ~~Deploy migrations #13-15~~ ✅ DONE (2026-01-26, deployed via `supabase db push --linked`)
 8. ~~Phase 6 Organization Direct Care Settings UI~~ ✅ DONE (2026-01-26)
-9. ~~Phase 5C Bug Fixes~~ ✅ DONE (2026-02-04, see below)
-10. Proceed to Phase 7 (Schedules & Assignments UI)
+9. ~~Phase 5C Bug Fixes~~ ✅ DONE (2026-02-04)
+10. ~~Phase 7 Schedules & Assignments UI~~ ✅ DONE (2026-02-05)
+
+**Next**: Archive these dev-docs to `dev/archived/multi-role-authorization/`
 
 ## Phase 5C: Bug Fixes ✅ COMPLETE (2026-02-04)
 
