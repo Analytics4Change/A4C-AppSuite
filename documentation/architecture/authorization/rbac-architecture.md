@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-26
+last_updated: 2026-02-04
 ---
 
 <!-- TL;DR-START -->
@@ -484,6 +484,63 @@ interface UserRoleRevokedEvent {
   };
 }
 ```
+
+### Unified Role Assignment Management
+
+For bulk operations where administrators need to add and remove multiple role assignments in a single transaction, the system provides unified assignment management via dedicated RPC functions.
+
+#### `api.list_users_for_role_management`
+
+Returns all users in the organization with their current assignment status for a specific role.
+
+```sql
+-- Signature
+api.list_users_for_role_management(p_role_id uuid)
+RETURNS TABLE (
+  user_id uuid,
+  email text,
+  name text,
+  is_assigned boolean  -- True if user currently has this role
+)
+```
+
+**Usage**: Called when opening the role assignment dialog to show all eligible users with their current assignment state.
+
+#### `api.sync_role_assignments`
+
+Synchronizes role assignments by processing additions and removals in a single operation.
+
+```sql
+-- Signature
+api.sync_role_assignments(
+  p_role_id uuid,
+  p_add_user_ids uuid[],      -- Users to assign the role to
+  p_remove_user_ids uuid[],   -- Users to remove the role from
+  p_correlation_id uuid       -- Links all events in this operation
+)
+RETURNS jsonb  -- { added: number, removed: number, errors: string[] }
+```
+
+**Events Emitted**:
+- `user.role.assigned` for each user in `p_add_user_ids`
+- `user.role.revoked` for each user in `p_remove_user_ids`
+
+All events share the same `correlation_id` for traceability of the bulk operation.
+
+#### Frontend Integration
+
+The `RoleAssignmentViewModel` implements delta tracking to compute the minimal set of changes:
+
+1. **Initial State**: Loads `initialAssignedUserIds` from `list_users_for_role_management()`
+2. **User Interaction**: Tracks `selectedUserIds` as checkboxes are toggled
+3. **Delta Computation**: On save, computes:
+   - `toAdd = selectedUserIds - initialAssignedUserIds`
+   - `toRemove = initialAssignedUserIds - selectedUserIds`
+4. **Sync**: Calls `sync_role_assignments()` with computed deltas
+
+This pattern minimizes database operations and provides clear audit trails via the shared `correlation_id`.
+
+**Migration Reference**: `20260204003918_role_assignment_management.sql`
 
 ---
 

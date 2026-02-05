@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-02-04
 ---
 
 <!-- TL;DR-START -->
@@ -58,6 +58,7 @@ The table supports multi-level organizational hierarchies with parent-child rela
 | deletion_reason | text | YES | - | Reason for deletion |
 | created_at | timestamptz | NO | - | Record creation timestamp |
 | updated_at | timestamptz | YES | NOW() | Record update timestamp |
+| direct_care_settings | jsonb | YES | '{"enable_staff_client_mapping": false, "enable_schedule_enforcement": false}' | Feature flags for direct care workflow routing |
 
 ### Column Details
 
@@ -125,6 +126,19 @@ The table supports multi-level organizational hierarchies with parent-child rela
 - **Value**: NULL for active organizations
 - **Impact**: Deleted organizations excluded from queries but preserved for audit
 - **Audit**: Set `deletion_reason` when soft deleting
+
+#### direct_care_settings
+- **Type**: `jsonb`
+- **Purpose**: Feature flags controlling direct care workflow behavior
+- **Default**: `{"enable_staff_client_mapping": false, "enable_schedule_enforcement": false}`
+- **Fields**:
+  - `enable_staff_client_mapping` (boolean): When true, notifications route to assigned staff only instead of all staff at the organizational unit
+  - `enable_schedule_enforcement` (boolean): When true, only staff currently scheduled receive notifications
+- **Usage**: Checked by Temporal workflows when determining notification routing
+- **UI**: Configurable via Organization Settings → Direct Care Settings
+- **API Functions**:
+  - `api.get_organization_direct_care_settings(p_org_id)` - Read current settings
+  - `api.update_organization_direct_care_settings(p_org_id, p_enable_staff_client_mapping, p_enable_schedule_enforcement)` - Update settings
 
 ## Relationships
 

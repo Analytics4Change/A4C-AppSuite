@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-02
+last_updated: 2026-02-04
 purpose: agent-navigation
 ---
 
@@ -153,12 +153,16 @@ purpose: agent-navigation
 | `role-permissions` | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | roles_projection.md |
 | `role-templates` | [role_permission_templates.md](infrastructure/reference/database/tables/role_permission_templates.md) | provider-admin-permissions-architecture.md |
 | `role-validity` | [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | rbac-architecture.md |
+| `role-assignment` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | manage-user.md, user_roles_projection.md |
+| `bulk-assignment` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | user_roles_projection.md |
+| `sync-role-assignments` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | manage-user.md |
 | `roles` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | roles_projection.md |
 | `router` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md |
 | `rxnorm` | [medications.md](infrastructure/reference/database/tables/medications.md) | rxnorm-medication-autocomplete.md |
 | `saga` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
 | `schedule` | [user_schedule_policies_projection.md](infrastructure/reference/database/tables/user_schedule_policies_projection.md) | user_client_assignments_projection.md, organizations_projection.md |
 | `staff-schedule` | [user_schedule_policies_projection.md](infrastructure/reference/database/tables/user_schedule_policies_projection.md) | organization_units_projection.md |
+| `weekly-schedule` | [user_schedule_policies_projection.md](infrastructure/reference/database/tables/user_schedule_policies_projection.md) | schedule, organizations_projection.md |
 | `saga-pattern` | [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | organization-bootstrap-workflow-design.md |
 | `schema-registry` | [event_types.md](infrastructure/reference/database/tables/event_types.md) | event-sourcing-overview.md |
 | `saml` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
