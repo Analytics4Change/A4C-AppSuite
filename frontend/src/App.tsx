@@ -71,7 +71,7 @@ function App() {
             <Route element={<ProtectedRoute />}>
               {/* Redirect root to clients */}
               <Route path="/" element={<Navigate to="/clients" replace />} />
-              
+
               {/* Main app layout with sidebar */}
               <Route element={<MainLayout />}>
                 {/* Client routes */}
@@ -86,91 +86,136 @@ function App() {
 
                 {/* Organization Management routes */}
                 <Route path="/organizations" element={<OrganizationListPage />} />
-                <Route path="/organizations/create" element={
-                  <RequirePermission permission="organization.create" fallback="/clients">
-                    <OrganizationCreatePage />
-                  </RequirePermission>
-                } />
-                <Route path="/organizations/:organizationId/bootstrap" element={<OrganizationBootstrapStatusPage />} />
+                <Route
+                  path="/organizations/create"
+                  element={
+                    <RequirePermission permission="organization.create" fallback="/clients">
+                      <OrganizationCreatePage />
+                    </RequirePermission>
+                  }
+                />
+                <Route
+                  path="/organizations/:organizationId/bootstrap"
+                  element={<OrganizationBootstrapStatusPage />}
+                />
                 <Route path="/organizations/:orgId/dashboard" element={<OrganizationDashboard />} />
-                <Route path="/organizations/:orgId/edit" element={<div>Organization Edit - Coming Soon</div>} />
+                <Route
+                  path="/organizations/:orgId/edit"
+                  element={<div>Organization Edit - Coming Soon</div>}
+                />
 
                 {/* Organization Units route (single consolidated view with permission-based UI) */}
-                <Route path="/organization-units" element={
-                  <RequirePermission permission="organization.view_ou" fallback="/clients">
-                    <OrganizationUnitsManagePage />
-                  </RequirePermission>
-                } />
+                <Route
+                  path="/organization-units"
+                  element={
+                    <RequirePermission permission="organization.view_ou" fallback="/clients">
+                      <OrganizationUnitsManagePage />
+                    </RequirePermission>
+                  }
+                />
                 {/* Legacy /manage route redirects to main route */}
-                <Route path="/organization-units/manage" element={<Navigate to="/organization-units" replace />} />
+                <Route
+                  path="/organization-units/manage"
+                  element={<Navigate to="/organization-units" replace />}
+                />
 
                 {/* Role Management routes */}
-                <Route path="/roles" element={
-                  <RequirePermission permission="role.create" fallback="/clients">
-                    <RolesPage />
-                  </RequirePermission>
-                } />
-                <Route path="/roles/manage" element={
-                  <RequirePermission permission="role.create" fallback="/clients">
-                    <RolesManagePage />
-                  </RequirePermission>
-                } />
+                <Route
+                  path="/roles"
+                  element={
+                    <RequirePermission permission="role.create" fallback="/clients">
+                      <RolesPage />
+                    </RequirePermission>
+                  }
+                />
+                <Route
+                  path="/roles/manage"
+                  element={
+                    <RequirePermission permission="role.create" fallback="/clients">
+                      <RolesManagePage />
+                    </RequirePermission>
+                  }
+                />
 
                 {/* User Management routes */}
-                <Route path="/users" element={
-                  <RequirePermission permission="user.view" fallback="/clients">
-                    <UserListPage />
-                  </RequirePermission>
-                } />
-                <Route path="/users/manage" element={
-                  <RequirePermission permission="user.create" fallback="/clients">
-                    <UsersManagePage />
-                  </RequirePermission>
-                } />
+                <Route
+                  path="/users"
+                  element={
+                    <RequirePermission permission="user.view" fallback="/clients">
+                      <UserListPage />
+                    </RequirePermission>
+                  }
+                />
+                <Route
+                  path="/users/manage"
+                  element={
+                    <RequirePermission permission="user.create" fallback="/clients">
+                      <UsersManagePage />
+                    </RequirePermission>
+                  }
+                />
 
                 {/* Staff Schedule routes */}
-                <Route path="/schedules" element={
-                  <RequirePermission permission="user.schedule_manage" fallback="/clients">
-                    <ScheduleListPage />
-                  </RequirePermission>
-                } />
-                <Route path="/schedules/:userId" element={
-                  <RequirePermission permission="user.schedule_manage" fallback="/clients">
-                    <ScheduleEditPage />
-                  </RequirePermission>
-                } />
+                <Route
+                  path="/schedules"
+                  element={
+                    <RequirePermission permission="user.schedule_manage" fallback="/clients">
+                      <ScheduleListPage />
+                    </RequirePermission>
+                  }
+                />
+                <Route
+                  path="/schedules/:userId"
+                  element={
+                    <RequirePermission permission="user.schedule_manage" fallback="/clients">
+                      <ScheduleEditPage />
+                    </RequirePermission>
+                  }
+                />
 
                 {/* Client Assignment routes */}
-                <Route path="/assignments" element={
-                  <RequirePermission permission="user.client_assign" fallback="/clients">
-                    <AssignmentListPage />
-                  </RequirePermission>
-                } />
-                <Route path="/assignments/:userId" element={
-                  <RequirePermission permission="user.client_assign" fallback="/clients">
-                    <UserCaseloadPage />
-                  </RequirePermission>
-                } />
+                <Route
+                  path="/assignments"
+                  element={
+                    <RequirePermission permission="user.client_assign" fallback="/clients">
+                      <AssignmentListPage />
+                    </RequirePermission>
+                  }
+                />
+                <Route
+                  path="/assignments/:userId"
+                  element={
+                    <RequirePermission permission="user.client_assign" fallback="/clients">
+                      <UserCaseloadPage />
+                    </RequirePermission>
+                  }
+                />
 
                 {/* Other main sections */}
                 <Route path="/medications" element={<MedicationsPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/settings/organization" element={
-                  <RequirePermission permission="organization.update" fallback="/settings">
-                    <OrganizationSettingsPage />
-                  </RequirePermission>
-                } />
+                <Route
+                  path="/settings/organization"
+                  element={
+                    <RequirePermission permission="organization.update" fallback="/settings">
+                      <OrganizationSettingsPage />
+                    </RequirePermission>
+                  }
+                />
 
                 {/* Admin routes - platform-owner only */}
-                <Route path="/admin/events" element={
-                  <RequirePermission permission="organization.create" fallback="/clients">
-                    <FailedEventsPage />
-                  </RequirePermission>
-                } />
+                <Route
+                  path="/admin/events"
+                  element={
+                    <RequirePermission permission="organization.create" fallback="/clients">
+                      <FailedEventsPage />
+                    </RequirePermission>
+                  }
+                />
               </Route>
             </Route>
-            
+
             {/* 404 */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
