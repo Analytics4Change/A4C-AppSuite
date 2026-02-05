@@ -3,19 +3,17 @@
 ## Decision Record
 
 **Date**: 2026-01-21
+**Completed**: 2026-02-03
 **Feature**: Bulk Role Assignment UI
 **Goal**: Enable administrators to assign multiple users to a role in a single operation, streamlining onboarding and role management.
 
 ### Relationship to Parent Architecture
 
 This implementation depends on decisions made in:
-- **Architecture Reference**: `dev/active/multi-role-authorization-context.md`
-- **Architecture Plan**: `dev/active/multi-role-authorization-plan.md`
+- **Architecture Reference**: `dev/archived/multi-role-authorization/` (completed)
+- **JWT Claims v4**: effective_permissions structure deployed
 
 This was the **original feature request** that prompted the multi-role authorization investigation. The investigation revealed that the single-role JWT structure was a blocker, leading to the effective permissions architecture.
-
-**Dependency Note (2026-01-22)**: This feature depends ONLY on Phase 2 (JWT Restructure + Effective Permissions).
-It does NOT depend on Phase 3 (Direct Care Infrastructure - schedule/assignment tables for Temporal routing).
 
 ### Key Decisions
 
@@ -24,6 +22,8 @@ It does NOT depend on Phase 3 (Direct Care Infrastructure - schedule/assignment 
 3. **Scope Selection Required**: User must specify scope when assigning (supports multi-scope architecture)
 4. **Atomic Per-User**: Each user assignment is atomic; partial failures allowed
 5. **Event-Sourced**: Each assignment emits a domain event for audit trail
+6. **Use existing event type**: Reuse `user.role.assigned` with `correlation_id` linking bulk operations - Added 2026-02-03
+7. **Query `users` table directly**: The `users` table is auth-synced, NOT a projection - Added 2026-02-03
 
 ### Why Bulk Assignment?
 
@@ -50,13 +50,12 @@ It does NOT depend on Phase 3 (Direct Care Infrastructure - schedule/assignment 
 ┌─────────────────────────────────────────────────────────────────────┐
 │                       FRONTEND                                       │
 │  ┌─────────────────────────────────────────────────────────────────┐│
-│  │ RoleManagePage                                                  ││
+│  │ RolesManagePage                                                 ││
 │  │   └── BulkAssignmentDialog                                      ││
 │  │         ├── UserSelectionList (multi-select)                    ││
-│  │         ├── ScopeSelector                                       ││
-│  │         └── AssignmentResultDisplay                             ││
+│  │         └── Result display (success/failure)                    ││
 │  │                                                                  ││
-│  │ BulkRoleAssignmentViewModel ← UserSelectionViewModel            ││
+│  │ BulkRoleAssignmentViewModel                                     ││
 │  └─────────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────┘
                               │ Supabase RPC
@@ -65,15 +64,19 @@ It does NOT depend on Phase 3 (Direct Care Infrastructure - schedule/assignment 
 │                       DATABASE                                       │
 │  ┌───────────────────────────────────────────────────────────────┐  │
 │  │ api.bulk_assign_role(role_id, user_ids[], scope_path)         │  │
+│  │   → Permission check (user.role_assign)                        │  │
+│  │   → Scope validation (within caller's scope)                   │  │
 │  │   → Loops through user_ids                                     │  │
-│  │   → Calls existing role assignment logic                       │  │
 │  │   → Emits user.role.assigned event per user                   │  │
-│  │   → Returns {success: uuid[], failed: {uuid, reason}[]}       │  │
+│  │   → Returns {successful: uuid[], failed: {uuid, reason}[]}    │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 │                              │                                       │
-│                              ▼                                       │
 │  ┌───────────────────────────────────────────────────────────────┐  │
-│  │ user_roles_projection (updated by event processor)            │  │
+│  │ api.list_users_for_bulk_assignment(role_id, scope_path)       │  │
+│  │   → Queries `users` table (NOT users_projection!)             │  │
+│  │   → Joins user_roles_projection for current roles             │  │
+│  │   → Filters already-assigned users                             │  │
+│  │   → Supports search and pagination                             │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -81,212 +84,119 @@ It does NOT depend on Phase 3 (Direct Care Infrastructure - schedule/assignment 
 ### Tech Stack
 
 - **Frontend**: React 19 + TypeScript + MobX
-- **UI Components**: Tailwind CSS + existing A4C component library
+- **UI Components**: Tailwind CSS + Radix UI Dialog
 - **State Management**: MobX ViewModels (MVVM pattern)
 - **API**: Supabase RPC functions in `api` schema
-- **Multi-select**: Custom or library (react-select, downshift)
-
-### Dependencies
-
-- Multi-role JWT infrastructure (effective permissions)
-- `user_roles_projection` table
-- `roles_projection` table
-- Existing role assignment API (`api.modify_user_roles`)
-- Existing `/roles` and `/roles/manage` routes
+- **Multi-select**: Custom checkbox list component
 
 ## File Structure
 
-### New Files to Create
+### Files Created
 
 **Frontend Components:**
-- `frontend/src/components/roles/BulkAssignmentDialog.tsx`
-- `frontend/src/components/roles/UserSelectionList.tsx`
-- `frontend/src/components/roles/AssignmentResultDisplay.tsx`
-- `frontend/src/components/common/ScopeSelector.tsx` (reusable)
+- `frontend/src/components/roles/BulkAssignmentDialog.tsx` - Modal with user selection and results
+- `frontend/src/components/roles/UserSelectionList.tsx` - Checkbox list with search
 
 **ViewModels:**
-- `frontend/src/viewModels/roles/BulkRoleAssignmentViewModel.ts`
-- `frontend/src/viewModels/roles/UserSelectionViewModel.ts`
+- `frontend/src/viewModels/roles/BulkRoleAssignmentViewModel.ts` - All bulk assignment state and logic
 
 **Types:**
-- `frontend/src/types/bulk-assignment.types.ts`
+- `frontend/src/types/bulk-assignment.types.ts` - BulkAssignmentResult, SelectableUser interfaces
 
-**Backend (SQL):**
-- `infrastructure/supabase/sql/03-functions/api/0XX-bulk-role-assignment.sql`
+**Backend (SQL Migrations):**
+- `infrastructure/supabase/supabase/migrations/20260203190007_bulk_role_assignment.sql` - Initial API functions
+- `infrastructure/supabase/supabase/migrations/20260203204826_fix_bulk_assign_deleted_at.sql` - Fix hard delete handling
+- `infrastructure/supabase/supabase/migrations/20260203205138_fix_bulk_assign_users_table.sql` - Fix table/column names
 
-### Existing Files to Modify
+### Files Modified
 
-- `frontend/src/pages/roles/RoleManagePage.tsx` - Add bulk assign button
-- `frontend/src/viewModels/roles/RoleManageViewModel.ts` - Integrate bulk assignment
-- `frontend/src/services/roles/IRoleService.ts` - Add bulk assign method
-- `frontend/src/services/roles/SupabaseRoleService.ts` - Implement bulk assign
+- `frontend/src/pages/roles/RolesManagePage.tsx` - Added bulk assign button and dialog
+- `frontend/src/services/roles/IRoleService.ts` - Added bulk assign methods
+- `frontend/src/services/roles/SupabaseRoleService.ts` - Implemented bulk assign RPCs
+- `frontend/src/services/roles/MockRoleService.ts` - Mock implementation for dev mode
 
-## Related Components
+## Important Constraints & Gotchas
 
-### Existing Role Management
+### 1. `users` vs `users_projection` - CRITICAL
 
-The current role management system includes:
-- `RolesListPage` - Lists all roles
-- `RoleManagePage` - Manage single role (view assignments, edit)
-- `RoleManageViewModel` - State management for role detail
-- `api.modify_user_roles(user_id, role_ids_to_add, role_ids_to_remove, scope_path)`
+The `users` table is **NOT** a CQRS projection. It's synced from `auth.users` via database triggers.
 
-### User Management
+| Table | Type | Source |
+|-------|------|--------|
+| `users` | Sync table | Mirrors `auth.users` |
+| `users_projection` | Does NOT exist | Common misconception |
+| `user_roles_projection` | CQRS projection | From domain events |
+| `roles_projection` | CQRS projection | From domain events |
+| `organizations_projection` | CQRS projection | From domain events |
 
-The current user management includes:
-- `UsersManagePage` - Lists all users
-- `api.list_users()` - Returns users in organization
+**Columns in `users`:**
+- `name` (not `display_name`)
+- `current_organization_id` (not `organization_id`)
+- `email`, `is_active`, `deleted_at`
 
-## Key Patterns and Conventions
+### 2. Hard Deletes vs Soft Deletes
 
-### Bulk Operation Pattern
+| Table | Delete Strategy |
+|-------|----------------|
+| `user_roles_projection` | **Hard delete** (no `deleted_at` column) |
+| `roles_projection` | Soft delete (`deleted_at` column) |
+| `users` | Soft delete (`deleted_at` column) |
+| `organizations_projection` | Soft delete (`deleted_at` column) |
 
-```typescript
-interface BulkAssignmentResult {
-  successful: string[];  // user_ids that succeeded
-  failed: Array<{
-    userId: string;
-    reason: string;
-  }>;
-  totalRequested: number;
-  totalSucceeded: number;
-  totalFailed: number;
-}
+This caused the "column ur.deleted_at does not exist" error when querying user_roles_projection.
 
-// ViewModel handles partial success
-class BulkRoleAssignmentViewModel {
-  @observable result: BulkAssignmentResult | null = null;
-  @observable isProcessing = false;
+### 3. Correlation ID for Bulk Operations
 
-  @action
-  async assignRole(): Promise<void> {
-    this.isProcessing = true;
-    try {
-      this.result = await this.roleService.bulkAssignRole(
-        this.selectedRoleId,
-        this.selectedUserIds,
-        this.selectedScopePath
-      );
-    } finally {
-      this.isProcessing = false;
-    }
-  }
-}
+All events from a bulk operation share the same `correlation_id`:
+
+```sql
+v_event_metadata := jsonb_build_object(
+  'correlation_id', p_correlation_id,
+  'bulk_operation', true,
+  'bulk_operation_id', p_correlation_id::TEXT,
+  'user_index', v_user_index,
+  'total_users', v_total_users
+);
 ```
 
-### User Selection Pattern
-
-```typescript
-interface SelectableUser {
-  id: string;
-  displayName: string;
-  email: string;
-  currentRoles: string[];  // For display
-  isSelected: boolean;
-  isAlreadyAssigned: boolean;  // Can't re-assign same role
-}
-
-class UserSelectionViewModel {
-  @observable users: SelectableUser[] = [];
-  @observable searchTerm = '';
-  @observable isLoading = false;
-
-  @computed
-  get selectedUsers(): SelectableUser[] {
-    return this.users.filter(u => u.isSelected);
-  }
-
-  @computed
-  get filteredUsers(): SelectableUser[] {
-    return this.users.filter(u =>
-      u.displayName.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(this.searchTerm.toLowerCase())
-    );
-  }
-
-  @action
-  toggleUser(userId: string): void {
-    const user = this.users.find(u => u.id === userId);
-    if (user && !user.isAlreadyAssigned) {
-      user.isSelected = !user.isSelected;
-    }
-  }
-
-  @action
-  selectAll(): void {
-    this.filteredUsers
-      .filter(u => !u.isAlreadyAssigned)
-      .forEach(u => u.isSelected = true);
-  }
-}
+Query all events from a bulk operation:
+```sql
+SELECT * FROM domain_events
+WHERE correlation_id = 'abc-123'::uuid
+ORDER BY created_at;
 ```
 
-## Important Constraints
+### 4. Role Loading from URL
 
-1. **Permission Gating**: Only users with `user.role_assign` permission can bulk assign
-2. **Scope Validation**: Selected scope must be within assignor's scope_path
-3. **Role Visibility**: Only roles visible at selected scope can be assigned
-4. **Duplicate Prevention**: Can't assign role user already has at same scope
-5. **Batch Limits**: Consider limiting to 100 users per operation for performance
-6. **JWT Refresh**: Users must re-authenticate to see new roles in their JWT
+When navigating from `/roles` to `/roles/manage?roleId=xxx`, the role must be loaded:
+
+```typescript
+// RolesManagePage.tsx
+const initialRoleId = searchParams.get('roleId');
+
+useEffect(() => {
+  if (initialRoleId && !viewModel.isLoading && viewModel.roles.length > 0 && panelMode === 'empty') {
+    selectAndLoadRole(initialRoleId);
+  }
+}, [initialRoleId, viewModel.isLoading, viewModel.roles.length, panelMode, selectAndLoadRole]);
+```
 
 ## Reference Materials
 
-- **Architecture Decisions**: `dev/active/multi-role-authorization-context.md`
-- **Effective Permissions**: See "Effective Permissions Computation" section in architecture context
+- **Multi-role Authorization**: `dev/archived/multi-role-authorization/` (completed)
+- **JWT Claims v4**: `documentation/infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md`
 - **A4C MVVM Patterns**: `frontend/CLAUDE.md`
-- **Existing Role Pages**: `frontend/src/pages/roles/` for UI patterns
+- **Existing Role Pages**: `frontend/src/pages/roles/`
 
-## UI Mockup (Conceptual)
+## Commits
 
-### Bulk Assignment Dialog
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ Assign Users to Role: Clinician                              [X]    │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│ Scope: [acme.pediatrics ▼]                                          │
-│                                                                      │
-│ Select Users:                              [Search users...]         │
-│ ┌─────────────────────────────────────────────────────────────────┐ │
-│ │ [x] Select All (15 eligible)                                    │ │
-│ ├─────────────────────────────────────────────────────────────────┤ │
-│ │ [x] Alice Johnson (alice@example.com) - viewer                  │ │
-│ │ [x] Bob Smith (bob@example.com) - viewer                        │ │
-│ │ [ ] Carol Davis (carol@example.com) - viewer                    │ │
-│ │ [—] Dan Wilson (dan@example.com) - clinician (already assigned) │ │
-│ │ [x] Eve Brown (eve@example.com) - viewer                        │ │
-│ │ ...                                                              │ │
-│ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                      │
-│ 3 users selected                                                     │
-│                                                                      │
-│                               [Cancel] [Assign 3 Users to Clinician] │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### Assignment Result
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ Assignment Complete                                          [X]    │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│ ✅ Successfully assigned 2 of 3 users                               │
-│                                                                      │
-│ Successful:                                                          │
-│   • Alice Johnson                                                    │
-│   • Bob Smith                                                        │
-│                                                                      │
-│ ⚠️ Failed (1):                                                       │
-│   • Eve Brown - User no longer active                               │
-│                                                                      │
-│ Note: Users must log out and back in to see new permissions.        │
-│                                                                      │
-│                                           [Close] [Retry Failed]    │
-└─────────────────────────────────────────────────────────────────────┘
-```
+| Commit | Description |
+|--------|-------------|
+| `eb41125d` | feat(roles): Add bulk role assignment feature |
+| `4fd69dbb` | fix(roles): Fix role creation/selection silent failures |
+| `5ac9eace` | fix(roles): Load role from URL param when navigating from /roles |
+| `a3be15c1` | fix(db): Remove invalid deleted_at refs from bulk assign functions |
+| `f503e43c` | fix(db): Use correct users table and column names in bulk assign |
 
 ## Why This Approach?
 
