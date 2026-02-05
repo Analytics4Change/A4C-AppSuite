@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-02-05
 ---
 
 <!-- TL;DR-START -->
@@ -456,10 +456,9 @@ import { SupabaseAuthProvider } from './SupabaseAuthProvider';
 - `src/contexts/AuthContext.tsx` - React context wrapper
 - `src/config/dev-auth.config.ts` - Mock user configuration
 
-#### JWT Custom Claims (v4)
+#### JWT Custom Claims
 
 The application uses custom JWT claims for multi-tenant isolation and RBAC.
-As of `claims_version: 4`, deprecated fields (`user_role`, `permissions`, `scope_path`) have been removed.
 
 ```typescript
 interface JWTClaims {

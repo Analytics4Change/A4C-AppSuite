@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-04
+last_updated: 2026-02-05
 purpose: agent-navigation
 ---
 
@@ -210,7 +210,7 @@ purpose: agent-navigation
 
 | Document | Summary | Keywords | ~Tokens |
 |----------|---------|----------|---------|
-| [CLAUDE.md](../CLAUDE.md) | Repository overview, quick start commands, key links | `overview`, `quickstart` | 3500 |
+| [CLAUDE.md](../CLAUDE.md) | Repository overview, quick start commands, key links | `monorepo`, `overview`, `quickstart`, `cross-component` | 3600 |
 | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | React/TypeScript development guide with accessibility | `react`, `mobx`, `accessibility` | 5200 |
 | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | Temporal workflow development guide | `temporal`, `activities`, `saga` | 4800 |
 | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | Infrastructure guide with deployment runbook | `supabase`, `kubernetes`, `deployment` | 6100 |

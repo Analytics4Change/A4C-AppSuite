@@ -1,3 +1,24 @@
+---
+status: current
+last_updated: 2026-02-05
+---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: Monorepo root guide for A4C-AppSuite covering frontend (React/TypeScript), workflows (Temporal.io), and infrastructure (Supabase/Kubernetes). Start here for quick-start commands, cross-component workflows, and navigation to component-specific CLAUDE.md files.
+
+**When to read**:
+- Starting work on any part of the monorepo
+- Making cross-component changes (database → workflow → frontend)
+- Understanding the overall architecture and data flow
+- Finding the right documentation entry point
+
+**Key topics**: `monorepo`, `overview`, `quickstart`, `cross-component`, `architecture`, `navigation`
+
+**Estimated read time**: 15 minutes (full), 3 minutes (navigation only)
+<!-- TL;DR-END -->
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -8,7 +29,8 @@ This is the A4C (Analytics4Change) AppSuite monorepo, containing:
 
 - **Frontend**: React/TypeScript medication management application (`frontend/`)
 - **Workflows**: Temporal.io workflow orchestration for long-running business processes (`workflows/`)
-- **Infrastructure**: Terraform-based infrastructure as code (`infrastructure/`)
+- **Infrastructure**: Supabase database, Kubernetes deployments, and IaC (`infrastructure/`)
+- **Documentation**: 115+ files organized for progressive disclosure and LLM-optimized navigation (`documentation/AGENT-INDEX.md`)
 
 ## AI Agent Quick Start
 
@@ -41,15 +63,19 @@ A4C-AppSuite/
 │   ├── Dockerfile    # Worker container image
 │   └── CLAUDE.md     # Detailed workflow guidance
 ├── documentation/     # Consolidated documentation (115+ files)
+│   ├── AGENT-INDEX.md # AI agent entry point (keyword nav, task decision tree)
+│   ├── AGENT-GUIDELINES.md # Documentation creation/update rules
 │   ├── architecture/ # Cross-cutting concerns (auth, CQRS, multi-tenancy)
 │   ├── frontend/     # Frontend guides and reference
 │   ├── workflows/    # Workflow guides and reference
 │   └── infrastructure/ # Infrastructure guides and reference
-└── infrastructure/    # Terraform IaC and deployment configs
-    ├── terraform/    # Terraform configurations
-    ├── supabase/     # Supabase-specific resources (SQL, migrations)
-    ├── k8s/          # Kubernetes deployments (Temporal, workers)
-    └── CLAUDE.md     # Detailed infrastructure guidance
+├── infrastructure/    # Supabase, Kubernetes, and deployment configs
+│   ├── supabase/     # Supabase resources (SQL migrations, Edge Functions)
+│   ├── k8s/          # Kubernetes deployments (Temporal, workers)
+│   └── CLAUDE.md     # Detailed infrastructure guidance
+├── shared/            # Shared configuration across components
+├── scripts/           # Operational scripts (bootstrap testing, etc.)
+└── dev/               # Development task tracking (active, archived, parked)
 ```
 
 ## Quick Start Commands
@@ -85,10 +111,10 @@ TEMPORAL_ADDRESS=localhost:7233 npm run worker
 ### Infrastructure Management
 
 ```bash
-cd infrastructure/terraform/environments/dev
-terraform init
-terraform plan
-terraform apply
+cd infrastructure/supabase
+supabase link --project-ref "your-project-ref"
+supabase db push --linked --dry-run  # Preview pending migrations
+supabase db push --linked             # Apply migrations
 ```
 
 ## Component-Specific Guidance
@@ -99,7 +125,7 @@ For detailed guidance on each component, refer to their respective CLAUDE.md fil
 
 - **Workflows**: See `workflows/CLAUDE.md` for Temporal.io workflow development, activity patterns, event-driven architecture, error handling, and testing strategies.
 
-- **Infrastructure**: See `infrastructure/CLAUDE.md` for Terraform workflows, provider configuration, environment management, and deployment procedures.
+- **Infrastructure**: See `infrastructure/CLAUDE.md` for Supabase migrations, Kubernetes deployments, environment management, and deployment procedures.
 
 - **Documentation**: See `documentation/README.md` for consolidated architecture, guides, and reference documentation across all components.
 
@@ -201,7 +227,7 @@ The frontend supports three authentication modes for different development needs
 
 - **Provider Interface**: `IAuthProvider` interface with dependency injection
 - **Factory Pattern**: `AuthProviderFactory` selects provider based on environment
-- **JWT Claims**: `org_id`, `org_type`, `effective_permissions` (v4) in all modes
+- **JWT Claims**: `org_id`, `org_type`, `effective_permissions` in all modes
 - **Session Management**: Unified `Session` type across all providers
 - **Testing**: Easy mocking via injected auth provider
 
@@ -229,8 +255,8 @@ The frontend supports three authentication modes for different development needs
 - **Use cases**: Organization onboarding, DNS provisioning, user invitations
 - **Pattern**: Workflow-First with Saga compensation for rollback
 
-### Infrastructure as Code
-- Terraform manages Supabase resources (Zitadel migration complete - October 2025)
+### Infrastructure
+- Supabase CLI manages database migrations and Edge Functions
 - Kubernetes deployments for Temporal server and workers
 - Event-driven data model with CQRS projections
 - Environment-specific configurations (dev/staging/production)
@@ -248,12 +274,12 @@ The frontend supports three authentication modes for different development needs
 - Temporal.io (workflow orchestration)
 - Node.js 20 + TypeScript
 - Cloudflare API (DNS provisioning)
-- Nodemailer (email delivery)
+- Resend API (email delivery, primary), SMTP (fallback)
 
 **Infrastructure:**
-- Terraform (IaC)
 - Supabase Auth (primary authentication provider)
 - Supabase (PostgreSQL database, Edge Functions, RLS)
+- Supabase CLI (migrations and deployment)
 - Kubernetes (k3s cluster for Temporal and workers)
 
 ## Development Environment Variables
@@ -287,12 +313,8 @@ export RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # Email provider (recomm
 
 ### Infrastructure
 ```bash
-export TF_VAR_supabase_access_token="..."
-export TF_VAR_supabase_project_ref="..."
-
-# Note: Zitadel migration complete (October 2025)
-# export TF_VAR_zitadel_service_user_id="..." (deprecated)
-# export TF_VAR_zitadel_service_user_secret="..." (deprecated)
+export SUPABASE_ACCESS_TOKEN="..."
+export SUPABASE_PROJECT_REF="..."
 ```
 
 ## Testing Strategy
