@@ -6,7 +6,7 @@
             "type": "domain",
             "enforcement": "suggest",
             "priority": "high",
-            "description": "React 19 + TypeScript best practices with Radix UI, Tailwind CSS, MobX, and WCAG 2.1 Level AA accessibility",
+            "description": "Guard rails for React/MobX reactivity, session management, CQRS queries, and WCAG 2.1 AA accessibility",
             "promptTriggers": {
                 "keywords": [
                     "component",
@@ -74,7 +74,7 @@
             "type": "domain",
             "enforcement": "suggest",
             "priority": "high",
-            "description": "Temporal.io workflow orchestration with Workflow-First architecture, Saga compensation, and event-driven patterns",
+            "description": "Guard rails for Temporal.io workflow determinism, saga compensation, and event-driven activity patterns",
             "promptTriggers": {
                 "keywords": [
                     "workflow",
@@ -104,7 +104,7 @@
             },
             "fileTriggers": {
                 "pathPatterns": [
-                    "temporal/src/**/*.ts"
+                    "workflows/src/**/*.ts"
                 ],
                 "pathExclusions": [
                     "**/*.test.ts",
@@ -125,10 +125,9 @@
             "type": "domain",
             "enforcement": "suggest",
             "priority": "high",
-            "description": "Infrastructure as Code with Terraform, Supabase (PostgreSQL + Auth + RLS), Kubernetes, and CQRS event-driven architecture",
+            "description": "Guard rails for Supabase SQL migrations, RLS policies, CQRS projections, and idempotent infrastructure patterns",
             "promptTriggers": {
                 "keywords": [
-                    "terraform",
                     "kubernetes",
                     "k8s",
                     "supabase",
@@ -152,35 +151,63 @@
                 "intentPatterns": [
                     "(create|add|write|implement).*?(migration|table|policy|trigger)",
                     "(update|modify|alter).*?(schema|table|migration)",
-                    "(deploy|apply|plan).*?(terraform|kubernetes|k8s)",
+                    "(deploy|apply).*?(kubernetes|k8s|supabase)",
                     "(implement|update|create).*?(projection|cqrs|event.*?store)",
-                    "(how to|best practice).*?(terraform|supabase|kubernetes|migration|rls)"
+                    "(how to|best practice).*?(supabase|kubernetes|migration|rls)"
                 ]
             },
             "fileTriggers": {
                 "pathPatterns": [
-                    "infrastructure/terraform/**/*.tf",
                     "infrastructure/supabase/sql/**/*.sql",
-                    "infrastructure/supabase/migrations/**/*.sql",
+                    "infrastructure/supabase/supabase/migrations/**/*.sql",
                     "infrastructure/k8s/**/*.yaml",
                     "infrastructure/k8s/**/*.yml"
                 ],
-                "pathExclusions": [
-                    "**/.terraform/**",
-                    "**/terraform.tfstate",
-                    "**/terraform.tfstate.backup"
-                ],
+                "pathExclusions": [],
                 "contentPatterns": [
                     "CREATE TABLE",
                     "CREATE POLICY",
                     "CREATE TRIGGER",
                     "ALTER TABLE",
-                    "resource \"",
-                    "provider \"",
                     "rls_",
                     "domain_events",
                     "kind:",
                     "apiVersion:"
+                ]
+            }
+        },
+        "documentation-writing": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "medium",
+            "description": "Guard rails for documentation quality: frontmatter, TL;DR format, AGENT-INDEX updates, and component prop documentation standards",
+            "promptTriggers": {
+                "keywords": [
+                    "documentation",
+                    "docs",
+                    "document",
+                    "readme",
+                    "guide",
+                    "template",
+                    "agent-index",
+                    "tl;dr",
+                    "frontmatter"
+                ],
+                "intentPatterns": [
+                    "(create|add|write|update).*?(documentation|doc|guide|readme)",
+                    "(document|describe).*?(component|api|feature|architecture)"
+                ]
+            },
+            "fileTriggers": {
+                "pathPatterns": [
+                    "documentation/**/*.md"
+                ],
+                "pathExclusions": [],
+                "contentPatterns": [
+                    "TL;DR-START",
+                    "status: current",
+                    "last_updated:",
+                    "AGENT-INDEX"
                 ]
             }
         }
@@ -200,8 +227,7 @@
         "customization": {
             "a4c_appsuite": "This file is customized for the A4C-AppSuite monorepo structure",
             "tech_stack": "Reflects actual tech choices: Radix UI (not MUI), Tailwind, MobX, Temporal, Supabase",
-            "file_paths": "Matches frontend/, temporal/, infrastructure/ monorepo structure",
-            "phase_2_note": "Skills referenced here don't exist yet - will be created in Phase 2"
+            "file_paths": "Matches frontend/, workflows/, infrastructure/ monorepo structure"
         }
     }
 }
