@@ -9,7 +9,7 @@
 import React, { useEffect, useState, useCallback, useRef, RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
-import { Users, X, Loader2, Search } from 'lucide-react';
+import { Users, X, Loader2, Search, AlertCircle } from 'lucide-react';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('component');
@@ -41,6 +41,7 @@ export const ScheduleUserAssignmentDialog: React.FC<ScheduleUserAssignmentDialog
   const [users, setUsers] = useState<UserItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(initialSelectedIds));
 
   useKeyboardNavigation({
@@ -59,9 +60,11 @@ export const ScheduleUserAssignmentDialog: React.FC<ScheduleUserAssignmentDialog
 
     setSelectedIds(new Set(initialSelectedIds));
     setSearchTerm('');
+    setLoadError(null);
 
     const loadUsers = async () => {
       setIsLoading(true);
+      setLoadError(null);
       try {
         // Get supabase service for apiRpc + session for org_id
         const { supabaseService } = await import('@/services/auth/supabase.service');
@@ -109,7 +112,9 @@ export const ScheduleUserAssignmentDialog: React.FC<ScheduleUserAssignmentDialog
           setUsers([]);
         }
       } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load users';
         log.error('Failed to load users for schedule assignment', err);
+        setLoadError(message);
         setUsers([]);
       } finally {
         setIsLoading(false);
@@ -201,6 +206,12 @@ export const ScheduleUserAssignmentDialog: React.FC<ScheduleUserAssignmentDialog
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
               <span className="ml-2 text-gray-600">Loading users...</span>
+            </div>
+          ) : loadError ? (
+            <div className="p-8 text-center" role="alert">
+              <AlertCircle className="w-12 h-12 mx-auto mb-3 text-red-400" />
+              <p className="text-red-700 font-medium">Failed to load users</p>
+              <p className="text-sm text-red-500 mt-1">{loadError}</p>
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
