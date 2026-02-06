@@ -80,18 +80,23 @@
 - [x] `npm run build` — successful
 
 ### Feature Complete Validation
-- [ ] Create schedule with name, grid, users
-- [ ] Edit schedule — modify name, grid, save
-- [ ] Deactivate schedule — confirm dialog, status changes
-- [ ] Reactivate schedule — confirm dialog, status restores
-- [ ] Delete schedule (after deactivate) — removed from list
-- [ ] User assignment dialog — search, check/uncheck, apply
-- [ ] Unsaved changes → navigate → discard warning
-- [ ] Keyboard navigation through all controls
+- [x] Create schedule with name, grid, users
+- [x] Edit schedule — modify name, grid, save
+- [x] Deactivate schedule — confirm dialog, status changes
+- [x] Reactivate schedule — confirm dialog, status restores
+- [x] Delete schedule (after deactivate) — removed from list
+- [x] User assignment dialog — search, check/uncheck, apply
+- [x] Unsaved changes → navigate → discard warning
+- [x] Keyboard navigation through all controls
+
+### UAT Bug Fixes
+- [x] Default all days active on create, sanitize incomplete days on submit
+- [x] Fix 404 in user assignment dialog — use apiRpc with full params
+- [x] Surface load errors in dialog instead of silent empty state
 
 ## Current Status
 
-**Phase**: 6 (Documentation) — COMPLETE
-**Status**: ✅ All implementation phases complete
-**Last Updated**: 2026-02-05
-**Next Step**: Manual feature validation in `npm run dev` (mock mode)
+**Phase**: UAT COMPLETE
+**Status**: ✅ All phases complete, UAT passed, deployed to production
+**Last Updated**: 2026-02-06
+**Next Step**: Archive to `dev/archived/`
