@@ -24,17 +24,19 @@ const log = Logger.getLogger('viewmodel');
 
 export type ScheduleFormMode = 'create' | 'edit';
 
-const EMPTY_SCHEDULE: WeeklySchedule = {
-  monday: null,
-  tuesday: null,
-  wednesday: null,
-  thursday: null,
-  friday: null,
-  saturday: null,
-  sunday: null,
-};
-
 const DEFAULT_DAY: DaySchedule = { begin: '0800', end: '1600' };
+
+/** Sanitize schedule for submission: days without both begin AND end become null */
+function sanitizeSchedule(schedule: WeeklySchedule): WeeklySchedule {
+  const result = { ...schedule };
+  for (const day of DAYS_OF_WEEK) {
+    const entry = result[day];
+    if (!entry || !entry.begin || !entry.end) {
+      result[day] = null;
+    }
+  }
+  return result;
+}
 
 export interface ScheduleFormData {
   scheduleName: string;
@@ -79,7 +81,15 @@ export class ScheduleFormViewModel {
     } else {
       this.formData = {
         scheduleName: '',
-        schedule: { ...EMPTY_SCHEDULE },
+        schedule: {
+          monday: { begin: '', end: '' },
+          tuesday: { begin: '', end: '' },
+          wednesday: { begin: '', end: '' },
+          thursday: { begin: '', end: '' },
+          friday: { begin: '', end: '' },
+          saturday: { begin: '', end: '' },
+          sunday: { begin: '', end: '' },
+        },
         orgUnitId: null,
         effectiveFrom: null,
         effectiveUntil: null,
@@ -272,6 +282,9 @@ export class ScheduleFormViewModel {
     });
 
     try {
+      // Sanitize: days without both begin and end times become inactive (null)
+      const cleanSchedule = sanitizeSchedule(this.formData.schedule);
+
       if (this.mode === 'create') {
         // For create mode, we create one schedule per assigned user
         // If no users assigned, create a "template" with a placeholder user
@@ -282,7 +295,7 @@ export class ScheduleFormViewModel {
           const result = await this.service.createSchedule({
             userId,
             scheduleName: this.formData.scheduleName.trim(),
-            schedule: this.formData.schedule,
+            schedule: cleanSchedule,
             orgUnitId: this.formData.orgUnitId ?? undefined,
             effectiveFrom: this.formData.effectiveFrom ?? undefined,
             effectiveUntil: this.formData.effectiveUntil ?? undefined,
@@ -306,7 +319,7 @@ export class ScheduleFormViewModel {
         await this.service.updateSchedule({
           scheduleId: this.editingScheduleId,
           scheduleName: this.formData.scheduleName.trim(),
-          schedule: this.formData.schedule,
+          schedule: cleanSchedule,
           orgUnitId: this.formData.orgUnitId ?? undefined,
           effectiveFrom: this.formData.effectiveFrom ?? undefined,
           effectiveUntil: this.formData.effectiveUntil ?? undefined,
