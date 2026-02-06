@@ -63,77 +63,54 @@ export const ScheduleUserAssignmentDialog: React.FC<ScheduleUserAssignmentDialog
     const loadUsers = async () => {
       setIsLoading(true);
       try {
-        // Use the api.list_users RPC via dynamic import to avoid circular deps
-        const { supabase } = await import('@/lib/supabase');
-        const { data, error } = await supabase.schema('api').rpc('list_users', {
+        // Get supabase service for apiRpc + session for org_id
+        const { supabaseService } = await import('@/services/auth/supabase.service');
+        const client = supabaseService.getClient();
+        const {
+          data: { session },
+        } = await client.auth.getSession();
+
+        if (!session) throw new Error('No authenticated session');
+
+        const payload = JSON.parse(globalThis.atob(session.access_token.split('.')[1]));
+        const orgId = payload.org_id;
+        if (!orgId) throw new Error('No org_id in JWT claims');
+
+        const { data, error } = await supabaseService.apiRpc<
+          Array<{
+            id: string;
+            email: string;
+            display_name: string | null;
+            is_active: boolean;
+            total_count: number;
+          }>
+        >('list_users', {
+          p_org_id: orgId,
           p_status: 'active',
+          p_search_term: null,
+          p_sort_by: 'name',
+          p_sort_desc: false,
+          p_page: 1,
+          p_page_size: 200,
         });
 
-        if (error) throw error;
+        if (error) throw new Error(error.message);
 
-        const result = typeof data === 'string' ? JSON.parse(data) : data;
-        if (result?.success && Array.isArray(result.data)) {
+        if (Array.isArray(data) && data.length > 0) {
           setUsers(
-            result.data.map((u: Record<string, unknown>) => ({
-              id: u.id as string,
-              display_name: (u.display_name as string) || (u.email as string) || 'Unknown',
-              email: (u.email as string) || '',
-              is_active: (u.is_active as boolean) ?? true,
+            data.map((u) => ({
+              id: u.id,
+              display_name: u.display_name || u.email || 'Unknown',
+              email: u.email || '',
+              is_active: u.is_active ?? true,
             }))
           );
         } else {
-          // Mock mode fallback
-          setUsers([
-            {
-              id: 'user-001',
-              display_name: 'Alice Johnson',
-              email: 'alice@example.com',
-              is_active: true,
-            },
-            {
-              id: 'user-002',
-              display_name: 'Bob Smith',
-              email: 'bob@example.com',
-              is_active: true,
-            },
-            {
-              id: 'user-003',
-              display_name: 'Carol Williams',
-              email: 'carol@example.com',
-              is_active: true,
-            },
-            {
-              id: 'user-004',
-              display_name: 'David Brown',
-              email: 'david@example.com',
-              is_active: true,
-            },
-            {
-              id: 'user-005',
-              display_name: 'Eva Martinez',
-              email: 'eva@example.com',
-              is_active: true,
-            },
-          ]);
+          setUsers([]);
         }
       } catch (err) {
         log.error('Failed to load users for schedule assignment', err);
-        // Provide mock fallback for dev mode
-        setUsers([
-          {
-            id: 'user-001',
-            display_name: 'Alice Johnson',
-            email: 'alice@example.com',
-            is_active: true,
-          },
-          { id: 'user-002', display_name: 'Bob Smith', email: 'bob@example.com', is_active: true },
-          {
-            id: 'user-003',
-            display_name: 'Carol Williams',
-            email: 'carol@example.com',
-            is_active: true,
-          },
-        ]);
+        setUsers([]);
       } finally {
         setIsLoading(false);
       }
