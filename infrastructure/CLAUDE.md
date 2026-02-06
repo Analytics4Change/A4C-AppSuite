@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-05
+last_updated: 2026-02-06
 ---
 
 <!-- TL;DR-START -->
@@ -149,16 +149,22 @@ WHERE p.prolang = (SELECT oid FROM pg_language WHERE lanname = 'plpgsql')
 
 Event processing uses **split handlers** (not monolithic processors):
 
-**Routers** (4 total):
-- `process_user_event()`, `process_organization_event()`, `process_organization_unit_event()`, `process_rbac_event()`
+**Routers** (16 total):
+- `process_user_event()`, `process_organization_event()`, `process_rbac_event()`, `process_invitation_event()`, `process_contact_event()`, `process_address_event()`, `process_phone_event()`, `process_email_event()`, `process_access_grant_event()`, `process_impersonation_event()`, `process_program_event()`, `process_organization_unit_event()`, `process_client_event()`, `process_medication_event()`, `process_medication_history_event()`, `process_dosage_event()`
+- Plus `process_junction_event()` for all `*.linked`/`*.unlinked` events
 - Thin CASE dispatchers (~50 lines each)
 - Dispatch to individual handlers based on `event_type`
 
-**Handlers** (37 total):
+**Handlers** (50+ total):
 - `handle_user_phone_added()`, `handle_organization_created()`, etc.
 - One function per event type
 - 20-50 lines each, single responsibility
 - Validated independently by plpgsql_check
+
+**Two event processing patterns** — choose based on what the handler does:
+- **Projection updates** → Synchronous BEFORE INSERT trigger handler (immediate consistency)
+- **Side effects (email, DNS, webhooks)** → Async AFTER INSERT trigger → pg_notify → Temporal
+- **See**: [`event-processing-patterns.md`](../documentation/infrastructure/patterns/event-processing-patterns.md) for the full decision guide
 
 **Adding a new event handler**:
 1. Create handler: `handle_<aggregate>_<action>(p_event record)`
@@ -189,6 +195,19 @@ Event processing uses **split handlers** (not monolithic processors):
 > `process_domain_event()` which passes `NEW` (the domain_events row). Always use
 > `p_event.stream_id` in handler functions — `p_event.aggregate_id` does not exist and
 > will cause a runtime error.
+
+> **⚠️ Router ELSE: Must RAISE EXCEPTION, not WARNING**
+>
+> Router ELSE clauses must use `RAISE EXCEPTION` (not `RAISE WARNING`) for unhandled
+> event types. Exceptions are caught by `process_domain_event()` and recorded in
+> `processing_error` (visible in admin dashboard). Warnings are invisible and mark the
+> event as successfully processed.
+
+> **⚠️ API functions must NEVER write projections directly**
+>
+> All projection updates go through event handlers. API functions emit events via
+> `api.emit_domain_event()`; handlers update projections. Direct writes bypass the audit
+> trail and break event replay.
 
 **See**: [`documentation/infrastructure/patterns/event-handler-pattern.md`](../documentation/infrastructure/patterns/event-handler-pattern.md) for complete implementation guide.
 

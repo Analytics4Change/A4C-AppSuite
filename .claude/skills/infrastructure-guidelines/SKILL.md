@@ -90,7 +90,71 @@ CREATE TRIGGER my_trigger AFTER INSERT ON domain_events
 
 Also: handlers receive `domain_events` rows. Use `p_event.stream_id`, NOT `p_event.aggregate_id` (that column does not exist).
 
-## 8. Event Metadata Must Include Audit Fields
+### Choosing the Event Processing Pattern
+
+Two patterns exist. Choose based on what the handler needs to do:
+
+| Need | Pattern | Mechanism |
+|------|---------|-----------|
+| Update projection table | **Synchronous** | BEFORE INSERT trigger → router → handler |
+| Send email, call API, start workflow | **Async** | AFTER INSERT trigger → pg_notify → Temporal |
+| Both projection + side effect | **Hybrid** | BEFORE handler for projection + AFTER trigger for async |
+
+```sql
+-- ✅ CORRECT: Projection update via synchronous handler
+WHEN 'user.phone.added' THEN PERFORM handle_user_phone_added(p_event);
+
+-- ✅ CORRECT: Async workflow via AFTER trigger + pg_notify
+-- (for email, DNS, webhooks — NOT for projection updates)
+CREATE TRIGGER notify_workflow_trigger AFTER INSERT ON domain_events
+  FOR EACH ROW WHEN (NEW.event_type = 'organization.bootstrap.initiated')
+  EXECUTE FUNCTION notify_workflow_worker();
+
+-- ❌ WRONG: External I/O in a synchronous trigger handler
+-- (blocks the transaction, no retry on failure)
+```
+
+**Full guide**: `documentation/infrastructure/patterns/event-processing-patterns.md`
+
+## 8. Router ELSE Must RAISE EXCEPTION, Not WARNING
+
+Routers must raise an EXCEPTION for unmatched event types, not a WARNING. Warnings are invisible — exceptions are caught by `process_domain_event()` and recorded in `processing_error`, visible in the admin dashboard.
+
+```sql
+-- ✅ CORRECT: Exception caught and recorded
+ELSE
+  RAISE EXCEPTION 'Unhandled event type "%" in process_user_event', p_event.event_type
+    USING ERRCODE = 'P9001';
+
+-- ❌ WRONG: Warning is invisible, event marked as "processed"
+ELSE
+  RAISE WARNING 'Unknown user event type: %', p_event.event_type;
+```
+
+If an event type intentionally has no handler, add an explicit no-op CASE:
+```sql
+WHEN 'some.audit_only.event' THEN NULL;  -- No projection needed
+```
+
+## 9. API Functions Must NEVER Write Projections Directly
+
+All projection updates go through event handlers. API functions emit events; handlers update projections.
+
+```sql
+-- ✅ CORRECT: Emit event, let handler update projection
+PERFORM api.emit_domain_event(
+  p_stream_type := 'invitation', p_stream_id := p_id,
+  p_event_type := 'invitation.revoked', p_event_data := ...);
+
+-- ❌ WRONG: Direct projection write (no audit trail, breaks replay)
+UPDATE invitations_projection SET status = 'revoked' WHERE id = p_id;
+
+-- ❌ WRONG: Dual write (event + direct write in same function)
+UPDATE organizations_projection SET direct_care_settings = v_settings;
+PERFORM api.emit_domain_event(...);  -- handler also does the UPDATE
+```
+
+## 10. Event Metadata Must Include Audit Fields
 
 Every domain event MUST include `user_id` and `reason` in metadata for audit compliance.
 
@@ -104,7 +168,7 @@ WHERE stream_id = '<resource_id>'
 ORDER BY created_at DESC;
 ```
 
-## 9. Failed Event Monitoring
+## 11. Failed Event Monitoring
 
 Check `processing_error` column on `domain_events` for failed projections. Use the admin API or RPC to retry:
 

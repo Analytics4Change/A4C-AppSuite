@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2026-02-05
+last_updated: 2026-02-06
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Split handler architecture where each domain event has a dedicated `handle_<aggregate>_<action>()` function, dispatched via explicit CASE routers for independent validation.
+**Summary**: Split handler architecture where each domain event has a dedicated `handle_<aggregate>_<action>()` function, dispatched via explicit CASE routers for independent validation. Covers the synchronous trigger handler pattern only — for async patterns (pg_notify + Temporal), see [event-processing-patterns.md](./event-processing-patterns.md).
 
 **When to read**:
 - Adding a new domain event type
@@ -15,7 +15,7 @@ last_updated: 2026-02-05
 
 **Prerequisites**: Familiarity with CQRS concepts (see [event-sourcing-overview.md](../../architecture/data/event-sourcing-overview.md))
 
-**Key topics**: `handler`, `event-handler`, `router`, `process_event`, `split-handlers`
+**Key topics**: `handler`, `event-handler`, `router`, `process_event`, `split-handlers`, `event-type-naming`
 
 **Estimated read time**: 8 minutes
 <!-- TL;DR-END -->
@@ -28,8 +28,10 @@ A4C uses a **split handler architecture** for processing domain events into CQRS
 
 | Component | Count | Purpose |
 |-----------|-------|---------|
-| **Routers** | 4 | Thin CASE dispatchers (~50 lines each) |
-| **Handlers** | 37 | Focused event processors (20-50 lines each) |
+| **Routers** | 16 | Thin CASE dispatchers (~50 lines each) |
+| **Handlers** | 50+ | Focused event processors (20-50 lines each) |
+
+> **Note**: This document covers the **synchronous trigger handler pattern** used for projection updates. For async side effects (email, DNS, webhooks), see [Event Processing Patterns](./event-processing-patterns.md).
 
 ### Previous Architecture (Monolithic)
 
@@ -62,17 +64,31 @@ $$;
 ```
 domain_events → process_domain_event() BEFORE INSERT trigger (single trigger)
                         ↓
+        Special routing: *.linked / *.unlinked events → process_junction_event(NEW)
+                        ↓
         Routes by stream_type to:
-        ├── process_user_event(NEW)
-        ├── process_organization_event(NEW)
+        ├── process_user_event(NEW)           (user lifecycle, phones, addresses, schedules, clients)
+        ├── process_organization_event(NEW)   (org lifecycle, subdomains, bootstrap, invitations)
         ├── process_organization_unit_event(NEW)
-        └── process_rbac_event(NEW)
+        ├── process_rbac_event(NEW)           (roles, permissions, user role assignments)
+        ├── process_invitation_event(NEW)     (invited, accepted, revoked, expired)
+        ├── process_client_event(NEW)
+        ├── process_medication_event(NEW)
+        ├── process_medication_history_event(NEW)
+        ├── process_dosage_event(NEW)
+        ├── process_contact_event(NEW)        (CRUD + user linking)
+        ├── process_address_event(NEW)
+        ├── process_phone_event(NEW)
+        ├── process_email_event(NEW)
+        ├── process_access_grant_event(NEW)   (cross-tenant grants)
+        ├── process_impersonation_event(NEW)
+        └── process_program_event(NEW)
                         ↓
         Each router dispatches by event_type to:
         ├── handle_user_created()
         ├── handle_user_phone_added()
         ├── handle_organization_created()
-        └── ... (39+ handlers total)
+        └── ... (50+ handlers total)
 ```
 
 > **⚠️ CRITICAL: Single trigger only — NEVER create per-event-type triggers**
@@ -108,7 +124,11 @@ BEGIN
     -- User lifecycle
     WHEN 'user.created' THEN PERFORM handle_user_created(p_event);
     WHEN 'user.synced_from_auth' THEN PERFORM handle_user_synced_from_auth(p_event);
-    WHEN 'user.invited' THEN PERFORM handle_user_invited(p_event);
+    WHEN 'user.deactivated' THEN PERFORM handle_user_deactivated(p_event);
+    WHEN 'user.reactivated' THEN PERFORM handle_user_reactivated(p_event);
+
+    -- Role assignments
+    WHEN 'user.role.assigned' THEN PERFORM handle_user_role_assigned(p_event);
 
     -- Phone management
     WHEN 'user.phone.added' THEN PERFORM handle_user_phone_added(p_event);
@@ -124,9 +144,10 @@ BEGIN
     WHEN 'user.notification_preferences.updated' THEN
       PERFORM handle_user_notification_preferences_updated(p_event);
 
-    -- Unknown event type
+    -- Unhandled event type — MUST be EXCEPTION, not WARNING
     ELSE
-      RAISE WARNING 'Unknown user event type: %', p_event.event_type;
+      RAISE EXCEPTION 'Unhandled event type "%" in process_user_event', p_event.event_type
+        USING ERRCODE = 'P9001';
   END CASE;
 END;
 $$;
@@ -136,7 +157,8 @@ $$;
 - Explicit CASE (not dynamic dispatch) - plpgsql_check validates all handler calls
 - One line per event type - easy to scan and modify
 - No business logic - only dispatching
-- RAISE WARNING for unknown types - aids debugging
+- RAISE EXCEPTION for unhandled types — caught by `process_domain_event()` and recorded in `processing_error` (visible in admin dashboard). NEVER use RAISE WARNING (it's invisible and marks the event as processed).
+- If an event type intentionally has no handler, add an explicit no-op: `WHEN 'audit.only' THEN NULL;`
 
 ## Handler Pattern
 
@@ -248,7 +270,8 @@ BEGIN
   CASE p_event.event_type
     -- ... existing handlers ...
     WHEN 'user.foo.created' THEN PERFORM handle_user_foo_created(p_event);
-    ELSE RAISE WARNING 'Unknown user event type: %', p_event.event_type;
+    ELSE RAISE EXCEPTION 'Unhandled event type "%" in process_user_event', p_event.event_type
+      USING ERRCODE = 'P9001';
   END CASE;
 END;
 $$;
@@ -279,16 +302,19 @@ The GitHub Actions workflow automatically:
 |------------|---------|
 | `user.created` | `handle_user_created` |
 | `user.synced_from_auth` | `handle_user_synced_from_auth` |
-| `user.invited` | `handle_user_invited` |
+| `user.deactivated` | `handle_user_deactivated` |
+| `user.reactivated` | `handle_user_reactivated` |
+| `user.organization_switched` | `handle_user_organization_switched` |
 | `user.role.assigned` | `handle_user_role_assigned` |
+| `user.role.revoked` | `handle_user_role_revoked` |
 | `user.access_dates.updated` | `handle_user_access_dates_updated` |
 | `user.notification_preferences.updated` | `handle_user_notification_preferences_updated` |
-| `user.phone.added` | `handle_user_phone_added` |
-| `user.phone.updated` | `handle_user_phone_updated` |
-| `user.phone.removed` | `handle_user_phone_removed` |
 | `user.address.added` | `handle_user_address_added` |
 | `user.address.updated` | `handle_user_address_updated` |
 | `user.address.removed` | `handle_user_address_removed` |
+| `user.phone.added` | `handle_user_phone_added` |
+| `user.phone.updated` | `handle_user_phone_updated` |
+| `user.phone.removed` | `handle_user_phone_removed` |
 | `user.schedule.created` | `handle_user_schedule_created` |
 | `user.schedule.updated` | `handle_user_schedule_updated` |
 | `user.schedule.deactivated` | `handle_user_schedule_deactivated` |
@@ -343,6 +369,30 @@ The GitHub Actions workflow automatically:
 | `user.role.assigned` | `handle_rbac_user_role_assigned` |
 | `user.role.revoked` | `handle_user_role_revoked` |
 
+### Invitation Events Router: `process_invitation_event()`
+
+| Event Type | Handler |
+|------------|---------|
+| `user.invited` | Inline: INSERT into `invitations_projection` |
+| `invitation.accepted` | Inline: UPDATE status to 'accepted' |
+| `invitation.revoked` | Inline: UPDATE status to 'revoked' |
+| `invitation.expired` | Inline: UPDATE status to 'expired' |
+
+### Additional Routers (Inline Handlers)
+
+The following routers handle events with inline CASE logic rather than separate `handle_*` functions. They follow the same CQRS compliance requirements.
+
+| Router | Stream Types | Event Types |
+|--------|-------------|-------------|
+| `process_contact_event` | `contact` | `contact.created`, `contact.updated`, `contact.deleted`, `contact.user.linked`, `contact.user.unlinked` |
+| `process_address_event` | `address` | `address.created`, `address.updated`, `address.deleted` |
+| `process_phone_event` | `phone` | `phone.created`, `phone.updated`, `phone.deleted` |
+| `process_email_event` | `email` | `email.created`, `email.updated`, `email.deleted` |
+| `process_access_grant_event` | `access_grant` | `access_grant.created`, `access_grant.revoked`, `access_grant.expired`, `access_grant.suspended`, `access_grant.reactivated` |
+| `process_impersonation_event` | `impersonation` | `impersonation.started`, `impersonation.renewed`, `impersonation.ended` |
+| `process_program_event` | `program` | `program.created`, `program.updated`, `program.activated`, `program.deactivated`, `program.deleted` |
+| `process_junction_event` | (any `*.linked`/`*.unlinked`) | `organization.contact.linked`, `contact.phone.linked`, etc. |
+
 ## CQRS Compliance Requirements
 
 Every handler MUST follow these rules:
@@ -353,6 +403,13 @@ Every handler MUST follow these rules:
 | **Timestamp from event** | Use `p_event.created_at`, not `NOW()` |
 | **No event emission** | Handlers only update projections |
 | **No cross-projection queries** | Projections are denormalized |
+| **No direct projection writes in API functions** | API functions emit events; only handlers update projections |
+
+> **Known Issues (tracked in [CQRS Dual-Write Audit](../../../dev/active/cqrs-dual-write-audit.md))**:
+> - Some production routers still use `RAISE WARNING` in ELSE clauses (should be `RAISE EXCEPTION`)
+> - 3 API functions have dual-write patterns (event + direct projection update)
+> - 3 API functions write projections directly without emitting events
+> - These are tracked as P0/P1 remediation items in the audit
 
 ## Debugging Event Processing
 
@@ -392,7 +449,10 @@ SELECT * FROM plpgsql_check_function('handle_user_phone_added(record)'::regproce
 
 ## Related Documentation
 
+- [Event Processing Patterns](./event-processing-patterns.md) - Decision guide for choosing sync vs async patterns
 - [Event Sourcing Overview](../../architecture/data/event-sourcing-overview.md) - CQRS architecture
 - [CQRS Projections](../../../.claude/skills/infrastructure-guidelines/resources/cqrs-projections.md) - Projection table design
+- [Event Observability](../guides/event-observability.md) - Monitoring, tracing, failed events
 - [Supabase Migrations](../guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) - Idempotent migration patterns
 - [AsyncAPI Contracts](../../../infrastructure/supabase/contracts/README.md) - Event schema definitions
+- [CQRS Dual-Write Audit](../../../dev/active/cqrs-dual-write-audit.md) - Audit of CQRS compliance violations

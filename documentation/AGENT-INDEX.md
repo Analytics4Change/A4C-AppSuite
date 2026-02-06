@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-05
+last_updated: 2026-02-06
 purpose: agent-navigation
 ---
 
@@ -17,6 +17,7 @@ purpose: agent-navigation
 | Add database table | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | [table-template.md](infrastructure/reference/database/table-template.md) |
 | Add domain event type | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) |
 | Add event handler | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | [cqrs-projections.md](../.claude/skills/infrastructure-guidelines/resources/cqrs-projections.md) |
+| Choose event processing pattern | [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) |
 | Add Temporal workflow | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | [temporal-overview.md](architecture/workflows/temporal-overview.md) |
 | Add frontend component | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | [DESIGN_PATTERNS_MIGRATION_GUIDE.md](frontend/guides/DESIGN_PATTERNS_MIGRATION_GUIDE.md) |
 | Configure authentication | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) |
@@ -71,6 +72,7 @@ purpose: agent-navigation
 | `dns-verification` | [activities-reference.md](workflows/reference/activities-reference.md) | organization-bootstrap-workflow-design.md |
 | `domain-events` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-metadata-schema.md |
 | `dosage-info` | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | medication_history.md |
+| `dual-write` | [cqrs-dual-write-audit.md](../dev/active/cqrs-dual-write-audit.md) | event-handler-pattern.md, event-processing-patterns.md |
 | `duration-ms` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `edge-function` | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `edge-function-jwt` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | EDGE_FUNCTION_TESTS.md |
@@ -79,6 +81,7 @@ purpose: agent-navigation
 | `event-errors` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md, triggering-workflows.md |
 | `event-metadata` | [event-metadata-schema.md](workflows/reference/event-metadata-schema.md) | triggering-workflows.md |
 | `event-processing` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md, DEPLOYMENT_INSTRUCTIONS.md |
+| `event-processing-patterns` | [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | event-handler-pattern.md, event-driven-workflow-triggering.md |
 | `event-types` | [event_types.md](infrastructure/reference/database/tables/event_types.md) | event-sourcing-overview.md |
 | `enterprise-sso` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
 | `event-handler` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md, event-sourcing-overview.md |
@@ -128,9 +131,11 @@ purpose: agent-navigation
 | `organization-management` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | tenants-as-organizations.md |
 | `organization-units` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | scoping-architecture.md |
 | `parent-span-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
+| `pattern-selection` | [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | event-handler-pattern.md, SKILL.md |
 | `permissions` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | permissions_projection.md |
 | `permission-grants` | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | rbac-architecture.md |
 | `pg-notify` | [event-driven-workflow-triggering.md](architecture/workflows/event-driven-workflow-triggering.md) | triggering-workflows.md |
+| `pg-notify-pattern` | [event-driven-workflow-triggering.md](architecture/workflows/event-driven-workflow-triggering.md) | event-processing-patterns.md |
 | `phi` | [clients.md](infrastructure/reference/database/tables/clients.md) | dosage_info.md |
 | `phone-addresses` | [phone_addresses.md](infrastructure/reference/database/tables/phone_addresses.md) | phones_projection.md |
 | `phones` | [phones_projection.md](infrastructure/reference/database/tables/phones_projection.md) | addresses_projection.md |
@@ -259,6 +264,8 @@ purpose: agent-navigation
 | [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | User lifecycle Edge Function API (deactivate, roles, notification prefs) | `manage-user`, `user-lifecycle`, `notification-preferences`, `role-modification` | 1000 |
 | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | AsyncAPI → TypeScript type generation with Modelina | `asyncapi`, `modelina`, `type-generation`, `contract-drift`, `generated-events` | 3700 |
 | [event-observability.md](infrastructure/guides/event-observability.md) | Event processing observability, W3C Trace Context, span timing | `observability`, `tracing`, `failed-events`, `correlation-id`, `trace-id`, `span-id`, `session-id`, `w3c-trace-context` | 3200 |
+| [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | Decision guide: sync trigger handlers vs async pg_notify + Temporal | `event-processing-patterns`, `pattern-selection`, `pg-notify-pattern`, `dual-write`, `synchronous-handler`, `async-workflow` | 2800 |
+| [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | Split handler architecture: routers, handlers, adding new event types | `event-handler`, `handler`, `router`, `process_event`, `split-handlers` | 3500 |
 | [observability-operations.md](infrastructure/guides/observability-operations.md) | **[Aspirational]** Production-scale: retention, sampling, APM integration | `retention-policy`, `trace-sampling`, `apm-integration`, `otlp-export`, `event-archival` | 2000 |
 | [table-template.md](infrastructure/reference/database/table-template.md) | Database table documentation template | `template`, `database`, `schema` | 800 |
 
