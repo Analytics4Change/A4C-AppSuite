@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-20
+last_updated: 2026-02-05
 ---
 
 <!-- TL;DR-START -->
@@ -60,20 +60,38 @@ $$;
 ### Current Architecture (Split Handlers)
 
 ```
-domain_events → process_domain_event() trigger
+domain_events → process_domain_event() BEFORE INSERT trigger (single trigger)
                         ↓
-        Routes by aggregate_type to:
-        ├── process_user_event()
-        ├── process_organization_event()
-        ├── process_organization_unit_event()
-        └── process_rbac_event()
+        Routes by stream_type to:
+        ├── process_user_event(NEW)
+        ├── process_organization_event(NEW)
+        ├── process_organization_unit_event(NEW)
+        └── process_rbac_event(NEW)
                         ↓
         Each router dispatches by event_type to:
         ├── handle_user_created()
         ├── handle_user_phone_added()
         ├── handle_organization_created()
-        └── ... (37 handlers total)
+        └── ... (39+ handlers total)
 ```
+
+> **⚠️ CRITICAL: Single trigger only — NEVER create per-event-type triggers**
+>
+> There is exactly ONE trigger on `domain_events`: the `process_domain_event_trigger`
+> (BEFORE INSERT/UPDATE). It routes by `stream_type` to the appropriate router.
+>
+> **Do NOT** create additional triggers with WHEN clauses filtering specific event types
+> (e.g., `WHEN (NEW.event_type = ANY (ARRAY['user.foo.created', ...]))`). This pattern
+> was used in an early migration but was removed by `remove_duplicate_event_triggers`
+> (migration `20260204220526`). Duplicate triggers cause double-processing.
+>
+> When adding new event types, only add a CASE line to the appropriate router function.
+
+> **⚠️ Field name: Use `stream_id`, NOT `aggregate_id`**
+>
+> The `domain_events` table column is `stream_id`. Handlers receive the full row from
+> `process_domain_event()` which passes `NEW`. Always use `p_event.stream_id` —
+> `p_event.aggregate_id` does not exist and causes a runtime error.
 
 ## Router Pattern
 
@@ -271,6 +289,13 @@ The GitHub Actions workflow automatically:
 | `user.address.added` | `handle_user_address_added` |
 | `user.address.updated` | `handle_user_address_updated` |
 | `user.address.removed` | `handle_user_address_removed` |
+| `user.schedule.created` | `handle_user_schedule_created` |
+| `user.schedule.updated` | `handle_user_schedule_updated` |
+| `user.schedule.deactivated` | `handle_user_schedule_deactivated` |
+| `user.schedule.reactivated` | `handle_user_schedule_reactivated` |
+| `user.schedule.deleted` | `handle_user_schedule_deleted` |
+| `user.client.assigned` | `handle_user_client_assigned` |
+| `user.client.unassigned` | `handle_user_client_unassigned` |
 
 ### Organization Events Router: `process_organization_event()`
 
@@ -285,9 +310,11 @@ The GitHub Actions workflow automatically:
 | `organization.subdomain.verified` | `handle_organization_subdomain_verified` |
 | `organization.subdomain.dns_created` | `handle_organization_subdomain_dns_created` |
 | `organization.subdomain.failed` | `handle_organization_subdomain_failed` |
-| `organization.bootstrap.completed` | `handle_bootstrap_completed` |
-| `organization.bootstrap.failed` | `handle_bootstrap_failed` |
-| `organization.bootstrap.cancelled` | `handle_bootstrap_cancelled` |
+| `organization.direct_care_settings.updated` | `handle_organization_direct_care_settings_updated` |
+| `bootstrap.completed` | `handle_bootstrap_completed` |
+| `bootstrap.failed` | `handle_bootstrap_failed` |
+| `bootstrap.cancelled` | `handle_bootstrap_cancelled` |
+| `user.invited` | `handle_user_invited` |
 | `invitation.resent` | `handle_invitation_resent` |
 
 ### Organization Unit Events Router: `process_organization_unit_event()`
@@ -312,6 +339,7 @@ The GitHub Actions workflow automatically:
 | `role.permission.granted` | `handle_role_permission_granted` |
 | `role.permission.revoked` | `handle_role_permission_revoked` |
 | `permission.defined` | `handle_permission_defined` |
+| `permission.updated` | `handle_permission_updated` |
 | `user.role.assigned` | `handle_rbac_user_role_assigned` |
 | `user.role.revoked` | `handle_user_role_revoked` |
 
@@ -331,7 +359,7 @@ Every handler MUST follow these rules:
 ### Check for Failed Events
 
 ```sql
-SELECT id, event_type, aggregate_id, processing_error, created_at
+SELECT id, event_type, stream_id, processing_error, created_at
 FROM domain_events
 WHERE processing_error IS NOT NULL
 ORDER BY created_at DESC
@@ -349,10 +377,10 @@ WHERE id = '<event_id>';
 ### Trace Event Processing
 
 ```sql
--- Find all events for an aggregate
+-- Find all events for a stream (entity)
 SELECT id, event_type, processed_at, processing_error, created_at
 FROM domain_events
-WHERE aggregate_id = '<aggregate_id>'
+WHERE stream_id = '<stream_id>'
 ORDER BY created_at;
 ```
 

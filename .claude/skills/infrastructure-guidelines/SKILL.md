@@ -63,19 +63,34 @@ await supabase.from('users').select('..., user_roles_projection!inner(...)')
 
 There is NO separate audit table. All state changes are domain events. **Never create audit/log tables** — query `domain_events` instead.
 
-## 6. Projection Triggers Must Use ON CONFLICT
+## 6. Projection Handlers Must Use ON CONFLICT
 
-CQRS projections receive events that may replay. Triggers MUST be idempotent.
+CQRS projection handlers receive events that may replay. Handlers MUST be idempotent.
 
 ```sql
 INSERT INTO my_projection (id, name, ...)
-VALUES (NEW.aggregate_id, NEW.event_data->>'name', ...)
+VALUES ((p_event.event_data->>'entity_id')::uuid, p_event.event_data->>'name', ...)
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
-  updated_at = now();
+  updated_at = p_event.created_at;
 ```
 
-## 7. Event Metadata Must Include Audit Fields
+## 7. Single Event Trigger — NEVER Create Per-Event-Type Triggers
+
+All event routing goes through ONE `process_domain_event()` BEFORE INSERT trigger on `domain_events`. It dispatches by `stream_type` to router functions, which dispatch by `event_type` to individual handlers. **NEVER create additional triggers** with WHEN clauses filtering specific event types.
+
+```sql
+-- ✅ CORRECT: Add CASE line to router
+WHEN 'user.foo.created' THEN PERFORM handle_user_foo_created(p_event);
+
+-- ❌ WRONG: Create per-event-type trigger
+CREATE TRIGGER my_trigger AFTER INSERT ON domain_events
+  WHEN (NEW.event_type = 'user.foo.created') ...
+```
+
+Also: handlers receive `domain_events` rows. Use `p_event.stream_id`, NOT `p_event.aggregate_id` (that column does not exist).
+
+## 8. Event Metadata Must Include Audit Fields
 
 Every domain event MUST include `user_id` and `reason` in metadata for audit compliance.
 
@@ -89,7 +104,7 @@ WHERE stream_id = '<resource_id>'
 ORDER BY created_at DESC;
 ```
 
-## 8. Failed Event Monitoring
+## 9. Failed Event Monitoring
 
 Check `processing_error` column on `domain_events` for failed projections. Use the admin API or RPC to retry:
 

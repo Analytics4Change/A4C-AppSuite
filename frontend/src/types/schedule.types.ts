@@ -51,6 +51,7 @@ export interface UserSchedulePolicy {
   organization_id: string;
   org_unit_id?: string | null;
   org_unit_name?: string | null;
+  schedule_name: string;
   schedule: WeeklySchedule;
   effective_from?: string | null;
   effective_until?: string | null;

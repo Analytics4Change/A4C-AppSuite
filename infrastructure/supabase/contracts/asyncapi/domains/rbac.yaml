@@ -8,6 +8,14 @@ components:
       payload:
         $ref: '#/components/schemas/PermissionDefinedEvent'
 
+    PermissionUpdated:
+      name: permission.updated
+      title: Permission Updated
+      summary: An existing permission's mutable fields have been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PermissionUpdatedEvent'
+
     RoleCreated:
       name: role.created
       title: Role Created
@@ -391,6 +399,19 @@ components:
           nullable: true
           description: Expiration timestamp for time-limited access
 
+    PermissionUpdatedData:
+      title: PermissionUpdatedData
+      type: object
+      properties:
+        description:
+          type: string
+          description: Updated human-readable explanation of the permission
+        scope_type:
+          $ref: ../components/enums.yaml#/components/schemas/ScopeType
+        requires_mfa:
+          type: boolean
+          description: Updated MFA requirement flag
+
     AccessGrantRevokedData:
       title: AccessGrantRevokedData
       type: object
@@ -441,6 +462,31 @@ components:
           const: permission.defined
         event_data:
           $ref: '#/components/schemas/PermissionDefinedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    PermissionUpdatedEvent:
+      title: PermissionUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Permission UUID
+        stream_type:
+          type: string
+          const: permission
+        event_type:
+          type: string
+          const: permission.updated
+        event_data:
+          $ref: '#/components/schemas/PermissionUpdatedData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 

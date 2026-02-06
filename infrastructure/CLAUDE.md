@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-19
+last_updated: 2026-02-05
 ---
 
 <!-- TL;DR-START -->
@@ -165,6 +165,30 @@ Event processing uses **split handlers** (not monolithic processors):
 2. Add CASE line to appropriate router: `WHEN 'event.type' THEN PERFORM handle_...();`
 3. Deploy via `supabase migration new <name>` then `supabase db push --linked`
 4. CI validates with plpgsql_check automatically
+
+> **⚠️ CRITICAL: NEVER create per-event-type triggers on `domain_events`**
+>
+> All event routing goes through a **single** `process_domain_event()` BEFORE INSERT trigger.
+> This trigger dispatches by `stream_type` to the appropriate router function, which then
+> dispatches by `event_type` to individual handlers. **Do NOT create additional triggers**
+> with WHEN clauses filtering specific event types — this pattern was used historically but
+> has been removed. Duplicate triggers cause events to be processed multiple times.
+>
+> ```
+> ✅ CORRECT: Add CASE line to router function
+>    process_domain_event() → process_user_event(NEW) → handle_user_foo(NEW)
+>
+> ❌ WRONG: Create trigger with WHEN clause
+>    CREATE TRIGGER my_trigger AFTER INSERT ON domain_events
+>    WHEN (NEW.event_type = 'user.foo.created') ...
+> ```
+
+> **⚠️ Event record field: Use `stream_id`, NOT `aggregate_id`**
+>
+> The `domain_events` table column is `stream_id`. Handlers receive the record from
+> `process_domain_event()` which passes `NEW` (the domain_events row). Always use
+> `p_event.stream_id` in handler functions — `p_event.aggregate_id` does not exist and
+> will cause a runtime error.
 
 **See**: [`documentation/infrastructure/patterns/event-handler-pattern.md`](../documentation/infrastructure/patterns/event-handler-pattern.md) for complete implementation guide.
 

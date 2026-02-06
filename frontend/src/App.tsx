@@ -21,7 +21,7 @@ import { OrganizationUnitsManagePage } from '@/pages/organization-units';
 import { RolesPage, RolesManagePage } from '@/pages/roles';
 import { UserListPage, UsersManagePage } from '@/pages/users';
 import { SettingsPage, OrganizationSettingsPage } from '@/pages/settings';
-import { ScheduleListPage, ScheduleEditPage } from '@/pages/schedules';
+import { ScheduleListPage, SchedulesManagePage } from '@/pages/schedules';
 import { AssignmentListPage, UserCaseloadPage } from '@/pages/assignments';
 import { DebugControlPanel } from '@/components/debug/DebugControlPanel';
 import { LogOverlay } from '@/components/debug/LogOverlay';
@@ -165,10 +165,10 @@ function App() {
                   }
                 />
                 <Route
-                  path="/schedules/:userId"
+                  path="/schedules/manage"
                   element={
                     <RequirePermission permission="user.schedule_manage" fallback="/clients">
-                      <ScheduleEditPage />
+                      <SchedulesManagePage />
                     </RequirePermission>
                   }
                 />

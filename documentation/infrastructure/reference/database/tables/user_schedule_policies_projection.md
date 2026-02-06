@@ -1,18 +1,18 @@
 ---
 status: current
-last_updated: 2026-02-02
+last_updated: 2026-02-05
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: CQRS projection for staff work schedules. Stores weekly schedule policies (JSONB with day keys and begin/end HHMM values) per user, organization, and optional org unit. One active schedule per user/org/OU combination enforced via unique constraint. Managed through `api.create_user_schedule`, `api.update_user_schedule`, `api.deactivate_user_schedule`, `api.list_user_schedules` RPCs.
+**Summary**: CQRS projection for named staff work schedules. Stores weekly schedule policies (JSONB with day keys and begin/end HHMM values) per user with a `schedule_name` label. Users can have multiple named schedules. Managed through `api.create_user_schedule`, `api.update_user_schedule`, `api.deactivate_user_schedule`, `api.reactivate_user_schedule`, `api.delete_user_schedule`, `api.get_schedule_by_id`, `api.list_user_schedules` RPCs.
 
 **When to read**:
 - Building staff schedule management UI
 - Understanding weekly schedule JSONB format
 - Querying active schedules by organization or org unit
-- Debugging schedule uniqueness constraints
+- Implementing schedule CRUD operations
 
 **Prerequisites**: [users](./users.md), [organizations_projection](./organizations_projection.md), [organization_units_projection](./organization_units_projection.md)
 
@@ -25,12 +25,14 @@ last_updated: 2026-02-02
 
 ## Overview
 
-CQRS projection table that stores staff work schedule policies. Each record represents a weekly schedule for a staff member within an organization, optionally scoped to a specific organization unit. The source of truth is `user.schedule.*` events in the `domain_events` table, processed by the event handler in the CRUD RPC migration.
+CQRS projection table that stores named staff work schedule policies. Each record represents a weekly schedule for a staff member within an organization, optionally scoped to a specific organization unit. The source of truth is `user.schedule.*` events in the `domain_events` table, processed by the single `process_domain_event_trigger`.
 
 Key characteristics:
-- **One active schedule per user/org/OU**: Enforced by `UNIQUE NULLS NOT DISTINCT (user_id, organization_id, org_unit_id)`
-- **Weekly JSONB format**: Days as keys (`monday`–`sunday`), values are `{begin: "HHMM", end: "HHMM"}` or `null` for days off
+- **Named schedules**: Each schedule has a `schedule_name` (e.g., "Day Shift M-F 8-4") for grouping and display
+- **Multiple schedules per user**: A user can have multiple named schedules (the old one-per-user/org/OU constraint was dropped)
+- **Weekly JSONB format**: Days as keys (`monday`-`sunday`), values are `{begin: "HHMM", end: "HHMM"}` or `null` for days off
 - **Effective date ranges**: Optional `effective_from` and `effective_until` for time-bounded schedules
+- **Full lifecycle**: Create, update, deactivate, reactivate, delete
 - **Permission gated**: Requires `user.schedule_manage` permission
 
 ## Table Schema
@@ -38,10 +40,11 @@ Key characteristics:
 | Column | Type | Nullable | Default | Description |
 |--------|------|----------|---------|-------------|
 | id | uuid | NO | gen_random_uuid() | Primary key |
-| user_id | uuid | NO | - | FK to `users(id)` — the staff member |
-| organization_id | uuid | NO | - | FK to `organizations_projection(id)` — owning org |
+| user_id | uuid | NO | - | FK to `users(id)` - the staff member |
+| organization_id | uuid | NO | - | FK to `organizations_projection(id)` - owning org |
+| schedule_name | text | NO | - | Display name (e.g., "Day Shift M-F 8-4") |
 | schedule | jsonb | NO | - | Weekly schedule (see format below) |
-| org_unit_id | uuid | YES | - | FK to `organization_units_projection(id)` — optional OU scope |
+| org_unit_id | uuid | YES | - | FK to `organization_units_projection(id)` - optional OU scope |
 | effective_from | date | YES | - | Schedule start date |
 | effective_until | date | YES | - | Schedule end date (null = indefinite) |
 | is_active | boolean | YES | true | Active status |
@@ -73,19 +76,17 @@ Key characteristics:
 | Constraint | Type | Definition |
 |-----------|------|------------|
 | `user_schedule_policies_projection_pkey` | PRIMARY KEY | `(id)` |
-| `user_schedule_policies_unique` | UNIQUE | `(user_id, organization_id, org_unit_id) NULLS NOT DISTINCT` |
-| `user_schedule_policies_projection_user_id_fkey` | FOREIGN KEY | `user_id → users(id)` |
-| `user_schedule_policies_projection_organization_id_fkey` | FOREIGN KEY | `organization_id → organizations_projection(id)` |
-| `user_schedule_policies_projection_org_unit_id_fkey` | FOREIGN KEY | `org_unit_id → organization_units_projection(id)` |
+| `user_schedule_policies_projection_user_id_fkey` | FOREIGN KEY | `user_id -> users(id)` |
+| `user_schedule_policies_projection_organization_id_fkey` | FOREIGN KEY | `organization_id -> organizations_projection(id)` |
+| `user_schedule_policies_projection_org_unit_id_fkey` | FOREIGN KEY | `org_unit_id -> organization_units_projection(id)` |
 
-The `NULLS NOT DISTINCT` on the unique constraint means a user can have at most one schedule with `org_unit_id = NULL` per organization (org-wide schedule), plus one per specific OU.
+**Note**: The old `user_schedule_policies_unique (user_id, organization_id, org_unit_id)` constraint was dropped in migration `20260206021113`. Users can now have multiple named schedules.
 
 ## Indexes
 
 | Index | Definition |
 |-------|-----------|
 | `user_schedule_policies_projection_pkey` | `UNIQUE (id)` |
-| `user_schedule_policies_unique` | `UNIQUE (user_id, organization_id, org_unit_id) NULLS NOT DISTINCT` |
 | `idx_user_schedule_policies_user` | `(user_id) WHERE is_active = true` |
 | `idx_user_schedule_policies_org_ou` | `(organization_id, org_unit_id) WHERE is_active = true` |
 | `idx_user_schedule_policies_dates` | `(effective_from, effective_until) WHERE is_active = true` |
@@ -103,20 +104,33 @@ The modify policy checks scope against the OU path if `org_unit_id` is set, othe
 
 | Function | Purpose | Event Emitted |
 |----------|---------|--------------|
-| `api.create_user_schedule()` | Create new schedule | `user.schedule.created` |
-| `api.update_user_schedule()` | Update existing schedule | `user.schedule.updated` |
-| `api.deactivate_user_schedule()` | Soft-deactivate | `user.schedule.deactivated` |
-| `api.list_user_schedules()` | Query with user name/email and OU name joins | — |
+| `api.create_user_schedule(p_user_id, p_schedule_name, p_schedule, ...)` | Create new named schedule | `user.schedule.created` |
+| `api.update_user_schedule(p_schedule_id, p_schedule_name, p_schedule, ...)` | Update existing schedule | `user.schedule.updated` |
+| `api.deactivate_user_schedule(p_schedule_id, p_reason)` | Soft-deactivate | `user.schedule.deactivated` |
+| `api.reactivate_user_schedule(p_schedule_id, p_reason)` | Reactivate schedule | `user.schedule.reactivated` |
+| `api.delete_user_schedule(p_schedule_id, p_reason)` | Hard-delete (must be inactive) | `user.schedule.deleted` |
+| `api.get_schedule_by_id(p_schedule_id)` | Get single schedule with user/OU joins | - |
+| `api.list_user_schedules(p_active_only, p_schedule_name, ...)` | Query with user name/email and OU name joins | - |
 
 ## Domain Events
 
-- `user.schedule.created` — New schedule policy created
-- `user.schedule.updated` — Schedule modified (times, dates, OU)
-- `user.schedule.deactivated` — Schedule deactivated
+- `user.schedule.created` - New schedule policy created
+- `user.schedule.updated` - Schedule modified (name, times, dates, OU)
+- `user.schedule.deactivated` - Schedule deactivated
+- `user.schedule.reactivated` - Schedule reactivated
+- `user.schedule.deleted` - Schedule permanently deleted
+
+## Frontend Integration
+
+The schedule management UI lives at:
+- **List page**: `/schedules` - Card grid with status tabs, search, quick actions
+- **Manage page**: `/schedules/manage` - Split-view CRUD (list 1/3 + form 2/3)
+
+See [schedule-management.md](../../../../frontend/reference/schedule-management.md) for frontend component details.
 
 ## See Also
 
-- [organizations_projection](./organizations_projection.md) — Parent organization
-- [organization_units_projection](./organization_units_projection.md) — Optional OU scope
-- [users](./users.md) — Staff member reference
-- [user_client_assignments_projection](./user_client_assignments_projection.md) — Related: client assignment mapping
+- [organizations_projection](./organizations_projection.md) - Parent organization
+- [organization_units_projection](./organization_units_projection.md) - Optional OU scope
+- [users](./users.md) - Staff member reference
+- [user_client_assignments_projection](./user_client_assignments_projection.md) - Related: client assignment mapping

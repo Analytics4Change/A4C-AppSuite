@@ -123,6 +123,7 @@ channels:
           - $ref: './domains/junction.yaml#/components/messages/PhoneAddressUnlinked'
           # RBAC events (roles and permissions)
           - $ref: './domains/rbac.yaml#/components/messages/PermissionDefined'
+          - $ref: './domains/rbac.yaml#/components/messages/PermissionUpdated'
           - $ref: './domains/rbac.yaml#/components/messages/RoleCreated'
           - $ref: './domains/rbac.yaml#/components/messages/RolePermissionGranted'
           - $ref: './domains/rbac.yaml#/components/messages/RolePermissionRevoked'

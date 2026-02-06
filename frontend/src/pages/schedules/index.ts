@@ -1,2 +1,2 @@
 export { ScheduleListPage } from './ScheduleListPage';
-export { ScheduleEditPage } from './ScheduleEditPage';
+export { SchedulesManagePage } from './SchedulesManagePage';
