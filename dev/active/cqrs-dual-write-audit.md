@@ -3,8 +3,8 @@
 ## Architecture Decision Record
 
 **Date**: 2026-02-06
-**Status**: P0 migration applied (`20260206234839_fix_p0_cqrs_critical_bugs`), P1/P2 pending
-**Priority**: P0 complete, P1 next
+**Status**: P0 + P1 (Migration 2 + 3a) applied, P1 (3b) and P2 pending
+**Priority**: P1 Migration 3b next (requires Temporal activity changes)
 **Supersedes**: Original audit skeleton (same file)
 
 ---
@@ -289,11 +289,13 @@ $$;
 - Changing the emitted format would require fixing all callers
 - Changing the router is a single-point fix
 
-### Migration 2: Remove Dual-Write Redundancy (P1)
+### Migration 2: Remove Dual-Write Redundancy (P1) -- APPLIED
 
 **Priority**: P1 -- After Migration 1 is verified in production
 **Risk**: Medium (behavior change, but handler already tested via Migration 1)
 **Dependencies**: Migration 1 must be applied and verified first
+**Migration**: `20260207000203_p1_remove_dual_writes_fix_resend` (combined with Migration 3a)
+**Status**: Applied and verified 2026-02-06
 
 #### 2a. Remove direct write from `update_organization_direct_care_settings`
 
@@ -327,11 +329,14 @@ The function should:
 **Risk**: Medium
 **Dependencies**: None (independent of Migrations 1-2)
 
-#### 3a. Fix `api.resend_invitation`
+#### 3a. Fix `api.resend_invitation` -- APPLIED
+
+**Migration**: `20260207000203_p1_remove_dual_writes_fix_resend` (combined with Migration 2)
+**Status**: Applied and verified 2026-02-06. Also added `invitation.resent` CASE to `process_invitation_event` router and fixed its ELSE clause to RAISE EXCEPTION.
 
 **Problem**: Direct write with no event. Handler `handle_invitation_resent` exists but is never triggered.
 
-**Fix**: Replace direct write with event emission. Use stream_type `invitation` so the event routes through `process_invitation_event` which already handles `invitation.resent` (though note it is also in `process_organization_event`).
+**Fix**: Replace direct write with event emission. Use stream_type `invitation` so the event routes through `process_invitation_event` which now handles `invitation.resent` (also present in `process_organization_event` as dead code).
 
 ```sql
 CREATE OR REPLACE FUNCTION api.resend_invitation(
@@ -419,30 +424,42 @@ The function body says DEPRECATED. The Edge Function `accept-invitation` handles
 
 Document the convention: compound action names use underscores (e.g., `direct_care_settings_updated`), not additional dots. Update `event-handler-pattern.md` and AsyncAPI contracts to reflect the actual convention.
 
+#### 4c. Observability gap: missing metadata in `api.*` RPC functions
+
+All `api.*` RPC functions (not just the ones fixed above) are missing `correlation_id`, `source_function`, and `reason` in event metadata. The `emit_domain_event` function already extracts these fields into dedicated indexed columns when present, but callers don't pass them. This affects all direct-RPC calls from the frontend (Edge Function calls DO include correlation IDs via `buildEventMetadata`).
+
+**Options**:
+1. Add optional `p_correlation_id` parameter to each `api.*` function, have frontend generate and pass it
+2. Use a PostgreSQL session variable (e.g., `SET LOCAL app.correlation_id = '...'`) set by a PostgREST pre-request hook
+3. Accept that RPC-called functions have less observability than Edge Function-called paths
+
+**Recommendation**: Option 1 for new functions, Option 2 for a systemic fix. At minimum, add `source_function` to all emitters (no signature change needed).
+
 ---
 
 ## 5. Dependency Graph
 
 ```
-Migration 1a (revoke_invitation)     -- independent
-Migration 1b (direct_care routing)   -- independent
-Migration 1c (access_dates routing)  -- independent
+Migration 1a (revoke_invitation)     -- ✅ APPLIED (20260206234839)
+Migration 1b (direct_care routing)   -- ✅ APPLIED (20260206234839)
+Migration 1c (access_dates routing)  -- ✅ APPLIED (20260206234839)
 
-Migration 2a (remove direct_care direct write) -- depends on 1b
-Migration 2b (remove access_dates direct write) -- depends on 1c
+Migration 2a (remove direct_care direct write) -- ✅ APPLIED (20260207000203)
+Migration 2b (remove access_dates direct write) -- ✅ APPLIED (20260207000203)
 
-Migration 3a (resend_invitation)     -- independent
-Migration 3b (update_org_status)     -- independent, requires Temporal activity changes
+Migration 3a (resend_invitation)     -- ✅ APPLIED (20260207000203)
+Migration 3b (update_org_status)     -- PENDING, requires Temporal activity changes
 
-Migration 4a (drop accept_invitation) -- independent
-Migration 4b (naming convention docs) -- independent
+Migration 4a (drop accept_invitation) -- PENDING
+Migration 4b (naming convention docs) -- PENDING
+Migration 4c (observability gap)     -- PENDING
 ```
 
 **Recommended execution order**:
-1. Migration 1 (all three fixes in one migration) -- unblocks everything
-2. Verify Migration 1 in production (check events are routed to handlers)
-3. Migration 2 (remove dual writes) -- only after verification
-4. Migration 3a (resend_invitation) -- can run in parallel with 2
+1. ~~Migration 1 (all three fixes in one migration)~~ -- ✅ APPLIED
+2. ~~Verify Migration 1 in production~~ -- ✅ VERIFIED
+3. ~~Migration 2 (remove dual writes) + 3a (resend_invitation)~~ -- ✅ APPLIED
+4. ~~Migration 3a (resend_invitation)~~ -- ✅ APPLIED (combined with 2)
 5. Migration 3b (update_org_status) -- requires Temporal activity code changes + deployment coordination
 6. Migration 4 (cleanup) -- whenever convenient
 
