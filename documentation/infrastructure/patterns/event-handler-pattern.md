@@ -6,16 +6,17 @@ last_updated: 2026-02-07
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Split handler architecture where each domain event has a dedicated `handle_<aggregate>_<action>()` function, dispatched via explicit CASE routers for independent validation. Covers the synchronous trigger handler pattern only — for async patterns (pg_notify + Temporal), see [event-processing-patterns.md](./event-processing-patterns.md).
+**Summary**: Split handler architecture where each domain event has a dedicated `handle_<aggregate>_<action>()` function, dispatched via explicit CASE routers for independent validation. Covers the synchronous trigger handler pattern only — for async patterns (pg_notify + Temporal), see [event-processing-patterns.md](./event-processing-patterns.md). Includes event type naming convention (dots for hierarchy, underscores for compound names).
 
 **When to read**:
 - Adding a new domain event type
+- Choosing an event type name
 - Debugging event processing failures
 - Understanding how projections are updated
 
 **Prerequisites**: Familiarity with CQRS concepts (see [event-sourcing-overview.md](../../architecture/data/event-sourcing-overview.md))
 
-**Key topics**: `handler`, `event-handler`, `router`, `process_event`, `split-handlers`, `event-type-naming`
+**Key topics**: `handler`, `event-handler`, `router`, `process_event`, `split-handlers`, `event-type-naming`, `naming-convention`
 
 **Estimated read time**: 8 minutes
 <!-- TL;DR-END -->
@@ -396,6 +397,44 @@ The following routers handle events with inline CASE logic rather than separate 
 | `process_program_event` | `program` | `program.created`, `program.updated`, `program.activated`, `program.deactivated`, `program.deleted` |
 | `process_junction_event` | (any `*.linked`/`*.unlinked`) | `organization.contact.linked`, `contact.phone.linked`, etc. |
 
+## Event Type Naming Convention
+
+Event types follow a dot-separated hierarchy: `{stream_type}.{entity}.{action}` or `{stream_type}.{action}`.
+
+### Rules
+
+1. **Dots separate hierarchy levels** — stream type, optional sub-entity, and action:
+   - `user.created` (stream_type + action)
+   - `user.phone.added` (stream_type + entity + action)
+   - `organization.subdomain.verified` (stream_type + entity + action)
+
+2. **Underscores for compound words within a level** — when a stream type, entity name, or action is multi-word, use underscores:
+   - `organization_unit.created` (compound stream type)
+   - `organization.direct_care_settings_updated` (compound entity + action)
+   - `user.synced_from_auth` (compound action)
+   - `user.notification_preferences.updated` (compound entity)
+
+3. **Never use dots within a compound name** — dots always mean hierarchy boundaries:
+   - `organization.direct_care_settings_updated` (compound action name)
+   - ~~`organization.direct_care_settings.updated`~~ (wrong — the router won't match)
+
+4. **Action names are past tense** — events describe what already happened:
+   - `created`, `updated`, `deleted`, `deactivated`, `revoked`, `synced_from_auth`
+
+### Quick Reference
+
+| Pattern | Example | Explanation |
+|---------|---------|-------------|
+| `{stream}.{action}` | `user.created` | Simple action on stream entity |
+| `{stream}.{entity}.{action}` | `user.phone.added` | Action on sub-entity |
+| `{stream}.{compound_action}` | `organization.direct_care_settings_updated` | Multi-word action (underscores) |
+| `{compound_stream}.{action}` | `organization_unit.created` | Multi-word stream type (underscores) |
+| `{stream}.{entity}.{compound_action}` | `organization.subdomain.dns_created` | Sub-entity with compound action |
+
+### Historical Note
+
+Early development used inconsistent conventions, with some routers expecting dot-separated compound names (`organization.direct_care_settings.updated`) while API functions emitted underscore-separated names (`organization.direct_care_settings_updated`). This mismatch caused handlers to silently never fire. Fixed in migration `20260206234839_fix_p0_cqrs_critical_bugs`.
+
 ## CQRS Compliance Requirements
 
 Every handler MUST follow these rules:
@@ -408,11 +447,13 @@ Every handler MUST follow these rules:
 | **No cross-projection queries** | Projections are denormalized |
 | **No direct projection writes in API functions** | API functions emit events; only handlers update projections |
 
-> **Known Issues (tracked in [CQRS Dual-Write Audit](../../../dev/active/cqrs-dual-write-audit.md))**:
-> - Some production routers still use `RAISE WARNING` in ELSE clauses (should be `RAISE EXCEPTION`)
-> - 3 API functions have dual-write patterns (event + direct projection update)
-> - 3 API functions write projections directly without emitting events
-> - These are tracked as P0/P1 remediation items in the audit
+> **Resolved Issues (see [CQRS Dual-Write Audit](../../../dev/active/cqrs-dual-write-audit.md))**:
+> All P0 and P1 CQRS violations have been remediated:
+> - Event type naming mismatches fixed (migration `20260206234839`)
+> - Dual-write patterns removed from API functions (migration `20260207000203`)
+> - Direct-write-only functions converted to emit events (migrations `20260207000203`, `20260207004639`)
+> - Router ELSE clauses updated to RAISE EXCEPTION (migration `20260207000203`)
+> - Deprecated `api.accept_invitation` dropped (migration `20260207020902`)
 
 ## Debugging Event Processing
 

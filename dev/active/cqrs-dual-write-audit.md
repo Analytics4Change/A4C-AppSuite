@@ -3,8 +3,8 @@
 ## Architecture Decision Record
 
 **Date**: 2026-02-06
-**Status**: P0 + P1 (Migrations 1-3) applied, P2 4c applied, P2 4a/4b pending
-**Priority**: P2 cleanup next (drop deprecated functions, naming convention docs)
+**Status**: P0 + P1 (Migrations 1-3) applied, P2 (4a/4b/4c) applied. 3b P2 cleanup remaining.
+**Priority**: 3b P2 cleanup remaining (drop update_organization_status, remove activate-organization activity)
 **Supersedes**: Original audit skeleton (same file)
 
 ---
@@ -431,13 +431,21 @@ This is backwards from the CQRS pattern. The projection is updated before the ev
 **Priority**: P2 -- Low urgency
 **Risk**: Low
 
-#### 4a. Drop deprecated `api.accept_invitation`
+#### 4a. Drop deprecated `api.accept_invitation` -- APPLIED
 
-The function body says DEPRECATED. The Edge Function `accept-invitation` handles this flow. Remove the function.
+**Migration**: `20260207020902_p2_drop_deprecated_accept_invitation`
+**Status**: Applied 2026-02-07
 
-#### 4b. Event type naming convention documentation
+The function body said DEPRECATED. The Edge Function `accept-invitation` handles this flow. Function dropped.
 
-Document the convention: compound action names use underscores (e.g., `direct_care_settings_updated`), not additional dots. Update `event-handler-pattern.md` and AsyncAPI contracts to reflect the actual convention.
+#### 4b. Event type naming convention documentation -- APPLIED
+
+**Status**: Documented 2026-02-07
+
+Convention documented in `event-handler-pattern.md` under "Event Type Naming Convention" section:
+- Dots separate hierarchy levels (`stream_type.entity.action`)
+- Underscores for compound words within a level (`direct_care_settings_updated`)
+- Historical note about the mismatch bug that led to this convention being formalized
 
 #### 4c. Observability gap: missing metadata in `api.*` RPC functions -- APPLIED
 
@@ -470,8 +478,8 @@ Migration 2b (remove access_dates direct write) -- ✅ APPLIED (20260207000203)
 Migration 3a (resend_invitation)     -- ✅ APPLIED (20260207000203)
 Migration 3b (update_org_status)     -- ✅ APPLIED (20260207004639 + TypeScript)
 
-Migration 4a (drop accept_invitation) -- PENDING
-Migration 4b (naming convention docs) -- PENDING
+Migration 4a (drop accept_invitation) -- ✅ APPLIED (20260207020902)
+Migration 4b (naming convention docs) -- ✅ DOCUMENTED (event-handler-pattern.md)
 Migration 4c (observability gap)     -- ✅ APPLIED (20260207013604)
 ```
 
@@ -481,7 +489,9 @@ Migration 4c (observability gap)     -- ✅ APPLIED (20260207013604)
 3. ~~Migration 2 (remove dual writes) + 3a (resend_invitation)~~ -- ✅ APPLIED
 4. ~~Migration 3a (resend_invitation)~~ -- ✅ APPLIED (combined with 2)
 5. ~~Migration 3b (update_org_status)~~ -- ✅ APPLIED (SQL + TypeScript)
-6. Migration 4 (cleanup) -- whenever convenient
+6. ~~Migration 4a (drop accept_invitation)~~ -- ✅ APPLIED
+7. ~~Migration 4b (naming convention docs)~~ -- ✅ DOCUMENTED
+8. 3b P2 cleanup (drop update_organization_status, remove activate-organization) -- whenever convenient
 
 ---
 
