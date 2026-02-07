@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2026-01-07
+last_updated: 2026-02-07
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Guide for monitoring and debugging failed domain events using the event processing observability system, including W3C Trace Context support for end-to-end tracing.
+**Summary**: Guide for monitoring and debugging failed domain events using the event processing observability system, including W3C Trace Context support for end-to-end tracing and automatic tracing via PostgREST pre-request hook.
 
 **When to read**:
 - Debugging why an operation silently failed (user created but no role assigned)
@@ -17,7 +17,7 @@ last_updated: 2026-01-07
 
 **Prerequisites**: Understanding of CQRS event sourcing, access to Supabase dashboard or SQL
 
-**Key topics**: `event-errors`, `observability`, `tracing`, `correlation-id`, `trace-id`, `span-id`, `session-id`, `traceparent`, `w3c-trace-context`, `duration-ms`, `failed-events`, `event-processing`, `debugging`
+**Key topics**: `event-errors`, `observability`, `tracing`, `correlation-id`, `trace-id`, `span-id`, `session-id`, `traceparent`, `w3c-trace-context`, `duration-ms`, `failed-events`, `event-processing`, `debugging`, `pre-request-hook`, `session-variable`, `automatic-tracing`
 
 **Estimated read time**: 15 minutes (full), 5 minutes (relevant sections)
 <!-- TL;DR-END -->
@@ -109,27 +109,38 @@ When a critical event's trigger processing fails, `api.emit_domain_event()` rais
 ┌─────────────────────────────────────────────────────────────────────┐
 │                           Frontend                                   │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ Edge Function Error → FunctionsHttpError → User Notification│   │
+│  │ Edge Function path:                                          │   │
+│  │   Error → FunctionsHttpError → User Notification             │   │
+│  │                                                              │   │
+│  │ RPC path (automatic tracing):                                │   │
+│  │   Custom fetch → X-Correlation-ID + traceparent headers      │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                       Edge Functions                                 │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ correlation_id = generateCorrelationId()                     │   │
-│  │ const { error } = await supabase.rpc('emit_domain_event')   │   │
-│  │ if (error) return handleRpcError(error, correlationId)      │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
+           │                                    │
+     (RPC calls)                         (Edge Functions)
+           │                                    │
+           ▼                                    ▼
+┌──────────────────────────┐   ┌──────────────────────────────────────┐
+│  PostgREST Pre-Request   │   │          Edge Functions               │
+│  Hook                    │   │  ┌──────────────────────────────┐   │
+│  ┌────────────────────┐  │   │  │ correlation_id = generate()  │   │
+│  │ Headers → app.*    │  │   │  │ supabase.rpc('emit_domain_  │   │
+│  │ session variables  │  │   │  │   event', { metadata: ... }) │   │
+│  └────────────────────┘  │   │  └──────────────────────────────┘   │
+└──────────────────────────┘   └──────────────────────────────────────┘
+           │                                    │
+           └────────────────┬───────────────────┘
+                            ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    api.emit_domain_event()                          │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 1. INSERT event → domain_events table                       │   │
-│  │ 2. Trigger: process_domain_event()                          │   │
-│  │ 3. If critical event AND processing_error IS NOT NULL:      │   │
+│  │ 1. Extract tracing from p_event_metadata (explicit)          │   │
+│  │ 2. Fallback to app.* session vars (from pre-request hook)   │   │
+│  │ 3. Enrich metadata JSONB with resolved tracing fields       │   │
+│  │ 4. Auto-inject user_id from auth.uid()                      │   │
+│  │ 5. INSERT event → domain_events table                       │   │
+│  │ 6. Trigger: process_domain_event()                          │   │
+│  │ 7. If critical event AND processing_error IS NOT NULL:      │   │
 │  │    RAISE EXCEPTION 'Event processing failed: %', error      │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────┘
@@ -185,13 +196,92 @@ All events emitted via `api.emit_domain_event()` should include:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `correlation_id` | ✅ Yes | Request-level trace ID |
-| `user_id` | ✅ Yes | UUID of acting user |
+| `correlation_id` | Auto-populated | Auto via pre-request hook for RPC calls; explicit for Edge Functions |
+| `user_id` | Auto-populated | Auto-injected from `auth.uid()` for RPC calls; explicit for Edge Functions |
 | `organization_id` | When applicable | Org context |
 | `source_function` | Recommended | Function name for debugging |
 | `reason` | When meaningful | Human-readable justification |
 | `ip_address` | Edge Functions | Client IP |
 | `user_agent` | Edge Functions | Client info |
+
+---
+
+## Automatic Tracing for RPC Calls
+
+> **Added 2026-02-07**: PostgREST pre-request hook + frontend fetch wrapper
+
+### Overview
+
+Frontend RPC calls (via `supabase.schema('api').rpc(...)`) now get automatic tracing without any code changes in the calling functions. This closes the HIPAA observability gap where `api.*` RPC functions were emitting events without `correlation_id`, `trace_id`, or `span_id`.
+
+### How It Works
+
+1. **Frontend fetch wrapper** (`supabase-ssr.ts`): Injects `X-Correlation-ID` and `traceparent` headers on every Supabase request via a custom `global.fetch` passed to `createBrowserClient`
+
+2. **PostgREST pre-request hook** (`public.postgrest_pre_request()`): Runs before every PostgREST request, extracts headers into `app.*` session variables:
+   - `X-Correlation-ID` → `app.correlation_id` (auto-generated if not sent)
+   - `traceparent` → `app.trace_id` + `app.span_id` (parsed from W3C format)
+   - `X-Session-ID` → `app.session_id`
+
+3. **`api.emit_domain_event()` fallback**: After extracting tracing from `p_event_metadata`, falls back to `app.*` session variables when fields are NULL. Also enriches the `event_metadata` JSONB so all tracing is queryable in one place.
+
+### Precedence Rules
+
+**Explicit metadata always wins.** Session variables are only used as fallback:
+
+| Source | When Used | Example |
+|--------|-----------|---------|
+| `p_event_metadata` fields | Always checked first | Edge Functions pass full tracing in metadata |
+| `app.*` session variables | Only when metadata field is NULL | Frontend RPC calls get tracing from headers |
+| `auth.uid()` | Only when `user_id` not in metadata | Auto-injected for authenticated requests |
+
+This means Edge Functions that already pass `correlation_id`, `trace_id`, etc. in metadata are **completely unaffected** — their explicit values take precedence.
+
+### Auto-Injected Fields
+
+| Field | Source | Notes |
+|-------|--------|-------|
+| `correlation_id` | `X-Correlation-ID` header or auto-generated UUID | Always populated for PostgREST requests |
+| `trace_id` | Parsed from `traceparent` header | 32 hex chars from W3C format |
+| `span_id` | Parsed from `traceparent` header | 16 hex chars from W3C format |
+| `user_id` | `auth.uid()` | Injected when not in metadata and user is authenticated |
+
+### Limitations
+
+- **`session_id` is NOT auto-populated** via the fetch wrapper (requires async JWT decode). It is only populated when explicitly passed in metadata (e.g., from Edge Functions). Session context is available via `auth.uid()` in the database.
+- **Non-PostgREST contexts** (psql, migrations, Temporal workers): Session variables are NULL; `current_setting('app.*', true)` returns NULL gracefully. No impact.
+- **PostgREST supports only ONE `db_pre_request` function**. If additional pre-request logic is needed, add it to `postgrest_pre_request()` body — do not create a second function.
+
+### Verification
+
+To verify automatic tracing is working after deployment:
+
+```bash
+# Via PostgREST HTTP call (use actual project URL and anon key)
+curl -X POST 'https://<project>.supabase.co/rest/v1/rpc/emit_domain_event' \
+  -H 'apikey: <anon-key>' \
+  -H 'Authorization: Bearer <jwt>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "p_stream_id": "<test-uuid>",
+    "p_stream_type": "test",
+    "p_event_type": "test.tracing_check",
+    "p_event_data": {"test": true},
+    "p_event_metadata": {}
+  }'
+
+# Then check the event — correlation_id and trace_id should be populated
+# even though p_event_metadata was empty:
+SELECT id, correlation_id, trace_id, span_id,
+       event_metadata->>'correlation_id' as meta_correlation,
+       event_metadata->>'user_id' as meta_user
+FROM domain_events
+WHERE event_type = 'test.tracing_check'
+ORDER BY created_at DESC LIMIT 1;
+
+-- Cleanup
+DELETE FROM domain_events WHERE event_type = 'test.tracing_check';
+```
 
 ---
 
@@ -232,6 +322,8 @@ traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
 - **flags**: `01` = sampled, `00` = not sampled
 
 ### Frontend Integration
+
+> **Note**: For `supabase.schema('api').rpc()` calls, tracing headers are injected automatically via the fetch wrapper in `supabase-ssr.ts`. The manual approach below is only needed for `supabase.functions.invoke()` (Edge Function calls).
 
 Frontend services create tracing context and pass headers to Edge Functions:
 
@@ -659,12 +751,34 @@ To add monitoring for new event types:
 - [Database Tables Reference](../reference/database/tables/) - Schema documentation
 - [Edge Functions](../../../infrastructure/supabase/supabase/functions/) - Source code
 
+## Migration History
+
+### 2026-02-07: PostgREST Pre-Request Hook for Automatic Tracing
+
+**Migration**: `20260207013604_p2_postgrest_pre_request_tracing.sql`
+
+**Changes**:
+- Added `public.postgrest_pre_request()` function that extracts tracing headers into `app.*` session variables
+- Registered pre-request function via `ALTER ROLE authenticator SET pgrst.db_pre_request`
+- Updated `api.emit_domain_event()` to fall back to session variables when metadata fields are NULL
+- Added metadata enrichment (tracing fields written back to `event_metadata` JSONB)
+- Added `user_id` auto-injection from `auth.uid()`
+- Frontend: custom fetch wrapper in `supabase-ssr.ts` injects `X-Correlation-ID` and `traceparent` headers
+
+**Backward Compatibility**: Fully compatible
+- Explicit metadata (from Edge Functions) always takes precedence
+- Non-PostgREST contexts (psql, Temporal) gracefully get NULL from session variables
+- Function signature unchanged — zero impact on callers
+
 ## Files Modified
 
 | File | Purpose |
 |------|---------|
 | `infrastructure/supabase/supabase/migrations/20260107002820_event_processing_observability.sql` | RPC functions + error propagation |
+| `infrastructure/supabase/supabase/migrations/20260207013604_p2_postgrest_pre_request_tracing.sql` | Pre-request hook + emit_domain_event update |
 | `infrastructure/supabase/supabase/functions/_shared/error-response.ts` | Shared error utilities |
+| `frontend/src/utils/trace-ids.ts` | Zero-dependency tracing ID generators |
+| `frontend/src/lib/supabase-ssr.ts` | Custom fetch wrapper for tracing headers |
 | `frontend/src/services/admin/EventMonitoringService.ts` | Frontend service |
 | `frontend/src/pages/admin/FailedEventsPage.tsx` | Admin dashboard |
 | `frontend/src/types/event-monitoring.types.ts` | TypeScript types |

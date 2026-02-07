@@ -3,7 +3,7 @@
 ## Architecture Decision Record
 
 **Date**: 2026-02-06
-**Status**: P0 + P1 (Migrations 1-3) applied, P2 pending
+**Status**: P0 + P1 (Migrations 1-3) applied, P2 4c applied, P2 4a/4b pending
 **Priority**: P2 cleanup next (drop deprecated functions, naming convention docs)
 **Supersedes**: Original audit skeleton (same file)
 
@@ -439,16 +439,21 @@ The function body says DEPRECATED. The Edge Function `accept-invitation` handles
 
 Document the convention: compound action names use underscores (e.g., `direct_care_settings_updated`), not additional dots. Update `event-handler-pattern.md` and AsyncAPI contracts to reflect the actual convention.
 
-#### 4c. Observability gap: missing metadata in `api.*` RPC functions
+#### 4c. Observability gap: missing metadata in `api.*` RPC functions -- APPLIED
 
-All `api.*` RPC functions (not just the ones fixed above) are missing `correlation_id`, `source_function`, and `reason` in event metadata. The `emit_domain_event` function already extracts these fields into dedicated indexed columns when present, but callers don't pass them. This affects all direct-RPC calls from the frontend (Edge Function calls DO include correlation IDs via `buildEventMetadata`).
+**Migration**: `20260207013604_p2_postgrest_pre_request_tracing`
+**Status**: Applied 2026-02-07
 
-**Options**:
-1. Add optional `p_correlation_id` parameter to each `api.*` function, have frontend generate and pass it
-2. Use a PostgreSQL session variable (e.g., `SET LOCAL app.correlation_id = '...'`) set by a PostgREST pre-request hook
-3. Accept that RPC-called functions have less observability than Edge Function-called paths
+**Solution applied**: Option 2 (PostgREST pre-request hook) — systemic fix covering all `api.*` RPC functions:
+- PostgREST pre-request hook (`public.postgrest_pre_request()`) extracts `X-Correlation-ID` and `traceparent` headers into `app.*` session variables
+- `api.emit_domain_event()` enhanced with session variable fallback when metadata fields are NULL
+- Frontend custom fetch wrapper injects tracing headers on every Supabase request
+- `user_id` auto-injected from `auth.uid()` when not in metadata
+- Explicit metadata (from Edge Functions) always takes precedence
 
-**Recommendation**: Option 1 for new functions, Option 2 for a systemic fix. At minimum, add `source_function` to all emitters (no signature change needed).
+All `api.*` RPC functions now automatically get `correlation_id`, `trace_id`, `span_id`, and `user_id` without any signature changes.
+
+**Remaining gap**: `source_function` and `reason` are still not auto-populated (these are context-specific and must be passed explicitly by callers when meaningful).
 
 ---
 
@@ -467,7 +472,7 @@ Migration 3b (update_org_status)     -- ✅ APPLIED (20260207004639 + TypeScript
 
 Migration 4a (drop accept_invitation) -- PENDING
 Migration 4b (naming convention docs) -- PENDING
-Migration 4c (observability gap)     -- PENDING
+Migration 4c (observability gap)     -- ✅ APPLIED (20260207013604)
 ```
 
 **Recommended execution order**:

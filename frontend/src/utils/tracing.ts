@@ -16,6 +16,10 @@
  */
 
 import { supabaseService } from '@/services/auth/supabase.service';
+import { generateCorrelationId } from './trace-ids';
+
+// Re-export from zero-dependency module (avoids circular dependency with supabase-ssr.ts)
+export { generateCorrelationId };
 
 /**
  * Tracing context containing all IDs for request correlation
@@ -39,27 +43,6 @@ export interface TraceparentComponents {
   traceId: string;
   spanId: string;
   flags: string;
-}
-
-/**
- * Generate a UUID v4 correlation ID
- *
- * Uses crypto.randomUUID() for secure random generation.
- * Falls back to manual generation if not available.
- *
- * @returns UUID v4 string (e.g., "550e8400-e29b-41d4-a716-446655440000")
- */
-export function generateCorrelationId(): string {
-  if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.randomUUID) {
-    return globalThis.crypto.randomUUID();
-  }
-
-  // Fallback for older browsers
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
 }
 
 /**
@@ -143,9 +126,7 @@ export function generateTraceparent(
  * @param traceparent - The traceparent header value
  * @returns Parsed components or null if invalid
  */
-export function parseTraceparent(
-  traceparent: string
-): TraceparentComponents | null {
+export function parseTraceparent(traceparent: string): TraceparentComponents | null {
   const parts = traceparent.split('-');
   if (parts.length !== 4) {
     return null;
@@ -154,12 +135,7 @@ export function parseTraceparent(
   const [version, traceId, spanId, flags] = parts;
 
   // Validate format
-  if (
-    version.length !== 2 ||
-    traceId.length !== 32 ||
-    spanId.length !== 16 ||
-    flags.length !== 2
-  ) {
+  if (version.length !== 2 || traceId.length !== 32 || spanId.length !== 16 || flags.length !== 2) {
     return null;
   }
 
@@ -224,9 +200,7 @@ export async function getSessionId(): Promise<string | null> {
  * Logger.pushTracingContext(context);
  * const headers = buildHeadersFromContext(context);
  */
-export function buildHeadersFromContext(
-  context: TracingContext
-): Record<string, string> {
+export function buildHeadersFromContext(context: TracingContext): Record<string, string> {
   const traceparentHeader = `00-${context.traceId}-${context.spanId}-01`;
 
   const headers: Record<string, string> = {
@@ -288,9 +262,7 @@ export async function buildTracingHeaders(): Promise<Record<string, string>> {
  * @param sessionId - Optional session ID to include
  * @returns Headers object with all tracing headers
  */
-export function buildTracingHeadersSync(
-  sessionId?: string | null
-): Record<string, string> {
+export function buildTracingHeadersSync(sessionId?: string | null): Record<string, string> {
   const correlationId = generateCorrelationId();
   const traceparent = generateTraceparent();
 
@@ -337,9 +309,7 @@ export async function createTracingContext(): Promise<TracingContext> {
  * @param sessionId - Optional session ID to include
  * @returns Complete tracing context
  */
-export function createTracingContextSync(
-  sessionId?: string | null
-): TracingContext {
+export function createTracingContextSync(sessionId?: string | null): TracingContext {
   return {
     correlationId: generateCorrelationId(),
     sessionId: sessionId || null,

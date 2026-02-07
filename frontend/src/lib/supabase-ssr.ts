@@ -12,6 +12,7 @@
  */
 import { createBrowserClient } from '@supabase/ssr';
 import { isLocalhost, getDeploymentConfig } from '@/config/deployment.config';
+import { generateCorrelationId, generateTraceparentHeader } from '@/utils/trace-ids';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -83,10 +84,49 @@ const effectiveUrl = supabaseUrl || 'https://placeholder.supabase.co';
 const effectiveKey = supabaseAnonKey || 'placeholder-key-for-mock-mode';
 
 /**
+ * Fetch wrapper that injects tracing headers into every Supabase request.
+ * PostgREST pre-request hook extracts these into session variables,
+ * which emit_domain_event uses as fallback for event tracing.
+ *
+ * Note: X-Session-ID is NOT injected here (requires async JWT decode).
+ * Session context is available via auth.uid() in the database.
+ */
+const tracingFetch: typeof fetch = (input, init) => {
+  const existingHeaders: Record<string, string> = {};
+
+  // Copy existing headers into a plain object
+  if (init?.headers) {
+    if (init.headers instanceof globalThis.Headers) {
+      init.headers.forEach((value, key) => {
+        existingHeaders[key] = value;
+      });
+    } else if (Array.isArray(init.headers)) {
+      for (const [key, value] of init.headers) {
+        existingHeaders[key] = value;
+      }
+    } else {
+      Object.assign(existingHeaders, init.headers);
+    }
+  }
+
+  // Inject tracing headers if not already present
+  if (!existingHeaders['X-Correlation-ID'] && !existingHeaders['x-correlation-id']) {
+    existingHeaders['X-Correlation-ID'] = generateCorrelationId();
+  }
+  if (!existingHeaders['traceparent']) {
+    existingHeaders['traceparent'] = generateTraceparentHeader();
+  }
+
+  return fetch(input, { ...init, headers: existingHeaders });
+};
+
+/**
  * Supabase client with cookie-based session storage
  *
  * Uses @supabase/ssr createBrowserClient for automatic cookie management.
  * Session cookies are scoped to the parent domain for cross-subdomain sharing.
+ * Injects tracing headers (X-Correlation-ID, traceparent) on every request
+ * for automatic HIPAA-compliant event correlation.
  *
  * @example
  * ```typescript
@@ -101,6 +141,9 @@ const effectiveKey = supabaseAnonKey || 'placeholder-key-for-mock-mode';
  * ```
  */
 export const supabase = createBrowserClient(effectiveUrl, effectiveKey, {
+  global: {
+    fetch: tracingFetch,
+  },
   cookieOptions: {
     domain: getCookieDomain(),
     path: '/',

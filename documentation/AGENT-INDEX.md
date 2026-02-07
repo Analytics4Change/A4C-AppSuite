@@ -37,6 +37,7 @@ purpose: agent-navigation
 | `activities-reference` | [activities-reference.md](workflows/reference/activities-reference.md) | error-handling-and-compensation.md |
 | `assignment` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | user_schedule_policies_projection.md, organizations_projection.md |
 | `activity` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | activities-reference.md |
+| `automatic-tracing` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `addresses` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | phones_projection.md |
 | `adr` | [adr-multi-role-effective-permissions.md](architecture/authorization/adr-multi-role-effective-permissions.md) | rbac-architecture.md, scoping-architecture.md |
 | `apm-integration` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
@@ -133,6 +134,7 @@ purpose: agent-navigation
 | `organization-units` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | scoping-architecture.md |
 | `parent-span-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `pattern-selection` | [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | event-handler-pattern.md, SKILL.md |
+| `pre-request-hook` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `permissions` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | permissions_projection.md |
 | `permission-grants` | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | rbac-architecture.md |
 | `pg-notify` | [event-driven-workflow-triggering.md](architecture/workflows/event-driven-workflow-triggering.md) | triggering-workflows.md |
@@ -177,6 +179,7 @@ purpose: agent-navigation
 | `schema-registry` | [event_types.md](infrastructure/reference/database/tables/event_types.md) | event-sourcing-overview.md |
 | `saml` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
 | `session-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
+| `session-variable` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `scope_path` | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | organization_units_projection.md, JWT-CLAIMS-SETUP.md |
 | `effective_permissions` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | rbac-architecture.md, frontend-auth-architecture.md |
 | `scoping` | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | organization_units_projection.md |

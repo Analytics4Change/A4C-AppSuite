@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-07
+last_updated: 2026-02-07
 ---
 
 <!-- TL;DR-START -->
@@ -89,7 +89,7 @@ Five tracing fields are promoted to dedicated columns in the `domain_events` tab
 2. **JSONB Limitation**: Extracting from JSONB prevents index usage in `WHERE correlation_id = X AND created_at > Y`
 3. **Schema Validation**: Column types enforce format (UUID vs TEXT)
 
-**Automatic Population**: The `api.emit_domain_event()` function automatically extracts these fields from `p_event_metadata` JSONB and populates the columns. You don't need to pass them separately.
+**Automatic Population**: The `api.emit_domain_event()` function automatically extracts these fields from `p_event_metadata` JSONB and populates the columns. You don't need to pass them separately. For RPC calls via PostgREST, a pre-request hook also populates `correlation_id`, `trace_id`, and `span_id` from HTTP headers as a fallback when not present in metadata. Additionally, `user_id` is auto-injected from `auth.uid()` when not in metadata.
 
 ## Field Definitions
 
@@ -247,8 +247,8 @@ event_metadata: {
 #### `user_id`
 
 **Type**: `string`
-**Required**: No (include if event triggered by user)
-**Populated By**: Application code
+**Required**: No (auto-injected from `auth.uid()` for PostgREST RPC calls when not in metadata)
+**Populated By**: Application code, or automatically via `auth.uid()` in `emit_domain_event`
 **Format**: UUID
 **Purpose**: Links event to user who triggered it
 **Example**: `"123e4567-e89b-12d3-a456-426614174000"`
@@ -278,8 +278,8 @@ WHERE event_metadata->>'user_id' = '123e4567-e89b-12d3-a456-426614174000';
 #### `correlation_id`
 
 **Type**: `string`
-**Required**: No (use for distributed tracing)
-**Populated By**: Application code
+**Required**: No (auto-populated for PostgREST RPC calls via pre-request hook)
+**Populated By**: Application code, or automatically via PostgREST pre-request hook (from `X-Correlation-ID` header)
 **Format**: UUID or external trace ID
 **Purpose**: Links related events across systems
 **Example**: `"trace-550e8400-e29b-41d4-a716-446655440000"`
@@ -1081,6 +1081,19 @@ ORDER BY created_at ASC;
 - Old events without tracing fields remain queryable (columns are nullable)
 - `api.emit_domain_event()` auto-extracts tracing from metadata (no API change)
 - New column indexes are partial (only index non-null values)
+
+### 2026-02-07: PostgREST Pre-Request Hook for Automatic Tracing
+
+**Migration**: `20260207013604_p2_postgrest_pre_request_tracing.sql`
+
+**Changes**:
+- `api.emit_domain_event()` now falls back to `app.*` session variables for `correlation_id`, `trace_id`, `span_id` when not present in `p_event_metadata`
+- Metadata JSONB is enriched with resolved tracing fields (queryable in one place)
+- `user_id` auto-injected from `auth.uid()` when not in metadata
+- PostgREST pre-request hook extracts `X-Correlation-ID` and `traceparent` headers into session variables
+- Frontend custom fetch wrapper injects tracing headers on every Supabase request
+
+**Backward Compatibility**: Fully compatible — explicit metadata always takes precedence
 
 ### 2025-11-24: Event-Workflow Linking
 
