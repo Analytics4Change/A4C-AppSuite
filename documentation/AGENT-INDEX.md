@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-06
+last_updated: 2026-02-07
 purpose: agent-navigation
 ---
 
@@ -62,6 +62,7 @@ purpose: agent-navigation
 | `contract-drift` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, workflows/CLAUDE.md |
 | `controlled-substances` | [medications.md](infrastructure/reference/database/tables/medications.md) | dosage_info.md |
 | `cqrs` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md, MIGRATION-FROM-CRUD.md |
+| `cqrs-compliance` | [cqrs-dual-write-audit.md](../dev/active/cqrs-dual-write-audit.md) | event-handler-pattern.md, event-processing-patterns.md |
 | `correlation-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md, triggering-workflows.md |
 | `cross-tenant` | [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | var-partnerships.md |
 | `custom-claims` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | frontend-auth-architecture.md, custom-claims-setup.md |
@@ -87,6 +88,7 @@ purpose: agent-navigation
 | `event-types` | [event_types.md](infrastructure/reference/database/tables/event_types.md) | event-sourcing-overview.md |
 | `enterprise-sso` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
 | `event-handler` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md, event-sourcing-overview.md |
+| `event-type-naming` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-dual-write-audit.md, event-sourcing-overview.md |
 | `events` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md |
 | `failed-events` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md |
 | `hipaa` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | impersonation-security-controls.md |
@@ -117,6 +119,7 @@ purpose: agent-navigation
 | `modelina` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, infrastructure/CLAUDE.md |
 | `migrations-applied` | [_migrations_applied.md](infrastructure/reference/database/tables/_migrations_applied.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `mobx` | [viewmodels.md](frontend/architecture/viewmodels.md) | frontend/CLAUDE.md, mobx-optimization.md |
+| `naming-convention` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md |
 | `multi-role` | [adr-multi-role-effective-permissions.md](architecture/authorization/adr-multi-role-effective-permissions.md) | rbac-architecture.md, scoping-architecture.md |
 | `multi-role-invitation` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | user_roles_projection.md |
 | `multi-tenancy` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | tenants-as-organizations.md |
@@ -239,6 +242,7 @@ purpose: agent-navigation
 | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | Permission-based RBAC with event sourcing | `rbac`, `permissions`, `roles` | 3100 |
 | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | Hierarchical permission scoping with ltree | `scoping`, `ltree`, `permissions` | 2800 |
 | [adr-multi-role-effective-permissions.md](architecture/authorization/adr-multi-role-effective-permissions.md) | ADR: RBAC + Effective Permissions over ReBAC | `adr`, `multi-role`, `effective-permissions`, `capability-accountability` | 2500 |
+| [adr-cqrs-dual-write-remediation.md](architecture/decisions/adr-cqrs-dual-write-remediation.md) | ADR: CQRS dual-write audit and remediation | `adr`, `cqrs-compliance`, `dual-write`, `event-type-naming`, `remediation` | 1500 |
 | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | Organization isolation via RLS and JWT claims | `rls`, `multi-tenant`, `org_id` | 2800 |
 | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | CQRS pattern, domain events, projections | `cqrs`, `events`, `projections` | 2500 |
 | [temporal-overview.md](architecture/workflows/temporal-overview.md) | Workflow orchestration concepts and patterns | `temporal`, `workflow`, `saga` | 3200 |

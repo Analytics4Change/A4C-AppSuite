@@ -189,6 +189,13 @@ Event processing uses **split handlers** (not monolithic processors):
 >    WHEN (NEW.event_type = 'user.foo.created') ...
 > ```
 
+> **⚠️ Event type naming convention**
+>
+> Event types use dots to separate hierarchy levels and underscores for compound names
+> within a level. Example: `user.phone.added`, `organization.direct_care_settings_updated`.
+> Never use dots within a compound name (e.g., ~~`organization.direct_care_settings.updated`~~).
+> See `documentation/infrastructure/patterns/event-handler-pattern.md#event-type-naming-convention`.
+
 > **⚠️ Event record field: Use `stream_id`, NOT `aggregate_id`**
 >
 > The `domain_events` table column is `stream_id`. Handlers receive the record from

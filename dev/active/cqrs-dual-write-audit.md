@@ -495,30 +495,26 @@ Migration 4c (observability gap)     -- ✅ APPLIED (20260207013604)
 
 ---
 
-## 6. Documentation Updates Needed
+## 6. Documentation Updates -- ✅ COMPLETED
 
-### 6.1 New Document: CQRS Compliance ADR
+All documentation updates applied 2026-02-07.
+
+### 6.1 CQRS Compliance ADR -- ✅ CREATED
 
 **Location**: `documentation/architecture/decisions/adr-cqrs-dual-write-remediation.md`
-**Content**: This audit's findings and decisions, formatted as an ADR
-**Purpose**: Permanent record of the architectural violations found and how they were resolved
 
-### 6.2 Updates to Existing Documents
+### 6.2 Existing Document Updates -- ✅ APPLIED
 
-| Document | Update Needed |
+| Document | Update Applied |
 |----------|---------------|
-| `documentation/infrastructure/patterns/event-handler-pattern.md` | 1. Update router/handler counts (16 routers, 41+ handlers per handler-reference-files.md). 2. Add section on event type naming convention. 3. Add warning about naming mismatch pitfall. 4. Update the "Available Routers and Handlers" table to reflect actual event types (underscore format). |
-| `documentation/architecture/data/event-sourcing-overview.md` | 1. Add caveat that the trigger code example shows AFTER INSERT but actual system uses BEFORE INSERT. 2. Add note about event type naming convention. |
-| `infrastructure/CLAUDE.md` | 1. Update router count from 4 to 16. 2. Update handler count from 37 to 41+. 3. Add warning about event type naming convention in the "Event Handler Architecture" section. |
-| `documentation/AGENT-INDEX.md` | Add keyword entries: `dual-write`, `cqrs-compliance`, `event-type-naming` |
+| `event-handler-pattern.md` | Naming convention section, resolved issues callout, updated TL;DR/keywords (done in 4b) |
+| `event-sourcing-overview.md` | Fixed trigger example (AFTER→BEFORE INSERT), added naming convention note, updated code to match actual architecture |
+| `infrastructure/CLAUDE.md` | Added naming convention warning (counts already correct at 16/54+) |
+| `AGENT-INDEX.md` | Added keywords: `cqrs-compliance`, `event-type-naming`, `naming-convention`. Added ADR to catalog. |
 
-### 6.3 Corrections to Claims in Documentation
+### 6.3 Claim Verification -- ✅ VERIFIED
 
-Several documents claim "all state changes emit domain events." After remediation, this will be true. Until then, the following functions violate this claim:
-
-- `api.update_organization_status` -- no event (workflows emit separately)
-- `api.resend_invitation` -- no event
-- `api.revoke_invitation` -- no event (also broken due to missing columns)
+"All state changes emit domain events" claims across 15+ documents are now accurate post-remediation. The three previously-violating functions (`update_organization_status`, `resend_invitation`, `revoke_invitation`) have all been fixed to emit events.
 
 ---
 

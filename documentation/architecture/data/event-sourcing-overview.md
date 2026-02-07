@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-02-07
 source: .plans/consolidated/agent-observations.md
 migration_note: "Extracted CQRS/Event Sourcing content from consolidated planning doc. Zitadel references updated to Supabase Auth."
 ---
@@ -214,34 +214,37 @@ All events include standardized metadata for audit trail and traceability:
 
 ### Projection Update Pattern
 
-Database triggers process events and update projections:
+A single **BEFORE INSERT** trigger on `domain_events` routes events to the appropriate processor based on `stream_type`. The BEFORE INSERT timing ensures the handler runs in the same transaction as the event insertion — the projection is updated by the time the INSERT returns to the caller.
 
 ```sql
+-- Simplified example (actual implementation has 16 routers and 54+ handlers)
 CREATE OR REPLACE FUNCTION process_domain_event()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Route to appropriate event processor based on stream_type
   CASE NEW.stream_type
     WHEN 'organization' THEN
       PERFORM process_organization_event(NEW);
-    WHEN 'access_grant' THEN
-      PERFORM process_access_grant_event(NEW);
-    WHEN 'var_partnership' THEN
-      PERFORM process_var_partnership_event(NEW);
-    WHEN 'permission' THEN
-      PERFORM process_permission_event(NEW);
-    -- ... other stream types
+    WHEN 'user' THEN
+      PERFORM process_user_event(NEW);
+    WHEN 'invitation' THEN
+      PERFORM process_invitation_event(NEW);
+    -- ... 13 more routers
   END CASE;
 
+  NEW.processed_at := clock_timestamp();
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trigger_process_domain_events
-  AFTER INSERT ON domain_events
+CREATE TRIGGER process_domain_event_trigger
+  BEFORE INSERT ON domain_events
   FOR EACH ROW
   EXECUTE FUNCTION process_domain_event();
 ```
+
+> **Note**: The trigger is BEFORE INSERT (not AFTER INSERT). This means the handler runs synchronously within the inserting transaction. The `processed_at` timestamp is set on the NEW record before it's written. For async side effects (email, DNS, webhooks), separate AFTER INSERT triggers use `pg_notify` — see [Event Processing Patterns](../../infrastructure/patterns/event-processing-patterns.md).
+
+> **Event type naming convention**: Event types use dots to separate hierarchy levels and underscores for compound names within a level (e.g., `user.phone.added`, `organization.direct_care_settings_updated`). See [Event Handler Pattern — Naming Convention](../../infrastructure/patterns/event-handler-pattern.md#event-type-naming-convention) for full rules.
 
 ### Query Pattern: RPC Functions Only
 
