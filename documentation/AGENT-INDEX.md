@@ -46,6 +46,7 @@ purpose: agent-navigation
 | `audit-trail` | [impersonation-architecture.md](architecture/authentication/impersonation-architecture.md) | impersonation-event-schema.md |
 | `authentication` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | supabase-auth-overview.md, custom-claims-setup.md |
 | `bootstrap` | [organization-onboarding-workflow.md](architecture/workflows/organization-onboarding-workflow.md) | provider-onboarding-quickstart.md |
+| `bootstrap-handlers` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | activities-reference.md, event-processing-patterns.md |
 | `bootstrap-workflow-design` | [organization-bootstrap-workflow-design.md](workflows/architecture/organization-bootstrap-workflow-design.md) | activities-reference.md |
 | `business-profile` | [organization_business_profiles_projection.md](infrastructure/reference/database/tables/organization_business_profiles_projection.md) | organizations_projection.md |
 | `cascade-deactivation` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | user_roles_projection.md |

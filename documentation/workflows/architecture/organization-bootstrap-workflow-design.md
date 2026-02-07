@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-02-07
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Complete design specification for OrganizationBootstrapWorkflow (13 activities, 10-40min duration). Three-layer idempotency: Workflow ID (`org-bootstrap-{orgId}`), activity check-then-act, event upsert. Unified ID system uses `organizationId` everywhere. 7-step flow: Create org → Grant permissions → Configure DNS → Wait propagation → Verify DNS (quorum 2/3) → Generate invitations → Send emails → Activate. Saga compensation rolls back in reverse.
+**Summary**: Complete design specification for OrganizationBootstrapWorkflow (15 activities: 7 forward + 2 event emission + 6 compensation, 10-40min duration). Three-layer idempotency: Workflow ID (`org-bootstrap-{orgId}`), activity check-then-act, event upsert. Unified ID system uses `organizationId` everywhere. 7-step flow: Create org → Grant permissions → Configure DNS → Wait propagation → Verify DNS (quorum 2/3) → Generate invitations → Send emails → Emit bootstrap completed. Saga compensation emits `organization.bootstrap.failed` event; `deactivateOrganization` kept as safety net fallback.
 
 **When to read**:
 - Understanding complete workflow design and rationale
@@ -27,7 +27,7 @@ last_updated: 2025-12-30
 **Implemented**: 2025-12-01 (production deployment with UAT passed)
 **Updated**: 2025-12-12 (Quorum-based DNS verification for Cloudflare proxy support)
 **Architecture**: 2-Hop (Frontend → Backend API → Temporal)
-**Activities**: 13 total (7 forward + 6 compensation)
+**Activities**: 15 total (7 forward + 2 event emission + 6 compensation)
 **Design Pattern**: Design by Contract with Three-Layer Idempotency
 **Complexity Score**: 2.6/5 (Moderate - Justified)
 **Priority**: Critical - Core business functionality
@@ -135,7 +135,7 @@ graph TB
         W --> A3[VerifyDNSActivity]
         W --> A4[GenerateInvitationsActivity]
         W --> A5[SendInvitationEmailsActivity]
-        W --> A6[ActivateOrganizationActivity]
+        W --> A6[EmitBootstrapCompletedActivity]
     end
 
     subgraph "Idempotency Control"
@@ -150,14 +150,16 @@ graph TB
         A2 --> E2[DNSConfigured]
         A4 --> E3[UserInvited]
         A5 --> E4[InvitationEmailSent]
-        A6 --> E5[OrganizationActivated]
+        A6 --> E5[organization.bootstrap.completed]
     end
 
     subgraph "Compensation Activities"
         W -.-> C1[RemoveDNSActivity]
-        W -.-> C2[DeactivateOrganizationActivity]
+        W -.-> C2[EmitBootstrapFailedActivity]
+        W -.-> C3[DeactivateOrganizationActivity - safety net]
         C1 -.-> E6[DNSRemoved]
-        C2 -.-> E7[OrganizationDeactivated]
+        C2 -.-> E7[organization.bootstrap.failed]
+        C3 -.-> E8[organization.deactivated]
     end
 
     style W fill:#2ecc71
@@ -375,11 +377,18 @@ export async function OrganizationBootstrapWorkflow(
     }
 
     // ========================================
-    // STEP 7: Activate Organization
+    // STEP 7: Emit Bootstrap Completed Event
     // ========================================
-    console.log('[WORKFLOW] Activating organization');
+    console.log('[WORKFLOW] Emitting bootstrap completed event');
 
-    await activateOrganizationActivity({ orgId: state.orgId });
+    await emitBootstrapCompletedActivity({
+      orgId: state.orgId,
+      bootstrapId: params.tracing?.correlationId || state.orgId,
+      adminRoleAssigned: 'provider_admin',
+      permissionsGranted: permResult.permissionsGranted,
+      ltreePath: scopePath,
+      tracing: params.tracing,
+    });
 
     console.log('[WORKFLOW] Organization bootstrap completed successfully');
 
@@ -408,9 +417,23 @@ export async function OrganizationBootstrapWorkflow(
         });
       }
 
-      // Deactivate organization if it was created
+      // Emit bootstrap failed event (handler sets is_active = false)
       if (state.orgCreated && state.orgId) {
-        console.log('[WORKFLOW] Compensating: Deactivating organization');
+        console.log('[WORKFLOW] Compensating: Emitting bootstrap failed event');
+        await emitBootstrapFailedActivity({
+          orgId: state.orgId,
+          bootstrapId: params.tracing?.correlationId || state.orgId,
+          failureStage: 'unknown',
+          errorMessage: error.message,
+          tracing: params.tracing,
+        });
+      }
+
+      // Deactivate organization (safety net)
+      // Redundant when emitBootstrapFailedActivity succeeds (handler sets is_active = false).
+      // Kept as fallback in case event emission failed above. Remove in P2 cleanup.
+      if (state.orgCreated && state.orgId) {
+        console.log('[WORKFLOW] Compensating: Deactivating organization (safety net)');
         await deactivateOrganizationActivity({
           orgId: state.orgId
         });
@@ -1452,80 +1475,62 @@ interface SendInvitationEmailsResult {
 }
 ```
 
-#### 2.6 ActivateOrganizationActivity
+#### 2.6 EmitBootstrapCompletedActivity
 
 ```typescript
 /**
- * Activates organization by setting is_active=true
+ * Emits organization.bootstrap.completed event
+ *
+ * The synchronous trigger handler (handle_bootstrap_completed) sets
+ * is_active=true on the organizations_projection. This replaces the
+ * previous activateOrganizationActivity which wrote directly to the projection.
  *
  * PRECONDITIONS:
  * - params.orgId exists in organizations_projection
  * - All bootstrap steps completed successfully
  *
  * POSTCONDITIONS:
- * - OrganizationActivated event emitted
- * - Event processor will set is_active=true in projection
- *
- * INVARIANTS:
- * - Organization can only be activated once
- * - Event is idempotent
+ * - organization.bootstrap.completed event emitted
+ * - Trigger handler sets is_active=true, metadata.bootstrap.completed_at
  *
  * IDEMPOTENCY:
- * - Check if OrganizationActivated event already exists
- * - If exists, return success without emitting duplicate
+ * - Event emission via typed emitter with tracing context
  *
  * PERFORMANCE:
  * - Event emission: < 200ms
  *
  * COMPLEXITY: 1/5 (Low)
- * - Simple event emission
+ * - Simple event emission via typed emitter
  */
-export async function activateOrganizationActivity(
-  params: ActivateOrganizationParams
-): Promise<void> {
+export async function emitBootstrapCompletedActivity(
+  params: EmitBootstrapCompletedParams
+): Promise<EmitBootstrapCompletedResult> {
+  const log = getLogger('EmitBootstrapCompleted');
+  log.info('Emitting bootstrap completed event', { orgId: params.orgId });
 
-  // IDEMPOTENCY: Check if already activated
-  const { data: existing } = await supabase
-    .from('domain_events')
-    .select('event_id')
-    .eq('event_type', 'OrganizationActivated')
-    .eq('aggregate_id', params.orgId)
-    .single();
+  const eventId = await emitBootstrapCompleted(params.orgId, {
+    bootstrap_id: params.bootstrapId,
+    organization_id: params.orgId,
+    admin_role_assigned: params.adminRoleAssigned as AdminRole,
+    permissions_granted: params.permissionsGranted,
+    ltree_path: params.ltreePath,
+  }, params.tracing);
 
-  if (existing) {
-    console.log(`[ACTIVITY] Organization already activated: ${params.orgId}`);
-    return;
-  }
-
-  const workflowInfo = Context.current().info;
-
-  // Emit OrganizationActivated event
-  const { error: eventError } = await supabase
-    .from('domain_events')
-    .insert({
-      event_type: 'OrganizationActivated',
-      aggregate_type: 'Organization',
-      aggregate_id: params.orgId,
-      event_data: {
-        org_id: params.orgId,
-        activated_at: new Date().toISOString()
-      },
-      metadata: {
-        workflow_id: workflowInfo.workflowId,
-        workflow_run_id: workflowInfo.runId,
-        workflow_type: workflowInfo.workflowType
-      }
-    });
-
-  if (eventError) {
-    throw new Error(`Failed to emit OrganizationActivated event: ${eventError.message}`);
-  }
-
-  console.log(`[ACTIVITY] Organization activated: ${params.orgId}`);
+  log.info('Bootstrap completed event emitted', { eventId });
+  return { eventId };
 }
 
-interface ActivateOrganizationParams {
+interface EmitBootstrapCompletedParams {
   orgId: string;
+  bootstrapId: string;
+  adminRoleAssigned: string; // e.g. 'provider_admin'
+  permissionsGranted: number;
+  ltreePath?: string;
+  tracing?: WorkflowTracingParams;
+}
+
+interface EmitBootstrapCompletedResult {
+  eventId: string;
 }
 ```
 
@@ -1608,13 +1613,18 @@ export async function removeDNSActivity(
 }
 
 /**
- * DeactivateOrganizationActivity - Compensation for CreateOrganizationActivity
+ * DeactivateOrganizationActivity - Safety net compensation
+ *
+ * NOTE: This is a safety net fallback. The primary compensation path
+ * is emitBootstrapFailedActivity, whose trigger handler (handle_bootstrap_failed)
+ * sets is_active=false. This activity is kept in case event emission fails.
+ * Scheduled for removal in P2 cleanup.
  *
  * PRECONDITIONS:
  * - Organization was created
  *
  * POSTCONDITIONS:
- * - OrganizationDeactivated event emitted
+ * - organization.deactivated event emitted
  * - Event processor will set is_active=false
  *
  * IDEMPOTENCY:
@@ -1625,32 +1635,8 @@ export async function removeDNSActivity(
 export async function deactivateOrganizationActivity(
   params: DeactivateOrganizationParams
 ): Promise<void> {
-
-  const workflowInfo = Context.current().info;
-
-  // Emit OrganizationDeactivated event
-  const { error: eventError } = await supabase
-    .from('domain_events')
-    .insert({
-      event_type: 'OrganizationDeactivated',
-      aggregate_type: 'Organization',
-      aggregate_id: params.orgId,
-      event_data: {
-        org_id: params.orgId,
-        reason: 'compensation',
-        deactivated_at: new Date().toISOString()
-      },
-      metadata: {
-        workflow_id: workflowInfo.workflowId,
-        workflow_run_id: workflowInfo.runId
-      }
-    });
-
-  if (eventError) {
-    throw new Error(`Failed to emit OrganizationDeactivated event: ${eventError.message}`);
-  }
-
-  console.log(`[COMPENSATION] Organization deactivated: ${params.orgId}`);
+  // ... emits organization.deactivated event via typed emitter
+  // See activities-reference.md for full implementation
 }
 ```
 
@@ -1831,9 +1817,10 @@ stateDiagram-v2
 | VerifyDNS | 10s | 1.5x | 5m | 10 | 5m | Propagation takes time, gentle backoff |
 | GenerateInvitations | 500ms | 2x | 10s | 3 | 5m | Fast operation, quick retries |
 | SendEmails | 2s | 2x | 30s | 2 | 5m | SMTP timeouts, limited retries |
-| ActivateOrganization | 1s | 2x | 30s | 3 | 5m | Database operation, fast recovery |
+| EmitBootstrapCompleted | 1s | 2x | 30s | 3 | 5m | Event emission, fast recovery |
+| EmitBootstrapFailed | 1s | 2x | 30s | 3 | 5m | Compensation event emission |
 | RemoveDNS | 5s | 2x | 1m | 3 | 10m | Compensation, be conservative |
-| DeactivateOrganization | 1s | 2x | 30s | 3 | 5m | Compensation, fast operation |
+| DeactivateOrganization | 1s | 2x | 30s | 3 | 5m | Safety net fallback (P2 removal) |
 
 ### Error Classification
 
@@ -2039,9 +2026,10 @@ The moderate complexity (2.9/5) is **fully justified** by the business requireme
 | VerifyDNS | 1/5 | Simple DNS lookup |
 | GenerateInvitations | 2/5 | Cryptographic tokens, batch operations |
 | SendEmails | 3/5 | SMTP integration, HTML templating |
-| ActivateOrganization | 1/5 | Simple event emission |
+| EmitBootstrapCompleted | 1/5 | Event emission via typed emitter |
+| EmitBootstrapFailed | 1/5 | Compensation event emission |
 | RemoveDNS | 3/5 | API cleanup, error handling |
-| DeactivateOrganization | 1/5 | Simple event emission |
+| DeactivateOrganization | 1/5 | Safety net fallback (P2 removal) |
 
 ---
 
@@ -2472,7 +2460,7 @@ describe('OrganizationBootstrapWorkflow Integration', () => {
     });
 
     // Verify compensation called
-    expect(mockActivities.deactivateOrganizationActivity).toHaveBeenCalled();
+    expect(mockActivities.emitBootstrapFailedActivity).toHaveBeenCalled();
   });
 });
 ```
@@ -2560,7 +2548,7 @@ describe('Workflow Idempotency', () => {
 - [ ] Add check-then-act pattern to all activities
 - [ ] Implement event deduplication with deterministic IDs
 - [ ] Add RemoveDNSActivity compensation
-- [ ] Add DeactivateOrganizationActivity compensation
+- [x] Add EmitBootstrapFailedActivity + DeactivateOrganizationActivity (safety net) compensation
 - [ ] Implement Saga pattern in workflow
 - [ ] Create comprehensive idempotency test suite
 
@@ -2577,7 +2565,7 @@ describe('Workflow Idempotency', () => {
 **Tasks**:
 - [ ] Implement GenerateInvitationsActivity
 - [ ] Implement SendInvitationEmailsActivity
-- [ ] Implement ActivateOrganizationActivity
+- [x] Implement EmitBootstrapCompletedActivity (replaces ActivateOrganizationActivity)
 - [ ] Configure SMTP server
 - [ ] Create email templates
 - [ ] Add partial failure handling for emails

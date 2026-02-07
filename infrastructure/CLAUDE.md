@@ -155,7 +155,7 @@ Event processing uses **split handlers** (not monolithic processors):
 - Thin CASE dispatchers (~50 lines each)
 - Dispatch to individual handlers based on `event_type`
 
-**Handlers** (50+ total):
+**Handlers** (54+ total):
 - `handle_user_phone_added()`, `handle_organization_created()`, etc.
 - One function per event type
 - 20-50 lines each, single responsibility

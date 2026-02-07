@@ -3,8 +3,8 @@
 ## Architecture Decision Record
 
 **Date**: 2026-02-06
-**Status**: P0 + P1 (Migration 2 + 3a) applied, P1 (3b) and P2 pending
-**Priority**: P1 Migration 3b next (requires Temporal activity changes)
+**Status**: P0 + P1 (Migrations 1-3) applied, P2 pending
+**Priority**: P2 cleanup next (drop deprecated functions, naming convention docs)
 **Supersedes**: Original audit skeleton (same file)
 
 ---
@@ -390,7 +390,10 @@ $$;
 
 **Recommendation**: Option 1. Add the CASE clause to `process_invitation_event` and call the existing `handle_invitation_resent` handler from there.
 
-#### 3b. Fix `api.update_organization_status`
+#### 3b. Fix `api.update_organization_status` -- APPLIED
+
+**Migration**: `20260207004639_p1_fix_bootstrap_handlers_org_status`
+**Status**: Applied and verified 2026-02-07
 
 **Problem**: Direct write with no event. Called by Temporal workflows that emit their own events.
 
@@ -400,16 +403,28 @@ $$;
 
 This is backwards from the CQRS pattern. The projection is updated before the event exists.
 
-**Fix (Option A -- Preferred)**: Modify the Temporal activities to emit events through `api.emit_domain_event()` via RPC and remove the `api.update_organization_status` call entirely. The existing handlers (`handle_organization_deactivated`, `handle_organization_reactivated`) will update the projection.
+**Solution applied**: Two-part fix (SQL migration + TypeScript workflow changes):
 
-**Fix (Option B -- Lower risk)**: Convert `api.update_organization_status` to emit the appropriate event type based on the `p_is_active` and `p_deleted_at` parameters. This keeps the API function as the entry point but adds the event. However, this creates a problem: the Temporal activities would then emit duplicate events (once from the API function, once from their own `emitEvent` call).
+**SQL migration** (deployed first -- additive, safe with old workers):
+- Fixed P0 event type mismatch: router CASE lines changed from `bootstrap.*` to `organization.bootstrap.*` (matching actual emitted types)
+- Added `organization.bootstrap.initiated` as no-op (informational event)
+- Updated `handle_bootstrap_completed` to set `is_active = true` + metadata
+- Updated `handle_bootstrap_failed` to set `is_active = false, deactivated_at, deleted_at` + metadata (fixed field name: `error_message` not `error`)
+- Updated `handle_bootstrap_cancelled` to set `is_active = false, deactivated_at` + metadata
+- Created `handle_organization_activated` for admin UI actions (sets `is_active = true`)
+- Updated `handle_organization_deactivated` to set `deactivated_at, deleted_at`
 
-**Recommendation**: Option A. The Temporal activities should use `api.emit_domain_event()` via Supabase RPC and let the handlers update projections. This eliminates the `update_organization_status` function entirely.
+**TypeScript workflow changes** (deployed after SQL):
+- Created `emitBootstrapCompleted` typed event emitter (mirrors `emitBootstrapFailed` pattern)
+- Created `emitBootstrapCompletedActivity` (mirrors `emitBootstrapFailedActivity` pattern)
+- Replaced `activateOrganization` in workflow Step 5 with `emitBootstrapCompletedActivity`
+- Kept `deactivateOrganization` as safety net in Saga compensation (if `emitBootstrapFailedActivity` fails, handler never sets `is_active = false`; deactivateOrganization catches this)
 
-**Implementation note**: The `activate-organization.ts` activity emits `organization.activated` but there is no `handle_organization_activated` handler, and no CASE clause for `organization.activated` in the router. The router has `organization.reactivated` but not `organization.activated`. Either:
-- Add `organization.activated` as a CASE clause mapping to a new handler, or
-- Change the activity to emit `organization.reactivated` (less correct semantically), or
-- Add the CASE clause and have it call `handle_organization_reactivated` (since the projection update is identical: `is_active = true`)
+**P2 cleanup remaining**:
+- Drop `api.update_organization_status` and `api.get_organization_status`
+- Delete `activate-organization.ts` activity
+- Remove `deactivateOrganization` safety net from compensation (after confirming event emission reliability)
+- Remove type definitions (`ActivateOrganizationParams`, `DeactivateOrganizationParams`)
 
 ### Migration 4: Cleanup (P2)
 
@@ -448,7 +463,7 @@ Migration 2a (remove direct_care direct write) -- ✅ APPLIED (20260207000203)
 Migration 2b (remove access_dates direct write) -- ✅ APPLIED (20260207000203)
 
 Migration 3a (resend_invitation)     -- ✅ APPLIED (20260207000203)
-Migration 3b (update_org_status)     -- PENDING, requires Temporal activity changes
+Migration 3b (update_org_status)     -- ✅ APPLIED (20260207004639 + TypeScript)
 
 Migration 4a (drop accept_invitation) -- PENDING
 Migration 4b (naming convention docs) -- PENDING
@@ -460,7 +475,7 @@ Migration 4c (observability gap)     -- PENDING
 2. ~~Verify Migration 1 in production~~ -- ✅ VERIFIED
 3. ~~Migration 2 (remove dual writes) + 3a (resend_invitation)~~ -- ✅ APPLIED
 4. ~~Migration 3a (resend_invitation)~~ -- ✅ APPLIED (combined with 2)
-5. Migration 3b (update_org_status) -- requires Temporal activity code changes + deployment coordination
+5. ~~Migration 3b (update_org_status)~~ -- ✅ APPLIED (SQL + TypeScript)
 6. Migration 4 (cleanup) -- whenever convenient
 
 ---

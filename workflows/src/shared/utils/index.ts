@@ -43,8 +43,9 @@ export {
   emitSubdomainDnsCreated,
   emitSubdomainVerified,
   emitOrganizationDnsRemoved,
-  // Organization bootstrap failure event emitter
+  // Organization bootstrap event emitters
   emitBootstrapFailed,
+  emitBootstrapCompleted,
   // Invitation event emitters
   emitInvitationEmailSent,
   // RBAC event emitters

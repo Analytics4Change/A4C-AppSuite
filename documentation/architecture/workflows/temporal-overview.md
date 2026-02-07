@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-02-07
 ---
 
 <!-- TL;DR-START -->
@@ -314,7 +314,8 @@ export async function OrganizationBootstrapWorkflow(params) {
     }
 
     if (orgId) {
-      await activities.deactivateOrganizationActivity({ orgId })
+      await activities.emitBootstrapFailedActivity({ orgId, ... }) // Handler sets is_active=false
+      await activities.deactivateOrganizationActivity({ orgId })   // Safety net fallback
     }
 
     throw error // Re-throw for Temporal to handle
@@ -733,8 +734,9 @@ describe('OrganizationBootstrapWorkflow', () => {
       testWorkflow(OrganizationBootstrapWorkflow, params)
     ).rejects.toThrow('DNS API unavailable')
 
-    // Verify compensation activity called
-    expect(mockActivity).toHaveBeenCalledWith('deactivateOrganizationActivity')
+    // Verify compensation activities called
+    expect(mockActivity).toHaveBeenCalledWith('emitBootstrapFailedActivity')
+    expect(mockActivity).toHaveBeenCalledWith('deactivateOrganizationActivity') // safety net
   })
 })
 ```

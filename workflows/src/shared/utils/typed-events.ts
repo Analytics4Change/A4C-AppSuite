@@ -53,6 +53,7 @@ import {
   SubdomainVerifiedData,
   OrganizationDnsRemovedData,
   OrganizationBootstrapFailureData,
+  OrganizationBootstrapCompletionData,
   // Invitation data types
   InvitationEmailSentData,
   // Junction data types
@@ -864,5 +865,24 @@ export async function emitBootstrapFailed(
     event_data: data as unknown as Record<string, unknown>,
     tags,
     ...buildTracingForEvent(tracing, 'emitBootstrapFailed'),
+  });
+}
+
+/**
+ * Emit an organization.bootstrap.completed event
+ */
+export async function emitBootstrapCompleted(
+  orgId: string,
+  data: OrganizationBootstrapCompletionData,
+  tracing?: WorkflowTracingParams
+): Promise<string> {
+  const tags = buildTags();
+  return emitEvent({
+    event_type: 'organization.bootstrap.completed',
+    aggregate_type: 'organization',
+    aggregate_id: orgId,
+    event_data: data as unknown as Record<string, unknown>,
+    tags,
+    ...buildTracingForEvent(tracing, 'emitBootstrapCompleted'),
   });
 }

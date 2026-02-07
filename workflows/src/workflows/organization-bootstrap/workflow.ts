@@ -55,7 +55,7 @@ const {
   verifyDNS,
   generateInvitations,
   sendInvitationEmails,
-  activateOrganization,
+  emitBootstrapCompletedActivity,
   emitBootstrapFailedActivity,
   removeDNS,
   deactivateOrganization,
@@ -344,13 +344,20 @@ export async function organizationBootstrapWorkflow(
     }
 
     // ========================================
-    // Step 5: Activate Organization
+    // Step 5: Emit Bootstrap Completed (handler sets is_active = true)
     // ========================================
-    log.info('Step 5: Activating organization', { orgId: state.orgId });
+    log.info('Step 5: Emitting bootstrap completed event', { orgId: state.orgId });
 
-    await activateOrganization({ orgId: state.orgId!, tracing: params.tracing });
+    await emitBootstrapCompletedActivity({
+      orgId: state.orgId!,
+      bootstrapId: params.tracing?.correlationId || state.orgId!,
+      adminRoleAssigned: 'provider_admin',
+      permissionsGranted: permResult.permissionsGranted,
+      ltreePath: scopePath,
+      tracing: params.tracing,
+    });
 
-    log.info('Organization activated', { orgId: state.orgId });
+    log.info('Organization activated via bootstrap completed event', { orgId: state.orgId });
 
     // ========================================
     // Success!
@@ -496,9 +503,11 @@ export async function organizationBootstrapWorkflow(
         state.compensationErrors.push(`Failed to delete contacts: ${compErrorMsg}`);
       }
 
-      // Deactivate organization (final step)
+      // Deactivate organization (safety net)
+      // Redundant when emitBootstrapFailedActivity succeeds (handler sets is_active = false).
+      // Kept as fallback in case event emission failed above. Remove in P2 cleanup.
       try {
-        log.info('Compensation: Deactivating organization', { orgId: state.orgId });
+        log.info('Compensation: Deactivating organization (safety net)', { orgId: state.orgId });
         await deactivateOrganization({ orgId: state.orgId });
         log.info('Organization deactivated', { orgId: state.orgId });
       } catch (compError) {

@@ -1001,19 +1001,19 @@ Organization Bootstrap Workflow
   │   ├─ Emit contact.address.linked (x6)
   │   └─ Emit phone.address.linked (x6)
   ├─ configureDNS activity
-  └─ activateOrganization activity
+  └─ emitBootstrapCompleted activity  // Trigger handler sets is_active=true
 ```
 
 **Compensation (Rollback)**:
 ```typescript
-// If workflow fails, compensation saga deletes all created entities
+// If workflow fails, compensation saga emits failure event + safety net deactivation
 try {
   const orgId = await createOrganization(params);
   await configureDNS(params.subdomain);
-  await activateOrganization(orgId);
+  await emitBootstrapCompleted(orgId);  // Handler sets is_active=true
 } catch (error) {
-  // Rollback: Delete org (cascade deletes contacts/addresses/phones via foreign keys)
-  await deleteOrganization(orgId);
+  await emitBootstrapFailed(orgId);        // Handler sets is_active=false
+  await deactivateOrganization(orgId);     // Safety net fallback
   throw error;
 }
 ```

@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-02-07
 ---
 
 <!-- TL;DR-START -->
@@ -90,9 +90,10 @@ Temporal Server (temporal-frontend.temporal.svc.cluster.local:7233)
 Temporal Worker (workflow-worker deployment)
 ```
 
-**Activities**: 13 total (7 forward + 6 compensation)
-- **Forward**: createOrganization, grantProviderAdminPermissions, configureDNS, verifyDNS, generateInvitations, sendInvitationEmails, activateOrganization
-- **Compensation**: deactivateOrganization, removeDNS, revokeInvitations, deleteContacts, deleteAddresses, deletePhones
+**Activities**: 15 total (7 forward + 2 event emission + 6 compensation)
+- **Forward**: createOrganization, grantProviderAdminPermissions, configureDNS, verifyDNS, generateInvitations, sendInvitationEmails, emitBootstrapCompletedActivity
+- **Event Emission**: emitBootstrapCompletedActivity (Step 5), emitBootstrapFailedActivity (catch block)
+- **Compensation**: deactivateOrganization (safety net), removeDNS, revokeInvitations, deleteContacts, deleteAddresses, deletePhones
 
 **Key Characteristics**:
 - **Duration**: 2-5 minutes (DNS instant with Cloudflare proxy)
@@ -120,10 +121,11 @@ const {
   verifyDNSActivity,
   generateInvitationsActivity,
   sendInvitationEmailsActivity,
-  activateOrganizationActivity,
+  emitBootstrapCompletedActivity,
+  emitBootstrapFailedActivity,
   // Compensation activities
   removeDNSActivity,
-  deactivateOrganizationActivity
+  deactivateOrganizationActivity  // Safety net only (P2 cleanup)
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: '5 minutes',
   retry: {
@@ -298,11 +300,18 @@ export async function OrganizationBootstrapWorkflow(
     }
 
     // ========================================
-    // STEP 7: Activate Organization
+    // STEP 7: Emit Bootstrap Completed (handler sets is_active = true)
     // ========================================
-    console.log('[WORKFLOW] Activating organization')
+    console.log('[WORKFLOW] Emitting bootstrap completed event')
 
-    await activateOrganizationActivity({ orgId: result.orgId })
+    await emitBootstrapCompletedActivity({
+      orgId: result.orgId,
+      bootstrapId: params.tracing?.correlationId || result.orgId,
+      adminRoleAssigned: 'provider_admin',
+      permissionsGranted: permResult.permissionsGranted,
+      ltreePath: scopePath,
+      tracing: params.tracing,
+    })
 
     console.log('[WORKFLOW] Organization bootstrap completed successfully')
     return result
@@ -324,9 +333,11 @@ export async function OrganizationBootstrapWorkflow(
         })
       }
 
-      // Deactivate organization if it was created
+      // Deactivate organization (safety net)
+      // Redundant when emitBootstrapFailedActivity succeeds (handler sets is_active = false).
+      // Kept as fallback in case event emission failed. Remove in P2 cleanup.
       if (orgCreated && result.orgId) {
-        console.log('[WORKFLOW] Compensating: Deactivating organization')
+        console.log('[WORKFLOW] Compensating: Deactivating organization (safety net)')
         await deactivateOrganizationActivity({
           orgId: result.orgId
         })
@@ -872,39 +883,33 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export interface ActivateOrganizationParams {
-  orgId: string
+// NOTE: activateOrganizationActivity replaced by emitBootstrapCompletedActivity
+// The handler (handle_bootstrap_completed) sets is_active = true synchronously.
+// See: workflows/src/activities/organization-bootstrap/emit-bootstrap-completed.ts
+
+export interface EmitBootstrapCompletedParams {
+  orgId: string;
+  bootstrapId: string;
+  adminRoleAssigned: string;
+  permissionsGranted: number;
+  ltreePath?: string;
+  tracing?: WorkflowTracingParams;
 }
 
-export async function activateOrganizationActivity(
-  params: ActivateOrganizationParams
-): Promise<void> {
+export async function emitBootstrapCompletedActivity(
+  params: EmitBootstrapCompletedParams
+): Promise<{ eventId: string }> {
 
-  const workflowInfo = Context.current().info
+  const eventId = await emitBootstrapCompleted(params.orgId, {
+    bootstrap_id: params.bootstrapId,
+    organization_id: params.orgId,
+    admin_role_assigned: params.adminRoleAssigned as AdminRole,
+    permissions_granted: params.permissionsGranted,
+    ltree_path: params.ltreePath,
+  }, params.tracing);
 
-  // Emit OrganizationActivated event
-  const { error: eventError } = await supabase
-    .from('domain_events')
-    .insert({
-      event_type: 'OrganizationActivated',
-      aggregate_type: 'Organization',
-      aggregate_id: params.orgId,
-      event_data: {
-        org_id: params.orgId,
-        activated_at: new Date().toISOString()
-      },
-      metadata: {
-        workflow_id: workflowInfo.workflowId,
-        workflow_run_id: workflowInfo.runId,
-        workflow_type: workflowInfo.workflowType
-      }
-    })
-
-  if (eventError) {
-    throw new Error(`Failed to emit OrganizationActivated event: ${eventError.message}`)
-  }
-
-  console.log(`[ACTIVITY] Organization activated: ${params.orgId}`)
+  console.log(`[ACTIVITY] Bootstrap completed event emitted: ${eventId}`);
+  return { eventId };
 }
 ```
 

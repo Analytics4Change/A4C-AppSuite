@@ -156,7 +156,7 @@ export async function organizationBootstrapWorkflow(input: OrgInput) {
     dnsRecord = await activities.configureDNS(orgId);
     await activities.generateInvitations(orgId);
     await activities.sendInvitationEmails(orgId);
-    await activities.activateOrganization(orgId);
+    await activities.emitBootstrapCompleted(orgId);  // Trigger handler sets is_active=true
 
   } catch (error) {
     // Compensation flow (reverse order)
@@ -164,7 +164,8 @@ export async function organizationBootstrapWorkflow(input: OrgInput) {
       await activities.removeDNS(dnsRecord);  // Compensate DNS creation
     }
     if (orgId) {
-      await activities.deactivateOrganization(orgId);  // Compensate org creation
+      await activities.emitBootstrapFailed(orgId);  // Handler sets is_active=false
+      await activities.deactivateOrganization(orgId);  // Safety net fallback
     }
     throw error;
   }
@@ -666,16 +667,19 @@ Each workflow must document:
  *   3. verifyDNS - Polls DNS until propagated
  *   4. generateInvitations - Creates invitation records
  *   5. sendInvitationEmails - Sends invitation emails
- *   6. activateOrganization - Sets organization status to active
+ *   6. emitBootstrapCompleted - Emits organization.bootstrap.completed event
+ *      (trigger handler sets is_active=true on projection)
  *
  * Compensation (Saga):
  *   - If any step fails after DNS creation: removeDNS(dns_record_id)
- *   - If any step fails after org creation: deactivateOrganization(org_id)
+ *   - If any step fails after org creation: emitBootstrapFailed(org_id)
+ *   - Safety net: deactivateOrganization(org_id) kept as fallback
  *
  * Events Emitted:
  *   - organization.created
  *   - organization.dns_configured
- *   - organization.activated
+ *   - organization.bootstrap.completed (on success)
+ *   - organization.bootstrap.failed (on failure)
  */
 ```
 

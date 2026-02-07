@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-02-07
 ---
 
 <!-- TL;DR-START -->
@@ -240,7 +240,8 @@ export async function OrganizationBootstrapWorkflow(params) {
     }
 
     if (orgCreated) {
-      await activities.deactivateOrganizationActivity({ orgId })
+      await activities.emitBootstrapFailedActivity({ orgId, ... })  // Handler sets is_active=false
+      await activities.deactivateOrganizationActivity({ orgId })    // Safety net fallback
     }
 
     throw error  // Re-throw for Temporal to record
@@ -260,7 +261,10 @@ export async function OrganizationBootstrapWorkflow(params) {
     // Step 1: Create organization
     const orgId = await activities.createOrganizationActivity(params.orgData)
     compensations.push(() =>
-      activities.deactivateOrganizationActivity({ orgId })
+      activities.emitBootstrapFailedActivity({ orgId, ... })  // Primary compensation
+    )
+    compensations.push(() =>
+      activities.deactivateOrganizationActivity({ orgId })    // Safety net fallback
     )
 
     // Step 2: Configure DNS
@@ -618,7 +622,9 @@ export async function OrganizationBootstrapWorkflow(params) {
     // Can't "unsend" emails, but can mark invitations as cancelled
     await activities.cancelInvitationsActivity({ orgId })
 
-    // Deactivate org (soft delete)
+    // Emit bootstrap failed event (handler sets is_active = false)
+    await activities.emitBootstrapFailedActivity({ orgId, ... })
+    // Safety net: deactivateOrganization kept as fallback
     await activities.deactivateOrganizationActivity({ orgId })
 
     throw error
@@ -770,6 +776,7 @@ describe('OrganizationBootstrapWorkflow', () => {
     const mockActivities = {
       createOrganizationActivity: jest.fn().mockResolvedValue('org-123'),
       configureDNSActivity: jest.fn().mockRejectedValue(new Error('DNS failed')),
+      emitBootstrapFailedActivity: jest.fn().mockResolvedValue({ eventId: 'evt-1' }),
       deactivateOrganizationActivity: jest.fn().mockResolvedValue(undefined)
     }
 
@@ -778,6 +785,8 @@ describe('OrganizationBootstrapWorkflow', () => {
     ).rejects.toThrow('DNS failed')
 
     // Verify compensation was called
+    expect(mockActivities.emitBootstrapFailedActivity)
+      .toHaveBeenCalled()
     expect(mockActivities.deactivateOrganizationActivity)
       .toHaveBeenCalledWith({ orgId: 'org-123' })
   })

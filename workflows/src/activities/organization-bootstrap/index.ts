@@ -10,9 +10,11 @@
  * - verifyDNS: Verify DNS propagation
  * - generateInvitations: Generate invitation tokens
  * - sendInvitationEmails: Send invitation emails
- * - activateOrganization: Mark organization as active
+ * - emitBootstrapCompletedActivity: Emit bootstrap completed event (handler sets is_active)
+ * - activateOrganization: Mark organization as active (kept for P2 cleanup)
  *
- * Failure Tracking Activity (1):
+ * Event Emission Activities (2):
+ * - emitBootstrapCompletedActivity: Emit bootstrap completed event (replaces activateOrganization)
  * - emitBootstrapFailedActivity: Emit bootstrap failure event (called from catch block)
  *
  * Compensation Activities (7):
@@ -33,6 +35,7 @@ export { generateInvitations } from './generate-invitations';
 export { sendInvitationEmails } from './send-invitation-emails';
 export { activateOrganization } from './activate-organization';
 export { emitBootstrapFailedActivity } from './emit-bootstrap-failed';
+export { emitBootstrapCompletedActivity } from './emit-bootstrap-completed';
 export { removeDNS } from './remove-dns';
 export { deactivateOrganization } from './deactivate-organization';
 export { revokeInvitations } from './revoke-invitations';

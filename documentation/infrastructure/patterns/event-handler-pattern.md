@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-06
+last_updated: 2026-02-07
 ---
 
 <!-- TL;DR-START -->
@@ -29,7 +29,7 @@ A4C uses a **split handler architecture** for processing domain events into CQRS
 | Component | Count | Purpose |
 |-----------|-------|---------|
 | **Routers** | 16 | Thin CASE dispatchers (~50 lines each) |
-| **Handlers** | 50+ | Focused event processors (20-50 lines each) |
+| **Handlers** | 54+ | Focused event processors (20-50 lines each) |
 
 > **Note**: This document covers the **synchronous trigger handler pattern** used for projection updates. For async side effects (email, DNS, webhooks), see [Event Processing Patterns](./event-processing-patterns.md).
 
@@ -307,7 +307,7 @@ The GitHub Actions workflow automatically:
 | `user.organization_switched` | `handle_user_organization_switched` |
 | `user.role.assigned` | `handle_user_role_assigned` |
 | `user.role.revoked` | `handle_user_role_revoked` |
-| `user.access_dates.updated` | `handle_user_access_dates_updated` |
+| `user.access_dates_updated` | `handle_user_access_dates_updated` |
 | `user.notification_preferences.updated` | `handle_user_notification_preferences_updated` |
 | `user.address.added` | `handle_user_address_added` |
 | `user.address.updated` | `handle_user_address_updated` |
@@ -336,10 +336,12 @@ The GitHub Actions workflow automatically:
 | `organization.subdomain.verified` | `handle_organization_subdomain_verified` |
 | `organization.subdomain.dns_created` | `handle_organization_subdomain_dns_created` |
 | `organization.subdomain.failed` | `handle_organization_subdomain_failed` |
-| `organization.direct_care_settings.updated` | `handle_organization_direct_care_settings_updated` |
-| `bootstrap.completed` | `handle_bootstrap_completed` |
-| `bootstrap.failed` | `handle_bootstrap_failed` |
-| `bootstrap.cancelled` | `handle_bootstrap_cancelled` |
+| `organization.activated` | `handle_organization_activated` |
+| `organization.direct_care_settings_updated` | `handle_organization_direct_care_settings_updated` |
+| `organization.bootstrap.initiated` | No-op (informational event) |
+| `organization.bootstrap.completed` | `handle_bootstrap_completed` |
+| `organization.bootstrap.failed` | `handle_bootstrap_failed` |
+| `organization.bootstrap.cancelled` | `handle_bootstrap_cancelled` |
 | `user.invited` | `handle_user_invited` |
 | `invitation.resent` | `handle_invitation_resent` |
 
@@ -377,6 +379,7 @@ The GitHub Actions workflow automatically:
 | `invitation.accepted` | Inline: UPDATE status to 'accepted' |
 | `invitation.revoked` | Inline: UPDATE status to 'revoked' |
 | `invitation.expired` | Inline: UPDATE status to 'expired' |
+| `invitation.resent` | `handle_invitation_resent` |
 
 ### Additional Routers (Inline Handlers)
 

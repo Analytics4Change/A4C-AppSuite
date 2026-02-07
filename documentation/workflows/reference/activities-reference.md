@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-02-07
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Complete reference for all Temporal activities. Categories: Organization (create, activate), DNS (configure via Cloudflare, verify with quorum-based multi-server lookup), Invitations (generate tokens, send via Resend), RBAC (grantProviderAdminPermissions from templates), Compensation (removeDNS, deactivate). All activities emit domain events with workflow context. Key pattern: check-then-act for idempotency.
+**Summary**: Complete reference for all Temporal activities. Categories: Organization (create, emitBootstrapCompleted), DNS (configure via Cloudflare, verify with quorum-based multi-server lookup), Invitations (generate tokens, send via Resend), RBAC (grantProviderAdminPermissions from templates), Event Emission (emitBootstrapCompleted, emitBootstrapFailed), Compensation (removeDNS, deactivate). All activities emit domain events with workflow context. Key pattern: check-then-act for idempotency.
 
 **When to read**:
 - Understanding activity signatures and parameters
@@ -59,10 +59,11 @@ Activities in Temporal perform side effects: API calls, database operations, ext
 
 | Category | Purpose | Activities |
 |----------|---------|------------|
-| **Organization** | Organization lifecycle | `createOrganizationActivity`, `activateOrganizationActivity` |
+| **Organization** | Organization lifecycle | `createOrganizationActivity` |
 | **DNS** | Subdomain provisioning | `configureDNSActivity`, `verifyDNSActivity` |
 | **Invitations** | User invitations | `generateInvitationsActivity`, `sendInvitationEmailsActivity` |
 | **RBAC** | Role & permission provisioning | `grantProviderAdminPermissions` |
+| **Event Emission** | Lifecycle events | `emitBootstrapCompletedActivity`, `emitBootstrapFailedActivity` |
 | **Compensation** | Rollback on failures | `removeDNSActivity`, `deactivateOrganizationActivity` |
 
 ---
@@ -140,54 +141,103 @@ interface CreateOrganizationParams {
 
 ---
 
-### `activateOrganizationActivity`
+### `emitBootstrapCompletedActivity`
 
-Marks an organization as active by emitting an `OrganizationActivated` event.
+Emits an `organization.bootstrap.completed` event when the bootstrap workflow succeeds. The synchronous trigger handler (`handle_bootstrap_completed`) sets `is_active = true` on the `organizations_projection`.
+
+> **Note**: Replaces the old `activateOrganizationActivity` which made direct RPC calls to `update_organization_status` (dual write removed per CQRS audit). The `activateOrganization` activity is kept only for P2 cleanup.
 
 **Signature**:
 ```typescript
-export async function activateOrganizationActivity(
-  params: ActivateOrganizationParams
-): Promise<void>
+export async function emitBootstrapCompletedActivity(
+  params: EmitBootstrapCompletedParams
+): Promise<EmitBootstrapCompletedResult>
 ```
 
 **Parameters**:
 ```typescript
-interface ActivateOrganizationParams {
-  orgId: string  // Organization UUID
+interface EmitBootstrapCompletedParams {
+  orgId: string;              // Organization UUID
+  bootstrapId: string;        // Bootstrap workflow run ID for correlation
+  adminRoleAssigned: string;  // Admin role (e.g. 'provider_admin')
+  permissionsGranted: number; // Number of permissions granted
+  ltreePath?: string;         // Ltree path for org hierarchy
+  tracing?: WorkflowTracingParams;
 }
 ```
 
-**Returns**: `void`
+**Returns**:
+```typescript
+interface EmitBootstrapCompletedResult {
+  eventId: string;  // Event ID of the emitted completion event
+}
+```
 
 **Events Emitted**:
-- `OrganizationActivated` → Updates `is_active=true` in `organizations_projection`
+- `organization.bootstrap.completed` → Handler sets `is_active=true`, records `metadata.bootstrap.completed_at` in `organizations_projection`
 
 **Event Data**:
 ```typescript
 {
-  event_type: 'OrganizationActivated',
-  aggregate_type: 'Organization',
+  event_type: 'organization.bootstrap.completed',
+  aggregate_type: 'organization',
   aggregate_id: orgId,
   event_data: {
-    org_id: string
-    activated_at: string  // ISO 8601 timestamp
-  },
-  metadata: {
-    workflow_id: string
-    workflow_run_id: string
-    workflow_type: string
+    bootstrap_id: string,
+    organization_id: string,
+    admin_role_assigned: AdminRole,  // 'provider_admin' | 'partner_admin'
+    permissions_granted: number,
+    ltree_path?: string
   }
 }
 ```
 
 **Error Conditions**:
-- Organization not found
 - Database event insertion failure
+- Supabase RPC unavailable
 
 **Retry Policy**: Default (3 attempts, exponential backoff)
 
-**Idempotency**: Safe to retry. Activation timestamp is set once; subsequent events are idempotent.
+**Idempotency**: Safe to retry. Event deduplication via aggregate_id + event_type + created_at constraint.
+
+---
+
+### `emitBootstrapFailedActivity`
+
+Emits an `organization.bootstrap.failed` event when the bootstrap workflow fails. Called from the workflow's catch block BEFORE running compensation activities. The synchronous trigger handler (`handle_bootstrap_failed`) sets `is_active = false`, `deactivated_at`, and `deleted_at`.
+
+**Signature**:
+```typescript
+export async function emitBootstrapFailedActivity(
+  params: EmitBootstrapFailedParams
+): Promise<EmitBootstrapFailedResult>
+```
+
+**Parameters**:
+```typescript
+interface EmitBootstrapFailedParams {
+  orgId: string;
+  bootstrapId: string;
+  failureStage: BootstrapFailureStage;
+  errorMessage: string;
+  partialCleanupRequired: boolean;
+  tracing?: WorkflowTracingParams;
+}
+```
+
+**Returns**:
+```typescript
+interface EmitBootstrapFailedResult {
+  eventId: string;
+}
+```
+
+**Events Emitted**:
+- `organization.bootstrap.failed` → Handler sets `is_active=false`, `deactivated_at`, `deleted_at`, records error in `metadata.bootstrap`
+
+**Retry Policy**: Default (3 attempts)
+
+**Idempotency**: Safe to retry. Event deduplication prevents duplicates.
 
 ---
 
@@ -737,7 +787,9 @@ interface RemoveDNSParams {
 
 ### `deactivateOrganizationActivity`
 
-Marks organization as inactive by emitting `OrganizationDeactivated` event.
+Marks organization as inactive by calling `api.update_organization_status` and emitting `organization.deactivated` event.
+
+> **Note**: This activity is now a **safety net only** in the bootstrap workflow's Saga compensation. When `emitBootstrapFailedActivity` succeeds, the `handle_bootstrap_failed` handler already sets `is_active = false`. `deactivateOrganization` is kept as a fallback in case event emission failed. Will be removed in P2 cleanup.
 
 **Signature**:
 ```typescript
@@ -756,25 +808,7 @@ interface DeactivateOrganizationParams {
 **Returns**: `void`
 
 **Events Emitted**:
-- `OrganizationDeactivated` → Sets `is_active=false` in projection
-
-**Event Data**:
-```typescript
-{
-  event_type: 'OrganizationDeactivated',
-  aggregate_type: 'Organization',
-  aggregate_id: orgId,
-  event_data: {
-    org_id: string
-    reason: 'compensation'
-    deactivated_at: string  // ISO 8601
-  },
-  metadata: {
-    workflow_id: string
-    workflow_run_id: string
-  }
-}
-```
+- `organization.deactivated` → Handler sets `is_active=false`, `deactivated_at`, `deleted_at` in projection
 
 **Error Conditions**:
 - Organization not found

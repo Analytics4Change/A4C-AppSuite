@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-02-07
 ---
 
 <!-- TL;DR-START -->
@@ -1165,10 +1165,14 @@ Load Draft:
 4. `verifyDNS()` - Quorum-based DNS propagation verification (2/3 resolvers)
 5. `generateInvitations()` - Create invitation tokens
 6. `sendInvitationEmails()` - Send emails via Resend API
-7. `activateOrganization()` - Activate organization status
+7. `emitBootstrapCompleted()` - Emit `organization.bootstrap.completed` event (trigger handler sets `is_active=true`)
+
+**Event Emission Activities**:
+1. `emitBootstrapCompleted()` - Emits `organization.bootstrap.completed` (on success)
+2. `emitBootstrapFailed()` - Emits `organization.bootstrap.failed` (on failure, handler sets `is_active=false`)
 
 **Compensation Activities** (Saga pattern rollback):
-1. `deactivateOrganization()` - Set organization to inactive
+1. `deactivateOrganization()` - Safety net fallback (P2 removal planned)
 2. `removeDNS()` - Remove DNS record from Cloudflare
 3. `revokeInvitations()` - Mark invitations as revoked
 4. `deleteContacts()` - Delete related contacts
