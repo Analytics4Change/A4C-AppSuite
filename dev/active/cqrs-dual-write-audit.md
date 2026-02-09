@@ -3,8 +3,8 @@
 ## Architecture Decision Record
 
 **Date**: 2026-02-06
-**Status**: P0 + P1 (Migrations 1-3) applied, P2 (4a/4b/4c) applied. 3b P2 cleanup remaining.
-**Priority**: 3b P2 cleanup remaining (drop update_organization_status, remove activate-organization activity)
+**Status**: ✅ COMPLETE — All migrations applied, all cleanup done, all documentation updated.
+**Completed**: 2026-02-09
 **Supersedes**: Original audit skeleton (same file)
 
 ---
@@ -12,10 +12,10 @@
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Comprehensive audit of all `api.*` functions for CQRS compliance. Found 5 functions with violations (2 dual-write, 3 direct-write-only), plus 2 critical event routing bugs where event type naming mismatches cause handlers to never fire, and 1 function referencing non-existent columns that will throw at runtime.
+**Summary**: Comprehensive audit of all `api.*` functions for CQRS compliance. Found 5 functions with violations (2 dual-write, 3 direct-write-only), plus 2 critical event routing bugs where event type naming mismatches cause handlers to never fire, and 1 function referencing non-existent columns that will throw at runtime. All issues remediated across 8 migrations.
 
 **When to read**:
-- Before implementing any remediation migration
+- Understanding the CQRS remediation history
 - When modifying `api.*` functions that write to projections
 - When adding new event types to routers
 - Understanding the event type naming convention
@@ -54,6 +54,15 @@ Beyond the CQRS pattern violations, the audit uncovered bugs that are more urgen
 | **Event type naming mismatch** (2 functions) | P0 | Handlers never fire; direct writes are the only working mechanism |
 | **Non-existent column references** (`revoke_invitation`) | P0 | Function throws runtime error when called with matching rows |
 | **`aggregate_id` reference** in handler | P1 | Handler would fail if ever invoked (currently masked by routing bug) |
+
+### Post-Remediation Bugs Discovered (Code Review)
+
+| Bug | Severity | Impact | Fix |
+|-----|----------|--------|-----|
+| **`user.invited` routing missing** in `process_user_event` | P0 | New invitations would not populate projection | Migration `20260209031755` |
+| **CHECK constraint** missing `'revoked'` on `invitations_projection` | P1 | `invitation.revoked` handler would violate constraint | Migration `20260209031755` |
+| **Dispatcher ELSE** used WARNING instead of EXCEPTION | P2 | Unknown `stream_type` silently ignored | Migration `20260209161446` |
+| **Dead router entries** in `process_organization_event` | P2 | Unreachable `user.invited`/`invitation.resent` cases | Migration `20260209161446` |
 
 ---
 
@@ -139,9 +148,9 @@ The direct writes also introduce a timestamp inconsistency: handlers use `p_even
 
 ### 2.5 Acceptable Exceptions
 
-#### `api.accept_invitation` (Deprecated)
+#### `api.accept_invitation` (Deprecated — DROPPED)
 
-The function body contains `RAISE WARNING 'DEPRECATED: No longer called. Event processor handles updates.'`. It is not called by any active code path. The Edge Function `accept-invitation` handles this flow via event emission. **Recommendation**: Drop the function in a future cleanup migration.
+The function body contained `RAISE WARNING 'DEPRECATED: No longer called. Event processor handles updates.'`. It was not called by any active code path. The Edge Function `accept-invitation` handles this flow via event emission. **Dropped** in migration `20260207020902`.
 
 #### `api.switch_org_unit`
 
@@ -160,15 +169,14 @@ All violations should be fixed the same way: **remove direct writes from API fun
 3. **Audit trail**: HIPAA requires all state changes in the audit log.
 4. **Single responsibility**: The handler is the sole owner of projection updates.
 
-### 3.2 Exception: `api.update_organization_status`
+### 3.2 Exception: `api.update_organization_status` (DROPPED)
 
-This function is called by Temporal workflows that emit their own events separately. The recommended fix is:
-- Convert the function to emit the appropriate event type (`organization.activated`, `organization.deactivated`, `organization.deleted`)
-- Remove the direct projection write
-- Update the Temporal activities to stop emitting separate events and stop calling this function, OR
-- Simpler: modify the activities to emit events through `api.emit_domain_event()` via RPC and remove the `update_organization_status` function entirely
-
-The simpler approach is preferred because the Temporal activities already have the business logic to determine the correct event type.
+This function was called by Temporal workflows that emitted their own events separately. The fix was:
+- Created `emitBootstrapCompletedActivity` (handler sets `is_active = true`)
+- Created `emitBootstrapFailedActivity` (handler sets `is_active = false`)
+- Deleted `activate-organization.ts` activity
+- Rewrote `deactivateOrganization` as CQRS-compliant safety net (direct-write fallback)
+- Dropped `api.update_organization_status` and `api.get_organization_status`
 
 ### 3.3 Risk Assessment: Removing Direct Writes
 
@@ -184,7 +192,7 @@ The simpler approach is preferred because the Temporal activities already have t
 
 ## 4. Specific Remediation Plan
 
-### Migration 1: Fix Critical Bugs (P0) -- APPLIED
+### Migration 1: Fix Critical Bugs (P0) — ✅ APPLIED
 
 **Priority**: P0 -- Fix before any other changes
 **Risk**: Low (fixes broken functions, no behavior change for working ones)
@@ -198,78 +206,11 @@ The simpler approach is preferred because the Temporal activities already have t
 
 **Fix**: Rewrite to emit `invitation.revoked` event and remove direct write. The existing handler in `process_invitation_event` already handles `invitation.revoked`.
 
-```sql
-CREATE OR REPLACE FUNCTION api.revoke_invitation(
-  p_invitation_id UUID,
-  p_reason TEXT DEFAULT 'manual_revocation'
-)
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public', 'extensions', 'pg_temp'
-AS $$
-DECLARE
-  v_invitation RECORD;
-BEGIN
-  -- Check invitation exists and is pending
-  SELECT id, organization_id INTO v_invitation
-  FROM invitations_projection
-  WHERE id = p_invitation_id AND status = 'pending';
-
-  IF NOT FOUND THEN
-    RETURN false;
-  END IF;
-
-  -- Emit domain event (handler in process_invitation_event updates projection)
-  PERFORM api.emit_domain_event(
-    p_stream_type := 'invitation',
-    p_stream_id := p_invitation_id,
-    p_event_type := 'invitation.revoked',
-    p_event_data := jsonb_build_object(
-      'invitation_id', p_invitation_id,
-      'reason', p_reason,
-      'revoked_at', now()
-    ),
-    p_event_metadata := jsonb_build_object(
-      'user_id', auth.uid(),
-      'reason', p_reason
-    )
-  );
-
-  RETURN true;
-END;
-$$;
-```
-
-**Note**: The existing handler in `process_invitation_event` for `invitation.revoked` sets `status = 'revoked'` and `updated_at`. It does NOT set `revoked_at` or `revoke_reason` because those columns do not exist. If revocation reason tracking is needed, add columns to `invitations_projection` first, then update the handler.
-
 #### 1b. Fix event type mismatch for `update_organization_direct_care_settings`
 
 **Problem**: API emits `organization.direct_care_settings_updated`, router matches `organization.direct_care_settings.updated`.
 
 **Fix**: Update the router CASE to match the emitted event type (underscore format). Also fix the handler's `aggregate_id` bug.
-
-```sql
--- Fix the router CASE clause
--- In process_organization_event, change:
---   WHEN 'organization.direct_care_settings.updated' THEN
--- To:
---   WHEN 'organization.direct_care_settings_updated' THEN
-
--- Fix the handler
-CREATE OR REPLACE FUNCTION handle_organization_direct_care_settings_updated(p_event record)
-RETURNS void
-LANGUAGE plpgsql
-SET search_path TO 'public', 'extensions', 'pg_temp'
-AS $$
-BEGIN
-  UPDATE organizations_projection SET
-    direct_care_settings = p_event.event_data->'settings',
-    updated_at = p_event.created_at  -- Use event timestamp, not now()
-  WHERE id = p_event.stream_id;  -- Fixed: was aggregate_id
-END;
-$$;
-```
 
 #### 1c. Fix event type mismatch for `update_user_access_dates`
 
@@ -277,19 +218,7 @@ $$;
 
 **Fix**: Update the router CASE to match the emitted event type (underscore format).
 
-```sql
--- In process_user_event, change:
---   WHEN 'user.access_dates.updated' THEN
--- To:
---   WHEN 'user.access_dates_updated' THEN
-```
-
-**Decision point**: The naming convention for event types is inconsistent. Most events use dots (`user.phone.added`, `organization.subdomain.verified`), but the API functions emit with underscores for compound action names. The recommendation is to standardize on the emitted format (underscore) because:
-- Events already exist in production with the underscore format
-- Changing the emitted format would require fixing all callers
-- Changing the router is a single-point fix
-
-### Migration 2: Remove Dual-Write Redundancy (P1) -- APPLIED
+### Migration 2: Remove Dual-Write Redundancy (P1) — ✅ APPLIED
 
 **Priority**: P1 -- After Migration 1 is verified in production
 **Risk**: Medium (behavior change, but handler already tested via Migration 1)
@@ -298,221 +227,130 @@ $$;
 **Status**: Applied and verified 2026-02-06
 
 #### 2a. Remove direct write from `update_organization_direct_care_settings`
-
-After Migration 1 fixes the routing, the handler will fire and update the projection. The direct write becomes redundant. Remove it from both overloads (3-param and 4-param versions).
-
-The function should:
-1. Validate permissions (keep)
-2. Read current settings (keep -- needed for event data)
-3. Build new settings (keep -- needed for event data)
-4. **Remove**: `UPDATE organizations_projection SET ...`
-5. Emit domain event (keep)
-6. Return `v_new_settings` (keep -- handler has already updated the projection by this point)
-
 #### 2b. Remove direct write from `update_user_access_dates`
 
-After Migration 1 fixes the routing, the handler will fire. Remove the direct write.
-
-The function should:
-1. Validate authorization (keep)
-2. Validate dates (keep)
-3. Read old values (keep -- needed for event data)
-4. Emit domain event (keep)
-5. **Remove**: `UPDATE user_organizations_projection SET ...`
-6. **Remove**: `IF NOT FOUND` check (the handler does upsert logic)
-
-**Note on return value**: The function currently returns `void` and raises an exception if no row is found. After removing the direct write, the existence check should move before the event emission.
-
-### Migration 3: Fix Direct-Write-Only Functions (P1)
+### Migration 3: Fix Direct-Write-Only Functions (P1) — ✅ APPLIED
 
 **Priority**: P1
 **Risk**: Medium
 **Dependencies**: None (independent of Migrations 1-2)
 
-#### 3a. Fix `api.resend_invitation` -- APPLIED
+#### 3a. Fix `api.resend_invitation` — ✅ APPLIED
 
 **Migration**: `20260207000203_p1_remove_dual_writes_fix_resend` (combined with Migration 2)
-**Status**: Applied and verified 2026-02-06. Also added `invitation.resent` CASE to `process_invitation_event` router and fixed its ELSE clause to RAISE EXCEPTION.
+**Status**: Applied and verified 2026-02-06
 
-**Problem**: Direct write with no event. Handler `handle_invitation_resent` exists but is never triggered.
+#### 3b. Fix `api.update_organization_status` — ✅ APPLIED + P2 CLEANUP COMPLETE
 
-**Fix**: Replace direct write with event emission. Use stream_type `invitation` so the event routes through `process_invitation_event` which now handles `invitation.resent` (also present in `process_organization_event` as dead code).
+**Migration**: `20260207004639_p1_fix_bootstrap_handlers_org_status` (SQL) + `20260207021836_p2_drop_org_status_functions` (cleanup)
+**Status**: Applied and verified 2026-02-07. P2 cleanup completed 2026-02-09.
 
-```sql
-CREATE OR REPLACE FUNCTION api.resend_invitation(
-  p_invitation_id UUID,
-  p_new_token TEXT,
-  p_new_expires_at TIMESTAMPTZ
-)
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public', 'extensions', 'pg_temp'
-AS $$
-DECLARE
-  v_exists BOOLEAN;
-BEGIN
-  -- Check invitation exists and is in resendable state
-  SELECT EXISTS(
-    SELECT 1 FROM invitations_projection
-    WHERE id = p_invitation_id AND status IN ('pending', 'expired')
-  ) INTO v_exists;
+**P2 cleanup completed**:
+- Dropped `api.update_organization_status` and `api.get_organization_status` (migration `20260207021836`)
+- Deleted `activate-organization.ts` activity (replaced by `emitBootstrapCompletedActivity`)
+- Rewrote `deactivateOrganization` as CQRS-compliant safety net — direct-writes to `organizations_projection` instead of calling dropped RPCs. Intentional CQRS exception: if event emission has failed, another event would also fail; direct write is the only reliable fallback.
+- Removed `ActivateOrganizationParams`, `emitOrganizationActivated` (unused after deletion)
 
-  IF NOT v_exists THEN
-    RETURN false;
-  END IF;
-
-  -- Emit domain event (handler updates projection)
-  PERFORM api.emit_domain_event(
-    p_stream_type := 'invitation',
-    p_stream_id := p_invitation_id,
-    p_event_type := 'invitation.resent',
-    p_event_data := jsonb_build_object(
-      'invitation_id', p_invitation_id,
-      'token', p_new_token,
-      'expires_at', p_new_expires_at
-    ),
-    p_event_metadata := jsonb_build_object(
-      'user_id', auth.uid()
-    )
-  );
-
-  RETURN true;
-END;
-$$;
-```
-
-**Routing note**: When `stream_type = 'invitation'`, the event routes to `process_invitation_event`. But `invitation.resent` is NOT in `process_invitation_event`'s CASE -- it is only in `process_organization_event`. This means using `stream_type := 'invitation'` would cause the event to fall through to ELSE.
-
-**Options**:
-1. Add `invitation.resent` to `process_invitation_event` (preferred -- the event is about an invitation, not an organization)
-2. Use `stream_type := 'organization'` and pass the org_id as stream_id (breaks convention)
-
-**Recommendation**: Option 1. Add the CASE clause to `process_invitation_event` and call the existing `handle_invitation_resent` handler from there.
-
-#### 3b. Fix `api.update_organization_status` -- APPLIED
-
-**Migration**: `20260207004639_p1_fix_bootstrap_handlers_org_status`
-**Status**: Applied and verified 2026-02-07
-
-**Problem**: Direct write with no event. Called by Temporal workflows that emit their own events.
-
-**Analysis**: The Temporal activities (`activate-organization.ts`, `deactivate-organization.ts`) follow this pattern:
-1. Call `api.update_organization_status` (direct projection write)
-2. Emit domain event (`organization.activated` / `organization.deactivated`)
-
-This is backwards from the CQRS pattern. The projection is updated before the event exists.
-
-**Solution applied**: Two-part fix (SQL migration + TypeScript workflow changes):
-
-**SQL migration** (deployed first -- additive, safe with old workers):
-- Fixed P0 event type mismatch: router CASE lines changed from `bootstrap.*` to `organization.bootstrap.*` (matching actual emitted types)
-- Added `organization.bootstrap.initiated` as no-op (informational event)
-- Updated `handle_bootstrap_completed` to set `is_active = true` + metadata
-- Updated `handle_bootstrap_failed` to set `is_active = false, deactivated_at, deleted_at` + metadata (fixed field name: `error_message` not `error`)
-- Updated `handle_bootstrap_cancelled` to set `is_active = false, deactivated_at` + metadata
-- Created `handle_organization_activated` for admin UI actions (sets `is_active = true`)
-- Updated `handle_organization_deactivated` to set `deactivated_at, deleted_at`
-
-**TypeScript workflow changes** (deployed after SQL):
-- Created `emitBootstrapCompleted` typed event emitter (mirrors `emitBootstrapFailed` pattern)
-- Created `emitBootstrapCompletedActivity` (mirrors `emitBootstrapFailedActivity` pattern)
-- Replaced `activateOrganization` in workflow Step 5 with `emitBootstrapCompletedActivity`
-- Kept `deactivateOrganization` as safety net in Saga compensation (if `emitBootstrapFailedActivity` fails, handler never sets `is_active = false`; deactivateOrganization catches this)
-
-**P2 cleanup remaining**:
-- Drop `api.update_organization_status` and `api.get_organization_status`
-- Delete `activate-organization.ts` activity
-- Remove `deactivateOrganization` safety net from compensation (after confirming event emission reliability)
-- Remove type definitions (`ActivateOrganizationParams`, `DeactivateOrganizationParams`)
-
-### Migration 4: Cleanup (P2)
+### Migration 4: Cleanup (P2) — ✅ APPLIED
 
 **Priority**: P2 -- Low urgency
 **Risk**: Low
 
-#### 4a. Drop deprecated `api.accept_invitation` -- APPLIED
+#### 4a. Drop deprecated `api.accept_invitation` — ✅ APPLIED
 
 **Migration**: `20260207020902_p2_drop_deprecated_accept_invitation`
 **Status**: Applied 2026-02-07
 
-The function body said DEPRECATED. The Edge Function `accept-invitation` handles this flow. Function dropped.
-
-#### 4b. Event type naming convention documentation -- APPLIED
+#### 4b. Event type naming convention documentation — ✅ APPLIED
 
 **Status**: Documented 2026-02-07
 
-Convention documented in `event-handler-pattern.md` under "Event Type Naming Convention" section:
-- Dots separate hierarchy levels (`stream_type.entity.action`)
-- Underscores for compound words within a level (`direct_care_settings_updated`)
-- Historical note about the mismatch bug that led to this convention being formalized
+Convention documented in `event-handler-pattern.md` under "Event Type Naming Convention" section.
 
-#### 4c. Observability gap: missing metadata in `api.*` RPC functions -- APPLIED
+#### 4c. Observability gap: missing metadata in `api.*` RPC functions — ✅ APPLIED
 
 **Migration**: `20260207013604_p2_postgrest_pre_request_tracing`
 **Status**: Applied 2026-02-07
 
-**Solution applied**: Option 2 (PostgREST pre-request hook) — systemic fix covering all `api.*` RPC functions:
-- PostgREST pre-request hook (`public.postgrest_pre_request()`) extracts `X-Correlation-ID` and `traceparent` headers into `app.*` session variables
-- `api.emit_domain_event()` enhanced with session variable fallback when metadata fields are NULL
-- Frontend custom fetch wrapper injects tracing headers on every Supabase request
-- `user_id` auto-injected from `auth.uid()` when not in metadata
-- Explicit metadata (from Edge Functions) always takes precedence
+### Post-Remediation Fixes (Code Review) — ✅ APPLIED
 
-All `api.*` RPC functions now automatically get `correlation_id`, `trace_id`, `span_id`, and `user_id` without any signature changes.
+#### Fix `user.invited` routing + CHECK constraint — ✅ APPLIED
 
-**Remaining gap**: `source_function` and `reason` are still not auto-populated (these are context-specific and must be passed explicitly by callers when meaningful).
+**Migration**: `20260209031755_fix_user_invited_routing_and_check_constraint`
+**Status**: Applied 2026-02-09
 
----
+- Added `WHEN 'user.invited' THEN PERFORM handle_user_invited(p_event)` to `process_user_event()`
+- Fixed `chk_invitation_status` CHECK constraint to include `'revoked'`
+- Reprocessed any stuck events (0 rows affected)
 
-## 5. Dependency Graph
+#### Cleanup dead router entries + dispatcher ELSE — ✅ APPLIED
 
-```
-Migration 1a (revoke_invitation)     -- ✅ APPLIED (20260206234839)
-Migration 1b (direct_care routing)   -- ✅ APPLIED (20260206234839)
-Migration 1c (access_dates routing)  -- ✅ APPLIED (20260206234839)
+**Migration**: `20260209161446_cleanup_dead_router_entries_and_dispatcher_else`
+**Status**: Applied 2026-02-09
 
-Migration 2a (remove direct_care direct write) -- ✅ APPLIED (20260207000203)
-Migration 2b (remove access_dates direct write) -- ✅ APPLIED (20260207000203)
+- Removed unreachable `user.invited`/`invitation.resent` from `process_organization_event()`
+- Upgraded `process_domain_event()` ELSE from `RAISE WARNING` to `RAISE EXCEPTION` (ERRCODE P9002)
+- Added `platform_admin`, `workflow_queue`, `test` as explicit no-op `stream_type` entries
 
-Migration 3a (resend_invitation)     -- ✅ APPLIED (20260207000203)
-Migration 3b (update_org_status)     -- ✅ APPLIED (20260207004639 + TypeScript)
+#### Additional review recommendations — ✅ APPLIED
 
-Migration 4a (drop accept_invitation) -- ✅ APPLIED (20260207020902)
-Migration 4b (naming convention docs) -- ✅ DOCUMENTED (event-handler-pattern.md)
-Migration 4c (observability gap)     -- ✅ APPLIED (20260207013604)
-```
+**Status**: Committed 2026-02-09
 
-**Recommended execution order**:
-1. ~~Migration 1 (all three fixes in one migration)~~ -- ✅ APPLIED
-2. ~~Verify Migration 1 in production~~ -- ✅ VERIFIED
-3. ~~Migration 2 (remove dual writes) + 3a (resend_invitation)~~ -- ✅ APPLIED
-4. ~~Migration 3a (resend_invitation)~~ -- ✅ APPLIED (combined with 2)
-5. ~~Migration 3b (update_org_status)~~ -- ✅ APPLIED (SQL + TypeScript)
-6. ~~Migration 4a (drop accept_invitation)~~ -- ✅ APPLIED
-7. ~~Migration 4b (naming convention docs)~~ -- ✅ DOCUMENTED
-8. 3b P2 cleanup (drop update_organization_status, remove activate-organization) -- whenever convenient
+- Regenerated `database.types.ts` (both frontend and workflows)
+- Updated ADR to reflect safety net kept (not removed)
+- Added `deactivated_at` to safety net direct-write
+- Fixed stale docs referencing deleted `activate-organization.ts`
 
 ---
 
-## 6. Documentation Updates -- ✅ COMPLETED
+## 5. Complete Migration History
 
-All documentation updates applied 2026-02-07.
+```
+Migration 1a (revoke_invitation)              — ✅ APPLIED (20260206234839)
+Migration 1b (direct_care routing)            — ✅ APPLIED (20260206234839)
+Migration 1c (access_dates routing)           — ✅ APPLIED (20260206234839)
 
-### 6.1 CQRS Compliance ADR -- ✅ CREATED
+Migration 2a (remove direct_care direct write) — ✅ APPLIED (20260207000203)
+Migration 2b (remove access_dates direct write) — ✅ APPLIED (20260207000203)
+
+Migration 3a (resend_invitation)              — ✅ APPLIED (20260207000203)
+Migration 3b (update_org_status)              — ✅ APPLIED (20260207004639 + TypeScript)
+Migration 3b P2 (drop RPCs, cleanup TS)       — ✅ APPLIED (20260207021836 + TypeScript)
+
+Migration 4a (drop accept_invitation)          — ✅ APPLIED (20260207020902)
+Migration 4b (naming convention docs)          — ✅ DOCUMENTED (event-handler-pattern.md)
+Migration 4c (observability gap)               — ✅ APPLIED (20260207013604)
+
+Post-review: user.invited routing + CHECK      — ✅ APPLIED (20260209031755)
+Post-review: dead entries + dispatcher ELSE    — ✅ APPLIED (20260209161446)
+Post-review: regen types, fix docs, cleanup    — ✅ COMMITTED (98ea0125)
+```
+
+---
+
+## 6. Documentation Updates — ✅ COMPLETED
+
+All documentation updates applied 2026-02-07 through 2026-02-09.
+
+### 6.1 CQRS Compliance ADR — ✅ CREATED
 
 **Location**: `documentation/architecture/decisions/adr-cqrs-dual-write-remediation.md`
 
-### 6.2 Existing Document Updates -- ✅ APPLIED
+### 6.2 Existing Document Updates — ✅ APPLIED
 
 | Document | Update Applied |
 |----------|---------------|
-| `event-handler-pattern.md` | Naming convention section, resolved issues callout, updated TL;DR/keywords (done in 4b) |
+| `event-handler-pattern.md` | Naming convention section, resolved issues callout, updated TL;DR/keywords |
 | `event-sourcing-overview.md` | Fixed trigger example (AFTER→BEFORE INSERT), added naming convention note, updated code to match actual architecture |
 | `infrastructure/CLAUDE.md` | Added naming convention warning (counts already correct at 16/54+) |
 | `AGENT-INDEX.md` | Added keywords: `cqrs-compliance`, `event-type-naming`, `naming-convention`. Added ADR to catalog. |
+| `workflows/README.md` | Updated directory listing (activate-organization → emit-bootstrap-completed/failed) |
+| `implementation.md` | Updated activity listings and test file references |
+| `activities-reference.md` | Updated deactivateOrganization description to reflect CQRS safety net rewrite |
+| `adr-cqrs-dual-write-remediation.md` | Updated "Remaining P2 Cleanup" → "Completed P2 Cleanup" with full details |
+| `database.types.ts` | Regenerated for both frontend and workflows (dropped functions removed) |
 
-### 6.3 Claim Verification -- ✅ VERIFIED
+### 6.3 Claim Verification — ✅ VERIFIED
 
 "All state changes emit domain events" claims across 15+ documents are now accurate post-remediation. The three previously-violating functions (`update_organization_status`, `resend_invitation`, `revoke_invitation`) have all been fixed to emit events.
 
@@ -532,49 +370,23 @@ All documentation updates applied 2026-02-07.
 
 ## 8. Verification Checklist
 
-After each migration, verify:
+Post-remediation verification (all passed 2026-02-09):
 
-- [ ] `supabase db lint --level error` passes (plpgsql_check validates all functions)
-- [ ] Event emitted by API function appears in `domain_events` with correct `event_type`
-- [ ] Event has `processed_at` set and `processing_error` is NULL
-- [ ] Projection table reflects the expected state change
-- [ ] No `RAISE WARNING 'Unknown ... event type'` in PostgreSQL logs for the new event type
-- [ ] Frontend operations that call the fixed function still work correctly
-
----
-
-## 9. SQL Queries for Verification
-
-```sql
--- After Migration 1b: Verify direct_care events are now routed to handler
-INSERT INTO domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-VALUES (
-  'test-org-id'::uuid, 'organization', 999,
-  'organization.direct_care_settings_updated',
-  '{"organization_id": "test-org-id", "settings": {"enable_staff_client_mapping": true}}'::jsonb,
-  '{"user_id": "test-user"}'::jsonb
-);
--- Check: SELECT processed_at, processing_error FROM domain_events WHERE stream_version = 999;
--- Expected: processed_at set, processing_error NULL
--- Cleanup: DELETE FROM domain_events WHERE stream_version = 999;
-
--- After any migration: Check for unrouted event types
-SELECT DISTINCT event_type, count(*)
-FROM domain_events
-WHERE processing_error IS NULL
-  AND processed_at IS NOT NULL
-GROUP BY event_type
-ORDER BY event_type;
-
--- Identify events that fell through to ELSE (processed but not handled)
--- These show up in PostgreSQL logs as RAISE WARNING but not in the table
--- Query recent events and spot-check their handlers exist
-```
+- [x] `supabase db lint --level error` passes (plpgsql_check validates all functions)
+- [x] Events emitted by API functions appear in `domain_events` with correct `event_type`
+- [x] Events have `processed_at` set and `processing_error` is NULL
+- [x] Projection tables reflect expected state changes
+- [x] No `processing_error` entries in `domain_events` (0 total errors)
+- [x] `process_domain_event()` ELSE upgraded to EXCEPTION with no-ops for admin stream_types
+- [x] All router ELSE clauses use RAISE EXCEPTION (not WARNING)
+- [x] `database.types.ts` regenerated (no references to dropped functions)
+- [x] `deactivateOrganization` safety net preserved with CQRS-compliant direct-write
 
 ---
 
 ## Related Documents
 
+- `documentation/architecture/decisions/adr-cqrs-dual-write-remediation.md` -- ADR for this remediation
 - `dev/active/handler-reference-files.md` -- Handler extraction plan (depends on this audit)
 - `documentation/infrastructure/patterns/event-handler-pattern.md` -- Trigger/handler architecture
 - `infrastructure/CLAUDE.md` -- Event handler documentation
