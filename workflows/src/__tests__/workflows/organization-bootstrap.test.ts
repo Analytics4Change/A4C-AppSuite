@@ -34,7 +34,8 @@ const mockActivities = {
     successCount: params.invitations.length,
     failures: []
   }),
-  activateOrganization: async () => true,
+  emitBootstrapCompletedActivity: async () => 'mock-event-id',
+  emitBootstrapFailedActivity: async () => 'mock-event-id',
   // Compensation activities
   removeDNS: async () => true,
   deactivateOrganization: async () => true,

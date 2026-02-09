@@ -350,15 +350,6 @@ export interface SendInvitationEmailsResult {
   }>;
 }
 
-/**
- * ActivateOrganizationActivity parameters
- */
-export interface ActivateOrganizationParams {
-  orgId: string;
-  /** Optional tracing context for end-to-end request correlation */
-  tracing?: WorkflowTracingParams;
-}
-
 // ========================================
 // Compensation Activity Types
 // ========================================
@@ -369,13 +360,6 @@ export interface ActivateOrganizationParams {
 export interface RemoveDNSParams {
   orgId: string;
   subdomain: string;
-}
-
-/**
- * DeactivateOrganizationActivity parameters (compensation)
- */
-export interface DeactivateOrganizationParams {
-  orgId: string;
 }
 
 /**
@@ -410,6 +394,13 @@ export interface DeletePhonesParams {
  * DeleteEmailsActivity parameters (compensation)
  */
 export interface DeleteEmailsParams {
+  orgId: string;
+}
+
+/**
+ * DeactivateOrganizationActivity parameters (compensation safety net)
+ */
+export interface DeactivateOrganizationParams {
   orgId: string;
 }
 

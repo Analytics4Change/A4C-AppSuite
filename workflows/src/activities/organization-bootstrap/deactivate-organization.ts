@@ -1,122 +1,108 @@
 /**
- * DeactivateOrganizationActivity (Compensation)
+ * DeactivateOrganizationActivity (Compensation Safety Net)
  *
- * Deactivates organization after workflow failure.
- * Marks organization as 'failed' and sets deleted_at timestamp.
+ * Last-resort fallback that directly updates the organizations_projection
+ * when the event-driven path (emitBootstrapFailed → handler) has failed.
+ *
+ * This is an intentional CQRS exception: if the event system itself is broken,
+ * emitting another event would also fail. A direct write is the only reliable
+ * way to ensure the organization doesn't remain marked as active after a
+ * failed bootstrap.
  *
  * Flow:
- * 1. Update organization status to 'failed'
- * 2. Set deleted_at timestamp (soft delete)
- * 3. Emit OrganizationDeactivated event
+ * 1. Check current is_active status (idempotency)
+ * 2. Direct-update organizations_projection: is_active = false, deleted_at = now
+ * 3. Log the safety-net activation (no event emission — the event path already failed)
  *
  * Idempotency:
  * - Safe to call multiple times
- * - No-op if already failed/deleted
- * - Event emission idempotent via event_id
+ * - No-op if already deactivated (is_active = false AND deleted_at set)
  *
  * Note:
- * - This is a soft delete (record remains for audit)
- * - Cleanup script can permanently delete if tagged as development
+ * - This is a soft delete (record remains for audit via domain_events)
+ * - Uses service_role_key which bypasses RLS
+ * - Does NOT emit domain events — this runs only when event emission has failed
  */
 
 import type { DeactivateOrganizationParams } from '@shared/types';
-import { getSupabaseClient, emitEvent, buildTags, getLogger } from '@shared/utils';
-import { AGGREGATE_TYPES } from '@shared/constants';
+import { getSupabaseClient, getLogger } from '@shared/utils';
 
 const log = getLogger('DeactivateOrganization');
 
 /**
- * Deactivate organization activity (compensation)
+ * Deactivate organization activity (compensation safety net)
+ *
+ * Direct-writes to organizations_projection as a fallback when
+ * emitBootstrapFailed has already failed. Does not emit events.
+ *
  * @param params - Deactivation parameters
- * @returns true if deactivated successfully
+ * @returns true always (compensation must not throw)
  */
 export async function deactivateOrganization(
   params: DeactivateOrganizationParams
 ): Promise<boolean> {
-  log.info('Starting organization deactivation', { orgId: params.orgId });
+  log.info('Safety net: starting organization deactivation', { orgId: params.orgId });
 
   const supabase = getSupabaseClient();
 
   try {
-    // Check current status (idempotency) via RPC (PostgREST only exposes 'api' schema)
-    const { data: orgData, error: checkError } = await supabase
-      .schema('api')
-      .rpc('get_organization_status', {
-        p_org_id: params.orgId
-      });
+    // Check current status (idempotency)
+    const { data: org, error: checkError } = await supabase
+      .from('organizations_projection')
+      .select('id, is_active, deleted_at')
+      .eq('id', params.orgId)
+      .maybeSingle();
 
     if (checkError) {
-      log.warn('Error checking status, continuing', { error: checkError.message });
-      // Continue with deactivation attempt
+      log.warn('Safety net: error checking org status, attempting update anyway', {
+        orgId: params.orgId,
+        error: checkError.message,
+      });
     }
 
-    const org = orgData && orgData.length > 0 ? orgData[0] : null;
-
     if (!org) {
-      log.info('Organization not found, skipping', { orgId: params.orgId });
+      log.info('Safety net: organization not found, skipping', { orgId: params.orgId });
       return true;
     }
 
     if (!org.is_active && org.deleted_at) {
-      log.info('Organization already deactivated', { orgId: params.orgId });
-
-      // Emit event even if already deactivated (for event replay)
-      await emitEvent({
-        event_type: 'organization.deactivated',
-        aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
-        aggregate_id: params.orgId,
-        event_data: {
-          org_id: params.orgId,
-          deactivated_at: org.deleted_at,
-          previous_is_active: org.is_active,
-          reason: 'workflow_failure'
-        },
-        tags: buildTags()
-      });
-
+      log.info('Safety net: organization already deactivated', { orgId: params.orgId });
       return true;
     }
 
-    // Update organization status via RPC (PostgREST only exposes 'api' schema)
+    // Direct-write to projection (justified CQRS exception for safety net)
     const deactivatedAt = new Date().toISOString();
     const { error: updateError } = await supabase
-      .schema('api')
-      .rpc('update_organization_status', {
-        p_org_id: params.orgId,
-        p_is_active: false,
-        p_deactivated_at: deactivatedAt,
-        p_deleted_at: deactivatedAt
-      });
+      .from('organizations_projection')
+      .update({
+        is_active: false,
+        deleted_at: deactivatedAt,
+        updated_at: deactivatedAt,
+      })
+      .eq('id', params.orgId);
 
     if (updateError) {
-      log.warn('Error updating status, continuing', { error: updateError.message });
-      // Don't fail compensation
+      log.error('Safety net: failed to deactivate organization', {
+        orgId: params.orgId,
+        error: updateError.message,
+      });
+      // Don't throw — compensation must not fail the workflow
+      return true;
     }
 
-    log.info('Organization deactivated', { orgId: params.orgId });
-
-    // Emit OrganizationDeactivated event
-    await emitEvent({
-      event_type: 'organization.deactivated',
-      aggregate_type: AGGREGATE_TYPES.ORGANIZATION,
-      aggregate_id: params.orgId,
-      event_data: {
-        org_id: params.orgId,
-        deactivated_at: deactivatedAt,
-        previous_is_active: org.is_active,
-        reason: 'workflow_failure'
-      },
-      tags: buildTags()
+    log.info('Safety net: organization deactivated via direct write', {
+      orgId: params.orgId,
+      deactivatedAt,
     });
-
-    log.debug('Emitted organization.deactivated event', { orgId: params.orgId });
 
     return true;
   } catch (error) {
-    // Log error but don't fail compensation
-    if (error instanceof Error) {
-      log.error('Non-fatal error during deactivation', { error: error.message });
-    }
-    return true; // Don't fail workflow
+    // Log but never throw — this is compensation
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    log.error('Safety net: non-fatal error during deactivation', {
+      orgId: params.orgId,
+      error: msg,
+    });
+    return true;
   }
 }

@@ -11,20 +11,19 @@
  * - generateInvitations: Generate invitation tokens
  * - sendInvitationEmails: Send invitation emails
  * - emitBootstrapCompletedActivity: Emit bootstrap completed event (handler sets is_active)
- * - activateOrganization: Mark organization as active (kept for P2 cleanup)
  *
  * Event Emission Activities (2):
- * - emitBootstrapCompletedActivity: Emit bootstrap completed event (replaces activateOrganization)
- * - emitBootstrapFailedActivity: Emit bootstrap failure event (called from catch block)
+ * - emitBootstrapCompletedActivity: Emit bootstrap completed event
+ * - emitBootstrapFailedActivity: Emit bootstrap failure event (handler sets is_active = false)
  *
- * Compensation Activities (7):
+ * Compensation Activities (6):
  * - revokeInvitations: Revoke pending invitations (rollback)
  * - removeDNS: Delete DNS record (rollback)
  * - deletePhones: Delete phone records (rollback)
  * - deleteEmails: Delete email records (rollback)
  * - deleteAddresses: Delete address records (rollback)
  * - deleteContacts: Delete contact records (rollback)
- * - deactivateOrganization: Mark organization as failed (rollback)
+ * - deactivateOrganization: Safety net direct-write deactivation (fallback)
  */
 
 export { createOrganization } from './create-organization';
@@ -33,13 +32,12 @@ export { configureDNS } from './configure-dns';
 export { verifyDNS } from './verify-dns';
 export { generateInvitations } from './generate-invitations';
 export { sendInvitationEmails } from './send-invitation-emails';
-export { activateOrganization } from './activate-organization';
 export { emitBootstrapFailedActivity } from './emit-bootstrap-failed';
 export { emitBootstrapCompletedActivity } from './emit-bootstrap-completed';
 export { removeDNS } from './remove-dns';
-export { deactivateOrganization } from './deactivate-organization';
 export { revokeInvitations } from './revoke-invitations';
 export { deleteContacts } from './delete-contacts';
 export { deleteAddresses } from './delete-addresses';
 export { deletePhones } from './delete-phones';
 export { deleteEmails } from './delete-emails';
+export { deactivateOrganization } from './deactivate-organization';

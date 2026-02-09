@@ -58,11 +58,11 @@ const {
   emitBootstrapCompletedActivity,
   emitBootstrapFailedActivity,
   removeDNS,
-  deactivateOrganization,
   revokeInvitations,
   deleteContacts,
   deleteAddresses,
-  deletePhones
+  deletePhones,
+  deactivateOrganization
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: '10 minutes',
   retry: {
@@ -505,7 +505,7 @@ export async function organizationBootstrapWorkflow(
 
       // Deactivate organization (safety net)
       // Redundant when emitBootstrapFailedActivity succeeds (handler sets is_active = false).
-      // Kept as fallback in case event emission failed above. Remove in P2 cleanup.
+      // Kept as fallback: direct-writes to projection if event emission failed above.
       try {
         log.info('Compensation: Deactivating organization (safety net)', { orgId: state.orgId });
         await deactivateOrganization({ orgId: state.orgId });
@@ -515,6 +515,7 @@ export async function organizationBootstrapWorkflow(
         log.error('Compensation failed: deactivate organization', { error: compErrorMsg });
         state.compensationErrors.push(`Failed to deactivate organization: ${compErrorMsg}`);
       }
+
     }
 
     // Return failure result

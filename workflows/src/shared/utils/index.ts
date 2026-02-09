@@ -37,8 +37,6 @@ export {
   emitEmailCreated,
   emitEmailUpdated,
   emitEmailDeleted,
-  // Organization lifecycle event emitters
-  emitOrganizationActivated,
   // Organization DNS event emitters
   emitSubdomainDnsCreated,
   emitSubdomainVerified,

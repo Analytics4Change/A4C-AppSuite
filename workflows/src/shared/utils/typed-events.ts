@@ -697,29 +697,6 @@ export function mapEmailType(localType: string): EmailType {
 }
 
 // ============================================================================
-// Organization Lifecycle Events
-// ============================================================================
-
-/**
- * Emit an organization.activated event
- */
-export async function emitOrganizationActivated(
-  orgId: string,
-  data: OrganizationActivatedData,
-  tracing?: WorkflowTracingParams
-): Promise<string> {
-  const tags = buildTags();
-  return emitEvent({
-    event_type: 'organization.activated',
-    aggregate_type: 'organization',
-    aggregate_id: orgId,
-    event_data: data as unknown as Record<string, unknown>,
-    tags,
-    ...buildTracingForEvent(tracing, 'emitOrganizationActivated'),
-  });
-}
-
-// ============================================================================
 // Organization DNS Events
 // ============================================================================
 
