@@ -148,10 +148,9 @@ Complete implementation of organization bootstrap workflows using Temporal.io fo
    - Individual failures don't fail activity
    - Emits InvitationEmailSent events
 
-6. `src/activities/organization-bootstrap/activate-organization.ts`
-   - Updates organization status to 'active'
-   - Sets activated_at timestamp
-   - Emits OrganizationActivated event
+6. `src/activities/organization-bootstrap/emit-bootstrap-completed.ts`
+   - Emits `organization.bootstrap.completed` event
+   - Trigger handler sets `is_active = true` on organizations_projection
 
 **Compensation Activities (3 files)**:
 7. `src/activities/organization-bootstrap/remove-dns.ts`
@@ -290,9 +289,9 @@ Complete implementation of organization bootstrap workflows using Temporal.io fo
    - Expiration validation
    - Uniqueness verification
 
-3. `src/__tests__/activities/activate-organization.test.ts`
-   - Organization activation tests
-   - Idempotency checks
+3. `src/__tests__/workflows/organization-bootstrap.test.ts`
+   - Workflow integration tests
+   - Compensation (Saga) tests
 
 **Validation Scripts (2 files)**:
 4. `src/scripts/test-config.ts` (450 lines)

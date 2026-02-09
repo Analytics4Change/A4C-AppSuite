@@ -145,7 +145,7 @@ interface CreateOrganizationParams {
 
 Emits an `organization.bootstrap.completed` event when the bootstrap workflow succeeds. The synchronous trigger handler (`handle_bootstrap_completed`) sets `is_active = true` on the `organizations_projection`.
 
-> **Note**: Replaces the old `activateOrganizationActivity` which made direct RPC calls to `update_organization_status` (dual write removed per CQRS audit). The `activateOrganization` activity is kept only for P2 cleanup.
+> **Note**: Replaces the old `activateOrganizationActivity` which made direct RPC calls to `update_organization_status` (dual write removed per CQRS audit). The old activity has been deleted.
 
 **Signature**:
 ```typescript
@@ -787,9 +787,9 @@ interface RemoveDNSParams {
 
 ### `deactivateOrganizationActivity`
 
-Marks organization as inactive by calling `api.update_organization_status` and emitting `organization.deactivated` event.
+Safety net fallback that directly updates `organizations_projection` when event emission has failed. Does NOT emit events (the event path already failed if this runs). Intentional CQRS exception.
 
-> **Note**: This activity is now a **safety net only** in the bootstrap workflow's Saga compensation. When `emitBootstrapFailedActivity` succeeds, the `handle_bootstrap_failed` handler already sets `is_active = false`. `deactivateOrganization` is kept as a fallback in case event emission failed. Will be removed in P2 cleanup.
+> **Note**: This activity is a **safety net only** in the bootstrap workflow's Saga compensation. When `emitBootstrapFailedActivity` succeeds, the `handle_bootstrap_failed` handler already sets `is_active = false`. `deactivateOrganization` only fires as a fallback when event emission itself has failed — it direct-writes `is_active = false` to the projection.
 
 **Signature**:
 ```typescript

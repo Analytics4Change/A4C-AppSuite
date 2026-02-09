@@ -33,9 +33,10 @@ workflows/
 │   │       ├── verify-dns.ts
 │   │       ├── generate-invitations.ts
 │   │       ├── send-invitation-emails.ts
-│   │       ├── activate-organization.ts
+│   │       ├── emit-bootstrap-completed.ts
+│   │       ├── emit-bootstrap-failed.ts
 │   │       ├── remove-dns.ts        # Compensation
-│   │       └── deactivate-organization.ts  # Compensation
+│   │       └── deactivate-organization.ts  # Compensation (safety net)
 │   ├── shared/                  # Shared utilities and types
 │   │   ├── config/              # Configuration validation
 │   │   ├── providers/           # DNS and email providers

@@ -76,6 +76,7 @@ export async function deactivateOrganization(
       .from('organizations_projection')
       .update({
         is_active: false,
+        deactivated_at: deactivatedAt,
         deleted_at: deactivatedAt,
         updated_at: deactivatedAt,
       })

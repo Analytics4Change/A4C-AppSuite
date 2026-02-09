@@ -101,12 +101,14 @@ To prevent recurrence:
 - **SKILL.md**: Infrastructure guidelines skill includes rule #9 (no direct projection writes)
 - **Router ELSE clauses**: All updated from `RAISE WARNING` to `RAISE EXCEPTION` so unhandled event types are visible in `processing_error`
 
-### Remaining P2 Cleanup
+### Completed P2 Cleanup
 
-- Drop `api.update_organization_status` and `api.get_organization_status`
-- Delete `activate-organization.ts` Temporal activity
-- Remove `deactivateOrganization` safety net from Saga compensation
-- Remove associated TypeScript type definitions
+- Dropped `api.update_organization_status` and `api.get_organization_status` (migration `20260207021836`)
+- Deleted `activate-organization.ts` Temporal activity (replaced by `emitBootstrapCompletedActivity`)
+- Rewrote `deactivateOrganization` as CQRS-compliant safety net — direct-writes to `organizations_projection` instead of calling dropped RPCs. Intentional CQRS exception: if event emission has failed, emitting another event would also fail; direct write is the only reliable fallback.
+- Removed `ActivateOrganizationParams`, `emitOrganizationActivated` (unused after deletion)
+- Dropped `api.accept_invitation` (migration `20260207020902`)
+- Fixed `user.invited` routing in `process_user_event()` and `chk_invitation_status` CHECK constraint (migration `20260209031755`)
 
 ### Risks Accepted
 
