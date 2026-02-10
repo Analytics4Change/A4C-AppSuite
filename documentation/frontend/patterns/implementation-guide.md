@@ -382,8 +382,7 @@ Track these metrics weekly:
 ### Documentation
 
 - [Main Strategy Document](./documentation-alignment-strategy.md)
-- [Templates](../templates/)
-- [Code Style Guidelines](../../CLAUDE.md#development-guidelines)
+- [Code Style Guidelines](../../../frontend/CLAUDE.md#development-guidelines)
 
 ### Tools
 

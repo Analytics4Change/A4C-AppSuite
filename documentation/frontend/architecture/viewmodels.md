@@ -525,7 +525,7 @@ function DevelopmentApp() {
 
 ## Related Documentation
 
-- [MobX Integration Patterns](../strategy/mobx-patterns.md)
-- [Component Architecture](../components.md)
+- [MobX Integration Patterns](../patterns/mobx-patterns.md)
+- [Component Architecture](../reference/components/components.md)
 - [Testing Strategies](../testing/viewmodel-testing.md)
 - [Performance Optimization](../performance/mobx-optimization.md)

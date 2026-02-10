@@ -486,6 +486,6 @@ class EfficientViewModel {
 ## Related Documentation
 
 - [ViewModel Testing Strategies](../testing/viewmodel-testing.md)
-- [MobX Integration Patterns](../strategy/mobx-patterns.md)
+- [MobX Integration Patterns](../patterns/mobx-patterns.md)
 - [Architecture Overview](../architecture/overview.md)
-- [Component Patterns](../components.md)
+- [Component Patterns](../reference/components/components.md)

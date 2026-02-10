@@ -228,7 +228,7 @@ const auth = getAuthProvider();
 import { SupabaseAuthProvider } from './SupabaseAuthProvider';
 ```
 
-See [Frontend Architecture](../architecture/README.md) for patterns.
+See [Frontend Architecture](../architecture/overview.md) for patterns.
 
 ## Environment Variables
 
@@ -371,7 +371,7 @@ Review errors and ensure:
 - [Installation Guide](./installation.md) - Initial setup
 - [Validation Guide](./validation-guide.md) - Documentation validation
 - [Testing Guide](../testing/TESTING.md) - Testing strategies
-- [CLAUDE.md](../../CLAUDE.md) - Claude Code guidance
+- [CLAUDE.md](../../../frontend/CLAUDE.md) - Claude Code guidance
 - [Frontend README](../README.md) - Architecture overview
 
 ## Getting Help

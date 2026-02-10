@@ -493,7 +493,7 @@ All code must meet documentation standards before considered complete:
 ### Reference Documentation
 
 - **[Components Reference](../reference/components/)** - Component documentation
-- **[ViewModels Reference](../reference/viewmodels/)** - ViewModel documentation
+- **[ViewModels Reference](../architecture/viewmodels.md)** - ViewModel documentation
 - **[Frontend CLAUDE.md](/home/lars/dev/A4C-AppSuite/frontend/CLAUDE.md)** - Detailed development guidelines
 - **[Frontend README](/home/lars/dev/A4C-AppSuite/frontend/README.md)** - Project overview
 

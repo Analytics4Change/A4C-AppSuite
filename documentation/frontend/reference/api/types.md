@@ -806,4 +806,4 @@ interface RXNormClassResponse {
 
 - [Component Documentation](../components/)
 - [API Documentation](./README.md)
-- [Architecture Overview](../architecture/overview.md)
+- [Architecture Overview](../../architecture/overview.md)

@@ -42,10 +42,10 @@ The API layer follows a service-oriented architecture with:
 
 ## Development Guidelines
 
-See the main [project documentation](../../CLAUDE.md) for development patterns and best practices.
+See the main [project documentation](../../../../frontend/CLAUDE.md) for development patterns and best practices.
 
 ## Related Documentation
 
-- [Architecture Overview](../architecture/overview.md)
+- [Architecture Overview](../../architecture/overview.md)
 - [Component Documentation](../components/)
-- [Testing Guide](../TESTING.md)
+- [Testing Guide](../../testing/TESTING.md)

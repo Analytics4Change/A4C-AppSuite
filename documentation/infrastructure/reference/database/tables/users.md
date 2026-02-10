@@ -751,9 +751,9 @@ SELECT * FROM users WHERE email = 'user@example.com';
   - [user_roles_projection](user_roles_projection.md) - User role assignments
   - [domain_events](domain_events.md) - User action audit trail (via event metadata)
 - **Database Functions**:
-  - [get_current_user_id()](../functions/authorization.md#get_current_user_id)
-  - [is_super_admin()](../functions/authorization.md#is_super_admin)
-  - [has_org_admin_permission()](../functions/authorization.md#has_org_admin_permission) - JWT-claims-based admin check
+  - `get_current_user_id()` - Returns the current authenticated user's ID from JWT
+  - `is_super_admin()` - Checks if current user has super_admin role
+  - `has_org_admin_permission()` - JWT-claims-based admin check
 - **Supabase Auth**: [Supabase Auth Documentation](https://supabase.com/docs/guides/auth)
 
 ---

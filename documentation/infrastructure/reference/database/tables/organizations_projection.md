@@ -788,8 +788,8 @@ WHERE path <@ 'root.org_acme_healthcare';
   - [clients](clients.md) - Patient records
 - **AsyncAPI Contracts**: `infrastructure/supabase/contracts/asyncapi/domains/organization.yaml`
 - **Database Functions**:
-  - [is_super_admin()](../functions/authorization.md#is_super_admin)
-  - [has_org_admin_permission()](../functions/authorization.md#has_org_admin_permission) - JWT-claims-based admin check
+  - `is_super_admin()` - Checks if current user has super_admin role
+  - `has_org_admin_permission()` - JWT-claims-based admin check
 - **Ltree Documentation**: [PostgreSQL ltree](https://www.postgresql.org/docs/current/ltree.html)
 
 ---

@@ -933,7 +933,6 @@ as "Coming Soon - Enterprise Feature"
 
 ### Data & Organization Management
 - **[Organization Management Architecture](./organization-management-architecture.md)** - Hierarchical organization structure with ltree
-- **[Organization Management Implementation](./organization-management-implementation.md)** - Technical implementation details
 - **[Tenants as Organizations](./tenants-as-organizations.md)** - Multi-tenancy design philosophy
 - **[Event Sourcing Overview](./event-sourcing-overview.md)** - CQRS and domain events for audit trail
 

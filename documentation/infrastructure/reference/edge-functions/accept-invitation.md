@@ -19,7 +19,7 @@ last_updated: 2026-02-10
 **Prerequisites**:
 - [oauth-invitation-acceptance.md](../../../architecture/authentication/oauth-invitation-acceptance.md) - OAuth invitation architecture
 - [invitations_projection.md](../database/tables/invitations_projection.md) - Invitation data model
-- [validate-invitation.md](./validate-invitation.md) - Pre-acceptance validation
+- `validate-invitation` edge function - Pre-acceptance validation (documentation pending)
 
 **Key topics**: `accept-invitation`, `edge-function`, `user-creation`, `oauth`, `email-password`, `role-assignment`, `contact-linking`, `notification-preferences`
 
@@ -715,6 +715,6 @@ ORDER BY created_at;
 - **[OAuth Invitation Acceptance](../../../architecture/authentication/oauth-invitation-acceptance.md)** - Architecture and flow diagrams
 - **[Event-Driven Architecture](../../guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)** - Backend event sourcing specification
 - **[invitations_projection Table](../database/tables/invitations_projection.md)** - Invitation data model
-- **[validate-invitation Edge Function](./validate-invitation.md)** - Pre-acceptance validation
-- **[invite-user Edge Function](./invite-user.md)** - Invitation creation flow
+- **validate-invitation Edge Function** - Pre-acceptance validation (documentation pending)
+- **invite-user Edge Function** - Invitation creation flow (documentation pending)
 - **[user_roles_projection Table](../database/tables/user_roles_projection.md)** - Role assignment model

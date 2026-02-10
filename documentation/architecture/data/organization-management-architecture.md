@@ -1234,7 +1234,6 @@ Temporal Worker (workflow-worker deployment)
 ## Related Documentation
 
 ### Implementation & Database
-- **[Organization Management Implementation](./organization-management-implementation.md)** - Technical implementation details
 - **[organizations_projection Table](../../infrastructure/reference/database/tables/organizations_projection.md)** - Complete database schema (760 lines)
 - **[organization_business_profiles_projection Table](../../infrastructure/reference/database/tables/organization_business_profiles_projection.md)** - Business profile schema
 - **organization_domains_projection** - Custom domains schema (not yet implemented)

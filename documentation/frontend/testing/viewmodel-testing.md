@@ -334,7 +334,7 @@ export function waitForViewModel(viewModel, condition, timeout = 1000) {
 
 ## Related Documentation
 
-- [MobX Integration Patterns](../strategy/mobx-patterns.md)
-- [Component Testing Guide](../TESTING.md)
+- [MobX Integration Patterns](../patterns/mobx-patterns.md)
+- [Component Testing Guide](./TESTING.md)
 - [Performance Optimization](../performance/mobx-optimization.md)
 - [Architecture Overview](../architecture/overview.md)

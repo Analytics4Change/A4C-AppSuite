@@ -355,6 +355,6 @@ export type SomeType = {
 - **Validation errors**: Check this guide first
 - **False positives**: Create an issue with details
 - **Feature requests**: Suggest improvements to validation
-- **Documentation standards**: See [CLAUDE.md](../../CLAUDE.md)
+- **Documentation standards**: See [CLAUDE.md](../../../frontend/CLAUDE.md)
 
 Remember: The validation system is designed to help maintain high-quality documentation that serves developers well. When in doubt, prioritize clarity and accuracy over perfect validation scores.

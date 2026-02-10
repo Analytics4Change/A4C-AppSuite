@@ -647,4 +647,4 @@ class MedicationPageViewModel {
 - [ViewModel Testing Strategies](../testing/viewmodel-testing.md)
 - [Performance Optimization](../performance/mobx-optimization.md)
 - [Architecture Overview](../architecture/overview.md)
-- [Component Documentation](../components.md)
+- [Component Documentation](../reference/components/components.md)

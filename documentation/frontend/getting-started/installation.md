@@ -139,8 +139,8 @@ npx playwright install
 ### Getting Help
 
 - Check the [README.md](../../README.md) for general information
-- Review [DEVELOPMENT.md](../DEVELOPMENT.md) for development guidelines
-- See [TESTING.md](../TESTING.md) for testing strategies
+- Review [DEVELOPMENT.md](../guides/DEVELOPMENT.md) for development guidelines
+- See [TESTING.md](../testing/TESTING.md) for testing strategies
 
 ## Next Steps
 
