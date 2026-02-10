@@ -750,7 +750,7 @@ CREATE INDEX idx_dosage_info_client_scheduled
 - [clients](./clients.md) - Client reference
 - [medications](./medications.md) - Medication catalog
 - [users](./users.md) - Administration and verification staff
-- [Event Sourcing](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern
+- [Event Sourcing](../../../../architecture/data/event-sourcing-overview.md) - CQRS pattern
 
 ## See Also
 

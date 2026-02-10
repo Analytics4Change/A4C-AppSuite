@@ -206,7 +206,7 @@ ORDER BY started_at DESC;
 
 ## Related Documentation
 
-- [Impersonation Architecture](../../../architecture/authentication/impersonation-architecture.md) - Design overview
-- [Impersonation Security Controls](../../../architecture/authentication/impersonation-security-controls.md) - Security details
+- [Impersonation Architecture](../../../../architecture/authentication/impersonation-architecture.md) - Design overview
+- [Impersonation Security Controls](../../../../architecture/authentication/impersonation-security-controls.md) - Security details
 - [users](./users.md) - User table reference
-- [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern
+- [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md) - CQRS pattern

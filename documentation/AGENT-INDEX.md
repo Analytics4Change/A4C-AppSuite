@@ -16,7 +16,7 @@ purpose: agent-navigation
 |------|-----------|-----------|
 | Add database table | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | [table-template.md](infrastructure/reference/database/table-template.md) |
 | Add domain event type | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) |
-| Add event handler | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | [cqrs-projections.md](../.claude/skills/infrastructure-guidelines/resources/cqrs-projections.md) |
+| Add event handler | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) |
 | Choose event processing pattern | [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) |
 | Add Temporal workflow | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | [temporal-overview.md](architecture/workflows/temporal-overview.md) |
 | Add frontend component | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | [DESIGN_PATTERNS_MIGRATION_GUIDE.md](frontend/guides/DESIGN_PATTERNS_MIGRATION_GUIDE.md) |
@@ -62,7 +62,7 @@ purpose: agent-navigation
 | `contract-drift` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, workflows/CLAUDE.md |
 | `controlled-substances` | [medications.md](infrastructure/reference/database/tables/medications.md) | dosage_info.md |
 | `cqrs` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md, MIGRATION-FROM-CRUD.md |
-| `cqrs-compliance` | [cqrs-dual-write-audit.md](../dev/active/cqrs-dual-write-audit.md) | event-handler-pattern.md, event-processing-patterns.md |
+| `cqrs-compliance` | [cqrs-dual-write-audit.md](../dev/archived/cqrs-dual-write-audit/cqrs-dual-write-audit-context.md) | event-handler-pattern.md, event-processing-patterns.md |
 | `correlation-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md, triggering-workflows.md |
 | `cross-tenant` | [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | var-partnerships.md |
 | `custom-claims` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | frontend-auth-architecture.md, custom-claims-setup.md |
@@ -75,7 +75,7 @@ purpose: agent-navigation
 | `dns-verification` | [activities-reference.md](workflows/reference/activities-reference.md) | organization-bootstrap-workflow-design.md |
 | `domain-events` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-metadata-schema.md |
 | `dosage-info` | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | medication_history.md |
-| `dual-write` | [cqrs-dual-write-audit.md](../dev/active/cqrs-dual-write-audit.md) | event-handler-pattern.md, event-processing-patterns.md |
+| `dual-write` | [cqrs-dual-write-audit.md](../dev/archived/cqrs-dual-write-audit/cqrs-dual-write-audit-context.md) | event-handler-pattern.md, event-processing-patterns.md |
 | `duration-ms` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `edge-function` | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `edge-function-jwt` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | EDGE_FUNCTION_TESTS.md |
@@ -87,7 +87,7 @@ purpose: agent-navigation
 | `event-processing-patterns` | [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | event-handler-pattern.md, event-driven-workflow-triggering.md |
 | `event-types` | [event_types.md](infrastructure/reference/database/tables/event_types.md) | event-sourcing-overview.md |
 | `enterprise-sso` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
-| `event-handler` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md, event-sourcing-overview.md |
+| `event-handler` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md |
 | `event-type-naming` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-dual-write-audit.md, event-sourcing-overview.md |
 | `events` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md |
 | `failed-events` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md |
@@ -95,7 +95,7 @@ purpose: agent-navigation
 | `feature-flag` | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | user_client_assignments_projection.md |
 | `formulary` | [medications.md](infrastructure/reference/database/tables/medications.md) | medication_history.md |
 | `generated-events` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | workflows/CLAUDE.md, event-sourcing-overview.md |
-| `handler` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md, event-sourcing-overview.md |
+| `handler` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md |
 | `hierarchy` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | scoping-architecture.md |
 | `idempotency` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | organization-bootstrap-workflow-design.md |
 | `impersonation` | [impersonation-architecture.md](architecture/authentication/impersonation-architecture.md) | impersonation-security-controls.md |
@@ -148,7 +148,7 @@ purpose: agent-navigation
 | `polling` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | integration-testing.md |
 | `postgres-notify` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-driven-workflow-triggering.md |
 | `prescriptions` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | dosage_info.md |
-| `process_event` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md |
+| `process_event` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md |
 | `projection` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | organizations_projection.md, table-template.md |
 | `provider-admin` | [provider-admin-permissions-architecture.md](architecture/authorization/provider-admin-permissions-architecture.md) | role_permission_templates.md |
 | `provider-onboarding` | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | organization-bootstrap-workflow-design.md |
@@ -168,7 +168,7 @@ purpose: agent-navigation
 | `bulk-assignment` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | user_roles_projection.md |
 | `sync-role-assignments` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | manage-user.md |
 | `roles` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | roles_projection.md |
-| `router` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md |
+| `router` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md |
 | `rxnorm` | [medications.md](infrastructure/reference/database/tables/medications.md) | rxnorm-medication-autocomplete.md |
 | `saga` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
 | `schedule` | [user_schedule_policies_projection.md](infrastructure/reference/database/tables/user_schedule_policies_projection.md) | schedule-management.md, user_client_assignments_projection.md, organizations_projection.md |
@@ -189,7 +189,7 @@ purpose: agent-navigation
 | `session-management` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | auth-provider-architecture.md, frontend/CLAUDE.md |
 | `getSession` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | auth-provider-architecture.md |
 | `span-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
-| `split-handlers` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | cqrs-projections.md |
+| `split-handlers` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md |
 | `social-login` | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) | OAUTH-TESTING.md |
 | `soft-delete` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | clients.md |
 | `supabase` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | DEPLOYMENT_INSTRUCTIONS.md, SUPABASE-AUTH-SETUP.md |

@@ -125,4 +125,4 @@ WHERE pa.address_id = 'address-uuid-here';
 
 - [phones_projection](./phones_projection.md) - Phone entity details
 - [addresses_projection](./addresses_projection.md) - Address entity details
-- [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation
+- [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation

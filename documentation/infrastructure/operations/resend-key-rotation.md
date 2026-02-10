@@ -382,7 +382,7 @@ If the Resend API key is exposed publicly (e.g., committed to git, posted in cha
 If Resend API is down (503 errors, timeouts):
 
 1. **Check Status**: Visit https://status.resend.com
-2. **Enable SMTP Fallback**: See [documentation/workflows/guides/resend-email-provider.md](../../../workflows/guides/resend-email-provider.md#smtp-fallback) for SMTP configuration
+2. **Enable SMTP Fallback**: See [documentation/workflows/guides/resend-email-provider.md](../../workflows/guides/resend-email-provider.md#smtp-fallback) for SMTP configuration
 3. **Monitor Recovery**: Once Resend is back online, revert to Resend for better deliverability
 
 ## Automation Considerations
@@ -428,10 +428,10 @@ Track rotation history for compliance and auditing:
 
 ## Related Documentation
 
-- [Resend Email Provider Guide](../../../workflows/guides/resend-email-provider.md) - Complete Resend implementation documentation
+- [Resend Email Provider Guide](../../workflows/guides/resend-email-provider.md) - Complete Resend implementation documentation
 - [Infrastructure CLAUDE.md](../../../infrastructure/CLAUDE.md#email-provider-configuration-resend) - Developer guidance on Resend configuration
 - [Temporal Worker Deployment](../../../infrastructure/k8s/temporal/worker-deployment.yaml) - K8s deployment configuration
-- [Activities Reference](../../../workflows/reference/activities-reference.md) - Email sending activities
+- [Activities Reference](../../workflows/reference/activities-reference.md) - Email sending activities
 
 ## Support
 

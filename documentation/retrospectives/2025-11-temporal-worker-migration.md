@@ -565,7 +565,7 @@ Distributed tracing, correlation IDs, centralized logging are not "nice to have"
 ## 📚 Related Documentation
 
 ### Migration Docs
-- `dev/active/temporal-worker-realtime-migration-context.md` - Complete architecture context
+- ~~`dev/active/temporal-worker-realtime-migration-context.md`~~ - Complete architecture context (dev task archived)
 - `dev/active/temporal-worker-realtime-migration-tasks.md` - All 9 phases with tasks
 - `dev/active/temporal-worker-realtime-migration.md` - Implementation plan
 

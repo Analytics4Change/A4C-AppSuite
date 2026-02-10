@@ -202,5 +202,5 @@ WHERE bp.physical_address->>'state' = 'MA';
 ## Related Documentation
 
 - [organizations_projection](./organizations_projection.md) - Main organization table
-- [Provider Partners Architecture](../../../architecture/data/provider-partners-architecture.md) - Partner types
-- [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern
+- [Provider Partners Architecture](../../../../architecture/data/provider-partners-architecture.md) - Partner types
+- [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md) - CQRS pattern

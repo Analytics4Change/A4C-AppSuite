@@ -14,7 +14,7 @@ last_updated: 2026-01-05
 - Troubleshooting invitation token issues
 - Understanding invitation status lifecycle
 
-**Prerequisites**: [Edge Functions Deployment](../../guides/supabase/edge-functions-deployment.md)
+**Prerequisites**: [Edge Functions Deployment](../../../guides/supabase/edge-functions-deployment.md)
 
 **Key topics**: `invitations`, `tokens`, `onboarding`, `edge-functions`, `status-lifecycle`, `multi-role-invitation`, `user-aggregate`
 

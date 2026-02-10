@@ -955,9 +955,9 @@ CREATE INDEX IF NOT EXISTS idx_medications_active_ingredients_gin
 - [users](./users.md) - User authentication and audit trail
 - [clients](./clients.md) - Client allergy cross-reference
 - [medication_history](./medication_history.md) - Child table for prescriptions (to be documented)
-- [Schema Overview](../schema-overview.md) - Complete database schema and ER diagrams (to be created)
-- [RLS Policies](../../guides/database/rls-policies.md) - Comprehensive RLS policy guide (to be created)
-- [RxNorm Integration](../../guides/database/rxnorm-integration.md) - RxNorm integration guide (to be created)
+- [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md) - Database schema and CQRS pattern
+- [RBAC Architecture](../../../../architecture/authorization/rbac-architecture.md) - RLS policies and role-based access control
+- [RxNorm Integration](../../../guides/database/rxnorm-integration.md) - RxNorm integration guide
 
 ## See Also
 

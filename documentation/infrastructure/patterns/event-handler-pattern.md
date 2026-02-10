@@ -447,7 +447,7 @@ Every handler MUST follow these rules:
 | **No cross-projection queries** | Projections are denormalized |
 | **No direct projection writes in API functions** | API functions emit events; only handlers update projections |
 
-> **Resolved Issues (see [CQRS Dual-Write Audit](../../../dev/active/cqrs-dual-write-audit.md))**:
+> **Resolved Issues (see [CQRS Dual-Write Audit](../../../dev/archived/cqrs-dual-write-audit/cqrs-dual-write-audit-context.md))**:
 > All P0 and P1 CQRS violations have been remediated:
 > - Event type naming mismatches fixed (migration `20260206234839`)
 > - Dual-write patterns removed from API functions (migration `20260207000203`)
@@ -495,8 +495,8 @@ SELECT * FROM plpgsql_check_function('handle_user_phone_added(record)'::regproce
 
 - [Event Processing Patterns](./event-processing-patterns.md) - Decision guide for choosing sync vs async patterns
 - [Event Sourcing Overview](../../architecture/data/event-sourcing-overview.md) - CQRS architecture
-- [CQRS Projections](../../../.claude/skills/infrastructure-guidelines/resources/cqrs-projections.md) - Projection table design
+- [Event Sourcing & CQRS Projections](../../architecture/data/event-sourcing-overview.md) - Projection table design
 - [Event Observability](../guides/event-observability.md) - Monitoring, tracing, failed events
 - [Supabase Migrations](../guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) - Idempotent migration patterns
 - [AsyncAPI Contracts](../../../infrastructure/supabase/contracts/README.md) - Event schema definitions
-- [CQRS Dual-Write Audit](../../../dev/active/cqrs-dual-write-audit.md) - Audit of CQRS compliance violations
+- [CQRS Dual-Write Audit](../../../dev/archived/cqrs-dual-write-audit/cqrs-dual-write-audit-context.md) - Audit of CQRS compliance violations

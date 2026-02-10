@@ -113,4 +113,4 @@ WHERE oa.address_id = 'address-uuid-here'
 
 - [addresses_projection](./addresses_projection.md) - Address entity details
 - [organizations_projection](./organizations_projection.md) - Organization entity details
-- [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation
+- [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation

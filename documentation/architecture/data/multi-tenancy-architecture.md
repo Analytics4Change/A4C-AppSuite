@@ -940,7 +940,7 @@ as "Coming Soon - Enterprise Feature"
 ### Database Implementation
 - **[organizations_projection Table](../../infrastructure/reference/database/tables/organizations_projection.md)** - Complete org table schema (760 lines)
 - **[users Table](../../infrastructure/reference/database/tables/users.md)** - User authentication and org association (742 lines)
-- **[RLS Policy Design](../../infrastructure/guides/supabase/RLS-POLICY-DESIGN.md)** - Row-level security patterns (if exists)
+- **[RBAC Architecture](../authorization/rbac-architecture.md)** - Row-level security patterns and role-based access control
 - **[SQL Idempotency Audit](../../infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md)** - Migration best practices
 
 ### Workflows & Operations

@@ -1149,7 +1149,7 @@ ORDER BY de.created_at DESC;
 - [Organization Management Architecture](../../architecture/data/organization-management-architecture.md) - Org structure
 
 **Infrastructure Foundation**:
-- [Provider Onboarding Enhancement Plan](../../../dev/active/provider-onboarding-enhancement-plan.md) - Junction table infrastructure
+- Provider Onboarding Enhancement Plan - Junction table infrastructure (dev task archived)
 
 ---
 

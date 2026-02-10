@@ -14,7 +14,7 @@ last_updated: 2025-12-30
 - Understanding which events affect which projections
 - Building event documentation or API catalogs
 
-**Prerequisites**: [domain_events](./domain_events.md), [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md)
+**Prerequisites**: [domain_events](./domain_events.md), [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md)
 
 **Key topics**: `event-types`, `schema-registry`, `json-schema`, `event-validation`, `projection-mapping`
 
@@ -570,6 +570,6 @@ None yet applied.
 ## Related Documentation
 
 - **[domain_events](domain_events.md)** - Event store table using these schemas
-- **[Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md)** - CQRS architecture
-- **[Event-Driven Architecture](../../guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)** - Backend specification
-- **[AsyncAPI Contracts](../../guides/supabase/contracts/)** - Event contract definitions
+- **[Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md)** - CQRS architecture
+- **[Event-Driven Architecture](../../../guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)** - Backend specification
+- **[AsyncAPI Contracts](../../../../../infrastructure/supabase/contracts/)** - Event contract definitions

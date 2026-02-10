@@ -870,7 +870,7 @@ WHERE id = 'prescription-uuid';
 - [dosage_info](./dosage_info.md) - Child dosage administration table (to be documented)
 - [organizations_projection](./organizations_projection.md) - Multi-tenant isolation
 - [users](./users.md) - Prescriber and audit references
-- [Event Sourcing](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern
+- [Event Sourcing](../../../../architecture/data/event-sourcing-overview.md) - CQRS pattern
 
 ## See Also
 

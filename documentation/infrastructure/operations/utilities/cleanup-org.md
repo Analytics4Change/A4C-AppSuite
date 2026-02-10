@@ -158,6 +158,4 @@ Step 4: Delete Cloudflare DNS record
 
 ## See Also
 
-- [cleanup-dev.ts](./cleanup-dev.md) - Soft delete tagged development entities
-- [query-dev.ts](./query-dev.md) - Query development entities
 - [Workflows CLAUDE.md](../../../../workflows/CLAUDE.md) - Script conventions

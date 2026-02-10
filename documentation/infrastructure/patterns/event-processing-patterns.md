@@ -280,5 +280,5 @@ Temporal provides:
 - [Event Handler Pattern](./event-handler-pattern.md) - How synchronous handlers work (routers, handlers, adding new ones)
 - [Event-Driven Workflow Triggering](../../architecture/workflows/event-driven-workflow-triggering.md) - How async pg_notify + Temporal works
 - [Event Observability](../../infrastructure/guides/event-observability.md) - Monitoring, tracing, failed events
-- [CQRS Dual-Write Audit](../../../dev/active/cqrs-dual-write-audit.md) - Audit of functions that violate the patterns above
+- [CQRS Dual-Write Audit](../../../dev/archived/cqrs-dual-write-audit/cqrs-dual-write-audit-context.md) - Audit of functions that violate the patterns above
 - [Event Sourcing Overview](../../architecture/data/event-sourcing-overview.md) - CQRS architecture overview

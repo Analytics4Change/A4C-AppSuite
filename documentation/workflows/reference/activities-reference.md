@@ -721,9 +721,9 @@ Only `super_admin` is seeded as a global role. All other roles are created per-o
 - **Template Seeds**: `infrastructure/supabase/sql/99-seeds/012-role-permission-templates.sql`
 
 **Related Documentation**:
-- [Permissions Reference](../../../architecture/authorization/permissions-reference.md)
-- [Provider Admin Permissions Architecture](../../../architecture/authorization/provider-admin-permissions-architecture.md)
-- [role_permission_templates Table Reference](../../../infrastructure/reference/database/tables/role_permission_templates.md)
+- [Permissions Reference](../../architecture/authorization/permissions-reference.md)
+- [Provider Admin Permissions Architecture](../../architecture/authorization/provider-admin-permissions-architecture.md)
+- [role_permission_templates Table Reference](../../infrastructure/reference/database/tables/role_permission_templates.md)
 
 ---
 

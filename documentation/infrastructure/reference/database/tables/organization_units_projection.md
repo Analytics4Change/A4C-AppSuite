@@ -385,8 +385,8 @@ ORDER BY created_at DESC;
 
 - [organizations_projection](organizations_projection.md) - Root organizations
 - [user_roles_projection](user_roles_projection.md) - Role assignments with scope
-- [Multi-Tenancy Architecture](../../../architecture/data/multi-tenancy-architecture.md)
-- [AsyncAPI Contract](../../../../infrastructure/supabase/contracts/asyncapi/domains/organization-unit.yaml)
+- [Multi-Tenancy Architecture](../../../../architecture/data/multi-tenancy-architecture.md)
+- [AsyncAPI Contract](../../../../../infrastructure/supabase/contracts/asyncapi/domains/organization-unit.yaml)
 
 ---
 

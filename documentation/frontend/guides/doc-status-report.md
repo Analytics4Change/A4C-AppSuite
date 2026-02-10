@@ -49,10 +49,6 @@ last_updated: 2025-12-30
 
 **📋 Next Steps**: Download the detailed alignment report artifact for complete file listings and fix suggestions.
 
-### Detailed Reports
-- [Validation Report](doc-validation-report.json)
-- [Alignment Report](doc-alignment-report.json)
-
 ### Recommendations
 - Review detailed alignment issues above and implement suggested fixes
 - Download alignment report artifact for complete issue listings

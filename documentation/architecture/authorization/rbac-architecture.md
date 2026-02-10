@@ -1458,10 +1458,10 @@ All platform admin actions emit audit events to `domain_events`:
   - [roles_projection.md](../../infrastructure/reference/database/tables/roles_projection.md) - Role templates and assignments
   - [role_permissions_projection.md](../../infrastructure/reference/database/tables/role_permissions_projection.md) - Role-permission junction
   - [user_roles_projection.md](../../infrastructure/reference/database/tables/user_roles_projection.md) - User role assignments
-- **Supabase RLS**: [../../infrastructure/guides/supabase/RLS-POLICY-DESIGN.md](../../infrastructure/guides/supabase/RLS-POLICY-DESIGN.md) - Row-level security patterns
+- **Supabase RLS**: See the RLS policies section above for row-level security patterns
 
 #### Workflows & Operations
-- **Organization Bootstrap**: [../workflows/organization-bootstrap-workflow-design.md](../workflows/organization-bootstrap-workflow-design.md) - Temporal workflow for org setup ✅
+- **Organization Bootstrap**: [../../workflows/architecture/organization-bootstrap-workflow-design.md](../../workflows/architecture/organization-bootstrap-workflow-design.md) - Temporal workflow for org setup
 - **Temporal Overview**: [../workflows/temporal-overview.md](../workflows/temporal-overview.md) - Workflow orchestration architecture
 - **Activities Reference**: [../../workflows/reference/activities-reference.md](../../workflows/reference/activities-reference.md) - Workflow activity catalog
 

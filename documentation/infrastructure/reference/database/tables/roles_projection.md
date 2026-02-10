@@ -14,7 +14,7 @@ last_updated: 2025-12-30
 - Implementing role-based UI rendering
 - Troubleshooting role visibility or scope constraint errors
 
-**Prerequisites**: [RBAC Architecture](../../../architecture/authorization/rbac-architecture.md)
+**Prerequisites**: [RBAC Architecture](../../../../architecture/authorization/rbac-architecture.md)
 
 **Key topics**: `roles`, `rbac`, `super-admin`, `org-scoped-roles`, `scope-check-constraint`
 

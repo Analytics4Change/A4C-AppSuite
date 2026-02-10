@@ -774,11 +774,11 @@ WHERE path <@ 'root.org_acme_healthcare';
 
 ## Related Documentation
 
-- [Schema Overview](../schema-overview.md) - Complete database schema and ER diagrams
-- [RLS Policies](../rls-policies.md) - Comprehensive RLS policy reference
-- [Migration Guide](../../guides/database/migration-guide.md) - How to create migrations
-- [Event Sourcing](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation
-- [Multi-Tenancy Architecture](../../../architecture/data/multi-tenancy-architecture.md) - Organizational isolation design
+- [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md) - Database schema and CQRS pattern
+- [RBAC Architecture](../../../../architecture/authorization/rbac-architecture.md) - RLS policies and role-based access control
+- [SQL Idempotency Audit](../../../guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) - Migration patterns and best practices
+- [Event Sourcing](../../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation
+- [Multi-Tenancy Architecture](../../../../architecture/data/multi-tenancy-architecture.md) - Organizational isolation design
 
 ## See Also
 

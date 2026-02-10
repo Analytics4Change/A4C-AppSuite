@@ -831,7 +831,7 @@ await emitEvent(...);
 - **[Event Sourcing Overview](../../architecture/data/event-sourcing-overview.md)** - CQRS and domain events architecture
 - **[Event-Driven Architecture Guide](../../infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)** - Complete backend event sourcing specification
 - **[domain_events Table](../../infrastructure/reference/database/tables/domain_events.md)** - Event store schema documentation
-- **[event_subscriptions Table](../../infrastructure/reference/database/tables/event_subscriptions.md)** - Event subscriber configuration
+- **event_subscriptions** - Event subscriber configuration (not yet implemented)
 
 ### Frontend Architecture
 - **[Frontend Architecture Overview](../architecture/overview.md)** - High-level application architecture

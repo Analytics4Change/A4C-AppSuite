@@ -113,4 +113,4 @@ WHERE op.phone_id = 'phone-uuid-here'
 
 - [phones_projection](./phones_projection.md) - Phone entity details
 - [organizations_projection](./organizations_projection.md) - Organization entity details
-- [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation
+- [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation

@@ -102,4 +102,4 @@ WHERE cp.phone_id = 'phone-uuid-here';
 
 - [contacts_projection](./contacts_projection.md) - Contact entity details
 - [phones_projection](./phones_projection.md) - Phone entity details
-- [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation
+- [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation

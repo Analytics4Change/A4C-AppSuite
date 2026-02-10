@@ -575,7 +575,7 @@ Junction tables enable queries impossible with embedded data:
 
 **Implementation**:
 - [Contact Management Implementation Guide](../../infrastructure/guides/contact-management-implementation-guide.md) - Phases, UI, testing
-- [Provider Onboarding Enhancement Plan](../../../dev/active/provider-onboarding-enhancement-plan.md) - Junction table infrastructure
+- Provider Onboarding Enhancement Plan - Junction table infrastructure (dev task archived)
 
 **Reference**:
 - [Database Tables: contacts_projection](../../infrastructure/reference/database/tables/contacts_projection.md) - Contact schema

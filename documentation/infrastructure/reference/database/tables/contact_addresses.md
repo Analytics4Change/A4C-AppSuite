@@ -102,4 +102,4 @@ WHERE ca.address_id = 'address-uuid-here';
 
 - [contacts_projection](./contacts_projection.md) - Contact entity details
 - [addresses_projection](./addresses_projection.md) - Address entity details
-- [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation
+- [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation

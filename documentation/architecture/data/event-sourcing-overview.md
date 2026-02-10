@@ -290,7 +290,7 @@ const { data } = await supabase
 - **[Event-Driven Architecture Guide](../../infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)** - Complete event sourcing specification
 - **[Frontend Event-Driven Guide](../../frontend/guides/EVENT-DRIVEN-GUIDE.md)** - Frontend CQRS implementation patterns
 - **[domain_events Table](../../infrastructure/reference/database/tables/domain_events.md)** - Event store schema documentation
-- **[event_subscriptions Table](../../infrastructure/reference/database/tables/event_subscriptions.md)** - Event subscriber configuration
+- **event_subscriptions** - Event subscriber configuration (not yet implemented)
 
 ### Database & Projections
 - **[Database Tables Reference](../../infrastructure/reference/database/tables/)** - All CQRS projection tables

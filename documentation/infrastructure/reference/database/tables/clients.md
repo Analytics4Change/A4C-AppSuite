@@ -14,7 +14,7 @@ last_updated: 2025-12-30
 - Querying client data with proper RLS enforcement
 - Understanding MAR (Medication Administration Record) data model
 
-**Prerequisites**: [organizations_projection](./organizations_projection.md), [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md)
+**Prerequisites**: [organizations_projection](./organizations_projection.md), [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md)
 
 **Key topics**: `clients`, `phi`, `hipaa`, `multi-tenancy`, `rls-gap`, `allergies`, `medical-conditions`, `soft-delete`
 
@@ -939,10 +939,10 @@ VACUUM FULL clients; -- Requires exclusive lock
 - [users](./users.md) - User authentication and multi-tenant access
 - [medication_history](./medication_history.md) - Child table for prescriptions (to be documented)
 - [dosage_info](./dosage_info.md) - Child table for dosage administration (to be documented)
-- [Schema Overview](../schema-overview.md) - Complete database schema and ER diagrams (to be created)
-- [RLS Policies](../../guides/database/rls-policies.md) - Comprehensive RLS policy guide (to be created)
-- [Migration Guide](../../guides/database/migration-guide.md) - How to create migrations (to be created)
-- [Event Sourcing](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation
+- [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md) - Database schema and CQRS pattern
+- [RBAC Architecture](../../../../architecture/authorization/rbac-architecture.md) - RLS policies and role-based access control
+- [SQL Idempotency Audit](../../../guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) - Migration patterns and best practices
+- [Event Sourcing](../../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation
 
 ## See Also
 

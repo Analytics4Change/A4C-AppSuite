@@ -760,7 +760,7 @@ npm run validate --prefix infrastructure/supabase/contracts
   - "Why Hand-Crafted?" section documents original decision
   - Contract-first development workflow
 
-- **Event-Driven Architecture Guide**: [`documentation/infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md`](../../guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)
+- **Event-Driven Architecture Guide**: [`documentation/infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md`](../guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)
   - Type generation section (lines 210-221)
   - Contract-first development principles
 

@@ -219,6 +219,6 @@ Old completed/failed jobs should be archived or deleted periodically to maintain
 
 ## Related Documentation
 
-- [Organization Bootstrap Workflow](../../../workflows/architecture/organization-bootstrap-workflow-design.md) - Workflow design
+- [Organization Bootstrap Workflow](../../../../workflows/architecture/organization-bootstrap-workflow-design.md) - Workflow design
 - [domain_events](./domain_events.md) - Event store table
-- [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern
+- [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md) - CQRS pattern

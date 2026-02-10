@@ -462,7 +462,7 @@ kubectl describe pod my-app-xxx | grep -A 5 "Pulling image"
 
 - [Deployment Checklist](../operations/deployment/DEPLOYMENT_CHECKLIST.md)
 - [Kubernetes RBAC Guide](kubernetes/rbac/)
-- [Temporal Worker Realtime Migration](../../../dev/active/temporal-worker-realtime-migration-context.md) - Original implementation
+- Temporal Worker Realtime Migration - Original implementation (dev task archived)
 
 ## Changelog
 

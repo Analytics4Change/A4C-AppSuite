@@ -69,7 +69,6 @@ React/TypeScript medication management application
 
 - **[Getting Started](./frontend/getting-started/)**
   - [Installation Guide](./frontend/getting-started/installation.md) - Dependencies, prerequisites, first run
-  - [Validation Guide](./frontend/getting-started/validation.md) - Testing your setup
 - **[Architecture](./frontend/architecture/)**
   - [Overview](./frontend/architecture/overview.md) - High-level application architecture
   - [ViewModels](./frontend/architecture/viewmodels.md) - MobX state management patterns
@@ -172,7 +171,6 @@ Cross-cutting architectural decisions that span multiple components
   - [Multi-Tenancy Architecture](./architecture/data/multi-tenancy-architecture.md) - Organization-based isolation with RLS
   - [Event Sourcing Overview](./architecture/data/event-sourcing-overview.md) - CQRS and domain events
   - [Organization Management Architecture](./architecture/data/organization-management-architecture.md) - Hierarchical organization structure
-  - [Organization Management Implementation](./architecture/data/organization-management-implementation.md) - Technical implementation
   - [Tenants as Organizations](./architecture/data/tenants-as-organizations.md) - Multi-tenancy design
   - [Provider Partners Architecture](./architecture/data/provider-partners-architecture.md) - Partner ecosystem
   - [VAR Partnerships](./architecture/data/var-partnerships.md) - Value-added reseller partnerships (aspirational)

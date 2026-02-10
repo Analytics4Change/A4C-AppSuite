@@ -14,7 +14,7 @@ last_updated: 2025-12-30
 - Designing contact directory UI components
 - Implementing contact import/export or deduplication
 
-**Prerequisites**: [Provider Onboarding Enhancement](../../../dev/active/provider-onboarding-enhancement-plan.md) complete
+**Prerequisites**: Provider Onboarding Enhancement complete
 
 **Key topics**: `contact-management`, `junction-tables`, `deduplication`, `csv-import`, `communication-history`
 
@@ -1143,7 +1143,7 @@ supabase functions delete contact-api
 - [organization_contacts](../reference/database/tables/organization_contacts.md) - Junction table (aspirational)
 
 **Infrastructure Foundation**:
-- [Provider Onboarding Enhancement Plan](../../../dev/active/provider-onboarding-enhancement-plan.md) - Junction table infrastructure
+- Provider Onboarding Enhancement Plan - Junction table infrastructure (dev task archived)
 
 ---
 

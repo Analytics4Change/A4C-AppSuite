@@ -369,4 +369,4 @@ infrastructure/supabase/contracts/
 - [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md) - CQRS and domain events architecture
 - [Event Metadata Schema](../../../workflows/reference/event-metadata-schema.md) - Metadata field requirements
 - [Infrastructure CLAUDE.md](../../../../infrastructure/CLAUDE.md) - Quick reference for type generation commands
-- [AsyncAPI Contracts Skill](.claude/skills/infrastructure-guidelines/resources/asyncapi-contracts.md) - Detailed Modelina patterns
+- [AsyncAPI Contracts](../../../../infrastructure/supabase/contracts/README.md) - Detailed Modelina patterns

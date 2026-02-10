@@ -14,7 +14,7 @@ last_updated: 2025-12-30
 - Working with user RLS policies (self-access, org-admin, super-admin)
 - Syncing Supabase Auth users with application data
 
-**Prerequisites**: [Supabase Auth Setup](../../guides/supabase/JWT-CLAIMS-SETUP.md)
+**Prerequisites**: [Supabase Auth Setup](../../../guides/supabase/JWT-CLAIMS-SETUP.md)
 
 **Key topics**: `users`, `supabase-auth`, `multi-org-access`, `rls-policies`, `gdpr-compliance`
 
@@ -739,9 +739,9 @@ SELECT * FROM users WHERE email = 'user@example.com';
 
 ## Related Documentation
 
-- [Schema Overview](../schema-overview.md) - Complete database schema and ER diagrams
-- [RLS Policies](../rls-policies.md) - Comprehensive RLS policy reference
-- [Migration Guide](../../../guides/database/migration-guide.md) - How to create migrations
+- [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md) - Database schema and CQRS pattern
+- [RBAC Architecture](../../../../architecture/authorization/rbac-architecture.md) - RLS policies and role-based access control
+- [SQL Idempotency Audit](../../../guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) - Migration patterns and best practices
 - [Supabase Auth Setup](../../../guides/supabase/JWT-CLAIMS-SETUP.md) - JWT custom claims configuration
 
 ## See Also

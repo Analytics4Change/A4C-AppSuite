@@ -14,7 +14,7 @@ last_updated: 2025-12-30
 - Debugging projection issues or event processing failures
 - Querying audit trails or user action history
 
-**Prerequisites**: [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md)
+**Prerequisites**: [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md)
 
 **Key topics**: `domain-events`, `event-sourcing`, `cqrs`, `audit-trail`, `stream-versioning`, `projections`
 
@@ -638,6 +638,6 @@ None yet applied.
 ## Related Documentation
 
 - **[event_types](event_types.md)** - Catalog of valid event types with schemas
-- **[Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md)** - CQRS architecture patterns
-- **[Event-Driven Architecture](../../guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)** - Backend event sourcing specification
-- **[Temporal Workflows](../../../architecture/workflows/temporal-overview.md)** - Workflows emit domain events
+- **[Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md)** - CQRS architecture patterns
+- **[Event-Driven Architecture](../../../guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md)** - Backend event sourcing specification
+- **[Temporal Workflows](../../../../architecture/workflows/temporal-overview.md)** - Workflows emit domain events

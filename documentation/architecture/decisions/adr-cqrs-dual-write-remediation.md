@@ -117,7 +117,7 @@ To prevent recurrence:
 
 ## Related Documents
 
-- [CQRS Dual-Write Audit](../../../dev/active/cqrs-dual-write-audit.md) — Full audit details, code samples, verification queries
+- [CQRS Dual-Write Audit](../../../dev/archived/cqrs-dual-write-audit/cqrs-dual-write-audit-context.md) — Full audit details, code samples, verification queries
 - [Event Handler Pattern](../../infrastructure/patterns/event-handler-pattern.md) — Handler architecture and naming convention
 - [Event Sourcing Overview](../data/event-sourcing-overview.md) — CQRS architecture
 - [Event Processing Patterns](../../infrastructure/patterns/event-processing-patterns.md) — Sync vs async pattern selection

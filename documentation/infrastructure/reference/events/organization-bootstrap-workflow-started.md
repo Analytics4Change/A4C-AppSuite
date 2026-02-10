@@ -281,5 +281,5 @@ private async emitWorkflowStartedEvent(
 
 - [AsyncAPI Contract](../../../../infrastructure/supabase/contracts/organization-bootstrap-events.yaml)
 - [Temporal Workflow Architecture](../../../architecture/workflows/temporal-overview.md)
-- [Event-Driven Triggering Validation](../../../workflows/validation/phase-6-event-driven-triggering.md)
-- [CQRS Projections Guide](../../guides/supabase/cqrs-projections.md)
+- [Event-Driven Triggering](../../../architecture/data/event-sourcing-overview.md)
+- [CQRS Projections](../../../architecture/data/event-sourcing-overview.md)

@@ -401,17 +401,17 @@ SELECT * FROM [table] WHERE [conditions];
 
 ## Related Documentation
 
-- [Schema Overview](../schema-overview.md) - Complete database schema and ER diagrams
-- [RLS Policies](../rls-policies.md) - Comprehensive RLS policy reference
-- [Migration Guide](../../guides/database/migration-guide.md) - How to create migrations
+- [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md) - Database schema and CQRS pattern
+- [RBAC Architecture](../../../architecture/authorization/rbac-architecture.md) - RLS policies and role-based access control
+- [SQL Idempotency Audit](../../guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) - Migration patterns and best practices
 - [Event Sourcing](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation
 
 ## See Also
 
 - **Related Tables**: [List related tables with links]
 - **AsyncAPI Contracts**: `infrastructure/supabase/contracts/asyncapi/domains/[domain].yaml`
-- **Database Functions**: [List relevant functions](../functions/)
-- **Triggers**: [List relevant triggers](../triggers.md)
+- **Database Functions**: [Event Handler Pattern](../../patterns/event-handler-pattern.md)
+- **Triggers**: [Event Handler Pattern](../../patterns/event-handler-pattern.md)
 
 ---
 

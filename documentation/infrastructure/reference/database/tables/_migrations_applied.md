@@ -207,5 +207,5 @@ If checksums don't match repository:
 
 ## Related Documentation
 
-- [Day 0 Migration Guide](../../guides/supabase/DAY0-MIGRATION-GUIDE.md) - Migration patterns
-- [Deployment Instructions](../../guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) - CI/CD setup
+- [Day 0 Migration Guide](../../../guides/supabase/DAY0-MIGRATION-GUIDE.md) - Migration patterns
+- [Deployment Instructions](../../../guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) - CI/CD setup

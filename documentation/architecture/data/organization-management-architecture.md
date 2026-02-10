@@ -1237,8 +1237,8 @@ Temporal Worker (workflow-worker deployment)
 - **[Organization Management Implementation](./organization-management-implementation.md)** - Technical implementation details
 - **[organizations_projection Table](../../infrastructure/reference/database/tables/organizations_projection.md)** - Complete database schema (760 lines)
 - **[organization_business_profiles_projection Table](../../infrastructure/reference/database/tables/organization_business_profiles_projection.md)** - Business profile schema
-- **[organization_domains_projection Table](../../infrastructure/reference/database/tables/organization_domains_projection.md)** - Custom domains schema
-- **[provider_partnerships_projection Table](../../infrastructure/reference/database/tables/provider_partnerships_projection.md)** - Partnership schema
+- **organization_domains_projection** - Custom domains schema (not yet implemented)
+- **provider_partnerships_projection** - Partnership schema (not yet implemented)
 
 ### Multi-Tenancy & Data Architecture
 - **[Multi-Tenancy Architecture](./multi-tenancy-architecture.md)** - Organization-based tenant isolation with RLS

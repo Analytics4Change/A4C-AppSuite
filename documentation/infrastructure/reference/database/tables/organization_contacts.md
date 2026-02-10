@@ -113,4 +113,4 @@ WHERE oc.contact_id = 'contact-uuid-here'
 
 - [contacts_projection](./contacts_projection.md) - Contact entity details
 - [organizations_projection](./organizations_projection.md) - Organization entity details
-- [Event Sourcing Overview](../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation
+- [Event Sourcing Overview](../../../../architecture/data/event-sourcing-overview.md) - CQRS pattern explanation
