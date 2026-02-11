@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-07
+last_updated: 2026-02-11
 ---
 
 <!-- TL;DR-START -->
@@ -29,8 +29,9 @@ A4C uses a **split handler architecture** for processing domain events into CQRS
 
 | Component | Count | Purpose |
 |-----------|-------|---------|
-| **Routers** | 16 | Thin CASE dispatchers (~50 lines each) |
-| **Handlers** | 54+ | Focused event processors (20-50 lines each) |
+| **Routers** | 12 active | Thin CASE dispatchers (~50 lines each) |
+| **Handlers** | 50 | Focused event processors (20-50 lines each) |
+| **Triggers** | 5 | On `domain_events` (1 BEFORE INSERT/UPDATE, 4 AFTER INSERT) |
 
 > **Note**: This document covers the **synchronous trigger handler pattern** used for projection updates. For async side effects (email, DNS, webhooks), see [Event Processing Patterns](./event-processing-patterns.md).
 
@@ -73,23 +74,18 @@ domain_events → process_domain_event() BEFORE INSERT trigger (single trigger)
         ├── process_organization_unit_event(NEW)
         ├── process_rbac_event(NEW)           (roles, permissions, user role assignments)
         ├── process_invitation_event(NEW)     (invited, accepted, revoked, expired)
-        ├── process_client_event(NEW)
-        ├── process_medication_event(NEW)
-        ├── process_medication_history_event(NEW)
-        ├── process_dosage_event(NEW)
         ├── process_contact_event(NEW)        (CRUD + user linking)
         ├── process_address_event(NEW)
         ├── process_phone_event(NEW)
         ├── process_email_event(NEW)
         ├── process_access_grant_event(NEW)   (cross-tenant grants)
-        ├── process_impersonation_event(NEW)
-        └── process_program_event(NEW)
+        └── process_impersonation_event(NEW)
                         ↓
         Each router dispatches by event_type to:
         ├── handle_user_created()
         ├── handle_user_phone_added()
         ├── handle_organization_created()
-        └── ... (50+ handlers total)
+        └── ... (50 handlers total)
 ```
 
 > **⚠️ CRITICAL: Single trigger only — NEVER create per-event-type triggers**
@@ -303,9 +299,6 @@ The GitHub Actions workflow automatically:
 |------------|---------|
 | `user.created` | `handle_user_created` |
 | `user.synced_from_auth` | `handle_user_synced_from_auth` |
-| `user.deactivated` | `handle_user_deactivated` |
-| `user.reactivated` | `handle_user_reactivated` |
-| `user.organization_switched` | `handle_user_organization_switched` |
 | `user.role.assigned` | `handle_user_role_assigned` |
 | `user.role.revoked` | `handle_user_role_revoked` |
 | `user.access_dates_updated` | `handle_user_access_dates_updated` |
@@ -394,7 +387,6 @@ The following routers handle events with inline CASE logic rather than separate 
 | `process_email_event` | `email` | `email.created`, `email.updated`, `email.deleted` |
 | `process_access_grant_event` | `access_grant` | `access_grant.created`, `access_grant.revoked`, `access_grant.expired`, `access_grant.suspended`, `access_grant.reactivated` |
 | `process_impersonation_event` | `impersonation` | `impersonation.started`, `impersonation.renewed`, `impersonation.ended` |
-| `process_program_event` | `program` | `program.created`, `program.updated`, `program.activated`, `program.deactivated`, `program.deleted` |
 | `process_junction_event` | (any `*.linked`/`*.unlinked`) | `organization.contact.linked`, `contact.phone.linked`, etc. |
 
 ## Event Type Naming Convention
@@ -490,6 +482,28 @@ ORDER BY created_at;
 ```sql
 SELECT * FROM plpgsql_check_function('handle_user_phone_added(record)'::regprocedure);
 ```
+
+## Handler Reference Files
+
+Canonical SQL source for every handler, router, and trigger is at `infrastructure/supabase/handlers/`. These are documentation files (not deployment artifacts) — the source of truth is always the deployed database.
+
+```
+handlers/
+├── README.md                    # Sync rules, usage instructions
+├── trigger/                     # 5 trigger function files
+├── routers/                     # 12 active router files
+├── user/                        # 20 handler files
+├── organization/                # 11 handler files
+├── organization_unit/           # 5 handler files
+├── rbac/                        # 10 handler files
+├── bootstrap/                   # 3 handler files
+└── invitation/                  # 1 handler file
+```
+
+**Workflow**:
+1. **Before modifying a handler**: Read `handlers/<domain>/<handler>.sql`, copy it into your migration, modify the copy
+2. **After creating a migration**: Update the reference file to match the new version
+3. **Adding a new handler**: Create handler + router CASE line in migration, then create reference file
 
 ## Related Documentation
 

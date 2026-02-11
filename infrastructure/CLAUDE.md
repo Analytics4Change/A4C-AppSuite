@@ -149,28 +149,59 @@ WHERE p.prolang = (SELECT oid FROM pg_language WHERE lanname = 'plpgsql')
 
 Event processing uses **split handlers** (not monolithic processors):
 
-**Routers** (16 total):
-- `process_user_event()`, `process_organization_event()`, `process_rbac_event()`, `process_invitation_event()`, `process_contact_event()`, `process_address_event()`, `process_phone_event()`, `process_email_event()`, `process_access_grant_event()`, `process_impersonation_event()`, `process_program_event()`, `process_organization_unit_event()`, `process_client_event()`, `process_medication_event()`, `process_medication_history_event()`, `process_dosage_event()`
+**Routers** (12 active):
+- `process_user_event()`, `process_organization_event()`, `process_rbac_event()`, `process_invitation_event()`, `process_contact_event()`, `process_address_event()`, `process_phone_event()`, `process_email_event()`, `process_access_grant_event()`, `process_impersonation_event()`, `process_organization_unit_event()`
 - Plus `process_junction_event()` for all `*.linked`/`*.unlinked` events
 - Thin CASE dispatchers (~50 lines each)
 - Dispatch to individual handlers based on `event_type`
 
-**Handlers** (54+ total):
+**Handlers** (50 total):
 - `handle_user_phone_added()`, `handle_organization_created()`, etc.
 - One function per event type
 - 20-50 lines each, single responsibility
 - Validated independently by plpgsql_check
+
+**Triggers on `domain_events`** (5):
+- `process_domain_event_trigger` (BEFORE INSERT/UPDATE) — main dispatcher
+- `bootstrap_workflow_trigger` (AFTER INSERT)
+- `enqueue_workflow_from_bootstrap_event_trigger` (AFTER INSERT)
+- `trigger_notify_bootstrap_initiated` (BEFORE INSERT)
+- `update_workflow_queue_projection_trigger` (AFTER INSERT)
 
 **Two event processing patterns** — choose based on what the handler does:
 - **Projection updates** → Synchronous BEFORE INSERT trigger handler (immediate consistency)
 - **Side effects (email, DNS, webhooks)** → Async AFTER INSERT trigger → pg_notify → Temporal
 - **See**: [`event-processing-patterns.md`](../documentation/infrastructure/patterns/event-processing-patterns.md) for the full decision guide
 
+#### Handler Reference Files — Read Before Writing
+
+> **⚠️ CRITICAL: Always read the reference file before modifying any handler or router.**
+
+Canonical SQL for every handler, router, and trigger is at `infrastructure/supabase/handlers/`:
+
+```
+handlers/
+├── trigger/           # 5 trigger function files
+├── routers/           # 12 active router files
+├── user/              # 20 handler files
+├── organization/      # 11 handler files
+├── organization_unit/ # 5 handler files
+├── rbac/              # 10 handler files
+├── bootstrap/         # 3 handler files
+└── invitation/        # 1 handler file
+```
+
+**Before modifying a handler**: Read `handlers/<domain>/<handler>.sql`, copy it, modify the copy.
+**After creating a migration**: Update the reference file to match the new version.
+**Adding a new handler**: Create handler + router CASE line in migration, then create reference file.
+
 **Adding a new event handler**:
-1. Create handler: `handle_<aggregate>_<action>(p_event record)`
-2. Add CASE line to appropriate router: `WHEN 'event.type' THEN PERFORM handle_...();`
-3. Deploy via `supabase migration new <name>` then `supabase db push --linked`
-4. CI validates with plpgsql_check automatically
+1. Read the existing router reference file: `handlers/routers/process_<domain>_event.sql`
+2. Create handler: `handle_<aggregate>_<action>(p_event record)`
+3. Add CASE line to appropriate router: `WHEN 'event.type' THEN PERFORM handle_...();`
+4. Deploy via `supabase migration new <name>` then `supabase db push --linked`
+5. Create reference files: `handlers/<domain>/<handler>.sql` and update `handlers/routers/<router>.sql`
+6. CI validates with plpgsql_check automatically
 
 > **⚠️ CRITICAL: NEVER create per-event-type triggers on `domain_events`**
 >

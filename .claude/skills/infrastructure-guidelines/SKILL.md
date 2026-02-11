@@ -90,6 +90,24 @@ CREATE TRIGGER my_trigger AFTER INSERT ON domain_events
 
 Also: handlers receive `domain_events` rows. Use `p_event.stream_id`, NOT `p_event.aggregate_id` (that column does not exist).
 
+### 7b. Handler Reference Files — Always Read Before Writing
+
+Before modifying ANY handler, router, or trigger function, **read the canonical reference file** at `infrastructure/supabase/handlers/<domain>/<function>.sql`. Copy the existing implementation into your migration and modify the copy — never rewrite from memory.
+
+```
+handlers/
+├── trigger/           # 5 trigger function files (process_domain_event, etc.)
+├── routers/           # 12 active router files (process_*_event)
+├── user/              # 20 handler files
+├── organization/      # 11 handler files
+├── organization_unit/ # 5 handler files
+├── rbac/              # 10 handler files
+├── bootstrap/         # 3 handler files
+└── invitation/        # 1 handler file
+```
+
+After creating a migration that changes a handler, **update the reference file** to match.
+
 ### Choosing the Event Processing Pattern
 
 Two patterns exist. Choose based on what the handler needs to do:
