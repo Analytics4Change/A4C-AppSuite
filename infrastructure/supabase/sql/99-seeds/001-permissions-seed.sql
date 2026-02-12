@@ -1,7 +1,7 @@
 -- ============================================
 -- AUTHORITATIVE PERMISSIONS SEED FILE
 -- ============================================
--- This file defines ALL 38 permissions for the A4C platform.
+-- This file defines ALL 40 permissions for the A4C platform.
 -- It emits permission.defined domain events which trigger projection updates.
 --
 -- IMPORTANT: This is the SINGLE SOURCE OF TRUTH for permission definitions.
@@ -143,7 +143,7 @@ EXCEPTION WHEN unique_violation THEN NULL;
 END $$;
 
 -- ============================================
--- ORG SCOPE PERMISSIONS (25 total)
+-- ORG SCOPE PERMISSIONS (29 total)
 -- Organization-level operations for org admins
 -- ============================================
 
@@ -452,5 +452,5 @@ END $$;
 
 -- ============================================
 -- END OF PERMISSIONS SEED FILE
--- Total: 37 permissions (10 global + 27 org)
+-- Total: 40 permissions (11 global + 29 org)
 -- ============================================

@@ -28,7 +28,7 @@ handlers/
 ├── routers/                     # Router functions dispatched by stream_type (12)
 │   ├── process_user_event.sql
 │   └── ...
-├── user/                        # User domain handlers (16)
+├── user/                        # User domain handlers (20)
 ├── organization/                # Organization domain handlers (11)
 ├── organization_unit/           # Org unit domain handlers (5)
 ├── rbac/                        # Role/permission handlers (10)
