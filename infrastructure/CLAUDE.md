@@ -173,9 +173,11 @@ Event processing uses **split handlers** (not monolithic processors):
 - **Side effects (email, DNS, webhooks)** → Async AFTER INSERT trigger → pg_notify → Temporal
 - **See**: [`event-processing-patterns.md`](../documentation/infrastructure/patterns/event-processing-patterns.md) for the full decision guide
 
-#### Handler Reference Files — Read Before Writing
+#### Handler Reference Files — Read Before Writing, Copy for Day Zero
 
 > **⚠️ CRITICAL: Always read the reference file before modifying any handler or router.**
+>
+> During Day Zero baseline resets, copy unchanged functions **verbatim** from these files instead of rewriting. See [Day 0 Migration Guide](../documentation/infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md#handler-reference-files).
 
 Canonical SQL for every handler, router, and trigger is at `infrastructure/supabase/handlers/`:
 
@@ -331,7 +333,7 @@ infrastructure/
 ├── supabase/            # Supabase database schema and migrations
 │   ├── supabase/       # Supabase CLI project directory
 │   │   ├── migrations/ # SQL migrations (Supabase CLI managed)
-│   │   │   └── 20240101000000_baseline.sql  # Day 0 baseline migration
+│   │   │   └── 20260121000918_baseline_v3.sql  # Day 0 v3 baseline (current)
 │   │   ├── functions/  # Edge Functions (Deno)
 │   │   └── config.toml # Supabase CLI configuration
 │   ├── sql.archived/   # Archived granular SQL files (reference only)
@@ -583,7 +585,7 @@ kubectl logs -n temporal -l app=workflow-worker | grep "sendInvitationEmails"
 ## Key Considerations
 
 1. **Supabase CLI Migrations**: Schema changes via `supabase db push --linked` (no more manual SQL execution)
-2. **Day 0 Baseline**: Production schema captured as `20240101000000_baseline.sql` - all future changes as incremental migrations
+2. **Day 0 Baseline**: Production schema captured as `20260121000918_baseline_v3.sql` - all future changes as incremental migrations
 3. **SQL Idempotency**: All migrations must be idempotent (IF NOT EXISTS, OR REPLACE, DROP IF EXISTS)
 4. **Zero Downtime**: All schema changes must maintain service availability
 5. **RLS First**: All tables must have Row-Level Security policies

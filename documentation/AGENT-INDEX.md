@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-07
+last_updated: 2026-02-11
 purpose: agent-navigation
 ---
 
@@ -20,6 +20,7 @@ purpose: agent-navigation
 | Choose event processing pattern | [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) |
 | Add Temporal workflow | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | [temporal-overview.md](architecture/workflows/temporal-overview.md) |
 | Add frontend component | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | [DESIGN_PATTERNS_MIGRATION_GUIDE.md](frontend/guides/DESIGN_PATTERNS_MIGRATION_GUIDE.md) |
+| Consolidate Day Zero baseline | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | [handlers/README.md](../infrastructure/supabase/handlers/README.md) |
 | Configure authentication | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) |
 | Deploy database changes | [DEPLOYMENT_INSTRUCTIONS.md](infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) |
 | Understand CQRS/events | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | [EVENT-DRIVEN-GUIDE.md](frontend/guides/EVENT-DRIVEN-GUIDE.md) |
@@ -45,6 +46,8 @@ purpose: agent-navigation
 | `applet-action` | [permissions_projection.md](infrastructure/reference/database/tables/permissions_projection.md) | rbac-architecture.md |
 | `asyncapi` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, event-sourcing-overview.md |
 | `audit-trail` | [impersonation-architecture.md](architecture/authentication/impersonation-architecture.md) | impersonation-event-schema.md |
+| `baseline` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | handlers/README.md, SQL_IDEMPOTENCY_AUDIT.md |
+| `baseline-consolidation` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | handlers/README.md |
 | `authentication` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | supabase-auth-overview.md, custom-claims-setup.md |
 | `bootstrap` | [organization-onboarding-workflow.md](architecture/workflows/organization-onboarding-workflow.md) | provider-onboarding-quickstart.md |
 | `bootstrap-handlers` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | activities-reference.md, event-processing-patterns.md |
@@ -66,6 +69,7 @@ purpose: agent-navigation
 | `correlation-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md, triggering-workflows.md |
 | `cross-tenant` | [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | var-partnerships.md |
 | `custom-claims` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | frontend-auth-architecture.md, custom-claims-setup.md |
+| `day0-migration` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | handlers/README.md, DEPLOYMENT_INSTRUCTIONS.md |
 | `database-hook` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | custom-claims-setup.md |
 | `deployment` | [DEPLOYMENT_INSTRUCTIONS.md](infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) | infrastructure/CLAUDE.md |
 | `determinism` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | temporal-overview.md |
@@ -96,7 +100,7 @@ purpose: agent-navigation
 | `formulary` | [medications.md](infrastructure/reference/database/tables/medications.md) | medication_history.md |
 | `generated-events` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | workflows/CLAUDE.md, event-sourcing-overview.md |
 | `handler` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md |
-| `handler-reference` | [handlers/README.md](../infrastructure/supabase/handlers/README.md) | event-handler-pattern.md, infrastructure/CLAUDE.md |
+| `handler-reference` | [handlers/README.md](../infrastructure/supabase/handlers/README.md) | event-handler-pattern.md, infrastructure/CLAUDE.md, DAY0-MIGRATION-GUIDE.md |
 | `hierarchy` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | scoping-architecture.md |
 | `idempotency` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | organization-bootstrap-workflow-design.md |
 | `impersonation` | [impersonation-architecture.md](architecture/authentication/impersonation-architecture.md) | impersonation-security-controls.md |
@@ -117,6 +121,7 @@ purpose: agent-navigation
 | `medication-history` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | medications.md |
 | `mfa` | [impersonation-security-controls.md](architecture/authentication/impersonation-security-controls.md) | enterprise-sso-guide.md |
 | `migration` | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | DEPLOYMENT_INSTRUCTIONS.md, table-template.md |
+| `migration-tracking` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | _migrations_applied.md, DEPLOYMENT_INSTRUCTIONS.md |
 | `modelina` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, infrastructure/CLAUDE.md |
 | `migrations-applied` | [_migrations_applied.md](infrastructure/reference/database/tables/_migrations_applied.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `mobx` | [viewmodels.md](frontend/architecture/viewmodels.md) | frontend/CLAUDE.md, mobx-optimization.md |
@@ -160,6 +165,7 @@ purpose: agent-navigation
 | `retry-policies` | [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | activities-reference.md |
 | `rls` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | table-template.md, SQL_IDEMPOTENCY_AUDIT.md |
 | `rls-gap` | [clients.md](infrastructure/reference/database/tables/clients.md) | medications.md |
+| `rollback` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `role-access-dates` | [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | rbac-architecture.md |
 | `role-modification` | [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | user_roles_projection.md, rbac-architecture.md |
 | `role-permissions` | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | roles_projection.md |
@@ -195,6 +201,7 @@ purpose: agent-navigation
 | `soft-delete` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | clients.md |
 | `supabase` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | DEPLOYMENT_INSTRUCTIONS.md, SUPABASE-AUTH-SETUP.md |
 | `supabase-auth` | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) | frontend-auth-architecture.md |
+| `supabase-cli` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | DEPLOYMENT_INSTRUCTIONS.md, infrastructure/CLAUDE.md |
 | `temporal` | [temporal-overview.md](architecture/workflows/temporal-overview.md) | workflows/CLAUDE.md, activities-reference.md |
 | `temporal-roles` | [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | rbac-architecture.md |
 | `testing` | [TESTING.md](frontend/testing/TESTING.md) | integration-testing.md |
@@ -265,6 +272,7 @@ purpose: agent-navigation
 
 | Document | Summary | Keywords | ~Tokens |
 |----------|---------|----------|---------|
+| [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | Day Zero baseline consolidation, handler reference files for resets | `day0-migration`, `baseline`, `migration-tracking`, `rollback`, `supabase-cli` | 3800 |
 | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | Idempotent SQL migration patterns | `migration`, `sql`, `idempotent` | 2400 |
 | [DEPLOYMENT_INSTRUCTIONS.md](infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) | Step-by-step deployment procedures | `deployment`, `supabase`, `edge-functions` | 2100 |
 | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | Google OAuth testing guide | `oauth`, `testing`, `google` | 1400 |

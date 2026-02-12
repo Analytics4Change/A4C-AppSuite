@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-20
+last_updated: 2026-02-11
 ---
 
 <!-- TL;DR-START -->
@@ -9,10 +9,10 @@ last_updated: 2026-01-20
 **Summary**: Guide for Day 0 migration strategy that consolidates all schema changes into a single baseline file for Supabase CLI migration tracking, including backup procedures, migration repair commands, and CI/CD integration.
 
 **When to read**:
-- Transitioning to Supabase CLI from manual SQL deployment
 - Consolidating multiple migrations into a fresh baseline
+- Using handler reference files during baseline consolidation
+- Transitioning to Supabase CLI from manual SQL deployment
 - Troubleshooting migration history issues
-- Understanding the v1 to v2 baseline consolidation
 
 **Prerequisites**: Supabase CLI installed, project access
 
@@ -45,6 +45,32 @@ Use this approach when:
 **Do NOT use if:**
 - You need to preserve individual migration rollback capability
 - Multiple environments have divergent migration histories
+
+## Handler Reference Files
+
+Before starting a Day Zero consolidation, use the **handler reference files** at `infrastructure/supabase/handlers/` (67 `.sql` files). These contain the canonical SQL for every event handler, router, and trigger function — one function per file.
+
+During baseline consolidation:
+
+1. **Identify unchanged functions** — handlers/routers/triggers that have not been modified since the last baseline
+2. **Copy them verbatim** from reference files into the new baseline — never rewrite from memory
+3. **Only rewrite functions** that were modified in post-baseline migrations
+
+This prevents column name drift, type mismatches, and logic errors that occur when AI agents reconstruct functions from memory.
+
+```
+handlers/
+├── trigger/           # 5 trigger function files
+├── routers/           # 12 active router files
+├── user/              # 20 handler files
+├── organization/      # 11 handler files
+├── organization_unit/ # 5 handler files
+├── rbac/              # 10 handler files
+├── bootstrap/         # 3 handler files
+└── invitation/        # 1 handler file
+```
+
+**See**: [`handlers/README.md`](../../../../infrastructure/supabase/handlers/README.md) for usage rules and sync protocol.
 
 ## How We Did It
 
@@ -258,6 +284,7 @@ supabase db push --linked
 | `infrastructure/supabase/supabase/migrations/20260121000918_baseline_v3.sql` | Day 0 v3 baseline (current) |
 | `infrastructure/supabase/supabase/migrations.archived/2026-january-cleanup/` | Archived migrations from v2 baseline through Jan 2026 |
 | `infrastructure/supabase/supabase/migrations.archived/2025-december-cleanup/` | Archived migrations from v1 baseline through Dec 2025 |
+| `infrastructure/supabase/handlers/` | Handler reference files (67 `.sql` files) — copy into new baseline |
 | `infrastructure/supabase/sql.archived/` | Original granular SQL files (reference only) |
 | `infrastructure/supabase/sql/99-seeds/` | Authoritative seed files (permissions, role templates) |
 | `infrastructure/supabase/backup_*.sql` | Pre-migration backups |
@@ -362,3 +389,11 @@ supabase db push --linked
 - GitHub Actions integration for automated deployments
 - Rollback capability via `migration repair`
 - Clean starting point for new developers (single file vs 25+)
+
+## Related Documentation
+
+- [Handler Reference Files](../../../../infrastructure/supabase/handlers/README.md) - Canonical SQL for copy/paste during baseline consolidation
+- [SQL Idempotency Audit](./SQL_IDEMPOTENCY_AUDIT.md) - Idempotent migration patterns
+- [Deployment Instructions](./DEPLOYMENT_INSTRUCTIONS.md) - Step-by-step deployment procedures
+- [Event Handler Pattern](../../patterns/event-handler-pattern.md) - Split handler architecture and reference file workflow
+- [infrastructure/CLAUDE.md](../../../../infrastructure/CLAUDE.md) - Infrastructure development guidance

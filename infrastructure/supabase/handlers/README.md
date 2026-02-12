@@ -6,6 +6,17 @@ Canonical SQL source for every event handler, router, and trigger function in th
 
 All handlers originate from the 14,648-line baseline migration and subsequent post-baseline migrations. Searching a file that large is error-prone — agents skip to "what they remember" and introduce column name drift. These reference files solve that by providing one function per file, ready to copy-paste into a new migration.
 
+### Primary Use Case: Day Zero Migration Resets
+
+When consolidating migrations into a new baseline ("Day Zero reset"), function definitions for unchanged handlers, routers, and triggers must be **copy/pasted verbatim** from these reference files — never rewritten from memory.
+
+**Day Zero workflow**:
+1. Identify which functions have NOT changed since the last baseline
+2. Copy their definitions from `handlers/<domain>/<function>.sql` into the new baseline
+3. Only rewrite functions that have actually been modified in post-baseline migrations
+
+This prevents column name drift, type mismatches, and logic errors during baseline consolidation. See the [Day 0 Migration Guide](../../../documentation/infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) for the full baseline consolidation workflow.
+
 ## Directory Structure
 
 ```

@@ -485,7 +485,12 @@ SELECT * FROM plpgsql_check_function('handle_user_phone_added(record)'::regproce
 
 ## Handler Reference Files
 
-Canonical SQL source for every handler, router, and trigger is at `infrastructure/supabase/handlers/`. These are documentation files (not deployment artifacts) — the source of truth is always the deployed database.
+Canonical SQL source for every handler, router, and trigger is at `infrastructure/supabase/handlers/`. These files serve two purposes:
+
+1. **Day Zero migration resets**: Copy unchanged functions verbatim into new baseline migrations — prevents column drift and logic errors
+2. **Regular development**: Reference when modifying existing handlers — copy, then modify the copy
+
+These are documentation files (not deployment artifacts) — the source of truth is always the deployed database via migrations.
 
 ```
 handlers/
@@ -504,6 +509,7 @@ handlers/
 1. **Before modifying a handler**: Read `handlers/<domain>/<handler>.sql`, copy it into your migration, modify the copy
 2. **After creating a migration**: Update the reference file to match the new version
 3. **Adding a new handler**: Create handler + router CASE line in migration, then create reference file
+4. **Day Zero baseline consolidation**: Copy unchanged functions verbatim from reference files — see [Day 0 Migration Guide](../guides/supabase/DAY0-MIGRATION-GUIDE.md#handler-reference-files)
 
 ## Related Documentation
 
@@ -512,5 +518,6 @@ handlers/
 - [Event Sourcing & CQRS Projections](../../architecture/data/event-sourcing-overview.md) - Projection table design
 - [Event Observability](../guides/event-observability.md) - Monitoring, tracing, failed events
 - [Supabase Migrations](../guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) - Idempotent migration patterns
+- [Day 0 Migration Guide](../guides/supabase/DAY0-MIGRATION-GUIDE.md) - Baseline consolidation with handler reference files
 - [AsyncAPI Contracts](../../../infrastructure/supabase/contracts/README.md) - Event schema definitions
 - [CQRS Dual-Write Audit](../../../dev/archived/cqrs-dual-write-audit/cqrs-dual-write-audit-context.md) - Audit of CQRS compliance violations

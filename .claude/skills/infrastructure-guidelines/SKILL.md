@@ -108,6 +108,8 @@ handlers/
 
 After creating a migration that changes a handler, **update the reference file** to match.
 
+**Day Zero consolidation**: When creating a new baseline migration, copy unchanged handler/router/trigger functions verbatim from reference files into the new baseline. Only rewrite functions that were modified in post-baseline migrations. See [Day 0 Migration Guide](../../../../documentation/infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md#handler-reference-files).
+
 ### Choosing the Event Processing Pattern
 
 Two patterns exist. Choose based on what the handler needs to do:
