@@ -14,7 +14,7 @@ name: Deploy Database Migrations
 #   - SUPABASE_PROJECT_REF secret (e.g., "tmrjlswbsxmbglmaclxu")
 #
 # Day 0 Migration:
-#   - 20240101000000_baseline.sql represents the complete schema as of 2024-12-22
+#   - 20260212010625_baseline_v4.sql represents the complete schema as of 2026-02-12
 #   - All previous migrations were consolidated into this baseline
 #   - Future schema changes should be added as new migration files
 

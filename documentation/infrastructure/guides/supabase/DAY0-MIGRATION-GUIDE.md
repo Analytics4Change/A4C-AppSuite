@@ -281,16 +281,56 @@ supabase db push --linked
 
 | File | Purpose |
 |------|---------|
-| `infrastructure/supabase/supabase/migrations/20260121000918_baseline_v3.sql` | Day 0 v3 baseline (current) |
+| `infrastructure/supabase/supabase/migrations/20260212010625_baseline_v4.sql` | Day 0 v4 baseline (current) |
+| `infrastructure/supabase/supabase/migrations.archived/2026-february-cleanup/` | Archived migrations from v3 baseline through Feb 2026 |
 | `infrastructure/supabase/supabase/migrations.archived/2026-january-cleanup/` | Archived migrations from v2 baseline through Jan 2026 |
 | `infrastructure/supabase/supabase/migrations.archived/2025-december-cleanup/` | Archived migrations from v1 baseline through Dec 2025 |
 | `infrastructure/supabase/handlers/` | Handler reference files (67 `.sql` files) — copy into new baseline |
 | `infrastructure/supabase/sql.archived/` | Original granular SQL files (reference only) |
-| `infrastructure/supabase/sql/99-seeds/` | Authoritative seed files (permissions, role templates) |
+| `infrastructure/supabase/sql/99-seeds/` | Authoritative seed files (permissions, role templates, implications) |
 | `infrastructure/supabase/backup_*.sql` | Pre-migration backups |
 | `.github/workflows/supabase-migrations.yml` | CI/CD migration workflow |
 
 ## Decision Records
+
+### Day 0 v4 Baseline (2026-02-12)
+
+**Date**: 2026-02-12
+**Decision**: Create Day 0 v4 baseline consolidating 53 post-v3 migrations
+
+**Context**:
+- Day 0 v3 baseline (2026-01-21) followed by 53 incremental migrations
+- Multi-role authorization (permission implications, effective_permissions, JWT hook v3) finalized
+- Schedule policies, client assignments, role management RPCs implemented
+- CQRS critical bugs fixed (aggregate_id→stream_id, dual writes, double event processing)
+- Database optimizations applied (FK indexes, junction table PKs, RLS INITPLAN fixes)
+- Dead code cleanup (deprecated functions, dead router/dispatcher branches)
+- Handler reference files (67 .sql files) synced from live DB on 2026-02-11
+
+**Migrations Consolidated** (53 total):
+- `20260121005323`-`20260126205504` - Multi-role auth, schedule policies, RLS phase 4 (17 migrations)
+- `20260202181252`-`20260204013108` - Schedule/assignment permissions, bulk role assignment (12 migrations)
+- `20260204174425`-`20260205004534` - CQRS fixes, DB optimizations, search path fixes (17 migrations)
+- `20260206004257`-`20260207021836` - Schedule RPCs, CQRS remediation P0-P2 (7 migrations)
+- `20260209031755`-`20260211234604` - Event routing fixes, dead code cleanup (3 migrations)
+
+**Seed Data Reconciliation**:
+- Fixed comment drift in `001-permissions-seed.sql`: 40 permissions (11 global + 29 org), not 37/38
+- Created `003-permission-implications-seed.sql` from archived migration `20260122204647`
+- Role-permission templates verified: 40 entries across 4 roles (clinician=4, partner_admin=4, provider_admin=29, viewer=3)
+- Permission implications verified: 22 rules in DB
+
+**Outcome**:
+- Created `20260212010625_baseline_v4.sql` from production dump (16,818 lines, 586 KB)
+- Archived all 54 old files (v3 baseline + 53 migrations) to `migrations.archived/2026-february-cleanup/`
+- Marked old migrations as reverted, new baseline as applied
+
+**Verification**:
+- `supabase migration list --linked` shows only baseline_v4
+- `supabase db push --linked --dry-run` reports "Remote database is up to date"
+- Seed file counts: 40 permissions, 40 role templates, 22 permission implications
+
+---
 
 ### Day 0 v3 Baseline (2026-01-20)
 
@@ -325,6 +365,8 @@ supabase db push --linked
 - `supabase migration list --linked` shows only baseline_v3
 - `supabase db push --linked --dry-run` reports "Remote database is up to date"
 - Seed file count: 38 permissions (11 global + 27 org)
+
+**Status**: Superseded by Day 0 v4 baseline (2026-02-12)
 
 ---
 

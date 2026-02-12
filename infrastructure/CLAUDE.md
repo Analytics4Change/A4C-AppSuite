@@ -333,7 +333,7 @@ infrastructure/
 ├── supabase/            # Supabase database schema and migrations
 │   ├── supabase/       # Supabase CLI project directory
 │   │   ├── migrations/ # SQL migrations (Supabase CLI managed)
-│   │   │   └── 20260121000918_baseline_v3.sql  # Day 0 v3 baseline (current)
+│   │   │   └── 20260212010625_baseline_v4.sql  # Day 0 v3 baseline (current)
 │   │   ├── functions/  # Edge Functions (Deno)
 │   │   └── config.toml # Supabase CLI configuration
 │   ├── sql.archived/   # Archived granular SQL files (reference only)
@@ -585,7 +585,7 @@ kubectl logs -n temporal -l app=workflow-worker | grep "sendInvitationEmails"
 ## Key Considerations
 
 1. **Supabase CLI Migrations**: Schema changes via `supabase db push --linked` (no more manual SQL execution)
-2. **Day 0 Baseline**: Production schema captured as `20260121000918_baseline_v3.sql` - all future changes as incremental migrations
+2. **Day 0 Baseline**: Production schema captured as `20260212010625_baseline_v4.sql` - all future changes as incremental migrations
 3. **SQL Idempotency**: All migrations must be idempotent (IF NOT EXISTS, OR REPLACE, DROP IF EXISTS)
 4. **Zero Downtime**: All schema changes must maintain service availability
 5. **RLS First**: All tables must have Row-Level Security policies
