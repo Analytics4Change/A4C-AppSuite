@@ -128,30 +128,8 @@ components:
       payload:
         $ref: '#/components/schemas/UserDeletedEvent'
 
-    # Schedule Events
-    UserScheduleCreated:
-      name: user.schedule.created
-      title: User Schedule Created
-      summary: A recurring weekly schedule policy has been created for a user
-      contentType: application/json
-      payload:
-        $ref: '#/components/schemas/UserScheduleCreatedEvent'
-
-    UserScheduleUpdated:
-      name: user.schedule.updated
-      title: User Schedule Updated
-      summary: A user's schedule policy has been modified
-      contentType: application/json
-      payload:
-        $ref: '#/components/schemas/UserScheduleUpdatedEvent'
-
-    UserScheduleDeactivated:
-      name: user.schedule.deactivated
-      title: User Schedule Deactivated
-      summary: A user's schedule policy has been deactivated
-      contentType: application/json
-      payload:
-        $ref: '#/components/schemas/UserScheduleDeactivatedEvent'
+    # NOTE: Schedule events moved to schedule.yaml (2026-02-17)
+    # Old user.schedule.* events replaced by schedule.* template events
 
     # Client Assignment Events
     UserClientAssigned:
@@ -1062,139 +1040,9 @@ components:
             - "Inactive account cleanup"
             - "Policy violation"
 
-    # =========================================================================
-    # Schedule Policy Events
-    # =========================================================================
-
-    UserScheduleCreatedEvent:
-      title: UserScheduleCreatedEvent
-      type: object
-      required:
-        - stream_id
-        - stream_type
-        - event_type
-        - event_data
-        - event_metadata
-      properties:
-        stream_id:
-          type: string
-          format: uuid
-          description: User UUID
-        stream_type:
-          type: string
-          const: user
-        event_type:
-          type: string
-          const: user.schedule.created
-        event_data:
-          $ref: '#/components/schemas/UserScheduleData'
-        event_metadata:
-          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
-
-    UserScheduleUpdatedEvent:
-      title: UserScheduleUpdatedEvent
-      type: object
-      required:
-        - stream_id
-        - stream_type
-        - event_type
-        - event_data
-        - event_metadata
-      properties:
-        stream_id:
-          type: string
-          format: uuid
-          description: User UUID
-        stream_type:
-          type: string
-          const: user
-        event_type:
-          type: string
-          const: user.schedule.updated
-        event_data:
-          allOf:
-            - $ref: '#/components/schemas/UserScheduleData'
-            - type: object
-              properties:
-                previous_schedule:
-                  $ref: '#/components/schemas/WeeklySchedule'
-                  description: Previous schedule pattern (for audit trail)
-        event_metadata:
-          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
-
-    UserScheduleDeactivatedEvent:
-      title: UserScheduleDeactivatedEvent
-      type: object
-      required:
-        - stream_id
-        - stream_type
-        - event_type
-        - event_data
-        - event_metadata
-      properties:
-        stream_id:
-          type: string
-          format: uuid
-          description: User UUID
-        stream_type:
-          type: string
-          const: user
-        event_type:
-          type: string
-          const: user.schedule.deactivated
-        event_data:
-          type: object
-          required:
-            - organization_id
-          properties:
-            organization_id:
-              type: string
-              format: uuid
-            org_unit_id:
-              type: string
-              format: uuid
-              nullable: true
-            reason:
-              type: string
-              description: Optional reason for deactivation
-        event_metadata:
-          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
-
-    UserScheduleData:
-      title: UserScheduleData
-      type: object
-      description: Schedule policy data for a user
-      required:
-        - organization_id
-        - schedule
-      properties:
-        schedule_id:
-          type: string
-          format: uuid
-          description: Optional explicit ID for the schedule policy
-        organization_id:
-          type: string
-          format: uuid
-          description: Organization where this schedule applies
-        org_unit_id:
-          type: string
-          format: uuid
-          nullable: true
-          description: |
-            Optional OU scope. If set, schedule only applies to this OU.
-            NULL means schedule applies to all OUs in the organization.
-        schedule:
-          $ref: '#/components/schemas/WeeklySchedule'
-        effective_from:
-          type: string
-          format: date
-          nullable: true
-          description: First date this schedule is active (NULL = immediate)
-        effective_until:
-          type: string
-          format: date
-          nullable: true
-          description: Last date this schedule is active (NULL = no expiration)
+    # NOTE: Schedule policy schemas moved to schedule.yaml (2026-02-17)
+    # Old UserScheduleCreatedEvent, UserScheduleUpdatedEvent, UserScheduleDeactivatedEvent,
+    # UserScheduleData removed — replaced by schedule.* template events
 
     WeeklySchedule:
       title: WeeklySchedule
@@ -1295,22 +1143,29 @@ components:
           type: string
           const: user.client.unassigned
         event_data:
-          type: object
-          required:
-            - client_id
-            - organization_id
-          properties:
-            client_id:
-              type: string
-              format: uuid
-            organization_id:
-              type: string
-              format: uuid
-            reason:
-              type: string
-              description: Optional reason for unassignment
+          $ref: '#/components/schemas/UserClientUnassignedData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    UserClientUnassignedData:
+      title: UserClientUnassignedData
+      type: object
+      description: Data for removing a staff-client assignment
+      required:
+        - client_id
+        - organization_id
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          description: Client being unassigned from this staff member
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization context for the unassignment
+        reason:
+          type: string
+          description: Optional reason for unassignment
 
     UserClientAssignmentData:
       title: UserClientAssignmentData

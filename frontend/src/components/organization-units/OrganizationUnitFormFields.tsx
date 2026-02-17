@@ -37,6 +37,8 @@ export interface OrganizationUnitFormFieldsProps {
   formViewModel: OrganizationUnitFormViewModel;
   /** Prefix for input IDs to ensure uniqueness (e.g., "create", "edit") */
   idPrefix: string;
+  /** When true, all fields are disabled (e.g., inactive unit) */
+  disabled?: boolean;
 }
 
 /**
@@ -44,7 +46,7 @@ export interface OrganizationUnitFormFieldsProps {
  * Fields: name, displayName, timezone
  */
 export const OrganizationUnitFormFields: React.FC<OrganizationUnitFormFieldsProps> = observer(
-  ({ formViewModel, idPrefix }) => {
+  ({ formViewModel, idPrefix, disabled = false }) => {
     const nameError = formViewModel.getFieldError('name');
     const displayNameError = formViewModel.getFieldError('displayName');
 
@@ -67,10 +69,12 @@ export const OrganizationUnitFormFields: React.FC<OrganizationUnitFormFieldsProp
             value={formViewModel.formData.name}
             onChange={(e) => formViewModel.updateName(e.target.value)}
             onBlur={() => formViewModel.touchField('name')}
+            disabled={disabled}
             className={cn(
               'flex w-full rounded-md border bg-white px-3 py-2 text-sm',
               'placeholder:text-gray-400',
               'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+              'disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed',
               formViewModel.hasFieldError('name')
                 ? 'border-red-500 focus:ring-red-500'
                 : 'border-gray-300'
@@ -111,10 +115,12 @@ export const OrganizationUnitFormFields: React.FC<OrganizationUnitFormFieldsProp
             value={formViewModel.formData.displayName}
             onChange={(e) => formViewModel.updateField('displayName', e.target.value)}
             onBlur={() => formViewModel.touchField('displayName')}
+            disabled={disabled}
             className={cn(
               'flex w-full rounded-md border bg-white px-3 py-2 text-sm',
               'placeholder:text-gray-400',
               'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+              'disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed',
               formViewModel.hasFieldError('displayName')
                 ? 'border-red-500 focus:ring-red-500'
                 : 'border-gray-300'
@@ -148,6 +154,7 @@ export const OrganizationUnitFormFields: React.FC<OrganizationUnitFormFieldsProp
           <Select.Root
             value={formViewModel.formData.timeZone}
             onValueChange={(value) => formViewModel.setTimeZone(value)}
+            disabled={disabled}
           >
             <Select.Trigger
               className={cn(
@@ -160,9 +167,8 @@ export const OrganizationUnitFormFields: React.FC<OrganizationUnitFormFieldsProp
               aria-label="Time Zone"
             >
               <Select.Value>
-                {COMMON_TIMEZONES.find(
-                  (tz) => tz.value === formViewModel.formData.timeZone
-                )?.label ?? formViewModel.formData.timeZone}
+                {COMMON_TIMEZONES.find((tz) => tz.value === formViewModel.formData.timeZone)
+                  ?.label ?? formViewModel.formData.timeZone}
               </Select.Value>
               <Select.Icon>
                 <ChevronDown className="h-4 w-4 text-gray-400" />

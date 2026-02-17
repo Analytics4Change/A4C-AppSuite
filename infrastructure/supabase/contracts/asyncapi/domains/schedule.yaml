@@ -1,0 +1,421 @@
+components:
+  messages:
+    # Template lifecycle events
+    ScheduleCreated:
+      name: schedule.created
+      title: Schedule Template Created
+      summary: A schedule template has been created with optional initial user assignments
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ScheduleCreatedEvent'
+
+    ScheduleUpdated:
+      name: schedule.updated
+      title: Schedule Template Updated
+      summary: A schedule template's name, hours, or OU scope has been modified
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ScheduleUpdatedEvent'
+
+    ScheduleDeactivated:
+      name: schedule.deactivated
+      title: Schedule Template Deactivated
+      summary: A schedule template has been deactivated (suspends all assignments)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ScheduleDeactivatedEvent'
+
+    ScheduleReactivated:
+      name: schedule.reactivated
+      title: Schedule Template Reactivated
+      summary: A schedule template has been reactivated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ScheduleReactivatedEvent'
+
+    ScheduleDeleted:
+      name: schedule.deleted
+      title: Schedule Template Deleted
+      summary: A schedule template has been permanently deleted (must be inactive with 0 assignments)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ScheduleDeletedEvent'
+
+    # Assignment events
+    ScheduleUserAssigned:
+      name: schedule.user_assigned
+      title: User Assigned to Schedule
+      summary: A user has been assigned to a schedule template
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ScheduleUserAssignedEvent'
+
+    ScheduleUserUnassigned:
+      name: schedule.user_unassigned
+      title: User Unassigned from Schedule
+      summary: A user has been removed from a schedule template
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ScheduleUserUnassignedEvent'
+
+  schemas:
+    # =========================================================================
+    # Template Lifecycle Events
+    # =========================================================================
+
+    ScheduleCreatedEvent:
+      title: ScheduleCreatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Schedule template UUID
+        stream_type:
+          type: string
+          const: schedule
+        event_type:
+          type: string
+          const: schedule.created
+        event_data:
+          $ref: '#/components/schemas/ScheduleCreatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ScheduleUpdatedEvent:
+      title: ScheduleUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Schedule template UUID
+        stream_type:
+          type: string
+          const: schedule
+        event_type:
+          type: string
+          const: schedule.updated
+        event_data:
+          $ref: '#/components/schemas/ScheduleUpdatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ScheduleDeactivatedEvent:
+      title: ScheduleDeactivatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Schedule template UUID
+        stream_type:
+          type: string
+          const: schedule
+        event_type:
+          type: string
+          const: schedule.deactivated
+        event_data:
+          $ref: '#/components/schemas/ScheduleDeactivatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ScheduleReactivatedEvent:
+      title: ScheduleReactivatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Schedule template UUID
+        stream_type:
+          type: string
+          const: schedule
+        event_type:
+          type: string
+          const: schedule.reactivated
+        event_data:
+          $ref: '#/components/schemas/ScheduleReactivatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ScheduleDeletedEvent:
+      title: ScheduleDeletedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Schedule template UUID
+        stream_type:
+          type: string
+          const: schedule
+        event_type:
+          type: string
+          const: schedule.deleted
+        event_data:
+          $ref: '#/components/schemas/ScheduleDeletedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    # =========================================================================
+    # Assignment Events
+    # =========================================================================
+
+    ScheduleUserAssignedEvent:
+      title: ScheduleUserAssignedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Schedule template UUID
+        stream_type:
+          type: string
+          const: schedule
+        event_type:
+          type: string
+          const: schedule.user_assigned
+        event_data:
+          $ref: '#/components/schemas/ScheduleUserAssignedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ScheduleUserUnassignedEvent:
+      title: ScheduleUserUnassignedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Schedule template UUID
+        stream_type:
+          type: string
+          const: schedule
+        event_type:
+          type: string
+          const: schedule.user_unassigned
+        event_data:
+          $ref: '#/components/schemas/ScheduleUserUnassignedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    # =========================================================================
+    # Data Schemas
+    # =========================================================================
+
+    ScheduleCreatedData:
+      title: ScheduleCreatedData
+      type: object
+      description: Data for schedule template creation. May include initial user assignments.
+      required:
+        - template_id
+        - organization_id
+        - schedule_name
+        - schedule
+      properties:
+        template_id:
+          type: string
+          format: uuid
+          description: Unique ID for the schedule template
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization this template belongs to
+        org_unit_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Optional OU scope. NULL means all OUs.
+        schedule_name:
+          type: string
+          description: Display name for the schedule template
+          examples:
+            - "Day Shift M-F 8-4"
+            - "Weekend On-Call"
+        schedule:
+          $ref: './user.yaml#/components/schemas/WeeklySchedule'
+        user_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Initial user assignments (optional, created atomically)
+        created_by:
+          type: string
+          format: uuid
+          description: User who created the template
+
+    ScheduleUpdatedData:
+      title: ScheduleUpdatedData
+      type: object
+      description: Data for schedule template update
+      required:
+        - template_id
+        - organization_id
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        schedule_name:
+          type: string
+          description: Updated display name (if changed)
+        schedule:
+          $ref: './user.yaml#/components/schemas/WeeklySchedule'
+        org_unit_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Updated OU scope (if changed)
+        previous_schedule:
+          $ref: './user.yaml#/components/schemas/WeeklySchedule'
+        previous_name:
+          type: string
+          description: Previous schedule name (for audit trail)
+
+    ScheduleDeactivatedData:
+      title: ScheduleDeactivatedData
+      type: object
+      description: Data for schedule template deactivation
+      required:
+        - template_id
+        - organization_id
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          description: Optional reason for deactivation
+
+    ScheduleReactivatedData:
+      title: ScheduleReactivatedData
+      type: object
+      description: Data for schedule template reactivation
+      required:
+        - template_id
+        - organization_id
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+
+    ScheduleDeletedData:
+      title: ScheduleDeletedData
+      type: object
+      description: Data for schedule template deletion. Template must be inactive with 0 assignments.
+      required:
+        - template_id
+        - organization_id
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          description: Optional reason for deletion
+
+    ScheduleUserAssignedData:
+      title: ScheduleUserAssignedData
+      type: object
+      description: Data for assigning a user to a schedule template
+      required:
+        - template_id
+        - user_id
+        - organization_id
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        effective_from:
+          type: string
+          format: date
+          nullable: true
+          description: Start date (NULL = immediate)
+        effective_until:
+          type: string
+          format: date
+          nullable: true
+          description: End date (NULL = indefinite)
+
+    ScheduleUserUnassignedData:
+      title: ScheduleUserUnassignedData
+      type: object
+      description: Data for removing a user from a schedule template
+      required:
+        - template_id
+        - user_id
+        - organization_id
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          description: Optional reason for unassignment

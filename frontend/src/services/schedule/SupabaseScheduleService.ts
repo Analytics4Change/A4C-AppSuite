@@ -4,30 +4,43 @@
  * Production implementation using api.* schema RPC functions.
  * Follows CQRS pattern: writes emit events, reads query projections.
  *
- * @see api.create_user_schedule()
- * @see api.update_user_schedule()
- * @see api.deactivate_user_schedule()
- * @see api.reactivate_user_schedule()
- * @see api.delete_user_schedule()
- * @see api.get_schedule_by_id()
- * @see api.list_user_schedules()
+ * @see api.create_schedule_template()
+ * @see api.update_schedule_template()
+ * @see api.deactivate_schedule_template()
+ * @see api.reactivate_schedule_template()
+ * @see api.delete_schedule_template()
+ * @see api.list_schedule_templates()
+ * @see api.get_schedule_template()
+ * @see api.assign_user_to_schedule()
+ * @see api.unassign_user_from_schedule()
  */
 
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/utils/logger';
-import type { UserSchedulePolicy, WeeklySchedule } from '@/types/schedule.types';
-import type { IScheduleService } from './IScheduleService';
+import type {
+  ScheduleTemplate,
+  ScheduleTemplateDetail,
+  WeeklySchedule,
+} from '@/types/schedule.types';
+import type { IScheduleService, ScheduleDeleteResult } from './IScheduleService';
 
 const log = Logger.getLogger('api');
 
-/** Parse RPC response envelope: { success, error?, data? } */
+/** Parse RPC response envelope: { success, error?, data?, errorDetails? } */
 function parseRpcResult(data: unknown): {
   success: boolean;
   error?: string;
   data?: unknown;
-  schedule_id?: string;
+  template_id?: string;
+  errorDetails?: { code: string; count?: number };
 } {
   const result = typeof data === 'string' ? JSON.parse(data) : data;
+  return result;
+}
+
+/** Parse and throw on failure */
+function parseOrThrow(data: unknown): ReturnType<typeof parseRpcResult> {
+  const result = parseRpcResult(data);
   if (!result?.success) {
     throw new Error(result?.error ?? 'RPC call failed');
   }
@@ -35,157 +48,219 @@ function parseRpcResult(data: unknown): {
 }
 
 export class SupabaseScheduleService implements IScheduleService {
-  async listSchedules(params: {
+  async listTemplates(params: {
     orgId?: string;
-    userId?: string;
-    orgUnitId?: string;
-    scheduleName?: string;
-    activeOnly?: boolean;
-  }): Promise<UserSchedulePolicy[]> {
-    log.debug('Listing schedules', params);
+    status?: 'all' | 'active' | 'inactive';
+    search?: string;
+  }): Promise<ScheduleTemplate[]> {
+    log.debug('Listing schedule templates', params);
 
-    const { data, error } = await supabase.schema('api').rpc('list_user_schedules', {
+    const { data, error } = await supabase.schema('api').rpc('list_schedule_templates', {
       p_org_id: params.orgId ?? null,
-      p_user_id: params.userId ?? null,
-      p_org_unit_id: params.orgUnitId ?? null,
-      p_schedule_name: params.scheduleName ?? null,
-      p_active_only: params.activeOnly ?? true,
+      p_status: params.status ?? 'all',
+      p_search: params.search ?? null,
     });
 
     if (error) {
-      log.error('Failed to list schedules', { error });
-      throw new Error(`Failed to list schedules: ${error.message}`);
+      log.error('Failed to list schedule templates', { error });
+      throw new Error(`Failed to list schedule templates: ${error.message}`);
     }
 
-    const result = parseRpcResult(data);
-    return (result.data as UserSchedulePolicy[]) ?? [];
+    const result = parseOrThrow(data);
+    return (result.data as ScheduleTemplate[]) ?? [];
   }
 
-  async getScheduleById(scheduleId: string): Promise<UserSchedulePolicy | null> {
-    log.debug('Getting schedule by ID', { scheduleId });
+  async getTemplate(templateId: string): Promise<ScheduleTemplateDetail | null> {
+    log.debug('Getting schedule template', { templateId });
 
-    const { data, error } = await supabase.schema('api').rpc('get_schedule_by_id', {
-      p_schedule_id: scheduleId,
+    const { data, error } = await supabase.schema('api').rpc('get_schedule_template', {
+      p_template_id: templateId,
     });
 
     if (error) {
-      log.error('Failed to get schedule', { error });
-      throw new Error(`Failed to get schedule: ${error.message}`);
+      log.error('Failed to get schedule template', { error });
+      throw new Error(`Failed to get schedule template: ${error.message}`);
     }
 
-    const result = parseRpcResult(data);
-    return (result.data as UserSchedulePolicy) ?? null;
+    const result = parseOrThrow(data);
+    return (result.data as ScheduleTemplateDetail) ?? null;
   }
 
-  async createSchedule(params: {
-    userId: string;
-    scheduleName: string;
+  async createTemplate(params: {
+    name: string;
     schedule: WeeklySchedule;
     orgUnitId?: string;
-    effectiveFrom?: string;
-    effectiveUntil?: string;
-    reason?: string;
-  }): Promise<{ scheduleId: string }> {
-    log.debug('Creating schedule', { userId: params.userId, scheduleName: params.scheduleName });
+    userIds: string[];
+  }): Promise<{ templateId: string }> {
+    log.debug('Creating schedule template', {
+      name: params.name,
+      userCount: params.userIds.length,
+    });
 
-    const { data, error } = await supabase.schema('api').rpc('create_user_schedule', {
-      p_user_id: params.userId,
-      p_schedule_name: params.scheduleName,
+    const { data, error } = await supabase.schema('api').rpc('create_schedule_template', {
+      p_name: params.name,
       p_schedule: params.schedule,
       p_org_unit_id: params.orgUnitId ?? null,
-      p_effective_from: params.effectiveFrom ?? null,
-      p_effective_until: params.effectiveUntil ?? null,
+      p_user_ids: params.userIds,
+    });
+
+    if (error) {
+      log.error('Failed to create schedule template', { error });
+      throw new Error(`Failed to create schedule template: ${error.message}`);
+    }
+
+    const result = parseOrThrow(data);
+    log.info('Schedule template created', { templateId: result.template_id });
+    return { templateId: result.template_id as string };
+  }
+
+  async updateTemplate(params: {
+    templateId: string;
+    name?: string;
+    schedule?: WeeklySchedule;
+    orgUnitId?: string | null;
+  }): Promise<void> {
+    log.debug('Updating schedule template', { templateId: params.templateId });
+
+    const { data, error } = await supabase.schema('api').rpc('update_schedule_template', {
+      p_template_id: params.templateId,
+      p_name: params.name ?? null,
+      p_schedule: params.schedule ?? null,
+      p_org_unit_id: params.orgUnitId ?? null,
+    });
+
+    if (error) {
+      log.error('Failed to update schedule template', { error });
+      throw new Error(`Failed to update schedule template: ${error.message}`);
+    }
+
+    parseOrThrow(data);
+    log.info('Schedule template updated', { templateId: params.templateId });
+  }
+
+  async deactivateTemplate(params: { templateId: string; reason?: string }): Promise<void> {
+    log.debug('Deactivating schedule template', { templateId: params.templateId });
+
+    const { data, error } = await supabase.schema('api').rpc('deactivate_schedule_template', {
+      p_template_id: params.templateId,
       p_reason: params.reason ?? null,
     });
 
     if (error) {
-      log.error('Failed to create schedule', { error });
-      throw new Error(`Failed to create schedule: ${error.message}`);
+      log.error('Failed to deactivate schedule template', { error });
+      throw new Error(`Failed to deactivate schedule template: ${error.message}`);
+    }
+
+    parseOrThrow(data);
+    log.info('Schedule template deactivated', { templateId: params.templateId });
+  }
+
+  async reactivateTemplate(params: { templateId: string }): Promise<void> {
+    log.debug('Reactivating schedule template', { templateId: params.templateId });
+
+    const { data, error } = await supabase.schema('api').rpc('reactivate_schedule_template', {
+      p_template_id: params.templateId,
+    });
+
+    if (error) {
+      log.error('Failed to reactivate schedule template', { error });
+      throw new Error(`Failed to reactivate schedule template: ${error.message}`);
+    }
+
+    parseOrThrow(data);
+    log.info('Schedule template reactivated', { templateId: params.templateId });
+  }
+
+  async deleteTemplate(params: {
+    templateId: string;
+    reason?: string;
+  }): Promise<ScheduleDeleteResult> {
+    log.debug('Deleting schedule template', { templateId: params.templateId });
+
+    const { data, error } = await supabase.schema('api').rpc('delete_schedule_template', {
+      p_template_id: params.templateId,
+      p_reason: params.reason ?? null,
+    });
+
+    if (error) {
+      log.error('Failed to delete schedule template', { error });
+      throw new Error(`Failed to delete schedule template: ${error.message}`);
     }
 
     const result = parseRpcResult(data);
-    log.info('Schedule created', { scheduleId: result.schedule_id });
-    return { scheduleId: result.schedule_id as string };
+
+    if (!result.success) {
+      log.warn('Delete schedule template returned error', {
+        templateId: params.templateId,
+        error: result.error,
+        errorDetails: result.errorDetails,
+      });
+      return {
+        success: false,
+        error: result.error ?? 'Failed to delete schedule template',
+        errorDetails: result.errorDetails as ScheduleDeleteResult['errorDetails'],
+      };
+    }
+
+    log.info('Schedule template deleted', { templateId: params.templateId });
+    return { success: true };
   }
 
-  async updateSchedule(params: {
-    scheduleId: string;
-    scheduleName?: string;
-    schedule?: WeeklySchedule;
-    orgUnitId?: string;
+  async assignUser(params: {
+    templateId: string;
+    userId: string;
     effectiveFrom?: string;
     effectiveUntil?: string;
-    reason?: string;
   }): Promise<void> {
-    log.debug('Updating schedule', { scheduleId: params.scheduleId });
+    log.debug('Assigning user to schedule', {
+      templateId: params.templateId,
+      userId: params.userId,
+    });
 
-    const { data, error } = await supabase.schema('api').rpc('update_user_schedule', {
-      p_schedule_id: params.scheduleId,
-      p_schedule_name: params.scheduleName ?? null,
-      p_schedule: params.schedule ?? null,
-      p_org_unit_id: params.orgUnitId ?? null,
+    const { data, error } = await supabase.schema('api').rpc('assign_user_to_schedule', {
+      p_template_id: params.templateId,
+      p_user_id: params.userId,
       p_effective_from: params.effectiveFrom ?? null,
       p_effective_until: params.effectiveUntil ?? null,
-      p_reason: params.reason ?? null,
     });
 
     if (error) {
-      log.error('Failed to update schedule', { error });
-      throw new Error(`Failed to update schedule: ${error.message}`);
+      log.error('Failed to assign user to schedule', { error });
+      throw new Error(`Failed to assign user to schedule: ${error.message}`);
     }
 
-    parseRpcResult(data);
-    log.info('Schedule updated', { scheduleId: params.scheduleId });
+    parseOrThrow(data);
+    log.info('User assigned to schedule', {
+      templateId: params.templateId,
+      userId: params.userId,
+    });
   }
 
-  async deactivateSchedule(params: { scheduleId: string; reason?: string }): Promise<void> {
-    log.debug('Deactivating schedule', { scheduleId: params.scheduleId });
+  async unassignUser(params: {
+    templateId: string;
+    userId: string;
+    reason?: string;
+  }): Promise<void> {
+    log.debug('Unassigning user from schedule', {
+      templateId: params.templateId,
+      userId: params.userId,
+    });
 
-    const { data, error } = await supabase.schema('api').rpc('deactivate_user_schedule', {
-      p_schedule_id: params.scheduleId,
+    const { data, error } = await supabase.schema('api').rpc('unassign_user_from_schedule', {
+      p_template_id: params.templateId,
+      p_user_id: params.userId,
       p_reason: params.reason ?? null,
     });
 
     if (error) {
-      log.error('Failed to deactivate schedule', { error });
-      throw new Error(`Failed to deactivate schedule: ${error.message}`);
+      log.error('Failed to unassign user from schedule', { error });
+      throw new Error(`Failed to unassign user from schedule: ${error.message}`);
     }
 
-    parseRpcResult(data);
-    log.info('Schedule deactivated', { scheduleId: params.scheduleId });
-  }
-
-  async reactivateSchedule(params: { scheduleId: string; reason?: string }): Promise<void> {
-    log.debug('Reactivating schedule', { scheduleId: params.scheduleId });
-
-    const { data, error } = await supabase.schema('api').rpc('reactivate_user_schedule', {
-      p_schedule_id: params.scheduleId,
-      p_reason: params.reason ?? null,
+    parseOrThrow(data);
+    log.info('User unassigned from schedule', {
+      templateId: params.templateId,
+      userId: params.userId,
     });
-
-    if (error) {
-      log.error('Failed to reactivate schedule', { error });
-      throw new Error(`Failed to reactivate schedule: ${error.message}`);
-    }
-
-    parseRpcResult(data);
-    log.info('Schedule reactivated', { scheduleId: params.scheduleId });
-  }
-
-  async deleteSchedule(params: { scheduleId: string; reason?: string }): Promise<void> {
-    log.debug('Deleting schedule', { scheduleId: params.scheduleId });
-
-    const { data, error } = await supabase.schema('api').rpc('delete_user_schedule', {
-      p_schedule_id: params.scheduleId,
-      p_reason: params.reason ?? null,
-    });
-
-    if (error) {
-      log.error('Failed to delete schedule', { error });
-      throw new Error(`Failed to delete schedule: ${error.message}`);
-    }
-
-    parseRpcResult(data);
-    log.info('Schedule deleted', { scheduleId: params.scheduleId });
   }
 }

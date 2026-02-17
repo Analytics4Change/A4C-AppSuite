@@ -586,12 +586,14 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
-          - name: user.schedule.created
-            title: User Schedule Created
-            summary: A recurring weekly schedule policy has been created for a user
+          - name: schedule.created
+            title: Schedule Template Created
+            summary: >-
+              A schedule template has been created with optional initial user
+              assignments
             contentType: application/json
             payload:
-              title: UserScheduleCreatedEvent
+              title: ScheduleCreatedEvent
               type: object
               required:
                 - stream_id
@@ -603,39 +605,44 @@ channels:
                 stream_id:
                   type: string
                   format: uuid
-                  description: User UUID
+                  description: Schedule template UUID
                 stream_type:
                   type: string
-                  const: user
+                  const: schedule
                 event_type:
                   type: string
-                  const: user.schedule.created
+                  const: schedule.created
                 event_data:
-                  title: UserScheduleData
+                  title: ScheduleCreatedData
                   type: object
-                  description: Schedule policy data for a user
+                  description: >-
+                    Data for schedule template creation. May include initial
+                    user assignments.
                   required:
+                    - template_id
                     - organization_id
+                    - schedule_name
                     - schedule
                   properties:
-                    schedule_id:
+                    template_id:
                       type: string
                       format: uuid
-                      description: Optional explicit ID for the schedule policy
+                      description: Unique ID for the schedule template
                     organization_id:
                       type: string
                       format: uuid
-                      description: Organization where this schedule applies
+                      description: Organization this template belongs to
                     org_unit_id:
                       type: string
                       format: uuid
                       nullable: true
-                      description: >
-                        Optional OU scope. If set, schedule only applies to this
-                        OU.
-
-                        NULL means schedule applies to all OUs in the
-                        organization.
+                      description: Optional OU scope. NULL means all OUs.
+                    schedule_name:
+                      type: string
+                      description: Display name for the schedule template
+                      examples:
+                        - Day Shift M-F 8-4
+                        - Weekend On-Call
                     schedule:
                       title: WeeklySchedule
                       type: object
@@ -864,16 +871,16 @@ channels:
                                 - '1600'
                                 - '1700'
                                 - '2100'
-                    effective_from:
+                    user_ids:
+                      type: array
+                      items:
+                        type: string
+                        format: uuid
+                      description: Initial user assignments (optional, created atomically)
+                    created_by:
                       type: string
-                      format: date
-                      nullable: true
-                      description: First date this schedule is active (NULL = immediate)
-                    effective_until:
-                      type: string
-                      format: date
-                      nullable: true
-                      description: Last date this schedule is active (NULL = no expiration)
+                      format: uuid
+                      description: User who created the template
                 event_metadata:
                   title: EventMetadata
                   type: object
@@ -936,12 +943,12 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
-          - name: user.schedule.updated
-            title: User Schedule Updated
-            summary: A user's schedule policy has been modified
+          - name: schedule.updated
+            title: Schedule Template Updated
+            summary: A schedule template's name, hours, or OU scope has been modified
             contentType: application/json
             payload:
-              title: UserScheduleUpdatedEvent
+              title: ScheduleUpdatedEvent
               type: object
               required:
                 - stream_id
@@ -953,615 +960,1027 @@ channels:
                 stream_id:
                   type: string
                   format: uuid
-                  description: User UUID
+                  description: Schedule template UUID
                 stream_type:
                   type: string
-                  const: user
+                  const: schedule
                 event_type:
                   type: string
-                  const: user.schedule.updated
+                  const: schedule.updated
                 event_data:
-                  allOf:
-                    - title: UserScheduleData
-                      type: object
-                      description: Schedule policy data for a user
-                      required:
-                        - organization_id
-                        - schedule
-                      properties:
-                        schedule_id:
-                          type: string
-                          format: uuid
-                          description: Optional explicit ID for the schedule policy
-                        organization_id:
-                          type: string
-                          format: uuid
-                          description: Organization where this schedule applies
-                        org_unit_id:
-                          type: string
-                          format: uuid
-                          nullable: true
-                          description: >
-                            Optional OU scope. If set, schedule only applies to
-                            this OU.
-
-                            NULL means schedule applies to all OUs in the
-                            organization.
-                        schedule:
-                          title: WeeklySchedule
-                          type: object
-                          description: >
-                            Weekly recurring schedule pattern.
-
-                            Keys are lowercase day names. Values are time
-                            windows or null (day off).
-
-                            Times in 24-hour HHMM format (local to org
-                            timezone).
-                          properties:
-                            monday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            tuesday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            wednesday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            thursday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            friday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            saturday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            sunday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                        effective_from:
-                          type: string
-                          format: date
-                          nullable: true
-                          description: >-
-                            First date this schedule is active (NULL =
-                            immediate)
-                        effective_until:
-                          type: string
-                          format: date
-                          nullable: true
-                          description: >-
-                            Last date this schedule is active (NULL = no
-                            expiration)
-                    - type: object
-                      properties:
-                        previous_schedule:
-                          title: WeeklySchedule
-                          type: object
-                          description: >
-                            Weekly recurring schedule pattern.
-
-                            Keys are lowercase day names. Values are time
-                            windows or null (day off).
-
-                            Times in 24-hour HHMM format (local to org
-                            timezone).
-                          properties:
-                            monday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            tuesday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            wednesday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            thursday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            friday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            saturday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            sunday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                event_metadata:
-                  title: EventMetadata
+                  title: ScheduleUpdatedData
                   type: object
+                  description: Data for schedule template update
                   required:
-                    - user_id
-                    - reason
-                  properties:
-                    user_id:
-                      type: string
-                      format: uuid
-                      description: ID of the user who initiated this event
-                    organization_id:
-                      type: string
-                      format: uuid
-                      description: >-
-                        ID of the organization context for this event
-                        (multi-tenant isolation)
-                    reason:
-                      type: string
-                      minLength: 10
-                      maxLength: 500
-                      description: >
-                        Business justification for this action. This field
-                        captures the "WHY"
-
-                        behind every change and is REQUIRED for all events.
-                      examples:
-                        - >-
-                          Patient showed allergic reaction to previous
-                          medication
-                        - >-
-                          Dosage adjustment per physician consultation on
-                          2024-01-15
-                        - >-
-                          Regular intake from emergency department referral
-                          #12345
-                    user_email:
-                      type: string
-                      format: email
-                      description: Email of the user who initiated this event
-                    user_name:
-                      type: string
-                      description: Name of the user who initiated this event
-                    correlation_id:
-                      type: string
-                      format: uuid
-                      description: ID to correlate related events across the system
-                    causation_id:
-                      type: string
-                      format: uuid
-                      description: ID of the event that caused this event
-                    ip_address:
-                      type: string
-                      format: ipv4
-                      description: IP address of the client
-                    user_agent:
-                      type: string
-                      description: User agent string of the client
-                    notes:
-                      type: string
-                      maxLength: 2000
-                      description: Additional context or notes
-          - name: user.schedule.deactivated
-            title: User Schedule Deactivated
-            summary: A user's schedule policy has been deactivated
-            contentType: application/json
-            payload:
-              title: UserScheduleDeactivatedEvent
-              type: object
-              required:
-                - stream_id
-                - stream_type
-                - event_type
-                - event_data
-                - event_metadata
-              properties:
-                stream_id:
-                  type: string
-                  format: uuid
-                  description: User UUID
-                stream_type:
-                  type: string
-                  const: user
-                event_type:
-                  type: string
-                  const: user.schedule.deactivated
-                event_data:
-                  type: object
-                  required:
+                    - template_id
                     - organization_id
                   properties:
+                    template_id:
+                      type: string
+                      format: uuid
                     organization_id:
                       type: string
                       format: uuid
+                    schedule_name:
+                      type: string
+                      description: Updated display name (if changed)
+                    schedule:
+                      title: WeeklySchedule
+                      type: object
+                      description: >
+                        Weekly recurring schedule pattern.
+
+                        Keys are lowercase day names. Values are time windows or
+                        null (day off).
+
+                        Times in 24-hour HHMM format (local to org timezone).
+                      properties:
+                        monday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        tuesday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        wednesday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        thursday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        friday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        saturday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        sunday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
                     org_unit_id:
                       type: string
                       format: uuid
                       nullable: true
+                      description: Updated OU scope (if changed)
+                    previous_schedule:
+                      title: WeeklySchedule
+                      type: object
+                      description: >
+                        Weekly recurring schedule pattern.
+
+                        Keys are lowercase day names. Values are time windows or
+                        null (day off).
+
+                        Times in 24-hour HHMM format (local to org timezone).
+                      properties:
+                        monday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        tuesday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        wednesday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        thursday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        friday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        saturday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        sunday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                    previous_name:
+                      type: string
+                      description: Previous schedule name (for audit trail)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: schedule.deactivated
+            title: Schedule Template Deactivated
+            summary: >-
+              A schedule template has been deactivated (suspends all
+              assignments)
+            contentType: application/json
+            payload:
+              title: ScheduleDeactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Schedule template UUID
+                stream_type:
+                  type: string
+                  const: schedule
+                event_type:
+                  type: string
+                  const: schedule.deactivated
+                event_data:
+                  title: ScheduleDeactivatedData
+                  type: object
+                  description: Data for schedule template deactivation
+                  required:
+                    - template_id
+                    - organization_id
+                  properties:
+                    template_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
                     reason:
                       type: string
                       description: Optional reason for deactivation
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: schedule.reactivated
+            title: Schedule Template Reactivated
+            summary: A schedule template has been reactivated
+            contentType: application/json
+            payload:
+              title: ScheduleReactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Schedule template UUID
+                stream_type:
+                  type: string
+                  const: schedule
+                event_type:
+                  type: string
+                  const: schedule.reactivated
+                event_data:
+                  title: ScheduleReactivatedData
+                  type: object
+                  description: Data for schedule template reactivation
+                  required:
+                    - template_id
+                    - organization_id
+                  properties:
+                    template_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: schedule.deleted
+            title: Schedule Template Deleted
+            summary: >-
+              A schedule template has been permanently deleted (must be inactive
+              with 0 assignments)
+            contentType: application/json
+            payload:
+              title: ScheduleDeletedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Schedule template UUID
+                stream_type:
+                  type: string
+                  const: schedule
+                event_type:
+                  type: string
+                  const: schedule.deleted
+                event_data:
+                  title: ScheduleDeletedData
+                  type: object
+                  description: >-
+                    Data for schedule template deletion. Template must be
+                    inactive with 0 assignments.
+                  required:
+                    - template_id
+                    - organization_id
+                  properties:
+                    template_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    reason:
+                      type: string
+                      description: Optional reason for deletion
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: schedule.user_assigned
+            title: User Assigned to Schedule
+            summary: A user has been assigned to a schedule template
+            contentType: application/json
+            payload:
+              title: ScheduleUserAssignedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Schedule template UUID
+                stream_type:
+                  type: string
+                  const: schedule
+                event_type:
+                  type: string
+                  const: schedule.user_assigned
+                event_data:
+                  title: ScheduleUserAssignedData
+                  type: object
+                  description: Data for assigning a user to a schedule template
+                  required:
+                    - template_id
+                    - user_id
+                    - organization_id
+                  properties:
+                    template_id:
+                      type: string
+                      format: uuid
+                    user_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    effective_from:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: Start date (NULL = immediate)
+                    effective_until:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: End date (NULL = indefinite)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: schedule.user_unassigned
+            title: User Unassigned from Schedule
+            summary: A user has been removed from a schedule template
+            contentType: application/json
+            payload:
+              title: ScheduleUserUnassignedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Schedule template UUID
+                stream_type:
+                  type: string
+                  const: schedule
+                event_type:
+                  type: string
+                  const: schedule.user_unassigned
+                event_data:
+                  title: ScheduleUserUnassignedData
+                  type: object
+                  description: Data for removing a user from a schedule template
+                  required:
+                    - template_id
+                    - user_id
+                    - organization_id
+                  properties:
+                    template_id:
+                      type: string
+                      format: uuid
+                    user_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    reason:
+                      type: string
+                      description: Optional reason for unassignment
                 event_metadata:
                   title: EventMetadata
                   type: object
@@ -1766,7 +2185,9 @@ channels:
                   type: string
                   const: user.client.unassigned
                 event_data:
+                  title: UserClientUnassignedData
                   type: object
+                  description: Data for removing a staff-client assignment
                   required:
                     - client_id
                     - organization_id
@@ -1774,9 +2195,11 @@ channels:
                     client_id:
                       type: string
                       format: uuid
+                      description: Client being unassigned from this staff member
                     organization_id:
                       type: string
                       format: uuid
+                      description: Organization context for the unassignment
                     reason:
                       type: string
                       description: Optional reason for unassignment
@@ -9673,6 +10096,111 @@ channels:
                       type: boolean
                       description: Whether MFA is required to use this permission
                       default: false
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: permission.updated
+            title: Permission Updated
+            summary: An existing permission's mutable fields have been updated
+            contentType: application/json
+            payload:
+              title: PermissionUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Permission UUID
+                stream_type:
+                  type: string
+                  const: permission
+                event_type:
+                  type: string
+                  const: permission.updated
+                event_data:
+                  title: PermissionUpdatedData
+                  type: object
+                  properties:
+                    description:
+                      type: string
+                      description: Updated human-readable explanation of the permission
+                    scope_type:
+                      type: string
+                      title: ScopeType
+                      enum:
+                        - global
+                        - org
+                      description: >-
+                        Permission scope type (global for platform-wide, org for
+                        organization-scoped)
+                    requires_mfa:
+                      type: boolean
+                      description: Updated MFA requirement flag
                 event_metadata:
                   title: EventMetadata
                   type: object
@@ -11535,12 +12063,14 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
-          - name: user.schedule.created
-            title: User Schedule Created
-            summary: A recurring weekly schedule policy has been created for a user
+          - name: schedule.created
+            title: Schedule Template Created
+            summary: >-
+              A schedule template has been created with optional initial user
+              assignments
             contentType: application/json
             payload:
-              title: UserScheduleCreatedEvent
+              title: ScheduleCreatedEvent
               type: object
               required:
                 - stream_id
@@ -11552,39 +12082,44 @@ channels:
                 stream_id:
                   type: string
                   format: uuid
-                  description: User UUID
+                  description: Schedule template UUID
                 stream_type:
                   type: string
-                  const: user
+                  const: schedule
                 event_type:
                   type: string
-                  const: user.schedule.created
+                  const: schedule.created
                 event_data:
-                  title: UserScheduleData
+                  title: ScheduleCreatedData
                   type: object
-                  description: Schedule policy data for a user
+                  description: >-
+                    Data for schedule template creation. May include initial
+                    user assignments.
                   required:
+                    - template_id
                     - organization_id
+                    - schedule_name
                     - schedule
                   properties:
-                    schedule_id:
+                    template_id:
                       type: string
                       format: uuid
-                      description: Optional explicit ID for the schedule policy
+                      description: Unique ID for the schedule template
                     organization_id:
                       type: string
                       format: uuid
-                      description: Organization where this schedule applies
+                      description: Organization this template belongs to
                     org_unit_id:
                       type: string
                       format: uuid
                       nullable: true
-                      description: >
-                        Optional OU scope. If set, schedule only applies to this
-                        OU.
-
-                        NULL means schedule applies to all OUs in the
-                        organization.
+                      description: Optional OU scope. NULL means all OUs.
+                    schedule_name:
+                      type: string
+                      description: Display name for the schedule template
+                      examples:
+                        - Day Shift M-F 8-4
+                        - Weekend On-Call
                     schedule:
                       title: WeeklySchedule
                       type: object
@@ -11813,16 +12348,16 @@ channels:
                                 - '1600'
                                 - '1700'
                                 - '2100'
-                    effective_from:
+                    user_ids:
+                      type: array
+                      items:
+                        type: string
+                        format: uuid
+                      description: Initial user assignments (optional, created atomically)
+                    created_by:
                       type: string
-                      format: date
-                      nullable: true
-                      description: First date this schedule is active (NULL = immediate)
-                    effective_until:
-                      type: string
-                      format: date
-                      nullable: true
-                      description: Last date this schedule is active (NULL = no expiration)
+                      format: uuid
+                      description: User who created the template
                 event_metadata:
                   title: EventMetadata
                   type: object
@@ -11885,12 +12420,12 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
-          - name: user.schedule.updated
-            title: User Schedule Updated
-            summary: A user's schedule policy has been modified
+          - name: schedule.updated
+            title: Schedule Template Updated
+            summary: A schedule template's name, hours, or OU scope has been modified
             contentType: application/json
             payload:
-              title: UserScheduleUpdatedEvent
+              title: ScheduleUpdatedEvent
               type: object
               required:
                 - stream_id
@@ -11902,615 +12437,1027 @@ channels:
                 stream_id:
                   type: string
                   format: uuid
-                  description: User UUID
+                  description: Schedule template UUID
                 stream_type:
                   type: string
-                  const: user
+                  const: schedule
                 event_type:
                   type: string
-                  const: user.schedule.updated
+                  const: schedule.updated
                 event_data:
-                  allOf:
-                    - title: UserScheduleData
-                      type: object
-                      description: Schedule policy data for a user
-                      required:
-                        - organization_id
-                        - schedule
-                      properties:
-                        schedule_id:
-                          type: string
-                          format: uuid
-                          description: Optional explicit ID for the schedule policy
-                        organization_id:
-                          type: string
-                          format: uuid
-                          description: Organization where this schedule applies
-                        org_unit_id:
-                          type: string
-                          format: uuid
-                          nullable: true
-                          description: >
-                            Optional OU scope. If set, schedule only applies to
-                            this OU.
-
-                            NULL means schedule applies to all OUs in the
-                            organization.
-                        schedule:
-                          title: WeeklySchedule
-                          type: object
-                          description: >
-                            Weekly recurring schedule pattern.
-
-                            Keys are lowercase day names. Values are time
-                            windows or null (day off).
-
-                            Times in 24-hour HHMM format (local to org
-                            timezone).
-                          properties:
-                            monday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            tuesday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            wednesday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            thursday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            friday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            saturday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            sunday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                        effective_from:
-                          type: string
-                          format: date
-                          nullable: true
-                          description: >-
-                            First date this schedule is active (NULL =
-                            immediate)
-                        effective_until:
-                          type: string
-                          format: date
-                          nullable: true
-                          description: >-
-                            Last date this schedule is active (NULL = no
-                            expiration)
-                    - type: object
-                      properties:
-                        previous_schedule:
-                          title: WeeklySchedule
-                          type: object
-                          description: >
-                            Weekly recurring schedule pattern.
-
-                            Keys are lowercase day names. Values are time
-                            windows or null (day off).
-
-                            Times in 24-hour HHMM format (local to org
-                            timezone).
-                          properties:
-                            monday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            tuesday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            wednesday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            thursday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            friday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            saturday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                            sunday:
-                              title: DaySchedule
-                              type: object
-                              nullable: true
-                              description: >-
-                                Schedule window for a single day. Null means day
-                                off.
-                              required:
-                                - begin
-                                - end
-                              properties:
-                                begin:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    Start time in HHMM format (e.g., "0800" for
-                                    8:00 AM)
-                                  examples:
-                                    - '0800'
-                                    - '0900'
-                                    - '1200'
-                                end:
-                                  type: string
-                                  pattern: ^[0-2][0-9][0-5][0-9]$
-                                  description: >-
-                                    End time in HHMM format (e.g., "1600" for
-                                    4:00 PM)
-                                  examples:
-                                    - '1600'
-                                    - '1700'
-                                    - '2100'
-                event_metadata:
-                  title: EventMetadata
+                  title: ScheduleUpdatedData
                   type: object
+                  description: Data for schedule template update
                   required:
-                    - user_id
-                    - reason
-                  properties:
-                    user_id:
-                      type: string
-                      format: uuid
-                      description: ID of the user who initiated this event
-                    organization_id:
-                      type: string
-                      format: uuid
-                      description: >-
-                        ID of the organization context for this event
-                        (multi-tenant isolation)
-                    reason:
-                      type: string
-                      minLength: 10
-                      maxLength: 500
-                      description: >
-                        Business justification for this action. This field
-                        captures the "WHY"
-
-                        behind every change and is REQUIRED for all events.
-                      examples:
-                        - >-
-                          Patient showed allergic reaction to previous
-                          medication
-                        - >-
-                          Dosage adjustment per physician consultation on
-                          2024-01-15
-                        - >-
-                          Regular intake from emergency department referral
-                          #12345
-                    user_email:
-                      type: string
-                      format: email
-                      description: Email of the user who initiated this event
-                    user_name:
-                      type: string
-                      description: Name of the user who initiated this event
-                    correlation_id:
-                      type: string
-                      format: uuid
-                      description: ID to correlate related events across the system
-                    causation_id:
-                      type: string
-                      format: uuid
-                      description: ID of the event that caused this event
-                    ip_address:
-                      type: string
-                      format: ipv4
-                      description: IP address of the client
-                    user_agent:
-                      type: string
-                      description: User agent string of the client
-                    notes:
-                      type: string
-                      maxLength: 2000
-                      description: Additional context or notes
-          - name: user.schedule.deactivated
-            title: User Schedule Deactivated
-            summary: A user's schedule policy has been deactivated
-            contentType: application/json
-            payload:
-              title: UserScheduleDeactivatedEvent
-              type: object
-              required:
-                - stream_id
-                - stream_type
-                - event_type
-                - event_data
-                - event_metadata
-              properties:
-                stream_id:
-                  type: string
-                  format: uuid
-                  description: User UUID
-                stream_type:
-                  type: string
-                  const: user
-                event_type:
-                  type: string
-                  const: user.schedule.deactivated
-                event_data:
-                  type: object
-                  required:
+                    - template_id
                     - organization_id
                   properties:
+                    template_id:
+                      type: string
+                      format: uuid
                     organization_id:
                       type: string
                       format: uuid
+                    schedule_name:
+                      type: string
+                      description: Updated display name (if changed)
+                    schedule:
+                      title: WeeklySchedule
+                      type: object
+                      description: >
+                        Weekly recurring schedule pattern.
+
+                        Keys are lowercase day names. Values are time windows or
+                        null (day off).
+
+                        Times in 24-hour HHMM format (local to org timezone).
+                      properties:
+                        monday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        tuesday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        wednesday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        thursday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        friday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        saturday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        sunday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
                     org_unit_id:
                       type: string
                       format: uuid
                       nullable: true
+                      description: Updated OU scope (if changed)
+                    previous_schedule:
+                      title: WeeklySchedule
+                      type: object
+                      description: >
+                        Weekly recurring schedule pattern.
+
+                        Keys are lowercase day names. Values are time windows or
+                        null (day off).
+
+                        Times in 24-hour HHMM format (local to org timezone).
+                      properties:
+                        monday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        tuesday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        wednesday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        thursday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        friday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        saturday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                        sunday:
+                          title: DaySchedule
+                          type: object
+                          nullable: true
+                          description: >-
+                            Schedule window for a single day. Null means day
+                            off.
+                          required:
+                            - begin
+                            - end
+                          properties:
+                            begin:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                Start time in HHMM format (e.g., "0800" for 8:00
+                                AM)
+                              examples:
+                                - '0800'
+                                - '0900'
+                                - '1200'
+                            end:
+                              type: string
+                              pattern: ^[0-2][0-9][0-5][0-9]$
+                              description: >-
+                                End time in HHMM format (e.g., "1600" for 4:00
+                                PM)
+                              examples:
+                                - '1600'
+                                - '1700'
+                                - '2100'
+                    previous_name:
+                      type: string
+                      description: Previous schedule name (for audit trail)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: schedule.deactivated
+            title: Schedule Template Deactivated
+            summary: >-
+              A schedule template has been deactivated (suspends all
+              assignments)
+            contentType: application/json
+            payload:
+              title: ScheduleDeactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Schedule template UUID
+                stream_type:
+                  type: string
+                  const: schedule
+                event_type:
+                  type: string
+                  const: schedule.deactivated
+                event_data:
+                  title: ScheduleDeactivatedData
+                  type: object
+                  description: Data for schedule template deactivation
+                  required:
+                    - template_id
+                    - organization_id
+                  properties:
+                    template_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
                     reason:
                       type: string
                       description: Optional reason for deactivation
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: schedule.reactivated
+            title: Schedule Template Reactivated
+            summary: A schedule template has been reactivated
+            contentType: application/json
+            payload:
+              title: ScheduleReactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Schedule template UUID
+                stream_type:
+                  type: string
+                  const: schedule
+                event_type:
+                  type: string
+                  const: schedule.reactivated
+                event_data:
+                  title: ScheduleReactivatedData
+                  type: object
+                  description: Data for schedule template reactivation
+                  required:
+                    - template_id
+                    - organization_id
+                  properties:
+                    template_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: schedule.deleted
+            title: Schedule Template Deleted
+            summary: >-
+              A schedule template has been permanently deleted (must be inactive
+              with 0 assignments)
+            contentType: application/json
+            payload:
+              title: ScheduleDeletedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Schedule template UUID
+                stream_type:
+                  type: string
+                  const: schedule
+                event_type:
+                  type: string
+                  const: schedule.deleted
+                event_data:
+                  title: ScheduleDeletedData
+                  type: object
+                  description: >-
+                    Data for schedule template deletion. Template must be
+                    inactive with 0 assignments.
+                  required:
+                    - template_id
+                    - organization_id
+                  properties:
+                    template_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    reason:
+                      type: string
+                      description: Optional reason for deletion
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: schedule.user_assigned
+            title: User Assigned to Schedule
+            summary: A user has been assigned to a schedule template
+            contentType: application/json
+            payload:
+              title: ScheduleUserAssignedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Schedule template UUID
+                stream_type:
+                  type: string
+                  const: schedule
+                event_type:
+                  type: string
+                  const: schedule.user_assigned
+                event_data:
+                  title: ScheduleUserAssignedData
+                  type: object
+                  description: Data for assigning a user to a schedule template
+                  required:
+                    - template_id
+                    - user_id
+                    - organization_id
+                  properties:
+                    template_id:
+                      type: string
+                      format: uuid
+                    user_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    effective_from:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: Start date (NULL = immediate)
+                    effective_until:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: End date (NULL = indefinite)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: schedule.user_unassigned
+            title: User Unassigned from Schedule
+            summary: A user has been removed from a schedule template
+            contentType: application/json
+            payload:
+              title: ScheduleUserUnassignedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Schedule template UUID
+                stream_type:
+                  type: string
+                  const: schedule
+                event_type:
+                  type: string
+                  const: schedule.user_unassigned
+                event_data:
+                  title: ScheduleUserUnassignedData
+                  type: object
+                  description: Data for removing a user from a schedule template
+                  required:
+                    - template_id
+                    - user_id
+                    - organization_id
+                  properties:
+                    template_id:
+                      type: string
+                      format: uuid
+                    user_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    reason:
+                      type: string
+                      description: Optional reason for unassignment
                 event_metadata:
                   title: EventMetadata
                   type: object
@@ -12715,7 +13662,9 @@ channels:
                   type: string
                   const: user.client.unassigned
                 event_data:
+                  title: UserClientUnassignedData
                   type: object
+                  description: Data for removing a staff-client assignment
                   required:
                     - client_id
                     - organization_id
@@ -12723,9 +13672,11 @@ channels:
                     client_id:
                       type: string
                       format: uuid
+                      description: Client being unassigned from this staff member
                     organization_id:
                       type: string
                       format: uuid
+                      description: Organization context for the unassignment
                     reason:
                       type: string
                       description: Optional reason for unassignment
@@ -20684,6 +21635,111 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
+          - name: permission.updated
+            title: Permission Updated
+            summary: An existing permission's mutable fields have been updated
+            contentType: application/json
+            payload:
+              title: PermissionUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Permission UUID
+                stream_type:
+                  type: string
+                  const: permission
+                event_type:
+                  type: string
+                  const: permission.updated
+                event_data:
+                  title: PermissionUpdatedData
+                  type: object
+                  properties:
+                    description:
+                      type: string
+                      description: Updated human-readable explanation of the permission
+                    scope_type:
+                      type: string
+                      title: ScopeType
+                      enum:
+                        - global
+                        - org
+                      description: >-
+                        Permission scope type (global for platform-wide, org for
+                        organization-scoped)
+                    requires_mfa:
+                      type: boolean
+                      description: Updated MFA requirement flag
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
           - name: role.created
             title: Role Created
             summary: A new role has been created
@@ -21964,6 +23020,7 @@ components:
             - email
             - access_grant
             - junction
+            - schedule
           description: Type of entity this event affects
         stream_version:
           type: integer

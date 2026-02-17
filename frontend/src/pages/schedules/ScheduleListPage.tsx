@@ -1,7 +1,7 @@
 /**
  * Schedule List Page
  *
- * Card-based listing of schedules with status tabs, search, and quick actions.
+ * Card-based listing of schedule templates with status tabs, search, and quick actions.
  * Mirrors RolesPage pattern.
  */
 
@@ -11,9 +11,9 @@ import { observer } from 'mobx-react-lite';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { Plus, Search, Calendar } from 'lucide-react';
+import { Plus, Search, Calendar, Users } from 'lucide-react';
 import { ScheduleListViewModel } from '@/viewModels/schedule/ScheduleListViewModel';
-import type { UserSchedulePolicy, DayOfWeek } from '@/types/schedule.types';
+import type { ScheduleTemplate, DayOfWeek } from '@/types/schedule.types';
 import { DAYS_OF_WEEK } from '@/types/schedule.types';
 import { cn } from '@/components/ui/utils';
 import { Logger } from '@/utils/logger';
@@ -36,12 +36,12 @@ function formatTime(hhmm: string): string {
 }
 
 const ScheduleGridCard: React.FC<{
-  schedule: UserSchedulePolicy;
+  template: ScheduleTemplate;
   onClick: () => void;
   isLoading: boolean;
-}> = ({ schedule, onClick, isLoading }) => {
+}> = ({ template, onClick, isLoading }) => {
   const activeDays = DAYS_OF_WEEK.filter(
-    (day) => schedule.schedule[day] !== null && schedule.schedule[day] !== undefined
+    (day) => template.schedule[day] !== null && template.schedule[day] !== undefined
   ).length;
 
   return (
@@ -51,33 +51,35 @@ const ScheduleGridCard: React.FC<{
       className="text-left rounded-xl border border-gray-200/60 bg-white/70 backdrop-blur-sm p-4
                shadow-sm hover:shadow-md hover:border-blue-200 transition-all w-full
                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-      aria-label={`${schedule.schedule_name}, ${schedule.user_name ?? 'unassigned'}, ${schedule.is_active ? 'active' : 'inactive'}`}
+      aria-label={`${template.schedule_name}, ${template.assigned_user_count} user${template.assigned_user_count !== 1 ? 's' : ''}, ${template.is_active ? 'active' : 'inactive'}`}
     >
       <div className="flex items-start justify-between mb-2">
         <div className="min-w-0">
-          <p className="font-semibold text-gray-900 truncate">{schedule.schedule_name}</p>
-          <p className="text-sm text-gray-600 truncate">
-            {schedule.user_name ?? schedule.user_email ?? 'Unknown User'}
+          <p className="font-semibold text-gray-900 truncate">{template.schedule_name}</p>
+          <p className="text-sm text-gray-600 truncate flex items-center gap-1">
+            <Users className="h-3.5 w-3.5" aria-hidden="true" />
+            {template.assigned_user_count} assigned user
+            {template.assigned_user_count !== 1 ? 's' : ''}
           </p>
         </div>
         <span
           className={cn(
             'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium flex-shrink-0 ml-2',
-            schedule.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+            template.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
           )}
         >
-          {schedule.is_active ? 'Active' : 'Inactive'}
+          {template.is_active ? 'Active' : 'Inactive'}
         </span>
       </div>
 
-      {schedule.org_unit_name && (
-        <p className="text-xs text-gray-500 mb-2">Unit: {schedule.org_unit_name}</p>
+      {template.org_unit_name && (
+        <p className="text-xs text-gray-500 mb-2">Unit: {template.org_unit_name}</p>
       )}
 
       {/* Mini day grid */}
       <div className="flex gap-1">
         {DAYS_OF_WEEK.map((day) => {
-          const daySchedule = schedule.schedule[day];
+          const daySchedule = template.schedule[day];
           const isActive = daySchedule !== null && daySchedule !== undefined;
           return (
             <div
@@ -103,7 +105,6 @@ const ScheduleGridCard: React.FC<{
         <span>
           {activeDays} day{activeDays !== 1 ? 's' : ''}
         </span>
-        {schedule.effective_from && <span>From: {schedule.effective_from}</span>}
       </div>
     </button>
   );
@@ -123,14 +124,14 @@ export const ScheduleListPage: React.FC = observer(() => {
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
-    scheduleId: string;
-    scheduleName: string;
+    templateId: string;
+    templateName: string;
     action: 'deactivate' | 'reactivate';
-  }>({ isOpen: false, scheduleId: '', scheduleName: '', action: 'deactivate' });
+  }>({ isOpen: false, templateId: '', templateName: '', action: 'deactivate' });
 
   useEffect(() => {
-    log.debug('ScheduleListPage mounting, loading schedules');
-    viewModel.loadSchedules();
+    log.debug('ScheduleListPage mounting, loading templates');
+    viewModel.loadTemplates();
   }, [viewModel]);
 
   // Sync local filter to viewModel
@@ -163,15 +164,15 @@ export const ScheduleListPage: React.FC = observer(() => {
     navigate(`/schedules/manage${params}`);
   };
 
-  const handleCardClick = (schedule: UserSchedulePolicy) => {
-    navigate(`/schedules/manage?scheduleId=${schedule.id}`);
+  const handleCardClick = (template: ScheduleTemplate) => {
+    navigate(`/schedules/manage?templateId=${template.id}`);
   };
 
   const handleConfirmAction = async () => {
     if (confirmDialog.action === 'deactivate') {
-      await viewModel.deactivateSchedule(confirmDialog.scheduleId, 'Deactivated from list view');
+      await viewModel.deactivateTemplate(confirmDialog.templateId, 'Deactivated from list view');
     } else {
-      await viewModel.reactivateSchedule(confirmDialog.scheduleId, 'Reactivated from list view');
+      await viewModel.reactivateTemplate(confirmDialog.templateId, 'Reactivated from list view');
     }
     setConfirmDialog({ ...confirmDialog, isOpen: false });
   };
@@ -181,8 +182,8 @@ export const ScheduleListPage: React.FC = observer(() => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Schedules</h1>
-          <p className="text-gray-600 mt-1">Manage staff work schedules</p>
+          <h1 className="text-3xl font-bold text-gray-900">Schedule Templates</h1>
+          <p className="text-gray-600 mt-1">Manage staff work schedule templates</p>
         </div>
         <Button
           className="flex items-center gap-2"
@@ -190,7 +191,7 @@ export const ScheduleListPage: React.FC = observer(() => {
           disabled={viewModel.isLoading}
         >
           <Plus size={20} />
-          Create Schedule
+          Create Template
         </Button>
       </div>
 
@@ -199,10 +200,10 @@ export const ScheduleListPage: React.FC = observer(() => {
         {(['all', 'active', 'inactive'] as const).map((status) => {
           const count =
             status === 'all'
-              ? viewModel.scheduleCount
+              ? viewModel.templateCount
               : status === 'active'
-                ? viewModel.activeScheduleCount
-                : viewModel.scheduleCount - viewModel.activeScheduleCount;
+                ? viewModel.activeTemplateCount
+                : viewModel.templateCount - viewModel.activeTemplateCount;
           return (
             <Button
               key={status}
@@ -230,11 +231,11 @@ export const ScheduleListPage: React.FC = observer(() => {
         />
         <Input
           type="search"
-          placeholder="Search by name, user, or email..."
+          placeholder="Search by name or unit..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10 max-w-md"
-          aria-label="Search schedules"
+          aria-label="Search schedule templates"
         />
       </div>
 
@@ -257,11 +258,11 @@ export const ScheduleListPage: React.FC = observer(() => {
       )}
 
       {/* Loading */}
-      {viewModel.isLoading && viewModel.schedules.length === 0 && (
+      {viewModel.isLoading && viewModel.templates.length === 0 && (
         <div className="flex items-center justify-center py-12">
           <div className="flex items-center gap-3 text-gray-500">
             <Calendar className="w-6 h-6 animate-pulse" />
-            <span>Loading schedules...</span>
+            <span>Loading schedule templates...</span>
           </div>
         </div>
       )}
@@ -271,30 +272,30 @@ export const ScheduleListPage: React.FC = observer(() => {
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
         data-testid="schedule-list"
       >
-        {viewModel.schedules.map((schedule) => (
+        {viewModel.templates.map((template) => (
           <ScheduleGridCard
-            key={schedule.id}
-            schedule={schedule}
-            onClick={() => handleCardClick(schedule)}
+            key={template.id}
+            template={template}
+            onClick={() => handleCardClick(template)}
             isLoading={viewModel.isLoading}
           />
         ))}
       </div>
 
       {/* Empty State */}
-      {!viewModel.isLoading && viewModel.schedules.length === 0 && (
+      {!viewModel.isLoading && viewModel.templates.length === 0 && (
         <div className="text-center py-12">
-          {viewModel.scheduleCount === 0 ? (
+          {viewModel.templateCount === 0 ? (
             <div>
               <Calendar className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500 mb-4">No schedules defined yet.</p>
+              <p className="text-gray-500 mb-4">No schedule templates defined yet.</p>
               <Button onClick={handleCreateClick}>
                 <Plus size={16} className="mr-2" />
-                Create Your First Schedule
+                Create Your First Template
               </Button>
             </div>
           ) : (
-            <p className="text-gray-500">No schedules match your search.</p>
+            <p className="text-gray-500">No templates match your search.</p>
           )}
         </div>
       )}
@@ -303,12 +304,14 @@ export const ScheduleListPage: React.FC = observer(() => {
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         title={
-          confirmDialog.action === 'deactivate' ? 'Deactivate Schedule' : 'Reactivate Schedule'
+          confirmDialog.action === 'deactivate'
+            ? 'Deactivate Schedule Template'
+            : 'Reactivate Schedule Template'
         }
         message={
           confirmDialog.action === 'deactivate'
-            ? `Are you sure you want to deactivate "${confirmDialog.scheduleName}"?`
-            : `Are you sure you want to reactivate "${confirmDialog.scheduleName}"?`
+            ? `Are you sure you want to deactivate "${confirmDialog.templateName}"?`
+            : `Are you sure you want to reactivate "${confirmDialog.templateName}"?`
         }
         confirmLabel={confirmDialog.action === 'deactivate' ? 'Deactivate' : 'Reactivate'}
         cancelLabel="Cancel"

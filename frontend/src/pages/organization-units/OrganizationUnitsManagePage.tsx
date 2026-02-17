@@ -34,8 +34,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DangerZone } from '@/components/ui/DangerZone';
 import { StatusFilterTabs, type StatusFilterOption } from '@/components/ui/StatusFilterTabs';
 import { OrganizationTree, OrganizationUnitFormFields } from '@/components/organization-units';
 import { OrganizationUnitsViewModel } from '@/viewModels/organization/OrganizationUnitsViewModel';
@@ -43,7 +43,6 @@ import { OrganizationUnitFormViewModel } from '@/viewModels/organization/Organiz
 import { getOrganizationUnitService } from '@/services/organization/OrganizationUnitServiceFactory';
 import {
   Plus,
-  Trash2,
   ChevronDown,
   ChevronUp,
   RefreshCw,
@@ -78,7 +77,9 @@ type DialogState =
   | { type: 'deactivate'; isLoading: boolean }
   | { type: 'reactivate'; isLoading: boolean }
   | { type: 'delete'; isLoading: boolean }
-  | { type: 'activeWarning' };
+  | { type: 'activeWarning' }
+  | { type: 'hasChildren'; children: string[] }
+  | { type: 'hasRoles'; count: number };
 
 /**
  * Organization Units Management Page Component
@@ -91,17 +92,21 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
   const permissions = useMemo(() => {
     const eps = session?.claims.effective_permissions ?? [];
     return {
-      canCreate: eps.some(ep => ep.p === 'organization.create_ou'),
-      canUpdate: eps.some(ep => ep.p === 'organization.update_ou'),
-      canDelete: eps.some(ep => ep.p === 'organization.delete_ou'),
-      canDeactivate: eps.some(ep => ep.p === 'organization.deactivate_ou'),
-      canReactivate: eps.some(ep => ep.p === 'organization.reactivate_ou'),
+      canCreate: eps.some((ep) => ep.p === 'organization.create_ou'),
+      canUpdate: eps.some((ep) => ep.p === 'organization.update_ou'),
+      canDelete: eps.some((ep) => ep.p === 'organization.delete_ou'),
+      canDeactivate: eps.some((ep) => ep.p === 'organization.deactivate_ou'),
+      canReactivate: eps.some((ep) => ep.p === 'organization.reactivate_ou'),
     };
   }, [session?.claims.effective_permissions]);
 
   // Determine if user has any write permissions (controls layout width)
-  const hasAnyWritePermission = permissions.canCreate || permissions.canUpdate ||
-    permissions.canDelete || permissions.canDeactivate || permissions.canReactivate;
+  const hasAnyWritePermission =
+    permissions.canCreate ||
+    permissions.canUpdate ||
+    permissions.canDelete ||
+    permissions.canDeactivate ||
+    permissions.canReactivate;
 
   // Tree ViewModel - manages tree state, selection, expansion
   const [viewModel] = useState(() => new OrganizationUnitsViewModel());
@@ -113,8 +118,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
   const [currentUnit, setCurrentUnit] = useState<OrganizationUnit | null>(null);
 
   // Form ViewModel (for edit and create modes)
-  const [formViewModel, setFormViewModel] =
-    useState<OrganizationUnitFormViewModel | null>(null);
+  const [formViewModel, setFormViewModel] = useState<OrganizationUnitFormViewModel | null>(null);
 
   // Dialog state - discriminated union for type-safe dialog management
   const [dialogState, setDialogState] = useState<DialogState>({ type: 'none' });
@@ -197,9 +201,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
             const term = searchTerm.toLowerCase();
             const nameMatch = node.name.toLowerCase().includes(term);
             const displayNameMatch = node.displayName?.toLowerCase().includes(term);
-            const hasMatchingChild = node.children.some(
-              (child) => filterNodes([child]).length > 0
-            );
+            const hasMatchingChild = node.children.some((child) => filterNodes([child]).length > 0);
             return nameMatch || displayNameMatch || hasMatchingChild;
           }
 
@@ -540,6 +542,24 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
           setFormViewModel(null);
           setCurrentUnit(null);
         }
+      } else if (result.errorDetails?.code === 'HAS_CHILDREN') {
+        // Enumerate child names from tree data
+        const findNode = (
+          nodes: typeof viewModel.treeNodes,
+          id: string
+        ): (typeof nodes)[0] | null => {
+          for (const node of nodes) {
+            if (node.id === id) return node;
+            const found = findNode(node.children, id);
+            if (found) return found;
+          }
+          return null;
+        };
+        const node = findNode(viewModel.treeNodes, currentUnit.id);
+        const childNames = node?.children.map((c) => c.displayName || c.name) ?? [];
+        setDialogState({ type: 'hasChildren', children: childNames });
+      } else if (result.errorDetails?.code === 'HAS_ROLES') {
+        setDialogState({ type: 'hasRoles', count: result.errorDetails.count ?? 0 });
       } else {
         setDialogState({ type: 'none' });
         setOperationError(result.error || 'Failed to delete unit');
@@ -569,9 +589,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
           <div className="flex items-center gap-3">
             <Building2 className="w-8 h-8 text-blue-600" />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Organization Units
-              </h1>
+              <h1 className="text-3xl font-bold text-gray-900">Organization Units</h1>
               <p className="text-gray-600 mt-1">
                 {hasAnyWritePermission
                   ? 'Create, edit, and organize your departments and locations'
@@ -583,17 +601,12 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
 
         {/* Error Banner */}
         {(viewModel.error || operationError) && (
-          <div
-            className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50"
-            role="alert"
-          >
+          <div className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-red-800 font-semibold">Error</h3>
-                <p className="text-red-700 text-sm mt-1">
-                  {viewModel.error || operationError}
-                </p>
+                <p className="text-red-700 text-sm mt-1">{viewModel.error || operationError}</p>
               </div>
               <Button
                 variant="outline"
@@ -611,12 +624,9 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         )}
 
         {/* Layout: Full-width for view-only users, split view for users with write permissions */}
-        <div className={cn(
-          "grid grid-cols-1 gap-6",
-          hasAnyWritePermission && "lg:grid-cols-3"
-        )}>
+        <div className={cn('grid grid-cols-1 gap-6', hasAnyWritePermission && 'lg:grid-cols-3')}>
           {/* Left Panel: Tree View */}
-          <div className={hasAnyWritePermission ? "lg:col-span-2" : "lg:col-span-1"}>
+          <div className={hasAnyWritePermission ? 'lg:col-span-2' : 'lg:col-span-1'}>
             <Card className="shadow-lg">
               <CardHeader className="border-b border-gray-200 pb-4">
                 <div className="flex items-center justify-between">
@@ -723,276 +733,135 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
 
           {/* Right Panel: Form Panel (only shown if user has write permissions) */}
           {hasAnyWritePermission && (
-          <div className="lg:col-span-1">
-            {/* Create Button - Only visible if user has create_ou permission */}
-            {permissions.canCreate && (
-            <Button
-              onClick={handleCreateClick}
-              disabled={viewModel.isLoading}
-              className="w-full mb-4 bg-blue-600 hover:bg-blue-700 text-white justify-start"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create New Unit
-              {panelMode === 'edit' && currentUnit && !currentUnit.isRootOrganization && (
-                <span className="ml-auto text-xs opacity-75">(under selected)</span>
+            <div className="lg:col-span-1">
+              {/* Create Button - Only visible if user has create_ou permission */}
+              {permissions.canCreate && (
+                <Button
+                  onClick={handleCreateClick}
+                  disabled={viewModel.isLoading}
+                  className="w-full mb-4 bg-blue-600 hover:bg-blue-700 text-white justify-start"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create New Unit
+                  {panelMode === 'edit' && currentUnit && !currentUnit.isRootOrganization && (
+                    <span className="ml-auto text-xs opacity-75">(under selected)</span>
+                  )}
+                </Button>
               )}
-            </Button>
-            )}
 
-            {/* Empty State */}
-            {panelMode === 'empty' && (
-              <Card className="shadow-lg">
-                <CardContent className="p-12 text-center">
-                  <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium text-gray-900 mb-2">
-                    No Unit Selected
-                  </h3>
-                  <p className="text-gray-500 max-w-md mx-auto">
-                    {permissions.canCreate
-                      ? 'Select a unit from the tree to view and edit its details, or click "Create New Unit" to add a new one.'
-                      : 'Select a unit from the tree to view its details.'}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* View Mode (read-only detail panel for users without update permission) */}
-            {panelMode === 'view' && currentUnit && (
-              <Card className="shadow-lg">
-                <CardHeader className="border-b border-gray-200">
-                  <CardTitle className="text-xl font-semibold text-gray-900">
-                    Unit Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 space-y-4">
-                  {/* Status Badge */}
-                  <div className="flex items-center gap-2">
-                    {currentUnit.isActive ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Active
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        <XCircle className="w-3 h-3 mr-1" />
-                        Inactive
-                      </span>
-                    )}
-                    {currentUnit.isRootOrganization && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        <Building2 className="w-3 h-3 mr-1" />
-                        Root Organization
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Name */}
-                  <div className="space-y-1">
-                    <Label className="text-sm font-medium text-gray-500">Unit Name</Label>
-                    <p className="text-gray-900">{currentUnit.name}</p>
-                  </div>
-
-                  {/* Display Name */}
-                  {currentUnit.displayName && (
-                    <div className="space-y-1">
-                      <Label className="text-sm font-medium text-gray-500">Display Name</Label>
-                      <p className="text-gray-900">{currentUnit.displayName}</p>
-                    </div>
-                  )}
-
-                  {/* Hierarchy Path */}
-                  <div className="space-y-1">
-                    <Label className="text-sm font-medium text-gray-500">Hierarchy Path</Label>
-                    <p className="text-sm text-gray-700 font-mono bg-gray-50 px-3 py-2 rounded-md border border-gray-200 break-all">
-                      {currentUnit.path}
+              {/* Empty State */}
+              {panelMode === 'empty' && (
+                <Card className="shadow-lg">
+                  <CardContent className="p-12 text-center">
+                    <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-medium text-gray-900 mb-2">No Unit Selected</h3>
+                    <p className="text-gray-500 max-w-md mx-auto">
+                      {permissions.canCreate
+                        ? 'Select a unit from the tree to view and edit its details, or click "Create New Unit" to add a new one.'
+                        : 'Select a unit from the tree to view its details.'}
                     </p>
-                  </div>
+                  </CardContent>
+                </Card>
+              )}
 
-                  {/* Timezone */}
-                  {currentUnit.timeZone && (
-                    <div className="space-y-1">
-                      <Label className="text-sm font-medium text-gray-500">Timezone</Label>
-                      <p className="text-gray-900">{currentUnit.timeZone}</p>
-                    </div>
-                  )}
-
-                  {/* Child Count */}
-                  {currentUnit.childCount > 0 && (
-                    <div className="space-y-1">
-                      <Label className="text-sm font-medium text-gray-500">Child Units</Label>
-                      <p className="text-gray-900">{currentUnit.childCount} unit(s)</p>
-                    </div>
-                  )}
-
-                  {/* Read-only notice */}
-                  <div className="pt-4 border-t border-gray-200">
-                    <p className="text-xs text-gray-500 text-center">
-                      You have view-only access to organization units.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Create Mode */}
-            {panelMode === 'create' && formViewModel && (
-              <Card className="shadow-lg">
-                <CardHeader className="border-b border-gray-200">
-                  <CardTitle className="text-xl font-semibold text-gray-900">
-                    Create New Unit
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Submission Error */}
-                    {formViewModel.submissionError && (
-                      <div className="p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
-                        <div className="flex items-start gap-2">
-                          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                          <div className="flex-1">
-                            <h4 className="text-red-800 font-semibold">
-                              Failed to create unit
-                            </h4>
-                            <p className="text-red-700 text-sm mt-1">
-                              {formViewModel.submissionError}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => formViewModel.clearSubmissionError()}
-                            className="text-red-600 hover:text-red-800"
-                            aria-label="Dismiss error"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Parent Unit Dropdown */}
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-medium text-gray-700">
-                        Parent Unit
-                      </Label>
-                      <Select.Root
-                        value={formViewModel.formData.parentId ?? 'root'}
-                        onValueChange={(value) =>
-                          formViewModel.setParent(value === 'root' ? null : value)
-                        }
-                      >
-                        <Select.Trigger
-                          className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          aria-label="Parent Unit"
-                        >
-                          <Select.Value>
-                            {selectedParentInCreate
-                              ? selectedParentInCreate.displayName || selectedParentInCreate.name
-                              : 'Root Organization (direct child)'}
-                          </Select.Value>
-                          <Select.Icon>
-                            <ChevronDown className="h-4 w-4 text-gray-400" />
-                          </Select.Icon>
-                        </Select.Trigger>
-                        <Select.Portal>
-                          <Select.Content className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50 max-h-[300px]">
-                            <Select.Viewport className="p-1">
-                              <Select.Item
-                                value="root"
-                                className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
-                              >
-                                <Select.ItemText>Root Organization (direct child)</Select.ItemText>
-                              </Select.Item>
-                              {availableParents.map((unit) => (
-                                <Select.Item
-                                  key={unit.id}
-                                  value={unit.id}
-                                  className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
-                                >
-                                  <Select.ItemText>
-                                    <span
-                                      className="inline-block"
-                                      style={{
-                                        marginLeft: `${(unit.path.split('.').length - 2) * 12}px`,
-                                      }}
-                                    >
-                                      {unit.displayName || unit.name}
-                                    </span>
-                                  </Select.ItemText>
-                                </Select.Item>
-                              ))}
-                            </Select.Viewport>
-                          </Select.Content>
-                        </Select.Portal>
-                      </Select.Root>
-                    </div>
-
-                    {/* Shared Form Fields: Name, Display Name, Timezone */}
-                    <OrganizationUnitFormFields
-                      formViewModel={formViewModel}
-                      idPrefix="create"
-                    />
-
-                    {/* Form Actions */}
-                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleCancel}
-                        disabled={formViewModel.isSubmitting}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={!formViewModel.canSubmit}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                      >
-                        <Plus className="w-4 h-4 mr-1" />
-                        {formViewModel.isSubmitting ? 'Creating...' : 'Create Unit'}
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Edit Mode */}
-            {panelMode === 'edit' && currentUnit && formViewModel && (
-              <>
-                {/* Root Organization Warning */}
-                {currentUnit.isRootOrganization && (
-                  <div className="mb-4 p-4 rounded-lg border border-blue-300 bg-blue-50">
-                    <div className="flex items-start gap-3">
-                      <Building2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <h3 className="text-blue-800 font-semibold text-sm">Root Organization</h3>
-                        <p className="text-blue-700 text-xs mt-1">
-                          This is your root organization. You can edit its name and display name,
-                          but it cannot be deactivated or deleted.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Form Card */}
+              {/* View Mode (read-only detail panel for users without update permission) */}
+              {panelMode === 'view' && currentUnit && (
                 <Card className="shadow-lg">
                   <CardHeader className="border-b border-gray-200">
                     <CardTitle className="text-xl font-semibold text-gray-900">
                       Unit Details
                     </CardTitle>
                   </CardHeader>
+                  <CardContent className="p-6 space-y-4">
+                    {/* Status Badge */}
+                    <div className="flex items-center gap-2">
+                      {currentUnit.isActive ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Inactive
+                        </span>
+                      )}
+                      {currentUnit.isRootOrganization && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <Building2 className="w-3 h-3 mr-1" />
+                          Root Organization
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Name */}
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium text-gray-500">Unit Name</Label>
+                      <p className="text-gray-900">{currentUnit.name}</p>
+                    </div>
+
+                    {/* Display Name */}
+                    {currentUnit.displayName && (
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-gray-500">Display Name</Label>
+                        <p className="text-gray-900">{currentUnit.displayName}</p>
+                      </div>
+                    )}
+
+                    {/* Hierarchy Path */}
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium text-gray-500">Hierarchy Path</Label>
+                      <p className="text-sm text-gray-700 font-mono bg-gray-50 px-3 py-2 rounded-md border border-gray-200 break-all">
+                        {currentUnit.path}
+                      </p>
+                    </div>
+
+                    {/* Timezone */}
+                    {currentUnit.timeZone && (
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-gray-500">Timezone</Label>
+                        <p className="text-gray-900">{currentUnit.timeZone}</p>
+                      </div>
+                    )}
+
+                    {/* Child Count */}
+                    {currentUnit.childCount > 0 && (
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-gray-500">Child Units</Label>
+                        <p className="text-gray-900">{currentUnit.childCount} unit(s)</p>
+                      </div>
+                    )}
+
+                    {/* Read-only notice */}
+                    <div className="pt-4 border-t border-gray-200">
+                      <p className="text-xs text-gray-500 text-center">
+                        You have view-only access to organization units.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Create Mode */}
+              {panelMode === 'create' && formViewModel && (
+                <Card className="shadow-lg">
+                  <CardHeader className="border-b border-gray-200">
+                    <CardTitle className="text-xl font-semibold text-gray-900">
+                      Create New Unit
+                    </CardTitle>
+                  </CardHeader>
                   <CardContent className="p-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
                       {/* Submission Error */}
                       {formViewModel.submissionError && (
-                        <div className="p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
+                        <div
+                          className="p-4 rounded-lg border border-red-300 bg-red-50"
+                          role="alert"
+                        >
                           <div className="flex items-start gap-2">
                             <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                             <div className="flex-1">
-                              <h4 className="text-red-800 font-semibold">
-                                Failed to update unit
-                              </h4>
+                              <h4 className="text-red-800 font-semibold">Failed to create unit</h4>
                               <p className="text-red-700 text-sm mt-1">
                                 {formViewModel.submissionError}
                               </p>
@@ -1009,166 +878,255 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                         </div>
                       )}
 
-                      {/* Path Display (read-only) */}
+                      {/* Parent Unit Dropdown */}
                       <div className="space-y-1.5">
-                        <Label className="text-sm font-medium text-gray-700">
-                          Hierarchy Path
-                        </Label>
-                        <p className="text-sm text-gray-700 font-mono bg-gray-50 px-3 py-2 rounded-md border border-gray-200 break-all">
-                          {currentUnit.path}
-                        </p>
+                        <Label className="text-sm font-medium text-gray-700">Parent Unit</Label>
+                        <Select.Root
+                          value={formViewModel.formData.parentId ?? 'root'}
+                          onValueChange={(value) =>
+                            formViewModel.setParent(value === 'root' ? null : value)
+                          }
+                        >
+                          <Select.Trigger
+                            className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            aria-label="Parent Unit"
+                          >
+                            <Select.Value>
+                              {selectedParentInCreate
+                                ? selectedParentInCreate.displayName || selectedParentInCreate.name
+                                : 'Root Organization (direct child)'}
+                            </Select.Value>
+                            <Select.Icon>
+                              <ChevronDown className="h-4 w-4 text-gray-400" />
+                            </Select.Icon>
+                          </Select.Trigger>
+                          <Select.Portal>
+                            <Select.Content className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50 max-h-[300px]">
+                              <Select.Viewport className="p-1">
+                                <Select.Item
+                                  value="root"
+                                  className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
+                                >
+                                  <Select.ItemText>
+                                    Root Organization (direct child)
+                                  </Select.ItemText>
+                                </Select.Item>
+                                {availableParents.map((unit) => (
+                                  <Select.Item
+                                    key={unit.id}
+                                    value={unit.id}
+                                    className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
+                                  >
+                                    <Select.ItemText>
+                                      <span
+                                        className="inline-block"
+                                        style={{
+                                          marginLeft: `${(unit.path.split('.').length - 2) * 12}px`,
+                                        }}
+                                      >
+                                        {unit.displayName || unit.name}
+                                      </span>
+                                    </Select.ItemText>
+                                  </Select.Item>
+                                ))}
+                              </Select.Viewport>
+                            </Select.Content>
+                          </Select.Portal>
+                        </Select.Root>
                       </div>
 
                       {/* Shared Form Fields: Name, Display Name, Timezone */}
-                      <OrganizationUnitFormFields
-                        formViewModel={formViewModel}
-                        idPrefix="edit"
-                      />
-
-                      {/* Active Status Toggle (not for root org, only if user has deactivate or reactivate permission) */}
-                      {!currentUnit.isRootOrganization && (
-                        (currentUnit.isActive && permissions.canDeactivate) ||
-                        (!currentUnit.isActive && permissions.canReactivate)
-                      ) && (
-                        <div className="flex items-start gap-2 p-3 rounded-lg bg-gray-50 border border-gray-200">
-                          <Checkbox
-                            id="is-active"
-                            checked={currentUnit.isActive}
-                            onCheckedChange={() => {
-                              if (currentUnit.isActive) {
-                                handleDeactivateClick();
-                              } else {
-                                handleReactivateClick();
-                              }
-                            }}
-                            disabled={
-                              dialogState.type === 'deactivate' ||
-                              dialogState.type === 'reactivate' ||
-                              formViewModel.isSubmitting
-                            }
-                            className="mt-0.5 shadow-sm ring-1 ring-gray-300 bg-white/80 backdrop-blur-sm"
-                          />
-                          <div>
-                            <Label htmlFor="is-active" className="text-xs font-medium text-gray-900 cursor-pointer">
-                              Unit is Active
-                            </Label>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              Inactive units are hidden from most views.
-                              {currentUnit.isActive && currentUnit.childCount > 0 && (
-                                <span className="block text-orange-600 mt-1 font-medium">
-                                  Warning: Deactivating will also deactivate all {currentUnit.childCount} child
-                                  unit(s).
-                                </span>
-                              )}
-                              {!currentUnit.isActive && currentUnit.childCount > 0 && (
-                                <span className="block text-green-600 mt-1 font-medium">
-                                  Note: Reactivating will also reactivate all {currentUnit.childCount} child
-                                  unit(s).
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                      )}
+                      <OrganizationUnitFormFields formViewModel={formViewModel} idPrefix="create" />
 
                       {/* Form Actions */}
-                      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                        <div>
-                          {formViewModel.isDirty && (
-                            <span className="text-sm text-amber-600">Unsaved changes</span>
-                          )}
-                        </div>
+                      <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleCancel}
+                          disabled={formViewModel.isSubmitting}
+                        >
+                          Cancel
+                        </Button>
                         <Button
                           type="submit"
                           disabled={!formViewModel.canSubmit}
                           className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
-                          <Save className="w-4 h-4 mr-1" />
-                          {formViewModel.isSubmitting ? 'Saving...' : 'Save Changes'}
+                          <Plus className="w-4 h-4 mr-1" />
+                          {formViewModel.isSubmitting ? 'Creating...' : 'Create Unit'}
                         </Button>
                       </div>
                     </form>
                   </CardContent>
                 </Card>
+              )}
 
-                {/* Danger Zone - only for non-root orgs and if user has deactivate, reactivate, or delete permissions */}
-                {!currentUnit.isRootOrganization && (permissions.canDeactivate || permissions.canReactivate || permissions.canDelete) && (
-                  <section className="mt-4" aria-labelledby="danger-zone-heading">
-                    <Card className="shadow-lg border-red-200">
-                      <CardHeader className="border-b border-red-200 bg-red-50 py-3">
-                        <CardTitle id="danger-zone-heading" className="text-sm font-semibold text-red-800">
-                          Danger Zone
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-4 space-y-4">
-                        {/* Reactivate Section - Only for inactive units and if user has reactivate_ou permission */}
-                        {!currentUnit.isActive && permissions.canReactivate && (
-                          <div className={permissions.canDelete ? "pb-4 border-b border-gray-200" : ""}>
-                            <h4 className="text-sm font-medium text-gray-900">Reactivate this unit</h4>
-                            <p className="text-xs text-gray-600 mt-1">
-                              Reactivating allows new role assignments.
-                              {currentUnit.childCount > 0 && (
-                                <span className="block text-green-600 mt-1">
-                                  This will also reactivate all {currentUnit.childCount} child unit(s).
-                                </span>
-                              )}
-                            </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleReactivateClick}
-                              disabled={
-                                formViewModel?.isSubmitting ||
-                                (dialogState.type === 'reactivate' && dialogState.isLoading)
-                              }
-                              className="mt-2 text-green-600 border-green-300 hover:bg-green-50"
-                            >
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              {dialogState.type === 'reactivate' && dialogState.isLoading
-                                ? 'Reactivating...'
-                                : 'Reactivate Unit'}
-                            </Button>
+              {/* Edit Mode */}
+              {panelMode === 'edit' && currentUnit && formViewModel && (
+                <>
+                  {/* Root Organization Warning */}
+                  {currentUnit.isRootOrganization && (
+                    <div className="mb-4 p-4 rounded-lg border border-blue-300 bg-blue-50">
+                      <div className="flex items-start gap-3">
+                        <Building2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <h3 className="text-blue-800 font-semibold text-sm">Root Organization</h3>
+                          <p className="text-blue-700 text-xs mt-1">
+                            This is your root organization. You can edit its name and display name,
+                            but it cannot be deactivated or deleted.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Inactive Warning Banner with Quick Reactivate */}
+                  {!currentUnit.isActive && !currentUnit.isRootOrganization && (
+                    <div className="mb-4 p-4 rounded-lg border border-amber-300 bg-amber-50">
+                      <div className="flex items-start gap-3">
+                        <XCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <h3 className="text-amber-800 font-semibold">
+                            Inactive Unit - Editing Disabled
+                          </h3>
+                          <p className="text-amber-700 text-sm mt-1">
+                            This unit is deactivated. The form is read-only until reactivated.
+                          </p>
+                        </div>
+                        {permissions.canReactivate && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleReactivateClick}
+                            disabled={
+                              formViewModel.isSubmitting ||
+                              (dialogState.type === 'reactivate' && dialogState.isLoading)
+                            }
+                            className="bg-green-600 hover:bg-green-700 text-white flex-shrink-0"
+                          >
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            {dialogState.type === 'reactivate' && dialogState.isLoading
+                              ? 'Reactivating...'
+                              : 'Reactivate'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Form Card */}
+                  <Card className="shadow-lg">
+                    <CardHeader className="border-b border-gray-200">
+                      <CardTitle className="text-xl font-semibold text-gray-900">
+                        Unit Details
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <form onSubmit={handleSubmit} className="space-y-6">
+                        {/* Submission Error */}
+                        {formViewModel.submissionError && (
+                          <div
+                            className="p-4 rounded-lg border border-red-300 bg-red-50"
+                            role="alert"
+                          >
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                              <div className="flex-1">
+                                <h4 className="text-red-800 font-semibold">
+                                  Failed to update unit
+                                </h4>
+                                <p className="text-red-700 text-sm mt-1">
+                                  {formViewModel.submissionError}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => formViewModel.clearSubmissionError()}
+                                className="text-red-600 hover:text-red-800"
+                                aria-label="Dismiss error"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         )}
 
-                        {/* Delete Section - Only if user has delete_ou permission */}
-                        {permissions.canDelete && (
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-900">Delete this unit</h4>
-                          <p className="text-xs text-gray-600 mt-1">
-                            Permanently remove from the organization hierarchy.
-                            {currentUnit.isActive && (
-                              <span className="block text-orange-600 mt-1">
-                                Must be deactivated before deletion.
-                              </span>
-                            )}
+                        {/* Path Display (read-only) */}
+                        <div className="space-y-1.5">
+                          <Label className="text-sm font-medium text-gray-700">
+                            Hierarchy Path
+                          </Label>
+                          <p className="text-sm text-gray-700 font-mono bg-gray-50 px-3 py-2 rounded-md border border-gray-200 break-all">
+                            {currentUnit.path}
                           </p>
+                        </div>
+
+                        {/* Shared Form Fields: Name, Display Name, Timezone */}
+                        <OrganizationUnitFormFields
+                          formViewModel={formViewModel}
+                          idPrefix="edit"
+                          disabled={!currentUnit.isActive}
+                        />
+
+                        {/* Form Actions */}
+                        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                          <div>
+                            {formViewModel.isDirty && (
+                              <span className="text-sm text-amber-600">Unsaved changes</span>
+                            )}
+                          </div>
                           <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleDeleteClick}
-                            disabled={
-                              formViewModel?.isSubmitting ||
-                              (dialogState.type === 'delete' && dialogState.isLoading)
-                            }
-                            className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
+                            type="submit"
+                            disabled={!formViewModel.canSubmit || !currentUnit.isActive}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
                           >
-                            <Trash2 className="w-3 h-3 mr-1" />
-                            {dialogState.type === 'delete' && dialogState.isLoading
-                              ? 'Deleting...'
-                              : 'Delete Unit'}
+                            <Save className="w-4 h-4 mr-1" />
+                            {formViewModel.isSubmitting ? 'Saving...' : 'Save Changes'}
                           </Button>
                         </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </section>
-                )}
-              </>
-            )}
-          </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+
+                  {/* Danger Zone */}
+                  {!currentUnit.isRootOrganization && (
+                    <DangerZone
+                      entityType="Unit"
+                      isActive={currentUnit.isActive}
+                      isSubmitting={formViewModel?.isSubmitting}
+                      canDeactivate={permissions.canDeactivate}
+                      onDeactivate={handleDeactivateClick}
+                      isDeactivating={dialogState.type === 'deactivate' && dialogState.isLoading}
+                      deactivateDescription="Deactivating prevents new role assignments to this unit."
+                      deactivateSlot={
+                        currentUnit.childCount > 0 ? (
+                          <span className="block text-orange-600 text-xs mt-1">
+                            This will also deactivate all {currentUnit.childCount} child unit(s).
+                          </span>
+                        ) : undefined
+                      }
+                      canReactivate={permissions.canReactivate}
+                      onReactivate={handleReactivateClick}
+                      isReactivating={dialogState.type === 'reactivate' && dialogState.isLoading}
+                      reactivateDescription="Reactivating allows new role assignments."
+                      reactivateSlot={
+                        currentUnit.childCount > 0 ? (
+                          <span className="block text-green-600 text-xs mt-1">
+                            This will also reactivate all {currentUnit.childCount} child unit(s).
+                          </span>
+                        ) : undefined
+                      }
+                      canDelete={permissions.canDelete}
+                      onDelete={handleDeleteClick}
+                      isDeleting={dialogState.type === 'delete' && dialogState.isLoading}
+                      deleteDescription="Permanently remove from the organization hierarchy."
+                      activeDeleteConstraint="Must be deactivated before deletion."
+                    />
+                  )}
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -1227,6 +1185,31 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         confirmLabel="Deactivate First"
         cancelLabel="Cancel"
         onConfirm={handleDeactivateFirst}
+        onCancel={() => setDialogState({ type: 'none' })}
+        variant="warning"
+      />
+
+      {/* Cannot Delete Unit With Children Dialog */}
+      <ConfirmDialog
+        isOpen={dialogState.type === 'hasChildren'}
+        title="Cannot Delete Unit"
+        message={`"${currentUnit?.displayName || currentUnit?.name}" has child units that must be removed or moved before deletion.`}
+        details={dialogState.type === 'hasChildren' ? dialogState.children : []}
+        confirmLabel="OK"
+        cancelLabel="Close"
+        onConfirm={() => setDialogState({ type: 'none' })}
+        onCancel={() => setDialogState({ type: 'none' })}
+        variant="warning"
+      />
+
+      {/* Cannot Delete Unit With Roles Dialog */}
+      <ConfirmDialog
+        isOpen={dialogState.type === 'hasRoles'}
+        title="Cannot Delete Unit"
+        message={`"${currentUnit?.displayName || currentUnit?.name}" has ${dialogState.type === 'hasRoles' ? dialogState.count : 0} role(s) scoped to it. Remove the role assignments before deletion.`}
+        confirmLabel="OK"
+        cancelLabel="Close"
+        onConfirm={() => setDialogState({ type: 'none' })}
         onCancel={() => setDialogState({ type: 'none' })}
         variant="warning"
       />

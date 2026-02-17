@@ -23,7 +23,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { RoleList, RoleFormFields, PermissionSelector, RoleAssignmentDialog } from '@/components/roles';
+import { DangerZone } from '@/components/ui/DangerZone';
+import {
+  RoleList,
+  RoleFormFields,
+  PermissionSelector,
+  RoleAssignmentDialog,
+} from '@/components/roles';
 import { RolesViewModel } from '@/viewModels/roles/RolesViewModel';
 import { RoleFormViewModel } from '@/viewModels/roles/RoleFormViewModel';
 import { RoleAssignmentViewModel } from '@/viewModels/roles/RoleAssignmentViewModel';
@@ -34,7 +40,6 @@ import type { OrganizationUnitNode } from '@/types/organization-unit.types';
 import { buildOrganizationUnitTree } from '@/types/organization-unit.types';
 import {
   Plus,
-  Trash2,
   RefreshCw,
   ArrowLeft,
   Shield,
@@ -64,7 +69,8 @@ type DialogState =
   | { type: 'deactivate'; isLoading: boolean }
   | { type: 'reactivate'; isLoading: boolean }
   | { type: 'delete'; isLoading: boolean }
-  | { type: 'activeWarning' };
+  | { type: 'activeWarning' }
+  | { type: 'hasUsers'; users: string[] };
 
 /**
  * Roles Management Page Component
@@ -139,13 +145,14 @@ export const RolesManagePage: React.FC = observer(() => {
         const service = getOrganizationUnitService();
         const units = await service.getUnits({ status: 'active' });
         // Find root path (shortest path in the set)
-        const rootPath = units.length > 0
-          ? units.reduce(
-              (shortest: string, unit) =>
-                unit.path.length < shortest.length ? unit.path : shortest,
-              units[0].path
-            )
-          : '';
+        const rootPath =
+          units.length > 0
+            ? units.reduce(
+                (shortest: string, unit) =>
+                  unit.path.length < shortest.length ? unit.path : shortest,
+                units[0].path
+              )
+            : '';
         const tree = buildOrganizationUnitTree(units, rootPath);
         setOuNodes(tree);
         log.debug('OU tree loaded for role scope selection', { nodeCount: units.length });
@@ -200,7 +207,12 @@ export const RolesManagePage: React.FC = observer(() => {
   // Handle roleId from URL (e.g., when clicking a role card from /roles page)
   useEffect(() => {
     // Wait until roles are loaded and we have a roleId in URL
-    if (initialRoleId && !viewModel.isLoading && viewModel.roles.length > 0 && panelMode === 'empty') {
+    if (
+      initialRoleId &&
+      !viewModel.isLoading &&
+      viewModel.roles.length > 0 &&
+      panelMode === 'empty'
+    ) {
       log.debug('Loading role from URL param', { roleId: initialRoleId });
       selectAndLoadRole(initialRoleId);
     }
@@ -289,7 +301,10 @@ export const RolesManagePage: React.FC = observer(() => {
     setCurrentRole(null);
     setPanelMode('create');
     viewModel.clearSelection();
-    log.debug('Duplicating role', { sourceRoleId: currentRole.id, sourceRoleName: currentRole.name });
+    log.debug('Duplicating role', {
+      sourceRoleId: currentRole.id,
+      sourceRoleName: currentRole.name,
+    });
   }, [currentRole, viewModel]);
 
   // Handle form submission
@@ -404,13 +419,26 @@ export const RolesManagePage: React.FC = observer(() => {
   }, [currentRole, viewModel, selectAndLoadRole]);
 
   // Delete handlers
-  const handleDeleteClick = useCallback(() => {
+  const handleDeleteClick = useCallback(async () => {
     if (!currentRole) return;
 
     if (currentRole.isActive) {
       setDialogState({ type: 'activeWarning' });
     } else if (currentRole.userCount > 0) {
-      setOperationError(`Cannot delete role with ${currentRole.userCount} assigned users. Remove all user assignments first.`);
+      // Enumerate assigned users for the dialog
+      try {
+        const service = getRoleService();
+        const users = await service.listUsersForRoleManagement({
+          roleId: currentRole.id,
+          scopePath: currentRole.orgHierarchyScope ?? '',
+        });
+        const assignedNames = users
+          .filter((u) => u.isAssigned)
+          .map((u) => u.displayName || u.email);
+        setDialogState({ type: 'hasUsers', users: assignedNames });
+      } catch {
+        setOperationError('Failed to load assigned users. Please try again.');
+      }
     } else {
       setOperationError(null);
       setDialogState({ type: 'delete', isLoading: false });
@@ -499,12 +527,7 @@ export const RolesManagePage: React.FC = observer(() => {
         {/* Page Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleBackClick}
-              className="text-gray-600"
-            >
+            <Button variant="outline" size="sm" onClick={handleBackClick} className="text-gray-600">
               <ArrowLeft className="w-4 h-4 mr-1" />
               Back to Settings
             </Button>
@@ -522,17 +545,12 @@ export const RolesManagePage: React.FC = observer(() => {
 
         {/* Error Banner */}
         {(viewModel.error || operationError) && (
-          <div
-            className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50"
-            role="alert"
-          >
+          <div className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-red-800 font-semibold">Error</h3>
-                <p className="text-red-700 text-sm mt-1">
-                  {viewModel.error || operationError}
-                </p>
+                <p className="text-red-700 text-sm mt-1">{viewModel.error || operationError}</p>
               </div>
               <Button
                 variant="outline"
@@ -556,18 +574,14 @@ export const RolesManagePage: React.FC = observer(() => {
             <Card className="shadow-lg h-[calc(100vh-280px)]">
               <CardHeader className="border-b border-gray-200 pb-4">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold text-gray-900">
-                    Roles
-                  </CardTitle>
+                  <CardTitle className="text-lg font-semibold text-gray-900">Roles</CardTitle>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => viewModel.refresh()}
                     disabled={viewModel.isLoading}
                   >
-                    <RefreshCw
-                      className={cn('w-4 h-4', viewModel.isLoading && 'animate-spin')}
-                    />
+                    <RefreshCw className={cn('w-4 h-4', viewModel.isLoading && 'animate-spin')} />
                   </Button>
                 </div>
               </CardHeader>
@@ -602,12 +616,10 @@ export const RolesManagePage: React.FC = observer(() => {
               <Card className="shadow-lg">
                 <CardContent className="p-12 text-center">
                   <Shield className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium text-gray-900 mb-2">
-                    No Role Selected
-                  </h3>
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No Role Selected</h3>
                   <p className="text-gray-500 max-w-md mx-auto">
-                    Select a role from the list to view and edit its details and
-                    permissions, or click "Create New Role" to add a new one.
+                    Select a role from the list to view and edit its details and permissions, or
+                    click "Create New Role" to add a new one.
                   </p>
                 </CardContent>
               </Card>
@@ -618,9 +630,7 @@ export const RolesManagePage: React.FC = observer(() => {
               <Card className="shadow-lg">
                 <CardHeader className="border-b border-gray-200">
                   <div className="flex items-center gap-2">
-                    {formViewModel.clonedFromRoleId && (
-                      <Copy className="w-5 h-5 text-blue-600" />
-                    )}
+                    {formViewModel.clonedFromRoleId && <Copy className="w-5 h-5 text-blue-600" />}
                     <CardTitle className="text-xl font-semibold text-gray-900">
                       {formViewModel.clonedFromRoleId ? 'Duplicate Role' : 'Create New Role'}
                     </CardTitle>
@@ -635,16 +645,11 @@ export const RolesManagePage: React.FC = observer(() => {
                   <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Submission Error */}
                     {formViewModel.submissionError && (
-                      <div
-                        className="p-4 rounded-lg border border-red-300 bg-red-50"
-                        role="alert"
-                      >
+                      <div className="p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
                         <div className="flex items-start gap-2">
                           <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                           <div className="flex-1">
-                            <h4 className="text-red-800 font-semibold">
-                              Failed to create role
-                            </h4>
+                            <h4 className="text-red-800 font-semibold">Failed to create role</h4>
                             <p className="text-red-700 text-sm mt-1">
                               {formViewModel.submissionError}
                             </p>
@@ -678,16 +683,24 @@ export const RolesManagePage: React.FC = observer(() => {
                       userPermissionIds={formViewModel.userPermissionIds}
                       onTogglePermission={formViewModel.togglePermission.bind(formViewModel)}
                       onToggleApplet={formViewModel.toggleApplet.bind(formViewModel)}
-                      isAppletFullySelected={formViewModel.isAppletFullySelected.bind(formViewModel)}
-                      isAppletPartiallySelected={formViewModel.isAppletPartiallySelected.bind(formViewModel)}
+                      isAppletFullySelected={formViewModel.isAppletFullySelected.bind(
+                        formViewModel
+                      )}
+                      isAppletPartiallySelected={formViewModel.isAppletPartiallySelected.bind(
+                        formViewModel
+                      )}
                       canGrant={formViewModel.canGrant.bind(formViewModel)}
                       disabled={formViewModel.isSubmitting}
                       showOnlyGrantable={formViewModel.showOnlyGrantable}
-                      onToggleShowOnlyGrantable={formViewModel.toggleShowOnlyGrantable.bind(formViewModel)}
+                      onToggleShowOnlyGrantable={formViewModel.toggleShowOnlyGrantable.bind(
+                        formViewModel
+                      )}
                       searchTerm={formViewModel.permissionSearchTerm}
                       onSearchChange={formViewModel.setPermissionSearchTerm.bind(formViewModel)}
                       isAppletCollapsed={formViewModel.isAppletCollapsed.bind(formViewModel)}
-                      onToggleAppletCollapsed={formViewModel.toggleAppletCollapsed.bind(formViewModel)}
+                      onToggleAppletCollapsed={formViewModel.toggleAppletCollapsed.bind(
+                        formViewModel
+                      )}
                       onExpandAll={formViewModel.expandAllApplets.bind(formViewModel)}
                       onCollapseAll={formViewModel.collapseAllApplets.bind(formViewModel)}
                     />
@@ -725,10 +738,12 @@ export const RolesManagePage: React.FC = observer(() => {
                     <div className="flex items-start gap-3">
                       <XCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                       <div className="flex-1">
-                        <h3 className="text-amber-800 font-semibold">Inactive Role - Editing Disabled</h3>
+                        <h3 className="text-amber-800 font-semibold">
+                          Inactive Role - Editing Disabled
+                        </h3>
                         <p className="text-amber-700 text-sm mt-1">
-                          This role is deactivated. The form is read-only until the role is reactivated.
-                          Users with this role cannot perform any actions.
+                          This role is deactivated. The form is read-only until the role is
+                          reactivated. Users with this role cannot perform any actions.
                         </p>
                       </div>
                       <Button
@@ -764,7 +779,11 @@ export const RolesManagePage: React.FC = observer(() => {
                           onClick={handleRoleAssignClick}
                           disabled={formViewModel.isSubmitting || !currentRole.isActive}
                           className="text-blue-600 border-blue-300 hover:bg-blue-50"
-                          title={!currentRole.isActive ? 'Activate role to manage users' : 'Add or remove user assignments for this role'}
+                          title={
+                            !currentRole.isActive
+                              ? 'Activate role to manage users'
+                              : 'Add or remove user assignments for this role'
+                          }
                         >
                           <Users className="w-4 h-4 mr-1" />
                           Manage User Assignments
@@ -803,9 +822,7 @@ export const RolesManagePage: React.FC = observer(() => {
                           <div className="flex items-start gap-2">
                             <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                             <div className="flex-1">
-                              <h4 className="text-red-800 font-semibold">
-                                Failed to update role
-                              </h4>
+                              <h4 className="text-red-800 font-semibold">Failed to update role</h4>
                               <p className="text-red-700 text-sm mt-1">
                                 {formViewModel.submissionError}
                               </p>
@@ -841,16 +858,24 @@ export const RolesManagePage: React.FC = observer(() => {
                         userPermissionIds={formViewModel.userPermissionIds}
                         onTogglePermission={formViewModel.togglePermission.bind(formViewModel)}
                         onToggleApplet={formViewModel.toggleApplet.bind(formViewModel)}
-                        isAppletFullySelected={formViewModel.isAppletFullySelected.bind(formViewModel)}
-                        isAppletPartiallySelected={formViewModel.isAppletPartiallySelected.bind(formViewModel)}
+                        isAppletFullySelected={formViewModel.isAppletFullySelected.bind(
+                          formViewModel
+                        )}
+                        isAppletPartiallySelected={formViewModel.isAppletPartiallySelected.bind(
+                          formViewModel
+                        )}
                         canGrant={formViewModel.canGrant.bind(formViewModel)}
                         disabled={formViewModel.isSubmitting || !currentRole.isActive}
                         showOnlyGrantable={formViewModel.showOnlyGrantable}
-                        onToggleShowOnlyGrantable={formViewModel.toggleShowOnlyGrantable.bind(formViewModel)}
+                        onToggleShowOnlyGrantable={formViewModel.toggleShowOnlyGrantable.bind(
+                          formViewModel
+                        )}
                         searchTerm={formViewModel.permissionSearchTerm}
                         onSearchChange={formViewModel.setPermissionSearchTerm.bind(formViewModel)}
                         isAppletCollapsed={formViewModel.isAppletCollapsed.bind(formViewModel)}
-                        onToggleAppletCollapsed={formViewModel.toggleAppletCollapsed.bind(formViewModel)}
+                        onToggleAppletCollapsed={formViewModel.toggleAppletCollapsed.bind(
+                          formViewModel
+                        )}
                         onExpandAll={formViewModel.expandAllApplets.bind(formViewModel)}
                         onCollapseAll={formViewModel.collapseAllApplets.bind(formViewModel)}
                       />
@@ -876,109 +901,31 @@ export const RolesManagePage: React.FC = observer(() => {
                 </Card>
 
                 {/* Danger Zone */}
-                <section aria-labelledby="danger-zone-heading">
-                  <Card className="shadow-lg border-red-200">
-                    <CardHeader className="border-b border-red-200 bg-red-50 py-3">
-                      <CardTitle
-                        id="danger-zone-heading"
-                        className="text-sm font-semibold text-red-800"
-                      >
-                        Danger Zone
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 space-y-4">
-                      {/* Deactivate/Reactivate Section */}
-                      <div className="pb-4 border-b border-gray-200">
-                        {currentRole.isActive ? (
-                          <>
-                            <h4 className="text-sm font-medium text-gray-900">
-                              Deactivate this role
-                            </h4>
-                            <p className="text-xs text-gray-600 mt-1">
-                              Deactivating freezes the role. Users with this role will lose their
-                              permissions until reactivated.
-                            </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleDeactivateClick}
-                              disabled={
-                                formViewModel.isSubmitting ||
-                                (dialogState.type === 'deactivate' && dialogState.isLoading)
-                              }
-                              className="mt-2 text-orange-600 border-orange-300 hover:bg-orange-50"
-                            >
-                              <XCircle className="w-3 h-3 mr-1" />
-                              {dialogState.type === 'deactivate' && dialogState.isLoading
-                                ? 'Deactivating...'
-                                : 'Deactivate Role'}
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <h4 className="text-sm font-medium text-gray-900">
-                              Reactivate this role
-                            </h4>
-                            <p className="text-xs text-gray-600 mt-1">
-                              Reactivating restores permissions to users with this role.
-                            </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleReactivateClick}
-                              disabled={
-                                formViewModel.isSubmitting ||
-                                (dialogState.type === 'reactivate' && dialogState.isLoading)
-                              }
-                              className="mt-2 text-green-600 border-green-300 hover:bg-green-50"
-                            >
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              {dialogState.type === 'reactivate' && dialogState.isLoading
-                                ? 'Reactivating...'
-                                : 'Reactivate Role'}
-                            </Button>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Delete Section */}
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900">Delete this role</h4>
-                        <p className="text-xs text-gray-600 mt-1">
-                          Permanently remove this role.
-                          {currentRole.isActive && (
-                            <span className="block text-orange-600 mt-1">
-                              Must be deactivated before deletion.
-                            </span>
-                          )}
-                          {currentRole.userCount > 0 && (
-                            <span className="block text-orange-600 mt-1">
-                              Cannot delete: {currentRole.userCount} user(s) assigned.
-                            </span>
-                          )}
-                        </p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleDeleteClick}
-                          disabled={
-                            formViewModel.isSubmitting ||
-                            (dialogState.type === 'delete' && dialogState.isLoading)
-                          }
-                          className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-3 h-3 mr-1" />
-                          {dialogState.type === 'delete' && dialogState.isLoading
-                            ? 'Deleting...'
-                            : 'Delete Role'}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </section>
+                <DangerZone
+                  entityType="Role"
+                  isActive={currentRole.isActive}
+                  isSubmitting={formViewModel.isSubmitting}
+                  canDeactivate={true}
+                  onDeactivate={handleDeactivateClick}
+                  isDeactivating={dialogState.type === 'deactivate' && dialogState.isLoading}
+                  deactivateDescription="Deactivating freezes the role. Users with this role will lose their permissions until reactivated."
+                  canReactivate={true}
+                  onReactivate={handleReactivateClick}
+                  isReactivating={dialogState.type === 'reactivate' && dialogState.isLoading}
+                  reactivateDescription="Reactivating restores permissions to users with this role."
+                  canDelete={true}
+                  onDelete={handleDeleteClick}
+                  isDeleting={dialogState.type === 'delete' && dialogState.isLoading}
+                  deleteDescription="Permanently remove this role."
+                  activeDeleteConstraint="Must be deactivated before deletion."
+                  deleteSlot={
+                    currentRole.userCount > 0 ? (
+                      <span className="block text-orange-600 text-xs mt-1">
+                        Cannot delete: {currentRole.userCount} user(s) assigned.
+                      </span>
+                    ) : undefined
+                  }
+                />
               </div>
             )}
           </div>
@@ -1031,6 +978,19 @@ export const RolesManagePage: React.FC = observer(() => {
         confirmLabel="Deactivate First"
         cancelLabel="Cancel"
         onConfirm={handleDeactivateFirst}
+        onCancel={() => setDialogState({ type: 'none' })}
+        variant="warning"
+      />
+
+      {/* Cannot Delete Role With Users Dialog */}
+      <ConfirmDialog
+        isOpen={dialogState.type === 'hasUsers'}
+        title="Cannot Delete Role"
+        message={`"${currentRole?.name}" has assigned users that must be removed before deletion.`}
+        details={dialogState.type === 'hasUsers' ? dialogState.users : []}
+        confirmLabel="OK"
+        cancelLabel="Close"
+        onConfirm={() => setDialogState({ type: 'none' })}
         onCancel={() => setDialogState({ type: 'none' })}
         variant="warning"
       />

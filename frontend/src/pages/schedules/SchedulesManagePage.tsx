@@ -1,15 +1,16 @@
 /**
  * Schedules Management Page
  *
- * Single-page interface for managing schedules with split view layout.
- * Left panel: Filterable schedule list with selection
+ * Single-page interface for managing schedule templates with split view layout.
+ * Left panel: Filterable template list with selection
  * Right panel: Form for create/edit with weekly grid and user assignment
  *
  * Features:
  * - Split view layout (list 1/3 + form 2/3)
- * - Select schedule -> shows editable form with weekly grid
- * - Create mode for new schedules with user assignment
- * - Deactivate/Reactivate/Delete operations
+ * - Select template -> shows editable form with weekly grid
+ * - Create mode for new templates with user assignment
+ * - Deactivate/Reactivate/Delete operations with structured error handling
+ * - DangerZone component for destructive operations
  * - Unsaved changes warning
  *
  * Route: /schedules/manage
@@ -22,6 +23,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DangerZone } from '@/components/ui/DangerZone';
 import {
   ScheduleList,
   ScheduleFormFields,
@@ -30,17 +32,16 @@ import {
 import { ScheduleListViewModel } from '@/viewModels/schedule/ScheduleListViewModel';
 import { ScheduleFormViewModel } from '@/viewModels/schedule/ScheduleFormViewModel';
 import { getScheduleService } from '@/services/schedule/ScheduleServiceFactory';
-import type { UserSchedulePolicy } from '@/types/schedule.types';
+import type { ScheduleTemplateDetail } from '@/types/schedule.types';
 import {
   Plus,
-  Trash2,
   RefreshCw,
   ArrowLeft,
   Calendar,
   AlertTriangle,
   X,
-  CheckCircle,
   XCircle,
+  CheckCircle,
   Save,
   Users,
 } from 'lucide-react';
@@ -57,99 +58,100 @@ type DialogState =
   | { type: 'deactivate'; isLoading: boolean }
   | { type: 'reactivate'; isLoading: boolean }
   | { type: 'delete'; isLoading: boolean }
-  | { type: 'activeWarning' };
+  | { type: 'activeWarning' }
+  | { type: 'hasUsers'; users: string[] };
 
 export const SchedulesManagePage: React.FC = observer(() => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialStatus = searchParams.get('status') as 'all' | 'active' | 'inactive' | null;
-  const initialScheduleId = searchParams.get('scheduleId');
+  const initialTemplateId = searchParams.get('templateId');
 
   const [viewModel] = useState(() => new ScheduleListViewModel());
 
   const [panelMode, setPanelMode] = useState<PanelMode>('empty');
-  const [currentSchedule, setCurrentSchedule] = useState<UserSchedulePolicy | null>(null);
+  const [currentTemplate, setCurrentTemplate] = useState<ScheduleTemplateDetail | null>(null);
   const [formViewModel, setFormViewModel] = useState<ScheduleFormViewModel | null>(null);
 
   const [dialogState, setDialogState] = useState<DialogState>({ type: 'none' });
-  const pendingActionRef = useRef<{ type: 'select' | 'create'; scheduleId?: string } | null>(null);
+  const pendingActionRef = useRef<{ type: 'select' | 'create'; templateId?: string } | null>(null);
 
   const [operationError, setOperationError] = useState<string | null>(null);
 
   const [showUserAssignDialog, setShowUserAssignDialog] = useState(false);
 
-  // Load schedules on mount
+  // Load templates on mount
   useEffect(() => {
     log.debug('SchedulesManagePage mounted, loading data');
     if (initialStatus && initialStatus !== 'all') {
       viewModel.setStatusFilter(initialStatus);
     }
-    viewModel.loadSchedules();
+    viewModel.loadTemplates();
   }, [viewModel, initialStatus]);
 
-  // Select and load a schedule for editing
-  const selectAndLoadSchedule = useCallback(
-    async (scheduleId: string) => {
+  // Select and load a template for editing
+  const selectAndLoadTemplate = useCallback(
+    async (templateId: string) => {
       setOperationError(null);
       try {
         const service = getScheduleService();
-        const fullSchedule = await service.getScheduleById(scheduleId);
-        if (fullSchedule) {
-          setCurrentSchedule(fullSchedule);
-          setFormViewModel(new ScheduleFormViewModel(service, 'edit', fullSchedule));
+        const detail = await service.getTemplate(templateId);
+        if (detail) {
+          setCurrentTemplate(detail);
+          setFormViewModel(new ScheduleFormViewModel(service, 'edit', detail));
           setPanelMode('edit');
-          viewModel.selectSchedule(scheduleId);
-          log.debug('Schedule loaded for editing', {
-            scheduleId,
-            name: fullSchedule.schedule_name,
+          viewModel.selectTemplate(templateId);
+          log.debug('Template loaded for editing', {
+            templateId,
+            name: detail.schedule_name,
           });
         } else {
-          log.warn('Schedule not found', { scheduleId });
-          setOperationError('Schedule could not be loaded. Please refresh the page.');
+          log.warn('Template not found', { templateId });
+          setOperationError('Template could not be loaded. Please refresh the page.');
         }
       } catch (error) {
-        log.error('Failed to load schedule', error);
-        setOperationError('Failed to load schedule details');
+        log.error('Failed to load template', error);
+        setOperationError('Failed to load template details');
       }
     },
     [viewModel]
   );
 
-  // Handle scheduleId from URL
+  // Handle templateId from URL
   useEffect(() => {
     if (
-      initialScheduleId &&
+      initialTemplateId &&
       !viewModel.isLoading &&
-      viewModel.schedules.length > 0 &&
+      viewModel.templates.length > 0 &&
       panelMode === 'empty'
     ) {
-      log.debug('Loading schedule from URL param', { scheduleId: initialScheduleId });
-      selectAndLoadSchedule(initialScheduleId);
+      log.debug('Loading template from URL param', { templateId: initialTemplateId });
+      selectAndLoadTemplate(initialTemplateId);
     }
   }, [
-    initialScheduleId,
+    initialTemplateId,
     viewModel.isLoading,
-    viewModel.schedules.length,
+    viewModel.templates.length,
     panelMode,
-    selectAndLoadSchedule,
+    selectAndLoadTemplate,
   ]);
 
-  // Handle schedule list selection with dirty check
-  const handleScheduleSelect = useCallback(
-    (scheduleId: string) => {
-      if (scheduleId === viewModel.selectedScheduleId && panelMode === 'edit') {
+  // Handle template list selection with dirty check
+  const handleTemplateSelect = useCallback(
+    (templateId: string) => {
+      if (templateId === viewModel.selectedTemplateId && panelMode === 'edit') {
         return;
       }
 
       if (formViewModel?.isDirty) {
-        pendingActionRef.current = { type: 'select', scheduleId };
+        pendingActionRef.current = { type: 'select', templateId };
         setDialogState({ type: 'discard' });
       } else {
-        selectAndLoadSchedule(scheduleId);
+        selectAndLoadTemplate(templateId);
       }
     },
-    [viewModel.selectedScheduleId, panelMode, formViewModel, selectAndLoadSchedule]
+    [viewModel.selectedTemplateId, panelMode, formViewModel, selectAndLoadTemplate]
   );
 
   // Handle discard changes
@@ -158,13 +160,13 @@ export const SchedulesManagePage: React.FC = observer(() => {
     setDialogState({ type: 'none' });
     pendingActionRef.current = null;
 
-    if (pending?.type === 'select' && pending.scheduleId) {
-      selectAndLoadSchedule(pending.scheduleId);
+    if (pending?.type === 'select' && pending.templateId) {
+      selectAndLoadTemplate(pending.templateId);
     } else if (pending?.type === 'create') {
       enterCreateMode();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectAndLoadSchedule]);
+  }, [selectAndLoadTemplate]);
 
   const handleCancelDiscard = useCallback(() => {
     setDialogState({ type: 'none' });
@@ -176,7 +178,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
     setOperationError(null);
     const service = getScheduleService();
     setFormViewModel(new ScheduleFormViewModel(service, 'create'));
-    setCurrentSchedule(null);
+    setCurrentTemplate(null);
     setPanelMode('create');
     viewModel.clearSelection();
     log.debug('Entered create mode');
@@ -200,43 +202,38 @@ export const SchedulesManagePage: React.FC = observer(() => {
 
       const result = await formViewModel.submit();
 
-      if (result.success && result.scheduleId) {
+      if (result.success && result.templateId) {
         log.info('Form submitted successfully', {
           mode: panelMode,
-          scheduleId: result.scheduleId,
+          templateId: result.templateId,
         });
 
         try {
           await viewModel.refresh();
-
-          if (panelMode === 'create') {
-            await selectAndLoadSchedule(result.scheduleId);
-          } else {
-            await selectAndLoadSchedule(result.scheduleId);
-          }
+          await selectAndLoadTemplate(result.templateId);
         } catch (err) {
           log.error('Failed to transition after save', err);
-          setOperationError('Schedule was saved but failed to reload. Please refresh the page.');
+          setOperationError('Template was saved but failed to reload. Please refresh the page.');
         }
       } else if (!result.success) {
-        setOperationError(result.error || 'Failed to save schedule');
+        setOperationError(result.error || 'Failed to save template');
       }
     },
-    [formViewModel, panelMode, viewModel, selectAndLoadSchedule]
+    [formViewModel, panelMode, viewModel, selectAndLoadTemplate]
   );
 
   // Handle cancel in form
   const handleCancel = useCallback(() => {
     if (panelMode === 'create') {
-      if (viewModel.selectedScheduleId) {
-        selectAndLoadSchedule(viewModel.selectedScheduleId);
+      if (viewModel.selectedTemplateId) {
+        selectAndLoadTemplate(viewModel.selectedTemplateId);
       } else {
         setPanelMode('empty');
         setFormViewModel(null);
-        setCurrentSchedule(null);
+        setCurrentTemplate(null);
       }
     }
-  }, [panelMode, viewModel.selectedScheduleId, selectAndLoadSchedule]);
+  }, [panelMode, viewModel.selectedTemplateId, selectAndLoadTemplate]);
 
   const handleBackClick = () => {
     navigate('/schedules');
@@ -244,105 +241,114 @@ export const SchedulesManagePage: React.FC = observer(() => {
 
   // Deactivate handlers
   const handleDeactivateClick = useCallback(() => {
-    if (currentSchedule && currentSchedule.is_active) {
+    if (currentTemplate && currentTemplate.is_active) {
       setOperationError(null);
       setDialogState({ type: 'deactivate', isLoading: false });
     }
-  }, [currentSchedule]);
+  }, [currentTemplate]);
 
   const handleDeactivateConfirm = useCallback(async () => {
-    if (!currentSchedule) return;
+    if (!currentTemplate) return;
 
     setDialogState({ type: 'deactivate', isLoading: true });
     setOperationError(null);
     try {
-      const result = await viewModel.deactivateSchedule(
-        currentSchedule.id,
+      const result = await viewModel.deactivateTemplate(
+        currentTemplate.id,
         'Deactivated from manage page'
       );
 
       if (result.success) {
         setDialogState({ type: 'none' });
-        log.info('Schedule deactivated', { scheduleId: currentSchedule.id });
-        await selectAndLoadSchedule(currentSchedule.id);
+        log.info('Template deactivated', { templateId: currentTemplate.id });
+        await selectAndLoadTemplate(currentTemplate.id);
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to deactivate schedule');
+        setOperationError(result.error || 'Failed to deactivate template');
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to deactivate schedule');
+      setOperationError(error instanceof Error ? error.message : 'Failed to deactivate template');
     }
-  }, [currentSchedule, viewModel, selectAndLoadSchedule]);
+  }, [currentTemplate, viewModel, selectAndLoadTemplate]);
 
   // Reactivate handlers
   const handleReactivateClick = useCallback(() => {
-    if (currentSchedule && !currentSchedule.is_active) {
+    if (currentTemplate && !currentTemplate.is_active) {
       setOperationError(null);
       setDialogState({ type: 'reactivate', isLoading: false });
     }
-  }, [currentSchedule]);
+  }, [currentTemplate]);
 
   const handleReactivateConfirm = useCallback(async () => {
-    if (!currentSchedule) return;
+    if (!currentTemplate) return;
 
     setDialogState({ type: 'reactivate', isLoading: true });
     setOperationError(null);
     try {
-      const result = await viewModel.reactivateSchedule(
-        currentSchedule.id,
+      const result = await viewModel.reactivateTemplate(
+        currentTemplate.id,
         'Reactivated from manage page'
       );
 
       if (result.success) {
         setDialogState({ type: 'none' });
-        log.info('Schedule reactivated', { scheduleId: currentSchedule.id });
-        await selectAndLoadSchedule(currentSchedule.id);
+        log.info('Template reactivated', { templateId: currentTemplate.id });
+        await selectAndLoadTemplate(currentTemplate.id);
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to reactivate schedule');
+        setOperationError(result.error || 'Failed to reactivate template');
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to reactivate schedule');
+      setOperationError(error instanceof Error ? error.message : 'Failed to reactivate template');
     }
-  }, [currentSchedule, viewModel, selectAndLoadSchedule]);
+  }, [currentTemplate, viewModel, selectAndLoadTemplate]);
 
-  // Delete handlers
+  // Delete handlers — with structured error handling (HAS_USERS, STILL_ACTIVE)
   const handleDeleteClick = useCallback(() => {
-    if (!currentSchedule) return;
+    if (!currentTemplate) return;
 
-    if (currentSchedule.is_active) {
+    if (currentTemplate.is_active) {
       setDialogState({ type: 'activeWarning' });
     } else {
       setOperationError(null);
       setDialogState({ type: 'delete', isLoading: false });
     }
-  }, [currentSchedule]);
+  }, [currentTemplate]);
 
   const handleDeleteConfirm = useCallback(async () => {
-    if (!currentSchedule) return;
+    if (!currentTemplate) return;
 
     setDialogState({ type: 'delete', isLoading: true });
     setOperationError(null);
     try {
-      const result = await viewModel.deleteSchedule(currentSchedule.id, 'Deleted from manage page');
+      const result = await viewModel.deleteTemplate(currentTemplate.id, 'Deleted from manage page');
 
       if (result.success) {
         setDialogState({ type: 'none' });
-        log.info('Schedule deleted', { scheduleId: currentSchedule.id });
+        log.info('Template deleted', { templateId: currentTemplate.id });
         setPanelMode('empty');
         setFormViewModel(null);
-        setCurrentSchedule(null);
+        setCurrentTemplate(null);
+      } else if (result.errorDetails?.code === 'HAS_USERS') {
+        // Show dialog listing assigned user names
+        setDialogState({ type: 'none' });
+        const userNames = currentTemplate.assigned_users.map(
+          (u) => u.user_name || u.user_email || u.user_id
+        );
+        setDialogState({ type: 'hasUsers', users: userNames });
+      } else if (result.errorDetails?.code === 'STILL_ACTIVE') {
+        setDialogState({ type: 'activeWarning' });
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to delete schedule');
+        setOperationError(result.error || 'Failed to delete template');
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to delete schedule');
+      setOperationError(error instanceof Error ? error.message : 'Failed to delete template');
     }
-  }, [currentSchedule, viewModel]);
+  }, [currentTemplate, viewModel]);
 
   const handleDeactivateFirst = useCallback(() => {
     setDialogState({ type: 'deactivate', isLoading: false });
@@ -408,8 +414,8 @@ export const SchedulesManagePage: React.FC = observer(() => {
           <div className="flex items-center gap-3">
             <Calendar className="w-8 h-8 text-blue-600" />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Schedule Management</h1>
-              <p className="text-gray-600 mt-1">Create and manage staff work schedules</p>
+              <h1 className="text-3xl font-bold text-gray-900">Schedule Template Management</h1>
+              <p className="text-gray-600 mt-1">Create and manage staff work schedule templates</p>
             </div>
           </div>
         </div>
@@ -440,12 +446,12 @@ export const SchedulesManagePage: React.FC = observer(() => {
 
         {/* Split View Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Panel: Schedule List */}
+          {/* Left Panel: Template List */}
           <div className="lg:col-span-1">
             <Card className="shadow-lg h-[calc(100vh-280px)]">
               <CardHeader className="border-b border-gray-200 pb-4">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold text-gray-900">Schedules</CardTitle>
+                  <CardTitle className="text-lg font-semibold text-gray-900">Templates</CardTitle>
                   <Button
                     variant="outline"
                     size="sm"
@@ -458,12 +464,12 @@ export const SchedulesManagePage: React.FC = observer(() => {
               </CardHeader>
               <CardContent className="p-4 h-[calc(100%-80px)]">
                 <ScheduleList
-                  schedules={viewModel.schedules}
-                  selectedScheduleId={viewModel.selectedScheduleId}
+                  schedules={viewModel.templates}
+                  selectedTemplateId={viewModel.selectedTemplateId}
                   statusFilter={viewModel.statusFilter}
                   searchTerm={viewModel.searchTerm}
                   isLoading={viewModel.isLoading}
-                  onSelect={handleScheduleSelect}
+                  onSelect={handleTemplateSelect}
                   onSearchChange={handleSearchChange}
                   onStatusChange={handleStatusChange}
                 />
@@ -480,7 +486,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
               className="w-full mb-4 bg-blue-600 hover:bg-blue-700 text-white justify-start"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Create New Schedule
+              Create New Template
             </Button>
 
             {/* Empty State */}
@@ -488,10 +494,10 @@ export const SchedulesManagePage: React.FC = observer(() => {
               <Card className="shadow-lg">
                 <CardContent className="p-12 text-center">
                   <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium text-gray-900 mb-2">No Schedule Selected</h3>
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No Template Selected</h3>
                   <p className="text-gray-500 max-w-md mx-auto">
-                    Select a schedule from the list to view and edit its details, or click "Create
-                    New Schedule" to add a new one.
+                    Select a template from the list to view and edit its details, or click "Create
+                    New Template" to add a new one.
                   </p>
                 </CardContent>
               </Card>
@@ -502,7 +508,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
               <Card className="shadow-lg">
                 <CardHeader className="border-b border-gray-200">
                   <CardTitle className="text-xl font-semibold text-gray-900">
-                    Create New Schedule
+                    Create New Template
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
@@ -514,7 +520,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
                           <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                           <div className="flex-1">
                             <h4 className="text-red-800 font-semibold">
-                              Failed to create schedule
+                              Failed to create template
                             </h4>
                             <p className="text-red-700 text-sm mt-1">
                               {formViewModel.submissionError}
@@ -536,14 +542,10 @@ export const SchedulesManagePage: React.FC = observer(() => {
                     <ScheduleFormFields
                       scheduleName={formViewModel.formData.scheduleName}
                       schedule={formViewModel.formData.schedule}
-                      effectiveFrom={formViewModel.formData.effectiveFrom}
-                      effectiveUntil={formViewModel.formData.effectiveUntil}
                       onScheduleNameChange={(name) => formViewModel.setScheduleName(name)}
                       onScheduleNameBlur={() => formViewModel.touchField('scheduleName')}
                       onToggleDay={(day) => formViewModel.toggleDay(day)}
                       onSetTime={(day, field, value) => formViewModel.setDayTime(day, field, value)}
-                      onEffectiveFromChange={(date) => formViewModel.setEffectiveFrom(date)}
-                      onEffectiveUntilChange={(date) => formViewModel.setEffectiveUntil(date)}
                       getFieldError={(field) => formViewModel.getFieldError(field)}
                       disabled={formViewModel.isSubmitting}
                     />
@@ -553,7 +555,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
                       <h3 className="text-sm font-medium text-gray-700">Assign Users</h3>
                       <p className="text-xs text-gray-500">
                         {formViewModel.assignedUserIds.length === 0
-                          ? 'No users assigned yet. Click below to assign users to this schedule.'
+                          ? 'No users assigned yet. Click below to assign users to this template.'
                           : `${formViewModel.assignedUserIds.length} user(s) selected`}
                       </p>
                       <Button
@@ -589,7 +591,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
                         className="bg-blue-600 hover:bg-blue-700 text-white"
                       >
                         <Plus className="w-4 h-4 mr-1" />
-                        {formViewModel.isSubmitting ? 'Creating...' : 'Create Schedule'}
+                        {formViewModel.isSubmitting ? 'Creating...' : 'Create Template'}
                       </Button>
                     </div>
                   </form>
@@ -598,19 +600,19 @@ export const SchedulesManagePage: React.FC = observer(() => {
             )}
 
             {/* Edit Mode */}
-            {panelMode === 'edit' && currentSchedule && formViewModel && (
+            {panelMode === 'edit' && currentTemplate && formViewModel && (
               <div className="space-y-4">
                 {/* Inactive Warning Banner */}
-                {!currentSchedule.is_active && (
+                {!currentTemplate.is_active && (
                   <div className="p-4 rounded-lg border border-amber-300 bg-amber-50">
                     <div className="flex items-start gap-3">
                       <XCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                       <div className="flex-1">
                         <h3 className="text-amber-800 font-semibold">
-                          Inactive Schedule - Editing Disabled
+                          Inactive Template - Editing Disabled
                         </h3>
                         <p className="text-amber-700 text-sm mt-1">
-                          This schedule is deactivated. The form is read-only until the schedule is
+                          This template is deactivated. The form is read-only until the template is
                           reactivated.
                         </p>
                       </div>
@@ -638,26 +640,25 @@ export const SchedulesManagePage: React.FC = observer(() => {
                   <CardHeader className="border-b border-gray-200">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-xl font-semibold text-gray-900">
-                        Edit Schedule
+                        Edit Template
                       </CardTitle>
                       <div className="flex items-center gap-2">
                         <span
                           className={cn(
                             'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                            currentSchedule.is_active
+                            currentTemplate.is_active
                               ? 'bg-green-100 text-green-800'
                               : 'bg-gray-100 text-gray-600'
                           )}
                         >
-                          {currentSchedule.is_active ? 'Active' : 'Inactive'}
+                          {currentTemplate.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </div>
                     </div>
-                    {currentSchedule.user_name && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        Assigned to: {currentSchedule.user_name}
-                      </p>
-                    )}
+                    <p className="text-sm text-gray-500 mt-1">
+                      {currentTemplate.assigned_user_count} assigned user
+                      {currentTemplate.assigned_user_count !== 1 ? 's' : ''}
+                    </p>
                   </CardHeader>
                   <CardContent className="p-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
@@ -671,7 +672,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
                             <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                             <div className="flex-1">
                               <h4 className="text-red-800 font-semibold">
-                                Failed to update schedule
+                                Failed to update template
                               </h4>
                               <p className="text-red-700 text-sm mt-1">
                                 {formViewModel.submissionError}
@@ -693,20 +694,16 @@ export const SchedulesManagePage: React.FC = observer(() => {
                       <ScheduleFormFields
                         scheduleName={formViewModel.formData.scheduleName}
                         schedule={formViewModel.formData.schedule}
-                        effectiveFrom={formViewModel.formData.effectiveFrom}
-                        effectiveUntil={formViewModel.formData.effectiveUntil}
                         onScheduleNameChange={(name) => formViewModel.setScheduleName(name)}
                         onScheduleNameBlur={() => formViewModel.touchField('scheduleName')}
                         onToggleDay={(day) => formViewModel.toggleDay(day)}
                         onSetTime={(day, field, value) =>
                           formViewModel.setDayTime(day, field, value)
                         }
-                        onEffectiveFromChange={(date) => formViewModel.setEffectiveFrom(date)}
-                        onEffectiveUntilChange={(date) => formViewModel.setEffectiveUntil(date)}
                         getFieldError={(field) => formViewModel.getFieldError(field)}
-                        disabled={formViewModel.isSubmitting || !currentSchedule.is_active}
+                        disabled={formViewModel.isSubmitting || !currentTemplate.is_active}
                         isEditMode
-                        scheduleId={currentSchedule.id}
+                        templateId={currentTemplate.id}
                       />
 
                       {/* Form Actions */}
@@ -718,7 +715,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
                         </div>
                         <Button
                           type="submit"
-                          disabled={!formViewModel.canSubmit || !currentSchedule.is_active}
+                          disabled={!formViewModel.canSubmit || !currentTemplate.is_active}
                           className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
                           <Save className="w-4 h-4 mr-1" />
@@ -730,104 +727,42 @@ export const SchedulesManagePage: React.FC = observer(() => {
                 </Card>
 
                 {/* Danger Zone */}
-                <section aria-labelledby="danger-zone-heading">
-                  <Card className="shadow-lg border-red-200">
-                    <CardHeader className="border-b border-red-200 bg-red-50 py-3">
-                      <CardTitle
-                        id="danger-zone-heading"
-                        className="text-sm font-semibold text-red-800"
-                      >
-                        Danger Zone
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 space-y-4">
-                      {/* Deactivate/Reactivate */}
-                      <div className="pb-4 border-b border-gray-200">
-                        {currentSchedule.is_active ? (
-                          <>
-                            <h4 className="text-sm font-medium text-gray-900">
-                              Deactivate this schedule
-                            </h4>
-                            <p className="text-xs text-gray-600 mt-1">
-                              Deactivating suspends this schedule assignment. It can be reactivated
-                              later.
-                            </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleDeactivateClick}
-                              disabled={
-                                formViewModel.isSubmitting ||
-                                (dialogState.type === 'deactivate' && dialogState.isLoading)
-                              }
-                              className="mt-2 text-orange-600 border-orange-300 hover:bg-orange-50"
-                            >
-                              <XCircle className="w-3 h-3 mr-1" />
-                              {dialogState.type === 'deactivate' && dialogState.isLoading
-                                ? 'Deactivating...'
-                                : 'Deactivate Schedule'}
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <h4 className="text-sm font-medium text-gray-900">
-                              Reactivate this schedule
-                            </h4>
-                            <p className="text-xs text-gray-600 mt-1">
-                              Reactivating restores this schedule assignment.
-                            </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleReactivateClick}
-                              disabled={
-                                formViewModel.isSubmitting ||
-                                (dialogState.type === 'reactivate' && dialogState.isLoading)
-                              }
-                              className="mt-2 text-green-600 border-green-300 hover:bg-green-50"
-                            >
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              {dialogState.type === 'reactivate' && dialogState.isLoading
-                                ? 'Reactivating...'
-                                : 'Reactivate Schedule'}
-                            </Button>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Delete */}
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900">Delete this schedule</h4>
-                        <p className="text-xs text-gray-600 mt-1">
-                          Permanently remove this schedule assignment.
-                          {currentSchedule.is_active && (
-                            <span className="block text-orange-600 mt-1">
-                              Must be deactivated before deletion.
-                            </span>
-                          )}
-                        </p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleDeleteClick}
-                          disabled={
-                            formViewModel.isSubmitting ||
-                            (dialogState.type === 'delete' && dialogState.isLoading)
-                          }
-                          className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-3 h-3 mr-1" />
-                          {dialogState.type === 'delete' && dialogState.isLoading
-                            ? 'Deleting...'
-                            : 'Delete Schedule'}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </section>
+                <DangerZone
+                  entityType="Template"
+                  isActive={currentTemplate.is_active}
+                  isSubmitting={formViewModel.isSubmitting}
+                  canDeactivate={currentTemplate.is_active}
+                  onDeactivate={handleDeactivateClick}
+                  isDeactivating={dialogState.type === 'deactivate' && dialogState.isLoading}
+                  deactivateDescription="Deactivating suspends this template for all assigned users. It can be reactivated later."
+                  deactivateSlot={
+                    currentTemplate.assigned_user_count > 0 ? (
+                      <span className="block text-orange-600 text-xs mt-1">
+                        This will suspend the schedule for all {currentTemplate.assigned_user_count}{' '}
+                        assigned user
+                        {currentTemplate.assigned_user_count !== 1 ? 's' : ''}.
+                      </span>
+                    ) : undefined
+                  }
+                  canReactivate={!currentTemplate.is_active}
+                  onReactivate={handleReactivateClick}
+                  isReactivating={dialogState.type === 'reactivate' && dialogState.isLoading}
+                  reactivateDescription="Reactivating restores this template for all assigned users."
+                  reactivateSlot={
+                    currentTemplate.assigned_user_count > 0 ? (
+                      <span className="block text-green-600 text-xs mt-1">
+                        This will reactivate the schedule for all{' '}
+                        {currentTemplate.assigned_user_count} assigned user
+                        {currentTemplate.assigned_user_count !== 1 ? 's' : ''}.
+                      </span>
+                    ) : undefined
+                  }
+                  canDelete
+                  onDelete={handleDeleteClick}
+                  isDeleting={dialogState.type === 'delete' && dialogState.isLoading}
+                  deleteDescription="Permanently remove this schedule template."
+                  activeDeleteConstraint="Must be deactivated before deletion."
+                />
               </div>
             )}
           </div>
@@ -849,8 +784,8 @@ export const SchedulesManagePage: React.FC = observer(() => {
       {/* Deactivate Confirmation Dialog */}
       <ConfirmDialog
         isOpen={dialogState.type === 'deactivate'}
-        title="Deactivate Schedule"
-        message={`Are you sure you want to deactivate "${currentSchedule?.schedule_name}" for ${currentSchedule?.user_name ?? 'this user'}?`}
+        title="Deactivate Template"
+        message={`Are you sure you want to deactivate "${currentTemplate?.schedule_name}"? This will suspend the schedule for all ${currentTemplate?.assigned_user_count ?? 0} assigned user${(currentTemplate?.assigned_user_count ?? 0) !== 1 ? 's' : ''}.`}
         confirmLabel="Deactivate"
         cancelLabel="Cancel"
         onConfirm={handleDeactivateConfirm}
@@ -862,8 +797,8 @@ export const SchedulesManagePage: React.FC = observer(() => {
       {/* Reactivate Confirmation Dialog */}
       <ConfirmDialog
         isOpen={dialogState.type === 'reactivate'}
-        title="Reactivate Schedule"
-        message={`Are you sure you want to reactivate "${currentSchedule?.schedule_name}" for ${currentSchedule?.user_name ?? 'this user'}?`}
+        title="Reactivate Template"
+        message={`Are you sure you want to reactivate "${currentTemplate?.schedule_name}"? This will reactivate the schedule for all ${currentTemplate?.assigned_user_count ?? 0} assigned user${(currentTemplate?.assigned_user_count ?? 0) !== 1 ? 's' : ''}.`}
         confirmLabel="Reactivate"
         cancelLabel="Cancel"
         onConfirm={handleReactivateConfirm}
@@ -875,8 +810,8 @@ export const SchedulesManagePage: React.FC = observer(() => {
       {/* Active Warning Dialog */}
       <ConfirmDialog
         isOpen={dialogState.type === 'activeWarning'}
-        title="Cannot Delete Active Schedule"
-        message={`"${currentSchedule?.schedule_name}" must be deactivated before it can be deleted. Would you like to deactivate it now?`}
+        title="Cannot Delete Active Template"
+        message={`"${currentTemplate?.schedule_name}" must be deactivated before it can be deleted. Would you like to deactivate it now?`}
         confirmLabel="Deactivate First"
         cancelLabel="Cancel"
         onConfirm={handleDeactivateFirst}
@@ -884,11 +819,24 @@ export const SchedulesManagePage: React.FC = observer(() => {
         variant="warning"
       />
 
+      {/* Has Users Warning Dialog */}
+      <ConfirmDialog
+        isOpen={dialogState.type === 'hasUsers'}
+        title="Cannot Delete Template"
+        message={`"${currentTemplate?.schedule_name}" has assigned users that must be removed before deletion.`}
+        details={dialogState.type === 'hasUsers' ? dialogState.users : []}
+        confirmLabel="OK"
+        cancelLabel="Close"
+        onConfirm={() => setDialogState({ type: 'none' })}
+        onCancel={() => setDialogState({ type: 'none' })}
+        variant="warning"
+      />
+
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={dialogState.type === 'delete'}
-        title="Delete Schedule"
-        message={`Are you sure you want to delete "${currentSchedule?.schedule_name}" for ${currentSchedule?.user_name ?? 'this user'}? This action is permanent and cannot be undone.`}
+        title="Delete Template"
+        message={`Are you sure you want to delete "${currentTemplate?.schedule_name}"? This action is permanent and cannot be undone.`}
         confirmLabel="Delete"
         cancelLabel="Cancel"
         onConfirm={handleDeleteConfirm}
@@ -903,7 +851,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
         onClose={handleUserAssignClose}
         onConfirm={handleUserAssignConfirm}
         selectedUserIds={formViewModel?.assignedUserIds ?? []}
-        title="Assign Users to Schedule"
+        title="Assign Users to Template"
       />
     </div>
   );

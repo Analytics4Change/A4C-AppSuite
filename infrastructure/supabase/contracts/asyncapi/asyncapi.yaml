@@ -41,10 +41,14 @@ channels:
           - $ref: './domains/user.yaml#/components/messages/UserDeactivated'
           - $ref: './domains/user.yaml#/components/messages/UserReactivated'
           - $ref: './domains/user.yaml#/components/messages/UserDeleted'
-          # User schedule events (staff work schedules)
-          - $ref: './domains/user.yaml#/components/messages/UserScheduleCreated'
-          - $ref: './domains/user.yaml#/components/messages/UserScheduleUpdated'
-          - $ref: './domains/user.yaml#/components/messages/UserScheduleDeactivated'
+          # Schedule template events (staff work schedules)
+          - $ref: './domains/schedule.yaml#/components/messages/ScheduleCreated'
+          - $ref: './domains/schedule.yaml#/components/messages/ScheduleUpdated'
+          - $ref: './domains/schedule.yaml#/components/messages/ScheduleDeactivated'
+          - $ref: './domains/schedule.yaml#/components/messages/ScheduleReactivated'
+          - $ref: './domains/schedule.yaml#/components/messages/ScheduleDeleted'
+          - $ref: './domains/schedule.yaml#/components/messages/ScheduleUserAssigned'
+          - $ref: './domains/schedule.yaml#/components/messages/ScheduleUserUnassigned'
           # User client assignment events (staff-client mapping)
           - $ref: './domains/user.yaml#/components/messages/UserClientAssigned'
           - $ref: './domains/user.yaml#/components/messages/UserClientUnassigned'
@@ -183,6 +187,7 @@ components:
             - email
             - access_grant
             - junction
+            - schedule
           description: Type of entity this event affects
         stream_version:
           type: integer

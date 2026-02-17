@@ -1,8 +1,9 @@
 /**
  * Schedule Form Fields Component
  *
- * Shared form fields for schedule create/edit forms.
- * Includes schedule name, weekly grid, and effective dates.
+ * Shared form fields for schedule template create/edit forms.
+ * Includes schedule name and weekly grid.
+ * Effective dates are managed per-assignment, not per-template.
  * Mirrors RoleFormFields pattern.
  */
 
@@ -54,18 +55,14 @@ const FieldWrapper: React.FC<FieldWrapperProps> = ({
 export interface ScheduleFormFieldsProps {
   scheduleName: string;
   schedule: WeeklySchedule;
-  effectiveFrom: string | null;
-  effectiveUntil: string | null;
   onScheduleNameChange: (name: string) => void;
   onScheduleNameBlur: () => void;
   onToggleDay: (day: DayOfWeek) => void;
   onSetTime: (day: DayOfWeek, field: 'begin' | 'end', value: string) => void;
-  onEffectiveFromChange: (date: string | null) => void;
-  onEffectiveUntilChange: (date: string | null) => void;
   getFieldError: (field: string) => string | null;
   disabled?: boolean;
   isEditMode?: boolean;
-  scheduleId?: string;
+  templateId?: string;
   className?: string;
 }
 
@@ -73,23 +70,17 @@ export const ScheduleFormFields = observer(
   ({
     scheduleName,
     schedule,
-    effectiveFrom,
-    effectiveUntil,
     onScheduleNameChange,
     onScheduleNameBlur,
     onToggleDay,
     onSetTime,
-    onEffectiveFromChange,
-    onEffectiveUntilChange,
     getFieldError,
     disabled = false,
     isEditMode = false,
-    scheduleId,
+    templateId,
     className,
   }: ScheduleFormFieldsProps) => {
     const nameId = useId();
-    const fromId = useId();
-    const untilId = useId();
 
     const handleNameChange = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,28 +89,14 @@ export const ScheduleFormFields = observer(
       [onScheduleNameChange]
     );
 
-    const handleFromChange = useCallback(
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        onEffectiveFromChange(e.target.value || null);
-      },
-      [onEffectiveFromChange]
-    );
-
-    const handleUntilChange = useCallback(
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        onEffectiveUntilChange(e.target.value || null);
-      },
-      [onEffectiveUntilChange]
-    );
-
     const nameError = getFieldError('scheduleName');
 
     return (
       <div className={cn('space-y-6', className)}>
-        {/* Schedule ID (edit mode only) */}
-        {isEditMode && scheduleId && (
+        {/* Template ID (edit mode only) */}
+        {isEditMode && templateId && (
           <div className="text-xs text-gray-500 font-mono bg-gray-50 px-3 py-2 rounded">
-            ID: {scheduleId}
+            ID: {templateId}
           </div>
         )}
 
@@ -150,36 +127,6 @@ export const ScheduleFormFields = observer(
             onSetTime={onSetTime}
             disabled={disabled}
           />
-        </div>
-
-        {/* Effective Dates */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor={fromId} className="text-sm font-medium text-gray-700">
-              Effective From
-            </Label>
-            <Input
-              id={fromId}
-              type="date"
-              value={effectiveFrom ?? ''}
-              onChange={handleFromChange}
-              disabled={disabled}
-              aria-label="Schedule effective from date"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor={untilId} className="text-sm font-medium text-gray-700">
-              Effective Until
-            </Label>
-            <Input
-              id={untilId}
-              type="date"
-              value={effectiveUntil ?? ''}
-              onChange={handleUntilChange}
-              disabled={disabled}
-              aria-label="Schedule effective until date"
-            />
-          </div>
         </div>
       </div>
     );

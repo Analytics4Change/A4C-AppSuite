@@ -24,14 +24,24 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DangerZone } from '@/components/ui/DangerZone';
 import { UserList, UserFormFields } from '@/components/users';
-import { AccessDatesForm, NotificationPreferencesForm, UserPhonesSection } from '@/components/users';
+import {
+  AccessDatesForm,
+  NotificationPreferencesForm,
+  UserPhonesSection,
+} from '@/components/users';
 import { UsersViewModel } from '@/viewModels/users/UsersViewModel';
 import { UserFormViewModel } from '@/viewModels/users/UserFormViewModel';
 import { getUserQueryService, getUserCommandService } from '@/services/users';
 import { getRoleService } from '@/services/roles';
 import { useAuth } from '@/contexts/AuthContext';
-import type { UserListItem, UserDisplayStatus, NotificationPreferences, UserPhone } from '@/types/user.types';
+import type {
+  UserListItem,
+  UserDisplayStatus,
+  NotificationPreferences,
+  UserPhone,
+} from '@/types/user.types';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/user.types';
 import type { Role } from '@/types/role.types';
 import {
@@ -45,7 +55,6 @@ import {
   XCircle,
   Save,
   Mail,
-  PowerOff,
   Trash2,
 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
@@ -67,7 +76,7 @@ type DialogState =
   | { type: 'resend'; isLoading: boolean }
   | { type: 'revoke'; isLoading: boolean }
   | { type: 'delete'; isLoading: boolean }
-  | { type: 'delete-warning' };
+  | { type: 'activeWarning' };
 
 /**
  * Users Management Page Component
@@ -110,7 +119,9 @@ export const UsersManagePage: React.FC = observer(() => {
   const [statusFilter, setStatusFilter] = useState<UserDisplayStatus | 'all'>('all');
 
   // Notification preferences state (for selected user)
-  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(
+    DEFAULT_NOTIFICATION_PREFERENCES
+  );
   const [userPhones, setUserPhones] = useState<UserPhone[]>([]);
   const [isLoadingPrefs, setIsLoadingPrefs] = useState(false);
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
@@ -340,9 +351,7 @@ export const UsersManagePage: React.FC = observer(() => {
   const handleCancel = useCallback(() => {
     if (panelMode === 'create') {
       if (viewModel.selectedItemId) {
-        const item = viewModel.items.find(
-          (u: UserListItem) => u.id === viewModel.selectedItemId
-        );
+        const item = viewModel.items.find((u: UserListItem) => u.id === viewModel.selectedItemId);
         if (item) {
           selectAndLoadUser(viewModel.selectedItemId, item.isInvitation);
         }
@@ -386,9 +395,7 @@ export const UsersManagePage: React.FC = observer(() => {
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(
-        error instanceof Error ? error.message : 'Failed to deactivate user'
-      );
+      setOperationError(error instanceof Error ? error.message : 'Failed to deactivate user');
     }
   }, [currentItem, viewModel, selectAndLoadUser]);
 
@@ -419,9 +426,7 @@ export const UsersManagePage: React.FC = observer(() => {
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(
-        error instanceof Error ? error.message : 'Failed to reactivate user'
-      );
+      setOperationError(error instanceof Error ? error.message : 'Failed to reactivate user');
     }
   }, [currentItem, viewModel, selectAndLoadUser]);
 
@@ -453,9 +458,7 @@ export const UsersManagePage: React.FC = observer(() => {
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(
-        error instanceof Error ? error.message : 'Failed to resend invitation'
-      );
+      setOperationError(error instanceof Error ? error.message : 'Failed to resend invitation');
     }
   }, [currentItem, viewModel]);
 
@@ -490,9 +493,7 @@ export const UsersManagePage: React.FC = observer(() => {
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(
-        error instanceof Error ? error.message : 'Failed to revoke invitation'
-      );
+      setOperationError(error instanceof Error ? error.message : 'Failed to revoke invitation');
     }
   }, [currentItem, viewModel]);
 
@@ -503,7 +504,7 @@ export const UsersManagePage: React.FC = observer(() => {
     setOperationError(null);
     // If user is active, show warning that they must be deactivated first
     if (currentItem.displayStatus === 'active') {
-      setDialogState({ type: 'delete-warning' });
+      setDialogState({ type: 'activeWarning' });
     } else if (currentItem.displayStatus === 'deactivated') {
       setDialogState({ type: 'delete', isLoading: false });
     }
@@ -530,9 +531,7 @@ export const UsersManagePage: React.FC = observer(() => {
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(
-        error instanceof Error ? error.message : 'Failed to delete user'
-      );
+      setOperationError(error instanceof Error ? error.message : 'Failed to delete user');
     }
   }, [currentItem, viewModel]);
 
@@ -584,12 +583,7 @@ export const UsersManagePage: React.FC = observer(() => {
         {/* Page Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleBackClick}
-              className="text-gray-600"
-            >
+            <Button variant="outline" size="sm" onClick={handleBackClick} className="text-gray-600">
               <ArrowLeft className="w-4 h-4 mr-1" />
               Back to Users
             </Button>
@@ -598,26 +592,19 @@ export const UsersManagePage: React.FC = observer(() => {
             <UserPlus className="w-8 h-8 text-blue-600" />
             <div>
               <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-              <p className="text-gray-600 mt-1">
-                Invite and manage users within your organization
-              </p>
+              <p className="text-gray-600 mt-1">Invite and manage users within your organization</p>
             </div>
           </div>
         </div>
 
         {/* Error Banner */}
         {(viewModel.error || operationError) && (
-          <div
-            className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50"
-            role="alert"
-          >
+          <div className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-red-800 font-semibold">Error</h3>
-                <p className="text-red-700 text-sm mt-1">
-                  {viewModel.error || operationError}
-                </p>
+                <p className="text-red-700 text-sm mt-1">{viewModel.error || operationError}</p>
               </div>
               <Button
                 variant="outline"
@@ -641,18 +628,14 @@ export const UsersManagePage: React.FC = observer(() => {
             <Card className="shadow-lg h-[calc(100vh-280px)]">
               <CardHeader className="border-b border-gray-200 pb-4">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold text-gray-900">
-                    Users
-                  </CardTitle>
+                  <CardTitle className="text-lg font-semibold text-gray-900">Users</CardTitle>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => viewModel.loadAll()}
                     disabled={viewModel.isLoading}
                   >
-                    <RefreshCw
-                      className={cn('w-4 h-4', viewModel.isLoading && 'animate-spin')}
-                    />
+                    <RefreshCw className={cn('w-4 h-4', viewModel.isLoading && 'animate-spin')} />
                   </Button>
                 </div>
               </CardHeader>
@@ -689,12 +672,10 @@ export const UsersManagePage: React.FC = observer(() => {
               <Card className="shadow-lg">
                 <CardContent className="p-12 text-center">
                   <UserPlus className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium text-gray-900 mb-2">
-                    No User Selected
-                  </h3>
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No User Selected</h3>
                   <p className="text-gray-500 max-w-md mx-auto">
-                    Select a user from the list to view and edit their details,
-                    or click "Invite New User" to add someone to your organization.
+                    Select a user from the list to view and edit their details, or click "Invite New
+                    User" to add someone to your organization.
                   </p>
                 </CardContent>
               </Card>
@@ -718,10 +699,7 @@ export const UsersManagePage: React.FC = observer(() => {
                   <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Submission Error */}
                     {formViewModel.submissionError && (
-                      <div
-                        className="p-4 rounded-lg border border-red-300 bg-red-50"
-                        role="alert"
-                      >
+                      <div className="p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
                         <div className="flex items-start gap-2">
                           <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                           <div className="flex-1">
@@ -807,7 +785,10 @@ export const UsersManagePage: React.FC = observer(() => {
                         Notification Preferences (Optional)
                       </h4>
                       <NotificationPreferencesForm
-                        preferences={formViewModel.formData.notificationPreferences ?? DEFAULT_NOTIFICATION_PREFERENCES}
+                        preferences={
+                          formViewModel.formData.notificationPreferences ??
+                          DEFAULT_NOTIFICATION_PREFERENCES
+                        }
                         availablePhones={
                           // Map InvitationPhone[] to UserPhone[] with temporary IDs
                           // Backend will map these to real IDs on invitation acceptance
@@ -860,19 +841,20 @@ export const UsersManagePage: React.FC = observer(() => {
             )}
 
             {/* Loading State - while user details are being fetched */}
-            {panelMode === 'edit' && currentItem && !formViewModel && viewModel.isLoadingDetails && (
-              <Card className="shadow-lg">
-                <CardContent className="p-12 text-center">
-                  <RefreshCw className="w-12 h-12 text-blue-500 mx-auto mb-4 animate-spin" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Loading User Details
-                  </h3>
-                  <p className="text-gray-500">
-                    Please wait while we fetch the user information...
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            {panelMode === 'edit' &&
+              currentItem &&
+              !formViewModel &&
+              viewModel.isLoadingDetails && (
+                <Card className="shadow-lg">
+                  <CardContent className="p-12 text-center">
+                    <RefreshCw className="w-12 h-12 text-blue-500 mx-auto mb-4 animate-spin" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Loading User Details</h3>
+                    <p className="text-gray-500">
+                      Please wait while we fetch the user information...
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
 
             {/* Edit Mode */}
             {panelMode === 'edit' && currentItem && formViewModel && (
@@ -884,10 +866,10 @@ export const UsersManagePage: React.FC = observer(() => {
                       <XCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                       <div className="flex-1">
                         <h3 className="text-amber-800 font-semibold">
-                          Deactivated User
+                          Inactive User - Editing Disabled
                         </h3>
                         <p className="text-amber-700 text-sm mt-1">
-                          This user is deactivated and cannot access the application.
+                          This user is deactivated. The form is read-only until reactivated.
                         </p>
                       </div>
                       <Button
@@ -1022,9 +1004,7 @@ export const UsersManagePage: React.FC = observer(() => {
                           <div className="flex items-start gap-2">
                             <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                             <div className="flex-1">
-                              <h4 className="text-red-800 font-semibold">
-                                Failed to update
-                              </h4>
+                              <h4 className="text-red-800 font-semibold">Failed to update</h4>
                               <p className="text-red-700 text-sm mt-1">
                                 {formViewModel.submissionError}
                               </p>
@@ -1060,8 +1040,7 @@ export const UsersManagePage: React.FC = observer(() => {
                         suggestedAction={null}
                         onSuggestedAction={() => {}}
                         disabled={
-                          formViewModel.isSubmitting ||
-                          currentItem.displayStatus === 'deactivated'
+                          formViewModel.isSubmitting || currentItem.displayStatus === 'deactivated'
                         }
                         isEditMode
                       />
@@ -1071,9 +1050,7 @@ export const UsersManagePage: React.FC = observer(() => {
                         <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                           <div>
                             {formViewModel.isDirty && (
-                              <span className="text-sm text-amber-600">
-                                Unsaved changes
-                              </span>
+                              <span className="text-sm text-amber-600">Unsaved changes</span>
                             )}
                           </div>
                           <Button
@@ -1123,81 +1100,27 @@ export const UsersManagePage: React.FC = observer(() => {
 
                 {/* Danger Zone (for active and deactivated users) */}
                 {!currentItem.isInvitation &&
-                 (currentItem.displayStatus === 'active' || currentItem.displayStatus === 'deactivated') && (
-                  <section aria-labelledby="danger-zone-heading">
-                    <Card className="shadow-lg border-red-200">
-                      <CardHeader className="border-b border-red-200 bg-red-50 py-3">
-                        <CardTitle
-                          id="danger-zone-heading"
-                          className="text-sm font-semibold text-red-800"
-                        >
-                          Danger Zone
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-4 space-y-4">
-                        {/* Deactivate Section (for active users) */}
-                        {currentItem.displayStatus === 'active' && (
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-900">
-                              Deactivate this user
-                            </h4>
-                            <p className="text-xs text-gray-600 mt-1">
-                              Deactivating will prevent the user from accessing the
-                              application. They can be reactivated later.
-                            </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleDeactivateClick}
-                              disabled={
-                                formViewModel?.isSubmitting ||
-                                (dialogState.type === 'deactivate' && dialogState.isLoading)
-                              }
-                              className="mt-2 text-orange-600 border-orange-300 hover:bg-orange-50"
-                            >
-                              <PowerOff className="w-3 h-3 mr-1" />
-                              {dialogState.type === 'deactivate' && dialogState.isLoading
-                                ? 'Deactivating...'
-                                : 'Deactivate User'}
-                            </Button>
-                          </div>
-                        )}
-
-                        {/* Delete Section */}
-                        <div className={currentItem.displayStatus === 'active' ? 'pt-4 border-t border-red-200' : ''}>
-                          <h4 className="text-sm font-medium text-gray-900">
-                            Delete this user
-                          </h4>
-                          <p className="text-xs text-gray-600 mt-1">
-                            Permanently remove this user from the organization.
-                            {currentItem.displayStatus === 'active' && (
-                              <span className="block text-orange-600 mt-1">
-                                User must be deactivated before deletion.
-                              </span>
-                            )}
-                          </p>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleDeleteClick}
-                            disabled={
-                              formViewModel?.isSubmitting ||
-                              (dialogState.type === 'delete' && dialogState.isLoading)
-                            }
-                            className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-3 h-3 mr-1" />
-                            {dialogState.type === 'delete' && dialogState.isLoading
-                              ? 'Deleting...'
-                              : 'Delete User'}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </section>
-                )}
+                  (currentItem.displayStatus === 'active' ||
+                    currentItem.displayStatus === 'deactivated') && (
+                    <DangerZone
+                      entityType="User"
+                      isActive={currentItem.displayStatus === 'active'}
+                      isSubmitting={formViewModel?.isSubmitting}
+                      canDeactivate={currentItem.displayStatus === 'active'}
+                      onDeactivate={handleDeactivateClick}
+                      isDeactivating={dialogState.type === 'deactivate' && dialogState.isLoading}
+                      deactivateDescription="Deactivating will prevent the user from accessing the application. They can be reactivated later."
+                      canReactivate={currentItem.displayStatus === 'deactivated'}
+                      onReactivate={handleReactivateClick}
+                      isReactivating={dialogState.type === 'reactivate' && dialogState.isLoading}
+                      reactivateDescription="Reactivating will restore the user's access to the application."
+                      canDelete={true}
+                      onDelete={handleDeleteClick}
+                      isDeleting={dialogState.type === 'delete' && dialogState.isLoading}
+                      deleteDescription="Permanently remove this user from the organization."
+                      activeDeleteConstraint="User must be deactivated before deletion."
+                    />
+                  )}
               </div>
             )}
           </div>
@@ -1272,7 +1195,7 @@ export const UsersManagePage: React.FC = observer(() => {
       <ConfirmDialog
         isOpen={dialogState.type === 'delete'}
         title="Delete User"
-        message={`Are you sure you want to permanently delete "${getDisplayName(currentItem)}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${getDisplayName(currentItem)}"? This action is permanent and cannot be undone.`}
         confirmLabel="Delete"
         cancelLabel="Cancel"
         onConfirm={handleDeleteConfirm}
@@ -1283,9 +1206,9 @@ export const UsersManagePage: React.FC = observer(() => {
 
       {/* Cannot Delete Active User Warning Dialog */}
       <ConfirmDialog
-        isOpen={dialogState.type === 'delete-warning'}
+        isOpen={dialogState.type === 'activeWarning'}
         title="Cannot Delete Active User"
-        message={`"${getDisplayName(currentItem)}" is currently active. You must deactivate the user before they can be deleted.`}
+        message={`"${getDisplayName(currentItem)}" must be deactivated before it can be deleted. Would you like to deactivate it now?`}
         confirmLabel="Deactivate First"
         cancelLabel="Cancel"
         onConfirm={() => {

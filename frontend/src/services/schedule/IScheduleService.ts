@@ -1,57 +1,75 @@
 /**
  * Schedule Service Interface
  *
- * Defines the contract for managing staff work schedules.
+ * Defines the contract for managing schedule templates and user assignments.
  *
  * Implementations:
  * - SupabaseScheduleService: Production (calls api.* RPCs)
  * - MockScheduleService: Development (in-memory)
  *
- * @see api.create_user_schedule()
- * @see api.update_user_schedule()
- * @see api.deactivate_user_schedule()
- * @see api.reactivate_user_schedule()
- * @see api.delete_user_schedule()
- * @see api.get_schedule_by_id()
- * @see api.list_user_schedules()
+ * @see api.create_schedule_template()
+ * @see api.update_schedule_template()
+ * @see api.deactivate_schedule_template()
+ * @see api.reactivate_schedule_template()
+ * @see api.delete_schedule_template()
+ * @see api.list_schedule_templates()
+ * @see api.get_schedule_template()
+ * @see api.assign_user_to_schedule()
+ * @see api.unassign_user_from_schedule()
  */
 
-import type { UserSchedulePolicy, WeeklySchedule } from '@/types/schedule.types';
+import type {
+  ScheduleTemplate,
+  ScheduleTemplateDetail,
+  WeeklySchedule,
+} from '@/types/schedule.types';
+
+export interface ScheduleDeleteResult {
+  success: boolean;
+  error?: string;
+  errorDetails?: {
+    code: 'STILL_ACTIVE' | 'HAS_USERS';
+    count?: number;
+  };
+}
 
 export interface IScheduleService {
-  listSchedules(params: {
+  // Template CRUD
+  listTemplates(params: {
     orgId?: string;
-    userId?: string;
-    orgUnitId?: string;
-    scheduleName?: string;
-    activeOnly?: boolean;
-  }): Promise<UserSchedulePolicy[]>;
+    status?: 'all' | 'active' | 'inactive';
+    search?: string;
+  }): Promise<ScheduleTemplate[]>;
 
-  getScheduleById(scheduleId: string): Promise<UserSchedulePolicy | null>;
+  getTemplate(templateId: string): Promise<ScheduleTemplateDetail | null>;
 
-  createSchedule(params: {
-    userId: string;
-    scheduleName: string;
+  createTemplate(params: {
+    name: string;
     schedule: WeeklySchedule;
     orgUnitId?: string;
-    effectiveFrom?: string;
-    effectiveUntil?: string;
-    reason?: string;
-  }): Promise<{ scheduleId: string }>;
+    userIds: string[];
+  }): Promise<{ templateId: string }>;
 
-  updateSchedule(params: {
-    scheduleId: string;
-    scheduleName?: string;
+  updateTemplate(params: {
+    templateId: string;
+    name?: string;
     schedule?: WeeklySchedule;
-    orgUnitId?: string;
-    effectiveFrom?: string;
-    effectiveUntil?: string;
-    reason?: string;
+    orgUnitId?: string | null;
   }): Promise<void>;
 
-  deactivateSchedule(params: { scheduleId: string; reason?: string }): Promise<void>;
+  deactivateTemplate(params: { templateId: string; reason?: string }): Promise<void>;
 
-  reactivateSchedule(params: { scheduleId: string; reason?: string }): Promise<void>;
+  reactivateTemplate(params: { templateId: string }): Promise<void>;
 
-  deleteSchedule(params: { scheduleId: string; reason?: string }): Promise<void>;
+  deleteTemplate(params: { templateId: string; reason?: string }): Promise<ScheduleDeleteResult>;
+
+  // User assignments
+  assignUser(params: {
+    templateId: string;
+    userId: string;
+    effectiveFrom?: string;
+    effectiveUntil?: string;
+  }): Promise<void>;
+
+  unassignUser(params: { templateId: string; userId: string; reason?: string }): Promise<void>;
 }

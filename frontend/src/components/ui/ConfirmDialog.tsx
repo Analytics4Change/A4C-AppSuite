@@ -38,6 +38,8 @@ export interface ConfirmDialogProps {
   onCancel: () => void;
   isLoading?: boolean;
   variant?: 'danger' | 'warning' | 'success' | 'default';
+  /** Optional list of affected entities rendered below the message */
+  details?: string[];
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -50,6 +52,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onCancel,
   isLoading = false,
   variant = 'default',
+  details,
 }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -59,10 +62,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   useKeyboardNavigation({
     containerRef: dialogRef as RefObject<HTMLElement>,
     enabled: isOpen,
-    trapFocus: true,        // Tab/Shift+Tab contained within dialog
-    restoreFocus: true,     // Return focus to trigger element on close
-    onEscape: onCancel,     // ESC key closes dialog
-    wrapAround: true,       // Tab from last element goes to first
+    trapFocus: true, // Tab/Shift+Tab contained within dialog
+    restoreFocus: true, // Return focus to trigger element on close
+    onEscape: onCancel, // ESC key closes dialog
+    wrapAround: true, // Tab from last element goes to first
     initialFocusRef: cancelButtonRef as RefObject<HTMLElement>, // Focus Cancel (safe option) by default
   });
 
@@ -102,11 +105,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       data-focus-context="modal"
     >
       {/* Backdrop - click to dismiss */}
-      <div
-        className="absolute inset-0 bg-black/50"
-        onClick={onCancel}
-        aria-hidden="true"
-      />
+      <div className="absolute inset-0 bg-black/50" onClick={onCancel} aria-hidden="true" />
       {/* Dialog panel - relative to sit above backdrop */}
       <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <div className="flex items-start gap-4">
@@ -124,15 +123,19 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             )}
           </div>
           <div className="flex-1">
-            <h3
-              id="confirm-dialog-title"
-              className="text-lg font-semibold text-gray-900"
-            >
+            <h3 id="confirm-dialog-title" className="text-lg font-semibold text-gray-900">
               {title}
             </h3>
             <p id="confirm-dialog-description" className="mt-2 text-gray-600">
               {message}
             </p>
+            {details && details.length > 0 && (
+              <ul className="mt-2 max-h-32 overflow-y-auto text-sm text-gray-600 list-disc pl-5 space-y-0.5">
+                {details.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            )}
           </div>
           <button
             onClick={onCancel}
@@ -143,12 +146,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </button>
         </div>
         <div className="mt-6 flex justify-end gap-3">
-          <Button
-            ref={cancelButtonRef}
-            variant="outline"
-            onClick={onCancel}
-            disabled={isLoading}
-          >
+          <Button ref={cancelButtonRef} variant="outline" onClick={onCancel} disabled={isLoading}>
             {cancelLabel}
           </Button>
           <Button

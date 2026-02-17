@@ -1,7 +1,7 @@
 /**
  * Schedule List Component
  *
- * Renders a filterable list of schedules with search, status filter, and selection.
+ * Renders a filterable list of schedule templates with search, status filter, and selection.
  * Mirrors RoleList pattern.
  */
 
@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Search, Calendar } from 'lucide-react';
 import { ScheduleCard } from './ScheduleCard';
-import type { UserSchedulePolicy } from '@/types/schedule.types';
+import type { ScheduleTemplate } from '@/types/schedule.types';
 import type { ScheduleStatusFilter } from '@/viewModels/schedule/ScheduleListViewModel';
 
 const STATUS_OPTIONS: { value: ScheduleStatusFilter; label: string }[] = [
@@ -23,12 +23,12 @@ const STATUS_OPTIONS: { value: ScheduleStatusFilter; label: string }[] = [
 ];
 
 export interface ScheduleListProps {
-  schedules: UserSchedulePolicy[];
-  selectedScheduleId: string | null;
+  schedules: ScheduleTemplate[];
+  selectedTemplateId: string | null;
   statusFilter: ScheduleStatusFilter;
   searchTerm: string;
   isLoading: boolean;
-  onSelect: (scheduleId: string) => void;
+  onSelect: (templateId: string) => void;
   onSearchChange: (term: string) => void;
   onStatusChange: (status: ScheduleStatusFilter) => void;
   className?: string;
@@ -52,7 +52,7 @@ const ScheduleCardSkeleton: React.FC = () => (
 export const ScheduleList = observer(
   ({
     schedules,
-    selectedScheduleId,
+    selectedTemplateId,
     statusFilter,
     searchTerm,
     isLoading,
@@ -76,7 +76,7 @@ export const ScheduleList = observer(
         <div className="flex-shrink-0 space-y-3 pb-4 border-b border-gray-200">
           <div>
             <Label htmlFor={searchId} className="sr-only">
-              Search schedules
+              Search schedule templates
             </Label>
             <div className="relative">
               <Search
@@ -86,11 +86,11 @@ export const ScheduleList = observer(
               <Input
                 id={searchId}
                 type="search"
-                placeholder="Search schedules..."
+                placeholder="Search templates..."
                 value={searchTerm}
                 onChange={handleSearchChange}
                 className="pl-9"
-                aria-label="Search schedules by name or user"
+                aria-label="Search schedule templates by name"
               />
             </div>
           </div>
@@ -120,10 +120,10 @@ export const ScheduleList = observer(
         {/* Count */}
         <div className="flex-shrink-0 py-2 text-sm text-gray-500">
           {isLoading ? (
-            <span>Loading schedules...</span>
+            <span>Loading templates...</span>
           ) : (
             <span>
-              {schedules.length} schedule{schedules.length !== 1 ? 's' : ''}
+              {schedules.length} template{schedules.length !== 1 ? 's' : ''}
               {searchTerm && ` matching "${searchTerm}"`}
             </span>
           )}
@@ -132,7 +132,7 @@ export const ScheduleList = observer(
         {/* List */}
         <div className="flex-1 overflow-y-auto -mx-1 px-1">
           {isLoading ? (
-            <ul className="space-y-2" aria-busy="true" aria-label="Loading schedules">
+            <ul className="space-y-2" aria-busy="true" aria-label="Loading schedule templates">
               {[1, 2, 3].map((n) => (
                 <ScheduleCardSkeleton key={n} />
               ))}
@@ -140,25 +140,25 @@ export const ScheduleList = observer(
           ) : schedules.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Calendar className="h-12 w-12 text-gray-300 mb-4" aria-hidden="true" />
-              <h3 className="text-lg font-medium text-gray-900">No schedules found</h3>
+              <h3 className="text-lg font-medium text-gray-900">No templates found</h3>
               <p className="mt-1 text-sm text-gray-500">
                 {searchTerm
                   ? 'Try adjusting your search or filters.'
-                  : 'Create a new schedule to get started.'}
+                  : 'Create a new schedule template to get started.'}
               </p>
             </div>
           ) : (
             <ul
               className="space-y-2"
               role="listbox"
-              aria-label="Schedules"
-              aria-activedescendant={selectedScheduleId || undefined}
+              aria-label="Schedule templates"
+              aria-activedescendant={selectedTemplateId || undefined}
             >
-              {schedules.map((schedule) => (
+              {schedules.map((template) => (
                 <ScheduleCard
-                  key={schedule.id}
-                  schedule={schedule}
-                  isSelected={schedule.id === selectedScheduleId}
+                  key={template.id}
+                  schedule={template}
+                  isSelected={template.id === selectedTemplateId}
                   onSelect={onSelect}
                 />
               ))}

@@ -1,8 +1,8 @@
 /**
  * Schedule List ViewModel
  *
- * Manages state and business logic for schedule list display and CRUD operations.
- * Mirrors RolesViewModel pattern with named-schedule grouping.
+ * Manages state and business logic for schedule template list display and CRUD operations.
+ * Operates on ScheduleTemplate[] (not per-user rows).
  *
  * @see IScheduleService
  * @see ScheduleFormViewModel for form state
@@ -10,9 +10,9 @@
 
 import { makeAutoObservable, runInAction } from 'mobx';
 import { Logger } from '@/utils/logger';
-import type { IScheduleService } from '@/services/schedule/IScheduleService';
+import type { IScheduleService, ScheduleDeleteResult } from '@/services/schedule/IScheduleService';
 import { getScheduleService } from '@/services/schedule/ScheduleServiceFactory';
-import type { UserSchedulePolicy } from '@/types/schedule.types';
+import type { ScheduleTemplate } from '@/types/schedule.types';
 
 const log = Logger.getLogger('viewmodel');
 
@@ -20,8 +20,8 @@ export type ScheduleStatusFilter = 'all' | 'active' | 'inactive';
 
 export class ScheduleListViewModel {
   // Observable State
-  private rawSchedules: UserSchedulePolicy[] = [];
-  selectedScheduleId: string | null = null;
+  private rawTemplates: ScheduleTemplate[] = [];
+  selectedTemplateId: string | null = null;
   isLoading = false;
   error: string | null = null;
   statusFilter: ScheduleStatusFilter = 'all';
@@ -34,86 +34,63 @@ export class ScheduleListViewModel {
 
   // Computed Properties
 
-  get schedules(): UserSchedulePolicy[] {
-    let result = [...this.rawSchedules];
+  get templates(): ScheduleTemplate[] {
+    let result = [...this.rawTemplates];
 
     if (this.statusFilter === 'active') {
-      result = result.filter((s) => s.is_active);
+      result = result.filter((t) => t.is_active);
     } else if (this.statusFilter === 'inactive') {
-      result = result.filter((s) => !s.is_active);
+      result = result.filter((t) => !t.is_active);
     }
 
     if (this.searchTerm.trim()) {
       const term = this.searchTerm.toLowerCase();
       result = result.filter(
-        (s) =>
-          s.schedule_name.toLowerCase().includes(term) ||
-          s.user_name?.toLowerCase().includes(term) ||
-          s.user_email?.toLowerCase().includes(term)
+        (t) =>
+          t.schedule_name.toLowerCase().includes(term) ||
+          t.org_unit_name?.toLowerCase().includes(term)
       );
     }
 
     return result;
   }
 
-  get selectedSchedule(): UserSchedulePolicy | null {
-    if (!this.selectedScheduleId) return null;
-    return this.rawSchedules.find((s) => s.id === this.selectedScheduleId) ?? null;
+  get selectedTemplate(): ScheduleTemplate | null {
+    if (!this.selectedTemplateId) return null;
+    return this.rawTemplates.find((t) => t.id === this.selectedTemplateId) ?? null;
   }
 
-  /** Unique schedule names with their user counts and active status */
-  get scheduleGroups(): {
-    name: string;
-    count: number;
-    activeCount: number;
-    schedules: UserSchedulePolicy[];
-  }[] {
-    const groups = new Map<string, UserSchedulePolicy[]>();
-    for (const s of this.schedules) {
-      const existing = groups.get(s.schedule_name) ?? [];
-      existing.push(s);
-      groups.set(s.schedule_name, existing);
-    }
-    return Array.from(groups.entries()).map(([name, schedules]) => ({
-      name,
-      count: schedules.length,
-      activeCount: schedules.filter((s) => s.is_active).length,
-      schedules,
-    }));
+  get templateCount(): number {
+    return this.rawTemplates.length;
   }
 
-  get scheduleCount(): number {
-    return this.rawSchedules.length;
-  }
-
-  get activeScheduleCount(): number {
-    return this.rawSchedules.filter((s) => s.is_active).length;
+  get activeTemplateCount(): number {
+    return this.rawTemplates.filter((t) => t.is_active).length;
   }
 
   get canEdit(): boolean {
-    const s = this.selectedSchedule;
-    return s !== null && s.is_active;
+    const t = this.selectedTemplate;
+    return t !== null && t.is_active;
   }
 
   get canDeactivate(): boolean {
-    const s = this.selectedSchedule;
-    return s !== null && s.is_active;
+    const t = this.selectedTemplate;
+    return t !== null && t.is_active;
   }
 
   get canReactivate(): boolean {
-    const s = this.selectedSchedule;
-    return s !== null && !s.is_active;
+    const t = this.selectedTemplate;
+    return t !== null && !t.is_active;
   }
 
   get canDelete(): boolean {
-    const s = this.selectedSchedule;
-    return s !== null && !s.is_active;
+    return this.selectedTemplate !== null;
   }
 
   // Actions - Data Loading
 
-  async loadSchedules(): Promise<void> {
-    log.debug('Loading schedules');
+  async loadTemplates(): Promise<void> {
+    log.debug('Loading schedule templates');
 
     runInAction(() => {
       this.isLoading = true;
@@ -121,38 +98,38 @@ export class ScheduleListViewModel {
     });
 
     try {
-      const schedules = await this.service.listSchedules({ activeOnly: false });
+      const templates = await this.service.listTemplates({ status: 'all' });
 
       runInAction(() => {
-        this.rawSchedules = schedules;
+        this.rawTemplates = templates;
         this.isLoading = false;
-        log.info('Loaded schedules', { count: schedules.length });
+        log.info('Loaded schedule templates', { count: templates.length });
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load schedules';
+      const message = error instanceof Error ? error.message : 'Failed to load schedule templates';
       runInAction(() => {
         this.isLoading = false;
         this.error = message;
       });
-      log.error('Failed to load schedules', error);
+      log.error('Failed to load schedule templates', error);
     }
   }
 
   async refresh(): Promise<void> {
-    await this.loadSchedules();
+    await this.loadTemplates();
   }
 
   // Actions - Selection
 
-  selectSchedule(scheduleId: string | null): void {
+  selectTemplate(templateId: string | null): void {
     runInAction(() => {
-      this.selectedScheduleId = scheduleId;
-      log.debug('Selected schedule', { scheduleId });
+      this.selectedTemplateId = templateId;
+      log.debug('Selected template', { templateId });
     });
   }
 
   clearSelection(): void {
-    this.selectSchedule(null);
+    this.selectTemplate(null);
   }
 
   // Actions - Filtering
@@ -171,11 +148,11 @@ export class ScheduleListViewModel {
 
   // Actions - CRUD Operations
 
-  async deactivateSchedule(
-    scheduleId: string,
+  async deactivateTemplate(
+    templateId: string,
     reason: string
   ): Promise<{ success: boolean; error?: string }> {
-    log.debug('Deactivating schedule', { scheduleId });
+    log.debug('Deactivating schedule template', { templateId });
 
     runInAction(() => {
       this.isLoading = true;
@@ -183,37 +160,38 @@ export class ScheduleListViewModel {
     });
 
     try {
-      await this.service.deactivateSchedule({ scheduleId, reason });
+      await this.service.deactivateTemplate({ templateId, reason });
 
       runInAction(() => {
-        const idx = this.rawSchedules.findIndex((s) => s.id === scheduleId);
+        const idx = this.rawTemplates.findIndex((t) => t.id === templateId);
         if (idx !== -1) {
-          this.rawSchedules = [
-            ...this.rawSchedules.slice(0, idx),
-            { ...this.rawSchedules[idx], is_active: false },
-            ...this.rawSchedules.slice(idx + 1),
+          this.rawTemplates = [
+            ...this.rawTemplates.slice(0, idx),
+            { ...this.rawTemplates[idx], is_active: false },
+            ...this.rawTemplates.slice(idx + 1),
           ];
         }
         this.isLoading = false;
       });
-      log.info('Deactivated schedule', { scheduleId });
+      log.info('Deactivated schedule template', { templateId });
       return { success: true };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to deactivate schedule';
+      const message =
+        error instanceof Error ? error.message : 'Failed to deactivate schedule template';
       runInAction(() => {
         this.error = message;
         this.isLoading = false;
       });
-      log.error('Error deactivating schedule', error);
+      log.error('Error deactivating schedule template', error);
       return { success: false, error: message };
     }
   }
 
-  async reactivateSchedule(
-    scheduleId: string,
-    reason: string
+  async reactivateTemplate(
+    templateId: string,
+    _reason: string
   ): Promise<{ success: boolean; error?: string }> {
-    log.debug('Reactivating schedule', { scheduleId });
+    log.debug('Reactivating schedule template', { templateId });
 
     runInAction(() => {
       this.isLoading = true;
@@ -221,37 +199,35 @@ export class ScheduleListViewModel {
     });
 
     try {
-      await this.service.reactivateSchedule({ scheduleId, reason });
+      await this.service.reactivateTemplate({ templateId });
 
       runInAction(() => {
-        const idx = this.rawSchedules.findIndex((s) => s.id === scheduleId);
+        const idx = this.rawTemplates.findIndex((t) => t.id === templateId);
         if (idx !== -1) {
-          this.rawSchedules = [
-            ...this.rawSchedules.slice(0, idx),
-            { ...this.rawSchedules[idx], is_active: true },
-            ...this.rawSchedules.slice(idx + 1),
+          this.rawTemplates = [
+            ...this.rawTemplates.slice(0, idx),
+            { ...this.rawTemplates[idx], is_active: true },
+            ...this.rawTemplates.slice(idx + 1),
           ];
         }
         this.isLoading = false;
       });
-      log.info('Reactivated schedule', { scheduleId });
+      log.info('Reactivated schedule template', { templateId });
       return { success: true };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to reactivate schedule';
+      const message =
+        error instanceof Error ? error.message : 'Failed to reactivate schedule template';
       runInAction(() => {
         this.error = message;
         this.isLoading = false;
       });
-      log.error('Error reactivating schedule', error);
+      log.error('Error reactivating schedule template', error);
       return { success: false, error: message };
     }
   }
 
-  async deleteSchedule(
-    scheduleId: string,
-    reason: string
-  ): Promise<{ success: boolean; error?: string }> {
-    log.debug('Deleting schedule', { scheduleId });
+  async deleteTemplate(templateId: string, reason: string): Promise<ScheduleDeleteResult> {
+    log.debug('Deleting schedule template', { templateId });
 
     runInAction(() => {
       this.isLoading = true;
@@ -259,24 +235,32 @@ export class ScheduleListViewModel {
     });
 
     try {
-      await this.service.deleteSchedule({ scheduleId, reason });
+      const result = await this.service.deleteTemplate({ templateId, reason });
 
       runInAction(() => {
-        this.rawSchedules = this.rawSchedules.filter((s) => s.id !== scheduleId);
-        if (this.selectedScheduleId === scheduleId) {
-          this.selectedScheduleId = null;
+        if (result.success) {
+          this.rawTemplates = this.rawTemplates.filter((t) => t.id !== templateId);
+          if (this.selectedTemplateId === templateId) {
+            this.selectedTemplateId = null;
+          }
         }
         this.isLoading = false;
       });
-      log.info('Deleted schedule', { scheduleId });
-      return { success: true };
+
+      if (result.success) {
+        log.info('Deleted schedule template', { templateId });
+      } else {
+        log.warn('Delete schedule template returned error', { templateId, result });
+      }
+
+      return result;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to delete schedule';
+      const message = error instanceof Error ? error.message : 'Failed to delete schedule template';
       runInAction(() => {
         this.error = message;
         this.isLoading = false;
       });
-      log.error('Error deleting schedule', error);
+      log.error('Error deleting schedule template', error);
       return { success: false, error: message };
     }
   }
@@ -289,7 +273,7 @@ export class ScheduleListViewModel {
     });
   }
 
-  getScheduleById(scheduleId: string): UserSchedulePolicy | null {
-    return this.rawSchedules.find((s) => s.id === scheduleId) ?? null;
+  getTemplateById(templateId: string): ScheduleTemplate | null {
+    return this.rawTemplates.find((t) => t.id === templateId) ?? null;
   }
 }

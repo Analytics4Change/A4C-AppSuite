@@ -1,15 +1,15 @@
 /**
  * Schedule Card Component
  *
- * Displays a schedule as a glass-morphism styled card in the list view.
- * Shows schedule name, status, assigned user, and mini day grid.
+ * Displays a schedule template as a glass-morphism styled card in the list view.
+ * Shows template name, status, assigned user count, and mini day grid.
  * Mirrors RoleCard pattern.
  */
 
 import React, { useCallback } from 'react';
-import { Calendar, Clock, Building2 } from 'lucide-react';
+import { Calendar, Users, Building2 } from 'lucide-react';
 import { cn } from '@/components/ui/utils';
-import type { UserSchedulePolicy, DayOfWeek } from '@/types/schedule.types';
+import type { ScheduleTemplate, DayOfWeek } from '@/types/schedule.types';
 import { DAYS_OF_WEEK } from '@/types/schedule.types';
 
 const DAY_SHORT: Record<DayOfWeek, string> = {
@@ -23,9 +23,9 @@ const DAY_SHORT: Record<DayOfWeek, string> = {
 };
 
 interface ScheduleCardProps {
-  schedule: UserSchedulePolicy;
+  schedule: ScheduleTemplate;
   isSelected: boolean;
-  onSelect: (scheduleId: string) => void;
+  onSelect: (templateId: string) => void;
 }
 
 export const ScheduleCard: React.FC<ScheduleCardProps> = React.memo(
@@ -62,7 +62,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = React.memo(
               : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
           )}
           aria-selected={isSelected}
-          aria-label={`${schedule.schedule_name}, ${schedule.user_name ?? 'unassigned'}, ${schedule.is_active ? 'active' : 'inactive'}, ${activeDays} days`}
+          aria-label={`${schedule.schedule_name}, ${schedule.assigned_user_count} user${schedule.assigned_user_count !== 1 ? 's' : ''}, ${schedule.is_active ? 'active' : 'inactive'}, ${activeDays} days`}
         >
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
@@ -77,9 +77,10 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = React.memo(
             </span>
           </div>
 
-          {/* User name */}
-          <p className="mt-1 text-sm text-gray-600 truncate">
-            {schedule.user_name ?? schedule.user_email ?? 'Unknown user'}
+          {/* User count */}
+          <p className="mt-1 text-sm text-gray-600">
+            {schedule.assigned_user_count} assigned user
+            {schedule.assigned_user_count !== 1 ? 's' : ''}
           </p>
 
           {/* Mini day grid */}
@@ -108,12 +109,13 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = React.memo(
               <span>{activeDays}d</span>
             </span>
 
-            {schedule.effective_from && (
-              <span className="flex items-center gap-1" title={`From: ${schedule.effective_from}`}>
-                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>{schedule.effective_from}</span>
-              </span>
-            )}
+            <span
+              className="flex items-center gap-1"
+              title={`${schedule.assigned_user_count} assigned users`}
+            >
+              <Users className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{schedule.assigned_user_count}</span>
+            </span>
 
             {schedule.org_unit_name && (
               <span

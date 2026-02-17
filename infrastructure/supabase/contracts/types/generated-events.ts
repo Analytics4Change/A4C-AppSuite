@@ -3,13 +3,16 @@
  *
  * Generated from AsyncAPI specification by Modelina
  * Source: infrastructure/supabase/contracts/asyncapi/
- * Generated: 2026-02-02T18:14:37.019Z
+ * Generated: 2026-02-17T21:08:33.343Z
  *
  * To regenerate: cd infrastructure/supabase/contracts && npm run generate:types
  *
  * IMPORTANT: These types are the source of truth for domain events.
  * If you need to change event structure, modify the AsyncAPI spec and regenerate.
  */
+
+/* eslint-disable */
+/* tslint:disable */
 
 // =============================================================================
 // Base Types (from components/schemas.yaml)
@@ -203,7 +206,7 @@ export enum RoleScope {
 // Interfaces
 // =============================================================================
 
-export type DomainEvents = UserSyncedFromAuthEvent | UserOrgSwitchedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | UserScheduleCreatedEvent | UserScheduleUpdatedEvent | UserScheduleDeactivatedEvent | UserClientAssignedEvent | UserClientUnassignedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent;
+export type DomainEvents = UserSyncedFromAuthEvent | UserOrgSwitchedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | ScheduleCreatedEvent | ScheduleUpdatedEvent | ScheduleDeactivatedEvent | ScheduleReactivatedEvent | ScheduleDeletedEvent | ScheduleUserAssignedEvent | ScheduleUserUnassignedEvent | UserClientAssignedEvent | UserClientUnassignedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | PermissionUpdatedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent;
 
 export interface UserSyncedFromAuthEvent {
   'stream_id': string;
@@ -305,22 +308,23 @@ export interface UserDeletedData {
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface UserScheduleCreatedEvent {
+export interface ScheduleCreatedEvent {
   'stream_id': string;
-  'stream_type': 'user';
-  'event_type': 'user.schedule.created';
-  'event_data': UserScheduleData;
+  'stream_type': 'schedule';
+  'event_type': 'schedule.created';
+  'event_data': ScheduleCreatedData;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface UserScheduleData {
-  'schedule_id'?: string;
+export interface ScheduleCreatedData {
+  'template_id': string;
   'organization_id': string;
   'org_unit_id'?: string;
+  'schedule_name': string;
   'schedule': WeeklySchedule;
-  'effective_from'?: string;
-  'effective_until'?: string;
+  'user_ids'?: string[];
+  'created_by'?: string;
   'additionalProperties'?: Map<string, any>;
 }
 
@@ -341,38 +345,104 @@ export interface DaySchedule {
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface UserScheduleUpdatedEvent {
+export interface ScheduleUpdatedEvent {
   'stream_id': string;
-  'stream_type': 'user';
-  'event_type': 'user.schedule.updated';
-  'event_data': AnonymousSchema_2042;
+  'stream_type': 'schedule';
+  'event_type': 'schedule.updated';
+  'event_data': ScheduleUpdatedData;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2042 {
-  'schedule_id'?: string;
+export interface ScheduleUpdatedData {
+  'template_id': string;
   'organization_id': string;
+  'schedule_name'?: string;
+  'schedule'?: WeeklySchedule;
   'org_unit_id'?: string;
-  'schedule': WeeklySchedule;
+  'previous_schedule'?: WeeklySchedule;
+  'previous_name'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ScheduleDeactivatedEvent {
+  'stream_id': string;
+  'stream_type': 'schedule';
+  'event_type': 'schedule.deactivated';
+  'event_data': ScheduleDeactivatedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ScheduleDeactivatedData {
+  'template_id': string;
+  'organization_id': string;
+  'reason'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ScheduleReactivatedEvent {
+  'stream_id': string;
+  'stream_type': 'schedule';
+  'event_type': 'schedule.reactivated';
+  'event_data': ScheduleReactivatedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ScheduleReactivatedData {
+  'template_id': string;
+  'organization_id': string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ScheduleDeletedEvent {
+  'stream_id': string;
+  'stream_type': 'schedule';
+  'event_type': 'schedule.deleted';
+  'event_data': ScheduleDeletedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ScheduleDeletedData {
+  'template_id': string;
+  'organization_id': string;
+  'reason'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ScheduleUserAssignedEvent {
+  'stream_id': string;
+  'stream_type': 'schedule';
+  'event_type': 'schedule.user_assigned';
+  'event_data': ScheduleUserAssignedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ScheduleUserAssignedData {
+  'template_id': string;
+  'user_id': string;
+  'organization_id': string;
   'effective_from'?: string;
   'effective_until'?: string;
-  'previous_schedule'?: WeeklySchedule;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface UserScheduleDeactivatedEvent {
+export interface ScheduleUserUnassignedEvent {
   'stream_id': string;
-  'stream_type': 'user';
-  'event_type': 'user.schedule.deactivated';
-  'event_data': AnonymousSchema_2109;
+  'stream_type': 'schedule';
+  'event_type': 'schedule.user_unassigned';
+  'event_data': ScheduleUserUnassignedData;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2109 {
+export interface ScheduleUserUnassignedData {
+  'template_id': string;
+  'user_id': string;
   'organization_id': string;
-  'org_unit_id'?: string;
   'reason'?: string;
   'additionalProperties'?: Map<string, any>;
 }
@@ -399,12 +469,12 @@ export interface UserClientUnassignedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.client.unassigned';
-  'event_data': AnonymousSchema_2149;
+  'event_data': UserClientUnassignedData;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2149 {
+export interface UserClientUnassignedData {
   'client_id': string;
   'organization_id': string;
   'reason'?: string;
@@ -1616,6 +1686,22 @@ export interface PermissionDefinedData {
   'description': string;
   'scope_type': ScopeType;
   'requires_mfa': boolean;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface PermissionUpdatedEvent {
+  'stream_id': string;
+  'stream_type': 'permission';
+  'event_type': 'permission.updated';
+  'event_data': PermissionUpdatedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface PermissionUpdatedData {
+  'description'?: string;
+  'scope_type'?: ScopeType;
+  'requires_mfa'?: boolean;
   'additionalProperties'?: Map<string, any>;
 }
 

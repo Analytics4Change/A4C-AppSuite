@@ -1,8 +1,9 @@
 /**
  * Schedule Form ViewModel
  *
- * Manages state and business logic for schedule create/edit forms.
- * Mirrors RoleFormViewModel pattern: form data, validation, dirty tracking, submit.
+ * Manages state and business logic for schedule template create/edit forms.
+ * In the template model, the form manages template fields (name, schedule, OU).
+ * User assignments are managed separately via the assignment dialog.
  *
  * @see IScheduleService
  * @see ScheduleListViewModel for list state
@@ -13,7 +14,7 @@ import { Logger } from '@/utils/logger';
 import type { IScheduleService } from '@/services/schedule/IScheduleService';
 import { getScheduleService } from '@/services/schedule/ScheduleServiceFactory';
 import type {
-  UserSchedulePolicy,
+  ScheduleTemplate,
   WeeklySchedule,
   DayOfWeek,
   DaySchedule,
@@ -42,8 +43,6 @@ export interface ScheduleFormData {
   scheduleName: string;
   schedule: WeeklySchedule;
   orgUnitId: string | null;
-  effectiveFrom: string | null;
-  effectiveUntil: string | null;
 }
 
 export class ScheduleFormViewModel {
@@ -60,23 +59,21 @@ export class ScheduleFormViewModel {
   submissionError: string | null = null;
 
   readonly mode: ScheduleFormMode;
-  readonly editingScheduleId: string | null;
+  readonly editingTemplateId: string | null;
 
   constructor(
     private service: IScheduleService = getScheduleService(),
     mode: ScheduleFormMode = 'create',
-    existingSchedule?: UserSchedulePolicy
+    existingTemplate?: ScheduleTemplate
   ) {
     this.mode = mode;
-    this.editingScheduleId = existingSchedule?.id ?? null;
+    this.editingTemplateId = existingTemplate?.id ?? null;
 
-    if (mode === 'edit' && existingSchedule) {
+    if (mode === 'edit' && existingTemplate) {
       this.formData = {
-        scheduleName: existingSchedule.schedule_name,
-        schedule: { ...existingSchedule.schedule },
-        orgUnitId: existingSchedule.org_unit_id ?? null,
-        effectiveFrom: existingSchedule.effective_from ?? null,
-        effectiveUntil: existingSchedule.effective_until ?? null,
+        scheduleName: existingTemplate.schedule_name,
+        schedule: { ...existingTemplate.schedule },
+        orgUnitId: existingTemplate.org_unit_id ?? null,
       };
     } else {
       this.formData = {
@@ -91,8 +88,6 @@ export class ScheduleFormViewModel {
           sunday: { begin: '', end: '' },
         },
         orgUnitId: null,
-        effectiveFrom: null,
-        effectiveUntil: null,
       };
     }
 
@@ -104,7 +99,7 @@ export class ScheduleFormViewModel {
     makeAutoObservable(this);
     log.debug('ScheduleFormViewModel initialized', {
       mode,
-      editingScheduleId: this.editingScheduleId,
+      editingTemplateId: this.editingTemplateId,
     });
   }
 
@@ -117,8 +112,6 @@ export class ScheduleFormViewModel {
   get isDirty(): boolean {
     if (this.formData.scheduleName !== this.originalData.scheduleName) return true;
     if (this.formData.orgUnitId !== this.originalData.orgUnitId) return true;
-    if (this.formData.effectiveFrom !== this.originalData.effectiveFrom) return true;
-    if (this.formData.effectiveUntil !== this.originalData.effectiveUntil) return true;
     if (JSON.stringify(this.formData.schedule) !== JSON.stringify(this.originalData.schedule))
       return true;
     return false;
@@ -163,20 +156,6 @@ export class ScheduleFormViewModel {
   setOrgUnitId(id: string | null): void {
     runInAction(() => {
       this.formData = { ...this.formData, orgUnitId: id };
-      this.submissionError = null;
-    });
-  }
-
-  setEffectiveFrom(date: string | null): void {
-    runInAction(() => {
-      this.formData = { ...this.formData, effectiveFrom: date };
-      this.submissionError = null;
-    });
-  }
-
-  setEffectiveUntil(date: string | null): void {
-    runInAction(() => {
-      this.formData = { ...this.formData, effectiveUntil: date };
       this.submissionError = null;
     });
   }
@@ -268,7 +247,7 @@ export class ScheduleFormViewModel {
 
   // Submission
 
-  async submit(): Promise<{ success: boolean; scheduleId?: string; error?: string }> {
+  async submit(): Promise<{ success: boolean; templateId?: string; error?: string }> {
     this.touchAllFields();
 
     if (!this.validateAll()) {
@@ -282,56 +261,42 @@ export class ScheduleFormViewModel {
     });
 
     try {
-      // Sanitize: days without both begin and end times become inactive (null)
       const cleanSchedule = sanitizeSchedule(this.formData.schedule);
 
       if (this.mode === 'create') {
-        // For create mode, we create one schedule per assigned user
-        // If no users assigned, create a "template" with a placeholder user
-        const userIds = this.assignedUserIds.length > 0 ? this.assignedUserIds : [];
-
-        let firstScheduleId: string | undefined;
-        for (const userId of userIds) {
-          const result = await this.service.createSchedule({
-            userId,
-            scheduleName: this.formData.scheduleName.trim(),
-            schedule: cleanSchedule,
-            orgUnitId: this.formData.orgUnitId ?? undefined,
-            effectiveFrom: this.formData.effectiveFrom ?? undefined,
-            effectiveUntil: this.formData.effectiveUntil ?? undefined,
-          });
-          if (!firstScheduleId) firstScheduleId = result.scheduleId;
-        }
-
-        runInAction(() => {
-          this.isSubmitting = false;
-          this.originalData = { ...this.formData, schedule: { ...this.formData.schedule } };
-          log.info('Schedule(s) created', { count: userIds.length });
-        });
-
-        return { success: true, scheduleId: firstScheduleId };
-      } else {
-        // Edit mode
-        if (!this.editingScheduleId) {
-          throw new Error('No schedule ID for edit mode');
-        }
-
-        await this.service.updateSchedule({
-          scheduleId: this.editingScheduleId,
-          scheduleName: this.formData.scheduleName.trim(),
+        const result = await this.service.createTemplate({
+          name: this.formData.scheduleName.trim(),
           schedule: cleanSchedule,
           orgUnitId: this.formData.orgUnitId ?? undefined,
-          effectiveFrom: this.formData.effectiveFrom ?? undefined,
-          effectiveUntil: this.formData.effectiveUntil ?? undefined,
+          userIds: this.assignedUserIds,
         });
 
         runInAction(() => {
           this.isSubmitting = false;
           this.originalData = { ...this.formData, schedule: { ...this.formData.schedule } };
-          log.info('Schedule updated', { scheduleId: this.editingScheduleId });
+          log.info('Schedule template created', { templateId: result.templateId });
         });
 
-        return { success: true, scheduleId: this.editingScheduleId };
+        return { success: true, templateId: result.templateId };
+      } else {
+        if (!this.editingTemplateId) {
+          throw new Error('No template ID for edit mode');
+        }
+
+        await this.service.updateTemplate({
+          templateId: this.editingTemplateId,
+          name: this.formData.scheduleName.trim(),
+          schedule: cleanSchedule,
+          orgUnitId: this.formData.orgUnitId,
+        });
+
+        runInAction(() => {
+          this.isSubmitting = false;
+          this.originalData = { ...this.formData, schedule: { ...this.formData.schedule } };
+          log.info('Schedule template updated', { templateId: this.editingTemplateId });
+        });
+
+        return { success: true, templateId: this.editingTemplateId };
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to submit form';
