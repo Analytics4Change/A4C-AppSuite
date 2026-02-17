@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-11
+last_updated: 2026-02-16
 purpose: agent-navigation
 ---
 
@@ -19,6 +19,7 @@ purpose: agent-navigation
 | Add event handler | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) |
 | Choose event processing pattern | [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) |
 | Add Temporal workflow | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | [temporal-overview.md](architecture/workflows/temporal-overview.md) |
+| Add data collection applet | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | [EVENT-DRIVEN-GUIDE.md](frontend/guides/EVENT-DRIVEN-GUIDE.md) |
 | Add frontend component | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | [DESIGN_PATTERNS_MIGRATION_GUIDE.md](frontend/guides/DESIGN_PATTERNS_MIGRATION_GUIDE.md) |
 | Consolidate Day Zero baseline | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | [handlers/README.md](../infrastructure/supabase/handlers/README.md) |
 | Configure authentication | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) |
@@ -68,8 +69,10 @@ purpose: agent-navigation
 | `cqrs-compliance` | [cqrs-dual-write-audit.md](../dev/archived/cqrs-dual-write-audit/cqrs-dual-write-audit-context.md) | event-handler-pattern.md, event-processing-patterns.md |
 | `correlation-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md, triggering-workflows.md |
 | `cross-tenant` | [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | var-partnerships.md |
+| `canonical-values` | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | ui-patterns.md, EVENT-DRIVEN-GUIDE.md |
 | `custom-claims` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | frontend-auth-architecture.md, custom-claims-setup.md |
 | `day0-migration` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | handlers/README.md, DEPLOYMENT_INSTRUCTIONS.md |
+| `data-collection` | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | ui-patterns.md, EVENT-DRIVEN-GUIDE.md |
 | `database-hook` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | custom-claims-setup.md |
 | `deployment` | [DEPLOYMENT_INSTRUCTIONS.md](infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) | infrastructure/CLAUDE.md |
 | `determinism` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | temporal-overview.md |
@@ -151,6 +154,7 @@ purpose: agent-navigation
 | `phi` | [clients.md](infrastructure/reference/database/tables/clients.md) | dosage_info.md |
 | `phone-addresses` | [phone_addresses.md](infrastructure/reference/database/tables/phone_addresses.md) | phones_projection.md |
 | `phones` | [phones_projection.md](infrastructure/reference/database/tables/phones_projection.md) | addresses_projection.md |
+| `precursor-question` | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | ui-patterns.md |
 | `polling` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | integration-testing.md |
 | `postgres-notify` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-driven-workflow-triggering.md |
 | `prescriptions` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | dosage_info.md |
@@ -266,6 +270,7 @@ purpose: agent-navigation
 | [DESIGN_PATTERNS_MIGRATION_GUIDE.md](frontend/guides/DESIGN_PATTERNS_MIGRATION_GUIDE.md) | Component patterns and best practices | `patterns`, `components`, `migration` | 3200 |
 | [EVENT-DRIVEN-GUIDE.md](frontend/guides/EVENT-DRIVEN-GUIDE.md) | CQRS patterns in React components | `events`, `cqrs`, `react` | 4200 |
 | [TESTING.md](frontend/testing/TESTING.md) | Unit and E2E testing strategies | `testing`, `vitest`, `playwright` | 2100 |
+| [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | **[Aspirational]** Precursor question with canonical location/status values for all data collection applets | `data-collection`, `canonical-values`, `precursor-question` | 500 |
 | [ui-patterns.md](frontend/patterns/ui-patterns.md) | Modal architecture, dropdown patterns | `modal`, `ui`, `patterns` | 1800 |
 
 ### Infrastructure
