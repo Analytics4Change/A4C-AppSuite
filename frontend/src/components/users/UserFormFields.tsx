@@ -92,6 +92,9 @@ export interface UserFormFieldsProps {
   /** Whether this is edit mode (hides email field) */
   isEditMode?: boolean;
 
+  /** User UUID (shown read-only in edit mode) */
+  userId?: string;
+
   /**
    * Whether the role list is filtered based on permission constraints.
    * When true, shows an info message explaining that only assignable roles are displayed.
@@ -146,10 +149,7 @@ const FieldWrapper: React.FC<FieldWrapperProps> = ({
     <div className="space-y-1.5">
       <Label
         htmlFor={id}
-        className={cn(
-          'text-sm font-medium',
-          error ? 'text-red-600' : 'text-gray-700'
-        )}
+        className={cn('text-sm font-medium', error ? 'text-red-600' : 'text-gray-700')}
       >
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
@@ -161,15 +161,8 @@ const FieldWrapper: React.FC<FieldWrapperProps> = ({
         </p>
       )}
       {error && (
-        <p
-          id={errorId}
-          className="flex items-center gap-1 text-sm text-red-600"
-          role="alert"
-        >
-          <AlertCircle
-            className="h-3.5 w-3.5 flex-shrink-0"
-            aria-hidden="true"
-          />
+        <p id={errorId} className="flex items-center gap-1 text-sm text-red-600" role="alert">
+          <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
           <span>{error}</span>
         </p>
       )}
@@ -284,10 +277,7 @@ const EmailLookupFeedback: React.FC<EmailLookupFeedbackProps> = ({
 
   return (
     <div
-      className={cn(
-        'mt-2 p-3 rounded-lg flex items-start gap-3',
-        config.bgClass
-      )}
+      className={cn('mt-2 p-3 rounded-lg flex items-start gap-3', config.bgClass)}
       role="status"
       aria-live="polite"
     >
@@ -357,6 +347,7 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
     onSuggestedAction,
     disabled = false,
     isEditMode = false,
+    userId,
     rolesFiltered = false,
     phones,
     onPhonesChange,
@@ -398,12 +389,17 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
       disabled ||
       !!(
         emailLookup &&
-        (emailLookup.status === 'active_member' ||
-          emailLookup.status === 'pending')
+        (emailLookup.status === 'active_member' || emailLookup.status === 'pending')
       );
 
     return (
       <div className={cn('space-y-4', className)}>
+        {isEditMode && userId && (
+          <div className="text-xs text-gray-500 font-mono bg-gray-50 px-3 py-2 rounded">
+            ID: {userId}
+          </div>
+        )}
+
         {/* Email Field (hidden in edit mode) */}
         {!isEditMode && (
           <div>
@@ -428,10 +424,7 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
                   onBlur={handleEmailBlur}
                   disabled={disabled}
                   placeholder="user@example.com"
-                  className={cn(
-                    'pl-10',
-                    emailError && 'border-red-300 focus:ring-red-500'
-                  )}
+                  className={cn('pl-10', emailError && 'border-red-300 focus:ring-red-500')}
                   aria-required="true"
                   aria-invalid={!!emailError}
                   aria-describedby={
@@ -466,12 +459,7 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
         )}
 
         {/* First Name */}
-        <FieldWrapper
-          id={firstNameId}
-          label="First Name"
-          error={firstNameError}
-          required
-        >
+        <FieldWrapper id={firstNameId} label="First Name" error={firstNameError} required>
           <div className="relative">
             <User
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -486,10 +474,7 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
               onBlur={() => onFieldBlur('firstName')}
               disabled={shouldDisableFields}
               placeholder="John"
-              className={cn(
-                'pl-10',
-                firstNameError && 'border-red-300 focus:ring-red-500'
-              )}
+              className={cn('pl-10', firstNameError && 'border-red-300 focus:ring-red-500')}
               aria-required="true"
               aria-invalid={!!firstNameError}
               aria-describedby={firstNameError ? `${firstNameId}-error` : undefined}
@@ -498,12 +483,7 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
         </FieldWrapper>
 
         {/* Last Name */}
-        <FieldWrapper
-          id={lastNameId}
-          label="Last Name"
-          error={lastNameError}
-          required
-        >
+        <FieldWrapper id={lastNameId} label="Last Name" error={lastNameError} required>
           <div className="relative">
             <User
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -518,10 +498,7 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
               onBlur={() => onFieldBlur('lastName')}
               disabled={shouldDisableFields}
               placeholder="Smith"
-              className={cn(
-                'pl-10',
-                lastNameError && 'border-red-300 focus:ring-red-500'
-              )}
+              className={cn('pl-10', lastNameError && 'border-red-300 focus:ring-red-500')}
               aria-required="true"
               aria-invalid={!!lastNameError}
               aria-describedby={lastNameError ? `${lastNameId}-error` : undefined}
@@ -533,10 +510,7 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
         <div className="space-y-1.5">
           <Label
             id={`${rolesId}-label`}
-            className={cn(
-              'text-sm font-medium',
-              rolesError ? 'text-red-600' : 'text-gray-700'
-            )}
+            className={cn('text-sm font-medium', rolesError ? 'text-red-600' : 'text-gray-700')}
           >
             Roles
           </Label>
@@ -556,9 +530,7 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
             aria-describedby={rolesError ? `${rolesId}-error` : undefined}
             className={cn(
               'border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto',
-              rolesError
-                ? 'border-red-300 bg-red-50/30'
-                : 'border-gray-200 bg-white/50'
+              rolesError ? 'border-red-300 bg-red-50/30' : 'border-gray-200 bg-white/50'
             )}
           >
             {availableRoles.length === 0 ? (
@@ -641,10 +613,7 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
               className="flex items-center gap-1 text-sm text-red-600"
               role="alert"
             >
-              <AlertCircle
-                className="h-3.5 w-3.5 flex-shrink-0"
-                aria-hidden="true"
-              />
+              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
               <span>{rolesError}</span>
             </p>
           )}

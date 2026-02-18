@@ -1067,6 +1067,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                           formViewModel={formViewModel}
                           idPrefix="edit"
                           disabled={!currentUnit.isActive}
+                          unitId={currentUnit.id}
                         />
 
                         {/* Form Actions */}

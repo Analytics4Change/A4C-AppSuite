@@ -1043,6 +1043,7 @@ export const UsersManagePage: React.FC = observer(() => {
                           formViewModel.isSubmitting || currentItem.displayStatus === 'deactivated'
                         }
                         isEditMode
+                        userId={currentItem.id}
                       />
 
                       {/* Form Actions */}

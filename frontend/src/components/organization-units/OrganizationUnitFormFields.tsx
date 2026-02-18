@@ -39,6 +39,8 @@ export interface OrganizationUnitFormFieldsProps {
   idPrefix: string;
   /** When true, all fields are disabled (e.g., inactive unit) */
   disabled?: boolean;
+  /** Organization unit UUID (shown read-only in edit mode) */
+  unitId?: string;
 }
 
 /**
@@ -46,12 +48,18 @@ export interface OrganizationUnitFormFieldsProps {
  * Fields: name, displayName, timezone
  */
 export const OrganizationUnitFormFields: React.FC<OrganizationUnitFormFieldsProps> = observer(
-  ({ formViewModel, idPrefix, disabled = false }) => {
+  ({ formViewModel, idPrefix, disabled = false, unitId }) => {
     const nameError = formViewModel.getFieldError('name');
     const displayNameError = formViewModel.getFieldError('displayName');
 
     return (
       <>
+        {idPrefix === 'edit' && unitId && (
+          <div className="text-xs text-gray-500 font-mono bg-gray-50 px-3 py-2 rounded">
+            ID: {unitId}
+          </div>
+        )}
+
         {/* Name Input */}
         <div className="space-y-1.5">
           <Label
