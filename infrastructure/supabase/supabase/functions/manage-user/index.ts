@@ -26,7 +26,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
-import { AnySchemaSupabaseClient } from '../_shared/types.ts';
+import { AnySchemaSupabaseClient, JWTPayload, hasPermission } from '../_shared/types.ts';
 import {
   handleRpcError,
   createInternalError,
@@ -42,7 +42,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v7-notification-prefs';
+const DEPLOY_VERSION = 'v8-jwt-v4-claims';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -87,20 +87,6 @@ interface ManageUserResponse {
   userId?: string;
   operation?: Operation;
   error?: string;
-}
-
-/**
- * JWT Payload structure for custom claims
- * Custom claims are added to the JWT payload via database hook (auth.custom_access_token_hook),
- * NOT to user.app_metadata. We must decode the JWT directly to access them.
- */
-interface JWTPayload {
-  permissions?: string[];
-  org_id?: string;
-  user_role?: string;
-  scope_path?: string;
-  sub?: string;
-  email?: string;
 }
 
 /**
@@ -220,7 +206,7 @@ serve(async (req) => {
     // Extract custom claims from decoded JWT payload (not from user.app_metadata!)
     // The JWT hook adds claims directly to the token payload
     const orgId = jwtPayload.org_id;
-    const permissions = jwtPayload.permissions || [];
+    const effectivePermissions = jwtPayload.effective_permissions;
 
     if (!orgId) {
       return new Response(
@@ -235,7 +221,7 @@ serve(async (req) => {
     const preCheckData = JSON.parse(bodyText) as ManageUserRequest;
 
     if (preCheckData.operation === 'delete') {
-      if (!permissions.includes('user.delete')) {
+      if (!hasPermission(effectivePermissions, 'user.delete')) {
         console.log(`[manage-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} lacks user.delete`);
         return new Response(
           JSON.stringify({ error: 'Permission denied: user.delete required' }),
@@ -243,7 +229,7 @@ serve(async (req) => {
         );
       }
     } else if (preCheckData.operation === 'modify_roles') {
-      if (!permissions.includes('user.role_assign')) {
+      if (!hasPermission(effectivePermissions, 'user.role_assign')) {
         console.log(`[manage-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} lacks user.role_assign`);
         return new Response(
           JSON.stringify({ error: 'Permission denied: user.role_assign required' }),
@@ -254,8 +240,8 @@ serve(async (req) => {
       // Allow users to update their own notification preferences
       // Org admins and platform admins can also update any user's preferences
       const isSelf = preCheckData.userId === user.id;
-      const hasOrgAdmin = permissions.includes('user.update');
-      if (!isSelf && !hasOrgAdmin) {
+      const hasUserUpdate = hasPermission(effectivePermissions, 'user.update');
+      if (!isSelf && !hasUserUpdate) {
         console.log(`[manage-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} cannot update notification preferences for ${preCheckData.userId}`);
         return new Response(
           JSON.stringify({ error: 'Permission denied: Can only update your own notification preferences unless you have user.update permission' }),
@@ -263,7 +249,7 @@ serve(async (req) => {
         );
       }
     } else {
-      if (!permissions.includes('user.update')) {
+      if (!hasPermission(effectivePermissions, 'user.update')) {
         console.log(`[manage-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} lacks user.update`);
         return new Response(
           JSON.stringify({ error: 'Permission denied: user.update required' }),

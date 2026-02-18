@@ -15,6 +15,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+import { JWTPayload, hasPermission } from '../_shared/types.ts';
 import {
   createInternalError,
   createCorsPreflightResponse,
@@ -28,7 +29,7 @@ import {
 } from '../_shared/tracing-context.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v5-tracing';
+const DEPLOY_VERSION = 'v6-jwt-v4-claims';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -161,15 +162,6 @@ serve(async (req) => {
     }
 
     // Decode JWT payload (base64)
-    interface JWTPayload {
-      permissions?: string[];
-      org_id?: string;
-      user_role?: string;
-      scope_path?: string;
-      sub?: string;
-      email?: string;
-    }
-
     let jwtPayload: JWTPayload;
     try {
       jwtPayload = JSON.parse(atob(jwtParts[1]));
@@ -200,20 +192,19 @@ serve(async (req) => {
 
     // Extract custom claims from JWT payload (not from user.app_metadata!)
     // The JWT hook adds claims directly to the token payload, accessible here via jwtPayload
-    const permissions = jwtPayload.permissions || [];
-    if (!permissions.includes('organization.create_root')) {
+    const effectivePermissions = jwtPayload.effective_permissions;
+    if (!hasPermission(effectivePermissions, 'organization.create_root')) {
       console.error('[organization-bootstrap] Permission denied:', {
         user_id: user.id,
         user_email: user.email,
-        permissions: permissions,
+        effective_permissions: effectivePermissions,
         required: 'organization.create_root'
       });
 
       return new Response(
         JSON.stringify({
           error: 'Forbidden: organization.create_root permission required to bootstrap organizations',
-          required_permission: 'organization.create_root',
-          user_permissions: permissions
+          required_permission: 'organization.create_root'
         }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

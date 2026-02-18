@@ -16,7 +16,7 @@ import {
   validateEmailFunctionEnv,
   validateAdminFunctionEnv,
 } from '../_shared/env-schema.ts';
-import { AnySchemaSupabaseClient } from '../_shared/types.ts';
+import { AnySchemaSupabaseClient, JWTPayload, hasPermission } from '../_shared/types.ts';
 import {
   handleRpcError,
   createInternalError,
@@ -33,7 +33,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v13-invitation-id-fix';
+const DEPLOY_VERSION = 'v14-jwt-v4-claims';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -121,20 +121,6 @@ interface InviteUserResponse {
   emailStatus?: EmailStatus;
   suggestedAction?: string;
   error?: string;
-}
-
-/**
- * JWT Payload structure for custom claims
- * Custom claims are added to the JWT payload via database hook (auth.custom_access_token_hook),
- * NOT to user.app_metadata. We must decode the JWT directly to access them.
- */
-interface JWTPayload {
-  permissions?: string[];
-  org_id?: string;
-  user_role?: string;
-  scope_path?: string;
-  sub?: string;
-  email?: string;
 }
 
 /**
@@ -494,7 +480,7 @@ serve(async (req) => {
     // Extract custom claims from decoded JWT payload (not from user.app_metadata!)
     // The JWT hook adds claims directly to the token payload
     const orgId = jwtPayload.org_id;
-    const permissions = jwtPayload.permissions || [];
+    const effectivePermissions = jwtPayload.effective_permissions;
 
     if (!orgId) {
       return new Response(
@@ -504,7 +490,7 @@ serve(async (req) => {
     }
 
     // Check user.create permission
-    if (!permissions.includes('user.create')) {
+    if (!hasPermission(effectivePermissions, 'user.create')) {
       console.log(`[invite-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} lacks user.create`);
       return new Response(
         JSON.stringify({ error: 'Permission denied: user.create required' }),

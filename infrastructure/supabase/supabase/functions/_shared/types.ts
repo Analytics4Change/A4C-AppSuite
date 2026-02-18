@@ -37,3 +37,34 @@ import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
  */
 // deno-lint-ignore no-explicit-any
 export type AnySchemaSupabaseClient = SupabaseClient<any, any, any>;
+
+// =============================================================================
+// JWT v4 Types
+// =============================================================================
+
+/** Single effective permission from JWT claims v4 */
+export interface EffectivePermission {
+  p: string;  // Permission name
+  s: string;  // Scope path (ltree)
+}
+
+/** JWT payload matching custom_access_token_hook v4 */
+export interface JWTPayload {
+  sub?: string;
+  email?: string;
+  org_id?: string;
+  org_type?: string;
+  effective_permissions?: EffectivePermission[];
+  access_blocked?: boolean;
+  claims_version?: number;
+  current_org_unit_id?: string;
+  current_org_unit_path?: string;
+}
+
+/** Check if JWT claims include a specific permission (any scope) */
+export function hasPermission(
+  effectivePermissions: EffectivePermission[] | undefined,
+  permission: string
+): boolean {
+  return effectivePermissions?.some(ep => ep.p === permission) ?? false;
+}
