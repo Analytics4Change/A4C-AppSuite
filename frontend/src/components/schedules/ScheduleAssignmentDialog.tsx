@@ -1,14 +1,20 @@
 /**
- * RoleAssignmentDialog Component
+ * ScheduleAssignmentDialog Component
  *
- * Modal dialog for unified role assignment management.
+ * Modal dialog for managing schedule template user assignments.
  * Shows ALL users with checkboxes reflecting current assignment state.
- * Allows both adding AND removing assignments in a single operation.
+ * Allows adding AND removing assignments in a single operation,
+ * with auto-transfer detection for users on another schedule.
  *
  * Composes shared sub-components from @/components/ui/assignment:
  * - ManageableUserList for the searchable checkbox list
  * - SyncResultDisplay for post-save result view
  * - AssignmentAlert for error alerts
+ *
+ * Schedule-specific behaviors:
+ * - Users on another template show "On: Template Name" context
+ * - Checking such a user shows amber "Transferring from: X" tag
+ * - Result display includes "Transferred" section in amber
  *
  * Accessibility (WCAG 2.1 Level AA + WAI-ARIA APG Dialog Pattern):
  * - Uses role="dialog" for modal indication
@@ -18,7 +24,7 @@
  * - Escape key: Closes dialog and returns focus
  * - Focus restoration: Returns focus to trigger element on close
  *
- * @see RoleAssignmentViewModel for state management
+ * @see ScheduleAssignmentViewModel for state management
  * @see ManageableUserList for user selection UI
  * @see SyncResultDisplay for result display
  */
@@ -28,74 +34,98 @@ import { observer } from 'mobx-react-lite';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/utils';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
-import { Users, Settings, CheckCircle, XCircle, Loader2, X } from 'lucide-react';
+import { Users, Calendar, CheckCircle, XCircle, Loader2, X, ArrowRightLeft } from 'lucide-react';
 import { AssignmentAlert, ManageableUserList, SyncResultDisplay } from '@/components/ui/assignment';
-import {
-  RoleAssignmentViewModel,
-  ManageableUserState,
-} from '@/viewModels/roles/RoleAssignmentViewModel';
+import type { ScheduleAssignmentViewModel } from '@/viewModels/schedule/ScheduleAssignmentViewModel';
+import type { ScheduleManageableUserState } from '@/types/bulk-assignment.types';
 import type { BaseManageableUserState } from '@/types/assignment.types';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('component');
 
-interface RoleAssignmentDialogProps {
+interface ScheduleAssignmentDialogProps {
   /** The ViewModel managing dialog state */
-  viewModel: RoleAssignmentViewModel;
+  viewModel: ScheduleAssignmentViewModel;
   /** Whether the dialog is open */
   isOpen: boolean;
   /** Callback when the dialog should close */
   onClose: () => void;
-  /** Callback after successful save (e.g., to refresh role data) */
+  /** Callback after successful save (e.g., to refresh template data) */
   onSuccess?: () => void;
 }
 
 /**
- * Render currentRoles context for each user in the role assignment list.
+ * Render schedule-specific context per user.
+ * - Users on a different template show "On: Template Name" or "Transferring from: X"
  */
-const renderRoleUserContext = (user: BaseManageableUserState): React.ReactNode => {
-  const roleUser = user as ManageableUserState;
-  if (!roleUser.currentRoles || roleUser.currentRoles.length === 0) return null;
-  return <span className="text-xs text-gray-400">Roles: {roleUser.currentRoles.join(', ')}</span>;
+const createRenderScheduleUserContext = (viewModel: ScheduleAssignmentViewModel) => {
+  return (user: BaseManageableUserState): React.ReactNode => {
+    const scheduleUser = user as ScheduleManageableUserState;
+    if (!scheduleUser.currentScheduleId) return null;
+
+    // Check if this user is being added (transfer scenario)
+    const isBeingAdded = viewModel.usersToAdd.includes(scheduleUser.id);
+
+    if (isBeingAdded) {
+      return (
+        <span className="text-xs px-1.5 py-0.5 bg-amber-200 text-amber-700 rounded inline-flex items-center gap-1">
+          <ArrowRightLeft size={10} />
+          Transferring from: {scheduleUser.currentScheduleName}
+        </span>
+      );
+    }
+
+    return <span className="text-xs text-gray-400">On: {scheduleUser.currentScheduleName}</span>;
+  };
 };
 
 /**
- * JWT refresh footer note for role assignments.
+ * Render transferred users section in result display.
  */
-const roleFooterNote = (
-  <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
-    <strong>Note:</strong> Permission changes take effect automatically within a few seconds.
-  </div>
-);
+const TransferredSection: React.FC<{
+  viewModel: ScheduleAssignmentViewModel;
+}> = observer(({ viewModel }) => {
+  if (!viewModel.result || viewModel.result.transferred.length === 0) return null;
 
-/**
- * RoleAssignmentDialog - Modal for unified role assignment management
- *
- * @example
- * const viewModel = new RoleAssignmentViewModel(
- *   roleService,
- *   { id: 'role-uuid', name: 'Clinician' },
- *   'acme.pediatrics'
- * );
- *
- * <RoleAssignmentDialog
- *   viewModel={viewModel}
- *   isOpen={showDialog}
- *   onClose={() => setShowDialog(false)}
- *   onSuccess={() => reloadRoleData()}
- * />
- */
-export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = observer(
+  return (
+    <div className="bg-amber-50 rounded-lg p-4">
+      <h4 className="text-sm font-medium text-amber-800 mb-2">
+        Transferred ({viewModel.result.transferred.length})
+      </h4>
+      <ul className="text-sm text-amber-700 space-y-1 max-h-24 overflow-y-auto">
+        {viewModel.result.transferred.map((transfer) => {
+          const user = viewModel.users.find((u) => u.id === transfer.userId);
+          return (
+            <li key={transfer.userId} className="flex items-center gap-2">
+              <ArrowRightLeft size={14} />
+              <span>
+                {user?.displayName || transfer.userId}
+                <span className="text-amber-600 text-xs ml-1">
+                  (from {transfer.fromTemplateName})
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+});
+
+TransferredSection.displayName = 'TransferredSection';
+
+export const ScheduleAssignmentDialog: React.FC<ScheduleAssignmentDialogProps> = observer(
   ({ viewModel, isOpen, onClose, onSuccess }) => {
     const dialogRef = useRef<HTMLDivElement | null>(null);
     const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
-    log.debug('RoleAssignmentDialog rendering', {
+    log.debug('ScheduleAssignmentDialog rendering', {
       isOpen,
       state: viewModel.state,
       hasChanges: viewModel.hasChanges,
       toAdd: viewModel.usersToAdd.length,
       toRemove: viewModel.usersToRemove.length,
+      toTransfer: viewModel.usersToTransfer.length,
     });
 
     // Focus trap and keyboard navigation
@@ -148,6 +178,9 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = observe
       [viewModel]
     );
 
+    // Create render function for user context (stable reference per render)
+    const renderUserContext = createRenderScheduleUserContext(viewModel);
+
     if (!isOpen) return null;
 
     const isSaving = viewModel.isSaving;
@@ -165,8 +198,8 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = observe
         className="fixed inset-0 z-50 flex items-center justify-center"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="role-assign-title"
-        aria-describedby="role-assign-description"
+        aria-labelledby="schedule-assign-title"
+        aria-describedby="schedule-assign-description"
         data-focus-context="modal"
       >
         {/* Backdrop */}
@@ -178,15 +211,15 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = observe
           <div className="flex items-start justify-between p-6 border-b border-gray-200">
             <div>
               <h2
-                id="role-assign-title"
+                id="schedule-assign-title"
                 className="text-lg font-semibold text-gray-900 flex items-center gap-2"
               >
-                <Settings size={20} className="text-blue-600" />
-                Manage Role Assignments: {viewModel.role.name}
+                <Calendar size={20} className="text-blue-600" />
+                Manage Schedule Assignments: {viewModel.template.name}
               </h2>
-              <p id="role-assign-description" className="mt-1 text-sm text-gray-500">
-                Check/uncheck users to assign or remove this role at scope:{' '}
-                {viewModel.scopePath || '(root)'}
+              <p id="schedule-assign-description" className="mt-1 text-sm text-gray-500">
+                Check/uncheck users to assign or remove from this schedule template. Users on
+                another template will be automatically transferred.
               </p>
             </div>
             <button
@@ -229,7 +262,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = observe
                   isPartialSuccess={viewModel.isPartialSuccess}
                   onClose={handleClose}
                   onBack={handleBack}
-                  footerNote={roleFooterNote}
+                  extraSections={<TransferredSection viewModel={viewModel} />}
                 />
               </div>
             ) : (
@@ -243,7 +276,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = observe
                   isLoading={viewModel.isLoading}
                   hasMore={viewModel.hasMore}
                   onLoadMore={() => viewModel.loadMore()}
-                  renderUserContext={renderRoleUserContext}
+                  renderUserContext={renderUserContext}
                 />
               </div>
             )}
@@ -300,4 +333,4 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = observe
   }
 );
 
-RoleAssignmentDialog.displayName = 'RoleAssignmentDialog';
+ScheduleAssignmentDialog.displayName = 'ScheduleAssignmentDialog';

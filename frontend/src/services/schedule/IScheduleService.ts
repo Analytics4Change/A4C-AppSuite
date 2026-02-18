@@ -23,6 +23,12 @@ import type {
   ScheduleTemplateDetail,
   WeeklySchedule,
 } from '@/types/schedule.types';
+import type {
+  ScheduleManageableUser,
+  SyncScheduleAssignmentsResult,
+  ListUsersForScheduleManagementParams,
+  SyncScheduleAssignmentsParams,
+} from '@/types/bulk-assignment.types';
 
 export interface ScheduleDeleteResult {
   success: boolean;
@@ -72,4 +78,12 @@ export interface IScheduleService {
   }): Promise<void>;
 
   unassignUser(params: { templateId: string; userId: string; reason?: string }): Promise<void>;
+
+  // Assignment management (batch operations)
+  listUsersForScheduleManagement(
+    params: ListUsersForScheduleManagementParams
+  ): Promise<ScheduleManageableUser[]>;
+  syncScheduleAssignments(
+    params: SyncScheduleAssignmentsParams
+  ): Promise<SyncScheduleAssignmentsResult>;
 }

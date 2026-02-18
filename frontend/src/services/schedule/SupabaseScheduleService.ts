@@ -22,6 +22,12 @@ import type {
   ScheduleTemplateDetail,
   WeeklySchedule,
 } from '@/types/schedule.types';
+import type {
+  ScheduleManageableUser,
+  SyncScheduleAssignmentsResult,
+  ListUsersForScheduleManagementParams,
+  SyncScheduleAssignmentsParams,
+} from '@/types/bulk-assignment.types';
 import type { IScheduleService, ScheduleDeleteResult } from './IScheduleService';
 
 const log = Logger.getLogger('api');
@@ -274,5 +280,81 @@ export class SupabaseScheduleService implements IScheduleService {
       templateId: params.templateId,
       userId: params.userId,
     });
+  }
+
+  async listUsersForScheduleManagement(
+    params: ListUsersForScheduleManagementParams
+  ): Promise<ScheduleManageableUser[]> {
+    log.debug('Listing users for schedule management', params);
+
+    const { data, error } = await supabase.schema('api').rpc('list_users_for_schedule_management', {
+      p_template_id: params.templateId,
+      p_search_term: params.searchTerm ?? null,
+      p_limit: params.limit ?? 100,
+      p_offset: params.offset ?? 0,
+    });
+
+    if (error) {
+      log.error('Failed to list users for schedule management', { error });
+      throw new Error(`Failed to list users for schedule management: ${error.message}`);
+    }
+
+    // This RPC returns TABLE rows directly (not wrapped in envelope)
+    const rows = Array.isArray(data) ? data : [];
+    return rows.map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      displayName: (row.display_name as string) || (row.email as string),
+      email: row.email as string,
+      isActive: row.is_active as boolean,
+      isAssigned: row.is_assigned as boolean,
+      currentScheduleId: (row.current_schedule_id as string) || null,
+      currentScheduleName: (row.current_schedule_name as string) || null,
+    }));
+  }
+
+  async syncScheduleAssignments(
+    params: SyncScheduleAssignmentsParams
+  ): Promise<SyncScheduleAssignmentsResult> {
+    log.debug('Syncing schedule assignments', {
+      templateId: params.templateId,
+      addCount: params.userIdsToAdd.length,
+      removeCount: params.userIdsToRemove.length,
+    });
+
+    const correlationId = params.correlationId || globalThis.crypto.randomUUID();
+
+    const { data, error } = await supabase.schema('api').rpc('sync_schedule_assignments', {
+      p_template_id: params.templateId,
+      p_user_ids_to_add: params.userIdsToAdd,
+      p_user_ids_to_remove: params.userIdsToRemove,
+      p_correlation_id: correlationId,
+      p_reason: params.reason ?? 'Schedule assignment update',
+    });
+
+    if (error) {
+      log.error('Failed to sync schedule assignments', { error });
+      throw new Error(`Failed to sync schedule assignments: ${error.message}`);
+    }
+
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    log.info('Schedule assignments synced', {
+      addedSuccessful: result.added?.successful?.length ?? 0,
+      removedSuccessful: result.removed?.successful?.length ?? 0,
+      transferred: result.transferred?.length ?? 0,
+      correlationId: result.correlationId,
+    });
+
+    return {
+      added: {
+        successful: result.added?.successful ?? [],
+        failed: result.added?.failed ?? [],
+      },
+      removed: {
+        successful: result.removed?.successful ?? [],
+        failed: result.removed?.failed ?? [],
+      },
+      transferred: result.transferred ?? [],
+      correlationId: result.correlationId ?? correlationId,
+    };
   }
 }

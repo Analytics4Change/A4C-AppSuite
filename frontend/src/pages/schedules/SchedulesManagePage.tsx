@@ -17,7 +17,7 @@
  * Permission: user.schedule_manage
  */
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,9 +28,11 @@ import {
   ScheduleList,
   ScheduleFormFields,
   ScheduleUserAssignmentDialog,
+  ScheduleAssignmentDialog,
 } from '@/components/schedules';
 import { ScheduleListViewModel } from '@/viewModels/schedule/ScheduleListViewModel';
 import { ScheduleFormViewModel } from '@/viewModels/schedule/ScheduleFormViewModel';
+import { ScheduleAssignmentViewModel } from '@/viewModels/schedule/ScheduleAssignmentViewModel';
 import { getScheduleService } from '@/services/schedule/ScheduleServiceFactory';
 import type { ScheduleTemplateDetail } from '@/types/schedule.types';
 import {
@@ -80,6 +82,18 @@ export const SchedulesManagePage: React.FC = observer(() => {
   const [operationError, setOperationError] = useState<string | null>(null);
 
   const [showUserAssignDialog, setShowUserAssignDialog] = useState(false);
+  const [showManageAssignDialog, setShowManageAssignDialog] = useState(false);
+
+  // Memoize the ScheduleAssignmentViewModel on currentTemplate ID only
+  // This prevents recreation on every render while recreating when the template changes
+  const scheduleAssignVM = useMemo(() => {
+    if (!currentTemplate) return null;
+    return new ScheduleAssignmentViewModel(getScheduleService(), {
+      id: currentTemplate.id,
+      name: currentTemplate.schedule_name,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTemplate?.id]);
 
   // Load templates on mount
   useEffect(() => {
@@ -373,6 +387,23 @@ export const SchedulesManagePage: React.FC = observer(() => {
     [formViewModel]
   );
 
+  // Manage assignments dialog handlers (edit mode)
+  const handleManageAssignClick = useCallback(() => {
+    setShowManageAssignDialog(true);
+  }, []);
+
+  const handleManageAssignClose = useCallback(() => {
+    setShowManageAssignDialog(false);
+  }, []);
+
+  const handleManageAssignSuccess = useCallback(async () => {
+    // Refresh template data and list after successful assignment changes
+    if (currentTemplate) {
+      await selectAndLoadTemplate(currentTemplate.id);
+    }
+    await viewModel.refresh();
+  }, [currentTemplate, selectAndLoadTemplate, viewModel]);
+
   // Filter handlers
   const handleSearchChange = useCallback(
     (term: string) => {
@@ -643,6 +674,18 @@ export const SchedulesManagePage: React.FC = observer(() => {
                         Edit Template
                       </CardTitle>
                       <div className="flex items-center gap-2">
+                        {currentTemplate.is_active && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleManageAssignClick}
+                            className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                          >
+                            <Users className="w-4 h-4 mr-1" />
+                            Manage User Assignments
+                          </Button>
+                        )}
                         <span
                           className={cn(
                             'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
@@ -846,7 +889,17 @@ export const SchedulesManagePage: React.FC = observer(() => {
         requireConfirmText="DELETE"
       />
 
-      {/* User Assignment Dialog */}
+      {/* Manage Assignments Dialog (edit mode - delta tracking) */}
+      {scheduleAssignVM && (
+        <ScheduleAssignmentDialog
+          viewModel={scheduleAssignVM}
+          isOpen={showManageAssignDialog}
+          onClose={handleManageAssignClose}
+          onSuccess={handleManageAssignSuccess}
+        />
+      )}
+
+      {/* User Assignment Dialog (create mode - simple picker) */}
       <ScheduleUserAssignmentDialog
         isOpen={showUserAssignDialog}
         onClose={handleUserAssignClose}

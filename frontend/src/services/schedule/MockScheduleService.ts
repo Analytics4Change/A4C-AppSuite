@@ -12,11 +12,28 @@ import type {
   ScheduleAssignment,
   WeeklySchedule,
 } from '@/types/schedule.types';
+import type {
+  ScheduleManageableUser,
+  SyncScheduleAssignmentsResult,
+  ListUsersForScheduleManagementParams,
+  SyncScheduleAssignmentsParams,
+} from '@/types/bulk-assignment.types';
 import type { IScheduleService, ScheduleDeleteResult } from './IScheduleService';
 
 const log = Logger.getLogger('api');
 
-function createSeedData(): { templates: ScheduleTemplate[]; assignments: ScheduleAssignment[] } {
+interface MockUser {
+  id: string;
+  name: string;
+  email: string;
+  isActive: boolean;
+}
+
+function createSeedData(): {
+  templates: ScheduleTemplate[];
+  assignments: ScheduleAssignment[];
+  users: MockUser[];
+} {
   const orgId = 'mock-org';
   const now = new Date().toISOString();
 
@@ -116,17 +133,27 @@ function createSeedData(): { templates: ScheduleTemplate[]; assignments: Schedul
     },
   ];
 
-  return { templates, assignments };
+  const users = [
+    { id: 'user-001', name: 'Alice Johnson', email: 'alice@example.com', isActive: true },
+    { id: 'user-002', name: 'Bob Smith', email: 'bob@example.com', isActive: true },
+    { id: 'user-003', name: 'Carol Williams', email: 'carol@example.com', isActive: true },
+    { id: 'user-004', name: 'David Brown', email: 'david@example.com', isActive: true },
+    { id: 'user-005', name: 'Eve Davis', email: 'eve@example.com', isActive: false },
+  ];
+
+  return { templates, assignments, users };
 }
 
 export class MockScheduleService implements IScheduleService {
   private templates: ScheduleTemplate[];
   private assignments: ScheduleAssignment[];
+  private mockUsers: MockUser[];
 
   constructor() {
     const seed = createSeedData();
     this.templates = seed.templates;
     this.assignments = seed.assignments;
+    this.mockUsers = seed.users;
   }
 
   async listTemplates(params: {
@@ -311,6 +338,151 @@ export class MockScheduleService implements IScheduleService {
 
     const template = this.templates.find((t) => t.id === params.templateId);
     if (template && template.assigned_user_count > 0) template.assigned_user_count--;
+  }
+
+  async listUsersForScheduleManagement(
+    params: ListUsersForScheduleManagementParams
+  ): Promise<ScheduleManageableUser[]> {
+    log.debug('[Mock] Listing users for schedule management', params);
+    await this.simulateDelay();
+
+    const { templateId, searchTerm, limit = 100, offset = 0 } = params;
+
+    let results: ScheduleManageableUser[] = this.mockUsers.map((user) => {
+      // Check if user is assigned to the target template
+      const assignedToTarget = this.assignments.some(
+        (a) => a.user_id === user.id && a.schedule_template_id === templateId
+      );
+
+      // Check if user is assigned to a different template
+      const otherAssignment = this.assignments.find(
+        (a) => a.user_id === user.id && a.schedule_template_id !== templateId
+      );
+
+      let currentScheduleId: string | null = null;
+      let currentScheduleName: string | null = null;
+
+      if (otherAssignment) {
+        currentScheduleId = otherAssignment.schedule_template_id;
+        const otherTemplate = this.templates.find(
+          (t) => t.id === otherAssignment.schedule_template_id
+        );
+        currentScheduleName = otherTemplate?.schedule_name ?? null;
+      }
+
+      return {
+        id: user.id,
+        displayName: user.name,
+        email: user.email,
+        isActive: user.isActive,
+        isAssigned: assignedToTarget,
+        currentScheduleId,
+        currentScheduleName,
+      };
+    });
+
+    // Filter by search term
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      results = results.filter(
+        (u) => u.displayName.toLowerCase().includes(term) || u.email.toLowerCase().includes(term)
+      );
+    }
+
+    // Apply pagination
+    return results.slice(offset, offset + limit);
+  }
+
+  async syncScheduleAssignments(
+    params: SyncScheduleAssignmentsParams
+  ): Promise<SyncScheduleAssignmentsResult> {
+    log.debug('[Mock] Syncing schedule assignments', {
+      templateId: params.templateId,
+      addCount: params.userIdsToAdd.length,
+      removeCount: params.userIdsToRemove.length,
+    });
+    await this.simulateDelay();
+
+    const correlationId = params.correlationId || globalThis.crypto.randomUUID();
+    const addedSuccessful: string[] = [];
+    const removedSuccessful: string[] = [];
+    const transferred: { userId: string; fromTemplateId: string; fromTemplateName: string }[] = [];
+
+    // Process additions
+    for (const userId of params.userIdsToAdd) {
+      const user = this.mockUsers.find((u) => u.id === userId);
+      if (!user) continue;
+
+      // Check if user is on another template (auto-transfer)
+      const existingAssignment = this.assignments.find(
+        (a) => a.user_id === userId && a.schedule_template_id !== params.templateId
+      );
+
+      if (existingAssignment) {
+        const fromTemplate = this.templates.find(
+          (t) => t.id === existingAssignment.schedule_template_id
+        );
+        transferred.push({
+          userId,
+          fromTemplateId: existingAssignment.schedule_template_id,
+          fromTemplateName: fromTemplate?.schedule_name ?? 'Unknown',
+        });
+
+        // Remove from old template
+        this.assignments = this.assignments.filter(
+          (a) =>
+            !(
+              a.user_id === userId &&
+              a.schedule_template_id === existingAssignment.schedule_template_id
+            )
+        );
+        if (fromTemplate && fromTemplate.assigned_user_count > 0) {
+          fromTemplate.assigned_user_count--;
+        }
+      }
+
+      // Remove any existing assignment to the target (idempotent)
+      this.assignments = this.assignments.filter(
+        (a) => !(a.user_id === userId && a.schedule_template_id === params.templateId)
+      );
+
+      // Add to target template
+      this.assignments.push({
+        id: globalThis.crypto.randomUUID(),
+        schedule_template_id: params.templateId,
+        user_id: userId,
+        user_name: user.name,
+        user_email: user.email,
+        effective_from: null,
+        effective_until: null,
+        is_active: true,
+      });
+
+      addedSuccessful.push(userId);
+    }
+
+    // Process removals
+    for (const userId of params.userIdsToRemove) {
+      this.assignments = this.assignments.filter(
+        (a) => !(a.user_id === userId && a.schedule_template_id === params.templateId)
+      );
+      removedSuccessful.push(userId);
+    }
+
+    // Update assigned_user_count on the target template
+    const template = this.templates.find((t) => t.id === params.templateId);
+    if (template) {
+      template.assigned_user_count = this.assignments.filter(
+        (a) => a.schedule_template_id === params.templateId
+      ).length;
+    }
+
+    return {
+      added: { successful: addedSuccessful, failed: [] },
+      removed: { successful: removedSuccessful, failed: [] },
+      transferred,
+      correlationId,
+    };
   }
 
   private simulateDelay(): Promise<void> {

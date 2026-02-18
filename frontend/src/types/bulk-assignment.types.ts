@@ -4,9 +4,21 @@
  * Types for bulk role assignment operations, enabling administrators
  * to assign multiple users to a role in a single operation.
  *
+ * Also contains unified role and schedule assignment management types
+ * that extend shared base types from assignment.types.ts.
+ *
+ * @see assignment.types.ts for shared base types
  * @see documentation/architecture/authorization/rbac-architecture.md
- * @see infrastructure/supabase/supabase/migrations/20260203190007_bulk_role_assignment.sql
  */
+
+import type {
+  BaseManageableUser,
+  BaseSyncResult,
+  FailedAssignment as BaseFailedAssignment,
+} from './assignment.types';
+
+// Re-export shared types for backwards compatibility
+export type { AssignmentDialogState, BaseManageableUser, BaseSyncResult } from './assignment.types';
 
 /**
  * Result from a bulk role assignment operation
@@ -157,12 +169,12 @@ export interface UserSelectionState extends SelectableUser {
  * Bulk assignment dialog state
  */
 export type BulkAssignmentDialogState =
-  | 'idle'           // Dialog closed
-  | 'selecting'      // User is selecting users
-  | 'confirming'     // User is reviewing before submit
-  | 'processing'     // Assignment in progress
-  | 'completed'      // Assignment finished (show results)
-  | 'error';         // Fatal error occurred
+  | 'idle' // Dialog closed
+  | 'selecting' // User is selecting users
+  | 'confirming' // User is reviewing before submit
+  | 'processing' // Assignment in progress
+  | 'completed' // Assignment finished (show results)
+  | 'error'; // Fatal error occurred
 
 /**
  * Props for the BulkAssignmentDialog component
@@ -248,15 +260,9 @@ export interface AssignmentResultDisplayProps {
 
 /**
  * Failed assignment/removal details
+ * Re-exported from assignment.types.ts for backwards compatibility
  */
-export interface FailedAssignment {
-  /** UUID of the user that failed */
-  userId: string;
-  /** Human-readable error message */
-  reason: string;
-  /** PostgreSQL error state code (e.g., 'P0002', '23505') */
-  sqlstate?: string;
-}
+export type FailedAssignment = BaseFailedAssignment;
 
 /**
  * Request parameters for listing users for role management
@@ -297,31 +303,12 @@ export interface ListUsersForRoleManagementParams {
  * Similar to SelectableUser but with isAssigned instead of isAlreadyAssigned,
  * as this is used for the unified management where we show all users.
  */
-export interface ManageableUser {
-  /** User UUID */
-  id: string;
-
-  /** User's display name */
-  displayName: string;
-
-  /** User's email address */
-  email: string;
-
-  /** Whether the user is currently active */
-  isActive: boolean;
-
+export interface ManageableUser extends BaseManageableUser {
   /**
    * Names of roles currently assigned to this user
    * Used for display context in the selection list
    */
   currentRoles: string[];
-
-  /**
-   * Whether this user is currently assigned to the target role at the target scope
-   * TRUE = checkbox should be checked initially
-   * FALSE = checkbox should be unchecked initially
-   */
-  isAssigned: boolean;
 }
 
 /**
@@ -362,41 +349,13 @@ export interface SyncRoleAssignmentsParams {
  * Contains detailed information about both additions and removals,
  * allowing partial success handling in the UI.
  */
-export interface SyncRoleAssignmentsResult {
-  /** Results for users added to the role */
-  added: {
-    /** User IDs that were successfully assigned */
-    successful: string[];
-    /** Users that failed to be assigned, with reasons */
-    failed: FailedAssignment[];
-  };
-
-  /** Results for users removed from the role */
-  removed: {
-    /** User IDs that were successfully removed */
-    successful: string[];
-    /** Users that failed to be removed, with reasons */
-    failed: FailedAssignment[];
-  };
-
-  /**
-   * Correlation ID linking all events from this sync operation
-   * Use for support tickets and debugging
-   */
-  correlationId: string;
-}
+export type SyncRoleAssignmentsResult = BaseSyncResult;
 
 /**
  * Role assignment management dialog state
+ * Alias for shared AssignmentDialogState (backwards compatibility)
  */
-export type RoleAssignmentDialogState =
-  | 'idle'           // Dialog closed
-  | 'loading'        // Loading user list
-  | 'managing'       // User is managing assignments (checking/unchecking)
-  | 'confirming'     // User is reviewing changes before save
-  | 'saving'         // Save in progress
-  | 'completed'      // Save finished (show results)
-  | 'error';         // Fatal error occurred
+export type { AssignmentDialogState as RoleAssignmentDialogState } from './assignment.types';
 
 /**
  * Props for the RoleAssignmentDialog component
@@ -426,4 +385,53 @@ export interface RoleAssignmentDialogProps {
    * Used to refresh the role's assignment list
    */
   onSuccess?: () => void;
+}
+
+// =============================================================================
+// SCHEDULE ASSIGNMENT MANAGEMENT TYPES
+// Used by the "Manage User Assignments" feature on schedule templates.
+// =============================================================================
+
+/**
+ * A user with schedule assignment info for management UI
+ */
+export interface ScheduleManageableUser extends BaseManageableUser {
+  /** If user is on a DIFFERENT template, its ID. NULL if unassigned or on this template. */
+  currentScheduleId: string | null;
+  /** If user is on a DIFFERENT template, its name. NULL otherwise. */
+  currentScheduleName: string | null;
+}
+
+/** UI state extension for schedule assignment management */
+export interface ScheduleManageableUserState extends ScheduleManageableUser {
+  isChecked: boolean;
+}
+
+/** A user that was auto-transferred from one template to another */
+export interface TransferredUser {
+  userId: string;
+  fromTemplateId: string;
+  fromTemplateName: string;
+}
+
+/** Result from sync schedule assignments operation */
+export interface SyncScheduleAssignmentsResult extends BaseSyncResult {
+  transferred: TransferredUser[];
+}
+
+/** Request parameters for syncing schedule assignments */
+export interface SyncScheduleAssignmentsParams {
+  templateId: string;
+  userIdsToAdd: string[];
+  userIdsToRemove: string[];
+  correlationId?: string;
+  reason?: string;
+}
+
+/** Request parameters for listing users for schedule management */
+export interface ListUsersForScheduleManagementParams {
+  templateId: string;
+  searchTerm?: string;
+  limit?: number;
+  offset?: number;
 }
