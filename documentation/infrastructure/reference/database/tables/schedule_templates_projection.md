@@ -6,7 +6,7 @@ last_updated: 2026-02-17
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: CQRS projection for named schedule templates. Stores the schedule definition (name, weekly grid, optional OU scope) as a first-class entity. Users are assigned to templates via `schedule_user_assignments_projection`. Managed through `api.create_schedule_template`, `api.update_schedule_template`, `api.deactivate_schedule_template`, `api.reactivate_schedule_template`, `api.delete_schedule_template`, `api.list_schedule_templates`, `api.get_schedule_template` RPCs.
+**Summary**: CQRS projection for named schedule templates with weekly grid definitions, optional OU scope, and multi-user assignment.
 
 **When to read**:
 - Building schedule template management UI
@@ -128,5 +128,5 @@ See [schedule-management.md](../../../../frontend/reference/schedule-management.
 
 ## Related Documentation
 
-- [event-handler-pattern.md](../../../infrastructure/patterns/event-handler-pattern.md) — Schedule event router
+- [event-handler-pattern.md](../../../patterns/event-handler-pattern.md) — Schedule event router
 - [schedule-management.md](../../../../frontend/reference/schedule-management.md) — Frontend reference

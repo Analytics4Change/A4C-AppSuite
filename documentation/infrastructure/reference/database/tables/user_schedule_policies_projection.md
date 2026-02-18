@@ -6,7 +6,7 @@ last_updated: 2026-02-17
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: This table was **dropped** in migration `20260217211231_schedule_template_refactor.sql`. It has been replaced by two new tables: `schedule_templates_projection` and `schedule_user_assignments_projection`. See those docs instead.
+**Summary**: Dropped table. Replaced by `schedule_templates_projection` + `schedule_user_assignments_projection`.
 
 **When to read**:
 - Understanding legacy schedule data model (pre-2026-02-17)
@@ -55,4 +55,4 @@ Migration `20260217211231` performed the following transformation:
 
 ## Related Documentation
 
-- [event-handler-pattern.md](../../../../documentation/infrastructure/patterns/event-handler-pattern.md) - Schedule event router
+- [event-handler-pattern.md](../../../patterns/event-handler-pattern.md) - Schedule event router

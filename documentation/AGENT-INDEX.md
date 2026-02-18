@@ -329,7 +329,7 @@ purpose: agent-navigation
 | [clients.md](infrastructure/reference/database/tables/clients.md) | Client/patient records | `clients`, `phi`, `hipaa` | 550 |
 | [schedule_templates_projection.md](infrastructure/reference/database/tables/schedule_templates_projection.md) | Schedule template definitions | `schedule`, `schedule-template`, `staff-schedule`, `weekly-schedule` | 500 |
 | [schedule_user_assignments_projection.md](infrastructure/reference/database/tables/schedule_user_assignments_projection.md) | User-to-schedule-template assignments | `schedule-assignment`, `user-assignment` | 350 |
-| [schedule-management.md](frontend/reference/schedule-management.md) | Schedule management frontend reference | `schedule-crud`, `schedule-form`, `weekly-grid`, `schedule-management` | 300 |
+| [schedule-management.md](frontend/reference/schedule-management.md) | Schedule template management frontend reference (MVVM, service layer, types) | `schedule-crud`, `schedule-form`, `weekly-grid`, `schedule-management`, `schedule-template` | 350 |
 | [user_schedule_policies_projection.md](infrastructure/reference/database/tables/user_schedule_policies_projection.md) | (ARCHIVED) Old per-user schedule table — dropped | `deprecated` | 100 |
 | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | Client-staff assignment mappings | `assignment`, `client-assignment`, `caseload`, `feature-flag` | 450 |
 | [event_types.md](infrastructure/reference/database/tables/event_types.md) | Event schema registry | `event-types`, `schema-registry`, `json-schema` | 500 |

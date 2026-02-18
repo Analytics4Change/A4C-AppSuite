@@ -6,7 +6,7 @@ last_updated: 2026-02-17
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: CQRS projection junction table linking users to schedule templates. Each record represents a user's assignment to a `schedule_templates_projection` template with optional effective date range. Managed through `api.assign_user_to_schedule` and `api.unassign_user_from_schedule` RPCs.
+**Summary**: CQRS junction table linking users to schedule templates with optional effective date ranges.
 
 **When to read**:
 - Assigning or unassigning users from schedule templates
@@ -93,5 +93,5 @@ Key characteristics:
 
 ## Related Documentation
 
-- [event-handler-pattern.md](../../../infrastructure/patterns/event-handler-pattern.md) — Schedule event router
+- [event-handler-pattern.md](../../../patterns/event-handler-pattern.md) — Schedule event router
 - [schedule-management.md](../../../../frontend/reference/schedule-management.md) — Frontend reference
