@@ -569,6 +569,34 @@ client_id uuid NOT NULL,  -- Will reference clients table when created
 
 This is intentional - clients table doesn't exist yet.
 
+### 15. Phase 5B Missed Edge Functions and 2 RLS Policies (Discovered 2026-02-18)
+
+Phase 5B ("Strip Deprecated Claims", migration `20260126180004`) stripped `permissions`, `user_role`, `scope_path` from the JWT hook and frontend code, but **missed 3 Edge Functions** that decode JWT client-side with their own local `JWTPayload` interfaces.
+
+**Broken Edge Functions** (read `jwtPayload.permissions` which is always `undefined` in v4):
+- `invite-user/index.ts` (line 497): checks `user.create`
+- `manage-user/index.ts` (line 223): checks `user.update`, `user.delete`, `user.role_assign`
+- `organization-bootstrap/index.ts` (line 203): checks `organization.create_root`
+
+**Impact**: ALL permission-gated Edge Function operations are silently blocked for ALL users. `permissions` is `undefined` → defaults to `[]` → every `.includes()` returns `false`.
+
+**Broken RLS Policies** (missed during Phase 4 RLS Policy Migration):
+- `permission_implications_modify`: reads `user_role` (removed in v4) — always denies
+- `user_notification_prefs_select_own`: reads `app_metadata.org_id` (never existed in v4 claims) — org-admin cross-user access broken
+
+**Root cause**: Phase 5B task "Update all service JWT decoders" only audited `frontend/src/services/auth/` — it didn't audit `infrastructure/supabase/supabase/functions/`. Phase 4 migrated 8 scope-based RLS policies but didn't audit ALL policies for other deprecated field references.
+
+**Why NOT `has_org_admin_permission()` for Edge Functions**:
+`has_org_admin_permission()` checks 6 permissions: `user.manage`, `user.role_assign`, `organization.manage`, `role.create`, `role.update`, `role.delete`. Edge Functions need `user.create`, `user.update`, `user.delete`, `user.role_assign`, `organization.create_root` — only 1 of 5 overlaps.
+
+**SQL permission helper equivalence**:
+| Layer | Function | Reads |
+|-------|----------|-------|
+| SQL (RLS/RPC) | `has_permission(p_permission text)` | `request.jwt.claims → effective_permissions[].p` |
+| TypeScript (Edge Fn) | `hasPermission(ep[], permission)` | Decoded JWT `effective_permissions[].p` |
+
+Both check the same JWT data; they just operate in different runtimes (PostgreSQL vs Deno).
+
 ## Why RBAC + Assignments Over Full ReBAC?
 
 **For Option A (Recommended)**:

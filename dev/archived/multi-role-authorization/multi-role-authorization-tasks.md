@@ -218,24 +218,54 @@
 - [ ] Bulk role assignment UI functional (dependent feature)
 - [ ] All existing functionality continues working
 
+## Phase 8: JWT v4 Edge Function + RLS Remediation ✅ COMPLETE
+
+> **Reopened 2026-02-18**: Phase 5B missed 3 Edge Functions and 2 RLS policies.
+> All still reference removed v3 JWT fields (`permissions`, `user_role`, `app_metadata.org_id`).
+
+### 8.1 Shared JWT v4 Types
+- [x] Add `EffectivePermission` interface to `_shared/types.ts`
+- [x] Add `JWTPayload` interface to `_shared/types.ts`
+- [x] Add `hasPermission()` helper to `_shared/types.ts`
+
+### 8.2 Fix Edge Functions
+- [x] `invite-user/index.ts`: Delete local JWTPayload, import shared, fix `permissions` → `effective_permissions`, replace `.includes()` with `hasPermission()` (v14-jwt-v4-claims, deployed version 59)
+- [x] `manage-user/index.ts`: Delete local JWTPayload, import shared, fix `permissions` → `effective_permissions`, replace 4x `.includes()` with `hasPermission()` (v8-jwt-v4-claims, deployed version 47)
+- [x] `organization-bootstrap/index.ts`: Delete local JWTPayload, import shared, fix `permissions` → `effective_permissions`, replace `.includes()` with `hasPermission()` (v6-jwt-v4-claims, deployed version 95)
+
+### 8.3 Fix RLS Policies
+- [x] Create migration: `permission_implications_modify` → use `has_platform_privilege()` (`20260218225841_fix_rls_policies_jwt_v4.sql`)
+- [x] Create migration: `user_notification_prefs_select_own` → use `get_current_org_id()` (same migration)
+
+### 8.4 Deploy + Verify
+- [x] Deploy `invite-user` Edge Function via MCP (version 59)
+- [x] Deploy `manage-user` Edge Function via MCP (version 47)
+- [x] Deploy `organization-bootstrap` Edge Function via MCP (version 95)
+- [x] Apply RLS migration via MCP
+- [x] Run MCP security advisors — no new issues (only pre-existing: plpgsql_check in public, leaked password protection)
+- [x] Verify via `get_logs` — no calls to new versions yet (expected, last call was on old v58)
+
+---
+
 ## Current Status
 
-**Phase**: All Phases Complete
-**Status**: ✅ All 16 migrations deployed, all phases complete (2026-02-05)
-**Last Updated**: 2026-02-05
-**Completed Steps**:
+**Phase**: Phase 8 — JWT v4 Edge Function + RLS Remediation
+**Status**: ✅ COMPLETE
+**Last Updated**: 2026-02-18
+**Next Step**: Archive dev-docs to `dev/archived/multi-role-authorization/`, document Edge Function permission pattern in `documentation/`
+
+### Previously Completed (before reopen)
+
 1. ~~Deploy migrations: `supabase db push --linked`~~ ✅ DONE
 2. ~~Run `npm run generate:types` in `infrastructure/supabase/contracts/`~~ ✅ DONE (2026-01-24)
 3. ~~Add event routing to `process_user_event()` for new event types~~ ✅ DONE (migration #11)
 4. ~~Phase 4 RLS Policy Migration~~ ✅ DONE (2026-01-24)
 5. ~~Phase 5 Frontend Integration~~ ✅ DONE (2026-01-26)
-6. ~~Phase 5B Strip Deprecated Claims~~ ✅ DONE (2026-01-26)
+6. ~~Phase 5B Strip Deprecated Claims~~ ✅ DONE (2026-01-26) — **INCOMPLETE: missed Edge Functions + 2 RLS policies**
 7. ~~Deploy migrations #13-15~~ ✅ DONE (2026-01-26, deployed via `supabase db push --linked`)
 8. ~~Phase 6 Organization Direct Care Settings UI~~ ✅ DONE (2026-01-26)
 9. ~~Phase 5C Bug Fixes~~ ✅ DONE (2026-02-04)
 10. ~~Phase 7 Schedules & Assignments UI~~ ✅ DONE (2026-02-05)
-
-**Next**: Archive these dev-docs to `dev/archived/multi-role-authorization/`
 
 ## Phase 5C: Bug Fixes ✅ COMPLETE (2026-02-04)
 

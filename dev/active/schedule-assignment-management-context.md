@@ -120,3 +120,25 @@
 **No handler changes needed**: This feature only adds RPC functions and a DB constraint. No event handlers or routers were modified, so handler reference files remain unchanged at 75 files.
 
 **Remaining**: Manual regression testing (roles dialog, schedule dialog), then archive to `dev/archived/`.
+
+## UX Alignment Refactor — 2026-02-18
+
+**Commit**: `35d8a953 refactor: align schedule management UX with roles workflow`
+
+**Problem**: Schedule management UX diverged from roles in 3 ways:
+1. Schedule creation required mandatory user assignment; roles did not
+2. "Manage User Assignments" button was hidden (conditional render) when inactive; roles showed it disabled with tooltip
+3. Edit header showed user count subtitle; roles did not
+
+**Changes**:
+- Removed mandatory "Assign Users" section from schedule create form (backend already accepts empty `p_user_ids`)
+- Deleted `ScheduleUserAssignmentDialog.tsx` (263 lines, no remaining consumers)
+- Changed button from `{is_active && <Button>}` to always-visible `<Button disabled={!is_active}>` with `title` tooltip
+- Removed user count subtitle from edit card header
+
+**Files deleted**: `frontend/src/components/schedules/ScheduleUserAssignmentDialog.tsx`
+**Files modified**: `SchedulesManagePage.tsx` (-96 lines), `components/schedules/index.ts` (removed barrel export)
+
+**Also fixed**: Pre-existing lint error — unused `/* eslint-disable */` in `generated-events.ts` (file is gitignored, fix is local-only)
+
+**Deployment**: 2 GitHub Actions workflows passed (Deploy Frontend, Validate Frontend Documentation). No DB migration needed.

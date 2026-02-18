@@ -61,8 +61,19 @@
 - [x] `npm run typecheck` passes
 - [x] `npm run lint` passes
 - [x] `npm run build` succeeds
-- [ ] Update handler reference files if needed (no handler changes in this feature)
-- [ ] Update MEMORY.md with completion notes
+- [x] Update handler reference files if needed (no handler changes in this feature — N/A)
+- [x] Update MEMORY.md with completion notes
+
+## Phase 9: UX Alignment with Roles ✅ COMPLETE
+
+- [x] Remove mandatory user assignment from schedule create form
+- [x] Delete `ScheduleUserAssignmentDialog.tsx` (no remaining consumers)
+- [x] Remove barrel export from `components/schedules/index.ts`
+- [x] Change "Manage User Assignments" button to always-visible + disabled when inactive (with tooltip)
+- [x] Remove user count subtitle from edit card header
+- [x] Fix pre-existing lint error (unused `/* eslint-disable */` in `generated-events.ts`)
+- [x] `npm run typecheck && npm run lint && npm run build` all pass
+- [x] Committed and deployed (`35d8a953`)
 
 ## Success Validation Checkpoints
 
@@ -88,7 +99,7 @@
 
 ## Current Status
 
-**Phase**: 8 — Final Verification
+**Phase**: 9 — UX Alignment with Roles
 **Status**: ✅ COMPLETE
 **Last Updated**: 2026-02-18
-**Next Step**: Manual regression check (roles assignment), then commit
+**Next Step**: Manual regression testing (roles + schedule dialogs), then archive to `dev/archived/`

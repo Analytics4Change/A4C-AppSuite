@@ -99,9 +99,41 @@ The current single-role JWT architecture cannot support this. Two approaches are
 | Migration breaks existing users | Backward-compatible claims, phased rollout |
 | ReBAC infrastructure complexity | Start with Auth0 FGA (managed) if selected |
 
+## Phase 8: JWT v4 Edge Function + RLS Remediation (2026-02-18)
+
+> **Reopened**: Phase 5B "Strip Deprecated Claims" was marked complete on 2026-01-26 but missed
+> 3 Edge Functions and 2 RLS policies that still reference removed v3 JWT fields.
+
+### 8.1 Shared JWT v4 Types for Edge Functions
+- Add `EffectivePermission`, `JWTPayload`, `hasPermission()` to `_shared/types.ts`
+- TypeScript equivalent of SQL `has_permission(p_permission text)` (baseline:9927)
+
+### 8.2 Fix 3 Edge Functions
+- `invite-user/index.ts`: `jwtPayload.permissions` → `jwtPayload.effective_permissions`
+- `manage-user/index.ts`: same fix, 4 permission checks
+- `organization-bootstrap/index.ts`: same fix, 1 permission check
+- Delete local `JWTPayload` interfaces, import shared types
+
+### 8.3 Fix 2 RLS Policies (migration)
+- `permission_implications_modify`: `user_role = 'super_admin'` → `has_platform_privilege()`
+- `user_notification_prefs_select_own`: `app_metadata.org_id` → `get_current_org_id()`
+
+### 8.4 Deploy + Verify
+- Deploy 3 Edge Functions via MCP `deploy_edge_function`
+- Apply migration via MCP `apply_migration`
+- Run MCP security advisors
+
+### Why NOT `has_org_admin_permission()`
+Edge Functions check granular permissions (`user.create`, `user.delete`, `organization.create_root`)
+that are NOT in the `has_org_admin_permission()` fixed set. Only 1 of 5 overlaps.
+The correct SQL equivalent is `has_permission(p_permission)`, but Edge Functions shouldn't
+call it via RPC — they already have the decoded JWT in-memory after `getUser()` validation.
+
 ## Next Steps After Completion
 
-1. Implement Clients domain (depends on authorization architecture)
-2. Implement shift scheduling system
-3. Build data collection modules (medication, incidents, sleep, activities)
-4. Implement analytics and correlation reporting
+1. Archive dev-docs to `dev/archived/multi-role-authorization/`
+2. Document Edge Function permission pattern in `documentation/` to prevent future drift
+3. Implement Clients domain (depends on authorization architecture)
+4. Implement shift scheduling system
+5. Build data collection modules (medication, incidents, sleep, activities)
+6. Implement analytics and correlation reporting
