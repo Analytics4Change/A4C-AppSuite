@@ -8,7 +8,7 @@
  * Features:
  * - Split view layout (list 1/3 + form 2/3)
  * - Select template -> shows editable form with weekly grid
- * - Create mode for new templates with user assignment
+ * - Create mode for new templates (users assigned after via edit mode)
  * - Deactivate/Reactivate/Delete operations with structured error handling
  * - DangerZone component for destructive operations
  * - Unsaved changes warning
@@ -24,12 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DangerZone } from '@/components/ui/DangerZone';
-import {
-  ScheduleList,
-  ScheduleFormFields,
-  ScheduleUserAssignmentDialog,
-  ScheduleAssignmentDialog,
-} from '@/components/schedules';
+import { ScheduleList, ScheduleFormFields, ScheduleAssignmentDialog } from '@/components/schedules';
 import { ScheduleListViewModel } from '@/viewModels/schedule/ScheduleListViewModel';
 import { ScheduleFormViewModel } from '@/viewModels/schedule/ScheduleFormViewModel';
 import { ScheduleAssignmentViewModel } from '@/viewModels/schedule/ScheduleAssignmentViewModel';
@@ -81,7 +76,6 @@ export const SchedulesManagePage: React.FC = observer(() => {
 
   const [operationError, setOperationError] = useState<string | null>(null);
 
-  const [showUserAssignDialog, setShowUserAssignDialog] = useState(false);
   const [showManageAssignDialog, setShowManageAssignDialog] = useState(false);
 
   // Memoize the ScheduleAssignmentViewModel on currentTemplate ID only
@@ -368,25 +362,6 @@ export const SchedulesManagePage: React.FC = observer(() => {
     setDialogState({ type: 'deactivate', isLoading: false });
   }, []);
 
-  // User assignment dialog handlers
-  const handleUserAssignClick = useCallback(() => {
-    setShowUserAssignDialog(true);
-  }, []);
-
-  const handleUserAssignClose = useCallback(() => {
-    setShowUserAssignDialog(false);
-  }, []);
-
-  const handleUserAssignConfirm = useCallback(
-    (userIds: string[]) => {
-      if (formViewModel) {
-        formViewModel.setAssignedUserIds(userIds);
-      }
-      setShowUserAssignDialog(false);
-    },
-    [formViewModel]
-  );
-
   // Manage assignments dialog handlers (edit mode)
   const handleManageAssignClick = useCallback(() => {
     setShowManageAssignDialog(true);
@@ -581,29 +556,6 @@ export const SchedulesManagePage: React.FC = observer(() => {
                       disabled={formViewModel.isSubmitting}
                     />
 
-                    {/* User Assignment */}
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium text-gray-700">Assign Users</h3>
-                      <p className="text-xs text-gray-500">
-                        {formViewModel.assignedUserIds.length === 0
-                          ? 'No users assigned yet. Click below to assign users to this template.'
-                          : `${formViewModel.assignedUserIds.length} user(s) selected`}
-                      </p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleUserAssignClick}
-                        disabled={formViewModel.isSubmitting}
-                        className="text-blue-600 border-blue-300 hover:bg-blue-50"
-                      >
-                        <Users className="w-4 h-4 mr-1" />
-                        {formViewModel.assignedUserIds.length === 0
-                          ? 'Select Users'
-                          : 'Change Users'}
-                      </Button>
-                    </div>
-
                     {/* Form Actions */}
                     <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
                       <Button
@@ -616,9 +568,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
                       </Button>
                       <Button
                         type="submit"
-                        disabled={
-                          !formViewModel.canSubmit || formViewModel.assignedUserIds.length === 0
-                        }
+                        disabled={!formViewModel.canSubmit}
                         className="bg-blue-600 hover:bg-blue-700 text-white"
                       >
                         <Plus className="w-4 h-4 mr-1" />
@@ -674,18 +624,21 @@ export const SchedulesManagePage: React.FC = observer(() => {
                         Edit Template
                       </CardTitle>
                       <div className="flex items-center gap-2">
-                        {currentTemplate.is_active && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleManageAssignClick}
-                            className="text-blue-600 border-blue-300 hover:bg-blue-50"
-                          >
-                            <Users className="w-4 h-4 mr-1" />
-                            Manage User Assignments
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleManageAssignClick}
+                          disabled={formViewModel.isSubmitting || !currentTemplate.is_active}
+                          className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                          title={
+                            !currentTemplate.is_active
+                              ? 'Activate template to manage users'
+                              : 'Add or remove user assignments for this template'
+                          }
+                        >
+                          <Users className="w-4 h-4 mr-1" />
+                          Manage User Assignments
+                        </Button>
                         <span
                           className={cn(
                             'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
@@ -698,10 +651,6 @@ export const SchedulesManagePage: React.FC = observer(() => {
                         </span>
                       </div>
                     </div>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {currentTemplate.assigned_user_count} assigned user
-                      {currentTemplate.assigned_user_count !== 1 ? 's' : ''}
-                    </p>
                   </CardHeader>
                   <CardContent className="p-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
@@ -898,15 +847,6 @@ export const SchedulesManagePage: React.FC = observer(() => {
           onSuccess={handleManageAssignSuccess}
         />
       )}
-
-      {/* User Assignment Dialog (create mode - simple picker) */}
-      <ScheduleUserAssignmentDialog
-        isOpen={showUserAssignDialog}
-        onClose={handleUserAssignClose}
-        onConfirm={handleUserAssignConfirm}
-        selectedUserIds={formViewModel?.assignedUserIds ?? []}
-        title="Assign Users to Template"
-      />
     </div>
   );
 });

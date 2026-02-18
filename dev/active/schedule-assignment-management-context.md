@@ -44,7 +44,7 @@
 
 ### Existing Files Modified
 - `frontend/src/types/bulk-assignment.types.ts` — Refactor to extend base types, append schedule types
-- `frontend/src/components/roles/RoleAssignmentDialog.tsx` — Refactor from 588 to ~200 lines using shared components
+- `frontend/src/components/roles/RoleAssignmentDialog.tsx` — Refactored from 588 to 311 lines using shared components
 - `frontend/src/viewModels/roles/RoleAssignmentViewModel.ts` — Minor type import changes
 - `frontend/src/services/schedule/IScheduleService.ts` — Add 2 new method signatures
 - `frontend/src/services/schedule/SupabaseScheduleService.ts` — Add 2 new method implementations
@@ -53,7 +53,7 @@
 - `frontend/src/pages/schedules/SchedulesManagePage.tsx` — Wire button, dialog, ViewModel
 
 ### New Files Created
-- `infrastructure/supabase/supabase/migrations/TIMESTAMP_schedule_assignment_management.sql` — Constraint + 2 RPCs
+- `infrastructure/supabase/supabase/migrations/20260218173920_schedule_assignment_management.sql` — Constraint + 2 RPCs
 - `frontend/src/types/assignment.types.ts` — Shared base types
 - `frontend/src/components/ui/assignment/AssignmentAlert.tsx` — Alert sub-component
 - `frontend/src/components/ui/assignment/ManageableUserList.tsx` — Checkbox list with render prop
@@ -100,3 +100,23 @@
 1. **No abstraction** (clone and adapt): Would produce ~800 lines of duplication. Any future bug fix or UX change would need updates in two places.
 2. **Fully generic ViewModel + Dialog**: Too many generics and configuration parameters. Transfer tracking, scope validation, and result types diverge enough that a generic ViewModel would be over-engineered.
 3. **Shared sub-components** (chosen): Extracts the 83% that's identical (checkbox list, result display, alert) as composable pieces with render props for the 17% that differs. Roles code is refactored (not duplicated), schedules compose the same pieces. ~712 net new lines vs ~1,175 without sharing.
+
+## Completion Notes — 2026-02-18
+
+**Status**: Feature complete, committed, deployed, all CI/CD passed.
+
+**Commit**: `69a63e7a feat: add schedule assignment management with auto-transfer`
+
+**Deployment**: All 3 GitHub Actions workflows passed:
+- Deploy Frontend (build + deploy)
+- Validate Frontend Documentation
+- Deploy Database Migrations
+
+**Actual line counts** (vs estimates):
+- RoleAssignmentDialog: 588 → 311 lines (estimated ~200, actual 311 — dialog shell + handlers kept more code than expected)
+- ScheduleAssignmentDialog: 337 lines (estimated ~250)
+- ScheduleAssignmentViewModel: 650 lines (estimated ~380 — transfer tracking + comprehensive changesSummary logic added more)
+
+**No handler changes needed**: This feature only adds RPC functions and a DB constraint. No event handlers or routers were modified, so handler reference files remain unchanged at 75 files.
+
+**Remaining**: Manual regression testing (roles dialog, schedule dialog), then archive to `dev/archived/`.

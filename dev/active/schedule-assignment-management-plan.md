@@ -72,21 +72,21 @@ To avoid ~800 lines of duplication, we extract shared sub-components from the ex
 ## Success Metrics
 
 ### Immediate
-- [ ] UNIQUE constraint verified via `execute_sql`
-- [ ] Both RPCs return correct data via MCP
-- [ ] TypeScript typecheck passes after shared type refactor
-- [ ] Roles assignment dialog works identically after refactor
+- [x] UNIQUE constraint verified via `execute_sql`
+- [x] Both RPCs return correct data via MCP
+- [x] TypeScript typecheck passes after shared type refactor
+- [ ] Roles assignment dialog works identically after refactor (manual check pending)
 
 ### Feature Complete
-- [ ] Schedule assignment dialog opens from edit mode
-- [ ] Users show correct assignment status and transfer tags
-- [ ] Save correctly assigns/unassigns/transfers
-- [ ] Result display shows transferred section
-- [ ] `npm run typecheck && npm run lint && npm run build` all pass
+- [x] Schedule assignment dialog opens from edit mode
+- [x] Users show correct assignment status and transfer tags (code complete, manual check pending)
+- [x] Save correctly assigns/unassigns/transfers (code complete, manual check pending)
+- [x] Result display shows transferred section (code complete, manual check pending)
+- [x] `npm run typecheck && npm run lint && npm run build` all pass
 
 ### Long-Term
-- [ ] Shared components reusable for future entity assignment patterns
-- [ ] 0-or-1 constraint prevents data integrity issues
+- [x] Shared components reusable for future entity assignment patterns
+- [x] 0-or-1 constraint prevents data integrity issues
 
 ## Risk Mitigation
 
@@ -98,6 +98,7 @@ To avoid ~800 lines of duplication, we extract shared sub-components from the ex
 | Missing event metadata audit fields | RPCs include `p_event_metadata` with `user_id` + `organization_id` |
 
 ## Next Steps After Completion
-- Update handler reference files at `infrastructure/supabase/handlers/schedule/`
-- Update AsyncAPI contracts if new event shapes
+- ~~Update handler reference files at `infrastructure/supabase/handlers/schedule/`~~ — Not needed (no handler changes)
+- ~~Update AsyncAPI contracts if new event shapes~~ — Not needed (no new event shapes)
 - Archive dev-docs to `dev/archived/schedule-assignment-management/`
+- Manual regression testing (roles dialog + schedule dialog)
