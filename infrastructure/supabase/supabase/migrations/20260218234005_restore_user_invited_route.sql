@@ -1,7 +1,11 @@
+-- Restore user.invited routing that was accidentally dropped by
+-- 20260217211231_schedule_template_refactor.sql when it rewrote
+-- process_user_event() to remove user.schedule.* branches.
+
 CREATE OR REPLACE FUNCTION public.process_user_event(p_event record)
- RETURNS void
- LANGUAGE plpgsql
- SET search_path TO 'public', 'extensions', 'pg_temp'
+    RETURNS void
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'extensions', 'pg_temp'
 AS $function$
 BEGIN
     CASE p_event.event_type
@@ -26,7 +30,7 @@ BEGIN
         -- Client assignments
         WHEN 'user.client.assigned'                  THEN PERFORM handle_user_client_assigned(p_event);
         WHEN 'user.client.unassigned'                THEN PERFORM handle_user_client_unassigned(p_event);
-        -- Invitations
+        -- Invitations (restored — accidentally dropped by schedule_template_refactor)
         WHEN 'user.invited'                          THEN PERFORM handle_user_invited(p_event);
         ELSE
             RAISE EXCEPTION 'Unhandled event type "%" in process_user_event', p_event.event_type
