@@ -66,6 +66,7 @@ Unify the deactivation and deletion user experience across four applets (/organi
 
 ### Long-Term
 - [x] No orphaned projection rows from missing CASCADE constraints (FK migration applied)
+- [x] Architecture review: 0 Critical, 2 Major fixed, 1 Minor fixed, rest acceptable
 - [ ] Zero processing_error rows for new schedule event types (requires production verification)
 
 ## Risk Mitigation

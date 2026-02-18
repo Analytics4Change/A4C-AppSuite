@@ -99,3 +99,17 @@ All applets use: `{ type: 'none' } | { type: 'deactivate' } | { type: 'reactivat
 - Schedule templates are first-class entities with shared-resource semantics
 - `effectiveFrom`/`effectiveUntil` belong to assignments (junction table), not templates
 - Structured error codes (`HAS_USERS`, `STILL_ACTIVE`, `HAS_CHILDREN`, `HAS_ROLES`) replace generic error strings
+
+### Architecture Review Remediation (2026-02-18)
+- **M1**: Response envelope mismatch — `list_schedule_templates` now returns `{success, data}` envelope; `getTemplate` frontend reads `result.template` + `result.assigned_users`
+- **M2**: All 9 schedule RPC functions now pass `p_event_metadata` with `user_id` + `organization_id` to `api.emit_domain_event()`
+- **m3**: `assigned_user_count` denormalized as stored `integer NOT NULL DEFAULT 0` column on `schedule_templates_projection`; maintained by idempotent recount in `handle_schedule_created`, `handle_schedule_user_assigned`, `handle_schedule_user_unassigned`
+- **m4**: `event-handler-pattern.md` and `infrastructure/CLAUDE.md` updated with new schedule stream type
+- **Lesson**: `roles_projection.user_count` is NOT a stored column — it's computed at query time via LEFT JOIN. The architect's suggestion to "match that pattern" was slightly inaccurate.
+
+### Additional Files from Remediation
+- `infrastructure/supabase/supabase/migrations/20260217231405_add_event_metadata_to_schedule_rpcs.sql` — M1+M2 fixes
+- `infrastructure/supabase/supabase/migrations/20260218001058_denormalize_schedule_assigned_user_count.sql` — m3 fix
+- `documentation/infrastructure/reference/database/tables/schedule_templates_projection.md` — NEW table doc
+- `documentation/infrastructure/reference/database/tables/schedule_user_assignments_projection.md` — NEW table doc
+- `documentation/AGENT-INDEX.md` — schedule keywords updated to new tables

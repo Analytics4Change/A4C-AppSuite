@@ -28,9 +28,23 @@
 - [x] Step 19: Frontend SchedulesManagePage — DangerZone component, structured delete errors (HAS_USERS dialog with details, STILL_ACTIVE → deactivate first)
 - [x] Verify Phase 2: typecheck + lint + build — all pass
 
+## Post-Implementation: Architecture Review Remediation - COMPLETE
+
+- [x] Architecture review by software-architect-dbc agent (2 Major, 8 Minor, 4 Informational findings)
+- [x] M1 fix: `list_schedule_templates` wrapped in `{success, data}` envelope; `getTemplate` reads `result.template`
+- [x] M2 fix: All 9 RPC functions now include `p_event_metadata` with `user_id` + `organization_id`
+- [x] m3 fix: `assigned_user_count` denormalized as stored column on `schedule_templates_projection`, maintained by handlers via idempotent recount
+- [x] m4 fix: `event-handler-pattern.md` + `infrastructure/CLAUDE.md` updated (router 12→13, handlers 50→52, schedule section added)
+- [x] AGENT-INDEX.md schedule keywords updated to point to new tables
+- [x] New table docs created: `schedule_templates_projection.md`, `schedule_user_assignments_projection.md`
+- [x] Old table doc `user_schedule_policies_projection.md` marked archived with redirect
+- [x] MEMORY.md updated with all completion notes
+- [x] Commits pushed to origin/main: `33de6902` (feat) + `311d13ef` (fix)
+- [x] Verify: typecheck + build pass after all remediation
+
 ## Current Status
 
-**Phase**: 2 — COMPLETE
-**Status**: Both phases complete. Full schedule template refactor done. Dev-docs updated.
-**Last Updated**: 2026-02-17
-**Next Step**: Archive dev-docs to `dev/archived/unified-deletion-ux/`, update MEMORY.md, commit all changes
+**Phase**: COMPLETE — All work done, pushed to origin
+**Status**: ✅ COMPLETE
+**Last Updated**: 2026-02-18
+**Next Step**: Archive dev-docs to `dev/archived/unified-deletion-ux/`
