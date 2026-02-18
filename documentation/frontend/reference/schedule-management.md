@@ -6,7 +6,7 @@ last_updated: 2026-02-17
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Frontend reference for schedule template management — split-view CRUD, user assignment, and weekly grid components.
+**Summary**: Frontend reference for schedule template management — split-view CRUD, user assignment, weekly grid, and shared DangerZone/ConfirmDialog deletion UX.
 
 **When to read**:
 - Modifying schedule list, form, or management pages
@@ -103,9 +103,18 @@ All data access goes through `api.*` schema RPCs:
 | `assignUser` | `api.assign_user_to_schedule` | Assign user to template |
 | `unassignUser` | `api.unassign_user_from_schedule` | Remove user from template |
 
+### Danger Zone (Shared Component)
+
+Deactivation, reactivation, and deletion actions live in the `DangerZone` component (`components/ui/DangerZone.tsx`), shared across all 4 manage pages (Org Units, Roles, Users, Schedules).
+
+- **Collapsible**: Collapsed by default, toggles via click or Enter/Space. State persists within the route but resets on navigation.
+- **Render slots**: Each page injects cascade warnings (e.g., assigned user counts) via `deactivateSlot`, `reactivateSlot`, `deleteSlot` props.
+
 ### Delete Safety
 
 A template must be **inactive** and have **0 assigned users** before deletion. The manage page enforces this with:
+- A collapsible `DangerZone` panel (collapsed by default) with deactivate/reactivate/delete sections
+- A **"type DELETE to confirm"** dialog (`ConfirmDialog` with `requireConfirmText="DELETE"`) — confirm button stays disabled until the user types "DELETE"
 - An "activeWarning" dialog when attempting to delete an active template (offers to deactivate first)
 - A "hasUsers" dialog when attempting to delete a template with assignments (lists affected users)
 

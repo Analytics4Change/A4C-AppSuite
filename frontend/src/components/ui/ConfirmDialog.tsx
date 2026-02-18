@@ -2,13 +2,18 @@
  * Confirm Dialog Component
  *
  * Reusable confirmation dialog with variant styles for different action types.
- * Used across Organization Unit management pages.
+ * Used across entity management pages (Org Units, Roles, Users, Schedules).
  *
  * Variants:
  * - danger: Red styling for destructive actions (delete)
  * - warning: Orange styling for caution actions (deactivate, discard)
  * - success: Green styling for positive actions (reactivate)
  * - default: Blue styling for neutral actions
+ *
+ * Optional confirm text hardening:
+ * - requireConfirmText prop shows a labeled text input
+ * - Confirm button stays disabled until user types the required text (case-insensitive)
+ * - Input resets when dialog closes; focus auto-directed to input on open
  *
  * Accessibility (WCAG 2.1 Level AA + WAI-ARIA APG Dialog Pattern):
  * - Uses role="alertdialog" for screen reader announcement
@@ -17,12 +22,12 @@
  * - Focus trap: Tab/Shift+Tab contained within dialog
  * - Escape key: Closes dialog and returns focus
  * - Focus restoration: Returns focus to trigger element on close
- * - Initial focus: Sets focus to first focusable element
+ * - Initial focus: Confirm text input (when present) or Cancel button
  * - Backdrop click: Closes dialog (optional dismissal)
  * - Color contrast: Icons meet WCAG AA 3:1 minimum for graphical objects
  */
 
-import React, { useRef, RefObject } from 'react';
+import React, { useRef, useState, useEffect, RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, CheckCircle, X } from 'lucide-react';
 import { cn } from '@/components/ui/utils';
@@ -40,6 +45,8 @@ export interface ConfirmDialogProps {
   variant?: 'danger' | 'warning' | 'success' | 'default';
   /** Optional list of affected entities rendered below the message */
   details?: string[];
+  /** When set, user must type this text to enable the confirm button */
+  requireConfirmText?: string;
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -53,9 +60,21 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isLoading = false,
   variant = 'default',
   details,
+  requireConfirmText,
 }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
+  const confirmInputRef = useRef<HTMLInputElement | null>(null);
+  const [confirmInput, setConfirmInput] = useState('');
+
+  // Reset confirm input when dialog opens/closes
+  useEffect(() => {
+    if (!isOpen) setConfirmInput('');
+  }, [isOpen]);
+
+  const confirmDisabled =
+    isLoading ||
+    (!!requireConfirmText && confirmInput.toUpperCase() !== requireConfirmText.toUpperCase());
 
   // Focus trap and keyboard navigation (WCAG 2.1 AA requirement)
   // Pattern from MedicationSearchModal - proven implementation
@@ -66,7 +85,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     restoreFocus: true, // Return focus to trigger element on close
     onEscape: onCancel, // ESC key closes dialog
     wrapAround: true, // Tab from last element goes to first
-    initialFocusRef: cancelButtonRef as RefObject<HTMLElement>, // Focus Cancel (safe option) by default
+    initialFocusRef: (requireConfirmText
+      ? confirmInputRef
+      : cancelButtonRef) as RefObject<HTMLElement>,
   });
 
   if (!isOpen) return null;
@@ -145,6 +166,23 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+        {requireConfirmText && (
+          <div className="mt-3">
+            <label htmlFor="confirm-text-input" className="block text-sm text-gray-700">
+              Type <strong className="font-mono">{requireConfirmText}</strong> to confirm
+            </label>
+            <input
+              ref={confirmInputRef}
+              id="confirm-text-input"
+              type="text"
+              autoComplete="off"
+              value={confirmInput}
+              onChange={(e) => setConfirmInput(e.target.value)}
+              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500"
+              aria-describedby="confirm-dialog-description"
+            />
+          </div>
+        )}
         <div className="mt-6 flex justify-end gap-3">
           <Button ref={cancelButtonRef} variant="outline" onClick={onCancel} disabled={isLoading}>
             {cancelLabel}
@@ -152,7 +190,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <Button
             className={cn('text-white', variantStyles[variant])}
             onClick={onConfirm}
-            disabled={isLoading}
+            disabled={confirmDisabled}
           >
             {isLoading ? 'Processing...' : confirmLabel}
           </Button>

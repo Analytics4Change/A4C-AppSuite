@@ -843,6 +843,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
         onCancel={() => setDialogState({ type: 'none' })}
         isLoading={dialogState.type === 'delete' && dialogState.isLoading}
         variant="danger"
+        requireConfirmText="DELETE"
       />
 
       {/* User Assignment Dialog */}

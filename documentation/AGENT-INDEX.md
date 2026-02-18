@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-16
+last_updated: 2026-02-17
 purpose: agent-navigation
 ---
 
@@ -62,6 +62,7 @@ purpose: agent-navigation
 | `compliance` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | dosage_info.md |
 | `contact-addresses` | [contact_addresses.md](infrastructure/reference/database/tables/contact_addresses.md) | contacts_projection.md |
 | `contact-phones` | [contact_phones.md](infrastructure/reference/database/tables/contact_phones.md) | contacts_projection.md |
+| `confirm-dialog` | [schedule-management.md](frontend/reference/schedule-management.md) | ui-patterns.md |
 | `contacts` | [contacts_projection.md](infrastructure/reference/database/tables/contacts_projection.md) | provider-partners-architecture.md |
 | `contract-drift` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, workflows/CLAUDE.md |
 | `controlled-substances` | [medications.md](infrastructure/reference/database/tables/medications.md) | dosage_info.md |
@@ -71,6 +72,7 @@ purpose: agent-navigation
 | `cross-tenant` | [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | var-partnerships.md |
 | `canonical-values` | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | ui-patterns.md, EVENT-DRIVEN-GUIDE.md |
 | `custom-claims` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | frontend-auth-architecture.md, custom-claims-setup.md |
+| `danger-zone` | [schedule-management.md](frontend/reference/schedule-management.md) | ui-patterns.md |
 | `day0-migration` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | handlers/README.md, DEPLOYMENT_INSTRUCTIONS.md |
 | `data-collection` | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | ui-patterns.md, EVENT-DRIVEN-GUIDE.md |
 | `database-hook` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | custom-claims-setup.md |
