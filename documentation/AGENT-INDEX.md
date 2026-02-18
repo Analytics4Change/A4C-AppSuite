@@ -37,7 +37,7 @@ purpose: agent-navigation
 |---------|-----------------|---------|
 | `accessibility` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | TESTING.md, component docs |
 | `activities-reference` | [activities-reference.md](workflows/reference/activities-reference.md) | error-handling-and-compensation.md |
-| `assignment` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | user_schedule_policies_projection.md, organizations_projection.md |
+| `assignment` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | schedule_user_assignments_projection.md, organizations_projection.md |
 | `activity` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | activities-reference.md |
 | `automatic-tracing` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `addresses` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | phones_projection.md |
@@ -55,7 +55,7 @@ purpose: agent-navigation
 | `bootstrap-workflow-design` | [organization-bootstrap-workflow-design.md](workflows/architecture/organization-bootstrap-workflow-design.md) | activities-reference.md |
 | `business-profile` | [organization_business_profiles_projection.md](infrastructure/reference/database/tables/organization_business_profiles_projection.md) | organizations_projection.md |
 | `cascade-deactivation` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | user_roles_projection.md |
-| `caseload` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | user_schedule_policies_projection.md |
+| `caseload` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | schedule_user_assignments_projection.md |
 | `client-assignment` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | organizations_projection.md |
 | `clients` | [clients.md](infrastructure/reference/database/tables/clients.md) | medication_history.md |
 | `compensation` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
@@ -182,13 +182,15 @@ purpose: agent-navigation
 | `router` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md |
 | `rxnorm` | [medications.md](infrastructure/reference/database/tables/medications.md) | rxnorm-medication-autocomplete.md |
 | `saga` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
-| `schedule` | [user_schedule_policies_projection.md](infrastructure/reference/database/tables/user_schedule_policies_projection.md) | schedule-management.md, user_client_assignments_projection.md, organizations_projection.md |
-| `schedule-crud` | [schedule-management.md](frontend/reference/schedule-management.md) | user_schedule_policies_projection.md |
-| `schedule-form` | [schedule-management.md](frontend/reference/schedule-management.md) | user_schedule_policies_projection.md |
-| `schedule-management` | [schedule-management.md](frontend/reference/schedule-management.md) | user_schedule_policies_projection.md |
-| `staff-schedule` | [user_schedule_policies_projection.md](infrastructure/reference/database/tables/user_schedule_policies_projection.md) | schedule-management.md, organization_units_projection.md |
-| `weekly-grid` | [schedule-management.md](frontend/reference/schedule-management.md) | user_schedule_policies_projection.md |
-| `weekly-schedule` | [user_schedule_policies_projection.md](infrastructure/reference/database/tables/user_schedule_policies_projection.md) | schedule-management.md, schedule, organizations_projection.md |
+| `schedule` | [schedule_templates_projection.md](infrastructure/reference/database/tables/schedule_templates_projection.md) | schedule_user_assignments_projection.md, schedule-management.md, organizations_projection.md |
+| `schedule-assignment` | [schedule_user_assignments_projection.md](infrastructure/reference/database/tables/schedule_user_assignments_projection.md) | schedule_templates_projection.md, users.md |
+| `schedule-crud` | [schedule-management.md](frontend/reference/schedule-management.md) | schedule_templates_projection.md |
+| `schedule-form` | [schedule-management.md](frontend/reference/schedule-management.md) | schedule_templates_projection.md |
+| `schedule-management` | [schedule-management.md](frontend/reference/schedule-management.md) | schedule_templates_projection.md |
+| `schedule-template` | [schedule_templates_projection.md](infrastructure/reference/database/tables/schedule_templates_projection.md) | schedule_user_assignments_projection.md, schedule-management.md |
+| `staff-schedule` | [schedule_templates_projection.md](infrastructure/reference/database/tables/schedule_templates_projection.md) | schedule-management.md, organization_units_projection.md |
+| `weekly-grid` | [schedule-management.md](frontend/reference/schedule-management.md) | schedule_templates_projection.md |
+| `weekly-schedule` | [schedule_templates_projection.md](infrastructure/reference/database/tables/schedule_templates_projection.md) | schedule-management.md, organizations_projection.md |
 | `saga-pattern` | [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | organization-bootstrap-workflow-design.md |
 | `schema-registry` | [event_types.md](infrastructure/reference/database/tables/event_types.md) | event-sourcing-overview.md |
 | `saml` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
@@ -325,8 +327,10 @@ purpose: agent-navigation
 | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | Prescription records | `prescriptions`, `compliance`, `controlled-substances` | 720 |
 | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | MAR tracking | `dosage-info`, `mar`, `medication-administration` | 800 |
 | [clients.md](infrastructure/reference/database/tables/clients.md) | Client/patient records | `clients`, `phi`, `hipaa` | 550 |
-| [user_schedule_policies_projection.md](infrastructure/reference/database/tables/user_schedule_policies_projection.md) | Staff weekly schedule policies | `schedule`, `staff-schedule`, `weekly-schedule` | 450 |
+| [schedule_templates_projection.md](infrastructure/reference/database/tables/schedule_templates_projection.md) | Schedule template definitions | `schedule`, `schedule-template`, `staff-schedule`, `weekly-schedule` | 500 |
+| [schedule_user_assignments_projection.md](infrastructure/reference/database/tables/schedule_user_assignments_projection.md) | User-to-schedule-template assignments | `schedule-assignment`, `user-assignment` | 350 |
 | [schedule-management.md](frontend/reference/schedule-management.md) | Schedule management frontend reference | `schedule-crud`, `schedule-form`, `weekly-grid`, `schedule-management` | 300 |
+| [user_schedule_policies_projection.md](infrastructure/reference/database/tables/user_schedule_policies_projection.md) | (ARCHIVED) Old per-user schedule table — dropped | `deprecated` | 100 |
 | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | Client-staff assignment mappings | `assignment`, `client-assignment`, `caseload`, `feature-flag` | 450 |
 | [event_types.md](infrastructure/reference/database/tables/event_types.md) | Event schema registry | `event-types`, `schema-registry`, `json-schema` | 500 |
 

@@ -149,13 +149,13 @@ WHERE p.prolang = (SELECT oid FROM pg_language WHERE lanname = 'plpgsql')
 
 Event processing uses **split handlers** (not monolithic processors):
 
-**Routers** (12 active):
-- `process_user_event()`, `process_organization_event()`, `process_rbac_event()`, `process_invitation_event()`, `process_contact_event()`, `process_address_event()`, `process_phone_event()`, `process_email_event()`, `process_access_grant_event()`, `process_impersonation_event()`, `process_organization_unit_event()`
+**Routers** (13 active):
+- `process_user_event()`, `process_organization_event()`, `process_rbac_event()`, `process_invitation_event()`, `process_contact_event()`, `process_address_event()`, `process_phone_event()`, `process_email_event()`, `process_access_grant_event()`, `process_impersonation_event()`, `process_organization_unit_event()`, `process_schedule_event()`
 - Plus `process_junction_event()` for all `*.linked`/`*.unlinked` events
 - Thin CASE dispatchers (~50 lines each)
 - Dispatch to individual handlers based on `event_type`
 
-**Handlers** (50 total):
+**Handlers** (52 total):
 - `handle_user_phone_added()`, `handle_organization_created()`, etc.
 - One function per event type
 - 20-50 lines each, single responsibility

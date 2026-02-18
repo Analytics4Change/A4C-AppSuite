@@ -1,136 +1,58 @@
 ---
-status: current
-last_updated: 2026-02-05
+status: archived
+last_updated: 2026-02-17
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: CQRS projection for named staff work schedules. Stores weekly schedule policies (JSONB with day keys and begin/end HHMM values) per user with a `schedule_name` label. Users can have multiple named schedules. Managed through `api.create_user_schedule`, `api.update_user_schedule`, `api.deactivate_user_schedule`, `api.reactivate_user_schedule`, `api.delete_user_schedule`, `api.get_schedule_by_id`, `api.list_user_schedules` RPCs.
+**Summary**: This table was **dropped** in migration `20260217211231_schedule_template_refactor.sql`. It has been replaced by two new tables: `schedule_templates_projection` and `schedule_user_assignments_projection`. See those docs instead.
 
 **When to read**:
-- Building staff schedule management UI
-- Understanding weekly schedule JSONB format
-- Querying active schedules by organization or org unit
-- Implementing schedule CRUD operations
+- Understanding legacy schedule data model (pre-2026-02-17)
+- Debugging data migration from old to new schedule model
 
-**Prerequisites**: [users](./users.md), [organizations_projection](./organizations_projection.md), [organization_units_projection](./organization_units_projection.md)
+**Key topics**: `schedule`, `deprecated`, `archived`
 
-**Key topics**: `schedule`, `staff-schedule`, `weekly-schedule`, `cqrs-projection`, `org-unit-scoped`
-
-**Estimated read time**: 8 minutes
+**Estimated read time**: 1 minute
 <!-- TL;DR-END -->
 
-# user_schedule_policies_projection
+# user_schedule_policies_projection (DROPPED)
 
-## Overview
+> **This table no longer exists.** It was replaced by the schedule template model on 2026-02-17.
 
-CQRS projection table that stores named staff work schedule policies. Each record represents a weekly schedule for a staff member within an organization, optionally scoped to a specific organization unit. The source of truth is `user.schedule.*` events in the `domain_events` table, processed by the single `process_domain_event_trigger`.
+## Replacement
 
-Key characteristics:
-- **Named schedules**: Each schedule has a `schedule_name` (e.g., "Day Shift M-F 8-4") for grouping and display
-- **Multiple schedules per user**: A user can have multiple named schedules (the old one-per-user/org/OU constraint was dropped)
-- **Weekly JSONB format**: Days as keys (`monday`-`sunday`), values are `{begin: "HHMM", end: "HHMM"}` or `null` for days off
-- **Effective date ranges**: Optional `effective_from` and `effective_until` for time-bounded schedules
-- **Full lifecycle**: Create, update, deactivate, reactivate, delete
-- **Permission gated**: Requires `user.schedule_manage` permission
+The per-user schedule clone model was replaced with a template + assignment model:
 
-## Table Schema
+| Old Table | New Tables | Purpose |
+|-----------|-----------|---------|
+| `user_schedule_policies_projection` | `schedule_templates_projection` | The schedule definition (name, weekly grid, OU scope) |
+| | `schedule_user_assignments_projection` | Junction table: which users are assigned to which template |
 
-| Column | Type | Nullable | Default | Description |
-|--------|------|----------|---------|-------------|
-| id | uuid | NO | gen_random_uuid() | Primary key |
-| user_id | uuid | NO | - | FK to `users(id)` - the staff member |
-| organization_id | uuid | NO | - | FK to `organizations_projection(id)` - owning org |
-| schedule_name | text | NO | - | Display name (e.g., "Day Shift M-F 8-4") |
-| schedule | jsonb | NO | - | Weekly schedule (see format below) |
-| org_unit_id | uuid | YES | - | FK to `organization_units_projection(id)` - optional OU scope |
-| effective_from | date | YES | - | Schedule start date |
-| effective_until | date | YES | - | Schedule end date (null = indefinite) |
-| is_active | boolean | YES | true | Active status |
-| created_at | timestamptz | YES | now() | Record creation timestamp |
-| updated_at | timestamptz | YES | now() | Record update timestamp |
-| created_by | uuid | YES | - | User who created the schedule |
-| last_event_id | uuid | YES | - | Last domain event that modified this record |
+## Why It Changed
 
-### Schedule JSONB Format
+The old model cloned schedule data per user, causing:
+- Schedule drift (same name, different data across users)
+- No single point of management for shared schedules
+- Bulk operations required N individual actions
 
-```json
-{
-  "monday":    { "begin": "0800", "end": "1630" },
-  "tuesday":   { "begin": "0800", "end": "1630" },
-  "wednesday": { "begin": "0800", "end": "1630" },
-  "thursday":  { "begin": "0800", "end": "1630" },
-  "friday":    { "begin": "0800", "end": "1200" },
-  "saturday":  null,
-  "sunday":    null
-}
-```
+The new model treats schedules as first-class templates that users are assigned to.
 
-- Keys: `monday` through `sunday`
-- Values: `{ begin: "HHMM", end: "HHMM" }` for working days, `null` for days off
-- Times use 24-hour HHMM format (e.g., `"0800"` = 8:00 AM, `"1630"` = 4:30 PM)
+## Data Migration
 
-## Constraints
-
-| Constraint | Type | Definition |
-|-----------|------|------------|
-| `user_schedule_policies_projection_pkey` | PRIMARY KEY | `(id)` |
-| `user_schedule_policies_projection_user_id_fkey` | FOREIGN KEY | `user_id -> users(id)` |
-| `user_schedule_policies_projection_organization_id_fkey` | FOREIGN KEY | `organization_id -> organizations_projection(id)` |
-| `user_schedule_policies_projection_org_unit_id_fkey` | FOREIGN KEY | `org_unit_id -> organization_units_projection(id)` |
-
-**Note**: The old `user_schedule_policies_unique (user_id, organization_id, org_unit_id)` constraint was dropped in migration `20260206021113`. Users can now have multiple named schedules.
-
-## Indexes
-
-| Index | Definition |
-|-------|-----------|
-| `user_schedule_policies_projection_pkey` | `UNIQUE (id)` |
-| `idx_user_schedule_policies_user` | `(user_id) WHERE is_active = true` |
-| `idx_user_schedule_policies_org_ou` | `(organization_id, org_unit_id) WHERE is_active = true` |
-| `idx_user_schedule_policies_dates` | `(effective_from, effective_until) WHERE is_active = true` |
-
-## RLS Policies
-
-| Policy | Command | Condition |
-|--------|---------|-----------|
-| `user_schedule_policies_select` | SELECT | `organization_id = get_current_org_id()` |
-| `user_schedule_policies_modify` | ALL | `has_effective_permission('user.schedule_manage', COALESCE(ou.path, org.path))` |
-
-The modify policy checks scope against the OU path if `org_unit_id` is set, otherwise falls back to the organization path.
-
-## API RPCs
-
-| Function | Purpose | Event Emitted |
-|----------|---------|--------------|
-| `api.create_user_schedule(p_user_id, p_schedule_name, p_schedule, ...)` | Create new named schedule | `user.schedule.created` |
-| `api.update_user_schedule(p_schedule_id, p_schedule_name, p_schedule, ...)` | Update existing schedule | `user.schedule.updated` |
-| `api.deactivate_user_schedule(p_schedule_id, p_reason)` | Soft-deactivate | `user.schedule.deactivated` |
-| `api.reactivate_user_schedule(p_schedule_id, p_reason)` | Reactivate schedule | `user.schedule.reactivated` |
-| `api.delete_user_schedule(p_schedule_id, p_reason)` | Hard-delete (must be inactive) | `user.schedule.deleted` |
-| `api.get_schedule_by_id(p_schedule_id)` | Get single schedule with user/OU joins | - |
-| `api.list_user_schedules(p_active_only, p_schedule_name, ...)` | Query with user name/email and OU name joins | - |
-
-## Domain Events
-
-- `user.schedule.created` - New schedule policy created
-- `user.schedule.updated` - Schedule modified (name, times, dates, OU)
-- `user.schedule.deactivated` - Schedule deactivated
-- `user.schedule.reactivated` - Schedule reactivated
-- `user.schedule.deleted` - Schedule permanently deleted
-
-## Frontend Integration
-
-The schedule management UI lives at:
-- **List page**: `/schedules` - Card grid with status tabs, search, quick actions
-- **Manage page**: `/schedules/manage` - Split-view CRUD (list 1/3 + form 2/3)
-
-See [schedule-management.md](../../../../frontend/reference/schedule-management.md) for frontend component details.
+Migration `20260217211231` performed the following transformation:
+1. Grouped rows by `(organization_id, org_unit_id, schedule_name, schedule)` → one template per group
+2. Created assignment rows linking each original user to the matching template
+3. Preserved `effective_from`/`effective_until` on assignments
+4. Dropped the old table
 
 ## See Also
 
-- [organizations_projection](./organizations_projection.md) - Parent organization
-- [organization_units_projection](./organization_units_projection.md) - Optional OU scope
-- [users](./users.md) - Staff member reference
-- [user_client_assignments_projection](./user_client_assignments_projection.md) - Related: client assignment mapping
+- [schedule_templates_projection](./schedule_templates_projection.md) - New template table
+- [schedule_user_assignments_projection](./schedule_user_assignments_projection.md) - New assignment table
+- [schedule-management.md](../../../../frontend/reference/schedule-management.md) - Frontend reference
+
+## Related Documentation
+
+- [event-handler-pattern.md](../../../../documentation/infrastructure/patterns/event-handler-pattern.md) - Schedule event router

@@ -49,5 +49,13 @@ BEGIN
             ) ON CONFLICT (schedule_template_id, user_id) DO NOTHING;
         END LOOP;
     END IF;
+
+    -- Recount assigned users (idempotent)
+    UPDATE schedule_templates_projection
+    SET assigned_user_count = (
+        SELECT count(*)::integer FROM schedule_user_assignments_projection
+        WHERE schedule_template_id = v_template_id
+    )
+    WHERE id = v_template_id;
 END;
 $function$;

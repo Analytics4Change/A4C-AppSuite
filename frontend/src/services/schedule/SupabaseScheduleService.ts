@@ -83,7 +83,19 @@ export class SupabaseScheduleService implements IScheduleService {
     }
 
     const result = parseOrThrow(data);
-    return (result.data as ScheduleTemplateDetail) ?? null;
+
+    // get_schedule_template returns { success, template, assigned_users }
+    const parsed = result as unknown as {
+      template: Omit<ScheduleTemplateDetail, 'assigned_users' | 'assigned_user_count'>;
+      assigned_users: ScheduleTemplateDetail['assigned_users'];
+    };
+    if (!parsed.template) return null;
+
+    return {
+      ...parsed.template,
+      assigned_users: parsed.assigned_users ?? [],
+      assigned_user_count: parsed.assigned_users?.length ?? 0,
+    } as ScheduleTemplateDetail;
   }
 
   async createTemplate(params: {

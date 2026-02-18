@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-11
+last_updated: 2026-02-17
 ---
 
 <!-- TL;DR-START -->
@@ -29,8 +29,8 @@ A4C uses a **split handler architecture** for processing domain events into CQRS
 
 | Component | Count | Purpose |
 |-----------|-------|---------|
-| **Routers** | 12 active | Thin CASE dispatchers (~50 lines each) |
-| **Handlers** | 50 | Focused event processors (20-50 lines each) |
+| **Routers** | 13 active | Thin CASE dispatchers (~50 lines each) |
+| **Handlers** | 52 | Focused event processors (20-50 lines each) |
 | **Triggers** | 5 | On `domain_events` (1 BEFORE INSERT/UPDATE, 4 AFTER INSERT) |
 
 > **Note**: This document covers the **synchronous trigger handler pattern** used for projection updates. For async side effects (email, DNS, webhooks), see [Event Processing Patterns](./event-processing-patterns.md).
@@ -309,11 +309,6 @@ The GitHub Actions workflow automatically:
 | `user.phone.added` | `handle_user_phone_added` |
 | `user.phone.updated` | `handle_user_phone_updated` |
 | `user.phone.removed` | `handle_user_phone_removed` |
-| `user.schedule.created` | `handle_user_schedule_created` |
-| `user.schedule.updated` | `handle_user_schedule_updated` |
-| `user.schedule.deactivated` | `handle_user_schedule_deactivated` |
-| `user.schedule.reactivated` | `handle_user_schedule_reactivated` |
-| `user.schedule.deleted` | `handle_user_schedule_deleted` |
 | `user.client.assigned` | `handle_user_client_assigned` |
 | `user.client.unassigned` | `handle_user_client_unassigned` |
 
@@ -348,6 +343,18 @@ The GitHub Actions workflow automatically:
 | `organization_unit.deactivated` | `handle_organization_unit_deactivated` |
 | `organization_unit.reactivated` | `handle_organization_unit_reactivated` |
 | `organization_unit.deleted` | `handle_organization_unit_deleted` |
+
+### Schedule Events Router: `process_schedule_event()`
+
+| Event Type | Handler |
+|------------|---------|
+| `schedule.created` | `handle_schedule_created` |
+| `schedule.updated` | `handle_schedule_updated` |
+| `schedule.deactivated` | `handle_schedule_deactivated` |
+| `schedule.reactivated` | `handle_schedule_reactivated` |
+| `schedule.deleted` | `handle_schedule_deleted` |
+| `schedule.user_assigned` | `handle_schedule_user_assigned` |
+| `schedule.user_unassigned` | `handle_schedule_user_unassigned` |
 
 ### RBAC Events Router: `process_rbac_event()`
 
