@@ -28,6 +28,9 @@ BEGIN
         WHEN 'user.client.unassigned'                THEN PERFORM handle_user_client_unassigned(p_event);
         -- Invitations
         WHEN 'user.invited'                          THEN PERFORM handle_user_invited(p_event);
+        -- Role assignments (emitted with stream_type 'user')
+        WHEN 'user.role.assigned'                    THEN PERFORM handle_user_role_assigned(p_event);
+        WHEN 'user.role.revoked'                     THEN PERFORM handle_user_role_revoked(p_event);
         ELSE
             RAISE EXCEPTION 'Unhandled event type "%" in process_user_event', p_event.event_type
                 USING ERRCODE = 'P9001';

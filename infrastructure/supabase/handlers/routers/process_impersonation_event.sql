@@ -5,10 +5,6 @@ CREATE OR REPLACE FUNCTION public.process_impersonation_event(p_event record)
 AS $function$
 DECLARE
   v_session_id TEXT;
-  v_super_admin_user_id UUID;
-  v_target_user_id UUID;
-  v_previous_expires_at TIMESTAMPTZ;
-  v_total_duration INTEGER;
 BEGIN
   v_session_id := p_event.event_data->>'session_id';
 
@@ -53,15 +49,6 @@ BEGIN
       ON CONFLICT (session_id) DO NOTHING;
 
     WHEN 'impersonation.renewed' THEN
-      SELECT expires_at,
-        total_duration_ms + (
-          (p_event.event_data->>'new_expires_at')::TIMESTAMPTZ -
-          (p_event.event_data->>'previous_expires_at')::TIMESTAMPTZ
-        ) / 1000
-      INTO v_previous_expires_at, v_total_duration
-      FROM impersonation_sessions_projection
-      WHERE session_id = v_session_id;
-
       UPDATE impersonation_sessions_projection
       SET expires_at = (p_event.event_data->>'new_expires_at')::TIMESTAMPTZ,
           total_duration_ms = (p_event.event_data->>'total_duration')::INTEGER,
@@ -93,13 +80,8 @@ BEGIN
       END IF;
 
     ELSE
-      RAISE WARNING 'Unknown impersonation event type: %', p_event.event_type;
+      RAISE EXCEPTION 'Unhandled event type "%" in process_impersonation_event', p_event.event_type
+          USING ERRCODE = 'P9001';
   END CASE;
-
-EXCEPTION
-  WHEN OTHERS THEN
-    RAISE WARNING 'Error processing impersonation event %: % (Event ID: %)',
-      p_event.event_type, SQLERRM, p_event.id;
-    RAISE;
 END;
 $function$;

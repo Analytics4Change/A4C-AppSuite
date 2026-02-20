@@ -37,7 +37,16 @@ channels:
           # NOTE: client.yaml and medication.yaml domains removed (2025-01-10)
           # Legacy CRUD tables dropped - will be redefined with proper event-driven architecture
           - $ref: './domains/user.yaml#/components/messages/UserSyncedFromAuth'
+          - $ref: './domains/user.yaml#/components/messages/UserCreated'
+          - $ref: './domains/user.yaml#/components/messages/UserProfileUpdated'
           - $ref: './domains/user.yaml#/components/messages/UserOrganizationSwitched'
+          - $ref: './domains/user.yaml#/components/messages/UserAccessDatesUpdated'
+          - $ref: './domains/user.yaml#/components/messages/UserNotificationPreferencesUpdated'
+          - $ref: './domains/user.yaml#/components/messages/UserAddressAdded'
+          - $ref: './domains/user.yaml#/components/messages/UserAddressUpdated'
+          - $ref: './domains/user.yaml#/components/messages/UserAddressRemoved'
+          - $ref: './domains/user.yaml#/components/messages/UserPhoneAdded'
+          - $ref: './domains/user.yaml#/components/messages/UserPhoneUpdated'
           - $ref: './domains/user.yaml#/components/messages/UserDeactivated'
           - $ref: './domains/user.yaml#/components/messages/UserReactivated'
           - $ref: './domains/user.yaml#/components/messages/UserDeleted'

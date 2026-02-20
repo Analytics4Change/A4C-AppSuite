@@ -13,7 +13,8 @@ BEGIN
     END IF;
 
     BEGIN
-        IF NEW.event_type LIKE '%.linked' OR NEW.event_type LIKE '%.unlinked' THEN
+        IF (NEW.event_type LIKE '%.linked' OR NEW.event_type LIKE '%.unlinked')
+           AND NEW.event_type NOT IN ('contact.user.linked', 'contact.user.unlinked') THEN
             PERFORM process_junction_event(NEW);
         ELSE
             CASE NEW.stream_type

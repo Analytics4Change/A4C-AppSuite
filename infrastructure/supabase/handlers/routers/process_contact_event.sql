@@ -97,7 +97,8 @@ BEGIN
         AND user_id = safe_jsonb_extract_uuid(p_event.event_data, 'user_id');
 
     ELSE
-      RAISE WARNING 'Unknown contact event type: %', p_event.event_type;
+      RAISE EXCEPTION 'Unhandled event type "%" in process_contact_event', p_event.event_type
+          USING ERRCODE = 'P9001';
   END CASE;
 
 END;

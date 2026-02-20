@@ -141,6 +141,308 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
+          - name: user.created
+            title: User Created
+            summary: >-
+              A new user account has been created (typically via invitation
+              acceptance)
+            contentType: application/json
+            payload:
+              title: UserCreatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID (same as auth.users.id)
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.created
+                event_data:
+                  title: UserCreatedData
+                  type: object
+                  required:
+                    - user_id
+                    - email
+                    - first_name
+                    - last_name
+                    - organization_id
+                    - auth_method
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: Supabase Auth user ID
+                    email:
+                      type: string
+                      format: email
+                    first_name:
+                      type: string
+                      maxLength: 100
+                      description: User's first name (copied from invitation)
+                    last_name:
+                      type: string
+                      maxLength: 100
+                      description: User's last name (copied from invitation)
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: Organization the user is joining
+                    auth_method:
+                      allOf:
+                        - type: string
+                          title: AuthMethod
+                          enum:
+                            - email_password
+                            - oauth_google
+                            - oauth_github
+                            - oauth_enterprise_sso
+                        - description: How the user authenticated
+                    invited_via:
+                      allOf:
+                        - type: string
+                          title: InvitationMethod
+                          enum:
+                            - organization_bootstrap
+                            - manual_invitation
+                        - description: How the user was invited
+                    access_start_date:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: >-
+                        First date the user can access the org (copied from
+                        invitation, NULL = immediate)
+                      examples:
+                        - '2025-01-15'
+                        - null
+                    access_expiration_date:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: >-
+                        Date the user's access will expire (copied from
+                        invitation, NULL = no expiration)
+                      examples:
+                        - '2025-12-31'
+                        - null
+                    notification_preferences:
+                      description: >-
+                        Initial notification preferences (copied from
+                        invitation)
+                      title: NotificationPreferences
+                      type: object
+                      properties:
+                        email:
+                          type: boolean
+                          default: true
+                          description: Whether to send email notifications
+                        sms:
+                          title: SmsNotificationPreference
+                          type: object
+                          description: SMS notification settings
+                          properties:
+                            enabled:
+                              type: boolean
+                              default: false
+                              description: Whether to send SMS notifications
+                            phone_id:
+                              type: string
+                              format: uuid
+                              nullable: true
+                              description: >-
+                                UUID of the phone to use for SMS (from
+                                user_phones or user_org_phone_overrides)
+                        in_app:
+                          type: boolean
+                          default: false
+                          description: >-
+                            Whether to send in-app notifications (future
+                            feature)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.profile.updated
+            title: User Profile Updated
+            summary: User profile information (first_name, last_name) has been updated
+            contentType: application/json
+            payload:
+              title: UserProfileUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.profile.updated
+                event_data:
+                  title: UserProfileUpdatedData
+                  type: object
+                  required:
+                    - user_id
+                    - organization_id
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: UUID of the user being updated
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        Organization context for the update (used for
+                        authorization)
+                    first_name:
+                      type: string
+                      maxLength: 100
+                      nullable: true
+                      description: New first name (NULL to keep existing)
+                    last_name:
+                      type: string
+                      maxLength: 100
+                      nullable: true
+                      description: New last name (NULL to keep existing)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
           - name: user.organization_switched
             title: User Organization Switched
             summary: User switched their active organization context
@@ -189,6 +491,992 @@ channels:
                         - User selected different organization from dropdown
                         - Automatic switch after single org access granted
                         - Session initialization with default organization
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.access_dates.updated
+            title: User Access Dates Updated
+            summary: User-level access dates for an organization have been updated
+            contentType: application/json
+            payload:
+              title: UserAccessDatesUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.access_dates.updated
+                event_data:
+                  title: UserAccessDatesUpdatedData
+                  type: object
+                  required:
+                    - user_id
+                    - org_id
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization for which access dates are being updated
+                    access_start_date:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: New access start date (NULL = immediate access)
+                    access_expiration_date:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: New access expiration date (NULL = no expiration)
+                    previous_access_start_date:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: Previous access start date (for audit trail)
+                    previous_access_expiration_date:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: Previous access expiration date (for audit trail)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.notification_preferences.updated
+            title: User Notification Preferences Updated
+            summary: >-
+              User notification preferences for an organization have been
+              updated
+            contentType: application/json
+            payload:
+              title: UserNotificationPreferencesUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.notification_preferences.updated
+                event_data:
+                  title: UserNotificationPreferencesUpdatedData
+                  type: object
+                  required:
+                    - user_id
+                    - org_id
+                    - notification_preferences
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization for which preferences are being updated
+                    notification_preferences:
+                      title: NotificationPreferences
+                      type: object
+                      description: User notification preferences (per-org)
+                      properties:
+                        email:
+                          type: boolean
+                          default: true
+                          description: Whether to send email notifications
+                        sms:
+                          title: SmsNotificationPreference
+                          type: object
+                          description: SMS notification settings
+                          properties:
+                            enabled:
+                              type: boolean
+                              default: false
+                              description: Whether to send SMS notifications
+                            phone_id:
+                              type: string
+                              format: uuid
+                              nullable: true
+                              description: >-
+                                UUID of the phone to use for SMS (from
+                                user_phones or user_org_phone_overrides)
+                        in_app:
+                          type: boolean
+                          default: false
+                          description: >-
+                            Whether to send in-app notifications (future
+                            feature)
+                    previous_notification_preferences:
+                      title: NotificationPreferences
+                      type: object
+                      description: User notification preferences (per-org)
+                      properties:
+                        email:
+                          type: boolean
+                          default: true
+                          description: Whether to send email notifications
+                        sms:
+                          title: SmsNotificationPreference
+                          type: object
+                          description: SMS notification settings
+                          properties:
+                            enabled:
+                              type: boolean
+                              default: false
+                              description: Whether to send SMS notifications
+                            phone_id:
+                              type: string
+                              format: uuid
+                              nullable: true
+                              description: >-
+                                UUID of the phone to use for SMS (from
+                                user_phones or user_org_phone_overrides)
+                        in_app:
+                          type: boolean
+                          default: false
+                          description: >-
+                            Whether to send in-app notifications (future
+                            feature)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.address.added
+            title: User Address Added
+            summary: >-
+              A new address has been added for a user (global or org-specific
+              override)
+            contentType: application/json
+            payload:
+              title: UserAddressAddedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.address.added
+                event_data:
+                  title: UserAddressData
+                  type: object
+                  description: Common address data structure used across address events
+                  required:
+                    - address_id
+                    - user_id
+                    - label
+                    - type
+                    - street1
+                    - city
+                    - state
+                    - zip_code
+                  properties:
+                    address_id:
+                      type: string
+                      format: uuid
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: If set, this is an org-specific override address
+                    label:
+                      type: string
+                      description: Human-readable label (e.g., "Home", "Work")
+                    type:
+                      type: string
+                      title: AddressType
+                      enum:
+                        - physical
+                        - mailing
+                        - billing
+                    street1:
+                      type: string
+                    street2:
+                      type: string
+                      nullable: true
+                    city:
+                      type: string
+                    state:
+                      type: string
+                    zip_code:
+                      type: string
+                    country:
+                      type: string
+                      default: USA
+                    is_primary:
+                      type: boolean
+                      default: false
+                      description: >-
+                        Whether this is the user's primary address (global
+                        addresses only)
+                    is_active:
+                      type: boolean
+                      default: true
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.address.updated
+            title: User Address Updated
+            summary: An existing user address has been modified
+            contentType: application/json
+            payload:
+              title: UserAddressUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.address.updated
+                event_data:
+                  allOf:
+                    - title: UserAddressData
+                      type: object
+                      description: Common address data structure used across address events
+                      required:
+                        - address_id
+                        - user_id
+                        - label
+                        - type
+                        - street1
+                        - city
+                        - state
+                        - zip_code
+                      properties:
+                        address_id:
+                          type: string
+                          format: uuid
+                        user_id:
+                          type: string
+                          format: uuid
+                        org_id:
+                          type: string
+                          format: uuid
+                          nullable: true
+                          description: If set, this is an org-specific override address
+                        label:
+                          type: string
+                          description: Human-readable label (e.g., "Home", "Work")
+                        type:
+                          type: string
+                          title: AddressType
+                          enum:
+                            - physical
+                            - mailing
+                            - billing
+                        street1:
+                          type: string
+                        street2:
+                          type: string
+                          nullable: true
+                        city:
+                          type: string
+                        state:
+                          type: string
+                        zip_code:
+                          type: string
+                        country:
+                          type: string
+                          default: USA
+                        is_primary:
+                          type: boolean
+                          default: false
+                          description: >-
+                            Whether this is the user's primary address (global
+                            addresses only)
+                        is_active:
+                          type: boolean
+                          default: true
+                    - type: object
+                      properties:
+                        previous_values:
+                          type: object
+                          description: >-
+                            Previous field values that were changed (for audit
+                            trail)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.address.removed
+            title: User Address Removed
+            summary: A user address has been deactivated or removed
+            contentType: application/json
+            payload:
+              title: UserAddressRemovedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.address.removed
+                event_data:
+                  type: object
+                  required:
+                    - address_id
+                    - user_id
+                  properties:
+                    address_id:
+                      type: string
+                      format: uuid
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: If set, this was an org-specific override
+                    removal_type:
+                      allOf:
+                        - type: string
+                          title: RemovalType
+                          enum:
+                            - soft_delete
+                            - hard_delete
+                        - description: >-
+                            Whether address was deactivated or permanently
+                            deleted
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.phone.added
+            title: User Phone Added
+            summary: >-
+              A new phone has been added for a user (global or org-specific
+              override)
+            contentType: application/json
+            payload:
+              title: UserPhoneAddedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.phone.added
+                event_data:
+                  title: UserPhoneData
+                  type: object
+                  description: Common phone data structure used across phone events
+                  required:
+                    - phone_id
+                    - user_id
+                    - label
+                    - type
+                    - number
+                  properties:
+                    phone_id:
+                      type: string
+                      format: uuid
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: If set, this is an org-specific override phone
+                    label:
+                      type: string
+                      description: Human-readable label (e.g., "Personal Cell", "Work")
+                    type:
+                      type: string
+                      title: PhoneType
+                      enum:
+                        - mobile
+                        - office
+                        - fax
+                        - emergency
+                    number:
+                      type: string
+                    extension:
+                      type: string
+                      nullable: true
+                    country_code:
+                      type: string
+                      default: '+1'
+                    is_primary:
+                      type: boolean
+                      default: false
+                      description: >-
+                        Whether this is the user's primary phone (global phones
+                        only)
+                    is_active:
+                      type: boolean
+                      default: true
+                    sms_capable:
+                      type: boolean
+                      default: false
+                      description: Whether this phone can receive SMS notifications
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.phone.updated
+            title: User Phone Updated
+            summary: An existing user phone has been modified
+            contentType: application/json
+            payload:
+              title: UserPhoneUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.phone.updated
+                event_data:
+                  allOf:
+                    - title: UserPhoneData
+                      type: object
+                      description: Common phone data structure used across phone events
+                      required:
+                        - phone_id
+                        - user_id
+                        - label
+                        - type
+                        - number
+                      properties:
+                        phone_id:
+                          type: string
+                          format: uuid
+                        user_id:
+                          type: string
+                          format: uuid
+                        org_id:
+                          type: string
+                          format: uuid
+                          nullable: true
+                          description: If set, this is an org-specific override phone
+                        label:
+                          type: string
+                          description: Human-readable label (e.g., "Personal Cell", "Work")
+                        type:
+                          type: string
+                          title: PhoneType
+                          enum:
+                            - mobile
+                            - office
+                            - fax
+                            - emergency
+                        number:
+                          type: string
+                        extension:
+                          type: string
+                          nullable: true
+                        country_code:
+                          type: string
+                          default: '+1'
+                        is_primary:
+                          type: boolean
+                          default: false
+                          description: >-
+                            Whether this is the user's primary phone (global
+                            phones only)
+                        is_active:
+                          type: boolean
+                          default: true
+                        sms_capable:
+                          type: boolean
+                          default: false
+                          description: Whether this phone can receive SMS notifications
+                    - type: object
+                      properties:
+                        previous_values:
+                          type: object
+                          description: >-
+                            Previous field values that were changed (for audit
+                            trail)
                 event_metadata:
                   title: EventMetadata
                   type: object
@@ -2407,9 +3695,9 @@ channels:
                         - '2025-12-31'
                         - null
                     notification_preferences:
-                      description: Initial notification preferences for the user
                       title: NotificationPreferences
                       type: object
+                      description: User notification preferences (per-org)
                       properties:
                         email:
                           type: boolean
@@ -2787,11 +4075,9 @@ channels:
                         Date the user's access will expire (copied from
                         invitation)
                     notification_preferences:
-                      description: >-
-                        Notification preferences (copied from invitation to
-                        user_organizations_projection)
                       title: NotificationPreferences
                       type: object
+                      description: User notification preferences (per-org)
                       properties:
                         email:
                           type: boolean
@@ -3010,11 +4296,11 @@ channels:
                 stream_id:
                   type: string
                   format: uuid
-                  description: Organization UUID (invitation lifecycle events keyed by org)
+                  description: Invitation UUID
                 stream_type:
                   type: string
-                  const: organization
-                  description: Events emitted on organization aggregate
+                  const: invitation
+                  description: Events emitted on invitation aggregate
                 event_type:
                   type: string
                   const: invitation.resent
@@ -11618,6 +12904,308 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
+          - name: user.created
+            title: User Created
+            summary: >-
+              A new user account has been created (typically via invitation
+              acceptance)
+            contentType: application/json
+            payload:
+              title: UserCreatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID (same as auth.users.id)
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.created
+                event_data:
+                  title: UserCreatedData
+                  type: object
+                  required:
+                    - user_id
+                    - email
+                    - first_name
+                    - last_name
+                    - organization_id
+                    - auth_method
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: Supabase Auth user ID
+                    email:
+                      type: string
+                      format: email
+                    first_name:
+                      type: string
+                      maxLength: 100
+                      description: User's first name (copied from invitation)
+                    last_name:
+                      type: string
+                      maxLength: 100
+                      description: User's last name (copied from invitation)
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: Organization the user is joining
+                    auth_method:
+                      allOf:
+                        - type: string
+                          title: AuthMethod
+                          enum:
+                            - email_password
+                            - oauth_google
+                            - oauth_github
+                            - oauth_enterprise_sso
+                        - description: How the user authenticated
+                    invited_via:
+                      allOf:
+                        - type: string
+                          title: InvitationMethod
+                          enum:
+                            - organization_bootstrap
+                            - manual_invitation
+                        - description: How the user was invited
+                    access_start_date:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: >-
+                        First date the user can access the org (copied from
+                        invitation, NULL = immediate)
+                      examples:
+                        - '2025-01-15'
+                        - null
+                    access_expiration_date:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: >-
+                        Date the user's access will expire (copied from
+                        invitation, NULL = no expiration)
+                      examples:
+                        - '2025-12-31'
+                        - null
+                    notification_preferences:
+                      description: >-
+                        Initial notification preferences (copied from
+                        invitation)
+                      title: NotificationPreferences
+                      type: object
+                      properties:
+                        email:
+                          type: boolean
+                          default: true
+                          description: Whether to send email notifications
+                        sms:
+                          title: SmsNotificationPreference
+                          type: object
+                          description: SMS notification settings
+                          properties:
+                            enabled:
+                              type: boolean
+                              default: false
+                              description: Whether to send SMS notifications
+                            phone_id:
+                              type: string
+                              format: uuid
+                              nullable: true
+                              description: >-
+                                UUID of the phone to use for SMS (from
+                                user_phones or user_org_phone_overrides)
+                        in_app:
+                          type: boolean
+                          default: false
+                          description: >-
+                            Whether to send in-app notifications (future
+                            feature)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.profile.updated
+            title: User Profile Updated
+            summary: User profile information (first_name, last_name) has been updated
+            contentType: application/json
+            payload:
+              title: UserProfileUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.profile.updated
+                event_data:
+                  title: UserProfileUpdatedData
+                  type: object
+                  required:
+                    - user_id
+                    - organization_id
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: UUID of the user being updated
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        Organization context for the update (used for
+                        authorization)
+                    first_name:
+                      type: string
+                      maxLength: 100
+                      nullable: true
+                      description: New first name (NULL to keep existing)
+                    last_name:
+                      type: string
+                      maxLength: 100
+                      nullable: true
+                      description: New last name (NULL to keep existing)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
           - name: user.organization_switched
             title: User Organization Switched
             summary: User switched their active organization context
@@ -11666,6 +13254,992 @@ channels:
                         - User selected different organization from dropdown
                         - Automatic switch after single org access granted
                         - Session initialization with default organization
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.access_dates.updated
+            title: User Access Dates Updated
+            summary: User-level access dates for an organization have been updated
+            contentType: application/json
+            payload:
+              title: UserAccessDatesUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.access_dates.updated
+                event_data:
+                  title: UserAccessDatesUpdatedData
+                  type: object
+                  required:
+                    - user_id
+                    - org_id
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization for which access dates are being updated
+                    access_start_date:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: New access start date (NULL = immediate access)
+                    access_expiration_date:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: New access expiration date (NULL = no expiration)
+                    previous_access_start_date:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: Previous access start date (for audit trail)
+                    previous_access_expiration_date:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: Previous access expiration date (for audit trail)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.notification_preferences.updated
+            title: User Notification Preferences Updated
+            summary: >-
+              User notification preferences for an organization have been
+              updated
+            contentType: application/json
+            payload:
+              title: UserNotificationPreferencesUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.notification_preferences.updated
+                event_data:
+                  title: UserNotificationPreferencesUpdatedData
+                  type: object
+                  required:
+                    - user_id
+                    - org_id
+                    - notification_preferences
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      description: Organization for which preferences are being updated
+                    notification_preferences:
+                      title: NotificationPreferences
+                      type: object
+                      description: User notification preferences (per-org)
+                      properties:
+                        email:
+                          type: boolean
+                          default: true
+                          description: Whether to send email notifications
+                        sms:
+                          title: SmsNotificationPreference
+                          type: object
+                          description: SMS notification settings
+                          properties:
+                            enabled:
+                              type: boolean
+                              default: false
+                              description: Whether to send SMS notifications
+                            phone_id:
+                              type: string
+                              format: uuid
+                              nullable: true
+                              description: >-
+                                UUID of the phone to use for SMS (from
+                                user_phones or user_org_phone_overrides)
+                        in_app:
+                          type: boolean
+                          default: false
+                          description: >-
+                            Whether to send in-app notifications (future
+                            feature)
+                    previous_notification_preferences:
+                      title: NotificationPreferences
+                      type: object
+                      description: User notification preferences (per-org)
+                      properties:
+                        email:
+                          type: boolean
+                          default: true
+                          description: Whether to send email notifications
+                        sms:
+                          title: SmsNotificationPreference
+                          type: object
+                          description: SMS notification settings
+                          properties:
+                            enabled:
+                              type: boolean
+                              default: false
+                              description: Whether to send SMS notifications
+                            phone_id:
+                              type: string
+                              format: uuid
+                              nullable: true
+                              description: >-
+                                UUID of the phone to use for SMS (from
+                                user_phones or user_org_phone_overrides)
+                        in_app:
+                          type: boolean
+                          default: false
+                          description: >-
+                            Whether to send in-app notifications (future
+                            feature)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.address.added
+            title: User Address Added
+            summary: >-
+              A new address has been added for a user (global or org-specific
+              override)
+            contentType: application/json
+            payload:
+              title: UserAddressAddedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.address.added
+                event_data:
+                  title: UserAddressData
+                  type: object
+                  description: Common address data structure used across address events
+                  required:
+                    - address_id
+                    - user_id
+                    - label
+                    - type
+                    - street1
+                    - city
+                    - state
+                    - zip_code
+                  properties:
+                    address_id:
+                      type: string
+                      format: uuid
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: If set, this is an org-specific override address
+                    label:
+                      type: string
+                      description: Human-readable label (e.g., "Home", "Work")
+                    type:
+                      type: string
+                      title: AddressType
+                      enum:
+                        - physical
+                        - mailing
+                        - billing
+                    street1:
+                      type: string
+                    street2:
+                      type: string
+                      nullable: true
+                    city:
+                      type: string
+                    state:
+                      type: string
+                    zip_code:
+                      type: string
+                    country:
+                      type: string
+                      default: USA
+                    is_primary:
+                      type: boolean
+                      default: false
+                      description: >-
+                        Whether this is the user's primary address (global
+                        addresses only)
+                    is_active:
+                      type: boolean
+                      default: true
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.address.updated
+            title: User Address Updated
+            summary: An existing user address has been modified
+            contentType: application/json
+            payload:
+              title: UserAddressUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.address.updated
+                event_data:
+                  allOf:
+                    - title: UserAddressData
+                      type: object
+                      description: Common address data structure used across address events
+                      required:
+                        - address_id
+                        - user_id
+                        - label
+                        - type
+                        - street1
+                        - city
+                        - state
+                        - zip_code
+                      properties:
+                        address_id:
+                          type: string
+                          format: uuid
+                        user_id:
+                          type: string
+                          format: uuid
+                        org_id:
+                          type: string
+                          format: uuid
+                          nullable: true
+                          description: If set, this is an org-specific override address
+                        label:
+                          type: string
+                          description: Human-readable label (e.g., "Home", "Work")
+                        type:
+                          type: string
+                          title: AddressType
+                          enum:
+                            - physical
+                            - mailing
+                            - billing
+                        street1:
+                          type: string
+                        street2:
+                          type: string
+                          nullable: true
+                        city:
+                          type: string
+                        state:
+                          type: string
+                        zip_code:
+                          type: string
+                        country:
+                          type: string
+                          default: USA
+                        is_primary:
+                          type: boolean
+                          default: false
+                          description: >-
+                            Whether this is the user's primary address (global
+                            addresses only)
+                        is_active:
+                          type: boolean
+                          default: true
+                    - type: object
+                      properties:
+                        previous_values:
+                          type: object
+                          description: >-
+                            Previous field values that were changed (for audit
+                            trail)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.address.removed
+            title: User Address Removed
+            summary: A user address has been deactivated or removed
+            contentType: application/json
+            payload:
+              title: UserAddressRemovedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.address.removed
+                event_data:
+                  type: object
+                  required:
+                    - address_id
+                    - user_id
+                  properties:
+                    address_id:
+                      type: string
+                      format: uuid
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: If set, this was an org-specific override
+                    removal_type:
+                      allOf:
+                        - type: string
+                          title: RemovalType
+                          enum:
+                            - soft_delete
+                            - hard_delete
+                        - description: >-
+                            Whether address was deactivated or permanently
+                            deleted
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.phone.added
+            title: User Phone Added
+            summary: >-
+              A new phone has been added for a user (global or org-specific
+              override)
+            contentType: application/json
+            payload:
+              title: UserPhoneAddedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.phone.added
+                event_data:
+                  title: UserPhoneData
+                  type: object
+                  description: Common phone data structure used across phone events
+                  required:
+                    - phone_id
+                    - user_id
+                    - label
+                    - type
+                    - number
+                  properties:
+                    phone_id:
+                      type: string
+                      format: uuid
+                    user_id:
+                      type: string
+                      format: uuid
+                    org_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: If set, this is an org-specific override phone
+                    label:
+                      type: string
+                      description: Human-readable label (e.g., "Personal Cell", "Work")
+                    type:
+                      type: string
+                      title: PhoneType
+                      enum:
+                        - mobile
+                        - office
+                        - fax
+                        - emergency
+                    number:
+                      type: string
+                    extension:
+                      type: string
+                      nullable: true
+                    country_code:
+                      type: string
+                      default: '+1'
+                    is_primary:
+                      type: boolean
+                      default: false
+                      description: >-
+                        Whether this is the user's primary phone (global phones
+                        only)
+                    is_active:
+                      type: boolean
+                      default: true
+                    sms_capable:
+                      type: boolean
+                      default: false
+                      description: Whether this phone can receive SMS notifications
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: user.phone.updated
+            title: User Phone Updated
+            summary: An existing user phone has been modified
+            contentType: application/json
+            payload:
+              title: UserPhoneUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: User UUID
+                stream_type:
+                  type: string
+                  const: user
+                event_type:
+                  type: string
+                  const: user.phone.updated
+                event_data:
+                  allOf:
+                    - title: UserPhoneData
+                      type: object
+                      description: Common phone data structure used across phone events
+                      required:
+                        - phone_id
+                        - user_id
+                        - label
+                        - type
+                        - number
+                      properties:
+                        phone_id:
+                          type: string
+                          format: uuid
+                        user_id:
+                          type: string
+                          format: uuid
+                        org_id:
+                          type: string
+                          format: uuid
+                          nullable: true
+                          description: If set, this is an org-specific override phone
+                        label:
+                          type: string
+                          description: Human-readable label (e.g., "Personal Cell", "Work")
+                        type:
+                          type: string
+                          title: PhoneType
+                          enum:
+                            - mobile
+                            - office
+                            - fax
+                            - emergency
+                        number:
+                          type: string
+                        extension:
+                          type: string
+                          nullable: true
+                        country_code:
+                          type: string
+                          default: '+1'
+                        is_primary:
+                          type: boolean
+                          default: false
+                          description: >-
+                            Whether this is the user's primary phone (global
+                            phones only)
+                        is_active:
+                          type: boolean
+                          default: true
+                        sms_capable:
+                          type: boolean
+                          default: false
+                          description: Whether this phone can receive SMS notifications
+                    - type: object
+                      properties:
+                        previous_values:
+                          type: object
+                          description: >-
+                            Previous field values that were changed (for audit
+                            trail)
                 event_metadata:
                   title: EventMetadata
                   type: object
@@ -13884,9 +16458,9 @@ channels:
                         - '2025-12-31'
                         - null
                     notification_preferences:
-                      description: Initial notification preferences for the user
                       title: NotificationPreferences
                       type: object
+                      description: User notification preferences (per-org)
                       properties:
                         email:
                           type: boolean
@@ -14264,11 +16838,9 @@ channels:
                         Date the user's access will expire (copied from
                         invitation)
                     notification_preferences:
-                      description: >-
-                        Notification preferences (copied from invitation to
-                        user_organizations_projection)
                       title: NotificationPreferences
                       type: object
+                      description: User notification preferences (per-org)
                       properties:
                         email:
                           type: boolean
@@ -14487,11 +17059,11 @@ channels:
                 stream_id:
                   type: string
                   format: uuid
-                  description: Organization UUID (invitation lifecycle events keyed by org)
+                  description: Invitation UUID
                 stream_type:
                   type: string
-                  const: organization
-                  description: Events emitted on organization aggregate
+                  const: invitation
+                  description: Events emitted on invitation aggregate
                 event_type:
                   type: string
                   const: invitation.resent

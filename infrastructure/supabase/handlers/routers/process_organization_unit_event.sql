@@ -11,7 +11,8 @@ BEGIN
     WHEN 'organization_unit.reactivated' THEN PERFORM handle_organization_unit_reactivated(p_event);
     WHEN 'organization_unit.deleted' THEN PERFORM handle_organization_unit_deleted(p_event);
     ELSE
-      RAISE WARNING 'Unknown organization_unit event type: %', p_event.event_type;
+      RAISE EXCEPTION 'Unhandled event type "%" in process_organization_unit_event', p_event.event_type
+          USING ERRCODE = 'P9001';
   END CASE;
 END;
 $function$;

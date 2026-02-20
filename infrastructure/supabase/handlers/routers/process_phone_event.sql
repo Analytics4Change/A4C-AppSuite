@@ -52,7 +52,8 @@ BEGIN
       WHERE id = p_event.stream_id;
 
     ELSE
-      RAISE WARNING 'Unknown phone event type: %', p_event.event_type;
+      RAISE EXCEPTION 'Unhandled event type "%" in process_phone_event', p_event.event_type
+          USING ERRCODE = 'P9001';
   END CASE;
 
 END;

@@ -23,8 +23,11 @@ BEGIN
     -- Forwarding CASE: invitation.resent events were emitted with stream_type='organization'
     -- by invite-user Edge Function (pre-v15). Forward to the correct handler.
     WHEN 'invitation.resent' THEN PERFORM handle_invitation_resent(p_event);
+    -- Forwarding CASE: invitation.email.sent events emitted with stream_type='organization'
+    -- by Temporal activities. Informational only, no projection needed.
+    WHEN 'invitation.email.sent' THEN NULL;
     ELSE
-      RAISE EXCEPTION 'Unhandled event type % in process_organization_event', p_event.event_type
+      RAISE EXCEPTION 'Unhandled event type "%" in process_organization_event', p_event.event_type
         USING ERRCODE = 'P9001';
   END CASE;
 END;

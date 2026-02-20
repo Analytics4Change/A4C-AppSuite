@@ -7,7 +7,7 @@ DECLARE
   v_grant_id UUID;
 BEGIN
   CASE p_event.event_type
-    
+
     WHEN 'access_grant.created' THEN
       INSERT INTO cross_tenant_access_grants_projection (
         id, consultant_org_id, consultant_user_id, provider_org_id,
@@ -35,7 +35,7 @@ BEGIN
 
     WHEN 'access_grant.revoked' THEN
       v_grant_id := safe_jsonb_extract_uuid(p_event.event_data, 'grant_id');
-      UPDATE cross_tenant_access_grants_projection 
+      UPDATE cross_tenant_access_grants_projection
       SET status = 'revoked',
           revoked_at = p_event.created_at,
           revoked_by = safe_jsonb_extract_uuid(p_event.event_data, 'revoked_by'),
@@ -46,7 +46,7 @@ BEGIN
 
     WHEN 'access_grant.expired' THEN
       v_grant_id := safe_jsonb_extract_uuid(p_event.event_data, 'grant_id');
-      UPDATE cross_tenant_access_grants_projection 
+      UPDATE cross_tenant_access_grants_projection
       SET status = 'expired',
           expired_at = p_event.created_at,
           expiration_type = safe_jsonb_extract_text(p_event.event_data, 'expiration_type'),
@@ -55,7 +55,7 @@ BEGIN
 
     WHEN 'access_grant.suspended' THEN
       v_grant_id := safe_jsonb_extract_uuid(p_event.event_data, 'grant_id');
-      UPDATE cross_tenant_access_grants_projection 
+      UPDATE cross_tenant_access_grants_projection
       SET status = 'suspended',
           suspended_at = p_event.created_at,
           suspended_by = safe_jsonb_extract_uuid(p_event.event_data, 'suspended_by'),
@@ -67,7 +67,7 @@ BEGIN
 
     WHEN 'access_grant.reactivated' THEN
       v_grant_id := safe_jsonb_extract_uuid(p_event.event_data, 'grant_id');
-      UPDATE cross_tenant_access_grants_projection 
+      UPDATE cross_tenant_access_grants_projection
       SET status = 'active',
           suspended_at = NULL, suspended_by = NULL,
           suspension_reason = NULL, suspension_details = NULL,
@@ -83,7 +83,8 @@ BEGIN
       WHERE id = v_grant_id;
 
     ELSE
-      RAISE WARNING 'Unknown access grant event type: %', p_event.event_type;
+      RAISE EXCEPTION 'Unhandled event type "%" in process_access_grant_event', p_event.event_type
+          USING ERRCODE = 'P9001';
   END CASE;
 
 END;
