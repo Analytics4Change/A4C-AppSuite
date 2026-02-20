@@ -172,6 +172,36 @@ Full audit of all event types across 12 routers + dispatcher vs 14 AsyncAPI doma
 8. **Existing helper functions to reuse**: `api.emit_domain_event()`, `get_current_org_id()`, `get_current_user_id()`, `has_effective_permission()`, `safe_jsonb_extract_text()`, `safe_jsonb_extract_uuid()`.
 9. **`event_types` table has unique constraint on `event_type`**: Dual-routed events (e.g., `user.invited` with stream_type `user` AND `invitation`) can only have ONE row. The seed uses `ON CONFLICT (event_type) DO NOTHING`.
 
+## Data Sensitivity Tiers (HIPAA)
+
+| Tier | Examples | Handling |
+|---|---|---|
+| PHI-Critical | SSN last 4 (if captured), diagnoses, medications, allergies | Field-level encryption, strict audit, minimum necessary |
+| PHI-Standard | Name, DOB, race/ethnicity, contacts | Standard HIPAA protections, role-based access |
+| Administrative | Case #, admission date, referral source, org unit | Standard access controls |
+
+## Frontend Patterns to Reuse (Phase 5)
+
+When the frontend intake form is built, these existing patterns apply:
+
+| Pattern | File | Reuse For |
+|---|---|---|
+| **Settings ViewModel** | `frontend/src/viewModels/settings/DirectCareSettingsViewModel.ts` | Intake form configuration ViewModel (observable state, dirty tracking, save/reset, audit) |
+| **Settings hub card** | `frontend/src/pages/settings/SettingsPage.tsx` | "Client Intake Configuration" card (glassmorphism, permission-gated, keyboard accessible) |
+| **Multi-section form** | `frontend/src/viewModels/organization/OrganizationFormViewModel.ts` | Client intake form (multi-section, complex validation, draft management) |
+| **Multi-select dropdown** | `frontend/src/components/ui/MultiSelectDropdown.tsx` | Race multi-select (WCAG 2.1 AA, checkbox-based, keyboard nav) |
+| **JSONB org settings** | `organizations_projection.direct_care_settings` | Pattern for per-org intake config storage |
+
+### Current Frontend State (as of 2026-02-06)
+- `/clients` route: Functional page with **mock data** (card grid, search/filter, client name + DOB + med count)
+- `/clients/:clientId` detail: Tabs for overview, medications, history (coming soon), documents (coming soon)
+- `/settings` route: Hub page with permission-gated cards; DirectCareSettings section with toggle switches + reason-for-change audit
+- Root `/` redirects to `/clients`
+
+### Open Frontend Questions (resolve before Phase 5)
+- **Navigation**: Intake form configuration under `/settings/organization` (alongside DirectCareSettings) or dedicated `/settings/intake-form` sub-route?
+- **Configurability UX**: Toggle switches (like DirectCareSettings) vs. drag-and-drop field ordering vs. section-based grouping?
+
 ## Why This Approach?
 
 **Why JSONB + field registry instead of per-tenant schemas?**

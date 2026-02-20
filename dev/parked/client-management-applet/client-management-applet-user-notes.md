@@ -1,28 +1,34 @@
-**Notes on field selection and management**
+# Client Management Applet — User Notes
 
-- gender: Should be a drop down that looks like the following:
+**Last Updated**: 2026-02-19
 
+## Field UX Decisions
+
+### Gender
+Drop-down with two modes controlled by a settings toggle:
+
+**Default mode** (binary):
 ```
-Binary
-  - Male
-  - Female
-Other [Note to agent: enable text capture if selected]
+Male
+Female
+Other → enables free-text input
 ```
 
-**Note to agent: The /settings should have a slider that enables the panopoly of gender choices beyond binary
+**Expanded mode** (enabled via /settings toggle):
+Full set of gender options from `client_reference_values` (Male, Female, Non-binary, Transgender Male, Transgender Female, Other, Prefer Not to Say).
 
-- pronouns: will also be a drop-down
-
+### Pronouns
+Drop-down (not free text):
 ```
-He/Him/His 
+He/Him/His
 She/Her/Hers
 They/Them/Theirs
-Ze/Hir/Hirs 
-Other [Note to agent: allow textual input if selected]
+Ze/Hir/Hirs
+Other → enables free-text input
 ```
 
-- Race: will be a drop down
-
+### Race
+Multi-select dropdown (OMB categories):
 ```
 American Indian or Alaska Native
 Asian
@@ -33,50 +39,49 @@ Two or more Races
 Prefer not to say
 ```
 
-- Ethnicity: this is also a drop-down
-
+### Ethnicity
+Single-select dropdown (OMB two-question format):
 ```
 Hispanic or Latino
 Not Hispanic or Latino
 Prefer not to say
 ```
 
-- Primary Language: will be a drop-down
-
+### Primary Language
+Single-select dropdown:
 ```
-Arabic
-Bengali
-Cantonese 
-English
-French
-German
-Hindi
-Japanese
-Karen 
-Lahnda
-Mandarin
-Marathi
-Portugese
-Russian
-Spanish
-Swahili
-Tagalog
-Tamil
-Turkish
-Urudu
-Vietnamese
+Arabic, Bengali, Cantonese, English, French, German, Hindi, Japanese,
+Karen, Lahnda, Mandarin, Marathi, Portugese, Russian, Spanish, Swahili,
+Tagalog, Tamil, Turkish, Urudu, Vietnamese
 ```
 
-- case_number: This should actually be called internal_case_number. This should be a renamable custom field.  This is the tenant facing unique identifier for the client.
+## Renamable Fields
 
-- discharge_date: This should be an event in the system on it's own registered in AsyncAPI.  It's visual representation can exist in the client management page.  Once the client.discharge event has been fired, an event called client.reverse_discharge should be made available with a corresponding new button (maybe? ).  client.reverse_discharege is meant to undo an accident or unintended dischage.
+Some fields have a fixed database column name but allow each organization to customize the **display label** shown in the UI. The underlying column and API field name never changes — only the tenant-facing label is configurable via the `client_field_definitions_projection` registry.
 
-**Note:**  We will need to be able to also have functionality that allows for the re-admittance of a previously discharged client.  This is **not** a client.reverse_discharge.  This is to accomodatge the scenario for when a provider has served the client in the past and has been re-contracted to serve the client again.
+Example: `internal_case_number` is the DB column. Org A labels it "Youth ID", Org B labels it "Client Number".
 
-- external_case_number_1: This should be a renamable custom field.
-- external_case_number_2: This should be a renamable custom field.
-- external_case_number_3: This should be a renamable custom field.
+### Renamable field list
 
-Note to agent:  There will be no court_case_number.
+| DB Column | Default Label | Notes |
+|-----------|--------------|-------|
+| `internal_case_number` | Internal Case Number | Tenant-facing unique identifier for the client |
+| `external_case_number_1` | External Case Number 1 | External system reference |
+| `external_case_number_2` | External Case Number 2 | External system reference |
+| `external_case_number_3` | External Case Number 3 | External system reference |
 
-- status: This should be renamable and mappable as well.  Its canonical domain of values: IN_PROGRAM, OUT_OF_PROGRAM_WORK, OUT_OF_PROGRAM_HOME_VISIT, OUT_OF_PROGRAM_OFF_CAMPUS, OUT_OF_PROGRAM_AWOL, OUT_OF_PROGRAM_HOSPITAL, OUT_OF_PROGRAM_SCHOOLING, OUT_OF_PROGRAM_DETENTION
+Case numbers cannot be canonicalized across organizations, so they are **not** candidates for BI slicers — but they are candidates for detail-level display.
+
+There will be no `court_case_number` field.
+
+## Status Field
+
+**Canonical values**: `active`, `inactive`
+
+This is a simple lifecycle status. Program-location tracking (in-program, AWOL, hospital, detention, etc.) belongs to a future data collection applet, not client management.
+
+## Discharge Events
+
+- `client.discharged` — sets `discharge_date`, transitions client
+- `client.reverse_discharge` — undoes an accidental or unintended discharge (restores previous state)
+- `client.readmitted` — re-admits a previously discharged client who is being served again by the same provider (distinct from reverse_discharge; this is a new service engagement)

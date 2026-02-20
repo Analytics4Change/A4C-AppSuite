@@ -68,7 +68,34 @@
 
 ## Phase 5: Frontend Intake Form ⏸️ PENDING
 
-_Deferred — no tasks defined yet. Will be planned after Phase 3 is complete._
+### 5.0 Scope Decisions (resolve before implementation)
+- [ ] Decide navigation placement: intake config under `/settings/organization` or dedicated `/settings/intake-form` sub-route
+- [ ] Decide configurability UX: toggle switches vs drag-and-drop ordering vs section-based grouping
+
+### 5.1 Intake Form Configuration (Settings UI)
+- [ ] Add "Client Intake Configuration" card to SettingsPage hub (reuse glassmorphism card pattern)
+- [ ] Define `IntakeFormConfig` TypeScript interface
+- [ ] Create `IIntakeFormConfigService` + Supabase + Mock implementations
+- [ ] Create `IntakeFormConfigViewModel` (mirror DirectCareSettingsViewModel: observable state, dirty tracking, save/reset, audit)
+- [ ] Create IntakeFormConfigSection component (core fields read-only, optional field toggles)
+- [ ] Permission gate on `organization.update`
+
+### 5.2 Client Intake Form
+- [ ] Create `ClientIntakeFormViewModel` (mirror OrganizationFormViewModel: multi-section, validation, draft management)
+- [ ] Demographics section (name, DOB, gender dropdown, pronouns dropdown)
+- [ ] Race/ethnicity section (OMB two-question: ethnicity single-select → race multi-select via MultiSelectDropdown)
+- [ ] Contact section (phone, email, address, emergency contacts)
+- [ ] Administrative section (internal case number, external case numbers, admission date, org unit, referral source)
+- [ ] Staff assignment section (clinician, program manager)
+- [ ] Conditional rendering based on org's intake form configuration
+- [ ] Validation (required fields, format checks)
+- [ ] WCAG 2.1 AA compliance (keyboard nav, ARIA, focus management)
+
+### 5.3 Client List Enhancements
+- [ ] Replace mock data with `api.list_clients()` RPC queries
+- [ ] Update ClientListPage to show configurable columns
+- [ ] Update search/filter for new fields
+- [ ] Update ClientDetailLayout for richer data display
 
 ## Documentation Tasks (after Phase 3)
 
@@ -110,6 +137,15 @@ _Deferred — no tasks defined yet. Will be planned after Phase 3 is complete._
 - [ ] Cube.js schema document covers all conforming dimensions
 - [ ] Dynamic dimension generation design documented
 - [ ] Pre-aggregation strategy defined
+
+### Phase 5 Complete
+- [ ] Org admin can view/toggle intake form configuration in settings
+- [ ] Configuration persists across sessions with audit trail (reason for change)
+- [ ] Intake form renders based on org configuration (conditional fields)
+- [ ] Race/ethnicity uses OMB two-question format
+- [ ] Mock mode works without Supabase
+- [ ] Client list shows real data from `api.list_clients()` RPC
+- [ ] WCAG 2.1 AA compliant (keyboard nav, ARIA, focus management)
 
 ## Current Status
 
