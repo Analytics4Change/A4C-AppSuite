@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-02
+last_updated: 2026-02-19
 ---
 
 <!-- TL;DR-START -->
@@ -147,6 +147,8 @@ $$;
 | 4 | RLS policy migration to `has_effective_permission()` | `20260124192733` | `18c5c512` |
 | 5 | Frontend integration (auth types, hasPermission, Realtime subscription) | `20260126173806` | `427292f3` |
 | 5B | Strip deprecated claims, bump to claims_version 4 | `20260126180004` | `f64901f4` |
+| 5B-fix1 | Fix 3 Edge Functions + 2 RLS policies still using v3 fields (2026-02-18) | `20260218225841` | — |
+| 5B-fix2 | Fix Backend API middleware (`workflows/src/api/middleware/auth.ts`) still using v3 `permissions` field + add `access_blocked` guard (2026-02-19) | — | — |
 | 6 | Direct Care Settings UI (Switch, ViewModel, 29 tests) | `20260126205504` | `78c357d7` |
 | 7A | Staff schedules backend RPCs + frontend UI | `20260202181252`, `20260202181537` | `8e8fa67d` |
 | 7B | Client assignments UI with feature flag | — | `df681aea`, `894d9d5c` |

@@ -1,7 +1,9 @@
 ---
-status: current
-last_updated: 2025-12-30
+status: archived
+last_updated: 2026-02-19
 ---
+
+> **Archived**: This document describes the v1 JWT claims implementation (October 2025, pre-v4 migration). The claims structure, field names (`permissions`, `user_role`, `scope_path`), and Zitadel references are all deprecated. For current JWT v4 architecture, see [ADR: Multi-Role Effective Permissions](../../../architecture/authorization/adr-multi-role-effective-permissions.md).
 
 <!-- TL;DR-START -->
 ## TL;DR

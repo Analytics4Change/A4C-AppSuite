@@ -20,13 +20,21 @@ function getRequiredEnvVar(name: string): string {
 const supabaseUrl = getRequiredEnvVar('SUPABASE_URL');
 const supabaseAnonKey = getRequiredEnvVar('SUPABASE_ANON_KEY');
 
+interface EffectivePermission {
+  p: string;  // Permission name
+  s: string;  // Scope path (ltree)
+}
+
 interface JWTPayload {
-  permissions?: string[];
-  org_id?: string;
-  user_role?: string;
-  scope_path?: string;
   sub?: string;
   email?: string;
+  org_id?: string;
+  org_type?: string;
+  effective_permissions?: EffectivePermission[];
+  access_blocked?: boolean;
+  claims_version?: number;
+  current_org_unit_id?: string | null;
+  current_org_unit_path?: string | null;
 }
 
 declare module 'fastify' {
@@ -36,7 +44,6 @@ declare module 'fastify' {
       email: string;
       permissions: string[];
       org_id?: string;
-      user_role?: string;
     };
     supabaseClient?: SupabaseClient;
   }
@@ -95,6 +102,14 @@ export async function authMiddleware(
     });
   }
 
+  // Block deactivated users before making any network calls
+  if (jwtPayload.access_blocked) {
+    return reply.code(403).send({
+      error: 'Forbidden',
+      message: 'Account access is blocked'
+    });
+  }
+
   // Create Supabase client with user's token for validation
   const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: {
@@ -114,13 +129,16 @@ export async function authMiddleware(
     });
   }
 
-  // Attach user info to request (from JWT custom claims)
+  // Map v4 effective_permissions to flat permission names.
+  // Scope (ep.s) is intentionally dropped — the only permission checked
+  // on this API (organization.create_root) is a platform-level privilege with
+  // root scope, making scope filtering a no-op. This matches the SQL
+  // has_permission() function which also checks permission name only.
   request.user = {
     id: user.id,
     email: user.email!,
-    permissions: jwtPayload.permissions || [],
+    permissions: (jwtPayload.effective_permissions ?? []).map(ep => ep.p),
     org_id: jwtPayload.org_id,
-    user_role: jwtPayload.user_role
   };
 
   request.supabaseClient = supabaseClient;
