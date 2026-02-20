@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-05
+last_updated: 2026-02-19
 ---
 
 <!-- TL;DR-START -->
@@ -896,9 +896,14 @@ SELECT * FROM invitations_projection WHERE token = '<token>';
   - Made `role` column NULLABLE (deprecated in favor of `roles`)
   - Migration: `20251231221901_user_extended_event_processors.sql`
 - Event routing fix (2026-01-05):
-  - Changed `stream_type` from 'organization' to 'user'
-  - Events now route to `process_user_event()` instead of `process_organization_event()`
+  - Changed `user.invited` `stream_type` from 'organization' to 'user'
+  - `user.invited` events now route to `process_user_event()` instead of `process_organization_event()`
   - Migration: `20260105_invitation_event_routing.sql` (Bootstrap workflow and Edge Function updates)
+- Invitation resend/revoke fix (2026-02-19):
+  - Fixed `invite-user` Edge Function (v15): `invitation.resent` now emits with `stream_type='invitation'` (was `'organization'`)
+  - Added `revoke` operation to `invite-user` Edge Function (calls `api.revoke_invitation` RPC)
+  - Added forwarding CASE in `process_organization_event()` for old misrouted `invitation.resent` events
+  - Migration: `20260219001026_fix_invitation_resent_routing.sql`
 
 ## References
 

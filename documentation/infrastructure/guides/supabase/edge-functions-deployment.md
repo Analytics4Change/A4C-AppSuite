@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-02-19
 ---
 
 <!-- TL;DR-START -->
@@ -48,7 +48,7 @@ graph LR
 
 **Edge Functions in A4C**:
 - `create-organization`: Validates input, emits `organization.bootstrap_initiated` event
-- *(Future)* `invite-user`: Emits `user.invitation_initiated` event
+- `invite-user`: Handles create/resend/revoke operations for user invitations (v15)
 - *(Future)* `update-subscription`: Emits `subscription.upgrade_initiated` event
 
 ## Prerequisites

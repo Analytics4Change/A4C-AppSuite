@@ -1,3 +1,17 @@
+-- Fix invitation.resent event routing
+--
+-- The invite-user Edge Function (pre-v15) emitted invitation.resent events with
+-- stream_type='organization', which routed them to process_organization_event()
+-- instead of process_invitation_event(). The ELSE clause raised an exception,
+-- causing the event to be marked with processing_error and the projection
+-- to never receive the new token.
+--
+-- This migration:
+-- 1. Adds a forwarding CASE for invitation.resent in process_organization_event()
+--    to delegate to handle_invitation_resent() — handles old misrouted events
+-- 2. Retries any failed invitation.resent events by clearing their error state
+
+-- Step 1: Add forwarding CASE to process_organization_event
 CREATE OR REPLACE FUNCTION public.process_organization_event(p_event record)
  RETURNS void
  LANGUAGE plpgsql
@@ -29,3 +43,12 @@ BEGIN
   END CASE;
 END;
 $function$;
+
+-- Step 2: Retry any failed invitation.resent events
+-- These events had processing_error set because process_organization_event()
+-- didn't have a CASE for them. Now that the forwarding CASE exists,
+-- clearing the error will allow them to be reprocessed.
+UPDATE domain_events
+SET processed_at = NULL, processing_error = NULL
+WHERE event_type = 'invitation.resent'
+  AND processing_error IS NOT NULL;

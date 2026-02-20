@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-17
+last_updated: 2026-02-19
 ---
 
 <!-- TL;DR-START -->
@@ -331,8 +331,7 @@ The GitHub Actions workflow automatically:
 | `organization.bootstrap.completed` | `handle_bootstrap_completed` |
 | `organization.bootstrap.failed` | `handle_bootstrap_failed` |
 | `organization.bootstrap.cancelled` | `handle_bootstrap_cancelled` |
-| `user.invited` | `handle_user_invited` |
-| `invitation.resent` | `handle_invitation_resent` |
+| `invitation.resent` | `handle_invitation_resent` (forwarding CASE — pre-v15 Edge Function emitted with `stream_type='organization'`; delegates to `process_invitation_event()` handler) |
 
 ### Organization Unit Events Router: `process_organization_unit_event()`
 

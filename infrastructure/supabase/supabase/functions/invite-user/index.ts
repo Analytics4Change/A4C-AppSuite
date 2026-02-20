@@ -33,7 +33,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v14-jwt-v4-claims';
+const DEPLOY_VERSION = 'v15-fix-resend-add-revoke';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -524,6 +524,51 @@ serve(async (req) => {
     console.log(`[invite-user v${DEPLOY_VERSION}] Operation: ${operation}`);
 
     // ==========================================================================
+    // REVOKE OPERATION
+    // ==========================================================================
+    if (operation === 'revoke') {
+      if (!requestData.invitationId) {
+        return new Response(
+          JSON.stringify({ error: 'Missing invitationId for revoke operation' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`[invite-user v${DEPLOY_VERSION}] Revoking invitation ${requestData.invitationId}`);
+
+      // Call existing api.revoke_invitation RPC (validates status=pending, emits event)
+      // Note: RPC uses auth.uid() internally for metadata; service_role has no uid,
+      // but the revocation reason and invitation_id provide sufficient audit trail
+      const { data: revokeResult, error: revokeError } = await supabaseAdmin
+        .rpc('revoke_invitation', {
+          p_invitation_id: requestData.invitationId,
+          p_reason: 'Revoked by administrator',
+        });
+
+      if (revokeError) {
+        console.error(`[invite-user v${DEPLOY_VERSION}] Revoke failed:`, revokeError);
+        return handleRpcError(revokeError, correlationId, corsHeaders, 'revoke invitation');
+      }
+
+      if (revokeResult === false) {
+        return new Response(
+          JSON.stringify({ error: 'Invitation not found or not revocable' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`[invite-user v${DEPLOY_VERSION}] Invitation revoked successfully: ${requestData.invitationId}`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          invitationId: requestData.invitationId,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ==========================================================================
     // RESEND OPERATION
     // ==========================================================================
     if (operation === 'resend') {
@@ -588,8 +633,8 @@ serve(async (req) => {
       const { error: eventError } = await (supabaseAdmin as AnySchemaSupabaseClient)
         .schema('api')
         .rpc('emit_domain_event', {
-          p_stream_id: orgId,  // Stream ID is org (invitation lifecycle events keyed by org)
-          p_stream_type: 'organization',
+          p_stream_id: existingInvitation.invitation_id,  // Stream ID is invitation (matches other invitation lifecycle events)
+          p_stream_type: 'invitation',
           p_event_type: 'invitation.resent',
           p_event_data: {
             invitation_id: existingInvitation.invitation_id,

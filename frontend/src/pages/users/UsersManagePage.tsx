@@ -497,6 +497,32 @@ export const UsersManagePage: React.FC = observer(() => {
     }
   }, [currentItem, viewModel]);
 
+  // UserCard invitation action handlers
+  // These bridge the UserCard buttons (which pass invitationId) to the dialog flow
+  const handleCardResendInvitation = useCallback(
+    (invitationId: string) => {
+      const item = viewModel.items.find((u: UserListItem) => u.invitationId === invitationId);
+      if (item) {
+        setCurrentItem(item);
+        setOperationError(null);
+        setDialogState({ type: 'resend', isLoading: false });
+      }
+    },
+    [viewModel.items]
+  );
+
+  const handleCardRevokeInvitation = useCallback(
+    (invitationId: string) => {
+      const item = viewModel.items.find((u: UserListItem) => u.invitationId === invitationId);
+      if (item) {
+        setCurrentItem(item);
+        setOperationError(null);
+        setDialogState({ type: 'revoke', isLoading: false });
+      }
+    },
+    [viewModel.items]
+  );
+
   // Delete handlers
   const handleDeleteClick = useCallback(() => {
     if (!currentItem || currentItem.isInvitation) return;
@@ -648,6 +674,8 @@ export const UsersManagePage: React.FC = observer(() => {
                   statusFilter={statusFilter}
                   onStatusFilterChange={setStatusFilter}
                   onUserClick={handleUserSelect}
+                  onResendInvitation={handleCardResendInvitation}
+                  onRevokeInvitation={handleCardRevokeInvitation}
                   isLoading={viewModel.isLoading}
                   totalCount={viewModel.totalCount}
                 />
