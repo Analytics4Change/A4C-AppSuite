@@ -308,6 +308,40 @@ export class SupabaseAuthProvider implements IAuthProvider {
   }
 
   /**
+   * Send a password reset email via Supabase Auth
+   */
+  async sendPasswordResetEmail(email: string): Promise<void> {
+    log.info('SupabaseAuthProvider: Sending password reset email', { email });
+
+    const { error } = await this.client.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/auth/reset-password',
+    });
+
+    if (error) {
+      // Log but don't throw - prevent email enumeration
+      log.warn('SupabaseAuthProvider: resetPasswordForEmail returned error', error);
+    }
+
+    log.info('SupabaseAuthProvider: Password reset email request processed');
+  }
+
+  /**
+   * Update the current user's password
+   */
+  async updatePassword(newPassword: string): Promise<void> {
+    log.info('SupabaseAuthProvider: Updating password');
+
+    const { error } = await this.client.auth.updateUser({ password: newPassword });
+
+    if (error) {
+      log.error('SupabaseAuthProvider: Password update failed', error);
+      throw new Error(`Password update failed: ${error.message}`);
+    }
+
+    log.info('SupabaseAuthProvider: Password updated successfully');
+  }
+
+  /**
    * Check if user has a specific permission.
    * Uses effective_permissions exclusively (JWT v4).
    * When targetPath is provided, also checks scope containment.
@@ -326,9 +360,7 @@ export class SupabaseAuthProvider implements IAuthProvider {
     let hasIt: boolean;
 
     if (targetPath) {
-      hasIt = eps.some(
-        (ep) => ep.p === permission && isPathContained(ep.s, targetPath)
-      );
+      hasIt = eps.some((ep) => ep.p === permission && isPathContained(ep.s, targetPath));
     } else {
       hasIt = eps.some((ep) => ep.p === permission);
     }

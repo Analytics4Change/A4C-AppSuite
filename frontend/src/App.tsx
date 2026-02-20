@@ -6,6 +6,8 @@ import { RequirePermission } from '@/components/auth/RequirePermission';
 import { FailedEventsPage } from '@/pages/admin/FailedEventsPage';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { AuthCallback } from '@/pages/auth/AuthCallback';
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { ClientListPage } from '@/pages/clients/ClientListPage';
 import { ClientDetailLayout } from '@/pages/clients/ClientDetailLayout';
@@ -65,6 +67,8 @@ function App() {
             {/* Public Routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
             <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
 
             {/* Protected Routes */}

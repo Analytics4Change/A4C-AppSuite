@@ -102,6 +102,7 @@ purpose: agent-navigation
 | `failed-events` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md |
 | `hipaa` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | impersonation-security-controls.md |
 | `feature-flag` | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | user_client_assignments_projection.md |
+| `forgot-password` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | LoginPage, supabase-auth-overview.md |
 | `formulary` | [medications.md](infrastructure/reference/database/tables/medications.md) | medication_history.md |
 | `generated-events` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | workflows/CLAUDE.md, event-sourcing-overview.md |
 | `handler` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md |
@@ -146,6 +147,7 @@ purpose: agent-navigation
 | `organization-bootstrap` | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | organization-bootstrap-workflow-design.md |
 | `organization-management` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | tenants-as-organizations.md |
 | `organization-units` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | scoping-architecture.md |
+| `password-reset` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | LoginPage, IAuthProvider |
 | `parent-span-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `pattern-selection` | [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | event-handler-pattern.md, SKILL.md |
 | `pre-request-hook` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |

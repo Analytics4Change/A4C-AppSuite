@@ -48,6 +48,8 @@ interface AuthContextType {
   handleOAuthCallback: (callbackUrl: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  sendPasswordResetEmail: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
 
   /** Permission checks */
   hasPermission: (permission: string, targetPath?: string) => Promise<boolean>;
@@ -84,7 +86,10 @@ interface AuthProviderProps {
  * AuthProvider component
  * Wraps the application and provides authentication context
  */
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvider: injectedProvider }) => {
+export const AuthProvider: React.FC<AuthProviderProps> = ({
+  children,
+  authProvider: injectedProvider,
+}) => {
   // Get auth provider (injected or from factory)
   const authProvider = injectedProvider || getAuthProvider();
 
@@ -313,6 +318,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvid
   };
 
   /**
+   * Send password reset email
+   */
+  const sendPasswordResetEmail = async (email: string): Promise<void> => {
+    log.info('AuthProvider: Sending password reset email');
+    await authProvider.sendPasswordResetEmail(email);
+  };
+
+  /**
+   * Update password (during recovery session)
+   */
+  const updatePassword = async (newPassword: string): Promise<void> => {
+    log.info('AuthProvider: Updating password');
+    await authProvider.updatePassword(newPassword);
+  };
+
+  /**
    * Check if user has a specific permission
    * Optionally scope-aware when targetPath is provided (JWT v3)
    */
@@ -364,6 +385,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, authProvid
     handleOAuthCallback,
     logout,
     refreshSession,
+    sendPasswordResetEmail,
+    updatePassword,
     hasPermission,
     switchOrganization,
     providerType: getDeploymentConfig().authProvider,

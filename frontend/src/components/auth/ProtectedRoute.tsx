@@ -21,6 +21,12 @@ export const ProtectedRoute: React.FC = () => {
     );
   }
 
+  // Block access during password recovery flow
+  if (isAuthenticated && sessionStorage.getItem('password_recovery_in_progress')) {
+    log.info('Recovery session active, redirecting to reset password');
+    return <Navigate to="/auth/reset-password" replace />;
+  }
+
   if (!isAuthenticated) {
     log.info('User not authenticated, redirecting to login');
     // Redirect to login page if not authenticated

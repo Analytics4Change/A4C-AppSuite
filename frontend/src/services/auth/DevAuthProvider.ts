@@ -185,6 +185,20 @@ export class DevAuthProvider implements IAuthProvider {
   }
 
   /**
+   * Mock password reset email - no-op in dev mode
+   */
+  async sendPasswordResetEmail(email: string): Promise<void> {
+    log.info('DevAuthProvider: Mock password reset email sent to', email);
+  }
+
+  /**
+   * Mock password update - no-op in dev mode
+   */
+  async updatePassword(_newPassword: string): Promise<void> {
+    log.info('DevAuthProvider: Mock password updated');
+  }
+
+  /**
    * Check if user has a specific permission.
    * Uses effective_permissions exclusively (JWT v4).
    * When targetPath is provided, also checks scope containment.
@@ -201,9 +215,7 @@ export class DevAuthProvider implements IAuthProvider {
     let hasIt: boolean;
 
     if (targetPath) {
-      hasIt = eps.some(
-        (ep) => ep.p === permission && isPathContained(ep.s, targetPath)
-      );
+      hasIt = eps.some((ep) => ep.p === permission && isPathContained(ep.s, targetPath));
     } else {
       hasIt = eps.some((ep) => ep.p === permission);
     }

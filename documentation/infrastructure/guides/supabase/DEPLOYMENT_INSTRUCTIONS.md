@@ -263,6 +263,15 @@ curl "$SUPABASE_URL/functions/v1/workflow-status?workflowId=test" \
    - Submit
    - Should navigate to bootstrap status page
 
+### 4. Customize Email Templates
+
+In the Supabase Dashboard, navigate to **Authentication > Email Templates** and customize the following for production branding:
+
+- **Reset Password**: Used by the self-service "Forgot Password" flow. Ensure the `{{ .ConfirmationURL }}` placeholder is included. The redirect URL should point to your production domain's `/auth/reset-password` path.
+- **Confirm Signup**, **Magic Link**, **Invite User**: Customize as needed for consistent branding.
+
+Also add your production reset password URL to **Authentication > URL Configuration > Redirect URLs** (e.g., `https://your-domain.com/auth/reset-password`).
+
 ---
 
 ## Troubleshooting

@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-01-26
+last_updated: 2026-02-19
 ---
 
 <!-- TL;DR-START -->
@@ -16,7 +16,7 @@ last_updated: 2026-01-26
 
 **Prerequisites**: Familiarity with React context, JWT tokens
 
-**Key topics**: `authentication`, `oauth`, `jwt`, `mock-auth`, `supabase-auth`, `dependency-injection`, `smart-detection`, `jwt-v4`, `scope-aware-permissions`
+**Key topics**: `authentication`, `oauth`, `jwt`, `mock-auth`, `supabase-auth`, `dependency-injection`, `smart-detection`, `jwt-v4`, `scope-aware-permissions`, `password-reset`, `forgot-password`
 
 **Estimated read time**: 15 minutes
 <!-- TL;DR-END -->
@@ -898,6 +898,48 @@ const MedicationList: React.FC = () => {
   );
 };
 ```
+
+---
+
+## Password Reset Flow
+
+Self-service password reset using Supabase Auth's PKCE recovery flow.
+
+### Flow Overview
+
+1. **User clicks "Forgot password?"** on `/login` page
+2. **ForgotPasswordPage** (`/auth/forgot-password`): Collects email, calls `sendPasswordResetEmail(email)` via `useAuth()`
+3. **Generic confirmation** displayed regardless of whether account exists (prevents email enumeration)
+4. **User clicks email link** → redirected to `/auth/reset-password?code=xxx`
+5. **ResetPasswordPage** (`/auth/reset-password`): Supabase auto-exchanges PKCE code via `detectSessionInUrl: true`
+6. **Recovery session guard**: `sessionStorage` flag `password_recovery_in_progress` prevents navigating into the app during recovery
+7. **User sets new password** → `updatePassword(newPassword)` via `useAuth()`
+8. **Logout + redirect** to `/login` with success toast
+
+### Security Design
+
+- **No email enumeration**: `sendPasswordResetEmail` never throws for non-existent emails
+- **Recovery session isolation**: `ProtectedRoute` redirects back to `/auth/reset-password` if recovery flag is set in `sessionStorage`
+- **PKCE flow**: Recovery code exchanged server-side, never exposed to JavaScript
+- **Session cleanup**: Recovery flag cleared and session logged out after password update
+
+### IAuthProvider Methods
+
+```typescript
+// Public operation - no session required
+sendPasswordResetEmail(email: string): Promise<void>;
+
+// Requires active recovery session
+updatePassword(newPassword: string): Promise<void>;
+```
+
+### Event Sourcing
+
+Password reset is purely an auth operation. Supabase Auth maintains its own audit log (`auth.audit_log_entries`). No domain events are emitted — there is no CQRS projection impact.
+
+### Mock Mode
+
+In mock mode, `sendPasswordResetEmail` is a no-op (logs a message). The ResetPasswordPage shows an "invalid link" error since there is no Supabase recovery code exchange.
 
 ---
 

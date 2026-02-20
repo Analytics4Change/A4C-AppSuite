@@ -84,6 +84,26 @@ export interface IAuthProvider {
   refreshSession(): Promise<Session>;
 
   /**
+   * Send a password reset email
+   *
+   * @precondition None (public operation, no session required)
+   * @postcondition If account exists, reset email sent; no error either way (security)
+   * @param email - Email address to send reset link to
+   * @throws Never throws for non-existent emails (prevents enumeration)
+   */
+  sendPasswordResetEmail(email: string): Promise<void>;
+
+  /**
+   * Update the current user's password
+   *
+   * @precondition Active recovery session (from PASSWORD_RECOVERY event)
+   * @postcondition Password updated, session remains active (caller should logout)
+   * @param newPassword - New password (min 6 chars)
+   * @throws Error if no active session, password too short, or update fails
+   */
+  updatePassword(newPassword: string): Promise<void>;
+
+  /**
    * Check if the current user has a specific permission
    *
    * Permission strings follow the applet.action pattern:
