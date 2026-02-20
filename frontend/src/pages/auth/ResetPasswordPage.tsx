@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, ArrowLeft, Info } from 'lucide-react';
 import { isMockAuth } from '@/services/auth/AuthProviderFactory';
+import { supabaseService } from '@/services/auth/supabase.service';
 import { toast } from 'sonner';
 import { Logger } from '@/utils/logger';
 
@@ -34,13 +35,17 @@ export const ResetPasswordPage: React.FC = () => {
   const [validationError, setValidationError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const passwordInputRef = useRef<HTMLInputElement>(null);
+  const codeExchangeAttempted = useRef(false);
 
   // Mark recovery in progress on mount
   useEffect(() => {
     sessionStorage.setItem('password_recovery_in_progress', 'true');
   }, []);
 
-  // Exchange PKCE code for session explicitly
+  // Exchange PKCE code for session.
+  // Race condition: Supabase's detectSessionInUrl (configured in supabase-ssr.ts) may also
+  // exchange the same one-time PKCE code. If our explicit call fails, we check the Supabase
+  // client directly — same pattern used by AuthCallback.tsx for OAuth.
   useEffect(() => {
     if (pageState !== 'loading') return;
 
@@ -50,24 +55,45 @@ export const ResetPasswordPage: React.FC = () => {
       return;
     }
 
-    // If already authenticated (e.g., detectSessionInUrl worked), go to form
+    // If already authenticated (e.g., detectSessionInUrl already handled it), go to form
     if (!authLoading && isAuthenticated) {
       log.info('[ResetPasswordPage] Recovery session already established');
       setPageState('form');
       return;
     }
 
-    // Extract PKCE code from URL and exchange it explicitly
+    // Extract PKCE code from URL and exchange it explicitly (once only)
     const code = searchParams.get('code');
-    if (code) {
+    if (code && !codeExchangeAttempted.current) {
+      codeExchangeAttempted.current = true;
       log.info('[ResetPasswordPage] Found PKCE code in URL, exchanging for session');
       exchangeCodeForSession(code)
         .then(() => {
           log.info('[ResetPasswordPage] PKCE code exchange successful');
           setPageState('form');
         })
-        .catch((err) => {
-          log.error('[ResetPasswordPage] PKCE code exchange failed', err);
+        .catch(async (err) => {
+          // detectSessionInUrl may have already consumed the one-time code.
+          // Check the Supabase client directly for a session (same pattern as AuthCallback.tsx).
+          log.warn(
+            '[ResetPasswordPage] Explicit code exchange failed, checking for session from detectSessionInUrl',
+            err
+          );
+          try {
+            const client = supabaseService.getClient();
+            const {
+              data: { session },
+            } = await client.auth.getSession();
+            if (session) {
+              log.info('[ResetPasswordPage] Session found via detectSessionInUrl');
+              setPageState('form');
+              return;
+            }
+          } catch (sessionErr) {
+            log.error('[ResetPasswordPage] Session check failed', sessionErr);
+          }
+          // No session from either path — truly invalid/expired link
+          log.error('[ResetPasswordPage] No session established, code is invalid or expired');
           setPageState('error');
         });
       return;
