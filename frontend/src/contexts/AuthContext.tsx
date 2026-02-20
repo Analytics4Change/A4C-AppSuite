@@ -50,6 +50,7 @@ interface AuthContextType {
   refreshSession: () => Promise<void>;
   sendPasswordResetEmail: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
+  exchangeCodeForSession: (code: string) => Promise<void>;
 
   /** Permission checks */
   hasPermission: (permission: string, targetPath?: string) => Promise<boolean>;
@@ -334,6 +335,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   };
 
   /**
+   * Exchange PKCE authorization code for session
+   */
+  const exchangeCodeForSession = async (code: string): Promise<void> => {
+    try {
+      setAuthState((prev) => ({ ...prev, loading: true, error: null }));
+
+      log.info('AuthProvider: Exchanging PKCE code for session');
+      const session = await authProvider.exchangeCodeForSession(code);
+
+      setAuthState({
+        isAuthenticated: true,
+        user: session.user,
+        session,
+        loading: false,
+        error: null,
+      });
+
+      log.info('AuthProvider: PKCE code exchange successful', {
+        user: session.user.email,
+      });
+    } catch (error) {
+      log.error('AuthProvider: PKCE code exchange failed', error);
+      setAuthState((prev) => ({
+        ...prev,
+        loading: false,
+        error: error as Error,
+      }));
+      throw error;
+    }
+  };
+
+  /**
    * Check if user has a specific permission
    * Optionally scope-aware when targetPath is provided (JWT v3)
    */
@@ -387,6 +420,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     refreshSession,
     sendPasswordResetEmail,
     updatePassword,
+    exchangeCodeForSession,
     hasPermission,
     switchOrganization,
     providerType: getDeploymentConfig().authProvider,

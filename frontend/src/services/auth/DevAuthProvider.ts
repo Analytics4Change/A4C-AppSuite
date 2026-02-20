@@ -199,6 +199,19 @@ export class DevAuthProvider implements IAuthProvider {
   }
 
   /**
+   * Mock PKCE code exchange - returns current session
+   */
+  async exchangeCodeForSession(_code: string): Promise<Session> {
+    log.info('DevAuthProvider: Mock PKCE code exchange');
+
+    if (!this.currentSession) {
+      this.currentSession = createMockSession(this.config.profile);
+    }
+
+    return this.currentSession;
+  }
+
+  /**
    * Check if user has a specific permission.
    * Uses effective_permissions exclusively (JWT v4).
    * When targetPath is provided, also checks scope containment.

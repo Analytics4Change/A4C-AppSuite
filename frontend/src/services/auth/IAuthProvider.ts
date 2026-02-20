@@ -104,6 +104,17 @@ export interface IAuthProvider {
   updatePassword(newPassword: string): Promise<void>;
 
   /**
+   * Exchange a PKCE authorization code for a session
+   *
+   * @precondition Valid PKCE code from URL params (e.g., password reset or OAuth redirect)
+   * @postcondition Session established with valid access/refresh tokens
+   * @param code - The PKCE authorization code from URL query parameters
+   * @returns Promise resolving to authenticated session
+   * @throws Error if code is invalid, expired, or code_verifier cookie is missing
+   */
+  exchangeCodeForSession(code: string): Promise<Session>;
+
+  /**
    * Check if the current user has a specific permission
    *
    * Permission strings follow the applet.action pattern:

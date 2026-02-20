@@ -342,6 +342,32 @@ export class SupabaseAuthProvider implements IAuthProvider {
   }
 
   /**
+   * Exchange a PKCE authorization code for a session
+   */
+  async exchangeCodeForSession(code: string): Promise<Session> {
+    log.info('SupabaseAuthProvider: Exchanging PKCE code for session');
+
+    const { data, error } = await this.client.auth.exchangeCodeForSession(code);
+
+    if (error) {
+      log.error('SupabaseAuthProvider: Code exchange failed', error);
+      throw new Error(`Code exchange failed: ${error.message}`);
+    }
+
+    if (!data.session) {
+      throw new Error('Code exchange failed: No session returned');
+    }
+
+    this.currentSession = this.convertSupabaseSession(data.session);
+
+    log.info('SupabaseAuthProvider: Code exchange successful', {
+      user: this.currentSession.user.email,
+    });
+
+    return this.currentSession;
+  }
+
+  /**
    * Check if user has a specific permission.
    * Uses effective_permissions exclusively (JWT v4).
    * When targetPath is provided, also checks scope containment.

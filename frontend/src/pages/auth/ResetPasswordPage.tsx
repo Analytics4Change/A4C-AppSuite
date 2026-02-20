@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,14 +12,20 @@ import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('component');
 
-const RECOVERY_TIMEOUT_MS = 10_000;
 const MIN_PASSWORD_LENGTH = 6;
 
 type PageState = 'loading' | 'form' | 'submitting' | 'success' | 'error';
 
 export const ResetPasswordPage: React.FC = () => {
-  const { isAuthenticated, updatePassword, logout, loading: authLoading } = useAuth();
+  const {
+    isAuthenticated,
+    updatePassword,
+    logout,
+    exchangeCodeForSession,
+    loading: authLoading,
+  } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const useMockAuth = isMockAuth();
 
   const [pageState, setPageState] = useState<PageState>('loading');
@@ -27,21 +33,14 @@ export const ResetPasswordPage: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [validationError, setValidationError] = useState('');
   const [submitError, setSubmitError] = useState('');
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
   // Mark recovery in progress on mount
   useEffect(() => {
     sessionStorage.setItem('password_recovery_in_progress', 'true');
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
   }, []);
 
-  // Wait for Supabase to auto-exchange recovery code and establish session
+  // Exchange PKCE code for session explicitly
   useEffect(() => {
     if (pageState !== 'loading') return;
 
@@ -51,22 +50,35 @@ export const ResetPasswordPage: React.FC = () => {
       return;
     }
 
+    // If already authenticated (e.g., detectSessionInUrl worked), go to form
     if (!authLoading && isAuthenticated) {
-      log.info('[ResetPasswordPage] Recovery session established');
+      log.info('[ResetPasswordPage] Recovery session already established');
       setPageState('form');
       return;
     }
 
-    // Start timeout for invalid/expired codes
-    if (!timeoutRef.current) {
-      timeoutRef.current = setTimeout(() => {
-        if (pageState === 'loading') {
-          log.warn('[ResetPasswordPage] Recovery code exchange timed out');
+    // Extract PKCE code from URL and exchange it explicitly
+    const code = searchParams.get('code');
+    if (code) {
+      log.info('[ResetPasswordPage] Found PKCE code in URL, exchanging for session');
+      exchangeCodeForSession(code)
+        .then(() => {
+          log.info('[ResetPasswordPage] PKCE code exchange successful');
+          setPageState('form');
+        })
+        .catch((err) => {
+          log.error('[ResetPasswordPage] PKCE code exchange failed', err);
           setPageState('error');
-        }
-      }, RECOVERY_TIMEOUT_MS);
+        });
+      return;
     }
-  }, [pageState, isAuthenticated, authLoading, useMockAuth]);
+
+    // No code in URL and not authenticated — invalid link
+    if (!authLoading) {
+      log.warn('[ResetPasswordPage] No code in URL and not authenticated');
+      setPageState('error');
+    }
+  }, [pageState, isAuthenticated, authLoading, useMockAuth, searchParams, exchangeCodeForSession]);
 
   // Focus password input when form state is reached
   useEffect(() => {
