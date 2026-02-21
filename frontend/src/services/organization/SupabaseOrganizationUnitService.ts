@@ -133,7 +133,9 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
   /**
    * Maps error details from RPC response to operation result format
    */
-  private mapErrorDetails(errorDetails?: MutationResponse['errorDetails']): OrganizationUnitOperationResult['errorDetails'] {
+  private mapErrorDetails(
+    errorDetails?: MutationResponse['errorDetails']
+  ): OrganizationUnitOperationResult['errorDetails'] {
     if (!errorDetails) return undefined;
 
     const codeMap: Record<string, OrganizationUnitOperationResult['errorDetails']> = {
@@ -169,10 +171,12 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
       },
     };
 
-    return codeMap[errorDetails.code] || {
-      code: 'UNKNOWN',
-      message: errorDetails.message,
-    };
+    return (
+      codeMap[errorDetails.code] || {
+        code: 'UNKNOWN',
+        message: errorDetails.message,
+      }
+    );
   }
 
   /**
@@ -182,12 +186,10 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
     log.debug('getUnits called', { filters });
 
     try {
-      const { data, error } = await supabase
-        .schema('api')
-        .rpc('get_organization_units', {
-          p_status: filters?.status || 'all',
-          p_search_term: filters?.searchTerm || null,
-        });
+      const { data, error } = await supabase.schema('api').rpc('get_organization_units', {
+        p_status: filters?.status || 'all',
+        p_search_term: filters?.searchTerm || null,
+      });
 
       if (error) {
         log.error('Error fetching organization units', error);
@@ -211,11 +213,9 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
     log.debug('getUnitById called', { unitId });
 
     try {
-      const { data, error } = await supabase
-        .schema('api')
-        .rpc('get_organization_unit_by_id', {
-          p_unit_id: unitId,
-        });
+      const { data, error } = await supabase.schema('api').rpc('get_organization_unit_by_id', {
+        p_unit_id: unitId,
+      });
 
       if (error) {
         log.error('Error fetching organization unit by ID', error);
@@ -267,18 +267,18 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
   /**
    * Creates a new organizational unit
    */
-  async createUnit(request: CreateOrganizationUnitRequest): Promise<OrganizationUnitOperationResult> {
+  async createUnit(
+    request: CreateOrganizationUnitRequest
+  ): Promise<OrganizationUnitOperationResult> {
     log.debug('createUnit called', { request });
 
     try {
-      const { data, error } = await supabase
-        .schema('api')
-        .rpc('create_organization_unit', {
-          p_parent_id: request.parentId,
-          p_name: request.name,
-          p_display_name: request.displayName,
-          p_timezone: request.timeZone || null,
-        });
+      const { data, error } = await supabase.schema('api').rpc('create_organization_unit', {
+        p_parent_id: request.parentId,
+        p_name: request.name,
+        p_display_name: request.displayName,
+        p_timezone: request.timeZone || null,
+      });
 
       if (error) {
         log.error('Error creating organization unit', error);
@@ -303,7 +303,20 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
         };
       }
 
-      log.info('Organization unit created', { unitId: response.unit?.id });
+      // Defense-in-depth: if handler failed, RPC may return success with empty unit
+      if (!response.unit?.id) {
+        log.error('Create returned success but no unit data', { response });
+        return {
+          success: false,
+          error: response.error || 'Organization unit creation failed — no data returned',
+          errorDetails: {
+            code: 'UNKNOWN',
+            message: 'Server returned success but no unit data',
+          },
+        };
+      }
+
+      log.info('Organization unit created', { unitId: response.unit.id });
       return {
         success: true,
         unit: this.mapResponseToUnit(response.unit),
@@ -327,18 +340,18 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
    * Note: Active status is not updated via this method.
    * Use deactivateUnit() to freeze, reactivateUnit() to unfreeze.
    */
-  async updateUnit(request: UpdateOrganizationUnitRequest): Promise<OrganizationUnitOperationResult> {
+  async updateUnit(
+    request: UpdateOrganizationUnitRequest
+  ): Promise<OrganizationUnitOperationResult> {
     log.debug('updateUnit called', { request });
 
     try {
-      const { data, error } = await supabase
-        .schema('api')
-        .rpc('update_organization_unit', {
-          p_unit_id: request.id,
-          p_name: request.name || null,
-          p_display_name: request.displayName || null,
-          p_timezone: request.timeZone || null,
-        });
+      const { data, error } = await supabase.schema('api').rpc('update_organization_unit', {
+        p_unit_id: request.id,
+        p_name: request.name || null,
+        p_display_name: request.displayName || null,
+        p_timezone: request.timeZone || null,
+      });
 
       if (error) {
         log.error('Error updating organization unit', error);
@@ -360,6 +373,19 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
           success: false,
           error: response.error,
           errorDetails: this.mapErrorDetails(response.errorDetails),
+        };
+      }
+
+      // Defense-in-depth: if handler failed, RPC may return success with empty unit
+      if (!response.unit?.id) {
+        log.error('Update returned success but no unit data', { response });
+        return {
+          success: false,
+          error: response.error || 'Organization unit update failed — no data returned',
+          errorDetails: {
+            code: 'UNKNOWN',
+            message: 'Server returned success but no unit data',
+          },
         };
       }
 
@@ -391,11 +417,9 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
     log.debug('deactivateUnit called', { unitId });
 
     try {
-      const { data, error } = await supabase
-        .schema('api')
-        .rpc('deactivate_organization_unit', {
-          p_unit_id: unitId,
-        });
+      const { data, error } = await supabase.schema('api').rpc('deactivate_organization_unit', {
+        p_unit_id: unitId,
+      });
 
       if (error) {
         log.error('Error deactivating organization unit', error);
@@ -417,6 +441,19 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
           success: false,
           error: response.error,
           errorDetails: this.mapErrorDetails(response.errorDetails),
+        };
+      }
+
+      // Defense-in-depth: if handler failed, RPC may return success with empty unit
+      if (!response.unit?.id) {
+        log.error('Deactivate returned success but no unit data', { response });
+        return {
+          success: false,
+          error: response.error || 'Organization unit deactivation failed — no data returned',
+          errorDetails: {
+            code: 'UNKNOWN',
+            message: 'Server returned success but no unit data',
+          },
         };
       }
 
@@ -447,11 +484,9 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
     log.debug('reactivateUnit called', { unitId });
 
     try {
-      const { data, error } = await supabase
-        .schema('api')
-        .rpc('reactivate_organization_unit', {
-          p_unit_id: unitId,
-        });
+      const { data, error } = await supabase.schema('api').rpc('reactivate_organization_unit', {
+        p_unit_id: unitId,
+      });
 
       if (error) {
         log.error('Error reactivating organization unit', error);
@@ -473,6 +508,19 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
           success: false,
           error: response.error,
           errorDetails: this.mapErrorDetails(response.errorDetails),
+        };
+      }
+
+      // Defense-in-depth: if handler failed, RPC may return success with empty unit
+      if (!response.unit?.id) {
+        log.error('Reactivate returned success but no unit data', { response });
+        return {
+          success: false,
+          error: response.error || 'Organization unit reactivation failed — no data returned',
+          errorDetails: {
+            code: 'UNKNOWN',
+            message: 'Server returned success but no unit data',
+          },
         };
       }
 
@@ -504,11 +552,9 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
     log.debug('deleteUnit called', { unitId });
 
     try {
-      const { data, error } = await supabase
-        .schema('api')
-        .rpc('delete_organization_unit', {
-          p_unit_id: unitId,
-        });
+      const { data, error } = await supabase.schema('api').rpc('delete_organization_unit', {
+        p_unit_id: unitId,
+      });
 
       if (error) {
         log.error('Error deleting organization unit', error);
@@ -530,6 +576,19 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
           success: false,
           error: response.error,
           errorDetails: this.mapErrorDetails(response.errorDetails),
+        };
+      }
+
+      // Defense-in-depth: if handler failed, RPC may return success with empty unit
+      if (!response.unit?.id) {
+        log.error('Delete returned success but no unit data', { response });
+        return {
+          success: false,
+          error: response.error || 'Organization unit deletion failed — no data returned',
+          errorDetails: {
+            code: 'UNKNOWN',
+            message: 'Server returned success but no unit data',
+          },
         };
       }
 

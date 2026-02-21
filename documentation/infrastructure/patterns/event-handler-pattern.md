@@ -517,6 +517,78 @@ handlers/
 3. **Adding a new handler**: Create handler + router CASE line in migration, then create reference file
 4. **Day Zero baseline consolidation**: Copy unchanged functions verbatim from reference files — see [Day 0 Migration Guide](../guides/supabase/DAY0-MIGRATION-GUIDE.md#handler-reference-files)
 
+## Projection Read-Back Guard
+
+When an RPC function emits a domain event and then reads the projection table to build its response, there is a **silent failure risk**: if the event handler fails, `process_domain_event()` catches the exception and records it in `processing_error`, but the RPC continues execution. The subsequent `SELECT INTO` from the projection returns no row, and the RPC returns `{success: true}` with null fields.
+
+### Required Pattern
+
+Every RPC that reads back from a projection after emitting an event **MUST** include a `NOT FOUND` guard:
+
+```sql
+-- Emit the event
+PERFORM api.emit_domain_event(...);
+
+-- Read back the projection
+SELECT * INTO v_result
+FROM my_projection
+WHERE id = v_entity_id;
+
+-- Guard: detect handler failure
+IF NOT FOUND THEN
+  -- Fetch actual processing error for diagnostics
+  SELECT processing_error INTO v_processing_error
+  FROM domain_events
+  WHERE stream_id = v_entity_id
+    AND event_type = 'entity.created'
+  ORDER BY sequence_number DESC
+  LIMIT 1;
+
+  RETURN jsonb_build_object(
+    'success', false,
+    'error', COALESCE(v_processing_error, 'Projection not found after event processing'),
+    'errorDetails', jsonb_build_object(
+      'code', 'PROCESSING_ERROR',
+      'message', 'The event was recorded but the handler failed. Check domain_events for details.'
+    )
+  );
+END IF;
+```
+
+### Why This Matters
+
+Without this guard:
+1. Handler fails (e.g., NOT NULL constraint, type mismatch)
+2. `process_domain_event()` catches exception, records in `processing_error`
+3. Domain event INSERT succeeds (with `processing_error` set)
+4. RPC continues, reads empty projection
+5. RPC returns `{success: true, unit: {id: null, ...}}`
+6. Frontend sees truthy response, displays no error — **silent data loss**
+
+### Frontend Defense-in-Depth
+
+Frontend services should also guard against this pattern by checking for null IDs in the response:
+
+```typescript
+if (response.success && !response.unit?.id) {
+  return {
+    success: false,
+    error: response.error || 'Operation failed — no data returned',
+    errorDetails: { code: 'UNKNOWN', message: 'Server returned success but no unit data' },
+  };
+}
+```
+
+### Affected RPCs
+
+Currently, only the organization unit RPCs follow the emit-then-read-back pattern:
+- `api.create_organization_unit()`
+- `api.update_organization_unit()`
+- `api.deactivate_organization_unit()`
+- `api.reactivate_organization_unit()`
+
+Other create RPCs (roles, schedules) return hardcoded data or just IDs, so they are not affected.
+
 ## Related Documentation
 
 - [Event Processing Patterns](./event-processing-patterns.md) - Decision guide for choosing sync vs async patterns

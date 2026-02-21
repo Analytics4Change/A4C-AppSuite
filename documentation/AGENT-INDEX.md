@@ -164,6 +164,7 @@ purpose: agent-navigation
 | `prescriptions` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | dosage_info.md |
 | `process_event` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md |
 | `projection` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | organizations_projection.md, table-template.md |
+| `projection-guard` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md, infrastructure/CLAUDE.md |
 | `provider-admin` | [provider-admin-permissions-architecture.md](architecture/authorization/provider-admin-permissions-architecture.md) | role_permission_templates.md |
 | `provider-onboarding` | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | organization-bootstrap-workflow-design.md |
 | `provider-partners` | [provider-partners-architecture.md](architecture/data/provider-partners-architecture.md) | var-partnerships.md |
@@ -293,7 +294,7 @@ purpose: agent-navigation
 | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | AsyncAPI → TypeScript type generation with Modelina | `asyncapi`, `modelina`, `type-generation`, `contract-drift`, `generated-events` | 3700 |
 | [event-observability.md](infrastructure/guides/event-observability.md) | Event processing observability, W3C Trace Context, span timing | `observability`, `tracing`, `failed-events`, `correlation-id`, `trace-id`, `span-id`, `session-id`, `w3c-trace-context` | 3200 |
 | [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | Decision guide: sync trigger handlers vs async pg_notify + Temporal | `event-processing-patterns`, `pattern-selection`, `pg-notify-pattern`, `dual-write`, `synchronous-handler`, `async-workflow` | 2800 |
-| [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | Split handler architecture: routers, handlers, adding new event types | `event-handler`, `handler`, `router`, `process_event`, `split-handlers` | 3500 |
+| [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | Split handler architecture: routers, handlers, adding new event types, projection read-back guard | `event-handler`, `handler`, `router`, `process_event`, `split-handlers`, `projection-guard` | 4200 |
 | [observability-operations.md](infrastructure/guides/observability-operations.md) | **[Aspirational]** Production-scale: retention, sampling, APM integration | `retention-policy`, `trace-sampling`, `apm-integration`, `otlp-export`, `event-archival` | 2000 |
 | [table-template.md](infrastructure/reference/database/table-template.md) | Database table documentation template | `template`, `database`, `schema` | 800 |
 

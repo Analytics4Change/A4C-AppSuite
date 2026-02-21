@@ -20,13 +20,21 @@ BEGIN
     timezone, is_active, created_at, updated_at
   ) VALUES (
     p_event.stream_id,
-    safe_jsonb_extract_uuid(p_event.event_data, 'organization_id'),
+    -- backward-compat: events before 20260221 used 'root_organization_id'
+    COALESCE(
+      safe_jsonb_extract_uuid(p_event.event_data, 'organization_id'),
+      safe_jsonb_extract_uuid(p_event.event_data, 'root_organization_id')
+    ),
     safe_jsonb_extract_text(p_event.event_data, 'name'),
     COALESCE(
       safe_jsonb_extract_text(p_event.event_data, 'display_name'),
       safe_jsonb_extract_text(p_event.event_data, 'name')
     ),
-    safe_jsonb_extract_text(p_event.event_data, 'slug'),
+    -- backward-compat: events before 20260221 omitted 'slug'; derive from path
+    COALESCE(
+      safe_jsonb_extract_text(p_event.event_data, 'slug'),
+      subpath((p_event.event_data->>'path')::LTREE, nlevel((p_event.event_data->>'path')::LTREE) - 1, 1)::TEXT
+    ),
     (p_event.event_data->>'path')::LTREE,
     (p_event.event_data->>'parent_path')::LTREE,
     COALESCE(safe_jsonb_extract_text(p_event.event_data, 'timezone'), 'UTC'),

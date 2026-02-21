@@ -249,6 +249,17 @@ handlers/
 > `api.emit_domain_event()`; handlers update projections. Direct writes bypass the audit
 > trail and break event replay.
 
+> **⚠️ RPC functions that read back from projections MUST check for NOT FOUND**
+>
+> When an RPC emits a domain event and then reads the projection to build its
+> response, it MUST check `IF NOT FOUND` after the SELECT INTO. If the event handler
+> fails, the exception is caught by `process_domain_event()` (recorded in
+> `processing_error`), but the RPC continues execution. Without a NOT FOUND check,
+> the RPC returns `{success: true}` with null fields — a silent failure.
+>
+> Always fetch the actual `processing_error` from `domain_events` to include in
+> the error response for diagnostics.
+
 **See**: [`documentation/infrastructure/patterns/event-handler-pattern.md`](../documentation/infrastructure/patterns/event-handler-pattern.md) for complete implementation guide.
 
 ### Kubernetes Commands
