@@ -74,6 +74,7 @@ interface MutationResponse {
     createdAt: string;
     updatedAt: string;
   };
+  deletedUnit?: MutationResponse['unit']; // backward-compat: old RPC key before migration fix
   error?: string;
   errorDetails?: {
     code: string;
@@ -580,7 +581,9 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
       }
 
       // Defense-in-depth: if handler failed, RPC may return success with empty unit
-      if (!response.unit?.id) {
+      // Backward-compat: old RPC returned 'deletedUnit', new RPC returns 'unit'
+      const unitData = response.unit || response.deletedUnit;
+      if (!unitData?.id) {
         log.error('Delete returned success but no unit data', { response });
         return {
           success: false,
@@ -595,7 +598,7 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
       log.info('Organization unit deleted', { unitId });
       return {
         success: true,
-        unit: this.mapResponseToUnit(response.unit),
+        unit: this.mapResponseToUnit(unitData),
       };
     } catch (err) {
       log.error('Exception in deleteUnit', err);
