@@ -46,14 +46,17 @@
 
 ## File Structure
 
-### Files to Modify
+### Files Modified (2026-02-23)
 
-- **New migration** `infrastructure/supabase/supabase/migrations/YYYYMMDDHHMMSS_fix_delete_org_unit_projection_guard.sql`
+- **`infrastructure/supabase/supabase/migrations/20260223163610_fix_delete_org_unit_projection_guard.sql`** (NEW)
   - `CREATE OR REPLACE FUNCTION api.delete_organization_unit()` with read-back guard
   - Pattern source: migration `20260221173821` lines 379-400
+  - Deployed to production via `supabase db push --linked`
 
-- **`frontend/src/services/organization/SupabaseOrganizationUnitService.ts`** (line 583)
-  - Add `response.deletedUnit` fallback for backward-compat
+- **`frontend/src/services/organization/SupabaseOrganizationUnitService.ts`**
+  - Line 77: Added `deletedUnit?: MutationResponse['unit']` to `MutationResponse` interface
+  - Line 584: `const unitData = response.unit || response.deletedUnit;` — backward-compat fallback
+  - Line 598: `unit: this.mapResponseToUnit(unitData)` — uses fallback variable
 
 ### Reference Files (read-only, verify after deploy)
 
