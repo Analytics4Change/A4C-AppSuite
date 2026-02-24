@@ -114,7 +114,7 @@ export class UserFormViewModel {
   isCheckingEmail = false;
 
   /** Available roles for selection */
-  readonly assignableRoles: RoleReference[];
+  assignableRoles: RoleReference[];
 
   /** Form mode (create or edit) */
   readonly mode: FormMode;
@@ -184,8 +184,7 @@ export class UserFormViewModel {
    * against an empty array and return [] even when roles are selected.
    */
   setAssignableRoles(roles: RoleReference[]): void {
-    // Type assertion to work around readonly - controlled mutation from within ViewModel
-    (this as { assignableRoles: RoleReference[] }).assignableRoles = roles;
+    this.assignableRoles = roles;
     log.debug('Updated assignable roles', { roleCount: roles.length });
   }
 
@@ -765,7 +764,9 @@ export class UserFormViewModel {
         );
         if (dateErrors) {
           // Set specific error for the field being validated
-          error = dateErrors[field === 'accessStartDate' ? 'accessStartDate' : 'accessExpirationDate'] ?? null;
+          error =
+            dateErrors[field === 'accessStartDate' ? 'accessStartDate' : 'accessExpirationDate'] ??
+            null;
         }
         break;
       }
@@ -869,6 +870,11 @@ export class UserFormViewModel {
    * Build invitation request from form data
    */
   buildRequest(): InviteUserRequest {
+    if (this.formData.roleIds.length > 0 && this.assignableRoles.length === 0) {
+      log.warn('buildRequest: roleIds selected but assignableRoles is empty — roles will be lost', {
+        roleIds: this.formData.roleIds,
+      });
+    }
     return {
       email: this.formData.email.trim(),
       firstName: this.formData.firstName.trim(),
