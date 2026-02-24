@@ -628,13 +628,9 @@ export const SchedulesManagePage: React.FC = observer(() => {
                           variant="outline"
                           size="sm"
                           onClick={handleManageAssignClick}
-                          disabled={formViewModel.isSubmitting || !currentTemplate.is_active}
+                          disabled={formViewModel.isSubmitting}
                           className="text-blue-600 border-blue-300 hover:bg-blue-50"
-                          title={
-                            !currentTemplate.is_active
-                              ? 'Activate template to manage users'
-                              : 'Add or remove user assignments for this template'
-                          }
+                          title="Add or remove user assignments for this template"
                         >
                           <Users className="w-4 h-4 mr-1" />
                           Manage User Assignments
@@ -754,6 +750,15 @@ export const SchedulesManagePage: React.FC = observer(() => {
                   isDeleting={dialogState.type === 'delete' && dialogState.isLoading}
                   deleteDescription="Permanently remove this schedule template."
                   activeDeleteConstraint="Must be deactivated before deletion."
+                  deleteSlot={
+                    !currentTemplate.is_active && currentTemplate.assigned_user_count > 0 ? (
+                      <span className="block text-orange-600 text-xs mt-1">
+                        {currentTemplate.assigned_user_count} user
+                        {currentTemplate.assigned_user_count !== 1 ? 's' : ''} still assigned —
+                        unassign before deleting.
+                      </span>
+                    ) : undefined
+                  }
                 />
               </div>
             )}
@@ -817,9 +822,12 @@ export const SchedulesManagePage: React.FC = observer(() => {
         title="Cannot Delete Template"
         message={`"${currentTemplate?.schedule_name}" has assigned users that must be removed before deletion.`}
         details={dialogState.type === 'hasUsers' ? dialogState.users : []}
-        confirmLabel="OK"
+        confirmLabel="Manage Assignments"
         cancelLabel="Close"
-        onConfirm={() => setDialogState({ type: 'none' })}
+        onConfirm={() => {
+          setDialogState({ type: 'none' });
+          setShowManageAssignDialog(true);
+        }}
         onCancel={() => setDialogState({ type: 'none' })}
         variant="warning"
       />
