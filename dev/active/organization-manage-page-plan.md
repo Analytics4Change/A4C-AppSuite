@@ -95,10 +95,15 @@ Single migration `20260226002002_organization_manage_page_phase1.sql` (1027 line
 - Role-based field editability: `isPlatformOwner` controls `canEditName`, `canEditFields` gates all edits when org inactive
 - Entity operations auto-reload details on success
 
-## Phase 7: Frontend Page + Navigation
+## Phase 7: Frontend Page + Navigation ✅ COMPLETE
 
-- `OrganizationsManagePage` split-panel with DangerZone, ConfirmDialogs
-- Route registration + nav sidebar updates
+- `OrganizationsManagePage` (~1500 lines): split-panel with left org list (platform owner) / auto-select (provider)
+- Right panel: org fields form, contacts/addresses/phones entity sections with inline add/edit/delete
+- DangerZone for platform owner with deactivate/reactivate/delete + ConfirmDialogs
+- Entity CRUD via `EntityFormDialog` modal components (contact, address, phone)
+- Route: `/organizations/manage` with `RequirePermission("organization.update")`
+- Nav item: visible to all org types with `organization.update` permission
+- Stub `/organizations/:orgId/edit` redirects to `/organizations/manage`
 
 ## Phase 8: Documentation Reconciliation
 

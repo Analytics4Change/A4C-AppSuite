@@ -18,6 +18,7 @@ import { OrganizationListPage } from '@/pages/organizations/OrganizationListPage
 import { OrganizationCreatePage } from '@/pages/organizations/OrganizationCreatePage';
 import { OrganizationBootstrapStatusPage } from '@/pages/organizations/OrganizationBootstrapStatusPage';
 import { OrganizationDashboard } from '@/pages/organizations/OrganizationDashboard';
+import { OrganizationsManagePage } from '@/pages/organizations/OrganizationsManagePage';
 import { AcceptInvitationPage } from '@/pages/organizations/AcceptInvitationPage';
 import { AccessBlockedPage } from '@/pages/auth/AccessBlockedPage';
 import { OrganizationUnitsManagePage } from '@/pages/organization-units';
@@ -106,8 +107,16 @@ function App() {
                 />
                 <Route path="/organizations/:orgId/dashboard" element={<OrganizationDashboard />} />
                 <Route
+                  path="/organizations/manage"
+                  element={
+                    <RequirePermission permission="organization.update" fallback="/clients">
+                      <OrganizationsManagePage />
+                    </RequirePermission>
+                  }
+                />
+                <Route
                   path="/organizations/:orgId/edit"
-                  element={<div>Organization Edit - Coming Soon</div>}
+                  element={<Navigate to="/organizations/manage" replace />}
                 />
 
                 {/* Organization Units route (single consolidated view with permission-based UI) */}

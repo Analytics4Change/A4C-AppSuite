@@ -117,16 +117,20 @@
 - [x] Typecheck passes (zero errors)
 - [x] Lint passes (zero errors)
 
-## Phase 7: Frontend Page + Navigation ⏸️ PENDING
+## Phase 7: Frontend Page + Navigation ✅ COMPLETE
 
-- [ ] Create `OrganizationsManagePage.tsx` (split-panel)
-- [ ] Implement left panel: org list with search/filters
-- [ ] Implement right panel: form sections (org fields, contacts, addresses, phones, read-only, DangerZone)
-- [ ] Add DangerZone for platform owner (deactivate/reactivate/delete)
-- [ ] Add ConfirmDialog instances for all dialog states
-- [ ] Register `/organizations/manage` route in App.tsx
-- [ ] Update nav sidebar in MainLayout.tsx (provider + platform owner)
-- [ ] Remove/redirect stub at `/organizations/:orgId/edit`
+- [x] Create `OrganizationsManagePage.tsx` (split-panel, ~1500 lines)
+- [x] Implement left panel: org list with search/filters (platform owner only; provider auto-selects own org)
+- [x] Implement right panel: form sections (org fields, contacts, addresses, phones, read-only, DangerZone)
+- [x] Add DangerZone for platform owner (deactivate/reactivate/delete)
+- [x] Add ConfirmDialog instances for all dialog states (discard, deactivate, reactivate, delete, activeWarning)
+- [x] Add EntityFormDialog for contact/address/phone add/edit (inline modal forms)
+- [x] Register `/organizations/manage` route in App.tsx (RequirePermission: organization.update)
+- [x] Update nav sidebar in MainLayout.tsx (visible to all with organization.update permission)
+- [x] Redirect stub `/organizations/:orgId/edit` to `/organizations/manage`
+- [x] Typecheck passes (zero errors)
+- [x] Build succeeds
+- [x] Lint clean (only pre-existing generated-events.ts issue)
 
 ## Phase 8: Documentation ⏸️ PENDING
 
@@ -167,7 +171,7 @@
 ## Current Status
 
 **Phase**: Phase 7 — Frontend Page + Navigation
-**Status**: ⏸️ PENDING
-**Last Updated**: 2026-02-25
-**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (uncommitted)
-**Next Step**: Commit Phase 6. Then proceed to Phase 7 (Frontend Page + Navigation).
+**Status**: ✅ COMPLETE
+**Last Updated**: 2026-02-26
+**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (`72f4666f`), Phase 7 (uncommitted)
+**Next Step**: Commit Phase 7. Then proceed to Phase 8 (Documentation).

@@ -146,8 +146,12 @@
 - `frontend/src/viewModels/organization/OrganizationManageListViewModel.ts` — list state, filtering, lifecycle ops
 - `frontend/src/viewModels/organization/OrganizationManageFormViewModel.ts` — form state, validation, entity CRUD
 
-### New Files Still to Create
-- `frontend/src/pages/organizations/OrganizationsManagePage.tsx`
+### New Files Created (Phase 7)
+- `frontend/src/pages/organizations/OrganizationsManagePage.tsx` — split-panel manage page (~1500 lines)
+
+### Existing Files Modified (Phase 7)
+- `frontend/src/App.tsx` — added `/organizations/manage` route, redirect `/organizations/:orgId/edit`
+- `frontend/src/components/layouts/MainLayout.tsx` — added "Manage Organization" nav item
 
 ## Related Components
 - `frontend/src/pages/roles/RolesManagePage.tsx` — pattern reference for split-panel
