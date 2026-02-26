@@ -88,9 +88,15 @@ Single migration `20260226002002_organization_manage_page_phase1.sql` (1027 line
 - `DELETE /api/v1/organizations/:id` API endpoint
 - Cross-tenant access grants preserved (all types)
 
-## Phase 6-7: Frontend ViewModels + Page
+## Phase 6: Frontend ViewModels ✅ COMPLETE
 
-- `OrganizationManageListViewModel` + `OrganizationManageFormViewModel` (MobX)
+- `OrganizationManageListViewModel` — list state, filtering, lifecycle operations (deactivate/reactivate/delete)
+- `OrganizationManageFormViewModel` — form state, validation, submission, 9 entity CRUD methods via shared helper
+- Role-based field editability: `isPlatformOwner` controls `canEditName`, `canEditFields` gates all edits when org inactive
+- Entity operations auto-reload details on success
+
+## Phase 7: Frontend Page + Navigation
+
 - `OrganizationsManagePage` split-panel with DangerZone, ConfirmDialogs
 - Route registration + nav sidebar updates
 

@@ -108,12 +108,14 @@
 - [x] Build succeeds
 - [ ] Test: trigger deletion, verify all 5 activities complete (deferred to integration testing)
 
-## Phase 6: Frontend ViewModels ⏸️ PENDING
+## Phase 6: Frontend ViewModels ✅ COMPLETE
 
-- [ ] Create `OrganizationManageListViewModel.ts`
-- [ ] Create `OrganizationManageFormViewModel.ts`
-- [ ] Wire contact/address/phone form state
-- [ ] Add role-based field editability logic
+- [x] Create `OrganizationManageListViewModel.ts` — list state, filtering, lifecycle ops (deactivate/reactivate/delete)
+- [x] Create `OrganizationManageFormViewModel.ts` — form state, validation, submission, contact/address/phone CRUD
+- [x] Wire contact/address/phone form state — 9 CRUD methods via `performEntityOperation` helper with auto-reload
+- [x] Add role-based field editability logic — `isPlatformOwner`, `canEditName`, `canEditFields` computed properties
+- [x] Typecheck passes (zero errors)
+- [x] Lint passes (zero errors)
 
 ## Phase 7: Frontend Page + Navigation ⏸️ PENDING
 
@@ -164,8 +166,8 @@
 
 ## Current Status
 
-**Phase**: Phase 6 — Frontend ViewModels
+**Phase**: Phase 7 — Frontend Page + Navigation
 **Status**: ⏸️ PENDING
 **Last Updated**: 2026-02-25
-**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (uncommitted)
-**Next Step**: Commit Phase 5. Then proceed to Phase 6 (Frontend ViewModels).
+**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (uncommitted)
+**Next Step**: Commit Phase 6. Then proceed to Phase 7 (Frontend Page + Navigation).

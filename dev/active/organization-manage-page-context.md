@@ -142,9 +142,11 @@
 - `workflows/src/worker/index.ts` — merged bootstrap + deletion activities, workflowsPath → top-level barrel
 - `workflows/src/api/routes/workflows.ts` — added DELETE /api/v1/organizations/:id endpoint
 
+### New Files Created (Phase 6)
+- `frontend/src/viewModels/organization/OrganizationManageListViewModel.ts` — list state, filtering, lifecycle ops
+- `frontend/src/viewModels/organization/OrganizationManageFormViewModel.ts` — form state, validation, entity CRUD
+
 ### New Files Still to Create
-- `frontend/src/viewModels/organization/OrganizationManageListViewModel.ts`
-- `frontend/src/viewModels/organization/OrganizationManageFormViewModel.ts`
 - `frontend/src/pages/organizations/OrganizationsManagePage.tsx`
 
 ## Related Components
