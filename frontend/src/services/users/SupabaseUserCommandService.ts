@@ -40,6 +40,7 @@ import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/user.types';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
 import { buildHeadersFromContext, createTracingContext } from '@/utils/tracing';
+import { decodeJWT } from '@/utils/jwt';
 
 const log = Logger.getLogger('api');
 
@@ -87,9 +88,10 @@ async function extractEdgeFunctionError(
       return {
         message: body?.error ?? `${operation} failed`,
         // Extract code from errorDetails if present, otherwise from top-level
-        code: (body?.errorDetails?.code as UserOperationErrorCode)
-          ?? (body?.code as UserOperationErrorCode)
-          ?? 'HTTP_ERROR',
+        code:
+          (body?.errorDetails?.code as UserOperationErrorCode) ??
+          (body?.code as UserOperationErrorCode) ??
+          'HTTP_ERROR',
         details: body?.details,
         // Pass through the full errorDetails object for rich error information
         errorDetails: body?.errorDetails,
@@ -143,14 +145,6 @@ const EDGE_FUNCTIONS = {
 } as const;
 
 /**
- * JWT Claims extracted from access token
- */
-interface DecodedJWTClaims {
-  org_id?: string;
-  sub?: string;
-}
-
-/**
  * Supabase User Command Service Implementation
  */
 export class SupabaseUserCommandService implements IUserCommandService {
@@ -174,29 +168,26 @@ export class SupabaseUserCommandService implements IUserCommandService {
 
       const client = supabaseService.getClient();
       const headers = buildHeadersFromContext(tracingContext);
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.INVITE_USER,
-        {
-          body: {
-            operation: 'invite',
-            email: request.email,
-            firstName: request.firstName,
-            lastName: request.lastName,
-            // Transform camelCase to snake_case for Edge Function contract
-            roles: request.roles?.map((r) => ({
-              role_id: r.roleId,
-              role_name: r.roleName,
-              org_hierarchy_scope: r.orgHierarchyScope,
-            })),
-            accessStartDate: request.accessStartDate,
-            accessExpirationDate: request.accessExpirationDate,
-            notificationPreferences: request.notificationPreferences,
-            // Phase 6: Include phones if provided
-            phones: request.phones,
-          },
-          headers,
-        }
-      );
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.INVITE_USER, {
+        body: {
+          operation: 'invite',
+          email: request.email,
+          firstName: request.firstName,
+          lastName: request.lastName,
+          // Transform camelCase to snake_case for Edge Function contract
+          roles: request.roles?.map((r) => ({
+            role_id: r.roleId,
+            role_name: r.roleName,
+            org_hierarchy_scope: r.orgHierarchyScope,
+          })),
+          accessStartDate: request.accessStartDate,
+          accessExpirationDate: request.accessExpirationDate,
+          notificationPreferences: request.notificationPreferences,
+          // Phase 6: Include phones if provided
+          phones: request.phones,
+        },
+        headers,
+      });
 
       if (error) {
         const errorInfo = await extractEdgeFunctionError(error, 'Invite user');
@@ -210,7 +201,9 @@ export class SupabaseUserCommandService implements IUserCommandService {
             code: errorInfo.code,
             message: errorInfo.message,
             // Pass through full errorDetails from Edge Function for rich error display
-            context: errorInfo.errorDetails ?? (errorInfo.details ? { details: errorInfo.details } : undefined),
+            context:
+              errorInfo.errorDetails ??
+              (errorInfo.details ? { details: errorInfo.details } : undefined),
             correlationId: errorInfo.correlationId,
           },
         };
@@ -278,16 +271,13 @@ export class SupabaseUserCommandService implements IUserCommandService {
 
       const client = supabaseService.getClient();
       const headers = buildHeadersFromContext(tracingContext);
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.INVITE_USER,
-        {
-          body: {
-            operation: 'resend',
-            invitationId,
-          },
-          headers,
-        }
-      );
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.INVITE_USER, {
+        body: {
+          operation: 'resend',
+          invitationId,
+        },
+        headers,
+      });
 
       if (error) {
         const errorInfo = await extractEdgeFunctionError(error, 'Resend invitation');
@@ -341,16 +331,13 @@ export class SupabaseUserCommandService implements IUserCommandService {
 
       const client = supabaseService.getClient();
       const headers = buildHeadersFromContext(tracingContext);
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.INVITE_USER,
-        {
-          body: {
-            operation: 'revoke',
-            invitationId,
-          },
-          headers,
-        }
-      );
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.INVITE_USER, {
+        body: {
+          operation: 'revoke',
+          invitationId,
+        },
+        headers,
+      });
 
       if (error) {
         const errorInfo = await extractEdgeFunctionError(error, 'Revoke invitation');
@@ -407,16 +394,13 @@ export class SupabaseUserCommandService implements IUserCommandService {
 
       const client = supabaseService.getClient();
       const headers = buildHeadersFromContext(tracingContext);
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.MANAGE_USER,
-        {
-          body: {
-            operation: 'deactivate',
-            userId,
-          },
-          headers,
-        }
-      );
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.MANAGE_USER, {
+        body: {
+          operation: 'deactivate',
+          userId,
+        },
+        headers,
+      });
 
       if (error) {
         const errorInfo = await extractEdgeFunctionError(error, 'Deactivate user');
@@ -440,9 +424,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
           success: false,
           error: data?.error ?? 'Failed to deactivate user',
           errorDetails: {
-            code: data?.error?.includes('already')
-              ? 'ALREADY_INACTIVE'
-              : 'UNKNOWN',
+            code: data?.error?.includes('already') ? 'ALREADY_INACTIVE' : 'UNKNOWN',
             message: data?.error ?? 'Unknown error',
           },
         };
@@ -479,16 +461,13 @@ export class SupabaseUserCommandService implements IUserCommandService {
 
       const client = supabaseService.getClient();
       const headers = buildHeadersFromContext(tracingContext);
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.MANAGE_USER,
-        {
-          body: {
-            operation: 'reactivate',
-            userId,
-          },
-          headers,
-        }
-      );
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.MANAGE_USER, {
+        body: {
+          operation: 'reactivate',
+          userId,
+        },
+        headers,
+      });
 
       if (error) {
         const errorInfo = await extractEdgeFunctionError(error, 'Reactivate user');
@@ -512,9 +491,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
           success: false,
           error: data?.error ?? 'Failed to reactivate user',
           errorDetails: {
-            code: data?.error?.includes('already')
-              ? 'ALREADY_ACTIVE'
-              : 'UNKNOWN',
+            code: data?.error?.includes('already') ? 'ALREADY_ACTIVE' : 'UNKNOWN',
             message: data?.error ?? 'Unknown error',
           },
         };
@@ -551,17 +528,14 @@ export class SupabaseUserCommandService implements IUserCommandService {
 
       const client = supabaseService.getClient();
       const headers = buildHeadersFromContext(tracingContext);
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.MANAGE_USER,
-        {
-          body: {
-            operation: 'delete',
-            userId,
-            reason,
-          },
-          headers,
-        }
-      );
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.MANAGE_USER, {
+        body: {
+          operation: 'delete',
+          userId,
+          reason,
+        },
+        headers,
+      });
 
       if (error) {
         const errorInfo = await extractEdgeFunctionError(error, 'Delete user');
@@ -585,9 +559,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
           success: false,
           error: data?.error ?? 'Failed to delete user',
           errorDetails: {
-            code: data?.error?.includes('active')
-              ? 'USER_ACTIVE'
-              : 'UNKNOWN',
+            code: data?.error?.includes('active') ? 'USER_ACTIVE' : 'UNKNOWN',
             message: data?.error ?? 'Unknown error',
           },
         };
@@ -634,7 +606,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
       }
 
       // Decode JWT to extract custom claims (org_id)
-      const claims = this.decodeJWT(session.access_token);
+      const claims = decodeJWT(session.access_token);
       if (!claims.org_id) {
         log.error('No organization context in JWT claims');
         return {
@@ -695,23 +667,6 @@ export class SupabaseUserCommandService implements IUserCommandService {
   }
 
   /**
-   * Decode JWT token to extract claims
-   * Uses same approach as SupabaseUserQueryService.decodeJWT()
-   */
-  private decodeJWT(token: string): DecodedJWTClaims {
-    try {
-      const payload = token.split('.')[1];
-      const decoded = JSON.parse(globalThis.atob(payload));
-      return {
-        org_id: decoded.org_id,
-        sub: decoded.sub,
-      };
-    } catch {
-      return {};
-    }
-  }
-
-  /**
    * Modify roles for a user (add and/or remove)
    *
    * Calls manage-user Edge Function with modify_roles operation.
@@ -729,18 +684,15 @@ export class SupabaseUserCommandService implements IUserCommandService {
     });
 
     try {
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.MANAGE_USER,
-        {
-          body: {
-            operation: 'modify_roles',
-            userId: request.userId,
-            roleIdsToAdd: request.roleIdsToAdd,
-            roleIdsToRemove: request.roleIdsToRemove,
-          },
-          headers,
-        }
-      );
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.MANAGE_USER, {
+        body: {
+          operation: 'modify_roles',
+          userId: request.userId,
+          roleIdsToAdd: request.roleIdsToAdd,
+          roleIdsToRemove: request.roleIdsToRemove,
+        },
+        headers,
+      });
 
       if (error) {
         const errorInfo = await extractEdgeFunctionError(error, 'Modify roles');
@@ -753,7 +705,9 @@ export class SupabaseUserCommandService implements IUserCommandService {
           errorDetails: {
             code: errorInfo.code,
             message: errorInfo.message,
-            context: errorInfo.errorDetails ?? (errorInfo.details ? { details: errorInfo.details } : undefined),
+            context:
+              errorInfo.errorDetails ??
+              (errorInfo.details ? { details: errorInfo.details } : undefined),
             correlationId: errorInfo.correlationId,
           },
         };
@@ -816,9 +770,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    *
    * TODO: Implement org context switching
    */
-  async switchOrganization(
-    _organizationId: string
-  ): Promise<UserOperationResult> {
+  async switchOrganization(_organizationId: string): Promise<UserOperationResult> {
     log.warn('switchOrganization not yet implemented for Supabase');
     return {
       success: false,
@@ -867,9 +819,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
   // Extended Data Collection Methods - Placeholder Implementations
   // ============================================================================
 
-  async addUserAddress(
-    _request: AddUserAddressRequest
-  ): Promise<UserOperationResult> {
+  async addUserAddress(_request: AddUserAddressRequest): Promise<UserOperationResult> {
     log.warn('addUserAddress not yet implemented for Supabase');
     return {
       success: false,
@@ -878,9 +828,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
     };
   }
 
-  async updateUserAddress(
-    _request: UpdateUserAddressRequest
-  ): Promise<UserOperationResult> {
+  async updateUserAddress(_request: UpdateUserAddressRequest): Promise<UserOperationResult> {
     log.warn('updateUserAddress not yet implemented for Supabase');
     return {
       success: false,
@@ -889,9 +837,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
     };
   }
 
-  async removeUserAddress(
-    _request: RemoveUserAddressRequest
-  ): Promise<UserOperationResult> {
+  async removeUserAddress(_request: RemoveUserAddressRequest): Promise<UserOperationResult> {
     log.warn('removeUserAddress not yet implemented for Supabase');
     return {
       success: false,
@@ -906,9 +852,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * Calls api.add_user_phone RPC which emits user.phone.added event.
    * If orgId is null, creates a global phone. If set, creates org-specific phone.
    */
-  async addUserPhone(
-    request: AddUserPhoneRequest
-  ): Promise<UserOperationResult> {
+  async addUserPhone(request: AddUserPhoneRequest): Promise<UserOperationResult> {
     try {
       log.info('Adding user phone', {
         userId: request.userId,
@@ -975,9 +919,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    *
    * Calls api.update_user_phone RPC which emits user.phone.updated event.
    */
-  async updateUserPhone(
-    request: UpdateUserPhoneRequest
-  ): Promise<UserOperationResult> {
+  async updateUserPhone(request: UpdateUserPhoneRequest): Promise<UserOperationResult> {
     try {
       log.info('Updating user phone', {
         phoneId: request.phoneId,
@@ -1047,9 +989,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    *
    * Calls api.remove_user_phone RPC which emits user.phone.removed event.
    */
-  async removeUserPhone(
-    request: RemoveUserPhoneRequest
-  ): Promise<UserOperationResult> {
+  async removeUserPhone(request: RemoveUserPhoneRequest): Promise<UserOperationResult> {
     try {
       log.info('Removing user phone', {
         phoneId: request.phoneId,
@@ -1115,9 +1055,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * Uses api.update_user_access_dates RPC which emits a domain event
    * and updates the user_organizations_projection.
    */
-  async updateAccessDates(
-    request: UpdateAccessDatesRequest
-  ): Promise<UserOperationResult> {
+  async updateAccessDates(request: UpdateAccessDatesRequest): Promise<UserOperationResult> {
     try {
       log.info('Updating user access dates', {
         userId: request.userId,
@@ -1125,15 +1063,12 @@ export class SupabaseUserCommandService implements IUserCommandService {
       });
 
       // Use RPC function to update access dates (emits domain event)
-      const { error } = await supabaseService.apiRpc<void>(
-        'update_user_access_dates',
-        {
-          p_user_id: request.userId,
-          p_org_id: request.orgId,
-          p_access_start_date: request.accessStartDate ?? null,
-          p_access_expiration_date: request.accessExpirationDate ?? null,
-        }
-      );
+      const { error } = await supabaseService.apiRpc<void>('update_user_access_dates', {
+        p_user_id: request.userId,
+        p_org_id: request.orgId,
+        p_access_start_date: request.accessStartDate ?? null,
+        p_access_expiration_date: request.accessExpirationDate ?? null,
+      });
 
       if (error) {
         log.error('Failed to update access dates via RPC', error);
@@ -1223,18 +1158,15 @@ export class SupabaseUserCommandService implements IUserCommandService {
         in_app: request.notificationPreferences.inApp, // camelCase → snake_case
       };
 
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.MANAGE_USER,
-        {
-          body: {
-            operation: 'update_notification_preferences',
-            userId: request.userId,
-            notificationPreferences: asyncApiPreferences,
-            reason: request.reason,
-          },
-          headers,
-        }
-      );
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.MANAGE_USER, {
+        body: {
+          operation: 'update_notification_preferences',
+          userId: request.userId,
+          notificationPreferences: asyncApiPreferences,
+          reason: request.reason,
+        },
+        headers,
+      });
 
       if (error) {
         const errorInfo = await extractEdgeFunctionError(error, 'Update notification preferences');

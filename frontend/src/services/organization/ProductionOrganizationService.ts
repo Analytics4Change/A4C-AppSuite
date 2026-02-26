@@ -1,13 +1,9 @@
 import { IOrganizationService } from './IOrganizationService';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
+import { decodeJWT } from '@/utils/jwt';
 
 const log = Logger.getLogger('main');
-
-interface DecodedJWTClaims {
-  org_id?: string;
-  sub?: string;
-}
 
 /**
  * Production Organization Service
@@ -22,35 +18,20 @@ export class ProductionOrganizationService implements IOrganizationService {
     log.info('ProductionOrganizationService initialized (using Supabase Auth)');
   }
 
-  /**
-   * Decode JWT token to extract claims
-   * Uses same approach as SupabaseAuthProvider.decodeJWT()
-   */
-  private decodeJWT(token: string): DecodedJWTClaims {
-    try {
-      const payload = token.split('.')[1];
-      const decoded = JSON.parse(globalThis.atob(payload));
-      return {
-        org_id: decoded.org_id,
-        sub: decoded.sub,
-      };
-    } catch {
-      return {};
-    }
-  }
-
   async getCurrentOrganizationId(): Promise<string> {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client (already authenticated)
-    const { data: { session } } = await client.auth.getSession();
+    const {
+      data: { session },
+    } = await client.auth.getSession();
     if (!session) {
       log.error('No authenticated session for getCurrentOrganizationId');
       throw new Error('No authenticated user - cannot determine organization context');
     }
 
     // Decode JWT to get org_id
-    const claims = this.decodeJWT(session.access_token);
+    const claims = decodeJWT(session.access_token);
     if (!claims.org_id) {
       log.error('No organization context in JWT claims');
       throw new Error('User has no organization context');
@@ -63,7 +44,9 @@ export class ProductionOrganizationService implements IOrganizationService {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client (already authenticated)
-    const { data: { session } } = await client.auth.getSession();
+    const {
+      data: { session },
+    } = await client.auth.getSession();
     if (!session) {
       log.error('No authenticated session for getCurrentOrganizationName');
       throw new Error('No authenticated user - cannot determine organization name');
@@ -79,13 +62,15 @@ export class ProductionOrganizationService implements IOrganizationService {
       const client = supabaseService.getClient();
 
       // Get session from Supabase client (already authenticated)
-      const { data: { session } } = await client.auth.getSession();
+      const {
+        data: { session },
+      } = await client.auth.getSession();
       if (!session) {
         return false;
       }
 
       // Decode JWT to get org_id
-      const claims = this.decodeJWT(session.access_token);
+      const claims = decodeJWT(session.access_token);
       return !!claims.org_id;
     } catch {
       return false;

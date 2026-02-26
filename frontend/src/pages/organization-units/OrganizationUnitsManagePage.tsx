@@ -377,9 +377,9 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
     setPanelMode('create');
 
     // Auto-focus Unit Name input after form renders
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       document.getElementById('create-unit-name')?.focus();
-    }, 0);
+    });
 
     log.debug('Entered create mode', { parentId: viewModel.selectedUnitId });
   }, [viewModel]);

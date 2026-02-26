@@ -1152,6 +1152,7 @@ The highlighting is powered by:
 ```
 Need dropdown selection?
 ├── Multiple items? → MultiSelectDropdown
+├── Hierarchical data? → TreeSelectDropdown
 ├── Large dataset (100+)? → SearchableDropdown
 ├── Need to edit after selection? → EditableDropdown
 ├── Need autocomplete? → EnhancedAutocompleteDropdown

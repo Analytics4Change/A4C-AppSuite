@@ -4,6 +4,7 @@ import { cn } from './utils';
 import { useDropdownHighlighting } from '@/hooks/useDropdownHighlighting';
 import { HighlightType } from '@/types/dropdown';
 import '@/styles/dropdown-highlighting.css';
+import { TIMINGS } from '@/config/timings';
 
 interface EnhancedAutocompleteDropdownProps {
   options: string[];
@@ -46,7 +47,7 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
   onBlur,
   onFocus,
   allowCustomValue = true,
-  filterStrategy: _filterStrategy = 'contains'
+  filterStrategy: _filterStrategy = 'contains',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
@@ -62,10 +63,8 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
       setFilteredOptions(options);
     } else {
       // Filter all items that contain the substring
-      const filtered = options.filter(option => 
-        option.toLowerCase().includes(searchTerm)
-      );
-      
+      const filtered = options.filter((option) => option.toLowerCase().includes(searchTerm));
+
       // Sort to put startsWith matches first
       filtered.sort((a, b) => {
         const aStarts = a.toLowerCase().startsWith(searchTerm);
@@ -74,7 +73,7 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
         if (!aStarts && bStarts) return 1;
         return 0;
       });
-      
+
       setFilteredOptions(filtered);
     }
   }, [inputValue, options]);
@@ -86,7 +85,7 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
     handleArrowKey,
     handleTextInput,
     handleMouseEnter,
-    reset: resetHighlighting
+    reset: resetHighlighting,
   } = useDropdownHighlighting({
     items: filteredOptions,
     getItemText: (item) => item,
@@ -97,10 +96,10 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
       if (optionRefs.current[index]) {
         optionRefs.current[index]?.scrollIntoView({
           behavior: 'smooth',
-          block: 'nearest'
+          block: 'nearest',
         });
       }
-    }
+    },
   });
 
   // Update local input when prop changes
@@ -113,7 +112,7 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
     setInputValue(newValue);
     onChange(newValue);
     handleTextInput(newValue);
-    
+
     if (!isOpen && newValue) {
       setIsOpen(true);
     }
@@ -142,31 +141,30 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
         e.preventDefault();
         handleArrowKey('down');
         break;
-      
+
       case 'ArrowUp':
         e.preventDefault();
         handleArrowKey('up');
         break;
-      
+
       case 'Home':
         e.preventDefault();
         handleArrowKey('home');
         break;
-        
+
       case 'End':
         e.preventDefault();
         handleArrowKey('end');
         break;
-      
+
       case 'Enter': {
         e.preventDefault();
 
         // Check how many items start with the typed text
         const searchText = inputValue.toLowerCase().trim();
-        const startsWithMatches = searchText ?
-          filteredOptions.filter(option =>
-            option.toLowerCase().startsWith(searchText)
-          ) : [];
+        const startsWithMatches = searchText
+          ? filteredOptions.filter((option) => option.toLowerCase().startsWith(searchText))
+          : [];
 
         if (navigationIndex >= 0 && filteredOptions[navigationIndex]) {
           // User has navigated with arrows - always respect that choice
@@ -185,13 +183,13 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
         }
         break;
       }
-      
+
       case 'Escape':
         e.preventDefault();
         setIsOpen(false);
         resetHighlighting();
         break;
-        
+
       case 'Tab':
         // Let tab naturally move focus, close dropdown
         setIsOpen(false);
@@ -215,7 +213,7 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
         resetHighlighting();
         onBlur?.();
       }
-    }, 200);
+    }, TIMINGS.dropdown.closeDelay);
   };
 
   // Handle click outside
@@ -254,10 +252,10 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
           placeholder={placeholder}
           disabled={disabled}
           className={cn(
-            "w-full px-3 py-2 pr-10 border rounded-md",
-            "focus:outline-none focus:ring-2 focus:ring-blue-500",
-            error ? "border-red-500" : "border-gray-300",
-            disabled && "bg-gray-100 cursor-not-allowed",
+            'w-full px-3 py-2 pr-10 border rounded-md',
+            'focus:outline-none focus:ring-2 focus:ring-blue-500',
+            error ? 'border-red-500' : 'border-gray-300',
+            disabled && 'bg-gray-100 cursor-not-allowed',
             className
           )}
           tabIndex={tabIndex}
@@ -269,9 +267,7 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
           aria-expanded={isOpen}
           aria-controls={isOpen ? `${id}-listbox` : undefined}
           aria-activedescendant={
-            isOpen && navigationIndex >= 0 
-              ? `${id}-option-${navigationIndex}` 
-              : undefined
+            isOpen && navigationIndex >= 0 ? `${id}-option-${navigationIndex}` : undefined
           }
           autoComplete="off"
           autoFocus={autoFocus}
@@ -284,11 +280,8 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
           tabIndex={-1}
           aria-label="Toggle dropdown"
         >
-          <ChevronDown 
-            className={cn(
-              "h-4 w-4 text-gray-400 transition-transform",
-              isOpen && "rotate-180"
-            )}
+          <ChevronDown
+            className={cn('h-4 w-4 text-gray-400 transition-transform', isOpen && 'rotate-180')}
           />
         </button>
       </div>
@@ -302,20 +295,22 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
         >
           {filteredOptions.map((option, index) => {
             const highlightType = getItemHighlightType(option, index);
-            
+
             return (
               <div
                 key={option}
-                ref={el => { optionRefs.current[index] = el; }}
+                ref={(el) => {
+                  optionRefs.current[index] = el;
+                }}
                 id={`${id}-option-${index}`}
                 role="option"
                 aria-selected={index === navigationIndex}
                 className={cn(
-                  "dropdown-item",
-                  highlightType === HighlightType.TypedMatch && "dropdown-item-typed-match",
-                  highlightType === HighlightType.Navigation && "dropdown-item-navigation",
-                  highlightType === HighlightType.Both && "dropdown-item-both",
-                  highlightType === HighlightType.None && "hover:bg-gray-50"
+                  'dropdown-item',
+                  highlightType === HighlightType.TypedMatch && 'dropdown-item-typed-match',
+                  highlightType === HighlightType.Navigation && 'dropdown-item-navigation',
+                  highlightType === HighlightType.Both && 'dropdown-item-both',
+                  highlightType === HighlightType.None && 'hover:bg-gray-50'
                 )}
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -333,9 +328,9 @@ export const EnhancedAutocompleteDropdown: React.FC<EnhancedAutocompleteDropdown
       {isOpen && filteredOptions.length === 0 && inputValue && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
           <p className="text-sm text-gray-500 text-center">
-            {allowCustomValue 
-              ? "No matches found. Press Enter to use custom value."
-              : "No matches found"}
+            {allowCustomValue
+              ? 'No matches found. Press Enter to use custom value.'
+              : 'No matches found'}
           </p>
         </div>
       )}

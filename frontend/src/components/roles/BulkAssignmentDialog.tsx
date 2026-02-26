@@ -35,6 +35,7 @@ import {
 import { UserSelectionList } from './UserSelectionList';
 import { BulkRoleAssignmentViewModel } from '@/viewModels/roles/BulkRoleAssignmentViewModel';
 import { Logger } from '@/utils/logger';
+import { TIMINGS } from '@/config/timings';
 
 const log = Logger.getLogger('component');
 
@@ -150,9 +151,7 @@ const AssignmentResult: React.FC<{
       {/* Failed Users */}
       {result.failed.length > 0 && (
         <div className="bg-red-50 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-red-800 mb-2">
-            Failed ({result.failed.length})
-          </h4>
+          <h4 className="text-sm font-medium text-red-800 mb-2">Failed ({result.failed.length})</h4>
           <ul className="text-sm text-red-700 space-y-1 max-h-32 overflow-y-auto">
             {result.failed.map((failure) => {
               const user = viewModel.users.find((u) => u.id === failure.userId);
@@ -172,15 +171,13 @@ const AssignmentResult: React.FC<{
 
       {/* Correlation ID for support */}
       {correlationId && (
-        <div className="text-xs text-gray-400 text-center pt-2">
-          Reference: {correlationId}
-        </div>
+        <div className="text-xs text-gray-400 text-center pt-2">Reference: {correlationId}</div>
       )}
 
       {/* Note about JWT refresh */}
       <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
-        <strong>Note:</strong> Users must log out and back in to see their new permissions
-        in effect.
+        <strong>Note:</strong> Users must log out and back in to see their new permissions in
+        effect.
       </div>
 
       {/* Action Buttons */}
@@ -295,10 +292,10 @@ export const BulkAssignmentDialog: React.FC<BulkAssignmentDialogProps> = observe
         if (searchTimeoutRef.current) {
           clearTimeout(searchTimeoutRef.current);
         }
-        // Debounced refresh - wait 300ms after typing stops
+        // Debounced refresh - wait for typing to stop
         searchTimeoutRef.current = setTimeout(() => {
           viewModel.refresh();
-        }, 300);
+        }, TIMINGS.debounce.default);
       },
       [viewModel]
     );
@@ -328,11 +325,7 @@ export const BulkAssignmentDialog: React.FC<BulkAssignmentDialogProps> = observe
         data-focus-context="modal"
       >
         {/* Backdrop */}
-        <div
-          className="absolute inset-0 bg-black/50"
-          onClick={handleClose}
-          aria-hidden="true"
-        />
+        <div className="absolute inset-0 bg-black/50" onClick={handleClose} aria-hidden="true" />
 
         {/* Dialog Panel */}
         <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 flex flex-col max-h-[80vh]">

@@ -8,40 +8,19 @@ import {
   CreateTemplateRequest,
   TemplateFilterOptions,
   TemplateStats,
-  ApplyTemplateResult
+  ApplyTemplateResult,
 } from '@/types/medication-template.types';
 import { MedicationHistory, DosageInfo } from '@/types/models/Medication';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
+import { decodeJWT } from '@/utils/jwt';
 
 const log = Logger.getLogger('api');
-
-interface DecodedJWTClaims {
-  org_id?: string;
-  sub?: string;
-}
 
 class MedicationTemplateService {
   private static instance: MedicationTemplateService;
 
   private constructor() {}
-
-  /**
-   * Decode JWT token to extract claims
-   * Uses same approach as SupabaseAuthProvider.decodeJWT()
-   */
-  private decodeJWT(token: string): DecodedJWTClaims {
-    try {
-      const payload = token.split('.')[1];
-      const decoded = JSON.parse(globalThis.atob(payload));
-      return {
-        org_id: decoded.org_id,
-        sub: decoded.sub,
-      };
-    } catch {
-      return {};
-    }
-  }
 
   static getInstance(): MedicationTemplateService {
     if (!MedicationTemplateService.instance) {
@@ -57,7 +36,7 @@ class MedicationTemplateService {
     try {
       log.info('Creating medication template', {
         medicationId: request.medicationId,
-        templateName: request.templateName
+        templateName: request.templateName,
       });
 
       // Get the source medication
@@ -68,14 +47,16 @@ class MedicationTemplateService {
 
       // Get session from Supabase client (already authenticated)
       const client = supabaseService.getClient();
-      const { data: { session } } = await client.auth.getSession();
+      const {
+        data: { session },
+      } = await client.auth.getSession();
       if (!session) {
         log.error('No authenticated session for createTemplate');
         throw new Error('User organization context required');
       }
 
       // Decode JWT to get org_id and user_id
-      const claims = this.decodeJWT(session.access_token);
+      const claims = decodeJWT(session.access_token);
       if (!claims.org_id || !claims.sub) {
         log.error('No organization context for createTemplate');
         throw new Error('User organization context required');
@@ -124,7 +105,7 @@ class MedicationTemplateService {
         usageCount: 0,
         tags: request.tags,
         notes: request.notes,
-        isActive: true
+        isActive: true,
       };
 
       // Save to database
@@ -155,14 +136,16 @@ class MedicationTemplateService {
       const client = supabaseService.getClient();
 
       // Get session from Supabase client (already authenticated)
-      const { data: { session } } = await client.auth.getSession();
+      const {
+        data: { session },
+      } = await client.auth.getSession();
       if (!session) {
         log.error('No authenticated session for getTemplates');
         throw new Error('User organization context required');
       }
 
       // Decode JWT to get org_id
-      const claims = this.decodeJWT(session.access_token);
+      const claims = decodeJWT(session.access_token);
       if (!claims.org_id) {
         log.error('No organization context for getTemplates');
         throw new Error('User organization context required');
@@ -289,39 +272,39 @@ class MedicationTemplateService {
             field: 'clientId',
             label: 'Client',
             type: 'select',
-            required: true
+            required: true,
           },
           {
             field: 'dosageAmount',
             label: 'Dosage Amount',
             type: 'number',
-            required: true
+            required: true,
           },
           {
             field: 'startDate',
             label: 'Start Date',
             type: 'date',
-            required: true
+            required: true,
           },
           {
             field: 'prescriber',
             label: 'Prescribing Doctor',
             type: 'text',
-            required: true
+            required: true,
           },
           {
             field: 'pharmacyName',
             label: 'Pharmacy Name',
             type: 'text',
-            required: false
+            required: false,
           },
           {
             field: 'pharmacyPhone',
             label: 'Pharmacy Phone',
             type: 'text',
-            required: false
-          }
-        ]
+            required: false,
+          },
+        ],
       };
     } catch (error) {
       log.error('Error applying template', error);
@@ -388,14 +371,16 @@ class MedicationTemplateService {
       const client = supabaseService.getClient();
 
       // Get session from Supabase client (already authenticated)
-      const { data: { session } } = await client.auth.getSession();
+      const {
+        data: { session },
+      } = await client.auth.getSession();
       if (!session) {
         log.error('No authenticated session for getTemplateStats');
         throw new Error('User organization context required');
       }
 
       // Decode JWT to get org_id
-      const claims = this.decodeJWT(session.access_token);
+      const claims = decodeJWT(session.access_token);
       if (!claims.org_id) {
         log.error('No organization context for getTemplateStats');
         throw new Error('User organization context required');
@@ -422,20 +407,21 @@ class MedicationTemplateService {
         .map((t: MedicationTemplate) => ({
           templateId: t.id,
           name: t.name,
-          usageCount: t.usageCount
+          usageCount: t.usageCount,
         }));
 
       // Recently used templates
       const recentlyUsedTemplates = templates
         .filter((t: MedicationTemplate) => t.lastUsedAt)
-        .sort((a: MedicationTemplate, b: MedicationTemplate) =>
-          new Date(b.lastUsedAt!).getTime() - new Date(a.lastUsedAt!).getTime()
+        .sort(
+          (a: MedicationTemplate, b: MedicationTemplate) =>
+            new Date(b.lastUsedAt!).getTime() - new Date(a.lastUsedAt!).getTime()
         )
         .slice(0, 5)
         .map((t: MedicationTemplate) => ({
           templateId: t.id,
           name: t.name,
-          lastUsedAt: t.lastUsedAt!
+          lastUsedAt: t.lastUsedAt!,
         }));
 
       // Category counts
@@ -450,7 +436,7 @@ class MedicationTemplateService {
         activeTemplates,
         mostUsedTemplates,
         recentlyUsedTemplates,
-        categoryCounts
+        categoryCounts,
       };
     } catch (error) {
       log.error('Error getting template stats', error);
@@ -470,7 +456,7 @@ class MedicationTemplateService {
         .from('medication_templates')
         .update({
           usage_count: (client as any).raw('usage_count + 1'),
-          last_used_at: new Date().toISOString()
+          last_used_at: new Date().toISOString(),
         })
         .eq('id', templateId);
 

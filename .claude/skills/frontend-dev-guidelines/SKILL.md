@@ -1,14 +1,14 @@
 ---
 name: Frontend Development Guidelines
 description: Guard rails for React/MobX reactivity, session management, CQRS queries, and WCAG 2.1 AA accessibility in A4C-AppSuite.
-version: 2.0.0
+version: 3.0.0
 category: frontend
-tags: [react, mobx, accessibility, wcag, cqrs, radix-ui, tailwind]
+tags: [react, mobx, accessibility, wcag, cqrs, logging, viewmodel]
 ---
 
 # Frontend Guard Rails
 
-Critical rules that prevent bugs in the React/TypeScript frontend. For full guidance, component patterns, and the dropdown decision tree, see `frontend/CLAUDE.md` and search `documentation/AGENT-INDEX.md` with keywords: `react`, `mobx`, `accessibility`, `wcag`, `component`, `radix`, `tailwind`, `auth`, `session`, `cqrs`.
+Critical rules that prevent bugs in the React/TypeScript frontend. For full guidance, component patterns, and the dropdown decision tree, see `frontend/CLAUDE.md` and search `documentation/AGENT-INDEX.md` with keywords: `react`, `mobx`, `accessibility`, `wcag`, `component`, `dropdown`, `modal`, `forgot-password`, `password-reset`, `logging`, `viewmodel`, `auth`, `session`, `cqrs`.
 
 ---
 
@@ -51,6 +51,8 @@ async fetchData() {
 ## 3. Never Cache Sessions Manually
 
 Supabase manages session state automatically. Manual caching causes **silent failures** — empty data lists with zero results and no errors.
+
+> **Do NOT use `getCurrentSession()` in new code** — it is a legacy cache pattern in `supabase.service.ts`. Do not copy it.
 
 ```typescript
 // ❌ WRONG — manual cache returns NULL, all queries silently fail
@@ -112,10 +114,81 @@ useEffect(() => {
 
 All delays, debounce intervals, and transition durations must use `TIMINGS` from `@/config/timings.ts`. Never hard-code timing values.
 
-## 9. Correlation ID: Business-Scoped
+## 9. Correlation ID: Auto-Injected via `tracingFetch`
 
-- **New transactions** (create org, invite user): Generate new `correlation_id`, pass via `x-correlation-id` header
-- **Continuing transactions** (accept invitation): Let backend reuse the stored `correlation_id` — do NOT generate a new one
+The Supabase client uses `tracingFetch` (defined in `frontend/src/lib/supabase-ssr.ts:112-118`) to **automatically inject** `X-Correlation-ID` and `traceparent` headers on every Supabase request. No manual header injection is needed for Supabase calls.
+
+**Gap**: `TemporalWorkflowClient.ts` uses direct `fetch()` and must inject headers manually.
+
+**Business-scoping rule** — still applies for generating vs reusing IDs:
+- **New transactions** (create org, invite user): Backend generates a new `correlation_id`
+- **Continuing transactions** (accept invitation): Do NOT generate a new one — backend reuses the stored `correlation_id`
+
+## 10. Generated Event Types: Import from `@/types/events`
+
+Domain event types are auto-generated from AsyncAPI schemas. **Never hand-write event interfaces.**
+
+```typescript
+// ✅ CORRECT — re-exports from generated + app-specific extensions
+import { DomainEvent, EventMetadata, StreamType } from '@/types/events';
+
+// ❌ WRONG — bypasses extensions
+import { DomainEvent } from '@/types/generated/generated-events';
+
+// ❌ WRONG — file does not exist, do not recreate it
+import { DomainEvent } from '@/types/event-types';
+```
+
+See `frontend/CLAUDE.md` "Generated Event Types" section for regeneration steps.
+
+## 11. CQRS Write Path: Event Emission Only
+
+All mutations go through event emission. **Never write directly to projection tables.**
+
+- Every write call must include a `reason` field (minimum 10 characters)
+- Use the `useEvents` hook and `ReasonInput` component for user-facing mutations
+- Batch multiple related entities in a single emission call
+
+```typescript
+// ✅ CORRECT
+const { emitEvent } = useEvents();
+await emitEvent('user.deactivated', { userId, reason: 'Account policy violation' });
+
+// ❌ WRONG — direct table write bypasses event sourcing
+await supabase.from('users_projection').update({ is_active: false }).eq('id', userId);
+```
+
+See `documentation/frontend/guides/EVENT-DRIVEN-GUIDE.md` for the full write-path pattern.
+
+## 12. JWT Utilities: Import from Shared Location
+
+Do NOT duplicate `decodeJWT()` logic in individual services. There are already 5 copies in the codebase — these are tech debt to be consolidated into `@/utils/jwt.ts`.
+
+```typescript
+// ✅ CORRECT — import from shared utility (once consolidated)
+import { decodeJWT } from '@/utils/jwt';
+
+// ❌ WRONG — inline decode duplicated per service
+const claims = JSON.parse(atob(token.split('.')[1]));
+```
+
+When the shared utility exists, all services must import from it. Do not add a 6th inline copy.
+
+## 13. Logging: `Logger.getLogger()`, Never Bare Console
+
+All logging must use the category logger. Bare `console.log` is stripped in production and provides no category filtering for the debug panel.
+
+```typescript
+import { Logger } from '@/utils/logger';
+const log = Logger.getLogger('viewmodel'); // or: api, component, navigation, validation
+
+log.debug('Loading users', { orgId });
+log.error('Query failed', error);
+// ❌ WRONG
+console.log('Loading users');
+```
+
+**Debug panel shortcuts**: `Ctrl+Shift+D` (control panel), `Ctrl+Shift+M` (MobX monitor), `Ctrl+Shift+P` (performance).
 
 ---
 
@@ -123,13 +196,16 @@ All delays, debounce intervals, and transition durations must use `TIMINGS` from
 
 | What | Where |
 |------|-------|
-| Components | `frontend/src/components/` (ui/, auth/, medication/, layouts/) |
+| Components | `frontend/src/components/` (ui/, auth/, debug/, layouts/, medication/, navigation/, organization/, organizations/, organization-units/, roles/, schedules/, users/) |
 | Pages | `frontend/src/pages/` |
+| Views | `frontend/src/views/` (client/, medication/) |
 | ViewModels | `frontend/src/viewModels/` |
-| Services | `frontend/src/services/` (api/, auth/, data/) |
-| Auth config | `frontend/src/config/oauth.config.ts` |
+| Services | `frontend/src/services/` (admin/, api/, assignment/, auth/, cache/, data/, direct-care/, http/, invitation/, medications/, mock/, organization/, roles/, schedule/, search/, storage/, users/, validation/, workflow/) |
+| Auth config | `frontend/src/config/deployment.config.ts` (smart detection), `dev-auth.config.ts` (mock profiles), `oauth.config.ts` |
 | Timing config | `frontend/src/config/timings.ts` |
+| Logging config | `frontend/src/config/logging.config.ts`, `mobx.config.ts` |
 | Tests | `frontend/src/test/`, `*.test.tsx` |
+| File size | ~300 lines per file; split when exceeding |
 
 ## Deep Reference
 
@@ -137,3 +213,14 @@ All delays, debounce intervals, and transition durations must use `TIMINGS` from
 - `documentation/AGENT-INDEX.md` — Search by keyword for architecture docs
 - `documentation/architecture/authentication/frontend-auth-architecture.md` — Auth system
 - `documentation/frontend/` — Frontend-specific guides and reference
+- `documentation/frontend/patterns/mobx-patterns.md` — MobX observable and action patterns
+- `documentation/frontend/patterns/ui-patterns.md` — Modal architecture, dropdown patterns
+- `documentation/frontend/architecture/auth-provider-architecture.md` — Provider injection details
+
+## Definition of Done
+
+- `npm run docs:check` passes
+- `npm run typecheck` passes
+- `npm run lint` passes
+- `npm run build` passes
+- Zero rule violations in changed files

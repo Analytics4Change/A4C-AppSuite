@@ -31,17 +31,9 @@ import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/user.types';
 import type { Role } from '@/types/role.types';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
+import { decodeJWT } from '@/utils/jwt';
 
 const log = Logger.getLogger('api');
-
-// ============================================================================
-// JWT Claims Type
-// ============================================================================
-
-interface DecodedJWTClaims {
-  org_id?: string;
-  sub?: string;
-}
 
 // ============================================================================
 // Database Row Types (for untyped Supabase responses)
@@ -215,10 +207,7 @@ interface DbAssignableRoleRow {
 /**
  * Map database invitation status to display status
  */
-function computeInvitationDisplayStatus(
-  status: string,
-  expiresAt: string
-): UserDisplayStatus {
+function computeInvitationDisplayStatus(status: string, expiresAt: string): UserDisplayStatus {
   if (status === 'accepted') return 'active';
   if (status === 'revoked') return 'deactivated';
   if (status === 'expired') return 'expired';
@@ -246,13 +235,13 @@ export class SupabaseUserQueryService implements IUserQueryService {
   /**
    * Get paginated list of users and invitations
    */
-  async getUsersPaginated(
-    options?: UserQueryOptions
-  ): Promise<PaginatedResult<UserListItem>> {
+  async getUsersPaginated(options?: UserQueryOptions): Promise<PaginatedResult<UserListItem>> {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client (already authenticated)
-    const { data: { session } } = await client.auth.getSession();
+    const {
+      data: { session },
+    } = await client.auth.getSession();
     if (!session) {
       log.error('No authenticated session for getUsersPaginated');
       return {
@@ -266,7 +255,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
     }
 
     // Decode JWT to get org_id
-    const claims = this.decodeJWT(session.access_token);
+    const claims = decodeJWT(session.access_token);
     if (!claims.org_id) {
       log.error('No organization context for getUsersPaginated');
       return {
@@ -320,7 +309,8 @@ export class SupabaseUserQueryService implements IUserQueryService {
           total_count: number;
         };
         let data: RpcUserRow[] | null = null;
-        let usersError: { message: string; code?: string; details?: string; hint?: string } | null = null;
+        let usersError: { message: string; code?: string; details?: string; hint?: string } | null =
+          null;
 
         try {
           const result = await supabaseService.apiRpc<RpcUserRow[]>('list_users', {
@@ -351,14 +341,20 @@ export class SupabaseUserQueryService implements IUserQueryService {
 
         if (usersError) {
           // Include full Supabase error details for debugging
-          const errorDetails = JSON.stringify({
-            message: usersError.message,
-            code: usersError.code,
-            details: usersError.details,
-            hint: usersError.hint,
-          }, null, 2);
+          const errorDetails = JSON.stringify(
+            {
+              message: usersError.message,
+              code: usersError.code,
+              details: usersError.details,
+              hint: usersError.hint,
+            },
+            null,
+            2
+          );
           log.error('Failed to fetch users via RPC', usersError);
-          throw new Error(`Failed to fetch users: ${usersError.message}\n\nDetails: ${errorDetails}`);
+          throw new Error(
+            `Failed to fetch users: ${usersError.message}\n\nDetails: ${errorDetails}`
+          );
         }
 
         if (data && Array.isArray(data)) {
@@ -414,10 +410,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
           totalCount += invitations.length;
 
           for (const inv of invitations) {
-            const displayStatus = computeInvitationDisplayStatus(
-              inv.status,
-              inv.expires_at
-            );
+            const displayStatus = computeInvitationDisplayStatus(inv.status, inv.expires_at);
 
             // Skip if status filter doesn't match (but 'all' shows everything)
             if (
@@ -524,17 +517,22 @@ export class SupabaseUserQueryService implements IUserQueryService {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client (already authenticated)
-    const { data: { session } } = await client.auth.getSession();
+    const {
+      data: { session },
+    } = await client.auth.getSession();
     if (!session) {
       log.error('No authenticated session for getUserById');
       return { user: null, errorMessage: 'Not authenticated. Please log in again.' };
     }
 
     // Decode JWT to get org_id
-    const claims = this.decodeJWT(session.access_token);
+    const claims = decodeJWT(session.access_token);
     if (!claims.org_id) {
       log.error('No organization context for getUserById');
-      return { user: null, errorMessage: 'No organization context. Please select an organization.' };
+      return {
+        user: null,
+        errorMessage: 'No organization context. Please select an organization.',
+      };
     }
 
     try {
@@ -548,7 +546,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
         is_active: boolean;
         created_at: string;
         updated_at: string;
-        last_login: string | null;  // Fixed: column is 'last_login' not 'last_login_at'
+        last_login: string | null; // Fixed: column is 'last_login' not 'last_login_at'
         current_organization_id: string | null;
         roles: Array<{
           role_id: string;
@@ -566,13 +564,10 @@ export class SupabaseUserQueryService implements IUserQueryService {
       }
 
       // Use RPC function (CQRS pattern) - NEVER use direct table queries with PostgREST embedding
-      const { data, error } = await supabaseService.apiRpc<RpcUserByIdRow[]>(
-        'get_user_by_id',
-        {
-          p_user_id: userId,
-          p_org_id: claims.org_id,
-        }
-      );
+      const { data, error } = await supabaseService.apiRpc<RpcUserByIdRow[]>('get_user_by_id', {
+        p_user_id: userId,
+        p_org_id: claims.org_id,
+      });
 
       // Log full response for debugging
       log.info('apiRpc get_user_by_id response', {
@@ -600,7 +595,10 @@ export class SupabaseUserQueryService implements IUserQueryService {
       // RPC returns array, get first row (or null if empty)
       const rows = data ?? [];
       if (rows.length === 0) {
-        log.debug('User not found or not a member of organization', { userId, orgId: claims.org_id });
+        log.debug('User not found or not a member of organization', {
+          userId,
+          orgId: claims.org_id,
+        });
         return {
           user: null,
           errorMessage: 'User not found or you do not have permission to view this user.',
@@ -658,13 +656,15 @@ export class SupabaseUserQueryService implements IUserQueryService {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client
-    const { data: { session } } = await client.auth.getSession();
+    const {
+      data: { session },
+    } = await client.auth.getSession();
     if (!session) {
       log.error('No authenticated session for getInvitations');
       return [];
     }
 
-    const claims = this.decodeJWT(session.access_token);
+    const claims = decodeJWT(session.access_token);
     if (!claims.org_id) {
       log.error('No organization context for getInvitations');
       return [];
@@ -672,14 +672,11 @@ export class SupabaseUserQueryService implements IUserQueryService {
 
     try {
       // Use RPC function for CQRS-compliant query (not direct table access)
-      const { data, error } = await supabaseService.apiRpc<DbInvitationRow[]>(
-        'list_invitations',
-        {
-          p_org_id: claims.org_id,
-          p_status: ['pending', 'expired'],
-          p_search_term: null,
-        }
-      );
+      const { data, error } = await supabaseService.apiRpc<DbInvitationRow[]>('list_invitations', {
+        p_org_id: claims.org_id,
+        p_status: ['pending', 'expired'],
+        p_search_term: null,
+      });
 
       if (error) {
         log.error('Failed to fetch invitations', error);
@@ -782,7 +779,9 @@ export class SupabaseUserQueryService implements IUserQueryService {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client
-    const { data: { session } } = await client.auth.getSession();
+    const {
+      data: { session },
+    } = await client.auth.getSession();
     if (!session) {
       return {
         status: 'not_found',
@@ -795,7 +794,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
       };
     }
 
-    const claims = this.decodeJWT(session.access_token);
+    const claims = decodeJWT(session.access_token);
     if (!claims.org_id) {
       return {
         status: 'not_found',
@@ -812,7 +811,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
 
     try {
       // Check if user has membership in this org
-       
+
       const { data: membershipData, error: membershipError } = await (client.rpc as any)(
         'check_user_org_membership',
         {
@@ -837,7 +836,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
       }
 
       // Check for pending invitation
-       
+
       const { data: pendingData, error: pendingError } = await (client.rpc as any)(
         'check_pending_invitation',
         {
@@ -865,7 +864,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
       }
 
       // Check if user exists in system (other org)
-       
+
       const { data: existsData, error: existsError } = await (client.rpc as any)(
         'check_user_exists',
         {
@@ -924,14 +923,16 @@ export class SupabaseUserQueryService implements IUserQueryService {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client (already authenticated)
-    const { data: { session } } = await client.auth.getSession();
+    const {
+      data: { session },
+    } = await client.auth.getSession();
     if (!session) {
       log.error('No authenticated session for getAssignableRoles');
       return [];
     }
 
     // Decode JWT to get org_id
-    const claims = this.decodeJWT(session.access_token);
+    const claims = decodeJWT(session.access_token);
     if (!claims.org_id) {
       log.error('No organization context for getAssignableRoles');
       return [];
@@ -973,20 +974,20 @@ export class SupabaseUserQueryService implements IUserQueryService {
    * Uses api.list_user_org_access RPC to fetch user's organization access
    * with active status calculated server-side.
    */
-  async getUserOrganizations(): Promise<
-    Array<{ id: string; name: string; type: string }>
-  > {
+  async getUserOrganizations(): Promise<Array<{ id: string; name: string; type: string }>> {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client (already authenticated)
-    const { data: { session } } = await client.auth.getSession();
+    const {
+      data: { session },
+    } = await client.auth.getSession();
     if (!session) {
       log.error('No authenticated session for getUserOrganizations');
       return [];
     }
 
     // Decode JWT to get user_id (sub claim)
-    const claims = this.decodeJWT(session.access_token);
+    const claims = decodeJWT(session.access_token);
     if (!claims.sub) {
       log.error('No user ID in session for getUserOrganizations');
       return [];
@@ -1082,17 +1083,14 @@ export class SupabaseUserQueryService implements IUserQueryService {
         return [];
       }
 
-      const claims = this.decodeJWT(session.access_token);
+      const claims = decodeJWT(session.access_token);
       const orgId = claims.org_id;
 
       // Use the RPC that returns both global and org-specific phones
-      const { data, error } = await supabaseService.apiRpc<UserPhoneRow[]>(
-        'get_user_phones',
-        {
-          p_user_id: userId,
-          p_organization_id: orgId ?? null,
-        }
-      );
+      const { data, error } = await supabaseService.apiRpc<UserPhoneRow[]>('get_user_phones', {
+        p_user_id: userId,
+        p_organization_id: orgId ?? null,
+      });
 
       if (error) {
         log.error('Failed to fetch user phones via RPC', error);
@@ -1128,10 +1126,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
    *
    * Uses api.get_user_org_access RPC instead of direct table access.
    */
-  async getUserOrgAccess(
-    userId: string,
-    orgId: string
-  ): Promise<UserOrgAccess | null> {
+  async getUserOrgAccess(userId: string, orgId: string): Promise<UserOrgAccess | null> {
     try {
       // Use RPC function instead of direct table access
       const { data, error } = await supabaseService.apiRpc<DbUserOrgAccessRow[]>(
@@ -1191,7 +1186,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
         return DEFAULT_NOTIFICATION_PREFERENCES;
       }
 
-      const claims = this.decodeJWT(session.access_token);
+      const claims = decodeJWT(session.access_token);
       const orgId = claims.org_id;
 
       if (!orgId) {
@@ -1218,27 +1213,6 @@ export class SupabaseUserQueryService implements IUserQueryService {
     } catch (error) {
       log.error('Error in getUserNotificationPreferences', error);
       return DEFAULT_NOTIFICATION_PREFERENCES;
-    }
-  }
-
-  // ============================================================================
-  // Private Helper Methods
-  // ============================================================================
-
-  /**
-   * Decode JWT token to extract claims
-   * Uses same approach as SupabaseAuthProvider.decodeJWT()
-   */
-  private decodeJWT(token: string): DecodedJWTClaims {
-    try {
-      const payload = token.split('.')[1];
-      const decoded = JSON.parse(globalThis.atob(payload));
-      return {
-        org_id: decoded.org_id,
-        sub: decoded.sub,
-      };
-    } catch {
-      return {};
     }
   }
 }

@@ -19,13 +19,11 @@
  */
 
 import type { IWorkflowClient } from './IWorkflowClient';
-import type {
-  OrganizationBootstrapParams,
-  WorkflowStatus
-} from '@/types/organization.types';
+import type { OrganizationBootstrapParams, WorkflowStatus } from '@/types/organization.types';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { getBackendApiUrl } from '@/lib/backend-api';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId, generateTraceparentHeader } from '@/utils/trace-ids';
 
 const log = Logger.getLogger('workflow');
 
@@ -33,7 +31,7 @@ const log = Logger.getLogger('workflow');
  * Backend API endpoints for workflow operations
  */
 const API_ENDPOINTS = {
-  ORGANIZATION_BOOTSTRAP: '/api/v1/workflows/organization-bootstrap'
+  ORGANIZATION_BOOTSTRAP: '/api/v1/workflows/organization-bootstrap',
 } as const;
 
 /**
@@ -41,7 +39,7 @@ const API_ENDPOINTS = {
  */
 const EDGE_FUNCTIONS = {
   GET_STATUS: 'workflow-status',
-  CANCEL_WORKFLOW: 'workflow-cancel'
+  CANCEL_WORKFLOW: 'workflow-cancel',
 } as const;
 
 /**
@@ -78,13 +76,11 @@ export class TemporalWorkflowClient implements IWorkflowClient {
    * @returns Workflow ID for status tracking
    * @throws Error if Backend API call fails or user not authenticated
    */
-  async startBootstrapWorkflow(
-    params: OrganizationBootstrapParams
-  ): Promise<string> {
+  async startBootstrapWorkflow(params: OrganizationBootstrapParams): Promise<string> {
     try {
       log.info('Starting organization bootstrap workflow', {
         subdomain: params.subdomain,
-        orgType: params.orgData.type
+        orgType: params.orgData.type,
       });
 
       // Get Backend API URL (validates based on deployment mode)
@@ -92,13 +88,16 @@ export class TemporalWorkflowClient implements IWorkflowClient {
       if (!apiUrl) {
         throw new Error(
           'Backend API not available in current mode. ' +
-          'Workflow operations require production or integration-auth mode.'
+            'Workflow operations require production or integration-auth mode.'
         );
       }
 
       // Get current session for JWT token
       const client = supabaseService.getClient();
-      const { data: { session }, error: sessionError } = await client.auth.getSession();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await client.auth.getSession();
 
       if (sessionError) {
         log.error('Failed to get session', sessionError);
@@ -110,17 +109,16 @@ export class TemporalWorkflowClient implements IWorkflowClient {
       }
 
       // Call Backend API
-      const response = await fetch(
-        `${apiUrl}${API_ENDPOINTS.ORGANIZATION_BOOTSTRAP}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify(params)
-        }
-      );
+      const response = await fetch(`${apiUrl}${API_ENDPOINTS.ORGANIZATION_BOOTSTRAP}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+          'X-Correlation-ID': generateCorrelationId(),
+          traceparent: generateTraceparentHeader(),
+        },
+        body: JSON.stringify(params),
+      });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -137,7 +135,7 @@ export class TemporalWorkflowClient implements IWorkflowClient {
       }
 
       log.info('Bootstrap workflow started', {
-        organizationId: data.organizationId
+        organizationId: data.organizationId,
       });
 
       // Return organizationId - this is now the single ID used for everything:
@@ -166,12 +164,9 @@ export class TemporalWorkflowClient implements IWorkflowClient {
       log.debug('Fetching workflow status', { workflowId });
 
       const client = supabaseService.getClient();
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.GET_STATUS,
-        {
-          body: { workflowId }
-        }
-      );
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.GET_STATUS, {
+        body: { workflowId },
+      });
 
       if (error) {
         log.error('Failed to fetch workflow status', error);
@@ -191,22 +186,22 @@ export class TemporalWorkflowClient implements IWorkflowClient {
         // Primary ID in unified system
         organizationId: data.organizationId || data.workflowId,
         status: data.status === 'unknown' ? 'failed' : data.status,
-        progress: (data.stages || []).map((stage: {
-          name: string;
-          status: string;
-          error?: string;
-        }) => ({
-          step: stage.name,
-          completed: stage.status === 'completed',
-          error: stage.error
-        })),
+        progress: (data.stages || []).map(
+          (stage: { name: string; status: string; error?: string }) => ({
+            step: stage.name,
+            completed: stage.status === 'completed',
+            error: stage.error,
+          })
+        ),
         // Result populated with data from events (domain, dnsConfigured, invitationsSent)
-        result: data.organizationId ? {
-          orgId: data.organizationId,
-          domain: data.domain || '',
-          dnsConfigured: data.dnsConfigured ?? false,
-          invitationsSent: data.invitationsSent ?? 0
-        } : undefined
+        result: data.organizationId
+          ? {
+              orgId: data.organizationId,
+              domain: data.domain || '',
+              dnsConfigured: data.dnsConfigured ?? false,
+              invitationsSent: data.invitationsSent ?? 0,
+            }
+          : undefined,
       };
 
       return transformedStatus;
@@ -232,12 +227,9 @@ export class TemporalWorkflowClient implements IWorkflowClient {
       log.info('Cancelling workflow', { workflowId });
 
       const client = supabaseService.getClient();
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.CANCEL_WORKFLOW,
-        {
-          body: { workflowId }
-        }
-      );
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.CANCEL_WORKFLOW, {
+        body: { workflowId },
+      });
 
       if (error) {
         log.error('Failed to cancel workflow', error);
@@ -245,10 +237,7 @@ export class TemporalWorkflowClient implements IWorkflowClient {
       }
 
       const success = data?.cancelled === true;
-      log.info(
-        success ? 'Workflow cancelled' : 'Workflow cancellation failed',
-        { workflowId }
-      );
+      log.info(success ? 'Workflow cancelled' : 'Workflow cancellation failed', { workflowId });
 
       return success;
     } catch (error) {

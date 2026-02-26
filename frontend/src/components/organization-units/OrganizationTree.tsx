@@ -31,6 +31,7 @@ import { cn } from '@/components/ui/utils';
 import { OrganizationTreeNode } from './OrganizationTreeNode';
 import type { OrganizationUnitNode } from '@/types/organization-unit.types';
 import { Logger } from '@/utils/logger';
+import { TIMINGS } from '@/config/timings';
 
 const log = Logger.getLogger('component');
 
@@ -121,7 +122,7 @@ export const OrganizationTree = observer(
     const typeAheadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     /** Type-ahead timeout in milliseconds (per WAI-ARIA recommendation) */
-    const TYPE_AHEAD_TIMEOUT = 500;
+    const TYPE_AHEAD_TIMEOUT = TIMINGS.debounce.search;
 
     /**
      * Flatten visible nodes (respecting expanded state) for type-ahead search.
@@ -159,9 +160,7 @@ export const OrganizationTree = observer(
         const lowerPrefix = prefix.toLowerCase();
 
         // Find current index
-        const currentIndex = selectedId
-          ? visibleNodes.findIndex((n) => n.id === selectedId)
-          : -1;
+        const currentIndex = selectedId ? visibleNodes.findIndex((n) => n.id === selectedId) : -1;
 
         // Search from current position + 1 to end, then wrap to beginning
         for (let offset = 1; offset <= visibleNodes.length; offset++) {
@@ -207,6 +206,7 @@ export const OrganizationTree = observer(
           log.debug('Type-ahead buffer cleared');
         }, TYPE_AHEAD_TIMEOUT);
       },
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- TYPE_AHEAD_TIMEOUT is a module-level constant
       [typeAheadBuffer, findMatchingNode, onSelect]
     );
 

@@ -1,7 +1,6 @@
 import { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/utils/logger';
-import { Session } from '@/types/auth.types';
 
 const log = Logger.getLogger('api');
 
@@ -15,7 +14,7 @@ const log = Logger.getLogger('api');
  *
  * Matches the pattern used in Edge Functions (_shared/types.ts).
  */
- 
+
 type AnySchemaSupabaseClient = SupabaseClient<any, any, any>;
 
 export interface Database {
@@ -30,7 +29,10 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['medications']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Insert: Omit<
+          Database['public']['Tables']['medications']['Row'],
+          'id' | 'created_at' | 'updated_at'
+        >;
         Update: Partial<Database['public']['Tables']['medications']['Insert']>;
       };
       clients: {
@@ -41,7 +43,10 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['clients']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Insert: Omit<
+          Database['public']['Tables']['clients']['Row'],
+          'id' | 'created_at' | 'updated_at'
+        >;
         Update: Partial<Database['public']['Tables']['clients']['Insert']>;
       };
     };
@@ -51,18 +56,20 @@ export interface Database {
 /**
  * Supabase Data Service
  *
- * Provides typed database access and organization-scoped query helpers.
- * Uses the singleton Supabase client for all operations to avoid multiple
- * GoTrueClient instances and ensure consistent OAuth callback handling.
- *
+ * Provides typed database access via the singleton Supabase client.
  * Authentication is handled automatically by the singleton client:
  * - Auth sessions are managed by SupabaseAuthProvider
  * - JWT tokens are automatically included in all requests
  * - RLS policies on the database use JWT claims for authorization
+ *
+ * For queries that need org_id or sub from the JWT, retrieve the session
+ * directly from the client and decode the access token:
+ *
+ *   const { data: { session } } = await client.auth.getSession();
+ *   const claims = decodeJWT(session.access_token);
  */
 class SupabaseService {
   private client: SupabaseClient<Database>;
-  private currentSession: Session | null = null;
 
   constructor() {
     // Use the singleton Supabase client to avoid multiple GoTrueClient instances
@@ -71,36 +78,6 @@ class SupabaseService {
     this.client = supabase as SupabaseClient<Database>;
 
     log.info('SupabaseService initialized (using singleton client)');
-  }
-
-  /**
-   * Update the current session reference
-   *
-   * Note: Authentication is handled automatically by the singleton Supabase client.
-   * This method only stores the session reference for use in organization-scoped
-   * helper methods (queryWithOrgScope, insertWithOrgScope, etc.)
-   *
-   * The Supabase client automatically:
-   * - Includes Authorization headers with JWT tokens on all requests
-   * - Handles token refresh
-   * - Manages session persistence
-   * - Processes OAuth callbacks
-   *
-   * RLS policies on the database read org_id and effective_permissions
-   * directly from the JWT claims, so manual header injection is unnecessary
-   * and can cause concurrency issues.
-   */
-  async updateAuthSession(session: Session | null): Promise<void> {
-    this.currentSession = session;
-
-    if (session) {
-      log.info('Session reference updated', {
-        user: session.user.email,
-        org_id: session.claims.org_id,
-      });
-    } else {
-      log.info('Session reference cleared');
-    }
   }
 
   /**
@@ -134,188 +111,6 @@ class SupabaseService {
   ): Promise<{ data: T | null; error: PostgrestError | null }> {
     const apiClient = this.client as AnySchemaSupabaseClient;
     return apiClient.schema('api').rpc(functionName, params);
-  }
-
-  /**
-   * Get the current session
-   */
-  getCurrentSession(): Session | null {
-    return this.currentSession;
-  }
-
-  /**
-   * Helper method for organization-scoped queries
-   * Automatically adds organization_id filter based on current session
-   */
-  async queryWithOrgScope<T>(
-    tableName: keyof Database['public']['Tables'],
-    query?: {
-      select?: string;
-      filter?: Record<string, any>;
-      orderBy?: { column: string; ascending?: boolean };
-      limit?: number;
-    }
-  ): Promise<{ data: T[] | null; error: any }> {
-    if (!this.currentSession?.claims.org_id) {
-      return {
-        data: null,
-        error: new Error('No organization context available'),
-      };
-    }
-
-    const client = this.getClient();
-    let dbQuery = client.from(tableName).select(query?.select || '*');
-
-    // Add organization filter
-    dbQuery = dbQuery.eq('organization_id', this.currentSession.claims.org_id);
-
-    // Add additional filters
-    if (query?.filter) {
-      Object.entries(query.filter).forEach(([key, value]) => {
-        dbQuery = dbQuery.eq(key, value);
-      });
-    }
-
-    // Add ordering
-    if (query?.orderBy) {
-      dbQuery = dbQuery.order(query.orderBy.column, {
-        ascending: query.orderBy.ascending ?? true,
-      });
-    }
-
-    // Add limit
-    if (query?.limit) {
-      dbQuery = dbQuery.limit(query.limit);
-    }
-
-    const result = await dbQuery;
-
-    if (result.error) {
-      log.error(`Query failed for ${tableName}`, result.error);
-    }
-
-    return result as { data: T[] | null; error: any };
-  }
-
-  /**
-   * Helper method for inserting data with organization scope
-   */
-  async insertWithOrgScope<T>(
-    tableName: keyof Database['public']['Tables'],
-    data: Omit<T, 'organization_id' | 'id' | 'created_at' | 'updated_at'>
-  ): Promise<{ data: T | null; error: any }> {
-    if (!this.currentSession?.claims.org_id) {
-      return {
-        data: null,
-        error: new Error('No organization context available'),
-      };
-    }
-
-    const client = this.getClient();
-    const result = await client
-      .from(tableName)
-      .insert({
-        ...data,
-        organization_id: this.currentSession.claims.org_id,
-      } as any)
-      .select()
-      .single();
-
-    if (result.error) {
-      log.error(`Insert failed for ${tableName}`, result.error);
-    }
-
-    return result as { data: T | null; error: any };
-  }
-
-  /**
-   * Helper method for updating data with organization scope verification
-   */
-  async updateWithOrgScope<T>(
-    tableName: keyof Database['public']['Tables'],
-    id: string,
-    updates: Partial<Omit<T, 'organization_id' | 'id' | 'created_at' | 'updated_at'>>
-  ): Promise<{ data: T | null; error: any }> {
-    if (!this.currentSession?.claims.org_id) {
-      return {
-        data: null,
-        error: new Error('No organization context available'),
-      };
-    }
-
-    const client = this.getClient();
-    const result = await (client as any)
-      .from(tableName)
-      .update(updates)
-      .eq('id', id)
-      .eq('organization_id', this.currentSession.claims.org_id) // Ensure org scope
-      .select()
-      .single();
-
-    if (result.error) {
-      log.error(`Update failed for ${tableName}`, result.error);
-    }
-
-    return result as { data: T | null; error: any };
-  }
-
-  /**
-   * Helper method for deleting data with organization scope verification
-   */
-  async deleteWithOrgScope(
-    tableName: keyof Database['public']['Tables'],
-    id: string
-  ): Promise<{ error: any }> {
-    if (!this.currentSession?.claims.org_id) {
-      return {
-        error: new Error('No organization context available'),
-      };
-    }
-
-    const client = this.getClient();
-    const result = await client
-      .from(tableName)
-      .delete()
-      .eq('id', id)
-      .eq('organization_id', this.currentSession.claims.org_id); // Ensure org scope
-
-    if (result.error) {
-      log.error(`Delete failed for ${tableName}`, result.error);
-    }
-
-    return result;
-  }
-
-  /**
-   * Real-time subscription helper
-   */
-  subscribeToChanges(
-    tableName: keyof Database['public']['Tables'],
-    callback: (payload: any) => void,
-    filter?: { column: string; value: string }
-  ) {
-    if (!this.currentSession?.claims.org_id) {
-      log.warn('Cannot subscribe without organization context');
-      return null;
-    }
-
-    const channel = this.client
-      .channel(`${tableName}-changes`)
-      .on(
-        'postgres_changes' as any,
-        {
-          event: '*',
-          schema: 'public',
-          table: tableName,
-          filter: filter
-            ? `${filter.column}=eq.${filter.value}`
-            : `organization_id=eq.${this.currentSession.claims.org_id}`,
-        },
-        callback
-      )
-      .subscribe();
-
-    return channel;
   }
 }
 
