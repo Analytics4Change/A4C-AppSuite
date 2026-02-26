@@ -20,6 +20,9 @@ BEGIN
     WHEN 'organization.bootstrap.completed' THEN PERFORM handle_bootstrap_completed(p_event);
     WHEN 'organization.bootstrap.failed' THEN PERFORM handle_bootstrap_failed(p_event);
     WHEN 'organization.bootstrap.cancelled' THEN PERFORM handle_bootstrap_cancelled(p_event);
+    -- Deletion workflow events (no projection update needed)
+    WHEN 'organization.deletion.initiated' THEN NULL; -- Temporal workflow tracking
+    WHEN 'organization.deletion.completed' THEN NULL; -- org already marked deleted by organization.deleted
     -- Forwarding CASE: invitation.resent events were emitted with stream_type='organization'
     -- by invite-user Edge Function (pre-v15). Forward to the correct handler.
     WHEN 'invitation.resent' THEN PERFORM handle_invitation_resent(p_event);
