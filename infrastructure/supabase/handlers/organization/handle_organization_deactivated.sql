@@ -7,14 +7,10 @@ BEGIN
   UPDATE organizations_projection SET
     is_active = false,
     deactivated_at = COALESCE(
-      (p_event.event_data->>'deactivated_at')::timestamptz,
+      safe_jsonb_extract_timestamp(p_event.event_data, 'effective_date'),
       p_event.created_at
     ),
-    deleted_at = COALESCE(
-      (p_event.event_data->>'deleted_at')::timestamptz,
-      (p_event.event_data->>'deactivated_at')::timestamptz,
-      p_event.created_at
-    ),
+    deactivation_reason = safe_jsonb_extract_text(p_event.event_data, 'deactivation_type'),
     updated_at = p_event.created_at
   WHERE id = p_event.stream_id;
 END;

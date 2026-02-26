@@ -6,14 +6,15 @@ AS $function$
 BEGIN
   UPDATE organizations_projection SET
     name = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'name'), name),
-    subdomain = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'subdomain'), subdomain),
+    display_name = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'display_name'), display_name),
+    slug = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'slug'), slug),
+    type = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'type'), type),
+    tax_number = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'tax_number'), tax_number),
+    phone_number = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'phone_number'), phone_number),
+    timezone = COALESCE(safe_jsonb_extract_text(p_event.event_data, 'timezone'), timezone),
     subdomain_status = COALESCE(
       safe_jsonb_extract_text(p_event.event_data, 'subdomain_status'),
       subdomain_status
-    ),
-    organization_type = COALESCE(
-      safe_jsonb_extract_text(p_event.event_data, 'organization_type')::organization_type,
-      organization_type
     ),
     metadata = CASE
       WHEN p_event.event_data ? 'metadata' THEN p_event.event_data->'metadata'
