@@ -81,7 +81,7 @@
 - [x] Add `/access-blocked` as public route in App.tsx (outside ProtectedRoute to avoid redirect loop)
 - [x] Typecheck passes (zero errors)
 
-## Phase 5: Temporal Deletion Workflow ⏸️ PENDING
+## Phase 5: Temporal Deletion Workflow ✅ COMPLETE
 
 **5 activities** (2 reused from bootstrap, 3 new):
 1. `emitDeletionInitiated` (new) → `organization.deletion.initiated`
@@ -92,14 +92,21 @@
 
 **Dropped**: `deletePhones`, `deleteAddresses`, `deleteContacts`, `deleteEmails` — org soft-delete blocks access; cross-tenant grants need child data; legal retention
 
-- [ ] Create `workflows/src/workflows/organization-deletion/workflow.ts` (5 activities)
-- [ ] Create `emit-deletion-initiated.ts` activity
-- [ ] Create `deactivate-org-users.ts` activity (Supabase Admin API)
-- [ ] Create `emit-deletion-completed.ts` activity
-- [ ] Add `DELETE /api/v1/organizations/:id` API endpoint
-- [ ] Register workflow + activities in worker
-- [ ] Add deletion events to `typed-events.ts`
-- [ ] Test: trigger deletion, verify all 5 activities complete
+- [x] Add OrganizationDeletionParams/Result + activity param types to shared/types/index.ts
+- [x] Sync generated events from contracts to workflows (was outdated)
+- [x] Add emitDeletionInitiated + emitDeletionCompleted to typed-events.ts + utils barrel
+- [x] Create `emit-deletion-initiated.ts` activity
+- [x] Create `deactivate-org-users.ts` activity (Supabase Admin API ban)
+- [x] Create `emit-deletion-completed.ts` activity
+- [x] Create activity barrel `organization-deletion/index.ts` (3 new + 2 reused)
+- [x] Create `workflows/src/workflows/organization-deletion/workflow.ts` (5 activities, best-effort)
+- [x] Create workflow barrel + top-level workflows/index.ts
+- [x] Update worker: merge activities, workflowsPath → top-level barrel
+- [x] Add `DELETE /api/v1/organizations/:id` API endpoint
+- [x] Typecheck passes (zero errors)
+- [x] Lint passes (zero errors)
+- [x] Build succeeds
+- [ ] Test: trigger deletion, verify all 5 activities complete (deferred to integration testing)
 
 ## Phase 6: Frontend ViewModels ⏸️ PENDING
 
@@ -157,8 +164,8 @@
 
 ## Current Status
 
-**Phase**: Phase 5 — Temporal Deletion Workflow
+**Phase**: Phase 6 — Frontend ViewModels
 **Status**: ⏸️ PENDING
 **Last Updated**: 2026-02-25
-**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (uncommitted)
-**Next Step**: Commit Phase 4. Then proceed to Phase 5 (Temporal deletion workflow).
+**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (uncommitted)
+**Next Step**: Commit Phase 5. Then proceed to Phase 6 (Frontend ViewModels).

@@ -28,7 +28,8 @@ if (process.env.NODE_ENV !== 'production') {
 import { NativeConnection, Worker } from '@temporalio/worker';
 import { logConfigurationStatus, getWorkflowsEnv } from '../shared/config';
 import { HealthCheckServer } from './health';
-import * as activities from '../activities/organization-bootstrap';
+import * as bootstrapActivities from '../activities/organization-bootstrap';
+import * as deletionActivities from '../activities/organization-deletion';
 
 /**
  * Main worker initialization
@@ -84,11 +85,14 @@ async function run() {
     process.exit(1);
   }
 
+  // Merge all activities into a single object for the worker
+  const activities = { ...bootstrapActivities, ...deletionActivities };
+
   // Create worker
   console.log('Creating worker...');
   console.log(`  Task Queue: ${env.TEMPORAL_TASK_QUEUE}`);
-  console.log(`  Workflows: organization-bootstrap`);
-  console.log(`  Activities: 9 activities (6 forward, 3 compensation)`);
+  console.log(`  Workflows: organization-bootstrap, organization-deletion`);
+  console.log(`  Activities: ${Object.keys(activities).length} activities`);
   console.log('');
 
   let worker: Worker;
@@ -97,7 +101,7 @@ async function run() {
       connection,
       namespace: env.TEMPORAL_NAMESPACE,
       taskQueue: env.TEMPORAL_TASK_QUEUE,
-      workflowsPath: require.resolve('../workflows/organization-bootstrap'),
+      workflowsPath: require.resolve('../workflows'),
       activities,
       // Worker options
       maxConcurrentActivityTaskExecutions: 10,

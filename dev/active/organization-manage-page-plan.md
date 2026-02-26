@@ -76,7 +76,7 @@ Single migration `20260226002002_organization_manage_page_phase1.sql` (1027 line
 - `ProtectedRoute.tsx` — added `session?.claims.access_blocked` check after password recovery, before !isAuthenticated
 - `/access-blocked` registered as public route in App.tsx (outside ProtectedRoute to prevent redirect loop)
 
-## Phase 5: Temporal Deletion Workflow
+## Phase 5: Temporal Deletion Workflow ✅ COMPLETE
 
 - `organizationDeletionWorkflow` with 5 activities (2 reused from bootstrap compensation):
   1. `emitDeletionInitiated` (new) → `organization.deletion.initiated`

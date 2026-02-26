@@ -429,6 +429,94 @@ export interface GrantProviderAdminPermissionsResult {
 }
 
 // ========================================
+// Organization Deletion Workflow Types
+// ========================================
+
+/**
+ * Input parameters for OrganizationDeletionWorkflow
+ *
+ * Triggered after an organization has been deactivated via the manage page.
+ * The delete_organization RPC requires prior deactivation.
+ */
+export interface OrganizationDeletionParams {
+  /** Organization ID to delete */
+  organizationId: string;
+
+  /** Reason for deletion (from the platform owner) */
+  reason: string;
+
+  /** Organization subdomain for DNS removal (optional — not all orgs have subdomains) */
+  subdomain?: string;
+
+  /** User ID of the platform owner who initiated deletion */
+  initiatedBy: string;
+
+  /** Optional tracing context for end-to-end request correlation */
+  tracing?: WorkflowTracingParams;
+}
+
+/**
+ * Result returned from OrganizationDeletionWorkflow
+ */
+export interface OrganizationDeletionResult {
+  /** Organization ID that was deleted */
+  orgId: string;
+
+  /** Whether DNS was removed successfully */
+  dnsRemoved: boolean;
+
+  /** Number of users deactivated */
+  usersDeactivated: number;
+
+  /** Number of invitations revoked */
+  invitationsRevoked: number;
+
+  /** Any non-fatal errors that occurred */
+  errors?: string[];
+}
+
+/**
+ * EmitDeletionInitiatedActivity parameters
+ */
+export interface EmitDeletionInitiatedParams {
+  orgId: string;
+  workflowId: string;
+  reason: string;
+  initiatedBy?: string;
+  tracing?: WorkflowTracingParams;
+}
+
+/**
+ * DeactivateOrgUsersActivity parameters
+ */
+export interface DeactivateOrgUsersParams {
+  orgId: string;
+  tracing?: WorkflowTracingParams;
+}
+
+/**
+ * DeactivateOrgUsersActivity result
+ */
+export interface DeactivateOrgUsersResult {
+  /** Number of users deactivated */
+  deactivatedCount: number;
+  /** Errors for individual users (non-fatal) */
+  errors: string[];
+}
+
+/**
+ * EmitDeletionCompletedActivity parameters
+ */
+export interface EmitDeletionCompletedParams {
+  orgId: string;
+  workflowId: string;
+  dnsRemoved: boolean;
+  usersDeactivated: number;
+  invitationsRevoked: number;
+  tracing?: WorkflowTracingParams;
+}
+
+// ========================================
 // Provider Interface Types
 // ========================================
 

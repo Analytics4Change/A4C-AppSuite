@@ -54,6 +54,8 @@ import {
   OrganizationDnsRemovedData,
   OrganizationBootstrapFailureData,
   OrganizationBootstrapCompletionData,
+  OrganizationDeletionInitiationData,
+  OrganizationDeletionCompletionData,
   // Invitation data types
   InvitationEmailSentData,
   // Junction data types
@@ -101,6 +103,8 @@ export type {
   SubdomainVerifiedData,
   OrganizationDnsRemovedData,
   OrganizationBootstrapFailureData,
+  OrganizationDeletionInitiationData,
+  OrganizationDeletionCompletionData,
   InvitationEmailSentData,
   OrganizationContactLinkData,
   OrganizationPhoneLinkData,
@@ -861,5 +865,47 @@ export async function emitBootstrapCompleted(
     event_data: data as unknown as Record<string, unknown>,
     tags,
     ...buildTracingForEvent(tracing, 'emitBootstrapCompleted'),
+  });
+}
+
+// ============================================================================
+// Organization Deletion Events
+// ============================================================================
+
+/**
+ * Emit an organization.deletion.initiated event
+ */
+export async function emitDeletionInitiated(
+  orgId: string,
+  data: OrganizationDeletionInitiationData,
+  tracing?: WorkflowTracingParams
+): Promise<string> {
+  const tags = buildTags();
+  return emitEvent({
+    event_type: 'organization.deletion.initiated',
+    aggregate_type: 'organization',
+    aggregate_id: orgId,
+    event_data: data as unknown as Record<string, unknown>,
+    tags,
+    ...buildTracingForEvent(tracing, 'emitDeletionInitiated'),
+  });
+}
+
+/**
+ * Emit an organization.deletion.completed event
+ */
+export async function emitDeletionCompleted(
+  orgId: string,
+  data: OrganizationDeletionCompletionData,
+  tracing?: WorkflowTracingParams
+): Promise<string> {
+  const tags = buildTags();
+  return emitEvent({
+    event_type: 'organization.deletion.completed',
+    aggregate_type: 'organization',
+    aggregate_id: orgId,
+    event_data: data as unknown as Record<string, unknown>,
+    tags,
+    ...buildTracingForEvent(tracing, 'emitDeletionCompleted'),
   });
 }

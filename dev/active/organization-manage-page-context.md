@@ -40,6 +40,14 @@
 
 16. **OrganizationCommandServiceFactory fixed to use getDeploymentConfig**: Was the only factory reading `VITE_AUTH_MODE` directly. Now uses `getDeploymentConfig().useMockOrganization` for consistency with query, unit, entity, schedule, and role service factories. - Added 2026-02-25
 
+17. **Deletion workflow: best-effort, no saga compensation**: Unlike bootstrap (which rolls back on failure), deletion uses best-effort cleanup. Individual activity failures are logged in `errors[]` but don't prevent other steps from running. Rationale: the org is already soft-deleted and access-blocked; cleanup is supplementary, not transactional. - Added 2026-02-25
+
+18. **Worker workflowsPath changed to top-level barrel**: `workflowsPath` now points to `workflows/index.ts` which re-exports both bootstrap and deletion workflows. Activities merged via spread: `{ ...bootstrapActivities, ...deletionActivities }`. Both share the same `bootstrap` task queue. - Added 2026-02-25
+
+19. **Generated events synced to workflows**: `workflows/src/shared/types/generated/events.ts` was outdated (1580 lines vs 2163 in contracts). Synced from `infrastructure/supabase/contracts/types/generated-events.ts` to get deletion event types. - Added 2026-02-25
+
+20. **Supabase Admin API `ban_duration: 'none'` for permanent user deactivation**: `deactivateOrgUsers` activity uses `supabase.auth.admin.updateUserById(id, { ban_duration: 'none' })` which permanently bans the user. This is a hard block (immediate, unlike JWT refresh delay). - Added 2026-02-25
+
 ## Technical Context
 
 ### Architecture
@@ -117,15 +125,27 @@
 ### New Files Created (Phase 4)
 - `frontend/src/pages/auth/AccessBlockedPage.tsx` — reason display + logout, glassmorphism card
 
+### New Files Created (Phase 5)
+- `workflows/src/workflows/organization-deletion/workflow.ts` — 5-activity deletion workflow (no saga, best-effort cleanup)
+- `workflows/src/workflows/organization-deletion/index.ts` — workflow barrel export
+- `workflows/src/workflows/index.ts` — top-level barrel exporting both bootstrap + deletion workflows
+- `workflows/src/activities/organization-deletion/index.ts` — activity barrel (3 new + 2 reused)
+- `workflows/src/activities/organization-deletion/emit-deletion-initiated.ts` — emits organization.deletion.initiated event
+- `workflows/src/activities/organization-deletion/deactivate-org-users.ts` — bans all org users via Supabase Admin API
+- `workflows/src/activities/organization-deletion/emit-deletion-completed.ts` — emits organization.deletion.completed event
+
+### Existing Files Modified (Phase 5)
+- `workflows/src/shared/types/index.ts` — added 6 new types (OrganizationDeletionParams/Result, EmitDeletionInitiated/CompletedParams, DeactivateOrgUsersParams/Result)
+- `workflows/src/shared/utils/typed-events.ts` — added emitDeletionInitiated + emitDeletionCompleted typed emitters, imported OrganizationDeletionInitiationData/CompletionData
+- `workflows/src/shared/utils/index.ts` — re-exported new emitters
+- `workflows/src/shared/types/generated/events.ts` — synced from contracts (was outdated, missing deletion event types)
+- `workflows/src/worker/index.ts` — merged bootstrap + deletion activities, workflowsPath → top-level barrel
+- `workflows/src/api/routes/workflows.ts` — added DELETE /api/v1/organizations/:id endpoint
+
 ### New Files Still to Create
 - `frontend/src/viewModels/organization/OrganizationManageListViewModel.ts`
 - `frontend/src/viewModels/organization/OrganizationManageFormViewModel.ts`
 - `frontend/src/pages/organizations/OrganizationsManagePage.tsx`
-- `frontend/src/pages/auth/AccessBlockedPage.tsx`
-- `workflows/src/workflows/organization-deletion/workflow.ts`
-- `workflows/src/activities/organization-deletion/deactivate-org-users.ts`
-- `workflows/src/activities/organization-deletion/emit-deletion-initiated.ts`
-- `workflows/src/activities/organization-deletion/emit-deletion-completed.ts`
 
 ## Related Components
 - `frontend/src/pages/roles/RolesManagePage.tsx` — pattern reference for split-panel

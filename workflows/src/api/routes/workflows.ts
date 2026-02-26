@@ -199,6 +199,113 @@ async function bootstrapOrganizationHandler(
 }
 
 /**
+ * Organization deletion request payload
+ */
+interface DeleteOrganizationRequest {
+  reason: string;
+}
+
+/**
+ * Organization Deletion Workflow Endpoint
+ *
+ * DELETE /api/v1/organizations/:id
+ *
+ * Flow:
+ * 1. Validate request (reason required)
+ * 2. Fetch organization to get subdomain
+ * 3. Start Temporal deletion workflow
+ * 4. Return workflow ID for status polling
+ *
+ * Prerequisites:
+ * - Organization must already be deactivated (enforced by delete_organization RPC)
+ * - Organization must already be soft-deleted (delete_organization RPC sets deleted_at)
+ * - Caller must have organization.create_root permission (platform owner)
+ */
+async function deleteOrganizationHandler(
+  request: FastifyRequest<{ Params: { id: string }; Body: DeleteOrganizationRequest }>,
+  reply: FastifyReply
+): Promise<void> {
+  const organizationId = request.params.id;
+  const { reason } = request.body;
+
+  if (!reason) {
+    return reply.code(400).send({
+      error: 'Invalid request payload',
+      details: 'Required field: reason',
+    });
+  }
+
+  request.log.info({
+    organization_id: organizationId,
+    user_id: request.user!.id,
+    user_email: request.user!.email,
+    reason,
+  }, 'Starting organization deletion workflow');
+
+  // Fetch organization to get subdomain for DNS removal
+  const supabaseAdmin = getSupabaseClient();
+  const { data: orgData, error: orgError } = await supabaseAdmin
+    .schema('api')
+    .rpc('get_organization_by_id', { p_org_id: organizationId });
+
+  if (orgError) {
+    request.log.error({ error: orgError }, 'Failed to fetch organization');
+    return reply.code(404).send({
+      error: 'Organization not found',
+      details: orgError.message,
+    });
+  }
+
+  // orgData is an array from the RPC — take first result
+  const org = Array.isArray(orgData) ? orgData[0] : orgData;
+  const subdomain = org?.slug;
+
+  // Extract tracing context from request headers
+  const tracing = extractTracingFromHeaders(request.headers as Record<string, string | string[] | undefined>);
+
+  let temporalWorkflowId: string;
+
+  try {
+    const connection = await Connection.connect({ address: temporalAddress });
+    const client = new Client({ connection, namespace: temporalNamespace });
+
+    temporalWorkflowId = `org-deletion-${organizationId}`;
+
+    await client.workflow.start('organizationDeletionWorkflow', {
+      taskQueue: 'bootstrap',
+      workflowId: temporalWorkflowId,
+      args: [{
+        organizationId,
+        reason,
+        subdomain,
+        initiatedBy: request.user!.id,
+        tracing,
+      }],
+    });
+
+    request.log.info({
+      temporal_workflow_id: temporalWorkflowId,
+      organization_id: organizationId,
+    }, 'Deletion workflow started successfully');
+
+    await connection.close();
+  } catch (temporalError) {
+    const errorMessage = temporalError instanceof Error ? temporalError.message : 'Unknown error';
+    request.log.error({ error: temporalError }, 'Failed to start deletion workflow');
+    return reply.code(500).send({
+      error: 'Failed to start deletion workflow',
+      details: errorMessage,
+    });
+  }
+
+  void reply.code(200).send({
+    organizationId,
+    workflowId: temporalWorkflowId,
+    status: 'initiated',
+  });
+}
+
+/**
  * Register workflow routes
  */
 export function registerWorkflowRoutes(server: FastifyInstance): void {
@@ -208,5 +315,13 @@ export function registerWorkflowRoutes(server: FastifyInstance): void {
       preHandler: [authMiddleware, requirePermission('organization.create_root')]
     },
     bootstrapOrganizationHandler
+  );
+
+  server.delete<{ Params: { id: string }; Body: DeleteOrganizationRequest }>(
+    '/api/v1/organizations/:id',
+    {
+      preHandler: [authMiddleware, requirePermission('organization.create_root')]
+    },
+    deleteOrganizationHandler
   );
 }

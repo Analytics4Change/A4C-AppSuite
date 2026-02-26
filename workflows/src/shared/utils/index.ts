@@ -44,6 +44,9 @@ export {
   // Organization bootstrap event emitters
   emitBootstrapFailed,
   emitBootstrapCompleted,
+  // Organization deletion event emitters
+  emitDeletionInitiated,
+  emitDeletionCompleted,
   // Invitation event emitters
   emitInvitationEmailSent,
   // RBAC event emitters
