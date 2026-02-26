@@ -19,6 +19,7 @@ import { OrganizationCreatePage } from '@/pages/organizations/OrganizationCreate
 import { OrganizationBootstrapStatusPage } from '@/pages/organizations/OrganizationBootstrapStatusPage';
 import { OrganizationDashboard } from '@/pages/organizations/OrganizationDashboard';
 import { AcceptInvitationPage } from '@/pages/organizations/AcceptInvitationPage';
+import { AccessBlockedPage } from '@/pages/auth/AccessBlockedPage';
 import { OrganizationUnitsManagePage } from '@/pages/organization-units';
 import { RolesPage, RolesManagePage } from '@/pages/roles';
 import { UserListPage, UsersManagePage } from '@/pages/users';
@@ -70,6 +71,7 @@ function App() {
             <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
             <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+            <Route path="/access-blocked" element={<AccessBlockedPage />} />
 
             {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>

@@ -114,6 +114,9 @@
 - `frontend/src/services/organization/MockOrganizationEntityService.ts` — in-memory mock with realistic data
 - `frontend/src/services/organization/OrganizationEntityServiceFactory.ts` — factory using getDeploymentConfig
 
+### New Files Created (Phase 4)
+- `frontend/src/pages/auth/AccessBlockedPage.tsx` — reason display + logout, glassmorphism card
+
 ### New Files Still to Create
 - `frontend/src/viewModels/organization/OrganizationManageListViewModel.ts`
 - `frontend/src/viewModels/organization/OrganizationManageFormViewModel.ts`

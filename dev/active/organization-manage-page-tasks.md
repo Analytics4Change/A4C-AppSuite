@@ -74,12 +74,12 @@
 - [x] Fix `OrganizationCommandServiceFactory` to use `getDeploymentConfig` (was using VITE_AUTH_MODE)
 - [x] Typecheck passes (zero errors)
 
-## Phase 4: Frontend `access_blocked` Guard ⏸️ PENDING
+## Phase 4: Frontend `access_blocked` Guard ✅ COMPLETE
 
-- [ ] Create `AccessBlockedPage.tsx` with reason display + logout
-- [ ] Add route guard in auth context for `access_blocked`
-- [ ] Add `/blocked` route to App.tsx
-- [ ] Test: blocked user redirected to blocked page
+- [x] Create `AccessBlockedPage.tsx` with reason display + logout (glassmorphism card, ShieldX icon, reason mapping, sign out button)
+- [x] Add `access_blocked` check to `ProtectedRoute.tsx` (after password recovery check, before !isAuthenticated)
+- [x] Add `/access-blocked` as public route in App.tsx (outside ProtectedRoute to avoid redirect loop)
+- [x] Typecheck passes (zero errors)
 
 ## Phase 5: Temporal Deletion Workflow ⏸️ PENDING
 
@@ -157,8 +157,8 @@
 
 ## Current Status
 
-**Phase**: Phase 4 — Frontend `access_blocked` Guard
+**Phase**: Phase 5 — Temporal Deletion Workflow
 **Status**: ⏸️ PENDING
 **Last Updated**: 2026-02-25
-**Completed**: Phase 0 (commit `dcfb4197`), Phase 1 (commit `27c6442a`), Phase 1B + Phase 2 (commit `549c7c74`), Phase 3 Frontend Service Layer (uncommitted)
-**Next Step**: Commit Phase 3 changes. Then proceed to Phase 4 (AccessBlockedPage + route guard).
+**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (uncommitted)
+**Next Step**: Commit Phase 4. Then proceed to Phase 5 (Temporal deletion workflow).

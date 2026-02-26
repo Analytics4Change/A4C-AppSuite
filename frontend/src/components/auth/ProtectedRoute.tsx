@@ -6,7 +6,7 @@ import { Logger } from '@/utils/logger';
 const log = Logger.getLogger('navigation');
 
 export const ProtectedRoute: React.FC = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, session, loading } = useAuth();
 
   log.debug('ProtectedRoute auth check', { isAuthenticated, loading });
 
@@ -25,6 +25,14 @@ export const ProtectedRoute: React.FC = () => {
   if (isAuthenticated && sessionStorage.getItem('password_recovery_in_progress')) {
     log.info('Recovery session active, redirecting to reset password');
     return <Navigate to="/auth/reset-password" replace />;
+  }
+
+  // Redirect blocked users (e.g. org deactivated) to access-blocked page
+  if (isAuthenticated && session?.claims.access_blocked) {
+    log.info('User access blocked, redirecting to access-blocked page', {
+      reason: session.claims.access_block_reason,
+    });
+    return <Navigate to="/access-blocked" replace />;
   }
 
   if (!isAuthenticated) {

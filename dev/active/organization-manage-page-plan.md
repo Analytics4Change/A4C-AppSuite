@@ -70,10 +70,11 @@ Single migration `20260226002002_organization_manage_page_phase1.sql` (1027 line
 - Fixed `OrganizationCommandServiceFactory` to use `getDeploymentConfig` (was using `VITE_AUTH_MODE`)
 - Typecheck: zero errors
 
-## Phase 4: Frontend `access_blocked` Guard
+## Phase 4: Frontend `access_blocked` Guard ✅ COMPLETE
 
-- `AccessBlockedPage` with reason display + logout button
-- Route guard in auth context redirecting blocked users
+- `AccessBlockedPage.tsx` — glassmorphism card with ShieldX icon, reason-to-label mapping, sign out button
+- `ProtectedRoute.tsx` — added `session?.claims.access_blocked` check after password recovery, before !isAuthenticated
+- `/access-blocked` registered as public route in App.tsx (outside ProtectedRoute to prevent redirect loop)
 
 ## Phase 5: Temporal Deletion Workflow
 
