@@ -72,6 +72,11 @@ channels:
           - $ref: './domains/organization.yaml#/components/messages/OrganizationUpdated'
           - $ref: './domains/organization.yaml#/components/messages/OrganizationActivated'
           - $ref: './domains/organization.yaml#/components/messages/OrganizationDeactivated'
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationReactivated'
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationDeleted'
+          # Organization deletion workflow events (async via Temporal)
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationDeletionInitiated'
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationDeletionCompleted'
           # Organization DNS events (subdomain provisioning)
           - $ref: './domains/organization.yaml#/components/messages/OrganizationSubdomainDnsCreated'
           - $ref: './domains/organization.yaml#/components/messages/OrganizationSubdomainVerified'

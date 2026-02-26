@@ -29,7 +29,7 @@ import {
 } from '../_shared/tracing-context.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v6-jwt-v4-claims';
+const DEPLOY_VERSION = 'v7-access-blocked-guard';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -187,6 +187,15 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if user's organization is deactivated (access blocked via JWT hook)
+    if (jwtPayload.access_blocked) {
+      console.log(`[organization-bootstrap ${DEPLOY_VERSION}] Access blocked for user ${user.id}: ${jwtPayload.access_block_reason || 'organization_deactivated'}`);
+      return new Response(
+        JSON.stringify({ error: 'Access blocked: organization is deactivated' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

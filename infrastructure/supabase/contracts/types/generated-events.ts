@@ -3,7 +3,7 @@
  *
  * Generated from AsyncAPI specification by Modelina
  * Source: infrastructure/supabase/contracts/asyncapi/
- * Generated: 2026-02-20T19:04:50.975Z
+ * Generated: 2026-02-26T00:35:03.437Z
  *
  * To regenerate: cd infrastructure/supabase/contracts && npm run generate:types
  *
@@ -122,6 +122,11 @@ export enum DeactivationReason {
   MAINTENANCE = "maintenance",
 }
 
+export enum DeletionStrategy {
+  CASCADE_DELETE = "cascade_delete",
+  BLOCK_IF_CHILDREN = "block_if_children",
+}
+
 export enum DNSRecordType {
   CNAME = "CNAME",
   A = "A",
@@ -223,7 +228,7 @@ export enum RoleScope {
 // Interfaces
 // =============================================================================
 
-export type DomainEvents = UserSyncedFromAuthEvent | UserCreatedEvent | UserProfileUpdatedEvent | UserOrgSwitchedEvent | UserAccessDatesUpdatedEvent | UserNotificationPreferencesUpdatedEvent | UserAddressAddedEvent | UserAddressUpdatedEvent | UserAddressRemovedEvent | UserPhoneAddedEvent | UserPhoneUpdatedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | ScheduleCreatedEvent | ScheduleUpdatedEvent | ScheduleDeactivatedEvent | ScheduleReactivatedEvent | ScheduleDeletedEvent | ScheduleUserAssignedEvent | ScheduleUserUnassignedEvent | UserClientAssignedEvent | UserClientUnassignedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | PermissionUpdatedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent;
+export type DomainEvents = UserSyncedFromAuthEvent | UserCreatedEvent | UserProfileUpdatedEvent | UserOrgSwitchedEvent | UserAccessDatesUpdatedEvent | UserNotificationPreferencesUpdatedEvent | UserAddressAddedEvent | UserAddressUpdatedEvent | UserAddressRemovedEvent | UserPhoneAddedEvent | UserPhoneUpdatedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | ScheduleCreatedEvent | ScheduleUpdatedEvent | ScheduleDeactivatedEvent | ScheduleReactivatedEvent | ScheduleDeletedEvent | ScheduleUserAssignedEvent | ScheduleUserUnassignedEvent | UserClientAssignedEvent | UserClientUnassignedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationReactivatedEvent | OrganizationDeletedEvent | OrganizationDeletionInitiatedEvent | OrganizationDeletionCompletedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | PermissionUpdatedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent;
 
 export interface UserSyncedFromAuthEvent {
   'stream_id': string;
@@ -393,12 +398,12 @@ export interface UserAddressUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.updated';
-  'event_data': AnonymousSchema_2419;
+  'event_data': AnonymousSchema_2486;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2419 {
+export interface AnonymousSchema_2486 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -420,12 +425,12 @@ export interface UserAddressRemovedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.removed';
-  'event_data': AnonymousSchema_2451;
+  'event_data': AnonymousSchema_2518;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2451 {
+export interface AnonymousSchema_2518 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -461,12 +466,12 @@ export interface UserPhoneUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.phone.updated';
-  'event_data': AnonymousSchema_2500;
+  'event_data': AnonymousSchema_2567;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2500 {
+export interface AnonymousSchema_2567 {
   'phone_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -922,6 +927,65 @@ export interface OrganizationDeactivationData {
   'role_assignment_blocked': boolean;
   'existing_users_affected': boolean;
   'reactivation_conditions'?: string[];
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface OrganizationReactivatedEvent {
+  'stream_id'?: string;
+  'stream_type'?: 'organization';
+  'event_type'?: 'organization.reactivated';
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface OrganizationDeletedEvent {
+  'stream_id': string;
+  'stream_type': 'organization';
+  'event_type': 'organization.deleted';
+  'event_data': OrganizationDeletionData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface OrganizationDeletionData {
+  'organization_id': string;
+  'deleted_path': string;
+  'deletion_strategy': DeletionStrategy;
+  'cascade_confirmed': boolean;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface OrganizationDeletionInitiatedEvent {
+  'stream_id': string;
+  'stream_type': 'organization';
+  'event_type': 'organization.deletion.initiated';
+  'event_data': OrganizationDeletionInitiationData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface OrganizationDeletionInitiationData {
+  'organization_id': string;
+  'workflow_id': string;
+  'reason': string;
+  'initiated_by'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface OrganizationDeletionCompletedEvent {
+  'stream_id': string;
+  'stream_type': 'organization';
+  'event_type': 'organization.deletion.completed';
+  'event_data': OrganizationDeletionCompletionData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface OrganizationDeletionCompletionData {
+  'organization_id': string;
+  'workflow_id': string;
+  'dns_removed': boolean;
+  'users_deactivated': number;
+  'invitations_revoked': number;
   'additionalProperties'?: Map<string, any>;
 }
 

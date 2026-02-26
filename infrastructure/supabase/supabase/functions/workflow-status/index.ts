@@ -10,6 +10,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+import { JWTPayload } from '../_shared/types.ts';
 import {
   handleRpcError,
   createValidationError,
@@ -22,7 +23,7 @@ import {
 import { extractTracingContext } from '../_shared/tracing-context.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v25-tracing';
+const DEPLOY_VERSION = 'v26-access-blocked-guard';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -99,6 +100,22 @@ serve(async (req) => {
     }
 
     console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ User authenticated: ${user.email}`);
+
+    // Decode JWT payload to check access_blocked claim
+    const token = authHeader.replace('Bearer ', '');
+    const jwtParts = token.split('.');
+    if (jwtParts.length === 3) {
+      try {
+        const jwtPayload: JWTPayload = JSON.parse(atob(jwtParts[1]));
+        if (jwtPayload.access_blocked) {
+          console.log(`[workflow-status ${DEPLOY_VERSION}] Access blocked for user ${user.id}: ${jwtPayload.access_block_reason || 'organization_deactivated'}`);
+          return createUnauthorizedError(correlationId, corsHeaders, 'Access blocked: organization is deactivated');
+        }
+      } catch (_e) {
+        // JWT decode failed — auth.getUser() already validated, proceed without claims check
+        console.warn(`[workflow-status ${DEPLOY_VERSION}] Could not decode JWT payload for access_blocked check`);
+      }
+    }
 
     // Get workflow ID from request body
     let requestBody;

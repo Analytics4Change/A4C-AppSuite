@@ -42,7 +42,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v8-jwt-v4-claims';
+const DEPLOY_VERSION = 'v9-access-blocked-guard';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -200,6 +200,15 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if user's organization is deactivated (access blocked via JWT hook)
+    if (jwtPayload.access_blocked) {
+      console.log(`[manage-user ${DEPLOY_VERSION}] Access blocked for user ${user.id}: ${jwtPayload.access_block_reason || 'organization_deactivated'}`);
+      return new Response(
+        JSON.stringify({ error: 'Access blocked: organization is deactivated' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

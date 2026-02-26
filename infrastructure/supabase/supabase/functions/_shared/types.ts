@@ -56,6 +56,7 @@ export interface JWTPayload {
   org_type?: string;
   effective_permissions?: EffectivePermission[];
   access_blocked?: boolean;
+  access_block_reason?: string;
   claims_version?: number;
   current_org_unit_id?: string;
   current_org_unit_path?: string;
