@@ -59,12 +59,16 @@ Single migration `20260226002002_organization_manage_page_phase1.sql` (1027 line
 - Skipped `validate-invitation` and `accept-invitation` (unauthenticated, token-based)
 - Backend API middleware already has guard (verified)
 
-## Phase 3: Frontend Service Layer
+## Phase 3: Frontend Service Layer ✅ COMPLETE
 
-- Extend types, command/query service interfaces
-- Refactor `SupabaseOrganizationCommandService` to use dedicated RPCs (fixes C1)
-- New `IOrganizationEntityService` for contact/address/phone CRUD
-- Mock service implementations
+- Extended `organization.types.ts` with 12 new types (OrganizationDetails, entity types, operation results, CRUD data types)
+- Updated `OrganizationUpdateData` to include `tax_number` and `phone_number`
+- Added lifecycle methods to `IOrganizationCommandService` (deactivate, reactivate, delete)
+- Refactored `SupabaseOrganizationCommandService` from `emit_domain_event` to dedicated RPCs (fixes C1)
+- Added `getOrganizationDetails` to query service (interface + Supabase + Mock)
+- Created `IOrganizationEntityService` with 9 CRUD methods + Supabase/Mock implementations + factory
+- Fixed `OrganizationCommandServiceFactory` to use `getDeploymentConfig` (was using `VITE_AUTH_MODE`)
+- Typecheck: zero errors
 
 ## Phase 4: Frontend `access_blocked` Guard
 

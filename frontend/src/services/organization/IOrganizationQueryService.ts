@@ -10,6 +10,7 @@
 
 import type {
   Organization,
+  OrganizationDetails,
   OrganizationFilterOptions,
   OrganizationQueryOptions,
   PaginatedResult,
@@ -98,4 +99,13 @@ export interface IOrganizationQueryService {
   getOrganizationsPaginated(
     options?: OrganizationQueryOptions
   ): Promise<PaginatedResult<Organization>>;
+
+  /**
+   * Retrieves detailed organization data including contacts, addresses, and phones.
+   * Used by the Organization Manage page for the edit form.
+   *
+   * @param orgId - Organization UUID
+   * @returns Full organization details or null if not found
+   */
+  getOrganizationDetails(orgId: string): Promise<OrganizationDetails | null>;
 }

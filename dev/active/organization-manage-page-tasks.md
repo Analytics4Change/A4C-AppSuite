@@ -57,20 +57,22 @@
 - [x] Skip `accept-invitation` — unauthenticated (uses admin API, token-based)
 - [ ] Deploy updated Edge Functions (deploy after commit)
 
-## Phase 3: Frontend Service Layer ⏸️ PENDING
+## Phase 3: Frontend Service Layer ✅ COMPLETE
 
-- [ ] Extend `organization.types.ts` with new types
-- [ ] Add lifecycle methods to `IOrganizationCommandService`
-- [ ] Add `getOrganizationDetails` to `IOrganizationQueryService`
-- [ ] Refactor `SupabaseOrganizationCommandService` to use dedicated RPCs (fixes C1)
-- [ ] Implement new methods in `SupabaseOrganizationCommandService`
-- [ ] Add `getOrganizationDetails` to `SupabaseOrganizationQueryService`
-- [ ] Create `IOrganizationEntityService` (contact/address/phone CRUD)
-- [ ] Create `SupabaseOrganizationEntityService`
-- [ ] Create `MockOrganizationEntityService`
-- [ ] Create service factory
-- [ ] Update `MockOrganizationCommandService` with new methods
-- [ ] Update `MockOrganizationQueryService` with new methods
+- [x] Extend `organization.types.ts` with new types (OrganizationDetails, OrganizationDetailRecord, OrganizationContact/Address/Phone, OrganizationOperationResult, OrganizationEntityResult, ContactData/AddressData/PhoneData, updated OrganizationUpdateData with tax_number/phone_number)
+- [x] Add lifecycle methods to `IOrganizationCommandService` (deactivate, reactivate, delete — all return OrganizationOperationResult)
+- [x] Add `getOrganizationDetails` to `IOrganizationQueryService`
+- [x] Refactor `SupabaseOrganizationCommandService` to use dedicated RPCs (fixes C1 — no more emit_domain_event)
+- [x] Implement lifecycle methods in `SupabaseOrganizationCommandService` (all 4 ops call dedicated RPCs)
+- [x] Add `getOrganizationDetails` to `SupabaseOrganizationQueryService`
+- [x] Create `IOrganizationEntityService` (contact/address/phone CRUD — 9 methods)
+- [x] Create `SupabaseOrganizationEntityService` (shared `callEntityRpc` helper)
+- [x] Create `MockOrganizationEntityService` (in-memory with mock data)
+- [x] Create `OrganizationEntityServiceFactory` (uses getDeploymentConfig)
+- [x] Update `MockOrganizationCommandService` with lifecycle methods
+- [x] Update `MockOrganizationQueryService` with `getOrganizationDetails`
+- [x] Fix `OrganizationCommandServiceFactory` to use `getDeploymentConfig` (was using VITE_AUTH_MODE)
+- [x] Typecheck passes (zero errors)
 
 ## Phase 4: Frontend `access_blocked` Guard ⏸️ PENDING
 
@@ -155,8 +157,8 @@
 
 ## Current Status
 
-**Phase**: Phase 3 — Frontend Service Layer
+**Phase**: Phase 4 — Frontend `access_blocked` Guard
 **Status**: ⏸️ PENDING
 **Last Updated**: 2026-02-25
-**Completed**: Phase 0 (commit `dcfb4197`), Phase 1 RPCs + JWT hook (commit `27c6442a`), Phase 1B AsyncAPI + types, Phase 2 Edge Function access_blocked audit
-**Next Step**: Commit Phase 1B + Phase 2 changes. Then proceed to Phase 3 (Frontend Service Layer).
+**Completed**: Phase 0 (commit `dcfb4197`), Phase 1 (commit `27c6442a`), Phase 1B + Phase 2 (commit `549c7c74`), Phase 3 Frontend Service Layer (uncommitted)
+**Next Step**: Commit Phase 3 changes. Then proceed to Phase 4 (AccessBlockedPage + route guard).

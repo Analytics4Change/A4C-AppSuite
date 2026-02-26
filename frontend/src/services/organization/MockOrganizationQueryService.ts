@@ -8,6 +8,7 @@
 import { Logger } from '@/utils/logger';
 import type {
   Organization,
+  OrganizationDetails,
   OrganizationFilterOptions,
   OrganizationQueryOptions,
   PaginatedResult,
@@ -189,7 +190,7 @@ export class MockOrganizationQueryService implements IOrganizationQueryService {
     }
     // 100-300ms delay to simulate network latency
     const delay = Math.random() * 200 + 100;
-    await new Promise(resolve => setTimeout(resolve, delay));
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
   async getOrganizations(filters?: OrganizationFilterOptions): Promise<Organization[]> {
@@ -203,27 +204,26 @@ export class MockOrganizationQueryService implements IOrganizationQueryService {
     if (filters) {
       // Filter by organization type
       if (filters.type && filters.type !== 'all') {
-        results = results.filter(org => org.type === filters.type);
+        results = results.filter((org) => org.type === filters.type);
       }
 
       // Filter by active/inactive status
       if (filters.status && filters.status !== 'all') {
-        results = results.filter(org =>
-          org.is_active === (filters.status === 'active')
-        );
+        results = results.filter((org) => org.is_active === (filters.status === 'active'));
       }
 
       // Filter by partner type
       if (filters.partnerType) {
-        results = results.filter(org => org.partner_type === filters.partnerType);
+        results = results.filter((org) => org.partner_type === filters.partnerType);
       }
 
       // Search by name or subdomain (case-insensitive)
       if (filters.searchTerm) {
         const searchLower = filters.searchTerm.toLowerCase();
-        results = results.filter(org =>
-          org.name.toLowerCase().includes(searchLower) ||
-          org.subdomain.toLowerCase().includes(searchLower)
+        results = results.filter(
+          (org) =>
+            org.name.toLowerCase().includes(searchLower) ||
+            org.subdomain.toLowerCase().includes(searchLower)
         );
       }
     }
@@ -240,7 +240,7 @@ export class MockOrganizationQueryService implements IOrganizationQueryService {
 
     log.debug('Mock: Fetching organization by ID', { orgId });
 
-    const org = MOCK_ORGANIZATIONS.find(o => o.id === orgId);
+    const org = MOCK_ORGANIZATIONS.find((o) => o.id === orgId);
 
     if (org) {
       log.info('Mock: Found organization by ID', { orgId, name: org.name });
@@ -256,7 +256,7 @@ export class MockOrganizationQueryService implements IOrganizationQueryService {
 
     log.debug('Mock: Fetching child organizations', { parentOrgId });
 
-    const children = MOCK_ORGANIZATIONS.filter(org => org.parent_org_id === parentOrgId);
+    const children = MOCK_ORGANIZATIONS.filter((org) => org.parent_org_id === parentOrgId);
 
     // Sort alphabetically by name
     children.sort((a, b) => a.name.localeCompare(b.name));
@@ -281,17 +281,17 @@ export class MockOrganizationQueryService implements IOrganizationQueryService {
 
     // Apply filters
     if (options?.type && options.type !== 'all') {
-      results = results.filter(org => org.type === options.type);
+      results = results.filter((org) => org.type === options.type);
     }
 
     if (options?.status && options.status !== 'all') {
-      results = results.filter(org => org.is_active === (options.status === 'active'));
+      results = results.filter((org) => org.is_active === (options.status === 'active'));
     }
 
     if (options?.searchTerm) {
       const searchLower = options.searchTerm.toLowerCase();
       results = results.filter(
-        org =>
+        (org) =>
           org.name.toLowerCase().includes(searchLower) ||
           org.subdomain.toLowerCase().includes(searchLower) ||
           (org.display_name && org.display_name.toLowerCase().includes(searchLower))
@@ -322,7 +322,9 @@ export class MockOrganizationQueryService implements IOrganizationQueryService {
       }
 
       if (aVal instanceof Date && bVal instanceof Date) {
-        return sortOrder === 'asc' ? aVal.getTime() - bVal.getTime() : bVal.getTime() - aVal.getTime();
+        return sortOrder === 'asc'
+          ? aVal.getTime() - bVal.getTime()
+          : bVal.getTime() - aVal.getTime();
       }
 
       const comparison = String(aVal).localeCompare(String(bVal));
@@ -344,6 +346,93 @@ export class MockOrganizationQueryService implements IOrganizationQueryService {
       page,
       pageSize,
       totalPages,
+    };
+  }
+
+  async getOrganizationDetails(orgId: string): Promise<OrganizationDetails | null> {
+    await this.simulateDelay();
+
+    const org = MOCK_ORGANIZATIONS.find((o) => o.id === orgId);
+    if (!org) {
+      log.debug('Mock: Organization details not found', { orgId });
+      return null;
+    }
+
+    log.info('Mock: Returning organization details', { orgId, name: org.name });
+    return {
+      organization: {
+        id: org.id,
+        name: org.name,
+        display_name: org.display_name,
+        slug: org.subdomain,
+        type: org.type,
+        path: org.path,
+        parent_path: org.parent_org_id ? `parent.${org.parent_org_id}` : null,
+        tax_number: null,
+        phone_number: null,
+        timezone: org.time_zone,
+        is_active: org.is_active,
+        deactivated_at: org.is_active ? null : '2024-03-10T00:00:00Z',
+        deactivation_reason: org.is_active ? null : 'administrative',
+        deleted_at: null,
+        deletion_reason: null,
+        subdomain_status: 'active',
+        partner_type: org.partner_type ?? null,
+        referring_partner_id: org.referring_partner_id ?? null,
+        direct_care_settings: null,
+        tags: null,
+        metadata: null,
+        created_at: org.created_at.toISOString(),
+        updated_at: org.updated_at.toISOString(),
+      },
+      contacts: [
+        {
+          id: 'mock-contact-1',
+          label: 'Billing Contact',
+          type: 'billing',
+          first_name: 'Jane',
+          last_name: 'Smith',
+          email: `billing@${org.subdomain}.example.com`,
+          title: 'CFO',
+          department: 'Finance',
+          is_primary: true,
+          is_active: true,
+          user_id: null,
+          created_at: org.created_at.toISOString(),
+          updated_at: org.updated_at.toISOString(),
+        },
+      ],
+      addresses: [
+        {
+          id: 'mock-address-1',
+          label: 'Headquarters',
+          type: 'physical',
+          street1: '123 Healthcare Blvd',
+          street2: 'Suite 400',
+          city: 'Los Angeles',
+          state: 'CA',
+          zip_code: '90001',
+          country: 'US',
+          is_primary: true,
+          is_active: true,
+          created_at: org.created_at.toISOString(),
+          updated_at: org.updated_at.toISOString(),
+        },
+      ],
+      phones: [
+        {
+          id: 'mock-phone-1',
+          label: 'Main Office',
+          type: 'office',
+          number: '(555) 123-4567',
+          extension: null,
+          country_code: '+1',
+          is_primary: true,
+          is_active: true,
+          created_at: org.created_at.toISOString(),
+          updated_at: org.updated_at.toISOString(),
+        },
+      ],
     };
   }
 }

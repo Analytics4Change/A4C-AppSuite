@@ -282,8 +282,8 @@ export interface InvitationDetails {
  */
 export interface UserCredentials {
   email: string;
-  password?: string;           // For email/password auth
-  authMethod?: AuthMethod;     // For OAuth/SSO auth
+  password?: string; // For email/password auth
+  authMethod?: AuthMethod; // For OAuth/SSO auth
   authenticatedUserId?: string; // Pre-authenticated OAuth user ID (from session)
 }
 
@@ -372,11 +372,179 @@ export interface OrganizationQueryOptions {
 }
 
 /**
- * Data for updating an organization via domain events
+ * Data for updating an organization via dedicated RPC
  * Used by IOrganizationCommandService.updateOrganization()
+ *
+ * Note: `name` can only be changed by platform owners (backend strips it for others)
  */
 export interface OrganizationUpdateData {
   name?: string;
   display_name?: string;
+  tax_number?: string;
+  phone_number?: string;
   timezone?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Organization Details (from api.get_organization_details)
+// ---------------------------------------------------------------------------
+
+/**
+ * Detailed organization data returned by get_organization_details RPC.
+ * Extends the base Organization with lifecycle fields and child entities.
+ */
+export interface OrganizationDetails {
+  organization: OrganizationDetailRecord;
+  contacts: OrganizationContact[];
+  addresses: OrganizationAddress[];
+  phones: OrganizationPhone[];
+}
+
+/**
+ * Full organization record from get_organization_details.
+ * Includes lifecycle fields not present in the list-view Organization type.
+ */
+export interface OrganizationDetailRecord {
+  id: string;
+  name: string;
+  display_name: string;
+  slug: string;
+  type: 'platform_owner' | 'provider' | 'provider_partner';
+  path: string;
+  parent_path: string | null;
+  tax_number: string | null;
+  phone_number: string | null;
+  timezone: string;
+  is_active: boolean;
+  deactivated_at: string | null;
+  deactivation_reason: string | null;
+  deleted_at: string | null;
+  deletion_reason: string | null;
+  subdomain_status: string | null;
+  partner_type: string | null;
+  referring_partner_id: string | null;
+  direct_care_settings: Record<string, unknown> | null;
+  tags: string[] | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Contact entity from contacts_projection (via get_organization_details)
+ */
+export interface OrganizationContact {
+  id: string;
+  label: string;
+  type: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  title: string | null;
+  department: string | null;
+  is_primary: boolean;
+  is_active: boolean;
+  user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Address entity from addresses_projection (via get_organization_details)
+ */
+export interface OrganizationAddress {
+  id: string;
+  label: string;
+  type: string;
+  street1: string;
+  street2: string | null;
+  city: string;
+  state: string;
+  zip_code: string;
+  country: string | null;
+  is_primary: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Phone entity from phones_projection (via get_organization_details)
+ */
+export interface OrganizationPhone {
+  id: string;
+  label: string;
+  type: string;
+  number: string;
+  extension: string | null;
+  country_code: string | null;
+  is_primary: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Lifecycle Operation Results
+// ---------------------------------------------------------------------------
+
+/**
+ * Result from organization lifecycle operations (update, deactivate, reactivate, delete)
+ */
+export interface OrganizationOperationResult {
+  success: boolean;
+  error?: string;
+  organization?: Partial<OrganizationDetailRecord>;
+}
+
+/**
+ * Result from entity CRUD operations (contact, address, phone)
+ */
+export interface OrganizationEntityResult {
+  success: boolean;
+  error?: string;
+  contact?: OrganizationContact;
+  address?: OrganizationAddress;
+  phone?: OrganizationPhone;
+}
+
+/**
+ * Input data for creating/updating a contact
+ */
+export interface ContactData {
+  label: string;
+  type: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  title?: string;
+  department?: string;
+  is_primary?: boolean;
+}
+
+/**
+ * Input data for creating/updating an address
+ */
+export interface AddressData {
+  label: string;
+  type: string;
+  street1: string;
+  street2?: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  country?: string;
+  is_primary?: boolean;
+}
+
+/**
+ * Input data for creating/updating a phone
+ */
+export interface PhoneData {
+  label: string;
+  type: string;
+  number: string;
+  extension?: string;
+  country_code?: string;
+  is_primary?: boolean;
 }

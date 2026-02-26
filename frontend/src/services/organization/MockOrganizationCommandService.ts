@@ -6,45 +6,67 @@
  */
 
 import { Logger } from '@/utils/logger';
-import type { OrganizationUpdateData } from '@/types/organization.types';
+import type {
+  OrganizationUpdateData,
+  OrganizationOperationResult,
+} from '@/types/organization.types';
 import type { IOrganizationCommandService } from './IOrganizationCommandService';
 
 const log = Logger.getLogger('api');
 
 export class MockOrganizationCommandService implements IOrganizationCommandService {
-  /**
-   * Simulates network delay for realistic testing
-   */
   private async simulateDelay(): Promise<void> {
-    // Skip delay in test environment
-    if (import.meta.env.MODE === 'test') {
-      return;
-    }
-    // 100-300ms delay to simulate network latency
+    if (import.meta.env.MODE === 'test') return;
     const delay = Math.random() * 200 + 100;
-    await new Promise(resolve => setTimeout(resolve, delay));
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
   async updateOrganization(
     orgId: string,
     data: OrganizationUpdateData,
-    reason: string
-  ): Promise<void> {
+    reason?: string
+  ): Promise<OrganizationOperationResult> {
     await this.simulateDelay();
+    log.info('Mock: Organization updated', { orgId, data, reason });
+    return { success: true, organization: { id: orgId, ...data } };
+  }
 
-    const updatedFields = Object.keys(data).filter(
-      key => data[key as keyof OrganizationUpdateData] !== undefined
-    );
+  async deactivateOrganization(
+    orgId: string,
+    reason?: string
+  ): Promise<OrganizationOperationResult> {
+    await this.simulateDelay();
+    log.info('Mock: Organization deactivated', { orgId, reason });
+    return {
+      success: true,
+      organization: {
+        id: orgId,
+        is_active: false,
+        deactivated_at: new Date().toISOString(),
+        deactivation_reason: reason ?? 'administrative',
+      },
+    };
+  }
 
-    log.info('Mock: Organization updated', {
-      orgId,
-      updatedFields,
-      data,
-      reason,
-      eventType: 'organization.updated',
-    });
+  async reactivateOrganization(orgId: string): Promise<OrganizationOperationResult> {
+    await this.simulateDelay();
+    log.info('Mock: Organization reactivated', { orgId });
+    return {
+      success: true,
+      organization: { id: orgId, is_active: true, deactivated_at: null, deactivation_reason: null },
+    };
+  }
 
-    // In mock mode, just log the operation
-    // Real implementation would emit domain event
+  async deleteOrganization(orgId: string, reason?: string): Promise<OrganizationOperationResult> {
+    await this.simulateDelay();
+    log.info('Mock: Organization deleted', { orgId, reason });
+    return {
+      success: true,
+      organization: {
+        id: orgId,
+        deleted_at: new Date().toISOString(),
+        deletion_reason: reason ?? 'soft_delete',
+      },
+    };
   }
 }

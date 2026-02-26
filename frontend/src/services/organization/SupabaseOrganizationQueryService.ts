@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { Logger } from '@/utils/logger';
 import type {
   Organization,
+  OrganizationDetails,
   OrganizationFilterOptions,
   OrganizationQueryOptions,
   PaginatedResult,
@@ -77,15 +78,12 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
 
       // Use API schema RPC function instead of direct table query
       // This matches the established pattern for Temporal workflow activities
-      const { data, error } = await supabase
-        .schema('api')
-        .rpc('get_organizations', {
-          p_type: filters?.type && filters.type !== 'all' ? filters.type : null,
-          p_is_active: filters?.status && filters.status !== 'all'
-            ? filters.status === 'active'
-            : null,
-          p_search_term: filters?.searchTerm || null,
-        });
+      const { data, error } = await supabase.schema('api').rpc('get_organizations', {
+        p_type: filters?.type && filters.type !== 'all' ? filters.type : null,
+        p_is_active:
+          filters?.status && filters.status !== 'all' ? filters.status === 'active' : null,
+        p_search_term: filters?.searchTerm || null,
+      });
 
       if (error) {
         log.error('Failed to fetch organizations', { error, filters });
@@ -110,11 +108,9 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
       log.debug('Fetching organization by ID', { orgId });
 
       // Use API schema RPC function instead of direct table query
-      const { data, error } = await supabase
-        .schema('api')
-        .rpc('get_organization_by_id', {
-          p_org_id: orgId,
-        });
+      const { data, error } = await supabase.schema('api').rpc('get_organization_by_id', {
+        p_org_id: orgId,
+      });
 
       if (error) {
         log.error('Failed to fetch organization by ID', { error, orgId });
@@ -140,11 +136,9 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
       log.debug('Fetching child organizations', { parentOrgId });
 
       // Use API schema RPC function instead of direct table query
-      const { data, error } = await supabase
-        .schema('api')
-        .rpc('get_child_organizations', {
-          p_parent_org_id: parentOrgId,
-        });
+      const { data, error } = await supabase.schema('api').rpc('get_child_organizations', {
+        p_parent_org_id: parentOrgId,
+      });
 
       if (error) {
         log.error('Failed to fetch child organizations', { error, parentOrgId });
@@ -216,6 +210,37 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
       };
     } catch (error) {
       log.error('Error in getOrganizationsPaginated', { error, options });
+      throw error;
+    }
+  }
+
+  async getOrganizationDetails(orgId: string): Promise<OrganizationDetails | null> {
+    try {
+      log.debug('Fetching organization details', { orgId });
+
+      const { data: result, error } = await supabase
+        .schema('api')
+        .rpc('get_organization_details', { p_org_id: orgId });
+
+      if (error) {
+        log.error('Failed to fetch organization details', { error, orgId });
+        throw new Error(`Failed to fetch organization details: ${error.message}`);
+      }
+
+      if (!result?.success) {
+        log.debug('Organization details not found', { orgId, error: result?.error });
+        return null;
+      }
+
+      log.info('Fetched organization details', { orgId, name: result.organization?.name });
+      return {
+        organization: result.organization,
+        contacts: result.contacts ?? [],
+        addresses: result.addresses ?? [],
+        phones: result.phones ?? [],
+      };
+    } catch (error) {
+      log.error('Error in getOrganizationDetails', { error, orgId });
       throw error;
     }
   }

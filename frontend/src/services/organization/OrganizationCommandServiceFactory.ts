@@ -1,54 +1,35 @@
 /**
  * Organization Command Service Factory
  *
- * Factory for creating organization command service instances based on
- * the current application mode (mock, integration, production).
- *
- * Pattern: Factory pattern for dependency injection.
+ * Factory for creating organization command service instances.
+ * Uses getDeploymentConfig() for consistent mode detection (aligned with other factories).
  */
 
+import { getDeploymentConfig } from '@/config/deployment.config';
 import type { IOrganizationCommandService } from './IOrganizationCommandService';
 import { SupabaseOrganizationCommandService } from './SupabaseOrganizationCommandService';
 import { MockOrganizationCommandService } from './MockOrganizationCommandService';
 
-/**
- * Creates an organization command service based on application mode
- *
- * @returns IOrganizationCommandService implementation
- *
- * Mode selection:
- * - 'mock': MockOrganizationCommandService (logs only, no network)
- * - 'integration': SupabaseOrganizationCommandService (real Supabase)
- * - 'production': SupabaseOrganizationCommandService (real Supabase)
- */
-export function createOrganizationCommandService(): IOrganizationCommandService {
-  const authMode = import.meta.env.VITE_AUTH_MODE || 'mock';
+export type OrganizationCommandServiceType = 'mock' | 'supabase';
 
-  if (authMode === 'mock') {
-    return new MockOrganizationCommandService();
-  }
-
-  return new SupabaseOrganizationCommandService();
+export function getOrganizationCommandServiceType(): OrganizationCommandServiceType {
+  const { useMockOrganization } = getDeploymentConfig();
+  return useMockOrganization ? 'mock' : 'supabase';
 }
 
-// Singleton instance for convenience
+export function createOrganizationCommandService(): IOrganizationCommandService {
+  return getOrganizationCommandServiceType() === 'mock'
+    ? new MockOrganizationCommandService()
+    : new SupabaseOrganizationCommandService();
+}
+
 let _instance: IOrganizationCommandService | null = null;
 
-/**
- * Gets the singleton organization command service instance
- *
- * Uses lazy initialization - service is created on first access.
- */
 export function getOrganizationCommandService(): IOrganizationCommandService {
-  if (!_instance) {
-    _instance = createOrganizationCommandService();
-  }
+  if (!_instance) _instance = createOrganizationCommandService();
   return _instance;
 }
 
-/**
- * Resets the singleton instance (useful for testing)
- */
 export function resetOrganizationCommandService(): void {
   _instance = null;
 }

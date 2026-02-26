@@ -32,6 +32,14 @@
 
 12. **Permission model for RPCs**: `has_platform_privilege()` gates lifecycle ops (deactivate/reactivate/delete). `has_effective_permission('organization.update', path)` gates entity CRUD (contacts/addresses/phones). `update_organization` uses both: platform owners edit all fields including `name`; non-platform-owners get `name` stripped from update data. - Added 2026-02-25
 
+13. **C1 fix: updateOrganization return type changed from void to OrganizationOperationResult**: All command service methods now return `{success, error?, organization?}` envelopes instead of throwing on failure. This matches the pattern used by org unit, role, and schedule services. The old `emit_domain_event` call with `p_aggregate_type`/`p_aggregate_id` params is fully removed. - Added 2026-02-25
+
+14. **Entity service is separate from command/query services**: Contact/address/phone CRUD lives in `IOrganizationEntityService` (not in the command service) because these are child entity operations, not organization-level commands. They have their own event types (`contact.created`, `address.updated`, etc.) and route to different routers. Follows separation of concerns. - Added 2026-02-25
+
+15. **SupabaseOrganizationEntityService uses shared `callEntityRpc` helper**: All 9 CRUD operations follow the same pattern (call RPC, check success, return entity result), so a single private method handles the common logic. The RPC name and params are the only varying parts. - Added 2026-02-25
+
+16. **OrganizationCommandServiceFactory fixed to use getDeploymentConfig**: Was the only factory reading `VITE_AUTH_MODE` directly. Now uses `getDeploymentConfig().useMockOrganization` for consistency with query, unit, entity, schedule, and role service factories. - Added 2026-02-25
+
 ## Technical Context
 
 ### Architecture
@@ -100,10 +108,13 @@
 - `infrastructure/supabase/supabase/migrations/20260226002002_organization_manage_page_phase1.sql` — Phase 1: JWT hook extension, 14 RPCs, router update (1027 lines, commit `27c6442a`)
 - Phase 1B + Phase 2 commit: `a68a1c8e` — AsyncAPI deletion events + access_blocked guard on 4 Edge Functions
 
+### New Files Created (Phase 3)
+- `frontend/src/services/organization/IOrganizationEntityService.ts` — contact/address/phone CRUD interface (9 methods)
+- `frontend/src/services/organization/SupabaseOrganizationEntityService.ts` — implementation with shared `callEntityRpc` helper
+- `frontend/src/services/organization/MockOrganizationEntityService.ts` — in-memory mock with realistic data
+- `frontend/src/services/organization/OrganizationEntityServiceFactory.ts` — factory using getDeploymentConfig
+
 ### New Files Still to Create
-- `frontend/src/services/organization/IOrganizationEntityService.ts` — contact/address/phone CRUD interface
-- `frontend/src/services/organization/SupabaseOrganizationEntityService.ts` — implementation
-- `frontend/src/services/organization/MockOrganizationEntityService.ts` — mock
 - `frontend/src/viewModels/organization/OrganizationManageListViewModel.ts`
 - `frontend/src/viewModels/organization/OrganizationManageFormViewModel.ts`
 - `frontend/src/pages/organizations/OrganizationsManagePage.tsx`
