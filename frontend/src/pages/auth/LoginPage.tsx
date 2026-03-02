@@ -149,7 +149,10 @@ export const LoginPage: React.FC = () => {
   const isLoading = loading || isSubmitting;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div
+      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100"
+      data-testid="login-page"
+    >
       <div className="w-full max-w-md px-4">
         <div className="text-center mb-8">
           <img src="/logo.png" alt="Analytics4Change" className="h-16 w-auto mx-auto" />

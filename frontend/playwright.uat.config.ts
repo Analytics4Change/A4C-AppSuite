@@ -40,7 +40,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'VITE_DEV_PROFILE=super_admin npm run dev -- --port 3458',
+    command: 'VITE_FORCE_MOCK=true VITE_DEV_PROFILE=super_admin npm run dev -- --port 3458',
     url: 'http://localhost:3458',
     reuseExistingServer: true,
     timeout: 60000,

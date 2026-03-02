@@ -23,6 +23,21 @@ const BASE_URL = 'http://localhost:3458';
 /** Navigate to manage page and wait for it to fully render */
 async function navigateToManagePage(page: Page, params?: string) {
   await page.goto(`${BASE_URL}/organizations/manage${params ? `?${params}` : ''}`);
+
+  // Safety net: if redirected to login (e.g. server reused without VITE_FORCE_MOCK),
+  // auto-login with the super_admin email so tests can still proceed
+  const isLoginPage = await page
+    .locator('[data-testid="login-page"]')
+    .isVisible({ timeout: 3000 })
+    .catch(() => false);
+  if (isLoginPage) {
+    await page.fill('#email', 'super.admin@example.com');
+    await page.fill('#password', 'any-password');
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/(clients|organizations|dashboard|settings)/, { timeout: 10000 });
+    await page.goto(`${BASE_URL}/organizations/manage${params ? `?${params}` : ''}`);
+  }
+
   await page.waitForSelector('[data-testid="org-manage-page"]', { timeout: 15000 });
 }
 
@@ -30,8 +45,14 @@ async function navigateToManagePage(page: Page, params?: string) {
 async function waitForListLoaded(page: Page) {
   // Wait for any loading indicator to disappear, then confirm list is present
   try {
-    await page.waitForSelector('[data-testid="org-list-loading"]', { state: 'attached', timeout: 2000 });
-    await page.waitForSelector('[data-testid="org-list-loading"]', { state: 'detached', timeout: 10000 });
+    await page.waitForSelector('[data-testid="org-list-loading"]', {
+      state: 'attached',
+      timeout: 2000,
+    });
+    await page.waitForSelector('[data-testid="org-list-loading"]', {
+      state: 'detached',
+      timeout: 10000,
+    });
   } catch {
     // Loading indicator may not appear if list loads instantly
   }
@@ -41,8 +62,14 @@ async function waitForListLoaded(page: Page) {
 /** Wait for org details to finish loading */
 async function waitForDetailsLoaded(page: Page) {
   try {
-    await page.waitForSelector('[data-testid="org-details-loading"]', { state: 'attached', timeout: 2000 });
-    await page.waitForSelector('[data-testid="org-details-loading"]', { state: 'detached', timeout: 10000 });
+    await page.waitForSelector('[data-testid="org-details-loading"]', {
+      state: 'attached',
+      timeout: 2000,
+    });
+    await page.waitForSelector('[data-testid="org-details-loading"]', {
+      state: 'detached',
+      timeout: 10000,
+    });
   } catch {
     // Loading indicator may not appear
   }
@@ -82,17 +109,26 @@ async function expandDangerZone(page: Page) {
 // TS-01: Navigation & Page Load (5 cases)
 // ============================================================================
 test.describe('TS-01: Navigation & Page Load', () => {
-  test('TC-01-01: super_admin sees split layout with left panel and empty state', async ({ page }) => {
+  test('TC-01-01: super_admin sees split layout with left panel and empty state', async ({
+    page,
+  }) => {
     await navigateToManagePage(page);
     await expect(page.locator('[data-testid="org-list-panel"]')).toBeVisible();
     await expect(page.locator('[data-testid="org-form-empty-state"]')).toBeVisible();
   });
 
-  test('TC-01-02: Page heading is "Organization Management" with correct subtitle', async ({ page }) => {
+  test('TC-01-02: Page heading is "Organization Management" with correct subtitle', async ({
+    page,
+  }) => {
     await navigateToManagePage(page);
-    await expect(page.locator('[data-testid="org-manage-heading"]')).toHaveText('Organization Management');
+    await expect(page.locator('[data-testid="org-manage-heading"]')).toHaveText(
+      'Organization Management'
+    );
     // Subtitle is the <p> in the same div as the heading
-    const subtitleEl = page.locator('[data-testid="org-manage-heading"]').locator('..').locator('p');
+    const subtitleEl = page
+      .locator('[data-testid="org-manage-heading"]')
+      .locator('..')
+      .locator('p');
     await expect(subtitleEl).toContainText('Manage organizations, lifecycle, and details');
   });
 
@@ -128,20 +164,30 @@ test.describe('TS-02: Organization List', () => {
     await waitForListLoaded(page);
   });
 
-  test('TC-02-01: List loads with 9 orgs alphabetically sorted (platform_owner excluded)', async ({ page }) => {
+  test('TC-02-01: List loads with 9 orgs alphabetically sorted (platform_owner excluded)', async ({
+    page,
+  }) => {
     const orgItems = page.locator('[data-testid="org-list"] [role="option"]');
     await expect(orgItems).toHaveCount(9);
     // First item alphabetically: ABC Healthcare
-    await expect(orgItems.first().locator('[data-testid="org-list-item-name"]')).toHaveText('ABC Healthcare');
+    await expect(orgItems.first().locator('[data-testid="org-list-item-name"]')).toHaveText(
+      'ABC Healthcare'
+    );
     // Last item alphabetically: XYZ Medical
-    await expect(orgItems.last().locator('[data-testid="org-list-item-name"]')).toHaveText('XYZ Medical');
+    await expect(orgItems.last().locator('[data-testid="org-list-item-name"]')).toHaveText(
+      'XYZ Medical'
+    );
   });
 
-  test('TC-02-02: Each org item shows display_name, type badge, and status badge', async ({ page }) => {
+  test('TC-02-02: Each org item shows display_name, type badge, and status badge', async ({
+    page,
+  }) => {
     const item = page.locator('[data-testid="org-list-item-provider-abc-healthcare-id"]');
     await expect(item.locator('[data-testid="org-list-item-name"]')).toHaveText('ABC Healthcare');
     await expect(item.locator('[data-testid="org-list-item-type"]')).toHaveText('provider');
-    await expect(item.locator('[data-testid="org-list-item-status-badge"]')).toContainText('Active');
+    await expect(item.locator('[data-testid="org-list-item-status-badge"]')).toContainText(
+      'Active'
+    );
   });
 
   test('TC-02-03: Active filter shows 8 orgs (Summit Health excluded)', async ({ page }) => {
@@ -149,7 +195,9 @@ test.describe('TS-02: Organization List', () => {
     await waitForListLoaded(page);
     const orgItems = page.locator('[data-testid="org-list"] [role="option"]');
     await expect(orgItems).toHaveCount(8);
-    await expect(page.locator('[data-testid="org-list-item-provider-summit-health-id"]')).not.toBeVisible();
+    await expect(
+      page.locator('[data-testid="org-list-item-provider-summit-health-id"]')
+    ).not.toBeVisible();
   });
 
   test('TC-02-04: Inactive filter shows 1 org (Summit Health only)', async ({ page }) => {
@@ -157,10 +205,14 @@ test.describe('TS-02: Organization List', () => {
     await waitForListLoaded(page);
     const orgItems = page.locator('[data-testid="org-list"] [role="option"]');
     await expect(orgItems).toHaveCount(1);
-    await expect(page.locator('[data-testid="org-list-item-provider-summit-health-id"]')).toBeVisible();
+    await expect(
+      page.locator('[data-testid="org-list-item-provider-summit-health-id"]')
+    ).toBeVisible();
   });
 
-  test('TC-02-05: All filter shows 9 orgs after switching from inactive filter', async ({ page }) => {
+  test('TC-02-05: All filter shows 9 orgs after switching from inactive filter', async ({
+    page,
+  }) => {
     await page.click('[data-testid="org-list-filter-inactive-btn"]');
     await waitForListLoaded(page);
     await page.click('[data-testid="org-list-filter-all-btn"]');
@@ -172,14 +224,18 @@ test.describe('TS-02: Organization List', () => {
     await page.fill('[data-testid="org-list-search-input"]', 'ABC');
     await page.waitForTimeout(600); // debounce
     await expect(page.locator('[data-testid="org-list"] [role="option"]')).toHaveCount(1);
-    await expect(page.locator('[data-testid="org-list-item-provider-abc-healthcare-id"]')).toBeVisible();
+    await expect(
+      page.locator('[data-testid="org-list-item-provider-abc-healthcare-id"]')
+    ).toBeVisible();
   });
 
   test('TC-02-07: Search "xyz" (case-insensitive) matches XYZ Medical', async ({ page }) => {
     await page.fill('[data-testid="org-list-search-input"]', 'xyz');
     await page.waitForTimeout(600);
     await expect(page.locator('[data-testid="org-list"] [role="option"]')).toHaveCount(1);
-    await expect(page.locator('[data-testid="org-list-item-provider-xyz-medical-id"]')).toBeVisible();
+    await expect(
+      page.locator('[data-testid="org-list-item-provider-xyz-medical-id"]')
+    ).toBeVisible();
   });
 
   test('TC-02-08: Search "nonexistent" shows org-list-empty state', async ({ page }) => {
@@ -206,7 +262,9 @@ test.describe('TS-03: Form Field Editability', () => {
     await waitForListLoaded(page);
   });
 
-  test('TC-03-01: super_admin selects active org -- all fields enabled, item aria-selected=true', async ({ page }) => {
+  test('TC-03-01: super_admin selects active org -- all fields enabled, item aria-selected=true', async ({
+    page,
+  }) => {
     await selectOrg(page, 'org-list-item-provider-abc-healthcare-id');
     await expect(page.locator('[data-testid="org-form-empty-state"]')).not.toBeVisible();
     await expect(page.locator('[data-testid="org-details-card"]')).toBeVisible();
@@ -215,10 +273,14 @@ test.describe('TS-03: Form Field Editability', () => {
     await expect(page.locator('#org-tax-number')).not.toBeDisabled();
     await expect(page.locator('#org-phone-number')).not.toBeDisabled();
     await expect(page.locator('#org-timezone')).not.toBeDisabled();
-    await expect(page.locator('[data-testid="org-list-item-provider-abc-healthcare-id"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(
+      page.locator('[data-testid="org-list-item-provider-abc-healthcare-id"]')
+    ).toHaveAttribute('aria-selected', 'true');
   });
 
-  test('TC-03-02: Form fields are pre-filled with correct values for ABC Healthcare', async ({ page }) => {
+  test('TC-03-02: Form fields are pre-filled with correct values for ABC Healthcare', async ({
+    page,
+  }) => {
     await selectOrg(page, 'org-list-item-provider-abc-healthcare-id');
     await expect(page.locator('#org-name')).toHaveValue('ABC Healthcare Partners');
     await expect(page.locator('#org-display-name')).toHaveValue('ABC Healthcare');
@@ -227,35 +289,47 @@ test.describe('TS-03: Form Field Editability', () => {
     await expect(page.locator('#org-phone-number')).toHaveValue('');
   });
 
-  test('TC-03-03: Read-only fields show correct values and are <p> elements (not inputs)', async ({ page }) => {
+  test('TC-03-03: Read-only fields show correct values and are <p> elements (not inputs)', async ({
+    page,
+  }) => {
     await selectOrg(page, 'org-list-item-provider-abc-healthcare-id');
     await expect(page.locator('[data-testid="org-field-slug-value"]')).toHaveText('abc-healthcare');
     await expect(page.locator('[data-testid="org-field-type-value"]')).toHaveText('provider');
-    await expect(page.locator('[data-testid="org-field-path-value"]')).toHaveText('a4c-platform-id.provider-abc-healthcare-id');
+    await expect(page.locator('[data-testid="org-field-path-value"]')).toHaveText(
+      'a4c-platform-id.provider-abc-healthcare-id'
+    );
     // These should be <p> elements, not inputs
     await expect(page.locator('input[data-testid="org-field-slug-value"]')).toHaveCount(0);
     await expect(page.locator('input[data-testid="org-field-type-value"]')).toHaveCount(0);
   });
 
-  test('TC-03-04: Inactive org (Summit Health) shows inactive banner and all fields disabled', async ({ page }) => {
+  test('TC-03-04: Inactive org (Summit Health) shows inactive banner and all fields disabled', async ({
+    page,
+  }) => {
     await selectOrg(page, 'org-list-item-provider-summit-health-id');
     await expect(page.locator('[data-testid="org-inactive-banner"]')).toBeVisible();
     await expect(page.locator('[data-testid="org-inactive-banner-reactivate-btn"]')).toBeVisible();
     await expect(page.locator('#org-name')).toBeDisabled();
     await expect(page.locator('#org-display-name')).toBeDisabled();
     await expect(page.locator('#org-timezone')).toBeDisabled();
-    await expect(page.locator('[data-testid="org-details-status-badge"]')).toContainText('Inactive');
+    await expect(page.locator('[data-testid="org-details-status-badge"]')).toContainText(
+      'Inactive'
+    );
     await expect(page.locator('[data-testid="org-form-save-btn"]')).toBeDisabled();
   });
 
-  test('TC-03-05: provider_admin cannot edit Organization Name [mock limitation]', async ({ page }) => {
+  test('TC-03-05: provider_admin cannot edit Organization Name [mock limitation]', async ({
+    page,
+  }) => {
     // Mock limitation: provider_admin org_id does not match any mock org.
     // The edit form never loads for provider_admin in mock mode.
     // Test is documented as a known limitation.
     test.skip(true, 'Mock limitation: provider_admin auto-select fails -- org_id not in mock data');
   });
 
-  test('TC-03-06: provider_admin -- non-name fields are editable [mock limitation]', async ({ page }) => {
+  test('TC-03-06: provider_admin -- non-name fields are editable [mock limitation]', async ({
+    page,
+  }) => {
     test.skip(true, 'Mock limitation: provider_admin auto-select fails -- org_id not in mock data');
   });
 });
@@ -270,7 +344,9 @@ test.describe('TS-04: Form Validation', () => {
     await selectOrg(page, 'org-list-item-provider-abc-healthcare-id');
   });
 
-  test('TC-04-01: Clearing Organization Name and blurring shows validation error', async ({ page }) => {
+  test('TC-04-01: Clearing Organization Name and blurring shows validation error', async ({
+    page,
+  }) => {
     await page.click('#org-name');
     await page.keyboard.press('Control+a');
     await page.keyboard.press('Delete');
@@ -314,7 +390,9 @@ test.describe('TS-04: Form Validation', () => {
     await expect(page.locator('[data-testid="org-form-save-btn"]')).toBeDisabled();
   });
 
-  test('TC-04-06: Tax Number and Phone Number are optional (no error when empty)', async ({ page }) => {
+  test('TC-04-06: Tax Number and Phone Number are optional (no error when empty)', async ({
+    page,
+  }) => {
     // Verify no aria-required on optional fields
     const taxNumberReq = await page.locator('#org-tax-number').getAttribute('aria-required');
     const phoneNumberReq = await page.locator('#org-phone-number').getAttribute('aria-required');
@@ -350,7 +428,9 @@ test.describe('TS-05: Save, Dirty State, Reset', () => {
     await selectOrg(page, 'org-list-item-provider-abc-healthcare-id');
   });
 
-  test('TC-05-01: Changing display name shows unsaved indicator and Reset button, enables Save', async ({ page }) => {
+  test('TC-05-01: Changing display name shows unsaved indicator and Reset button, enables Save', async ({
+    page,
+  }) => {
     await page.click('#org-display-name');
     await page.keyboard.press('End');
     await page.type('#org-display-name', ' Updated');
@@ -373,7 +453,9 @@ test.describe('TS-05: Save, Dirty State, Reset', () => {
     await page.fill('#org-display-name', 'ABC Healthcare Updated');
     await page.click('[data-testid="org-form-save-btn"]');
     // Wait for save to complete (button text cycles through "Saving...")
-    await expect(page.locator('[data-testid="org-manage-error-banner"]')).not.toBeVisible({ timeout: 8000 });
+    await expect(page.locator('[data-testid="org-manage-error-banner"]')).not.toBeVisible({
+      timeout: 8000,
+    });
   });
 });
 
@@ -393,18 +475,26 @@ test.describe('TS-06: Unsaved Changes Guard', () => {
     const dialog = page.locator('[data-testid="confirm-dialog"]');
     await expect(dialog).toBeVisible({ timeout: 5000 });
     await expect(page.locator('[data-testid="confirm-dialog-title"]')).toContainText('Unsaved');
-    await expect(page.locator('[data-testid="confirm-dialog-cancel-btn"]')).toContainText('Stay Here');
-    await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toContainText('Discard');
+    await expect(page.locator('[data-testid="confirm-dialog-cancel-btn"]')).toContainText(
+      'Stay Here'
+    );
+    await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toContainText(
+      'Discard'
+    );
   });
 
-  test('TC-06-02: "Stay Here" closes dialog and keeps current org with changes intact', async ({ page }) => {
+  test('TC-06-02: "Stay Here" closes dialog and keeps current org with changes intact', async ({
+    page,
+  }) => {
     await page.fill('#org-display-name', 'Modified');
     await page.click('[data-testid="org-list-item-provider-xyz-medical-id"]');
     await page.locator('[data-testid="confirm-dialog"]').waitFor({ timeout: 5000 });
     await page.click('[data-testid="confirm-dialog-cancel-btn"]');
     await expect(page.locator('[data-testid="confirm-dialog"]')).not.toBeVisible();
     await expect(page.locator('#org-display-name')).toHaveValue('Modified');
-    await expect(page.locator('[data-testid="org-list-item-provider-abc-healthcare-id"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(
+      page.locator('[data-testid="org-list-item-provider-abc-healthcare-id"]')
+    ).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('[data-testid="org-form-unsaved-indicator"]')).toBeVisible();
   });
 
@@ -416,11 +506,15 @@ test.describe('TS-06: Unsaved Changes Guard', () => {
     await expect(page.locator('[data-testid="confirm-dialog"]')).not.toBeVisible();
     await waitForDetailsLoaded(page);
     await expect(page.locator('#org-name')).toHaveValue('XYZ Medical Group');
-    await expect(page.locator('[data-testid="org-list-item-provider-xyz-medical-id"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(
+      page.locator('[data-testid="org-list-item-provider-xyz-medical-id"]')
+    ).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('[data-testid="org-form-unsaved-indicator"]')).not.toBeVisible();
   });
 
-  test('TC-06-04: Switching org without unsaved changes loads immediately (no dialog)', async ({ page }) => {
+  test('TC-06-04: Switching org without unsaved changes loads immediately (no dialog)', async ({
+    page,
+  }) => {
     // Form is pristine -- no changes
     await page.click('[data-testid="org-list-item-provider-xyz-medical-id"]');
     // Dialog should NOT appear
@@ -448,7 +542,9 @@ test.describe('TS-07: Contact CRUD', () => {
     await expect(contactRow).toContainText('Billing Contact');
   });
 
-  test('TC-07-02: Click Add opens empty contact dialog with title "Add Contact"', async ({ page }) => {
+  test('TC-07-02: Click Add opens empty contact dialog with title "Add Contact"', async ({
+    page,
+  }) => {
     await page.click('[data-testid="org-contacts-add-btn"]');
     const dialog = page.locator('[data-testid="contact-dialog"]');
     await expect(dialog).toBeVisible({ timeout: 5000 });
@@ -472,11 +568,15 @@ test.describe('TS-07: Contact CRUD', () => {
     await expect(page.locator('[data-testid="org-manage-error-banner"]')).not.toBeVisible();
   });
 
-  test('TC-07-04: Click edit on Jane Smith opens pre-filled dialog with title "Edit Contact"', async ({ page }) => {
+  test('TC-07-04: Click edit on Jane Smith opens pre-filled dialog with title "Edit Contact"', async ({
+    page,
+  }) => {
     await page.click('[data-testid="org-contact-edit-btn-mock-contact-1"]');
     const dialog = page.locator('[data-testid="contact-dialog"]');
     await expect(dialog).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('[data-testid="contact-dialog-title"]')).toContainText('Edit Contact');
+    await expect(page.locator('[data-testid="contact-dialog-title"]')).toContainText(
+      'Edit Contact'
+    );
     await expect(page.locator('#contact-first-name')).toHaveValue('Jane');
     await expect(page.locator('#contact-last-name')).toHaveValue('Smith');
     await expect(page.locator('#contact-label')).toHaveValue('Billing Contact');
@@ -527,7 +627,9 @@ test.describe('TS-08: Address CRUD', () => {
     await expect(addrRow).toContainText('Los Angeles');
   });
 
-  test('TC-08-02: Click Add opens empty address dialog with title "Add Address"', async ({ page }) => {
+  test('TC-08-02: Click Add opens empty address dialog with title "Add Address"', async ({
+    page,
+  }) => {
     await page.click('[data-testid="org-addresses-add-btn"]');
     const dialog = page.locator('[data-testid="address-dialog"]');
     await expect(dialog).toBeVisible({ timeout: 5000 });
@@ -550,11 +652,15 @@ test.describe('TS-08: Address CRUD', () => {
     await expect(page.locator('[data-testid="org-manage-error-banner"]')).not.toBeVisible();
   });
 
-  test('TC-08-04: Click edit on Headquarters opens pre-filled dialog with title "Edit Address"', async ({ page }) => {
+  test('TC-08-04: Click edit on Headquarters opens pre-filled dialog with title "Edit Address"', async ({
+    page,
+  }) => {
     await page.click('[data-testid="org-address-edit-btn-mock-address-1"]');
     const dialog = page.locator('[data-testid="address-dialog"]');
     await expect(dialog).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('[data-testid="address-dialog-title"]')).toContainText('Edit Address');
+    await expect(page.locator('[data-testid="address-dialog-title"]')).toContainText(
+      'Edit Address'
+    );
     await expect(page.locator('#address-label')).toHaveValue('Headquarters');
     await expect(page.locator('#address-street1')).toHaveValue('123 Healthcare Blvd');
     await expect(page.locator('#address-city')).toHaveValue('Los Angeles');
@@ -629,7 +735,9 @@ test.describe('TS-09: Phone CRUD', () => {
 // TS-10: Empty Entity Sections (1 case)
 // ============================================================================
 test.describe('TS-10: Empty Entity Sections', () => {
-  test('TC-10-01: Mock data has entities -- empty states NOT visible when org is selected', async ({ page }) => {
+  test('TC-10-01: Mock data has entities -- empty states NOT visible when org is selected', async ({
+    page,
+  }) => {
     await navigateToManagePage(page);
     await waitForListLoaded(page);
     await selectOrg(page, 'org-list-item-provider-abc-healthcare-id');
@@ -650,15 +758,25 @@ test.describe('TS-11: Danger Zone Toggle', () => {
     await selectOrg(page, 'org-list-item-provider-abc-healthcare-id');
   });
 
-  test('TC-11-01: super_admin sees Danger Zone card collapsed by default (aria-expanded=false)', async ({ page }) => {
+  test('TC-11-01: super_admin sees Danger Zone card collapsed by default (aria-expanded=false)', async ({
+    page,
+  }) => {
     await expect(page.locator('[data-testid="danger-zone"]')).toBeVisible();
-    await expect(page.locator('[data-testid="danger-zone-toggle-btn"]')).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('[data-testid="danger-zone-toggle-btn"]')).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
     await expect(page.locator('[data-testid="danger-zone-content"]')).not.toBeVisible();
   });
 
-  test('TC-11-02: Click toggle expands Danger Zone with deactivate and delete sections', async ({ page }) => {
+  test('TC-11-02: Click toggle expands Danger Zone with deactivate and delete sections', async ({
+    page,
+  }) => {
     await expandDangerZone(page);
-    await expect(page.locator('[data-testid="danger-zone-toggle-btn"]')).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('[data-testid="danger-zone-toggle-btn"]')).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
     await expect(page.locator('[data-testid="danger-zone-content"]')).toBeVisible();
     await expect(page.locator('[data-testid="danger-zone-deactivate-section"]')).toBeVisible();
     await expect(page.locator('[data-testid="danger-zone-delete-section"]')).toBeVisible();
@@ -671,7 +789,10 @@ test.describe('TS-11: Danger Zone Toggle', () => {
   test('TC-11-03: Click toggle again collapses Danger Zone', async ({ page }) => {
     await expandDangerZone(page);
     await page.click('[data-testid="danger-zone-toggle-btn"]');
-    await expect(page.locator('[data-testid="danger-zone-toggle-btn"]')).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('[data-testid="danger-zone-toggle-btn"]')).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
     await expect(page.locator('[data-testid="danger-zone-content"]')).not.toBeVisible();
   });
 
@@ -704,14 +825,20 @@ test.describe('TS-12: Deactivate Flow', () => {
     await expect(dialog).toBeVisible({ timeout: 5000 });
     await expect(dialog).toHaveAttribute('role', 'alertdialog');
     await expect(page.locator('[data-testid="confirm-dialog-title"]')).toContainText('Deactivate');
-    await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toContainText('Deactivate');
+    await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toContainText(
+      'Deactivate'
+    );
     await expect(page.locator('[data-testid="confirm-dialog-cancel-btn"]')).toContainText('Cancel');
   });
 
-  test('TC-12-02: Deactivate dialog message contains org display name "ABC Healthcare"', async ({ page }) => {
+  test('TC-12-02: Deactivate dialog message contains org display name "ABC Healthcare"', async ({
+    page,
+  }) => {
     await page.click('[data-testid="danger-zone-deactivate-btn"]');
     await page.locator('[data-testid="confirm-dialog"]').waitFor({ timeout: 5000 });
-    await expect(page.locator('[data-testid="confirm-dialog-message"]')).toContainText('ABC Healthcare');
+    await expect(page.locator('[data-testid="confirm-dialog-message"]')).toContainText(
+      'ABC Healthcare'
+    );
   });
 
   test('TC-12-03: Confirming deactivation closes dialog without error banner', async ({ page }) => {
@@ -741,7 +868,9 @@ test.describe('TS-13: Reactivate Flow', () => {
     await selectOrg(page, 'org-list-item-provider-summit-health-id');
   });
 
-  test('TC-13-01: Inactive org (Summit Health) shows Reactivate section, no Deactivate section', async ({ page }) => {
+  test('TC-13-01: Inactive org (Summit Health) shows Reactivate section, no Deactivate section', async ({
+    page,
+  }) => {
     await expandDangerZone(page);
     await expect(page.locator('[data-testid="danger-zone-reactivate-section"]')).toBeVisible();
     await expect(page.locator('[data-testid="danger-zone-reactivate-btn"]')).toBeVisible();
@@ -750,14 +879,20 @@ test.describe('TS-13: Reactivate Flow', () => {
     await expect(page.locator('[data-testid="danger-zone-active-constraint"]')).not.toBeVisible();
   });
 
-  test('TC-13-02: Click Reactivate button opens success-variant confirm dialog', async ({ page }) => {
+  test('TC-13-02: Click Reactivate button opens success-variant confirm dialog', async ({
+    page,
+  }) => {
     await expandDangerZone(page);
     await page.click('[data-testid="danger-zone-reactivate-btn"]');
     const dialog = page.locator('[data-testid="confirm-dialog"]');
     await expect(dialog).toBeVisible({ timeout: 5000 });
     await expect(page.locator('[data-testid="confirm-dialog-title"]')).toContainText('Reactivate');
-    await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toContainText('Reactivate');
-    await expect(page.locator('[data-testid="confirm-dialog-message"]')).toContainText('Summit Health');
+    await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toContainText(
+      'Reactivate'
+    );
+    await expect(page.locator('[data-testid="confirm-dialog-message"]')).toContainText(
+      'Summit Health'
+    );
   });
 
   test('TC-13-03: Confirming reactivation closes dialog without error banner', async ({ page }) => {
@@ -769,7 +904,9 @@ test.describe('TS-13: Reactivate Flow', () => {
     await expect(page.locator('[data-testid="org-manage-error-banner"]')).not.toBeVisible();
   });
 
-  test('TC-13-04: Inline reactivate button in inactive banner also triggers dialog', async ({ page }) => {
+  test('TC-13-04: Inline reactivate button in inactive banner also triggers dialog', async ({
+    page,
+  }) => {
     const inlinBtn = page.locator('[data-testid="org-inactive-banner-reactivate-btn"]');
     await expect(inlinBtn).toBeVisible();
     await inlinBtn.click();
@@ -783,7 +920,9 @@ test.describe('TS-13: Reactivate Flow', () => {
 // TS-14: Delete Flow (7 cases)
 // ============================================================================
 test.describe('TS-14: Delete Flow', () => {
-  test('TC-14-01: Delete active org (ABC Healthcare) shows "Cannot Delete Active" warning dialog', async ({ page }) => {
+  test('TC-14-01: Delete active org (ABC Healthcare) shows "Cannot Delete Active" warning dialog', async ({
+    page,
+  }) => {
     await navigateToManagePage(page);
     await waitForListLoaded(page);
     await selectOrg(page, 'org-list-item-provider-abc-healthcare-id');
@@ -791,23 +930,35 @@ test.describe('TS-14: Delete Flow', () => {
     await page.click('[data-testid="danger-zone-delete-btn"]');
     const dialog = page.locator('[data-testid="confirm-dialog"]');
     await expect(dialog).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('[data-testid="confirm-dialog-title"]')).toContainText('Cannot Delete');
-    await expect(page.locator('[data-testid="confirm-dialog-message"]')).toContainText('deactivated');
-    await expect(page.locator('[data-testid="confirm-dialog-message"]')).toContainText('ABC Healthcare');
+    await expect(page.locator('[data-testid="confirm-dialog-title"]')).toContainText(
+      'Cannot Delete'
+    );
+    await expect(page.locator('[data-testid="confirm-dialog-message"]')).toContainText(
+      'deactivated'
+    );
+    await expect(page.locator('[data-testid="confirm-dialog-message"]')).toContainText(
+      'ABC Healthcare'
+    );
   });
 
-  test('TC-14-02: "Cannot Delete" dialog has "Deactivate First" and "Cancel" buttons', async ({ page }) => {
+  test('TC-14-02: "Cannot Delete" dialog has "Deactivate First" and "Cancel" buttons', async ({
+    page,
+  }) => {
     await navigateToManagePage(page);
     await waitForListLoaded(page);
     await selectOrg(page, 'org-list-item-provider-abc-healthcare-id');
     await expandDangerZone(page);
     await page.click('[data-testid="danger-zone-delete-btn"]');
     await page.locator('[data-testid="confirm-dialog"]').waitFor({ timeout: 5000 });
-    await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toContainText('Deactivate First');
+    await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toContainText(
+      'Deactivate First'
+    );
     await expect(page.locator('[data-testid="confirm-dialog-cancel-btn"]')).toContainText('Cancel');
   });
 
-  test('TC-14-03: Clicking "Deactivate First" transitions dialog to deactivate confirmation', async ({ page }) => {
+  test('TC-14-03: Clicking "Deactivate First" transitions dialog to deactivate confirmation', async ({
+    page,
+  }) => {
     await navigateToManagePage(page);
     await waitForListLoaded(page);
     await selectOrg(page, 'org-list-item-provider-abc-healthcare-id');
@@ -816,11 +967,17 @@ test.describe('TS-14: Delete Flow', () => {
     await page.locator('[data-testid="confirm-dialog"]').waitFor({ timeout: 5000 });
     await page.click('[data-testid="confirm-dialog-confirm-btn"]'); // "Deactivate First"
     // Dialog should transition to deactivate flow
-    await expect(page.locator('[data-testid="confirm-dialog-title"]')).toContainText('Deactivate', { timeout: 5000 });
-    await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toContainText('Deactivate');
+    await expect(page.locator('[data-testid="confirm-dialog-title"]')).toContainText('Deactivate', {
+      timeout: 5000,
+    });
+    await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toContainText(
+      'Deactivate'
+    );
   });
 
-  test('TC-14-04: Delete inactive org (Summit Health) shows DELETE text-input confirmation dialog', async ({ page }) => {
+  test('TC-14-04: Delete inactive org (Summit Health) shows DELETE text-input confirmation dialog', async ({
+    page,
+  }) => {
     await navigateToManagePage(page);
     await waitForListLoaded(page);
     await selectOrg(page, 'org-list-item-provider-summit-health-id');
@@ -828,12 +985,16 @@ test.describe('TS-14: Delete Flow', () => {
     await page.click('[data-testid="danger-zone-delete-btn"]');
     const dialog = page.locator('[data-testid="confirm-dialog"]');
     await expect(dialog).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('[data-testid="confirm-dialog-title"]')).toContainText('Delete Organization');
+    await expect(page.locator('[data-testid="confirm-dialog-title"]')).toContainText(
+      'Delete Organization'
+    );
     await expect(page.locator('[data-testid="confirm-dialog-confirm-text-input"]')).toBeVisible();
     await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toBeDisabled();
   });
 
-  test('TC-14-05: Typing "delete" (case-insensitive) enables the Confirm button', async ({ page }) => {
+  test('TC-14-05: Typing "delete" (case-insensitive) enables the Confirm button', async ({
+    page,
+  }) => {
     await navigateToManagePage(page);
     await waitForListLoaded(page);
     await selectOrg(page, 'org-list-item-provider-summit-health-id');
@@ -844,7 +1005,9 @@ test.describe('TS-14: Delete Flow', () => {
     await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).not.toBeDisabled();
   });
 
-  test('TC-14-06: Type "DELETE" and confirm -- dialog closes, panel resets to empty state', async ({ page }) => {
+  test('TC-14-06: Type "DELETE" and confirm -- dialog closes, panel resets to empty state', async ({
+    page,
+  }) => {
     await navigateToManagePage(page);
     await waitForListLoaded(page);
     await selectOrg(page, 'org-list-item-provider-summit-health-id');
@@ -856,7 +1019,9 @@ test.describe('TS-14: Delete Flow', () => {
     await expect(page.locator('[data-testid="confirm-dialog"]')).not.toBeVisible({ timeout: 8000 });
     await expect(page.locator('[data-testid="org-manage-error-banner"]')).not.toBeVisible();
     // Panel should reset to empty state after deletion
-    await expect(page.locator('[data-testid="org-form-empty-state"]')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="org-form-empty-state"]')).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test('TC-14-07: Cancel in delete dialog takes no action', async ({ page }) => {
@@ -878,7 +1043,9 @@ test.describe('TS-14: Delete Flow', () => {
 // TS-15: Error Banner (1 case)
 // ============================================================================
 test.describe('TS-15: Error Banner', () => {
-  test('TC-15-01: Error banner is NOT visible on initial page load (mock mode returns no errors)', async ({ page }) => {
+  test('TC-15-01: Error banner is NOT visible on initial page load (mock mode returns no errors)', async ({
+    page,
+  }) => {
     await navigateToManagePage(page);
     await expect(page.locator('[data-testid="org-manage-error-banner"]')).not.toBeVisible();
   });
@@ -893,7 +1060,9 @@ test.describe('TS-16: Keyboard Navigation & Accessibility', () => {
     await waitForListLoaded(page);
   });
 
-  test('TC-16-01: Tab from back button reaches search input, then filter buttons', async ({ page }) => {
+  test('TC-16-01: Tab from back button reaches search input, then filter buttons', async ({
+    page,
+  }) => {
     // Focus the back button first
     const backBtn = page.locator('[data-testid="org-manage-back-btn"]');
     await backBtn.focus();
@@ -906,19 +1075,29 @@ test.describe('TS-16: Keyboard Navigation & Accessibility', () => {
     await expect(page.locator('[data-testid="org-list-filter-all-btn"]')).toBeFocused();
   });
 
-  test('TC-16-02: Org list container has role=listbox and items have role=option', async ({ page }) => {
+  test('TC-16-02: Org list container has role=listbox and items have role=option', async ({
+    page,
+  }) => {
     await expect(page.locator('[data-testid="org-list"]')).toHaveAttribute('role', 'listbox');
     const firstItem = page.locator('[data-testid="org-list"] [role="option"]').first();
     await expect(firstItem).toHaveAttribute('role', 'option');
   });
 
-  test('TC-16-03: Selected org has aria-selected=true, others have aria-selected=false', async ({ page }) => {
+  test('TC-16-03: Selected org has aria-selected=true, others have aria-selected=false', async ({
+    page,
+  }) => {
     await selectOrg(page, 'org-list-item-provider-abc-healthcare-id');
-    await expect(page.locator('[data-testid="org-list-item-provider-abc-healthcare-id"]')).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('[data-testid="org-list-item-provider-xyz-medical-id"]')).toHaveAttribute('aria-selected', 'false');
+    await expect(
+      page.locator('[data-testid="org-list-item-provider-abc-healthcare-id"]')
+    ).toHaveAttribute('aria-selected', 'true');
+    await expect(
+      page.locator('[data-testid="org-list-item-provider-xyz-medical-id"]')
+    ).toHaveAttribute('aria-selected', 'false');
   });
 
-  test('TC-16-04: Confirm dialog has correct ARIA attributes (role, aria-modal, aria-labelledby)', async ({ page }) => {
+  test('TC-16-04: Confirm dialog has correct ARIA attributes (role, aria-modal, aria-labelledby)', async ({
+    page,
+  }) => {
     await selectOrg(page, 'org-list-item-provider-abc-healthcare-id');
     await expandDangerZone(page);
     await page.click('[data-testid="danger-zone-deactivate-btn"]');
@@ -946,7 +1125,9 @@ test.describe('TS-16: Keyboard Navigation & Accessibility', () => {
     await expect(toggleBtn).toHaveAttribute('aria-expanded', 'true');
   });
 
-  test('TC-16-07: Required form fields have aria-required=true, optional do not', async ({ page }) => {
+  test('TC-16-07: Required form fields have aria-required=true, optional do not', async ({
+    page,
+  }) => {
     await selectOrg(page, 'org-list-item-provider-abc-healthcare-id');
     // Required fields
     await expect(page.locator('#org-name')).toHaveAttribute('aria-required', 'true');
@@ -964,18 +1145,28 @@ test.describe('TS-16: Keyboard Navigation & Accessibility', () => {
 // TS-17: URL Parameter Handling (2 cases)
 // ============================================================================
 test.describe('TS-17: URL Parameter Handling', () => {
-  test('TC-17-01: ?status=inactive pre-selects Inactive filter and shows 1 org (Summit Health)', async ({ page }) => {
+  test('TC-17-01: ?status=inactive pre-selects Inactive filter and shows 1 org (Summit Health)', async ({
+    page,
+  }) => {
     await navigateToManagePage(page, 'status=inactive');
     await waitForListLoaded(page);
-    await expect(page.locator('[data-testid="org-list-filter-inactive-btn"]')).toHaveClass(/bg-blue|selected|active/);
+    await expect(page.locator('[data-testid="org-list-filter-inactive-btn"]')).toHaveClass(
+      /bg-blue|selected|active/
+    );
     await expect(page.locator('[data-testid="org-list"] [role="option"]')).toHaveCount(1);
-    await expect(page.locator('[data-testid="org-list-item-provider-summit-health-id"]')).toBeVisible();
+    await expect(
+      page.locator('[data-testid="org-list-item-provider-summit-health-id"]')
+    ).toBeVisible();
   });
 
-  test('TC-17-02: ?orgId=provider-abc-healthcare-id auto-selects ABC Healthcare', async ({ page }) => {
+  test('TC-17-02: ?orgId=provider-abc-healthcare-id auto-selects ABC Healthcare', async ({
+    page,
+  }) => {
     await navigateToManagePage(page, 'orgId=provider-abc-healthcare-id');
     await waitForDetailsLoaded(page);
-    await expect(page.locator('[data-testid="org-list-item-provider-abc-healthcare-id"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(
+      page.locator('[data-testid="org-list-item-provider-abc-healthcare-id"]')
+    ).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('[data-testid="org-details-card"]')).toBeVisible();
     await expect(page.locator('#org-name')).toHaveValue('ABC Healthcare Partners');
     await expect(page.locator('[data-testid="org-form-empty-state"]')).not.toBeVisible();
