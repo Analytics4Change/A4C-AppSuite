@@ -1,31 +1,33 @@
 ---
 status: current
-last_updated: 2026-02-07
+last_updated: 2026-02-26
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Complete architecture for organization management module including frontend (React/MobX), service layer with factory pattern, Temporal workflows, and event-driven CQRS backend.
+**Summary**: Complete architecture for organization management module including frontend manage page (React/MobX), service layer with factory pattern, organization lifecycle operations (deactivate/reactivate/delete), contact/address/phone CRUD, Temporal deletion workflow, and event-driven CQRS backend with JWT access_blocked guard.
 
 **When to read**:
 - Understanding organization management module architecture
 - Implementing new organization-related features
-- Debugging organization CRUD operations
+- Debugging organization CRUD or lifecycle operations
 - Understanding service factory pattern
+- Working with organization entity services (contacts, addresses, phones)
+- Understanding the deletion workflow or access_blocked mechanism
 
 **Prerequisites**: [event-sourcing-overview.md](event-sourcing-overview.md), [temporal-overview.md](../workflows/temporal-overview.md)
 
-**Key topics**: `organization-management`, `cqrs`, `service-factory`, `temporal`, `mobx`, `dependency-injection`
+**Key topics**: `organization-management`, `organization-lifecycle`, `organization-deletion`, `entity-service`, `access-blocked`, `cqrs`, `service-factory`, `temporal`, `mobx`, `dependency-injection`
 
-**Estimated read time**: 20 minutes
+**Estimated read time**: 25 minutes
 <!-- TL;DR-END -->
 
 # Organization Management Module - Architecture
 
-**Last Updated**: 2025-12-02
-**Status**: ✅ Implementation Complete (100%)
-**UAT Status**: Passed (2025-12-02)
+**Last Updated**: 2026-02-26
+**Status**: ✅ Implementation Complete
+**UAT Status**: Passed (2025-12-02 — creation/bootstrap), In Progress (2026-02-26 — manage page/lifecycle)
 
 ---
 
@@ -35,12 +37,14 @@ last_updated: 2026-02-07
 2. [Frontend Architecture](#frontend-architecture)
 3. [Service Layer](#service-layer)
 4. [Backend Infrastructure](#backend-infrastructure)
-5. [Database Schema](#database-schema)
-6. [Event Processing](#event-processing)
-7. [Authentication & Authorization](#authentication--authorization)
-8. [Configuration System](#configuration-system)
-9. [Data Flow Diagrams](#data-flow-diagrams)
-10. [Deployment Architecture](#deployment-architecture)
+5. [Organization Lifecycle Operations](#organization-lifecycle-operations)
+6. [Organization Deletion Workflow](#organization-deletion-workflow)
+7. [Database Schema](#database-schema)
+8. [Event Processing](#event-processing)
+9. [Authentication & Authorization](#authentication--authorization)
+10. [Configuration System](#configuration-system)
+11. [Data Flow Diagrams](#data-flow-diagrams)
+12. [Deployment Architecture](#deployment-architecture)
 
 ---
 
@@ -90,25 +94,29 @@ The frontend follows strict Model-View-ViewModel separation:
 │  • OrganizationCreatePage                           │
 │  • OrganizationBootstrapStatusPage                  │
 │  • OrganizationListPage                             │
+│  • OrganizationsManagePage (split-panel, lifecycle)  │
 │  • OrganizationDashboard                            │
 │  • AcceptInvitationPage                             │
+│  • AccessBlockedPage                                │
 └─────────────────┬───────────────────────────────────┘
                   │ observes (MobX)
                   ▼
 ┌─────────────────────────────────────────────────────┐
 │                   VIEWMODEL LAYER                    │
 │  (Business Logic + State Management)                │
-│  • OrganizationFormViewModel                        │
+│  • OrganizationFormViewModel (create)               │
+│  • OrganizationManageListViewModel (list, lifecycle)│
+│  • OrganizationManageFormViewModel (edit, entities) │
 │  • InvitationAcceptanceViewModel                    │
-│    - Form validation                                │
-│    - Auto-save drafts                               │
-│    - Field-level error tracking                     │
 └─────────────────┬───────────────────────────────────┘
                   │ uses
                   ▼
 ┌─────────────────────────────────────────────────────┐
 │                    SERVICE LAYER                     │
 │  (API Communication + Data Persistence)             │
+│  • IOrganizationCommandService (lifecycle RPCs)     │
+│  • IOrganizationQueryService (details, list)        │
+│  • IOrganizationEntityService (contact/addr/phone)  │
 │  • IWorkflowClient (interface)                      │
 │  • IInvitationService (interface)                   │
 │  • OrganizationService (draft management)           │
@@ -117,7 +125,7 @@ The frontend follows strict Model-View-ViewModel separation:
 
 ### Key Components
 
-#### Pages (5 total)
+#### Pages (7 total)
 
 1. **OrganizationCreatePage** (`frontend/src/pages/organizations/OrganizationCreatePage.tsx`)
    - Full organization creation form (~700 lines)
@@ -172,6 +180,22 @@ The frontend follows strict Model-View-ViewModel separation:
    - Google OAuth integration
    - Error states (expired, already accepted)
 
+6. **OrganizationsManagePage** (`frontend/src/pages/organizations/OrganizationsManagePage.tsx`)
+   - Split-panel manage page (~1500 lines) following `RolesManagePage` pattern
+   - **Left panel** (platform owner only): Organization list with search, status badges
+   - **Right panel**: Organization details form, contacts/addresses/phones entity sections
+   - **Entity CRUD**: Inline add/edit/delete for contacts, addresses, phones via `EntityFormDialog`
+   - **DangerZone**: Deactivate/reactivate/delete with `ConfirmDialog` (platform owner only)
+   - **Role-based behavior**: Platform owners see all orgs; provider admins auto-select own org (full-width)
+   - **Field editability**: Platform owners edit all fields including `name`; others edit display_name, tax_number, phone_number, timezone only
+   - **Route**: `/organizations/manage` with `RequirePermission("organization.update")`
+   - **Nav**: "Manage Organization" visible to all org types with `organization.update` permission
+
+7. **AccessBlockedPage** (`frontend/src/pages/auth/AccessBlockedPage.tsx`)
+   - Displayed when JWT `access_blocked` claim is true (e.g., org deactivated)
+   - Glassmorphism card with ShieldX icon, reason-to-label mapping, sign out button
+   - Route: `/access-blocked` (public, outside `ProtectedRoute`)
+
 #### Reusable Components (3 custom)
 
 1. **PhoneInput** (`frontend/src/components/organization/PhoneInput.tsx`)
@@ -190,31 +214,23 @@ The frontend follows strict Model-View-ViewModel separation:
    - Used for: states, timezones, program types, payment types
    - ARIA-compliant
 
-#### ViewModels (2 total)
+#### ViewModels (4 total)
 
 1. **OrganizationFormViewModel** (`frontend/src/viewModels/organization/OrganizationFormViewModel.ts`)
-   - **Responsibilities**:
-     - Form state management (MobX observables)
-     - Validation logic (email, phone, zip, subdomain)
-     - Draft auto-save (500ms debounce)
-     - Workflow submission
-     - Nested field updates (address, phone, program)
-   - **Key Features**:
-     - Field-level error tracking
-     - Touch tracking (pristine state)
-     - Computed properties (`isValid`, `canSubmit`)
-     - Constructor injection for testability
+   - **Responsibilities**: Create form state, validation, draft auto-save, workflow submission
+   - **Key Features**: Field-level errors, touch tracking, computed `isValid`/`canSubmit`
 
-2. **InvitationAcceptanceViewModel** (`frontend/src/viewModels/organization/InvitationAcceptanceViewModel.ts`)
-   - **Responsibilities**:
-     - Token validation
-     - Password strength checking
-     - Invitation acceptance (email/password or OAuth)
-     - Loading state management
-   - **Key Features**:
-     - Dual authentication methods
-     - Computed properties (`isValid`, `isExpired`, `isAlreadyAccepted`)
-     - Error handling and recovery
+2. **OrganizationManageListViewModel** (`frontend/src/viewModels/organization/OrganizationManageListViewModel.ts`)
+   - **Responsibilities**: Organization list state, search/filtering, lifecycle operations
+   - **Key Features**: `deactivateOrganization()`, `reactivateOrganization()`, `deleteOrganization()` with operation result tracking
+
+3. **OrganizationManageFormViewModel** (`frontend/src/viewModels/organization/OrganizationManageFormViewModel.ts`)
+   - **Responsibilities**: Edit form state, validation, submission, 9 entity CRUD methods
+   - **Key Features**: Role-based `isPlatformOwner`, `canEditName`, `canEditFields` computed properties; `performEntityOperation()` shared helper with auto-reload on success
+
+4. **InvitationAcceptanceViewModel** (`frontend/src/viewModels/organization/InvitationAcceptanceViewModel.ts`)
+   - **Responsibilities**: Token validation, invitation acceptance (email/password or OAuth)
+   - **Key Features**: Dual auth methods, computed `isValid`/`isExpired`/`isAlreadyAccepted`
 
 ---
 
@@ -242,7 +258,44 @@ const vm = new OrganizationFormViewModel(mockClient);
 
 ### Service Implementations
 
-#### 1. Workflow Client Service
+#### 1. Organization Command Service
+
+**Interface**: `IOrganizationCommandService` (`frontend/src/services/organization/IOrganizationCommandService.ts`)
+
+**Methods**:
+- `updateOrganization(orgId, data, reason?)` → `OrganizationOperationResult`
+- `deactivateOrganization(orgId, reason)` → `OrganizationOperationResult`
+- `reactivateOrganization(orgId)` → `OrganizationOperationResult`
+- `deleteOrganization(orgId, reason)` → `OrganizationOperationResult`
+
+**Implementations**: `SupabaseOrganizationCommandService` (dedicated RPCs), `MockOrganizationCommandService` (in-memory)
+
+**Factory**: `OrganizationCommandServiceFactory` selects based on `getDeploymentConfig().useMockOrganization`
+
+#### 2. Organization Query Service
+
+**Interface**: `IOrganizationQueryService` (`frontend/src/services/organization/IOrganizationQueryService.ts`)
+
+**Methods**:
+- `getOrganizationDetails(orgId)` → org + contacts + addresses + phones in single response
+- `listOrganizations()` → organization list
+
+**Implementations**: `SupabaseOrganizationQueryService` (RPC), `MockOrganizationQueryService` (in-memory)
+
+#### 3. Organization Entity Service
+
+**Interface**: `IOrganizationEntityService` (`frontend/src/services/organization/IOrganizationEntityService.ts`)
+
+**Methods** (9 total — 3 each for contacts, addresses, phones):
+- `createContact/Address/Phone(orgId, data)` → `OrganizationEntityResult`
+- `updateContact/Address/Phone(orgId, entityId, data)` → `OrganizationEntityResult`
+- `deleteContact/Address/Phone(orgId, entityId)` → `OrganizationEntityResult`
+
+**Implementations**: `SupabaseOrganizationEntityService` (shared `callEntityRpc` helper), `MockOrganizationEntityService` (in-memory with realistic data)
+
+**Factory**: `OrganizationEntityServiceFactory` selects based on `getDeploymentConfig()`
+
+#### 4. Workflow Client Service
 
 **Interface**: `IWorkflowClient` (`frontend/src/services/workflow/IWorkflowClient.ts`)
 
@@ -334,6 +387,7 @@ Frontend (React) → Backend API (Fastify/k8s) → Temporal Server → Worker
 - `GET /health` - Liveness probe
 - `GET /ready` - Readiness probe (checks Temporal connection)
 - `POST /api/v1/workflows/organization-bootstrap` - Start bootstrap workflow
+- `DELETE /api/v1/organizations/:id` - Start organization deletion workflow
 
 **Authentication**: JWT from Supabase Auth (Authorization header)
 **Permission Required**: `organization.create_root`
@@ -511,6 +565,65 @@ return new Response(JSON.stringify({ workflowId }), {
   headers: { 'Content-Type': 'application/json' }
 });
 ```
+
+---
+
+## Organization Lifecycle Operations
+
+### Overview
+
+Organization lifecycle operations (deactivate, reactivate, delete) are managed through dedicated `api.` schema RPC functions. All operations emit domain events and use read-back guards to verify handler success.
+
+### RPC Functions (5 lifecycle + 9 entity CRUD)
+
+**Lifecycle RPCs** (platform owner only via `has_platform_privilege()`):
+- `api.deactivate_organization(p_org_id, p_reason)` — sets `is_active=false`, emits `organization.deactivated`
+- `api.reactivate_organization(p_org_id)` — sets `is_active=true`, emits `organization.reactivated`
+- `api.delete_organization(p_org_id, p_reason)` — requires prior deactivation, emits `organization.deleted`
+
+**Detail/Update RPCs** (permission-gated via `has_effective_permission()`):
+- `api.get_organization_details(p_org_id)` — returns org + contacts + addresses + phones
+- `api.update_organization(p_org_id, p_data, p_reason)` — strips `name` for non-platform-owners
+
+**Entity CRUD RPCs** (9 total — `has_effective_permission('organization.update')`):
+- `api.create_contact/address/phone(p_org_id, p_data)`
+- `api.update_contact/address/phone(p_org_id, p_entity_id, p_data)`
+- `api.delete_contact/address/phone(p_org_id, p_entity_id)`
+
+### JWT Access Blocked Mechanism
+
+When an organization is deactivated, the JWT custom claims hook (`custom_access_token_hook`) detects `is_active = false` and sets:
+- `access_blocked: true`
+- `access_block_reason: 'organization_deactivated'`
+
+This blocks user access within ~1 hour (JWT refresh window). The frontend `ProtectedRoute` checks for `access_blocked` and redirects to `AccessBlockedPage`.
+
+**Note**: This is a pull mechanism (token refresh), not push. For immediate blocking, the deletion workflow also bans users via Supabase Admin API.
+
+---
+
+## Organization Deletion Workflow
+
+### Temporal Workflow: `organizationDeletionWorkflow`
+
+**Location**: `workflows/src/workflows/organization-deletion/workflow.ts`
+**Pattern**: Best-effort cleanup (no saga compensation)
+**Task Queue**: `bootstrap` (shared with bootstrap workflow)
+**Trigger**: `DELETE /api/v1/organizations/:id` → Temporal `client.workflow.start()`
+
+### 5-Activity Pipeline
+
+1. **`emitDeletionInitiated`** (new) → emits `organization.deletion.initiated` event
+2. **`revokeInvitations`** (reused from bootstrap compensation) → revokes pending invitations
+3. **`removeDNS`** (reused from bootstrap compensation) → removes Cloudflare DNS record
+4. **`deactivateOrgUsers`** (new) → bans all org users via `supabase.auth.admin.updateUserById(id, { ban_duration: 'none' })`
+5. **`emitDeletionCompleted`** (new) → emits `organization.deletion.completed` event with summary
+
+### Design Decisions
+
+- **No saga compensation**: The org is already soft-deleted and access-blocked; cleanup is supplementary, not transactional. Individual activity failures logged in `errors[]` but don't prevent other steps.
+- **Child entities NOT deleted**: Contacts, addresses, phones preserved for cross-tenant grant holders, legal/compliance retention. Org soft-delete + RLS blocks normal access.
+- **Cross-tenant grants preserved**: All grant types (VAR, court, social services, family, emergency) persist independently of org lifecycle.
 
 ---
 
@@ -806,18 +919,19 @@ WHEN 'contact.created' THEN
 
 **Status**: ✅ Fully implemented (as of 2025-10-28)
 
-### JWT Custom Claims Structure
+### JWT Custom Claims Structure (v4)
 
 All authenticated users receive JWT tokens with custom claims:
 
 ```typescript
 interface JWTClaims {
-  sub: string;              // User UUID
+  sub: string;                        // User UUID
   email: string;
-  org_id: string;          // Organization UUID (for RLS)
-  user_role: UserRole;     // User's role
-  permissions: string[];   // Permission strings
-  scope_path: string;      // Hierarchical scope (ltree)
+  org_id: string;                    // Organization UUID (for RLS)
+  org_type: string;                  // Organization type (platform_owner, provider, provider_partner)
+  effective_permissions: number;     // Bitfield of merged permissions across all roles
+  access_blocked?: boolean;          // Set to true when org is deactivated/deleted
+  access_block_reason?: string;      // 'organization_deactivated' | 'organization_deleted'
 }
 ```
 
@@ -827,11 +941,12 @@ interface JWTClaims {
   "sub": "user-123e4567-e89b-12d3-a456-426614174000",
   "email": "admin@acme-healthcare.com",
   "org_id": "org-660e8400-e29b-41d4-a716-446655440000",
-  "user_role": "provider_admin",
-  "permissions": ["organization.read", "organization.write", "user.invite"],
-  "scope_path": "org_acme_healthcare"
+  "org_type": "provider",
+  "effective_permissions": 4194303
 }
 ```
+
+**Note**: v3 fields (`user_role`, `permissions` array, `scope_path`) were removed in the JWT v4 migration (2026-01-26). Permissions are now a bitfield checked via `hasPermission()` / `has_permission()` helpers.
 
 ### Row-Level Security (RLS)
 
@@ -839,20 +954,20 @@ PostgreSQL RLS policies enforce multi-tenant isolation:
 
 ```sql
 -- Example RLS policy for organizations_projection
-CREATE POLICY "Users can only see their organization"
-ON organizations_projection
-FOR SELECT
-USING (
-  org_id = (current_setting('request.jwt.claims', true)::json->>'org_id')::uuid
-  OR
-  (current_setting('request.jwt.claims', true)::json->>'user_role')::text IN ('super_admin', 'a4c_partner')
-);
+CREATE POLICY organizations_super_admin_all
+  ON organizations_projection FOR ALL
+  USING (is_super_admin(get_current_user_id()));
+
+CREATE POLICY organizations_org_admin_select
+  ON organizations_projection FOR SELECT
+  USING (has_org_admin_permission() AND id = get_current_org_id());
 ```
 
 **Key Points**:
-- `super_admin` and `a4c_partner` can see all organizations
-- `provider_admin` can only see their own organization
-- `clinician` and `viewer` have further restrictions
+- `is_super_admin()` users can see/manage all organizations
+- `has_org_admin_permission()` users can only see their own organization
+- RLS uses helper functions (not raw JWT parsing) for v4 claims compatibility
+- Regular users have no direct table access (organization context via JWT claims)
 
 ### Authentication Modes
 
@@ -1112,9 +1227,10 @@ Load Draft:
 │  │  • Web UI: port 8080                       │   │
 │  └────────────────────────────────────────────┘   │
 │  ┌────────────────────────────────────────────┐   │
-│  │  Temporal Workers (Not yet deployed)       │   │
-│  │  • OrganizationBootstrapWorkflow           │   │
-│  │  • 8 activities (DNS, email, etc.)         │   │
+│  │  Temporal Workers (Deployed)               │   │
+│  │  • OrganizationBootstrapWorkflow (10 stg)  │   │
+│  │  • OrganizationDeletionWorkflow (5 stg)    │   │
+│  │  • 13 forward + 6 compensation activities  │   │
 │  └────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────┘
 ```
@@ -1126,10 +1242,10 @@ Load Draft:
 - CDN for frontend static assets
 - DDoS protection
 
-**Email Service** (Future):
-- Resend.com for transactional emails
+**Email Service** (Resend — Operational):
+- Resend.com for transactional emails (primary), SMTP (fallback)
 - User invitation emails
-- Password reset emails
+- See [Resend Email Provider Guide](../../workflows/guides/resend-email-provider.md)
 
 ---
 
@@ -1156,7 +1272,7 @@ Load Draft:
 9. **Stage 9**: Activate organization
 10. **Stage 10**: Emit completion event
 
-### Activities (13 total: 7 forward + 6 compensation)
+### Bootstrap Activities (13 total: 7 forward + 6 compensation)
 
 **Forward Activities**:
 1. `createOrganization()` - Create org, emit `organization.created` event
@@ -1179,6 +1295,19 @@ Load Draft:
 5. `deleteAddresses()` - Delete related addresses
 6. `deletePhones()` - Delete related phones
 
+### Deletion Workflow Activities (5 total: 3 new + 2 reused)
+
+**Location**: `workflows/src/workflows/organization-deletion/workflow.ts`
+**Pattern**: Best-effort cleanup (no saga compensation — org is already soft-deleted)
+
+1. `emitDeletionInitiated()` (new) - Emits `organization.deletion.initiated` event
+2. `revokeInvitations()` (reused from bootstrap) - Revokes all pending invitations
+3. `removeDNS()` (reused from bootstrap) - Removes Cloudflare DNS record
+4. `deactivateOrgUsers()` (new) - Bans all org users via Supabase Admin API (`ban_duration: 'none'`)
+5. `emitDeletionCompleted()` (new) - Emits `organization.deletion.completed` with error summary
+
+**API Trigger**: `DELETE /api/v1/organizations/:id` (`workflows/src/api/routes/workflows.ts`)
+
 ### Triggering Architecture
 
 **2-Hop Pattern**: Frontend → Backend API → Temporal
@@ -1197,20 +1326,21 @@ Temporal Worker (workflow-worker deployment)
 
 ## Summary
 
-### Implementation Status: 100% Complete
+### Implementation Status: Complete
 
-✅ **Frontend** (5 pages, 3 components, 2 ViewModels)
-✅ **Service Layer** (factory pattern, mock + production)
-✅ **Backend API** (Fastify service deployed to k8s)
-✅ **Edge Functions** (4 Deno functions - proxying to Backend API)
+✅ **Frontend** (7 pages, 3 components, 4 ViewModels)
+✅ **Service Layer** (6 service interfaces with factory pattern, mock + production)
+✅ **Backend API** (Fastify service deployed to k8s, 2 endpoints)
+✅ **Edge Functions** (4 Deno functions with `access_blocked` guard)
 ✅ **Database Schema** (4 CQRS projections + 3 junction tables)
-✅ **Event Processing** (trigger-based updates)
-✅ **Temporal Workflows** (13 activities: 7 forward + 6 compensation)
+✅ **Database RPCs** (14 lifecycle + entity CRUD functions in `api` schema)
+✅ **Event Processing** (trigger-based updates, 13 routers, 52+ handlers)
+✅ **Temporal Workflows** (bootstrap: 13 activities, deletion: 5 activities)
 ✅ **Worker Deployment** (workflow-worker in temporal namespace)
-✅ **Testing** (100+ unit tests, 27 E2E tests)
+✅ **JWT Access Blocked** (org deactivation → access_blocked claim → AccessBlockedPage)
 ✅ **Configuration System** (profile-based)
-✅ **Authentication** (Supabase Auth + JWT claims)
-✅ **UAT Testing** (Passed 2025-12-02)
+✅ **Authentication** (Supabase Auth + JWT v4 claims)
+✅ **UAT Testing** (Passed 2025-12-02 — creation/bootstrap)
 
 ### Key Architecture Decisions
 
@@ -1220,14 +1350,19 @@ Temporal Worker (workflow-worker deployment)
 | Form Structure | 3 Sections (General, Billing, Admin) | Captures all required organization data |
 | Data Reuse | "Use General Information" checkboxes | Reduces data entry, uses junction tables |
 | Entity Classification | Type/Label system | Machine queries (type) + human display (label) |
-| Compensation | Saga pattern (6 rollback activities) | Graceful failure recovery |
+| Bootstrap Compensation | Saga pattern (6 rollback activities) | Graceful failure recovery |
+| Deletion Workflow | Best-effort cleanup (no saga) | Org already soft-deleted; cleanup is supplementary |
+| Dedicated RPCs | `api.update_organization()` etc. over `emit_domain_event()` | Backend owns event emission, proper permission checks |
+| Temporal for Deletion Only | Deactivate/reactivate are synchronous RPCs | Only deletion has unreliable external calls (DNS, Admin API) |
+| Cross-Tenant Grants on Delete | Preserved (all grant types) | Legal obligation + VAR metrics + soft-delete architecture |
 
 ### Future Enhancements
 
+- Organization deletion status polling UI
 - Real-time workflow status via WebSocket (currently polling)
+- Cross-tenant access grant management UI
+- VAR dashboard with aggregated performance metrics
 - Bulk organization import from CSV
-- Organization templates (pre-filled forms)
-- Multi-step invitation acceptance wizard
 
 ---
 
@@ -1262,7 +1397,7 @@ Temporal Worker (workflow-worker deployment)
 
 ---
 
-**Document Version**: 2.0
-**Last Updated**: 2025-12-02
+**Document Version**: 3.0
+**Last Updated**: 2026-02-26
 **Author**: Claude Code
-**Status**: ✅ Implementation Complete (100%)
+**Status**: ✅ Implementation Complete

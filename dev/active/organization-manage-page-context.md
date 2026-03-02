@@ -153,6 +153,20 @@
 - `frontend/src/App.tsx` — added `/organizations/manage` route, redirect `/organizations/:orgId/edit`
 - `frontend/src/components/layouts/MainLayout.tsx` — added "Manage Organization" nav item
 
+### Existing Files Modified (Phase 8 — Documentation)
+- `documentation/architecture/data/organization-management-architecture.md` — v3.0: added manage page, lifecycle RPCs, entity service, deletion workflow, access_blocked, JWT v4, deployment status fixes
+- `documentation/AGENT-INDEX.md` — added 6 new keywords (access-blocked, deletion-workflow, entity-service, organization-deletion, organization-lifecycle, organization-manage)
+
+21. **Provider admins auto-select their own org**: Non-platform-owner users don't see the left panel list at all. Their org is loaded automatically via `authSession.claims.org_id`. The form panel spans full width (`lg:col-span-3`). - Added 2026-02-26
+
+22. **EntityFormDialog is an inline modal, not a shared component**: Contact/address/phone add/edit uses a local `EntityFormDialog` component defined within `OrganizationsManagePage.tsx`. It's a simple modal wrapper with save/cancel. Not extracted to shared UI because it's only used here and the entity forms are structurally different (contact has names/email, address has street/city/state, phone has number/extension). - Added 2026-02-26
+
+23. **Local search filtering**: The org list search is client-side filtering (`filteredOrgs`) on already-loaded data, separate from the server-side `listVM.setSearchFilter()`. This matches the pattern in `RolesManagePage` where the list is small enough to filter locally. - Added 2026-02-26
+
+24. **Nav item uses permission-only gating (no showForOrgTypes)**: The "Manage Organization" nav item has `permission: 'organization.update'` but no `showForOrgTypes` constraint. This means any org type with `organization.update` permission sees it — platform owners, providers, and partners. The page itself adapts behavior based on `isPlatformOwner`. - Added 2026-02-26
+
+25. **Pre-existing lint issue in generated-events.ts**: `frontend/src/types/generated/generated-events.ts` line 14 has an unused eslint-disable directive. This is a pre-existing issue from type generation, not introduced by Phase 7. All Phase 7 code is lint-clean. - Added 2026-02-26
+
 ## Related Components
 - `frontend/src/pages/roles/RolesManagePage.tsx` — pattern reference for split-panel
 - `frontend/src/components/ui/DangerZone.tsx` — shared component for lifecycle actions

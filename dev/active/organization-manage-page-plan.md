@@ -95,7 +95,7 @@ Single migration `20260226002002_organization_manage_page_phase1.sql` (1027 line
 - Role-based field editability: `isPlatformOwner` controls `canEditName`, `canEditFields` gates all edits when org inactive
 - Entity operations auto-reload details on success
 
-## Phase 7: Frontend Page + Navigation ✅ COMPLETE
+## Phase 7: Frontend Page + Navigation ✅ COMPLETE (commit `cab2cf9c`)
 
 - `OrganizationsManagePage` (~1500 lines): split-panel with left org list (platform owner) / auto-select (provider)
 - Right panel: org fields form, contacts/addresses/phones entity sections with inline add/edit/delete
@@ -105,10 +105,12 @@ Single migration `20260226002002_organization_manage_page_phase1.sql` (1027 line
 - Nav item: visible to all org types with `organization.update` permission
 - Stub `/organizations/:orgId/edit` redirects to `/organizations/manage`
 
-## Phase 8: Documentation Reconciliation
+## Phase 8: Documentation Reconciliation ✅ COMPLETE
 
-- Update `organization-management-architecture.md`, frontend overview, AGENT-INDEX.md
-- Verify table reference docs, handler reference files
+- Updated `organization-management-architecture.md` (v3.0): manage page, lifecycle RPCs, entity service, deletion workflow, access_blocked, JWT v4, deployment status
+- Updated `AGENT-INDEX.md` with 6 new keywords
+- Verified all handler reference files current
+- Table reference docs and frontend overview confirmed up-to-date
 
 ## Success Metrics
 

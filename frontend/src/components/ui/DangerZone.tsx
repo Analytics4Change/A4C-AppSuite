@@ -91,7 +91,7 @@ export const DangerZone: React.FC<DangerZoneProps> = ({
   if (!showTopSection && !canDelete) return null;
 
   return (
-    <section className="mt-4" aria-labelledby="danger-zone-heading">
+    <section className="mt-4" aria-labelledby="danger-zone-heading" data-testid="danger-zone">
       <Card className="shadow-lg border-red-200">
         <CardHeader className="border-b border-red-200 bg-red-50 py-3">
           <button
@@ -100,6 +100,7 @@ export const DangerZone: React.FC<DangerZoneProps> = ({
             aria-expanded={isExpanded}
             aria-controls="danger-zone-content"
             className="w-full flex items-center justify-between text-left"
+            data-testid="danger-zone-toggle-btn"
           >
             <CardTitle id="danger-zone-heading" className="text-sm font-semibold text-red-800">
               Danger Zone
@@ -118,10 +119,14 @@ export const DangerZone: React.FC<DangerZoneProps> = ({
             role="region"
             aria-labelledby="danger-zone-heading"
             className="p-4 space-y-4"
+            data-testid="danger-zone-content"
           >
             {/* Deactivate Section */}
             {showDeactivate && (
-              <div className={canDelete ? 'pb-4 border-b border-gray-200' : ''}>
+              <div
+                className={canDelete ? 'pb-4 border-b border-gray-200' : ''}
+                data-testid="danger-zone-deactivate-section"
+              >
                 <h4 className="text-sm font-medium text-gray-900">
                   Deactivate this {entityType.toLowerCase()}
                 </h4>
@@ -134,6 +139,7 @@ export const DangerZone: React.FC<DangerZoneProps> = ({
                   onClick={onDeactivate}
                   disabled={isSubmitting || isDeactivating}
                   className="mt-2 text-orange-600 border-orange-300 hover:bg-orange-50"
+                  data-testid="danger-zone-deactivate-btn"
                 >
                   <XCircle className="w-3 h-3 mr-1" />
                   {isDeactivating ? 'Deactivating...' : `Deactivate ${entityType}`}
@@ -143,7 +149,10 @@ export const DangerZone: React.FC<DangerZoneProps> = ({
 
             {/* Reactivate Section */}
             {showReactivate && (
-              <div className={canDelete ? 'pb-4 border-b border-gray-200' : ''}>
+              <div
+                className={canDelete ? 'pb-4 border-b border-gray-200' : ''}
+                data-testid="danger-zone-reactivate-section"
+              >
                 <h4 className="text-sm font-medium text-gray-900">
                   Reactivate this {entityType.toLowerCase()}
                 </h4>
@@ -156,6 +165,7 @@ export const DangerZone: React.FC<DangerZoneProps> = ({
                   onClick={onReactivate}
                   disabled={isSubmitting || isReactivating}
                   className="mt-2 text-green-600 border-green-300 hover:bg-green-50"
+                  data-testid="danger-zone-reactivate-btn"
                 >
                   <CheckCircle className="w-3 h-3 mr-1" />
                   {isReactivating ? 'Reactivating...' : `Reactivate ${entityType}`}
@@ -165,14 +175,19 @@ export const DangerZone: React.FC<DangerZoneProps> = ({
 
             {/* Delete Section */}
             {canDelete && (
-              <div>
+              <div data-testid="danger-zone-delete-section">
                 <h4 className="text-sm font-medium text-gray-900">
                   Delete this {entityType.toLowerCase()}
                 </h4>
                 <p className="text-xs text-gray-600 mt-1">
                   {deleteDescription}
                   {isActive && activeDeleteConstraint && (
-                    <span className="block text-orange-600 mt-1">{activeDeleteConstraint}</span>
+                    <span
+                      className="block text-orange-600 mt-1"
+                      data-testid="danger-zone-active-constraint"
+                    >
+                      {activeDeleteConstraint}
+                    </span>
                   )}
                 </p>
                 {deleteSlot}
@@ -183,6 +198,7 @@ export const DangerZone: React.FC<DangerZoneProps> = ({
                   onClick={onDelete}
                   disabled={isSubmitting || isDeleting}
                   className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
+                  data-testid="danger-zone-delete-btn"
                 >
                   <Trash2 className="w-3 h-3 mr-1" />
                   {isDeleting ? 'Deleting...' : `Delete ${entityType}`}

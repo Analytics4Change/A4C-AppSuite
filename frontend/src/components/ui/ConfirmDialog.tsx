@@ -124,11 +124,20 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       aria-labelledby="confirm-dialog-title"
       aria-describedby="confirm-dialog-description"
       data-focus-context="modal"
+      data-testid="confirm-dialog"
     >
       {/* Backdrop - click to dismiss */}
-      <div className="absolute inset-0 bg-black/50" onClick={onCancel} aria-hidden="true" />
+      <div
+        className="absolute inset-0 bg-black/50"
+        onClick={onCancel}
+        aria-hidden="true"
+        data-testid="confirm-dialog-backdrop"
+      />
       {/* Dialog panel - relative to sit above backdrop */}
-      <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+      <div
+        className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6"
+        data-testid="confirm-dialog-panel"
+      >
         <div className="flex items-start gap-4">
           {/* Icon with WCAG AA compliant contrast (3:1 minimum for graphical objects) */}
           <div
@@ -144,14 +153,25 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             )}
           </div>
           <div className="flex-1">
-            <h3 id="confirm-dialog-title" className="text-lg font-semibold text-gray-900">
+            <h3
+              id="confirm-dialog-title"
+              className="text-lg font-semibold text-gray-900"
+              data-testid="confirm-dialog-title"
+            >
               {title}
             </h3>
-            <p id="confirm-dialog-description" className="mt-2 text-gray-600">
+            <p
+              id="confirm-dialog-description"
+              className="mt-2 text-gray-600"
+              data-testid="confirm-dialog-message"
+            >
               {message}
             </p>
             {details && details.length > 0 && (
-              <ul className="mt-2 max-h-32 overflow-y-auto text-sm text-gray-600 list-disc pl-5 space-y-0.5">
+              <ul
+                className="mt-2 max-h-32 overflow-y-auto text-sm text-gray-600 list-disc pl-5 space-y-0.5"
+                data-testid="confirm-dialog-details-list"
+              >
                 {details.map((item, i) => (
                   <li key={i}>{item}</li>
                 ))}
@@ -162,6 +182,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             onClick={onCancel}
             className="flex-shrink-0 text-gray-400 hover:text-gray-600"
             aria-label="Close"
+            data-testid="confirm-dialog-close-btn"
           >
             <X className="w-5 h-5" />
           </button>
@@ -180,17 +201,25 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               onChange={(e) => setConfirmInput(e.target.value)}
               className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500"
               aria-describedby="confirm-dialog-description"
+              data-testid="confirm-dialog-confirm-text-input"
             />
           </div>
         )}
         <div className="mt-6 flex justify-end gap-3">
-          <Button ref={cancelButtonRef} variant="outline" onClick={onCancel} disabled={isLoading}>
+          <Button
+            ref={cancelButtonRef}
+            variant="outline"
+            onClick={onCancel}
+            disabled={isLoading}
+            data-testid="confirm-dialog-cancel-btn"
+          >
             {cancelLabel}
           </Button>
           <Button
             className={cn('text-white', variantStyles[variant])}
             onClick={onConfirm}
             disabled={confirmDisabled}
+            data-testid="confirm-dialog-confirm-btn"
           >
             {isLoading ? 'Processing...' : confirmLabel}
           </Button>

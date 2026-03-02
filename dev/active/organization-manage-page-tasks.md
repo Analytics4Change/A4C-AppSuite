@@ -132,13 +132,13 @@
 - [x] Build succeeds
 - [x] Lint clean (only pre-existing generated-events.ts issue)
 
-## Phase 8: Documentation ⏸️ PENDING
+## Phase 8: Documentation ✅ COMPLETE
 
-- [ ] Update `organization-management-architecture.md`
-- [ ] Update `frontend/architecture/overview.md`
-- [ ] Update AGENT-INDEX.md with new keywords
-- [ ] Verify table reference docs (contacts, addresses, phones, organizations)
-- [ ] Update handler reference files for all modified handlers
+- [x] Update `organization-management-architecture.md` — major rewrite: added manage page, lifecycle RPCs, entity service, deletion workflow, access_blocked, fixed stale JWT v3→v4, fixed deployment status
+- [x] Update AGENT-INDEX.md with new keywords (`access-blocked`, `deletion-workflow`, `entity-service`, `organization-deletion`, `organization-lifecycle`, `organization-manage`)
+- [x] Verify handler reference files — all 4 handlers + router confirmed current
+- [x] Skip `frontend/architecture/overview.md` — generic architecture doc, no org-specific content needed
+- [x] Table reference docs verified — organizations_projection already has lifecycle columns documented
 
 ## Success Validation Checkpoints
 
@@ -159,19 +159,19 @@
 - [ ] DangerZone shows for platform owner only
 - [ ] Blocked users see AccessBlockedPage on next token refresh
 - [ ] No direct table queries in new frontend service code
-- [ ] AsyncAPI types regenerated with no `AnonymousSchema`
-- [ ] All handler reference files updated
+- [x] AsyncAPI types regenerated with no `AnonymousSchema`
+- [x] All handler reference files updated
 
 ### Integration Validation
 - [ ] Lifecycle operations work end-to-end in integration mode
 - [ ] Temporal deletion workflow completes (DNS removed, users banned)
 - [ ] Zero failed events in `domain_events.processing_error`
-- [ ] Documentation has correct frontmatter, TL;DR, and AGENT-INDEX entries
+- [x] Documentation has correct frontmatter, TL;DR, and AGENT-INDEX entries
 
 ## Current Status
 
-**Phase**: Phase 7 — Frontend Page + Navigation
+**Phase**: Phase 8 — Documentation
 **Status**: ✅ COMPLETE
-**Last Updated**: 2026-02-26
-**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (`72f4666f`), Phase 7 (uncommitted)
-**Next Step**: Commit Phase 7. Then proceed to Phase 8 (Documentation).
+**Last Updated**: 2026-03-02
+**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (`72f4666f`), Phase 7 (`cab2cf9c`), Phase 8 (docs update)
+**Next Step**: Integration testing — deploy Edge Functions, test lifecycle ops end-to-end, verify manage page in mock mode.

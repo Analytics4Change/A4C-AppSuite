@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-17
+last_updated: 2026-02-26
 purpose: agent-navigation
 ---
 
@@ -35,6 +35,7 @@ purpose: agent-navigation
 
 | Keyword | Primary Document | Related |
 |---------|-----------------|---------|
+| `access-blocked` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | frontend-auth-architecture.md, JWT-CLAIMS-SETUP.md |
 | `accessibility` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | TESTING.md, component docs |
 | `activities-reference` | [activities-reference.md](workflows/reference/activities-reference.md) | error-handling-and-compensation.md |
 | `assignment` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | schedule_user_assignments_projection.md, organizations_projection.md |
@@ -84,11 +85,13 @@ purpose: agent-navigation
 | `dns-verification` | [activities-reference.md](workflows/reference/activities-reference.md) | organization-bootstrap-workflow-design.md |
 | `domain-events` | [triggering-workflows.md](workflows/guides/triggering-workflows.md) | event-metadata-schema.md |
 | `dosage-info` | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | medication_history.md |
+| `deletion-workflow` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | activities-reference.md, temporal-overview.md |
 | `dual-write` | [cqrs-dual-write-audit.md](../dev/archived/cqrs-dual-write-audit/cqrs-dual-write-audit-context.md) | event-handler-pattern.md, event-processing-patterns.md |
 | `duration-ms` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `edge-function` | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `edge-function-jwt` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | EDGE_FUNCTION_TESTS.md |
 | `email` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |
+| `entity-service` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | organization-management-architecture.md |
 | `event-archival` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `event-errors` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md, triggering-workflows.md |
 | `event-metadata` | [event-metadata-schema.md](workflows/reference/event-metadata-schema.md) | triggering-workflows.md |
@@ -141,11 +144,14 @@ purpose: agent-navigation
 | `okta` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
 | `otlp-export` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `organization` | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | organization-management-architecture.md |
+| `organization-deletion` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | activities-reference.md, temporal-overview.md |
+| `organization-lifecycle` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | organizations_projection.md, JWT-CLAIMS-SETUP.md |
+| `organization-manage` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | schedule-management.md |
 | `organization-addresses` | [organization_addresses.md](infrastructure/reference/database/tables/organization_addresses.md) | addresses_projection.md |
 | `organization-contacts` | [organization_contacts.md](infrastructure/reference/database/tables/organization_contacts.md) | contacts_projection.md |
 | `organization-phones` | [organization_phones.md](infrastructure/reference/database/tables/organization_phones.md) | phones_projection.md |
 | `organization-bootstrap` | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | organization-bootstrap-workflow-design.md |
-| `organization-management` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | tenants-as-organizations.md |
+| `organization-management` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | tenants-as-organizations.md, schedule-management.md |
 | `organization-units` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | scoping-architecture.md |
 | `password-reset` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | LoginPage, IAuthProvider |
 | `parent-span-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |

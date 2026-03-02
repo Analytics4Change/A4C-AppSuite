@@ -160,17 +160,23 @@ const OrgListItem: React.FC<{
     )}
     aria-selected={isSelected}
     role="option"
+    data-testid={`org-list-item-${org.id}`}
   >
     <div className="flex items-center justify-between">
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-gray-900 truncate">{org.display_name || org.name}</p>
-        <p className="text-xs text-gray-500 truncate">{org.type}</p>
+        <p className="text-sm font-medium text-gray-900 truncate" data-testid="org-list-item-name">
+          {org.display_name || org.name}
+        </p>
+        <p className="text-xs text-gray-500 truncate" data-testid="org-list-item-type">
+          {org.type}
+        </p>
       </div>
       <span
         className={cn(
           'inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 ml-2',
           org.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
         )}
+        data-testid="org-list-item-status-badge"
       >
         {org.is_active ? 'Active' : 'Inactive'}
       </span>
@@ -665,12 +671,21 @@ export const OrganizationsManagePage: React.FC = observer(() => {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 p-8">
+    <div
+      className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 p-8"
+      data-testid="org-manage-page"
+    >
       <div className="max-w-7xl mx-auto">
         {/* Page Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
-            <Button variant="outline" size="sm" onClick={handleBackClick} className="text-gray-600">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBackClick}
+              className="text-gray-600"
+              data-testid="org-manage-back-btn"
+            >
               <ArrowLeft className="w-4 h-4 mr-1" />
               Back to Settings
             </Button>
@@ -678,7 +693,9 @@ export const OrganizationsManagePage: React.FC = observer(() => {
           <div className="flex items-center gap-3">
             <Building className="w-8 h-8 text-blue-600" />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Organization Management</h1>
+              <h1 className="text-3xl font-bold text-gray-900" data-testid="org-manage-heading">
+                Organization Management
+              </h1>
               <p className="text-gray-600 mt-1">
                 {isPlatformOwner
                   ? 'Manage organizations, lifecycle, and details'
@@ -690,7 +707,11 @@ export const OrganizationsManagePage: React.FC = observer(() => {
 
         {/* Error Banner */}
         {(listVM.error || operationError) && (
-          <div className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
+          <div
+            className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50"
+            role="alert"
+            data-testid="org-manage-error-banner"
+          >
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
@@ -705,6 +726,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                   setOperationError(null);
                 }}
                 className="text-red-600 border-red-300"
+                data-testid="org-manage-error-dismiss-btn"
               >
                 Dismiss
               </Button>
@@ -717,7 +739,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
           {/* Left Panel: Org List */}
           {isPlatformOwner && (
             <div className="lg:col-span-1">
-              <Card className="shadow-lg h-[calc(100vh-280px)]">
+              <Card className="shadow-lg h-[calc(100vh-280px)]" data-testid="org-list-panel">
                 <CardHeader className="border-b border-gray-200 pb-4">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg font-semibold text-gray-900">
@@ -729,6 +751,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                       onClick={() => listVM.refresh()}
                       disabled={listVM.isLoading}
                       aria-label="Refresh organization list"
+                      data-testid="org-list-refresh-btn"
                     >
                       <RefreshCw className={cn('w-4 h-4', listVM.isLoading && 'animate-spin')} />
                     </Button>
@@ -745,6 +768,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                       onChange={(e) => handleSearchChange(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       aria-label="Search organizations"
+                      data-testid="org-list-search-input"
                     />
                   </div>
 
@@ -755,6 +779,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                         key={status}
                         type="button"
                         onClick={() => handleStatusChange(status)}
+                        data-testid={`org-list-filter-${status}-btn`}
                         className={cn(
                           'px-2.5 py-1 text-xs font-medium rounded-md transition-colors',
                           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
@@ -773,11 +798,20 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                     className="flex-1 overflow-y-auto space-y-1"
                     role="listbox"
                     aria-label="Organization list"
+                    data-testid="org-list"
                   >
                     {listVM.isLoading ? (
-                      <div className="text-center text-sm text-gray-500 py-8">Loading...</div>
+                      <div
+                        className="text-center text-sm text-gray-500 py-8"
+                        data-testid="org-list-loading"
+                      >
+                        Loading...
+                      </div>
                     ) : filteredOrgs.length === 0 ? (
-                      <div className="text-center text-sm text-gray-500 py-8">
+                      <div
+                        className="text-center text-sm text-gray-500 py-8"
+                        data-testid="org-list-empty"
+                      >
                         No organizations found
                       </div>
                     ) : (
@@ -800,7 +834,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
           <div className={isPlatformOwner ? 'lg:col-span-2' : 'lg:col-span-3'}>
             {/* Empty State */}
             {panelMode === 'empty' && (
-              <Card className="shadow-lg">
+              <Card className="shadow-lg" data-testid="org-form-empty-state">
                 <CardContent className="p-12 text-center">
                   <Building className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-xl font-medium text-gray-900 mb-2">
@@ -820,7 +854,10 @@ export const OrganizationsManagePage: React.FC = observer(() => {
               <div className="space-y-4">
                 {/* Inactive Warning Banner */}
                 {!formVM.isActive && (
-                  <div className="p-4 rounded-lg border border-amber-300 bg-amber-50">
+                  <div
+                    className="p-4 rounded-lg border border-amber-300 bg-amber-50"
+                    data-testid="org-inactive-banner"
+                  >
                     <div className="flex items-start gap-3">
                       <XCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                       <div className="flex-1">
@@ -847,6 +884,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                             (dialogState.type === 'reactivate' && dialogState.isLoading)
                           }
                           className="bg-green-600 hover:bg-green-700 text-white flex-shrink-0"
+                          data-testid="org-inactive-banner-reactivate-btn"
                         >
                           <CheckCircle className="w-4 h-4 mr-1" />
                           {dialogState.type === 'reactivate' && dialogState.isLoading
@@ -859,7 +897,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                 )}
 
                 {/* Organization Details Form */}
-                <Card className="shadow-lg">
+                <Card className="shadow-lg" data-testid="org-details-card">
                   <CardHeader className="border-b border-gray-200">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-xl font-semibold text-gray-900">
@@ -872,6 +910,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                             ? 'bg-green-100 text-green-800'
                             : 'bg-gray-100 text-gray-600'
                         )}
+                        data-testid="org-details-status-badge"
                       >
                         {formVM.isActive ? 'Active' : 'Inactive'}
                       </span>
@@ -879,7 +918,12 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                   </CardHeader>
                   <CardContent className="p-6">
                     {formVM.isLoading ? (
-                      <div className="text-center py-8 text-gray-500">Loading details...</div>
+                      <div
+                        className="text-center py-8 text-gray-500"
+                        data-testid="org-details-loading"
+                      >
+                        Loading details...
+                      </div>
                     ) : (
                       <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Submission Error */}
@@ -887,6 +931,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                           <div
                             className="p-4 rounded-lg border border-red-300 bg-red-50"
                             role="alert"
+                            data-testid="org-details-submit-error"
                           >
                             <div className="flex items-start gap-2">
                               <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
@@ -903,6 +948,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                                 onClick={() => formVM.clearSubmissionError()}
                                 className="text-red-600 hover:text-red-800"
                                 aria-label="Dismiss error"
+                                data-testid="org-details-submit-error-dismiss-btn"
                               >
                                 <X className="w-4 h-4" />
                               </button>
@@ -969,19 +1015,28 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
                             <div>
                               <p className="text-xs font-medium text-gray-500 uppercase">Slug</p>
-                              <p className="text-sm text-gray-700 mt-0.5">
+                              <p
+                                className="text-sm text-gray-700 mt-0.5"
+                                data-testid="org-field-slug-value"
+                              >
                                 {formVM.organization.slug}
                               </p>
                             </div>
                             <div>
                               <p className="text-xs font-medium text-gray-500 uppercase">Type</p>
-                              <p className="text-sm text-gray-700 mt-0.5">
+                              <p
+                                className="text-sm text-gray-700 mt-0.5"
+                                data-testid="org-field-type-value"
+                              >
                                 {formVM.organization.type}
                               </p>
                             </div>
                             <div>
                               <p className="text-xs font-medium text-gray-500 uppercase">Path</p>
-                              <p className="text-sm text-gray-700 mt-0.5 font-mono text-xs">
+                              <p
+                                className="text-sm text-gray-700 mt-0.5 font-mono text-xs"
+                                data-testid="org-field-path-value"
+                              >
                                 {formVM.organization.path}
                               </p>
                             </div>
@@ -992,7 +1047,12 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                         <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                           <div>
                             {formVM.isDirty && (
-                              <span className="text-sm text-amber-600">Unsaved changes</span>
+                              <span
+                                className="text-sm text-amber-600"
+                                data-testid="org-form-unsaved-indicator"
+                              >
+                                Unsaved changes
+                              </span>
                             )}
                           </div>
                           <div className="flex gap-2">
@@ -1003,6 +1063,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                                 size="sm"
                                 onClick={() => formVM.reset()}
                                 disabled={formVM.isSubmitting}
+                                data-testid="org-form-reset-btn"
                               >
                                 Reset
                               </Button>
@@ -1011,6 +1072,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                               type="submit"
                               disabled={!formVM.canSubmit}
                               className="bg-blue-600 hover:bg-blue-700 text-white"
+                              data-testid="org-form-save-btn"
                             >
                               <Save className="w-4 h-4 mr-1" />
                               {formVM.isSubmitting ? 'Saving...' : 'Save Changes'}
@@ -1028,13 +1090,23 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                   icon={<User className="w-5 h-5 text-blue-600" />}
                   canEdit={formVM.canEditFields}
                   onAdd={() => handleEntityAdd('contact')}
+                  data-testid="org-contacts-section"
                 >
                   {formVM.contacts.length === 0 ? (
-                    <p className="text-sm text-gray-500 py-4 text-center">No contacts yet</p>
+                    <p
+                      className="text-sm text-gray-500 py-4 text-center"
+                      data-testid="org-contacts-empty"
+                    >
+                      No contacts yet
+                    </p>
                   ) : (
                     <div className="divide-y divide-gray-100">
                       {formVM.contacts.map((c) => (
-                        <div key={c.id} className="py-3 flex items-start justify-between">
+                        <div
+                          key={c.id}
+                          className="py-3 flex items-start justify-between"
+                          data-testid={`org-contact-row-${c.id}`}
+                        >
                           <div>
                             <p className="text-sm font-medium text-gray-900">
                               {c.first_name} {c.last_name}
@@ -1056,6 +1128,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                                 onClick={() => handleEntityEdit('contact', c)}
                                 className="p-1 text-gray-400 hover:text-blue-600"
                                 aria-label={`Edit contact ${c.first_name} ${c.last_name}`}
+                                data-testid={`org-contact-edit-btn-${c.id}`}
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
@@ -1064,6 +1137,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                                 onClick={() => handleEntityDelete('contact', c.id)}
                                 className="p-1 text-gray-400 hover:text-red-600"
                                 aria-label={`Delete contact ${c.first_name} ${c.last_name}`}
+                                data-testid={`org-contact-delete-btn-${c.id}`}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1081,13 +1155,23 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                   icon={<MapPin className="w-5 h-5 text-blue-600" />}
                   canEdit={formVM.canEditFields}
                   onAdd={() => handleEntityAdd('address')}
+                  data-testid="org-addresses-section"
                 >
                   {formVM.addresses.length === 0 ? (
-                    <p className="text-sm text-gray-500 py-4 text-center">No addresses yet</p>
+                    <p
+                      className="text-sm text-gray-500 py-4 text-center"
+                      data-testid="org-addresses-empty"
+                    >
+                      No addresses yet
+                    </p>
                   ) : (
                     <div className="divide-y divide-gray-100">
                       {formVM.addresses.map((a) => (
-                        <div key={a.id} className="py-3 flex items-start justify-between">
+                        <div
+                          key={a.id}
+                          className="py-3 flex items-start justify-between"
+                          data-testid={`org-address-row-${a.id}`}
+                        >
                           <div>
                             <p className="text-sm font-medium text-gray-900">
                               {a.label}
@@ -1112,6 +1196,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                                 onClick={() => handleEntityEdit('address', a)}
                                 className="p-1 text-gray-400 hover:text-blue-600"
                                 aria-label={`Edit address ${a.label}`}
+                                data-testid={`org-address-edit-btn-${a.id}`}
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
@@ -1120,6 +1205,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                                 onClick={() => handleEntityDelete('address', a.id)}
                                 className="p-1 text-gray-400 hover:text-red-600"
                                 aria-label={`Delete address ${a.label}`}
+                                data-testid={`org-address-delete-btn-${a.id}`}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1137,13 +1223,23 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                   icon={<Phone className="w-5 h-5 text-blue-600" />}
                   canEdit={formVM.canEditFields}
                   onAdd={() => handleEntityAdd('phone')}
+                  data-testid="org-phones-section"
                 >
                   {formVM.phones.length === 0 ? (
-                    <p className="text-sm text-gray-500 py-4 text-center">No phones yet</p>
+                    <p
+                      className="text-sm text-gray-500 py-4 text-center"
+                      data-testid="org-phones-empty"
+                    >
+                      No phones yet
+                    </p>
                   ) : (
                     <div className="divide-y divide-gray-100">
                       {formVM.phones.map((p) => (
-                        <div key={p.id} className="py-3 flex items-start justify-between">
+                        <div
+                          key={p.id}
+                          className="py-3 flex items-start justify-between"
+                          data-testid={`org-phone-row-${p.id}`}
+                        >
                           <div>
                             <p className="text-sm font-medium text-gray-900">
                               {p.label}
@@ -1167,6 +1263,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                                 onClick={() => handleEntityEdit('phone', p)}
                                 className="p-1 text-gray-400 hover:text-blue-600"
                                 aria-label={`Edit phone ${p.label}`}
+                                data-testid={`org-phone-edit-btn-${p.id}`}
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
@@ -1175,6 +1272,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                                 onClick={() => handleEntityDelete('phone', p.id)}
                                 className="p-1 text-gray-400 hover:text-red-600"
                                 aria-label={`Delete phone ${p.label}`}
+                                data-testid={`org-phone-delete-btn-${p.id}`}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1291,6 +1389,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
           onSave={handleContactSave}
           onCancel={() => setDialogState({ type: 'none' })}
           isSubmitting={entitySubmitting}
+          data-testid="contact-dialog"
         >
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -1373,6 +1472,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
           onSave={handleAddressSave}
           onCancel={() => setDialogState({ type: 'none' })}
           isSubmitting={entitySubmitting}
+          data-testid="address-dialog"
         >
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -1451,6 +1551,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
           onSave={handlePhoneSave}
           onCancel={() => setDialogState({ type: 'none' })}
           isSubmitting={entitySubmitting}
+          data-testid="phone-dialog"
         >
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -1516,8 +1617,9 @@ const EntitySection: React.FC<{
   canEdit: boolean;
   onAdd: () => void;
   children: React.ReactNode;
-}> = ({ title, icon, canEdit, onAdd, children }) => (
-  <Card className="shadow-lg">
+  'data-testid'?: string;
+}> = ({ title, icon, canEdit, onAdd, children, 'data-testid': testId }) => (
+  <Card className="shadow-lg" data-testid={testId}>
     <CardHeader className="border-b border-gray-200 py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -1530,6 +1632,7 @@ const EntitySection: React.FC<{
             size="sm"
             onClick={onAdd}
             className="text-blue-600 border-blue-300 hover:bg-blue-50"
+            data-testid={testId ? `${testId.replace('-section', '')}-add-btn` : undefined}
           >
             <Plus className="w-3.5 h-3.5 mr-1" />
             Add
@@ -1548,32 +1651,49 @@ const EntityFormDialog: React.FC<{
   onCancel: () => void;
   isSubmitting: boolean;
   children: React.ReactNode;
-}> = ({ title, onSave, onCancel, isSubmitting, children }) => (
+  'data-testid'?: string;
+}> = ({ title, onSave, onCancel, isSubmitting, children, 'data-testid': testId }) => (
   <div
     className="fixed inset-0 z-50 flex items-center justify-center"
     role="dialog"
     aria-modal="true"
     aria-labelledby="entity-dialog-title"
+    data-testid={testId}
   >
     <div className="absolute inset-0 bg-black/50" onClick={onCancel} aria-hidden="true" />
     <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 id="entity-dialog-title" className="text-lg font-semibold text-gray-900">
+        <h3
+          id="entity-dialog-title"
+          className="text-lg font-semibold text-gray-900"
+          data-testid={testId ? `${testId}-title` : undefined}
+        >
           {title}
         </h3>
-        <button onClick={onCancel} className="text-gray-400 hover:text-gray-600" aria-label="Close">
+        <button
+          onClick={onCancel}
+          className="text-gray-400 hover:text-gray-600"
+          aria-label="Close"
+          data-testid={testId ? `${testId}-close-btn` : undefined}
+        >
           <X className="w-5 h-5" />
         </button>
       </div>
       {children}
       <div className="mt-6 flex justify-end gap-3">
-        <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
+        <Button
+          variant="outline"
+          onClick={onCancel}
+          disabled={isSubmitting}
+          data-testid={testId ? `${testId}-cancel-btn` : undefined}
+        >
           Cancel
         </Button>
         <Button
           className="bg-blue-600 hover:bg-blue-700 text-white"
           onClick={onSave}
           disabled={isSubmitting}
+          data-testid={testId ? `${testId}-save-btn` : undefined}
         >
           {isSubmitting ? 'Saving...' : 'Save'}
         </Button>

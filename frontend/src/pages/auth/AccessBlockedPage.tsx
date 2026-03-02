@@ -24,10 +24,14 @@ export const AccessBlockedPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div
+      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100"
+      data-testid="access-blocked-page"
+    >
       <div className="w-full max-w-md px-4">
         <div
           className="rounded-xl shadow-lg p-8"
+          data-testid="access-blocked-card"
           style={{
             background: 'rgba(255, 255, 255, 0.85)',
             backdropFilter: 'blur(20px)',
@@ -39,18 +43,28 @@ export const AccessBlockedPage: React.FC = () => {
               <ShieldX className="w-8 h-8 text-red-600" aria-hidden="true" />
             </div>
 
-            <h1 className="text-xl font-semibold text-gray-900 mb-2">Access Blocked</h1>
+            <h1
+              className="text-xl font-semibold text-gray-900 mb-2"
+              data-testid="access-blocked-heading"
+            >
+              Access Blocked
+            </h1>
 
-            <p className="text-sm text-gray-600 mb-6">{message}</p>
+            <p className="text-sm text-gray-600 mb-6" data-testid="access-blocked-message">
+              {message}
+            </p>
 
             {session?.user?.email && (
-              <p className="text-xs text-gray-400 mb-4">Signed in as {session.user.email}</p>
+              <p className="text-xs text-gray-400 mb-4" data-testid="access-blocked-email">
+                Signed in as {session.user.email}
+              </p>
             )}
 
             <button
               onClick={handleLogout}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
               aria-label="Sign out and return to login page"
+              data-testid="access-blocked-signout-btn"
             >
               <LogOut className="w-4 h-4" aria-hidden="true" />
               Sign Out
