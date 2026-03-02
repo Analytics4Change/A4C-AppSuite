@@ -135,7 +135,13 @@ test.describe('TS-01: Navigation & Page Load', () => {
   test('TC-01-03: provider_admin sees no left panel', async ({ page }) => {
     await navigateToManagePage(page);
     await switchToProfile(page, 'dev@example.com');
-    await page.goto(`${BASE_URL}/organizations/manage`);
+    // Use SPA navigation (click nav link) — page.goto() causes a full reload which
+    // resets DevAuth back to VITE_DEV_PROFILE=super_admin, defeating the profile switch.
+    await page
+      .locator('a[href="/organizations/manage"]')
+      .waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('a[href="/organizations/manage"]').click();
+    await page.waitForURL(/\/organizations\/manage/, { timeout: 10000 });
     await page.waitForSelector('[data-testid="org-manage-page"]', { timeout: 15000 });
     await expect(page.locator('[data-testid="org-list-panel"]')).not.toBeVisible();
   });
@@ -143,7 +149,13 @@ test.describe('TS-01: Navigation & Page Load', () => {
   test('TC-01-04: partner_admin sees no left panel', async ({ page }) => {
     await navigateToManagePage(page);
     await switchToProfile(page, 'partner.admin@example.com');
-    await page.goto(`${BASE_URL}/organizations/manage`);
+    // Use SPA navigation (click nav link) — page.goto() causes a full reload which
+    // resets DevAuth back to VITE_DEV_PROFILE=super_admin, defeating the profile switch.
+    await page
+      .locator('a[href="/organizations/manage"]')
+      .waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('a[href="/organizations/manage"]').click();
+    await page.waitForURL(/\/organizations\/manage/, { timeout: 10000 });
     await page.waitForSelector('[data-testid="org-manage-page"]', { timeout: 15000 });
     await expect(page.locator('[data-testid="org-list-panel"]')).not.toBeVisible();
   });
@@ -1067,6 +1079,9 @@ test.describe('TS-16: Keyboard Navigation & Accessibility', () => {
     const backBtn = page.locator('[data-testid="org-manage-back-btn"]');
     await backBtn.focus();
     await expect(backBtn).toBeFocused();
+    // DOM tab order: back button → refresh button → search input → filter buttons
+    await page.keyboard.press('Tab');
+    await expect(page.locator('[data-testid="org-list-refresh-btn"]')).toBeFocused();
     // Tab to search input
     await page.keyboard.press('Tab');
     await expect(page.locator('[data-testid="org-list-search-input"]')).toBeFocused();

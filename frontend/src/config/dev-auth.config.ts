@@ -10,7 +10,15 @@
  * See .plans/supabase-auth-integration/frontend-auth-architecture.md
  */
 
-import { Session, User, JWTClaims, UserRole, Permission, OrganizationType, EffectivePermission } from '@/types/auth.types';
+import {
+  Session,
+  User,
+  JWTClaims,
+  UserRole,
+  Permission,
+  OrganizationType,
+  EffectivePermission,
+} from '@/types/auth.types';
 import { getRolePermissions } from './roles.config';
 import { PERMISSIONS } from './permissions.config';
 
@@ -34,13 +42,7 @@ export const DEV_PERMISSIONS: Record<string, Permission[]> = {
   ],
 
   // Client Management (org-scoped)
-  client: [
-    'client.create',
-    'client.view',
-    'client.update',
-    'client.delete',
-    'client.transfer',
-  ],
+  client: ['client.create', 'client.view', 'client.update', 'client.delete', 'client.transfer'],
 
   // Medication Management (org-scoped)
   medication: [
@@ -52,21 +54,10 @@ export const DEV_PERMISSIONS: Record<string, Permission[]> = {
   ],
 
   // Role Management (global + org-scoped)
-  role: [
-    'global_roles.create',
-    'cross_org.grant',
-    'role.create',
-    'role.assign',
-    'role.view',
-  ],
+  role: ['global_roles.create', 'cross_org.grant', 'role.create', 'role.assign', 'role.view'],
 
   // User Management (global + org-scoped)
-  user: [
-    'users.impersonate',
-    'user.create',
-    'user.view',
-    'user.update',
-  ],
+  user: ['users.impersonate', 'user.create', 'user.view', 'user.update'],
 };
 
 /**
@@ -79,26 +70,58 @@ export function getAllPermissions(): Permission[] {
 }
 
 /**
+ * Explicit permission declarations for dev personas whose roles are NOT in CANONICAL_ROLES.
+ *
+ * Rules:
+ * - super_admin and provider_admin are NOT listed here; they derive from CANONICAL_ROLES.
+ * - All other personas (custom org roles) MUST declare permissions explicitly here.
+ * - Each entry MUST include a comment explaining WHY the persona has each permission.
+ *   This prevents silent drift as the permission catalog grows.
+ *
+ * MOCK MODE ONLY. Production permissions come from JWT claims populated
+ * by the Temporal workflow during organization bootstrap.
+ *
+ * See: documentation/architecture/authorization/provider-admin-permissions-architecture.md
+ */
+export const MOCK_PROFILE_PERMISSIONS: Partial<Record<string, Permission[]>> = {
+  partner_admin: [
+    // Provider partner org admins can view and update their own organization.
+    // Required for: /organizations/manage route guard (organization.update)
+    // and "Manage Organization" nav link visibility.
+    // They do NOT have organization.create so isPlatformOwner = false →
+    // org-list panel is hidden (provider_partner org_type).
+    'organization.view',
+    'organization.update',
+  ],
+};
+
+/**
  * Get permissions for a dev profile, including implicit org grants for provider_admin
  *
  * This is MOCK MODE ONLY - production gets permissions from JWT claims populated
  * by the Temporal workflow during organization bootstrap.
  *
- * In mock mode, provider_admin users get all organization-scoped permissions
- * to simulate the implicit "full control within their org" behavior that would
- * be granted via the Temporal workflow in production.
+ * Custom org roles (not in CANONICAL_ROLES) use explicit declarations from
+ * MOCK_PROFILE_PERMISSIONS above. Canonical roles derive from CANONICAL_ROLES.
  *
  * See: documentation/architecture/authorization/provider-admin-permissions-architecture.md
  */
 export function getDevProfilePermissions(role: UserRole): Permission[] {
+  // Custom org roles declare permissions explicitly — checked before canonical derivation.
+  // This ensures any role not in CANONICAL_ROLES gets its intended permissions,
+  // not a silent empty array.
+  if (role in MOCK_PROFILE_PERMISSIONS) {
+    return MOCK_PROFILE_PERMISSIONS[role] ?? [];
+  }
+
   const basePermissions = getRolePermissions(role);
 
   // In mock mode, provider_admin gets all organization-scoped permissions
   // This simulates the implicit grant that would come from Temporal workflow in production
   if (role === 'provider_admin') {
     const orgPermissions = Object.values(PERMISSIONS)
-      .filter(p => p.scope === 'organization')
-      .map(p => p.id);
+      .filter((p) => p.scope === 'organization')
+      .map((p) => p.id);
     return [...new Set([...basePermissions, ...orgPermissions])];
   }
 
@@ -148,17 +171,20 @@ export const DEFAULT_DEV_USER: DevUserProfile = {
   scope_path: import.meta.env.VITE_DEV_SCOPE_PATH || 'org_dev_organization',
   permissions: import.meta.env.VITE_DEV_PERMISSIONS
     ? import.meta.env.VITE_DEV_PERMISSIONS.split(',')
-    : getDevProfilePermissions((import.meta.env.VITE_DEV_USER_ROLE as UserRole) || 'provider_admin'),
+    : getDevProfilePermissions(
+        (import.meta.env.VITE_DEV_USER_ROLE as UserRole) || 'provider_admin'
+      ),
   picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=dev-user',
 };
 
 /**
- * Additional test user profiles for canonical roles
- * Only includes system-defined roles from CANONICAL_ROLES
- * Custom organization roles should be tested via real database queries
+ * Test user profiles for E2E and development testing.
+ * Includes both canonical-role profiles (super_admin, provider_admin) and
+ * custom-role profiles (partner_admin, etc.) for testing different org types.
+ * Custom-role permissions are declared in MOCK_PROFILE_PERMISSIONS above.
  *
- * Note: Uses getDevProfilePermissions() to include implicit org permissions
- * for provider_admin in mock mode.
+ * Do NOT add custom org roles to CANONICAL_ROLES — that is a production concept
+ * and must not be modified for testing purposes.
  */
 export const DEV_USER_PROFILES: Record<string, DevUserProfile> = {
   provider_admin: DEFAULT_DEV_USER,

@@ -199,6 +199,26 @@
 - Event metadata schema: `documentation/workflows/reference/event-metadata-schema.md`
 - Event processing patterns: `documentation/infrastructure/patterns/event-processing-patterns.md`
 
+26. **UAT test infrastructure: VITE_FORCE_MOCK=true in webServer command**: The playwright.uat.config.ts webServer must include `VITE_FORCE_MOCK=true` in the command to force DevAuthProvider even when `.env.local` has real Supabase credentials. Without this, deployment.config.ts selects SupabaseAuthProvider (no session → ProtectedRoute redirects all 81 tests to /login). VITE_DEV_PROFILE=super_admin sets the auto-login persona. - Added 2026-03-02
+
+27. **SPA navigation vs page.goto() in profile-switch tests**: After `switchToProfile()`, tests MUST use `page.locator('a[href="..."]').click()` (SPA nav) not `page.goto()` to navigate. `page.goto()` triggers a full JS reload causing DevAuthProvider to re-initialize with VITE_DEV_PROFILE=super_admin (autoLogin=true), overriding the profile switch. SPA nav preserves the in-memory DevAuth session. - Added 2026-03-02
+
+28. **MOCK_PROFILE_PERMISSIONS pattern for custom org roles in mock mode**: `CANONICAL_ROLES` only contains production system roles (super_admin, provider_admin). Custom org roles (partner_admin, etc.) have no entry → `getRolePermissions()` returns `[]` → zero permissions in mock mode. The fix is a `MOCK_PROFILE_PERMISSIONS` map in `dev-auth.config.ts` with explicit permission declarations per persona. `getDevProfilePermissions()` checks this map FIRST before CANONICAL_ROLES derivation. Each entry must include rationale comments. Do NOT add custom roles to CANONICAL_ROLES — that is a production contract. - Added 2026-03-02
+
+29. **TC-16-01 DOM tab order: Back → Refresh → Search → Filters**: The org-list-panel has a Refresh button (`data-testid="org-list-refresh-btn"`) in the card header BEFORE the search input. Tab order follows DOM order. Tests that skip directly from Back button to Search input will fail. Correct order: Back button → Refresh button → Search input → All/Active/Inactive filter buttons. - Added 2026-03-02
+
+### New Files Created (Phase 9)
+- `frontend/playwright.uat.config.ts` — UAT playwright config, port 3458, VITE_FORCE_MOCK=true, workers: 1 (commit `6d89795a`)
+- `frontend/e2e/organization-manage-page.spec.ts` — 81 test cases across 17 test suites (commit `6d89795a`)
+
+### Existing Files Modified (Phase 9)
+- `frontend/src/pages/auth/LoginPage.tsx` — added `data-testid="login-page"` to root div (commit `45b99a99`)
+- `frontend/.gitignore` — added `playwright-report-uat/`
+- `frontend/src/config/dev-auth.config.ts` — added `MOCK_PROFILE_PERMISSIONS`, updated `getDevProfilePermissions()`, updated `DEV_USER_PROFILES` JSDoc
+- `frontend/e2e/organization-manage-page.spec.ts` — fixed TC-01-03, TC-01-04 (SPA navigation), TC-16-01 (Refresh button tab step)
+- `documentation/architecture/authorization/provider-admin-permissions-architecture.md` — added MOCK_PROFILE_PERMISSIONS persona catalog section
+- `documentation/architecture/authorization/rbac-architecture.md` — added mock mode separation note
+
 ## Why This Approach?
 - **Dedicated RPCs** over raw `emit_domain_event`: Moves event emission responsibility to backend (consistent with schedule/role pattern), enables proper permission checks, metadata population, and read-back guards server-side. Frontend only needs to call typed RPC functions.
 - **Temporal for deletion only**: Deactivation/reactivation are simple atomic operations. Deletion involves unreliable external calls (DNS, Supabase Admin API) that benefit from Temporal's retry and durability.

@@ -168,10 +168,41 @@
 - [ ] Zero failed events in `domain_events.processing_error`
 - [x] Documentation has correct frontmatter, TL;DR, and AGENT-INDEX entries
 
+## Phase 9: Playwright UAT Test Suite ✅ IN PROGRESS
+
+### 9A: Test Infrastructure ✅ COMPLETE
+- [x] Create `frontend/playwright.uat.config.ts` — separate UAT config on port 3458, workers: 1, reuseExistingServer: true
+- [x] Add `VITE_FORCE_MOCK=true VITE_DEV_PROFILE=super_admin` to webServer command — forces DevAuth regardless of .env.local credentials
+- [x] Create `frontend/e2e/organization-manage-page.spec.ts` — 81 test cases across 17 test suites (TS-01 through TS-17)
+- [x] Add `data-testid="login-page"` to `LoginPage.tsx` root div — allows tests to detect login redirect
+- [x] Add defensive login fallback in `navigateToManagePage()` — handles reuseExistingServer edge case
+- [x] Add `playwright-report-uat/` to `frontend/.gitignore`
+- [x] Commit: `6d89795a` (feat: add Playwright UAT test suite)
+- [x] Commit: `45b99a99` (fix: activate mock auth for UAT and add login-page data-testid)
+
+### 9B: Fix Failing Tests (TC-01-03, TC-01-04, TC-16-01) ⏸️ PENDING COMMIT
+- [x] **Root cause TC-01-03/04**: `page.goto()` after `switchToProfile()` triggers full SPA reload → DevAuth re-initializes with `VITE_DEV_PROFILE=super_admin` → profile switch is lost
+- [x] **Root cause TC-16-01**: DOM tab order is Back → Refresh → Search → Filters; test skipped the Refresh button
+- [x] **Root cause TC-01-04 (secondary)**: `partner_admin` has zero permissions (not in CANONICAL_ROLES) → RequirePermission blocks route
+- [x] Add `MOCK_PROFILE_PERMISSIONS` map to `dev-auth.config.ts` — explicit permission declarations for custom org roles not in CANONICAL_ROLES
+- [x] Add `partner_admin` to `MOCK_PROFILE_PERMISSIONS` with `organization.view` + `organization.update`
+- [x] Update `getDevProfilePermissions()` to check `MOCK_PROFILE_PERMISSIONS` first
+- [x] Update `DEV_USER_PROFILES` JSDoc (was misleading: "Only includes system-defined roles from CANONICAL_ROLES")
+- [x] Fix TC-01-03: Replace `page.goto()` with `page.locator('a[href="/organizations/manage"]').click()` (SPA navigation)
+- [x] Fix TC-01-04: Same SPA navigation fix (now works because partner_admin has `organization.update`)
+- [x] Fix TC-16-01: Add `await expect(org-list-refresh-btn).toBeFocused()` step between back button and search input
+- [x] Update architecture docs: `provider-admin-permissions-architecture.md` (MOCK_PROFILE_PERMISSIONS section), `rbac-architecture.md` (mock mode note)
+- [ ] Commit all Phase 9B changes
+
+### 9C: Test Run Validation ⏸️ PENDING
+- [ ] Run `npx playwright test --config playwright.uat.config.ts --grep "TC-01-03|TC-01-04|TC-16-01"` — verify 3 fixed tests pass
+- [ ] Run full UAT suite `npx playwright test --config playwright.uat.config.ts` — verify all 81 pass
+- [ ] Add `frontend/test-results/` remains gitignored (already on line 8 of .gitignore)
+
 ## Current Status
 
-**Phase**: Phase 8 — Documentation
-**Status**: ✅ COMPLETE
+**Phase**: Phase 9B — Fix Failing UAT Tests
+**Status**: ⏸️ PENDING COMMIT
 **Last Updated**: 2026-03-02
-**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (`72f4666f`), Phase 7 (`cab2cf9c`), Phase 8 (docs update)
-**Next Step**: Integration testing — deploy Edge Functions, test lifecycle ops end-to-end, verify manage page in mock mode.
+**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (`72f4666f`), Phase 7 (`cab2cf9c`), Phase 8 (docs update), Phase 9A (`6d89795a`, `45b99a99`)
+**Next Step**: Commit Phase 9B changes, then run full UAT suite to validate all 81 tests pass.

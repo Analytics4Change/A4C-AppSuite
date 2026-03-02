@@ -7,6 +7,7 @@ node_modules/
 /coverage
 test-results/
 playwright-report/
+playwright-report-uat/
 test-results.json
 test-results.xml
 user_unit_test_run*.txt
