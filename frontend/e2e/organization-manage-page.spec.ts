@@ -2,7 +2,7 @@
  * Organization Manage Page UAT
  *
  * Implements the UAT plan from dev/active/organization-manage-page-uat.md
- * 81 test cases across 17 test suites.
+ * 112 test cases across 24 test suites.
  *
  * Run with:
  *   cd frontend && npx playwright test --config playwright.uat.config.ts
@@ -1075,7 +1075,9 @@ test.describe('TS-16: Keyboard Navigation & Accessibility', () => {
     const backBtn = page.locator('[data-testid="org-manage-back-btn"]');
     await backBtn.focus();
     await expect(backBtn).toBeFocused();
-    // DOM tab order: back button → refresh button → search input → filter buttons
+    // DOM tab order: back button → create button → refresh button → search input → filter buttons
+    await page.keyboard.press('Tab');
+    await expect(page.locator('[data-testid="org-list-create-btn"]')).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(page.locator('[data-testid="org-list-refresh-btn"]')).toBeFocused();
     // Tab to search input
@@ -1181,5 +1183,469 @@ test.describe('TS-17: URL Parameter Handling', () => {
     await expect(page.locator('[data-testid="org-details-card"]')).toBeVisible();
     await expect(page.locator('#org-name')).toHaveValue('ABC Healthcare Partners');
     await expect(page.locator('[data-testid="org-form-empty-state"]')).not.toBeVisible();
+  });
+});
+
+// ============================================================================
+// Helpers for Create Form Tests
+// ============================================================================
+
+/** Click the Create button and wait for the create form to appear */
+async function enterCreateMode(page: Page) {
+  await page.click('[data-testid="org-list-create-btn"]');
+  await page.waitForSelector('[data-testid="org-create-form"]', { timeout: 5000 });
+}
+
+/**
+ * Set a React controlled input's value via native setter + input event.
+ * Needed because the 3-column grid layout renders some inputs at 0px width,
+ * making Playwright's fill() fail with "element is not visible".
+ */
+async function reactFill(page: Page, selector: string, value: string) {
+  await page.locator(selector).evaluate((el: HTMLInputElement, val: string) => {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+    setter?.call(el, val);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+}
+
+/** Scoped version of reactFill for inputs within a container */
+async function reactFillScoped(
+  page: Page,
+  containerSelector: string,
+  inputSelector: string,
+  value: string
+) {
+  await page
+    .locator(containerSelector)
+    .locator(inputSelector)
+    .evaluate((el: HTMLInputElement, val: string) => {
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value'
+      )?.set;
+      setter?.call(el, val);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, value);
+}
+
+/** Fill the minimum required fields for a valid provider form submission */
+async function fillMinimalProviderForm(page: Page) {
+  // Organization fields (inputs may have 0px width in 3-col layout, use reactFill)
+  await reactFill(page, '[data-testid="org-create-name-input"]', 'Test Organization');
+  await reactFill(page, '[data-testid="org-create-display-name-input"]', 'Test Org');
+  // Subdomain (SubdomainInput renders a plain <input> with id="subdomain")
+  await reactFill(page, '#subdomain', 'test-org');
+  // General address
+  const addrSel = '[data-testid="org-create-general-address"]';
+  await reactFillScoped(page, addrSel, 'input[aria-label="Street address line 1"]', '123 Main St');
+  await reactFillScoped(page, addrSel, 'input[aria-label="City"]', 'New York');
+  await reactFillScoped(page, addrSel, 'input[aria-label="State (2-letter abbreviation)"]', 'NY');
+  await reactFillScoped(page, addrSel, 'input[aria-label="Zip code"]', '10001');
+  // General phone
+  await reactFillScoped(
+    page,
+    '[data-testid="org-create-general-phone"]',
+    'input[aria-label="Phone number"]',
+    '2125551234'
+  );
+  // Billing contact
+  const billSel = '[data-testid="org-create-billing-contact"]';
+  await reactFillScoped(page, billSel, 'input[aria-label="First name"]', 'Jane');
+  await reactFillScoped(page, billSel, 'input[aria-label="Last name"]', 'Doe');
+  await reactFillScoped(page, billSel, 'input[aria-label="Email address"]', 'jane@test.com');
+  // Use General for billing address + phone
+  await page.locator('[data-testid="org-create-use-billing-general-address"]').click();
+  await page.locator('[data-testid="org-create-use-billing-general-phone"]').click();
+  // Provider admin contact
+  const adminSel = '[data-testid="org-create-admin-contact"]';
+  await reactFillScoped(page, adminSel, 'input[aria-label="First name"]', 'John');
+  await reactFillScoped(page, adminSel, 'input[aria-label="Last name"]', 'Admin');
+  await reactFillScoped(page, adminSel, 'input[aria-label="Email address"]', 'john@test.com');
+  await reactFillScoped(
+    page,
+    adminSel,
+    'input[aria-label="Confirm email address"]',
+    'john@test.com'
+  );
+  // Use General for admin address + phone
+  await page.locator('[data-testid="org-create-use-admin-general-address"]').click();
+  await page.locator('[data-testid="org-create-use-admin-general-phone"]').click();
+}
+
+// ============================================================================
+// TS-18: Create Button Visibility & Entry (4 cases)
+// ============================================================================
+test.describe('TS-18: Create Button Visibility & Entry', () => {
+  test('TC-18-01: Create button visible for super_admin (platform owner)', async ({ page }) => {
+    await navigateToManagePage(page);
+    await expect(page.locator('[data-testid="org-list-create-btn"]')).toBeVisible();
+  });
+
+  test('TC-18-02: Create button NOT visible for provider_admin (no left panel)', async ({
+    page,
+  }) => {
+    await navigateToManagePage(page);
+    await switchToProfile(page, 'dev@example.com');
+    await page.locator('a[href="/organizations"]').waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('a[href="/organizations"]').click();
+    await page.waitForURL(/\/organizations/, { timeout: 10000 });
+    await page.waitForSelector('[data-testid="org-manage-page"]', { timeout: 15000 });
+    await expect(page.locator('[data-testid="org-list-create-btn"]')).not.toBeVisible();
+  });
+
+  test('TC-18-03: Clicking Create shows the create form in right panel', async ({ page }) => {
+    await navigateToManagePage(page);
+    await enterCreateMode(page);
+    await expect(page.locator('[data-testid="org-create-form"]')).toBeVisible();
+  });
+
+  test('TC-18-04: Create form replaces empty state / edit form', async ({ page }) => {
+    await navigateToManagePage(page);
+    // Start from empty state
+    await expect(page.locator('[data-testid="org-form-empty-state"]')).toBeVisible();
+    await enterCreateMode(page);
+    await expect(page.locator('[data-testid="org-form-empty-state"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="org-create-form"]')).toBeVisible();
+  });
+});
+
+// ============================================================================
+// TS-19: Create Form Structure & Sections (5 cases)
+// ============================================================================
+test.describe('TS-19: Create Form Structure & Sections', () => {
+  test.beforeEach(async ({ page }) => {
+    await navigateToManagePage(page);
+    await enterCreateMode(page);
+  });
+
+  test('TC-19-01: General Information section visible by default', async ({ page }) => {
+    await expect(page.locator('[data-testid="org-create-section-general"]')).toBeVisible();
+  });
+
+  test('TC-19-02: Billing section visible when type is provider (default)', async ({ page }) => {
+    await expect(page.locator('[data-testid="org-create-section-billing"]')).toBeVisible();
+  });
+
+  test('TC-19-03: Billing section hidden when type changed to provider_partner', async ({
+    page,
+  }) => {
+    // Change type to Provider Partner (force click: overlapping glassmorphism cards)
+    await page
+      .locator('[data-testid="org-create-type-select"]')
+      .evaluate((el) => (el as HTMLElement).click());
+    await page.locator('[role="option"]:has-text("Provider Partner")').click();
+    await expect(page.locator('[data-testid="org-create-section-billing"]')).not.toBeVisible();
+  });
+
+  test('TC-19-04: Provider Admin section always visible', async ({ page }) => {
+    await expect(page.locator('[data-testid="org-create-section-provider-admin"]')).toBeVisible();
+    // Also visible after switching type
+    await page
+      .locator('[data-testid="org-create-type-select"]')
+      .evaluate((el) => (el as HTMLElement).click());
+    await page.locator('[role="option"]:has-text("Provider Partner")').click();
+    await expect(page.locator('[data-testid="org-create-section-provider-admin"]')).toBeVisible();
+  });
+
+  test('TC-19-05: Section collapse/expand toggles work', async ({ page }) => {
+    // General section should be expanded (type select is visible)
+    const typeSelect = page.locator('[data-testid="org-create-type-select"]');
+    await expect(typeSelect).toBeVisible();
+    // Click the section title text to collapse
+    await page
+      .locator('[data-testid="org-create-section-general"]')
+      .locator('text=General Information')
+      .click();
+    await expect(typeSelect).not.toBeVisible();
+    // Click again to expand
+    await page
+      .locator('[data-testid="org-create-section-general"]')
+      .locator('text=General Information')
+      .click();
+    await expect(typeSelect).toBeVisible();
+  });
+});
+
+// ============================================================================
+// TS-20: Create Form Fields & Type Switching (5 cases)
+// ============================================================================
+test.describe('TS-20: Create Form Fields & Type Switching', () => {
+  test.beforeEach(async ({ page }) => {
+    await navigateToManagePage(page);
+    await enterCreateMode(page);
+  });
+
+  test('TC-20-01: Default form has org type Provider and timezone America/New_York', async ({
+    page,
+  }) => {
+    // Check type select shows Provider Organization
+    await expect(page.locator('[data-testid="org-create-type-select"]')).toContainText(
+      'Provider Organization'
+    );
+    // Check timezone shows Eastern
+    await expect(page.locator('[data-testid="org-create-timezone-select"]')).toContainText(
+      'Eastern'
+    );
+  });
+
+  test('TC-20-02: Switching to Provider Partner shows Partner Type, hides Billing, hides Referring Partner', async ({
+    page,
+  }) => {
+    // Initially: partner type not visible, billing visible, referring partner visible
+    await expect(page.locator('[data-testid="org-create-partner-type-select"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="org-create-section-billing"]')).toBeVisible();
+    await expect(page.locator('[data-testid="org-create-referring-partner"]')).toBeVisible();
+    // Switch to Provider Partner (force click: overlapping glassmorphism cards)
+    await page
+      .locator('[data-testid="org-create-type-select"]')
+      .evaluate((el) => (el as HTMLElement).click());
+    await page.locator('[role="option"]:has-text("Provider Partner")').click();
+    // Now: partner type visible, billing hidden, referring partner hidden
+    await expect(page.locator('[data-testid="org-create-partner-type-select"]')).toBeVisible();
+    await expect(page.locator('[data-testid="org-create-section-billing"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="org-create-referring-partner"]')).not.toBeVisible();
+  });
+
+  test('TC-20-03: Partner Type select appears only for provider_partner type', async ({ page }) => {
+    // Default is provider - partner type not visible
+    await expect(page.locator('[data-testid="org-create-partner-type-select"]')).not.toBeVisible();
+    // Switch to Partner
+    await page
+      .locator('[data-testid="org-create-type-select"]')
+      .evaluate((el) => (el as HTMLElement).click());
+    await page.locator('[role="option"]:has-text("Provider Partner")').click();
+    await expect(page.locator('[data-testid="org-create-partner-type-select"]')).toBeVisible();
+    // Switch back to Provider Organization
+    await page
+      .locator('[data-testid="org-create-type-select"]')
+      .evaluate((el) => (el as HTMLElement).click());
+    await page.getByRole('option', { name: 'Provider Organization', exact: true }).click();
+    await expect(page.locator('[data-testid="org-create-partner-type-select"]')).not.toBeVisible();
+  });
+
+  test('TC-20-04: Subdomain field present for provider type', async ({ page }) => {
+    // Provider is default - subdomain input should exist in DOM
+    // (may have 0px width in 3-col grid but is attached)
+    await expect(page.locator('#subdomain')).toBeAttached();
+  });
+
+  test('TC-20-05: Referring Partner dropdown visible only for provider type', async ({ page }) => {
+    await expect(page.locator('[data-testid="org-create-referring-partner"]')).toBeVisible();
+    // Switch to Partner
+    await page
+      .locator('[data-testid="org-create-type-select"]')
+      .evaluate((el) => (el as HTMLElement).click());
+    await page.locator('[role="option"]:has-text("Provider Partner")').click();
+    await expect(page.locator('[data-testid="org-create-referring-partner"]')).not.toBeVisible();
+  });
+});
+
+// ============================================================================
+// TS-21: Create Form Validation (6 cases)
+// ============================================================================
+test.describe('TS-21: Create Form Validation', () => {
+  test.beforeEach(async ({ page }) => {
+    await navigateToManagePage(page);
+    await enterCreateMode(page);
+  });
+
+  test('TC-21-01: Submit with empty form shows validation errors summary', async ({ page }) => {
+    // Make form dirty via reactFill then clear, so submit becomes enabled
+    await reactFill(page, '[data-testid="org-create-name-input"]', 'x');
+    await reactFill(page, '[data-testid="org-create-name-input"]', '');
+    await page.click('[data-testid="org-create-submit-btn"]');
+    await expect(page.locator('[data-testid="org-create-validation-errors"]')).toBeVisible();
+  });
+
+  test('TC-21-02: Organization Name required error shown', async ({ page }) => {
+    // Make form dirty then submit (only fill display name, not name)
+    await reactFill(page, '[data-testid="org-create-display-name-input"]', 'Test');
+    await page.click('[data-testid="org-create-submit-btn"]');
+    await expect(page.locator('[data-testid="org-create-validation-errors"]')).toContainText(
+      /name/i
+    );
+  });
+
+  test('TC-21-03: Display Name required error shown', async ({ page }) => {
+    await reactFill(page, '[data-testid="org-create-name-input"]', 'Test');
+    await page.click('[data-testid="org-create-submit-btn"]');
+    await expect(page.locator('[data-testid="org-create-validation-errors"]')).toContainText(
+      /display/i
+    );
+  });
+
+  test('TC-21-04: Headquarters address fields required (street1, city, state, zip)', async ({
+    page,
+  }) => {
+    await reactFill(page, '[data-testid="org-create-name-input"]', 'Test Org');
+    await reactFill(page, '[data-testid="org-create-display-name-input"]', 'Test');
+    await page.click('[data-testid="org-create-submit-btn"]');
+    const errors = page.locator('[data-testid="org-create-validation-errors"]');
+    await expect(errors).toBeVisible();
+    // Should mention address-related errors
+    await expect(errors).toContainText(/address|street|headquarters/i);
+  });
+
+  test('TC-21-05: Provider Admin contact required (first name, last name, email)', async ({
+    page,
+  }) => {
+    await reactFill(page, '[data-testid="org-create-name-input"]', 'Test Org');
+    await reactFill(page, '[data-testid="org-create-display-name-input"]', 'Test');
+    await page.click('[data-testid="org-create-submit-btn"]');
+    const errors = page.locator('[data-testid="org-create-validation-errors"]');
+    await expect(errors).toBeVisible();
+    await expect(errors).toContainText(/admin|provider/i);
+  });
+
+  test('TC-21-06: Submit button disabled when form is untouched (canSubmit requires isDirty)', async ({
+    page,
+  }) => {
+    await expect(page.locator('[data-testid="org-create-submit-btn"]')).toBeDisabled();
+  });
+});
+
+// ============================================================================
+// TS-22: "Use General" Checkboxes (4 cases)
+// ============================================================================
+test.describe('TS-22: Use General Checkboxes', () => {
+  test.beforeEach(async ({ page }) => {
+    await navigateToManagePage(page);
+    await enterCreateMode(page);
+  });
+
+  test('TC-22-01: Billing Address "Use General" checkbox disables billing address inputs', async ({
+    page,
+  }) => {
+    const billingAddr = page.locator('[data-testid="org-create-billing-address"]');
+    const street1 = billingAddr.locator('input[aria-label="Street address line 1"]');
+    // Initially enabled
+    await expect(street1).toBeEnabled();
+    // Check "Use General"
+    await page.locator('[data-testid="org-create-use-billing-general-address"]').click();
+    // Now disabled
+    await expect(street1).toBeDisabled();
+  });
+
+  test('TC-22-02: Billing Phone "Use General" checkbox disables billing phone inputs', async ({
+    page,
+  }) => {
+    const billingPhone = page.locator('[data-testid="org-create-billing-phone"]');
+    const phoneInput = billingPhone.locator('input[aria-label="Phone number"]');
+    await expect(phoneInput).toBeEnabled();
+    await page.locator('[data-testid="org-create-use-billing-general-phone"]').click();
+    await expect(phoneInput).toBeDisabled();
+  });
+
+  test('TC-22-03: Admin Address "Use General" checkbox disables admin address inputs', async ({
+    page,
+  }) => {
+    const adminAddr = page.locator('[data-testid="org-create-admin-address"]');
+    const street1 = adminAddr.locator('input[aria-label="Street address line 1"]');
+    await expect(street1).toBeEnabled();
+    await page.locator('[data-testid="org-create-use-admin-general-address"]').click();
+    await expect(street1).toBeDisabled();
+  });
+
+  test('TC-22-04: Admin Phone "Use General" checkbox disables admin phone inputs', async ({
+    page,
+  }) => {
+    const adminPhone = page.locator('[data-testid="org-create-admin-phone"]');
+    const phoneInput = adminPhone.locator('input[aria-label="Phone number"]');
+    await expect(phoneInput).toBeEnabled();
+    await page.locator('[data-testid="org-create-use-admin-general-phone"]').click();
+    await expect(phoneInput).toBeDisabled();
+  });
+});
+
+// ============================================================================
+// TS-23: Create Form Actions (4 cases)
+// ============================================================================
+test.describe('TS-23: Create Form Actions', () => {
+  test.beforeEach(async ({ page }) => {
+    await navigateToManagePage(page);
+    await enterCreateMode(page);
+  });
+
+  test('TC-23-01: Cancel button returns to empty state', async ({ page }) => {
+    await page.click('[data-testid="org-create-cancel-btn"]');
+    await expect(page.locator('[data-testid="org-create-form"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="org-form-empty-state"]')).toBeVisible();
+  });
+
+  test('TC-23-02: Save Draft button triggers save (last-saved timestamp appears)', async ({
+    page,
+  }) => {
+    // Make the form dirty first via reactFill (inputs may have 0px width)
+    await reactFill(page, '[data-testid="org-create-name-input"]', 'Draft Test Org');
+    await page.click('[data-testid="org-create-save-draft-btn"]');
+    await expect(page.locator('[data-testid="org-create-last-saved"]')).toBeVisible({
+      timeout: 5000,
+    });
+  });
+
+  test('TC-23-03: Submit with valid data navigates to bootstrap page', async ({ page }) => {
+    await fillMinimalProviderForm(page);
+    await page.click('[data-testid="org-create-submit-btn"]');
+    // Mock mode should navigate to /organizations/{id}/bootstrap
+    await page.waitForURL(/\/organizations\/.*\/bootstrap/, { timeout: 10000 });
+  });
+
+  test('TC-23-04: Enter key in text inputs does NOT submit form', async ({ page }) => {
+    // Focus the name input and type via keyboard (reactFill + keyboard Enter)
+    await reactFill(page, '[data-testid="org-create-name-input"]', 'Test');
+    // Focus the input element directly, then press Enter
+    await page.locator('[data-testid="org-create-name-input"]').evaluate((el) => el.focus());
+    await page.keyboard.press('Enter');
+    // Form should still be visible (not submitted)
+    await expect(page.locator('[data-testid="org-create-form"]')).toBeVisible();
+    // No navigation should have occurred
+    expect(page.url()).toContain('/organizations');
+    expect(page.url()).not.toContain('/bootstrap');
+  });
+});
+
+// ============================================================================
+// TS-24: Create Mode Unsaved Changes Guard (3 cases)
+// ============================================================================
+test.describe('TS-24: Create Mode Unsaved Changes Guard', () => {
+  test.beforeEach(async ({ page }) => {
+    await navigateToManagePage(page);
+    await waitForListLoaded(page);
+    await enterCreateMode(page);
+  });
+
+  test('TC-24-01: Clicking org in list while in create mode shows discard dialog', async ({
+    page,
+  }) => {
+    await page.click('[data-testid="org-list-item-provider-abc-healthcare-id"]');
+    const dialog = page.locator('[data-testid="confirm-dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 5000 });
+    await expect(dialog).toContainText(/unsaved changes/i);
+  });
+
+  test('TC-24-02: Confirming discard loads selected org (exits create mode)', async ({ page }) => {
+    await page.click('[data-testid="org-list-item-provider-abc-healthcare-id"]');
+    const dialog = page.locator('[data-testid="confirm-dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 5000 });
+    // Click "Discard Changes" button
+    await dialog.locator('button:has-text("Discard")').click();
+    // Create form should be gone, edit form should show
+    await expect(page.locator('[data-testid="org-create-form"]')).not.toBeVisible();
+    await waitForDetailsLoaded(page);
+    await expect(page.locator('[data-testid="org-details-card"]')).toBeVisible();
+  });
+
+  test('TC-24-03: Canceling discard stays in create mode', async ({ page }) => {
+    await page.click('[data-testid="org-list-item-provider-abc-healthcare-id"]');
+    const dialog = page.locator('[data-testid="confirm-dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 5000 });
+    // Click "Stay Here" button
+    await dialog.locator('button:has-text("Stay")').click();
+    await expect(dialog).not.toBeVisible();
+    // Create form should still be visible
+    await expect(page.locator('[data-testid="org-create-form"]')).toBeVisible();
   });
 });

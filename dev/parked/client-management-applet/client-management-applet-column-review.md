@@ -1,64 +1,108 @@
 # Client Management Applet — Column Review
 
 **Date**: 2026-02-12
-**Purpose**: Candidate field inventory for `clients_projection` with customizability classification.
+**Last Updated**: 2026-03-04
+**Purpose**: Finalized field inventory for `clients_projection` with mandatory/optional classification and configurability decisions.
 
 ---
 
-## Core Typed Columns (universal, NOT customizable)
+## Field Classification Legend
 
-These exist as real PostgreSQL columns on `clients_projection`. Every org gets them. They serve as conforming dimensions for Cube.js analytics.
+| Classification | Meaning |
+|---------------|---------|
+| **Mandatory + NOT NULL** | Always present, value required at registration |
+| **Mandatory + NULLABLE** | Always present as a field, but value can be null until a lifecycle event sets it |
+| **Optional** | Always present as a column, but not required |
+| **Configurable presence** | Org admin toggles whether field appears (via `client_field_definitions_projection`) |
+| **Infrastructure** | Column exists but not rendered in UI |
+
+---
+
+## Mandatory + NOT NULL (value required at registration)
+
+| Field | Type | Label Configurable | Dropdown Source | Reporting Dimension | Notes |
+|-------|------|-------------------|----------------|-------------------|-------|
+| `id` | uuid | N/A | — | — | PK, auto-generated |
+| `organization_id` | uuid | N/A | — | — | FK → organizations_projection |
+| `first_name` | text | No | — | No | |
+| `last_name` | text | No | — | No | |
+| `date_of_birth` | date | No | — | Yes | Drives computed `age_group` dimension |
+| `gender` | text | No | Hardcoded (Male, Female) | Yes | Label: "Gender Assigned at Birth" |
+| `race` | text[] | No | Hardcoded (7 OMB values) | Yes | Multi-select |
+| `ethnicity` | text | No | Hardcoded (3 OMB values) | Yes | Single-select |
+| `primary_language` | text | No | Org-configurable from `client_reference_values` master list | Yes | Defaults: English, Spanish |
+| `interpreter_needed` | boolean | No | — | No | |
+| `admission_date` | date | No | — | Yes | Provider-specified (not set by event handler) |
+| `internal_case_number` | text | **Yes** | — | No | Auto-populated from UUID; only renamable field |
+| `status` | text | No | — | Yes | Domain: `active` / `inactive` only |
+| `allergies` | jsonb | No | — | No | `{ nka, items: [{ name, severity }] }` with mutual exclusivity |
+| `medical_conditions` | jsonb | No | — | No | `{ nkmc, items: [{ code, description }] }` ICD-10 autocomplete |
+
+## Mandatory + NULLABLE (always present, value null until lifecycle event)
+
+| Field | Type | Label Configurable | Dropdown Source | Reporting Dimension | Notes |
+|-------|------|-------------------|----------------|-------------------|-------|
+| `discharge_date` | date | No | — | Yes | Provider-specified, set via `client.discharged` event payload |
+| `referral_source` | text | No | — (free text) | No | |
+
+## Optional (always present as column, not required)
+
+| Field | Type | Label Configurable | Dropdown Source | Reporting Dimension | Notes |
+|-------|------|-------------------|----------------|-------------------|-------|
+| `pronouns` | text | No | Org-configurable (via `client_field_definitions_projection`) | No | UI always appends "Other → free text" |
+| `middle_name` | text | No | — | No | **Not yet discussed** |
+| `preferred_name` | text | No | — | No | **Not yet discussed** |
+
+## Configurable Presence (org toggles on/off)
+
+| Field | Type | Label Configurable | Dropdown Source | Reporting Dimension | Notes |
+|-------|------|-------------------|----------------|-------------------|-------|
+| `medicaid_id` | text | No | — (free text) | No | Insurance identifier |
+| `medicare_id` | text | No | — (free text) | No | Insurance identifier |
+| `education_status` | text | No | Hardcoded (~10 values) | No | enrolled, not_enrolled, homeschool, etc. |
+| `grade_level` | text | No | — (free text) | No | |
+| `iep_status` | boolean | No | — | No | Individualized Education Program |
+
+## Infrastructure Columns (not rendered in UI)
 
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
-| `id` | uuid | yes | PK, auto-generated |
-| `organization_id` | uuid | yes | FK → organizations_projection |
-| `organization_unit_id` | uuid | no | FK → organization_units_projection (placement) |
-| **Demographics** | | | |
-| `first_name` | text | yes | |
-| `last_name` | text | yes | |
-| `middle_name` | text | no | |
-| `preferred_name` | text | no | |
-| `date_of_birth` | date | yes | Drives computed `age_group` dimension |
-| `gender` | text | no | Expanded values via `client_reference_values` |
-| `pronouns` | text | no | Free text (not enum) |
-| **Regulatory Demographics** | | | |
-| `race` | text[] | no | Multi-select, OMB categories (federally mandated) |
-| `ethnicity` | text | no | OMB two-question format |
-| `primary_language` | text | no | ISO 639 |
-| `interpreter_needed` | boolean | no | Default false |
-| **Administrative** | | | |
-| `case_number` | text | no | Org-specific numbering |
-| `admission_date` | date | no | Set by `client.admitted` event |
-| `discharge_date` | date | no | Set by `client.discharged` event |
-| `status` | text | yes | `registered`/`active`/`inactive`/`discharged`/`archived` |
-| `referral_source` | text | no | |
-| **Legal/Custody** | | | |
-| `legal_status` | jsonb | no | Guardianship, court order, case worker |
-| **Medical** | | | |
-| `allergies` | text[] | no | |
-| `medical_conditions` | text[] | no | ICD-10 codes |
-| `blood_type` | text | no | |
-| `height_cm` | numeric | no | |
-| `weight_kg` | numeric | no | |
-| **Insurance** | | | |
-| `medicaid_id` | text | no | Primary insurance identifier |
-| `ssn_last_four` | text | no | Last 4 only (HIPAA liability) |
-| **Education** | | | |
-| `education_status` | text | no | enrolled, homeschool, ged, etc. |
-| `grade_level` | text | no | |
-| `iep_status` | boolean | no | Individualized Education Program |
-| **Staff Assignments** | | | |
-| `assigned_clinician_id` | uuid | no | FK → users |
-| `program_manager_id` | uuid | no | FK → users |
-| **Other** | | | |
-| `photo_url` | text | no | |
-| `notes` | text | no | |
-| **Audit** | | | |
-| `created_at` | timestamptz | yes | Auto |
-| `updated_at` | timestamptz | no | Auto |
-| `created_by` | uuid | no | |
-| `updated_by` | uuid | no | |
+| `organization_unit_id` | uuid | NOT NULL | FK → organization_units_projection; set programmatically |
+
+## Not Yet Discussed (as of 2026-03-04)
+
+**Resume here next session** — user was about to answer when session ended.
+
+| Field | Type | Original Notes |
+|-------|------|---------------|
+| `photo_url` | text | Requires Supabase Storage infrastructure — likely defer |
+| `notes` | text | Free-text on client record vs separate notes system |
+
+## Audit Columns (standard, not yet discussed)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `created_at` | timestamptz | Auto |
+| `updated_at` | timestamptz | Auto |
+| `created_by` | uuid | |
+| `updated_by` | uuid | |
+
+## Dropped Fields (decided 2026-03-02, updated 2026-03-04)
+
+| Field | Original Type | Reason |
+|-------|--------------|--------|
+| `external_case_number_1` | text | Not needed |
+| `external_case_number_2` | text | Not needed |
+| `external_case_number_3` | text | Not needed |
+| `legal_status` | jsonb | Dropped |
+| `blood_type` | text | Not standard for residential behavioral health |
+| `height_cm` | numeric | Vitals — defer to future applet |
+| `weight_kg` | numeric | Vitals — defer to future applet |
+| `ssn_last_four` | text | Not required by EHR/EMR, HIPAA breach liability |
+| `program_manager_id` | uuid | Dropped |
+| `assigned_clinician_id` | uuid | Replaced by 4NF contact-designation model (2026-03-04) |
+
+---
 
 ## Customizable Fields (org-configurable via JSONB)
 
@@ -86,26 +130,75 @@ Stored in `custom_fields jsonb DEFAULT '{}'` on `clients_projection`. Defined pe
 | `discharge_plan` | Discharge Plan | text | no | Tenant |
 | `behavioral_tier` | Behavioral Tier | enum | yes | Tenant |
 
-## Contact Info (via junction tables, NOT columns)
+---
 
-Not stored on `clients_projection` directly. Linked via junction tables reusing existing projections:
+## Contact Info & Clinical Assignment (via junction tables, NOT columns)
+
+Not stored on `clients_projection` directly. Linked via junction tables reusing existing projections.
+
+### Standard Junction Tables
 
 | Junction Table | Links To | Examples |
 |---------------|----------|----------|
-| `client_contacts` | `contacts_projection` | Emergency contacts, guardians, caseworkers |
 | `client_phones` | `phones_projection` | Client/guardian phone numbers |
 | `client_addresses` | `addresses_projection` | Placement address, home address |
 
-## App-Owner Reference Values (read-only for tenants)
+### 4NF Contact-Designation Model (decided 2026-03-04)
 
-Stored in `client_reference_values`, managed by migrations/seeds. Tenants can't modify these — they're standardized for cross-org analytics.
+Clinician assignment uses a 4NF decomposition instead of a simple FK column. This supports internal users AND external people as clinical contacts, with per-client designation (clinician for Client A, therapist for Client B).
 
-| Category | Standard | Count | Examples |
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `contacts_projection` (existing, add `user_id`) | Unified "people" dimension | `user_id` (nullable FK → users; NULL = external) |
+| `contact_designations_projection` (new) | Designations a contact holds within an org (7 values: clinician, therapist, psychiatrist, behavioral_analyst, case_worker, guardian, emergency_contact) | `contact_id`, `designation`, `organization_id`; UNIQUE on all 3 |
+| `client_contact_assignments` (new, replaces `client_contacts`) | 4NF junction: client + contact + designation | `client_id`, `contact_id`, `contact_designation_id`, `organization_id`; UNIQUE on first 3 |
+
+**Replaces**: Originally planned `client_contacts` junction table.
+**Replaces**: `assigned_clinician_id` column on `clients_projection`.
+
+See `dev/active/client-management-applet-user-notes.md` "Clinical Contact Assignment Architecture" section for full table schemas, scenarios, and rationale.
+
+---
+
+## `client_reference_values` Table (reduced scope)
+
+Only **language** remains in the reference table. All other categories moved to hardcoded frontend dropdowns.
+
+| Category | Standard | Count | Purpose |
 |----------|----------|-------|---------|
-| Race | OMB | 7 | American Indian/Alaska Native, Asian, Black/African American, White, ... |
-| Ethnicity | OMB | 2 | Hispanic or Latino, Not Hispanic or Latino |
-| Language | ISO 639 | 20 | English, Spanish, Mandarin, Vietnamese, ... |
-| Gender | A4C | 7 | Male, Female, Non-binary, Transgender Male, Transgender Female, Other, Prefer Not to Say |
+| Language | ISO 639 | 20 | Master list for org admin to select from |
+
+**Removed from reference table** (hardcoded in frontend instead):
+- Gender (2 values: Male, Female)
+- Race (7 OMB values)
+- Ethnicity (3 OMB values)
+
+---
+
+## `client_field_definitions_projection` Usage Summary
+
+This table is used for:
+1. **Pronouns** — storing org-configurable dropdown options
+2. **Primary Language** — storing which languages from the master list the org has selected (defaults: English, Spanish)
+3. **Medicaid ID / Medicare ID** — toggling presence on/off
+4. **Education fields** — toggling presence on/off (education_status, grade_level, iep_status)
+5. **Internal Case Number** — configurable display label
+6. **Custom fields** — defining org-specific JSONB fields
+
+It is **NOT** used for configuring labels on any field other than `internal_case_number`.
+
+---
+
+## Provider-Specified Dates vs System Event Timestamps
+
+Two distinct date concepts for admission and discharge:
+
+| Concept | Storage | Source |
+|---------|---------|--------|
+| **Provider-specified date** | `admission_date` / `discharge_date` column on `clients_projection` | Entered by provider, part of CQRS event payload |
+| **System event timestamp** | `domain_events.created_at` | Automatic when event is recorded |
+
+Both flow through the full CQRS pipeline: API function → domain event payload → event handler → projection column.
 
 ---
 

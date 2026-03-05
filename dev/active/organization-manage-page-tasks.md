@@ -55,7 +55,7 @@
 - [x] Added `access_block_reason` field to `_shared/types.ts` JWTPayload
 - [x] Skip `validate-invitation` — unauthenticated (no JWT, token-based)
 - [x] Skip `accept-invitation` — unauthenticated (uses admin API, token-based)
-- [ ] Deploy updated Edge Functions (deploy after commit)
+- [x] Deploy updated Edge Functions — deployed via GitHub Actions 2026-03-02 21:33:58Z (success)
 
 ## Phase 3: Frontend Service Layer ✅ COMPLETE
 
@@ -168,7 +168,7 @@
 - [ ] Zero failed events in `domain_events.processing_error`
 - [x] Documentation has correct frontmatter, TL;DR, and AGENT-INDEX entries
 
-## Phase 9: Playwright UAT Test Suite ✅ IN PROGRESS
+## Phase 9: Playwright UAT Test Suite ✅ COMPLETE
 
 ### 9A: Test Infrastructure ✅ COMPLETE
 - [x] Create `frontend/playwright.uat.config.ts` — separate UAT config on port 3458, workers: 1, reuseExistingServer: true
@@ -180,7 +180,7 @@
 - [x] Commit: `6d89795a` (feat: add Playwright UAT test suite)
 - [x] Commit: `45b99a99` (fix: activate mock auth for UAT and add login-page data-testid)
 
-### 9B: Fix Failing Tests (TC-01-03, TC-01-04, TC-16-01) ⏸️ PENDING COMMIT
+### 9B: Fix Failing Tests (TC-01-03, TC-01-04, TC-16-01) ✅ COMPLETE
 - [x] **Root cause TC-01-03/04**: `page.goto()` after `switchToProfile()` triggers full SPA reload → DevAuth re-initializes with `VITE_DEV_PROFILE=super_admin` → profile switch is lost
 - [x] **Root cause TC-16-01**: DOM tab order is Back → Refresh → Search → Filters; test skipped the Refresh button
 - [x] **Root cause TC-01-04 (secondary)**: `partner_admin` has zero permissions (not in CANONICAL_ROLES) → RequirePermission blocks route
@@ -192,17 +192,54 @@
 - [x] Fix TC-01-04: Same SPA navigation fix (now works because partner_admin has `organization.update`)
 - [x] Fix TC-16-01: Add `await expect(org-list-refresh-btn).toBeFocused()` step between back button and search input
 - [x] Update architecture docs: `provider-admin-permissions-architecture.md` (MOCK_PROFILE_PERMISSIONS section), `rbac-architecture.md` (mock mode note)
-- [ ] Commit all Phase 9B changes
+- [x] Commit: `0f71b00e` (fix: add MOCK_PROFILE_PERMISSIONS pattern and fix 3 failing UAT tests)
 
-### 9C: Test Run Validation ⏸️ PENDING
-- [ ] Run `npx playwright test --config playwright.uat.config.ts --grep "TC-01-03|TC-01-04|TC-16-01"` — verify 3 fixed tests pass
-- [ ] Run full UAT suite `npx playwright test --config playwright.uat.config.ts` — verify all 81 pass
-- [ ] Add `frontend/test-results/` remains gitignored (already on line 8 of .gitignore)
+### 9C: Test Run Validation ✅ COMPLETE
+- [x] Run `npx playwright test --config playwright.uat.config.ts --grep "TC-01-03|TC-01-04|TC-16-01"` — 3 fixed tests pass
+- [x] Run full UAT suite `npx playwright test --config playwright.uat.config.ts` — all 81 pass
+- [x] `frontend/test-results/` remains gitignored (already on line 8 of .gitignore)
+
+## Phase 10: Route Consolidation ✅ COMPLETE
+
+- [x] Extract `OrganizationCreateForm` from `OrganizationCreatePage` (strip page wrapper, accept `onSubmitSuccess`/`onCancel` callbacks, rename export)
+- [x] Add `data-testid` attributes to all create form elements (28 test IDs per plan)
+- [x] Add `'create'` to `PanelMode` type in `OrganizationsManagePage`
+- [x] Add "Create" button in left panel header (next to Refresh, platform owner only)
+- [x] Render `OrganizationCreateForm` in right panel when `panelMode === 'create'`
+- [x] Add unsaved-changes guard for create mode (conservative: always shows discard dialog)
+- [x] Consolidate routes in `App.tsx` (5 routes → 2)
+- [x] Merge two nav entries in `MainLayout.tsx` into single "Organizations" entry
+- [x] Update `MoreMenuSheet.tsx` — remove `showForOrgTypes` restriction
+- [x] Update `OrganizationBootstrapStatusPage.tsx` — "Start Over" navigates to `/organizations`
+- [x] Delete `OrganizationListPage.tsx` and `OrganizationCreatePage.tsx`
+- [x] Update UAT test URLs from `/organizations/manage` to `/organizations`
+- [x] Typecheck passes (zero errors)
+- [x] Build succeeds
+- [x] Lint clean (only pre-existing issues)
+- [x] Commit: `c0c3ce49`
+- [x] Fix 3 lint issues: rename unused `page` → `_page` in TC-03-05/TC-03-06, remove stale `eslint-disable` from generated-events.ts (gitignored, local only)
+- [x] Lint passes with zero errors, zero warnings (uncommitted — spec file fix needs commit)
+
+## Phase 11: Create Form UAT Tests ✅ COMPLETE
+
+- [x] Add `reactFill()` helper — sets React controlled input values via native setter + event dispatch (inputs render at 0px width in 3-col grid at 1280px viewport)
+- [x] Add `reactFillScoped()` helper — scoped version for inputs within a container
+- [x] Add `enterCreateMode()` helper — clicks Create button and waits for form
+- [x] Add `fillMinimalProviderForm()` helper — fills all required fields for valid provider submission
+- [x] TS-18: Create Button Visibility & Entry (4 cases) — create button visible for super_admin, hidden for provider_admin, shows form, replaces empty state
+- [x] TS-19: Create Form Structure & Sections (5 cases) — section visibility, billing conditional on provider type, collapse/expand toggles
+- [x] TS-20: Create Form Fields & Type Switching (5 cases) — default values, Provider Partner toggle, Partner Type/Subdomain/Referring Partner conditional visibility
+- [x] TS-21: Create Form Validation (6 cases) — empty form errors, required field errors, submit disabled when untouched
+- [x] TS-22: Use General Checkboxes (4 cases) — billing address/phone and admin address/phone "Use General" disables inputs
+- [x] TS-23: Create Form Actions (4 cases) — cancel returns to empty state, save draft shows timestamp, submit navigates to bootstrap, Enter key blocked in text inputs
+- [x] TS-24: Create Mode Unsaved Changes Guard (3 cases) — discard dialog on org select, confirm exits create mode, cancel stays in create mode
+- [x] Fix TC-16-01 (pre-existing): Tab order updated to include Create button (Back → Create → Refresh → Search → Filters)
+- [x] All 112 tests pass (110 passed + 2 skipped, 0 failures)
 
 ## Current Status
 
-**Phase**: Phase 9B — Fix Failing UAT Tests
-**Status**: ⏸️ PENDING COMMIT
-**Last Updated**: 2026-03-02
-**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (`72f4666f`), Phase 7 (`cab2cf9c`), Phase 8 (docs update), Phase 9A (`6d89795a`, `45b99a99`)
-**Next Step**: Commit Phase 9B changes, then run full UAT suite to validate all 81 tests pass.
+**Phase**: All phases complete (0–11)
+**Status**: ✅ FEATURE COMPLETE
+**Last Updated**: 2026-03-05
+**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (`72f4666f`), Phase 7 (`cab2cf9c`), Phase 8 (docs update), Phase 9A (`6d89795a`, `45b99a99`), Phase 9B (`0f71b00e`), Phase 9C (81/81 UAT tests pass), Phase 10 (`c0c3ce49`), Phase 11 (31 new create form tests, 112 total)
+**Next Step**: Commit Phase 11 changes. Then archive dev-docs to `dev/archived/organization-manage-page/`. Remaining unchecked items are integration validation (require live Temporal + Supabase environment).

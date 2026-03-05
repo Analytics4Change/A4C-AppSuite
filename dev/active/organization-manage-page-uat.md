@@ -1686,6 +1686,503 @@ Entity dialog form fields use `id` attributes (not data-testid):
 
 ---
 
+### TS-18: Create Button Visibility & Entry (4 cases)
+
+---
+
+#### TC-18-01: Create button visible for super_admin (platform owner)
+**Profile**: super_admin
+**Precondition**: On manage page
+
+**Steps**:
+1. Navigate to `/organizations`
+2. Check for Create button -- `[data-testid="org-list-create-btn"]`
+
+**Expected**:
+- `org-list-create-btn` is visible in the left panel header
+- Button is next to the Refresh button
+
+---
+
+#### TC-18-02: Create button NOT visible for provider_admin
+**Profile**: provider_admin
+**Precondition**: On manage page
+
+**Steps**:
+1. Switch to provider_admin profile
+2. Navigate to `/organizations` (SPA navigation)
+3. Check for Create button -- `[data-testid="org-list-create-btn"]`
+
+**Expected**:
+- `org-list-create-btn` does NOT exist in DOM
+- Left panel is not rendered for provider_admin (no `org-list-panel`)
+
+---
+
+#### TC-18-03: Clicking Create shows the create form in right panel
+**Profile**: super_admin
+**Precondition**: On manage page, no org selected
+
+**Steps**:
+1. Click Create button -- `[data-testid="org-list-create-btn"]`
+2. Wait for create form -- `[data-testid="org-create-form"]`
+
+**Expected**:
+- `org-create-form` is visible in the right panel
+- Empty state (`org-form-empty-state`) is NOT visible
+
+---
+
+#### TC-18-04: Create form replaces edit form when org was selected
+**Profile**: super_admin
+**Precondition**: ABC Healthcare selected (edit mode)
+
+**Steps**:
+1. Click Create button -- `[data-testid="org-list-create-btn"]`
+2. Wait for create form -- `[data-testid="org-create-form"]`
+
+**Expected**:
+- `org-create-form` is visible
+- `org-details-card` (edit form) is NOT visible
+
+**Note**: If the edit form has unsaved changes, a discard dialog appears first.
+
+---
+
+### TS-19: Create Form Structure & Sections (5 cases)
+
+---
+
+#### TC-19-01: General Information section visible by default
+**Profile**: super_admin
+**Precondition**: Create form open
+
+**Steps**:
+1. Enter create mode (click Create button)
+2. Check for General section -- `[data-testid="org-create-section-general"]`
+
+**Expected**:
+- `org-create-section-general` is visible
+- Contains org type, name, display name, timezone, address, phone fields
+
+---
+
+#### TC-19-02: Billing section visible when type is "provider" (default)
+**Profile**: super_admin
+**Precondition**: Create form open with default type (Provider Organization)
+
+**Steps**:
+1. Enter create mode
+2. Check for Billing section -- `[data-testid="org-create-section-billing"]`
+
+**Expected**:
+- `org-create-section-billing` is visible (default type is Provider Organization)
+
+---
+
+#### TC-19-03: Billing section hidden when type changed to "provider_partner"
+**Profile**: super_admin
+**Precondition**: Create form open
+
+**Steps**:
+1. Enter create mode
+2. Change type to "Provider Partner" via `[data-testid="org-create-type-select"]`
+3. Check for Billing section
+
+**Expected**:
+- `org-create-section-billing` does NOT exist in DOM
+- Provider Partner type does not require billing info
+
+**Selector note**: Use `evaluate(el => el.click())` on the select trigger, then `getByRole('option', { name: 'Provider Partner' })` for the option.
+
+---
+
+#### TC-19-04: Provider Admin section always visible
+**Profile**: super_admin
+**Precondition**: Create form open
+
+**Steps**:
+1. Enter create mode
+2. Check for Provider Admin section -- `[data-testid="org-create-section-provider-admin"]`
+
+**Expected**:
+- `org-create-section-provider-admin` is visible for all org types
+
+---
+
+#### TC-19-05: Section collapse/expand toggles work
+**Profile**: super_admin
+**Precondition**: Create form open
+
+**Steps**:
+1. Enter create mode
+2. Click the "General Information" section header text
+3. Check that section content collapses
+4. Click again
+5. Check that section content re-expands
+
+**Expected**:
+- Section content toggles visibility on header click
+- All three sections are independently collapsible
+
+---
+
+### TS-20: Create Form Fields & Type Switching (5 cases)
+
+---
+
+#### TC-20-01: Default form has org type "Provider Organization", timezone "America/New_York"
+**Profile**: super_admin
+**Precondition**: Create form open
+
+**Steps**:
+1. Enter create mode
+2. Check type select value -- `[data-testid="org-create-type-select"]`
+3. Check timezone select value -- `[data-testid="org-create-timezone-select"]`
+
+**Expected**:
+- Type shows "Provider Organization"
+- Timezone shows "America/New_York"
+
+---
+
+#### TC-20-02: Switching to "Provider Partner" hides Billing section and Referring Partner
+**Profile**: super_admin
+**Precondition**: Create form open
+
+**Steps**:
+1. Enter create mode
+2. Change type to "Provider Partner"
+3. Check for Billing section -- `[data-testid="org-create-section-billing"]`
+4. Check for Referring Partner dropdown -- `[data-testid="org-create-referring-partner-dropdown"]`
+
+**Expected**:
+- `org-create-section-billing` does NOT exist
+- `org-create-referring-partner-dropdown` does NOT exist
+- Partner Type select is visible -- `[data-testid="org-create-partner-type-select"]`
+
+---
+
+#### TC-20-03: Partner Type select appears only for provider_partner type
+**Profile**: super_admin
+**Precondition**: Create form open with default "Provider Organization" type
+
+**Steps**:
+1. Enter create mode
+2. Verify `[data-testid="org-create-partner-type-select"]` does NOT exist
+3. Switch to "Provider Partner"
+4. Verify `[data-testid="org-create-partner-type-select"]` IS visible
+
+**Expected**:
+- Partner Type select only rendered for provider_partner type
+
+---
+
+#### TC-20-04: Subdomain field visible for provider type
+**Profile**: super_admin
+**Precondition**: Create form open
+
+**Steps**:
+1. Enter create mode
+2. Check for subdomain input -- `[data-testid="org-create-subdomain-input"]`
+
+**Expected**:
+- `org-create-subdomain-input` is visible for provider type
+
+**Selector note**: SubdomainInput does not accept `data-testid` on the inner `<input>`. Use `[data-testid="org-create-subdomain-input"] input` or `#subdomain`.
+
+---
+
+#### TC-20-05: Referring Partner dropdown visible only for provider type
+**Profile**: super_admin
+**Precondition**: Create form open
+
+**Steps**:
+1. Enter create mode (default: Provider Organization)
+2. Check for Referring Partner -- `[data-testid="org-create-referring-partner-dropdown"]`
+3. Switch to Provider Partner
+4. Check again
+
+**Expected**:
+- Visible for Provider Organization type
+- NOT visible for Provider Partner type
+
+---
+
+### TS-21: Create Form Validation (6 cases)
+
+---
+
+#### TC-21-01: Submit with empty form shows validation errors summary
+**Profile**: super_admin
+**Precondition**: Create form open, no fields filled
+
+**Steps**:
+1. Enter create mode
+2. Fill one field to make form dirty (required for submit to be enabled)
+3. Click Submit -- `[data-testid="org-create-submit-btn"]`
+4. Check for validation errors -- `[data-testid="org-create-validation-errors"]`
+
+**Expected**:
+- Validation errors summary appears listing required fields
+- Form is NOT submitted
+
+---
+
+#### TC-21-02: Organization Name required error shown
+**Profile**: super_admin
+**Precondition**: Create form with Organization Name empty
+
+**Steps**:
+1. Enter create mode
+2. Fill Display Name (makes form dirty) but leave Name empty
+3. Click Submit
+4. Check validation errors for "Organization Name"
+
+**Expected**:
+- Validation errors mention "Organization Name" as required
+
+---
+
+#### TC-21-03: Display Name required error shown
+**Profile**: super_admin
+**Precondition**: Create form with Display Name empty
+
+**Steps**:
+1. Enter create mode
+2. Fill Organization Name but leave Display Name empty
+3. Click Submit
+4. Check validation errors for "Display Name"
+
+**Expected**:
+- Validation errors mention "Display Name" as required
+
+---
+
+#### TC-21-04: Headquarters address fields required
+**Profile**: super_admin
+**Precondition**: Create form with address fields empty
+
+**Steps**:
+1. Enter create mode
+2. Fill name fields but leave address empty
+3. Click Submit
+4. Check validation errors for address fields
+
+**Expected**:
+- Validation errors mention street address, city, state, and zip as required
+
+---
+
+#### TC-21-05: Provider Admin contact required
+**Profile**: super_admin
+**Precondition**: Create form with admin fields empty
+
+**Steps**:
+1. Enter create mode
+2. Fill name and address fields but leave admin contact empty
+3. Click Submit
+4. Check validation errors for admin fields
+
+**Expected**:
+- Validation errors mention admin first name, last name, and email as required
+
+---
+
+#### TC-21-06: Submit button disabled when form untouched
+**Profile**: super_admin
+**Precondition**: Create form just opened (no fields touched)
+
+**Steps**:
+1. Enter create mode
+2. Check submit button state -- `[data-testid="org-create-submit-btn"]`
+
+**Expected**:
+- Submit button is disabled (`canSubmit = isDirty && !isSubmitting`, isDirty is false when untouched)
+
+---
+
+### TS-22: "Use General" Checkboxes (4 cases)
+
+---
+
+#### TC-22-01: Billing Address "Use General" checkbox disables billing address inputs
+**Profile**: super_admin
+**Precondition**: Create form open (provider type, billing section visible)
+
+**Steps**:
+1. Enter create mode
+2. Click "Use General" for billing address -- `[data-testid="org-create-use-billing-general-address"]`
+3. Check billing address inputs within `[data-testid="org-create-billing-address"]`
+
+**Expected**:
+- Billing address inputs are disabled after checking "Use General"
+
+---
+
+#### TC-22-02: Billing Phone "Use General" checkbox disables billing phone inputs
+**Profile**: super_admin
+**Precondition**: Create form open (provider type, billing section visible)
+
+**Steps**:
+1. Enter create mode
+2. Click "Use General" for billing phone -- `[data-testid="org-create-use-billing-general-phone"]`
+3. Check billing phone inputs within `[data-testid="org-create-billing-phone"]`
+
+**Expected**:
+- Billing phone inputs are disabled after checking "Use General"
+
+---
+
+#### TC-22-03: Admin Address "Use General" checkbox disables admin address inputs
+**Profile**: super_admin
+**Precondition**: Create form open
+
+**Steps**:
+1. Enter create mode
+2. Click "Use General" for admin address -- `[data-testid="org-create-use-admin-general-address"]`
+3. Check admin address inputs within `[data-testid="org-create-admin-address"]`
+
+**Expected**:
+- Admin address inputs are disabled after checking "Use General"
+
+---
+
+#### TC-22-04: Admin Phone "Use General" checkbox disables admin phone inputs
+**Profile**: super_admin
+**Precondition**: Create form open
+
+**Steps**:
+1. Enter create mode
+2. Click "Use General" for admin phone -- `[data-testid="org-create-use-admin-general-phone"]`
+3. Check admin phone inputs within `[data-testid="org-create-admin-phone"]`
+
+**Expected**:
+- Admin phone inputs are disabled after checking "Use General"
+
+---
+
+### TS-23: Create Form Actions (4 cases)
+
+---
+
+#### TC-23-01: Cancel button returns to empty state
+**Profile**: super_admin
+**Precondition**: Create form open
+
+**Steps**:
+1. Enter create mode
+2. Click Cancel -- `[data-testid="org-create-cancel-btn"]`
+3. Check for empty state -- `[data-testid="org-form-empty-state"]`
+
+**Expected**:
+- Create form is removed from DOM
+- Empty state is visible (panelMode → 'empty')
+
+---
+
+#### TC-23-02: Save Draft button triggers save (last-saved timestamp appears)
+**Profile**: super_admin
+**Precondition**: Create form open with at least one field filled
+
+**Steps**:
+1. Enter create mode
+2. Fill Organization Name
+3. Click Save Draft -- `[data-testid="org-create-save-draft-btn"]`
+4. Check for last-saved timestamp -- `[data-testid="org-create-last-saved"]`
+
+**Expected**:
+- Last-saved timestamp appears (e.g., "Last saved: 3:45 PM")
+- Form remains in create mode
+
+---
+
+#### TC-23-03: Submit with valid data navigates to bootstrap page
+**Profile**: super_admin
+**Precondition**: Create form with all required fields filled
+
+**Steps**:
+1. Enter create mode
+2. Fill all required fields using `fillMinimalProviderForm()`
+3. Click Submit -- `[data-testid="org-create-submit-btn"]`
+4. Wait for navigation
+
+**Expected**:
+- URL changes to `/organizations/{id}/bootstrap` pattern
+- Mock service creates org and returns a new ID
+
+---
+
+#### TC-23-04: Enter key in text inputs does NOT submit form
+**Profile**: super_admin
+**Precondition**: Create form open
+
+**Steps**:
+1. Enter create mode
+2. Click into Organization Name input
+3. Type a value
+4. Press Enter key
+5. Check that form is still visible
+
+**Expected**:
+- Create form remains visible (not submitted)
+- `handleFormKeyDown` intercepts Enter on input[type="text"] and prevents submission
+
+---
+
+### TS-24: Create Mode Unsaved Changes Guard (3 cases)
+
+---
+
+#### TC-24-01: Clicking org in list while in create mode shows discard dialog
+**Profile**: super_admin
+**Precondition**: In create mode
+
+**Steps**:
+1. Enter create mode
+2. Click an org in the list (e.g., ABC Healthcare)
+3. Wait for dialog
+
+**Expected**:
+- Discard changes dialog appears -- `[data-testid="confirm-dialog"]`
+- Title is "Unsaved Changes" -- `[data-testid="confirm-dialog-title"]`
+- Confirm button says "Discard Changes"
+- Cancel button says "Stay Here"
+
+**Note**: Dialog appears even if no fields were filled (conservative guard — parent can't check create form's isDirty).
+
+---
+
+#### TC-24-02: Confirming discard loads selected org (exits create mode)
+**Profile**: super_admin
+**Precondition**: Discard dialog visible (from TC-24-01)
+
+**Steps**:
+1. Click "Discard Changes" -- `[data-testid="confirm-dialog-confirm-btn"]`
+2. Wait for org details to load
+
+**Expected**:
+- Create form is removed from DOM
+- Selected org's edit form appears -- `[data-testid="org-details-card"]`
+- Dialog closes
+
+---
+
+#### TC-24-03: Canceling discard stays in create mode
+**Profile**: super_admin
+**Precondition**: Discard dialog visible (from TC-24-01)
+
+**Steps**:
+1. Click "Stay Here" -- `[data-testid="confirm-dialog-cancel-btn"]`
+2. Check form state
+
+**Expected**:
+- Dialog closes
+- Create form remains visible -- `[data-testid="org-create-form"]`
+- No org is selected in the list
+
+---
+
 ## Summary
 
 | Suite | Cases | Description |
@@ -1707,7 +2204,22 @@ Entity dialog form fields use `id` attributes (not data-testid):
 | TS-15 | 1 | Error Banner |
 | TS-16 | 7 | Keyboard Nav & Accessibility |
 | TS-17 | 2 | URL Parameter Handling |
-| **Total** | **81** | |
+| TS-18 | 4 | Create Button Visibility & Entry |
+| TS-19 | 5 | Create Form Structure & Sections |
+| TS-20 | 5 | Create Form Fields & Type Switching |
+| TS-21 | 6 | Create Form Validation |
+| TS-22 | 4 | Use General Checkboxes |
+| TS-23 | 4 | Create Form Actions |
+| TS-24 | 3 | Create Mode Unsaved Changes Guard |
+| **Total** | **112** | |
+
+### Playwright Automation Notes (TS-18 through TS-24)
+
+1. **0-width inputs**: The create form's 3-column grid layout makes inputs render at 0px width. Playwright's `fill()` fails. Use `reactFill()` helper (native `HTMLInputElement.prototype.value` setter + `input`/`change` events).
+2. **Radix Select interaction**: Glassmorphism card overlap intercepts pointer events. Use `evaluate(el => el.click())` on the trigger, then `getByRole('option', { name: '...', exact: true })` for options.
+3. **Exact option labels**: Use "Provider Organization" (not "Provider") — the shorter text matches both options via `:has-text()`.
+4. **SubdomainInput**: Does not accept `data-testid` on inner `<input>`. Target via `[data-testid="org-create-subdomain-input"] input` or `#subdomain`.
+5. **Section collapse/expand**: Click section title text (e.g., `locator('text=General Information')`), not a class-based selector.
 
 ### Known Mock Limitations Summary
 

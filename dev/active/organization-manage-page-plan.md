@@ -138,8 +138,21 @@ Single migration `20260226002002_organization_manage_page_phase1.sql` (1027 line
 | Bootstrap activity reuse incompatibility | Medium | Verify each activity queries by org_id, test in isolation |
 | Schema column mismatch | High | Phase 0C verification step before writing any RPCs |
 
+## Phase 10: Route Consolidation ✅ COMPLETE (commit `c0c3ce49`)
+
+Consolidated 5 organization routes into single `/organizations` page matching the org-units pattern.
+
+### Changes
+- Extracted `OrganizationCreateForm` from `OrganizationCreatePage` (callback props, `data-testid` attributes)
+- Added `'create'` panel mode to `OrganizationsManagePage` with discard guard
+- Merged 5 routes to 2: `/organizations` (manage page) + `/organizations/:id/bootstrap`
+- Single nav entry "Organizations" with `organization.update` permission (no org type restriction)
+- Deleted `OrganizationListPage.tsx` and `OrganizationCreatePage.tsx`
+- Updated UAT test URLs
+
 ## Next Steps After Completion
 
+- Run UAT tests to verify route changes don't break existing 81 test cases
 - Organization deletion status polling UI (S3 from architect review)
 - Cross-tenant access grant management UI
 - VAR dashboard with aggregated performance metrics
