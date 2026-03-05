@@ -20,8 +20,13 @@ interface MoreMenuItem {
  * More menu items - overflow items not shown in bottom nav
  */
 const moreMenuItems: MoreMenuItem[] = [
-  { to: '/organizations', icon: Building, label: 'Organizations', showForOrgTypes: ['platform_owner'] },
-  { to: '/organization-units', icon: FolderTree, label: 'Organization Units', showForOrgTypes: ['provider'] },
+  { to: '/organizations', icon: Building, label: 'Organizations' },
+  {
+    to: '/organization-units',
+    icon: FolderTree,
+    label: 'Organization Units',
+    showForOrgTypes: ['provider'],
+  },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
@@ -46,11 +51,11 @@ export const MoreMenuSheet: React.FC<MoreMenuSheetProps> = ({ isOpen, onClose })
     enabled: isOpen,
     trapFocus: true,
     restoreFocus: true,
-    onEscape: onClose
+    onEscape: onClose,
   });
 
   // Filter items based on org_type
-  const visibleItems = moreMenuItems.filter(item => {
+  const visibleItems = moreMenuItems.filter((item) => {
     // Check showForOrgTypes (inclusion pattern)
     if (item.showForOrgTypes && orgType) {
       if (!item.showForOrgTypes.includes(orgType)) {
@@ -100,7 +105,6 @@ export const MoreMenuSheet: React.FC<MoreMenuSheetProps> = ({ isOpen, onClose })
         <div className="flex justify-center pt-3 pb-2">
           <div className="w-12 h-1 bg-gray-300 rounded-full" />
         </div>
-
         {/* Close button */}
         <button
           onClick={onClose}
@@ -110,7 +114,6 @@ export const MoreMenuSheet: React.FC<MoreMenuSheetProps> = ({ isOpen, onClose })
         >
           <X size={20} aria-hidden="true" />
         </button>
-
         {/* Menu items */}
         <nav className="px-4 py-2 space-y-1" aria-label="Additional navigation">
           {visibleItems.map((item) => {
@@ -123,10 +126,7 @@ export const MoreMenuSheet: React.FC<MoreMenuSheetProps> = ({ isOpen, onClose })
                 className={({ isActive }) => `
                   flex items-center gap-3 px-4 py-3 rounded-lg
                   transition-colors duration-200
-                  ${isActive
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-700 hover:bg-gray-100'
-                  }
+                  ${isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'}
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
                 `}
               >
@@ -148,7 +148,6 @@ export const MoreMenuSheet: React.FC<MoreMenuSheetProps> = ({ isOpen, onClose })
             <span className="font-medium">Logout</span>
           </button>
         </nav>
-
         <div className="h-4" /> {/* Bottom spacing */}
       </div>
     </>

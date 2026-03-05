@@ -14,8 +14,6 @@ import { ClientDetailLayout } from '@/pages/clients/ClientDetailLayout';
 import { ClientOverviewPage } from '@/pages/clients/ClientOverviewPage';
 import { ClientMedicationsPage } from '@/pages/clients/ClientMedicationsPage';
 import { MedicationManagementPage } from '@/pages/medications/MedicationManagementPage';
-import { OrganizationListPage } from '@/pages/organizations/OrganizationListPage';
-import { OrganizationCreatePage } from '@/pages/organizations/OrganizationCreatePage';
 import { OrganizationBootstrapStatusPage } from '@/pages/organizations/OrganizationBootstrapStatusPage';
 import { OrganizationDashboard } from '@/pages/organizations/OrganizationDashboard';
 import { OrganizationsManagePage } from '@/pages/organizations/OrganizationsManagePage';
@@ -92,12 +90,11 @@ function App() {
                 </Route>
 
                 {/* Organization Management routes */}
-                <Route path="/organizations" element={<OrganizationListPage />} />
                 <Route
-                  path="/organizations/create"
+                  path="/organizations"
                   element={
-                    <RequirePermission permission="organization.create" fallback="/clients">
-                      <OrganizationCreatePage />
+                    <RequirePermission permission="organization.update" fallback="/clients">
+                      <OrganizationsManagePage />
                     </RequirePermission>
                   }
                 />
@@ -106,18 +103,6 @@ function App() {
                   element={<OrganizationBootstrapStatusPage />}
                 />
                 <Route path="/organizations/:orgId/dashboard" element={<OrganizationDashboard />} />
-                <Route
-                  path="/organizations/manage"
-                  element={
-                    <RequirePermission permission="organization.update" fallback="/clients">
-                      <OrganizationsManagePage />
-                    </RequirePermission>
-                  }
-                />
-                <Route
-                  path="/organizations/:orgId/edit"
-                  element={<Navigate to="/organizations/manage" replace />}
-                />
 
                 {/* Organization Units route (single consolidated view with permission-based UI) */}
                 <Route

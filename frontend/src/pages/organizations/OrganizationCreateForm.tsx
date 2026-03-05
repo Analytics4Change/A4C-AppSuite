@@ -1,6 +1,7 @@
 /**
- * Organization Create Page
+ * Organization Create Form
  *
+ * Extracted from OrganizationCreatePage for embedding in the manage page's right panel.
  * Complete implementation with 3-section structure:
  * - General Information (Organization + Headquarters)
  * - Billing Information (Contact + Address + Phone) - Conditional for providers
@@ -20,7 +21,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
-import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -31,11 +31,7 @@ import { PhoneInputEnhanced } from '@/components/organizations/PhoneInputEnhance
 import { ReferringPartnerDropdown } from '@/components/organizations/ReferringPartnerDropdown';
 import { SubdomainInput } from '@/components/organization/SubdomainInput';
 import { OrganizationFormViewModel } from '@/viewModels/organization/OrganizationFormViewModel';
-import {
-  US_TIME_ZONES,
-  ORGANIZATION_TYPES,
-  PARTNER_TYPES
-} from '@/constants';
+import { US_TIME_ZONES, ORGANIZATION_TYPES, PARTNER_TYPES } from '@/constants';
 import { Save, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import { Logger } from '@/utils/logger';
@@ -55,14 +51,15 @@ const GLASSMORPHISM_SECTION_STYLE: React.CSSProperties = {
   backdropFilter: 'blur(20px)',
   WebkitBackdropFilter: 'blur(20px)',
   border: '1px solid',
-  borderImage: 'linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.5) 100%) 1',
+  borderImage:
+    'linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.5) 100%) 1',
   boxShadow: `
     0 0 0 1px rgba(255, 255, 255, 0.18) inset,
     0 2px 4px rgba(0, 0, 0, 0.04),
     0 4px 8px rgba(0, 0, 0, 0.04),
     0 8px 16px rgba(0, 0, 0, 0.04),
     0 0 24px rgba(59, 130, 246, 0.03)
-  `.trim()
+  `.trim(),
 };
 
 /**
@@ -73,7 +70,7 @@ const GLASSMORPHISM_CARD_STYLE: React.CSSProperties = {
   backdropFilter: 'blur(20px)',
   WebkitBackdropFilter: 'blur(20px)',
   border: '1px solid rgba(255, 255, 255, 0.3)',
-  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
 };
 
 /**
@@ -96,107 +93,107 @@ const createCardHoverHandlers = () => ({
   onMouseLeave: (e: React.MouseEvent<HTMLDivElement>) => {
     e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
     e.currentTarget.style.transform = 'translateY(0)';
-  }
+  },
 });
 
+// =============================================================================
+// Props Interface
+// =============================================================================
+
+export interface OrganizationCreateFormProps {
+  onSubmitSuccess: (organizationId: string) => void;
+  onCancel: () => void;
+}
+
 /**
- * Organization Create Page Component
+ * Organization Create Form Component
  *
  * Full 3-section form with dynamic visibility and "Use General Information" support.
  */
-export const OrganizationCreatePage: React.FC = observer(() => {
-  const navigate = useNavigate();
-  useAuth(); // For auth context availability
-  const [viewModel] = useState(() => new OrganizationFormViewModel());
-  const [isSubmitting, setIsSubmitting] = useState(false);
+export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = observer(
+  ({ onSubmitSuccess, onCancel }) => {
+    useAuth(); // For auth context availability
+    const [viewModel] = useState(() => new OrganizationFormViewModel());
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Section collapse states
-  const [generalCollapsed, setGeneralCollapsed] = useState(false);
-  const [billingCollapsed, setBillingCollapsed] = useState(false);
-  const [adminCollapsed, setAdminCollapsed] = useState(false);
+    // Section collapse states
+    const [generalCollapsed, setGeneralCollapsed] = useState(false);
+    const [billingCollapsed, setBillingCollapsed] = useState(false);
+    const [adminCollapsed, setAdminCollapsed] = useState(false);
 
-  // Auto-save effect (debounced)
-  useEffect(() => {
-    if (viewModel.isDirty) {
-      const timeoutId = setTimeout(() => {
-        viewModel.autoSaveDraft();
-      }, 500);
+    // Auto-save effect (debounced)
+    useEffect(() => {
+      if (viewModel.isDirty) {
+        const timeoutId = setTimeout(() => {
+          viewModel.autoSaveDraft();
+        }, 500);
 
-      return () => clearTimeout(timeoutId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- viewModel is a stable MobX store created in useMemo
-  }, [viewModel.formData, viewModel.isDirty]);
-
-  // Form submission handler
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!viewModel.validate()) {
-      log.warn('Form validation failed', {
-        errorCount: viewModel.validationErrors.length
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const organizationId = await viewModel.submit();
-
-      if (organizationId) {
-        log.info('Organization workflow started', { organizationId });
-        // Navigate to status page - route uses organizationId (unified ID system)
-        navigate(`/organizations/${organizationId}/bootstrap`);
-      } else {
-        // Submission failed - error is already displayed in submissionError
-        log.warn('Organization submission returned null - staying on form');
+        return () => clearTimeout(timeoutId);
       }
-    } catch (error) {
-      log.error('Failed to submit organization', error);
-      // Error is already handled in viewModel.submit() catch block
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- viewModel is a stable MobX store created in useMemo
+    }, [viewModel.formData, viewModel.isDirty]);
 
-  /**
-   * Prevent Enter key from submitting form when in text inputs.
-   * Complex multi-field forms should require explicit Submit button click.
-   * Enter still works for:
-   * - Radix Select dropdowns (item selection)
-   * - Submit button when focused
-   * - Non-text inputs (checkboxes, radios, etc.)
-   */
-  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
-    if (e.key === 'Enter') {
-      const target = e.target as HTMLElement;
-      const tagName = target.tagName.toLowerCase();
+    // Form submission handler
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
 
-      if (tagName === 'input') {
-        const inputType = (target as HTMLInputElement).type?.toLowerCase();
-        const textTypes = ['text', 'email', 'tel', 'password', 'search', 'url'];
-        if (!inputType || textTypes.includes(inputType)) {
-          e.preventDefault();
+      if (!viewModel.validate()) {
+        log.warn('Form validation failed', {
+          errorCount: viewModel.validationErrors.length,
+        });
+        return;
+      }
+
+      setIsSubmitting(true);
+
+      try {
+        const organizationId = await viewModel.submit();
+
+        if (organizationId) {
+          log.info('Organization workflow started', { organizationId });
+          onSubmitSuccess(organizationId);
+        } else {
+          // Submission failed - error is already displayed in submissionError
+          log.warn('Organization submission returned null - staying on form');
+        }
+      } catch (error) {
+        log.error('Failed to submit organization', error);
+        // Error is already handled in viewModel.submit() catch block
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    /**
+     * Prevent Enter key from submitting form when in text inputs.
+     * Complex multi-field forms should require explicit Submit button click.
+     * Enter still works for:
+     * - Radix Select dropdowns (item selection)
+     * - Submit button when focused
+     * - Non-text inputs (checkboxes, radios, etc.)
+     */
+    const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+      if (e.key === 'Enter') {
+        const target = e.target as HTMLElement;
+        const tagName = target.tagName.toLowerCase();
+
+        if (tagName === 'input') {
+          const inputType = (target as HTMLInputElement).type?.toLowerCase();
+          const textTypes = ['text', 'email', 'tel', 'password', 'search', 'url'];
+          if (!inputType || textTypes.includes(inputType)) {
+            e.preventDefault();
+          }
         }
       }
-    }
-  };
+    };
 
-  const formData = viewModel.formData;
-  const isProvider = formData.type === 'provider';
-  const isPartner = formData.type === 'provider_partner';
+    const formData = viewModel.formData;
+    const isProvider = formData.type === 'provider';
+    const isPartner = formData.type === 'provider_partner';
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 p-8">
-      <div className="max-w-[130rem] mx-auto">
+    return (
+      <div data-testid="org-create-form">
         <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="space-y-6">
-          {/* Page Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              Create New Organization
-            </h1>
-          </div>
-
           {/* Submission Error Banner */}
           {viewModel.submissionError && (
             <div
@@ -204,10 +201,11 @@ export const OrganizationCreatePage: React.FC = observer(() => {
               style={{
                 background: 'rgba(239, 68, 68, 0.1)',
                 backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)'
+                WebkitBackdropFilter: 'blur(10px)',
               }}
               role="alert"
               aria-live="assertive"
+              data-testid="org-create-submit-error"
             >
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">
@@ -230,9 +228,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                   <h3 className="text-red-800 font-semibold mb-1">
                     Organization Submission Failed
                   </h3>
-                  <p className="text-red-700 text-sm">
-                    {viewModel.submissionError}
-                  </p>
+                  <p className="text-red-700 text-sm">{viewModel.submissionError}</p>
                   <p className="text-red-600 text-xs mt-2">
                     Please check the form and try again. If the problem persists, contact support.
                   </p>
@@ -243,12 +239,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                   className="flex-shrink-0 text-red-600 hover:text-red-800"
                   aria-label="Dismiss error"
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -265,6 +256,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
           <Card
             className="transition-all duration-200"
             style={GLASSMORPHISM_SECTION_STYLE}
+            data-testid="org-create-section-general"
           >
             <CardHeader
               className="border-b border-gray-200/50 cursor-pointer"
@@ -307,12 +299,15 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                         </label>
                         <Select.Root
                           value={formData.type}
-                          onValueChange={(value) => viewModel.updateField('type', value as 'provider' | 'provider_partner')}
+                          onValueChange={(value) =>
+                            viewModel.updateField('type', value as 'provider' | 'provider_partner')
+                          }
                         >
                           <Select.Trigger
                             className="w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
                             aria-label="Organization Type"
                             aria-required="true"
+                            data-testid="org-create-type-select"
                           >
                             <Select.Value />
                             <Select.Icon>
@@ -356,6 +351,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                               className="w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
                               aria-label="Partner Type"
                               aria-required="true"
+                              data-testid="org-create-partner-type-select"
                             >
                               <Select.Value />
                               <Select.Icon>
@@ -395,6 +391,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                             aria-label="Organization Name"
                             aria-required="true"
                             aria-invalid={!!viewModel.getFieldError('name')}
+                            data-testid="org-create-name-input"
                           />
                           {viewModel.getFieldError('name') && (
                             <p className="text-red-600 text-sm mt-1">
@@ -418,6 +415,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                             aria-label="Display Name"
                             aria-required="true"
                             aria-invalid={!!viewModel.getFieldError('displayName')}
+                            data-testid="org-create-display-name-input"
                           />
                           {viewModel.getFieldError('displayName') && (
                             <p className="text-red-600 text-sm mt-1">
@@ -436,6 +434,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                           onChange={(value) => viewModel.updateSubdomain(value)}
                           error={viewModel.getFieldError('subdomain')}
                           required
+                          data-testid="org-create-subdomain-input"
                         />
                       )}
 
@@ -452,6 +451,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                             className="w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
                             aria-label="Time Zone"
                             aria-required="true"
+                            data-testid="org-create-timezone-select"
                           >
                             <Select.Value />
                             <Select.Icon>
@@ -481,6 +481,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                         <ReferringPartnerDropdown
                           value={formData.referringPartnerId}
                           onChange={(value) => viewModel.updateField('referringPartnerId', value)}
+                          data-testid="org-create-referring-partner"
                         />
                       )}
                     </div>
@@ -491,6 +492,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                     className="p-4 rounded-lg transition-all duration-200"
                     style={GLASSMORPHISM_CARD_STYLE}
                     {...createCardHoverHandlers()}
+                    data-testid="org-create-general-address"
                   >
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Headquarters Address
@@ -506,10 +508,9 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                     className="p-4 rounded-lg transition-all duration-200"
                     style={GLASSMORPHISM_CARD_STYLE}
                     {...createCardHoverHandlers()}
+                    data-testid="org-create-general-phone"
                   >
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Main Office Phone
-                    </h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Main Office Phone</h3>
                     <PhoneInputEnhanced
                       value={formData.generalPhone}
                       onChange={(phone) => viewModel.updateField('generalPhone', phone)}
@@ -525,6 +526,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
             <Card
               className="transition-all duration-200"
               style={GLASSMORPHISM_SECTION_STYLE}
+              data-testid="org-create-section-billing"
             >
               <CardHeader
                 className="border-b border-gray-200/50 cursor-pointer"
@@ -553,10 +555,9 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                       className="p-4 rounded-lg transition-all duration-200"
                       style={GLASSMORPHISM_CARD_STYLE}
                       {...createCardHoverHandlers()}
+                      data-testid="org-create-billing-contact"
                     >
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                        Billing Contact
-                      </h3>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Billing Contact</h3>
                       <ContactInput
                         value={formData.billingContact}
                         onChange={(contact) => viewModel.updateField('billingContact', contact)}
@@ -568,11 +569,10 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                       className="p-4 rounded-lg transition-all duration-200"
                       style={GLASSMORPHISM_CARD_STYLE}
                       {...createCardHoverHandlers()}
+                      data-testid="org-create-billing-address"
                     >
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Billing Address
-                        </h3>
+                        <h3 className="text-lg font-semibold text-gray-900">Billing Address</h3>
                         <div className="flex items-center gap-2">
                           <Checkbox
                             id="use-billing-general-address"
@@ -580,8 +580,12 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                             onCheckedChange={(checked) =>
                               viewModel.updateField('useBillingGeneralAddress', checked as boolean)
                             }
+                            data-testid="org-create-use-billing-general-address"
                           />
-                          <Label htmlFor="use-billing-general-address" className="text-gray-900 cursor-pointer text-sm">
+                          <Label
+                            htmlFor="use-billing-general-address"
+                            className="text-gray-900 cursor-pointer text-sm"
+                          >
                             Use General
                           </Label>
                         </div>
@@ -598,11 +602,10 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                       className="p-4 rounded-lg transition-all duration-200"
                       style={GLASSMORPHISM_CARD_STYLE}
                       {...createCardHoverHandlers()}
+                      data-testid="org-create-billing-phone"
                     >
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Billing Phone
-                        </h3>
+                        <h3 className="text-lg font-semibold text-gray-900">Billing Phone</h3>
                         <div className="flex items-center gap-2">
                           <Checkbox
                             id="use-billing-general-phone"
@@ -610,8 +613,12 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                             onCheckedChange={(checked) =>
                               viewModel.updateField('useBillingGeneralPhone', checked as boolean)
                             }
+                            data-testid="org-create-use-billing-general-phone"
                           />
-                          <Label htmlFor="use-billing-general-phone" className="text-gray-900 cursor-pointer text-sm">
+                          <Label
+                            htmlFor="use-billing-general-phone"
+                            className="text-gray-900 cursor-pointer text-sm"
+                          >
                             Use General
                           </Label>
                         </div>
@@ -632,6 +639,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
           <Card
             className="transition-all duration-200"
             style={GLASSMORPHISM_SECTION_STYLE}
+            data-testid="org-create-section-provider-admin"
           >
             <CardHeader
               className="border-b border-gray-200/50 cursor-pointer"
@@ -660,6 +668,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                     className="p-4 rounded-lg transition-all duration-200"
                     style={GLASSMORPHISM_CARD_STYLE}
                     {...createCardHoverHandlers()}
+                    data-testid="org-create-admin-contact"
                   >
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Provider Admin Contact
@@ -676,6 +685,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                     className="p-4 rounded-lg transition-all duration-200"
                     style={GLASSMORPHISM_CARD_STYLE}
                     {...createCardHoverHandlers()}
+                    data-testid="org-create-admin-address"
                   >
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-gray-900">
@@ -686,10 +696,17 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                           id="use-admin-general-address"
                           checked={formData.useProviderAdminGeneralAddress}
                           onCheckedChange={(checked) =>
-                            viewModel.updateField('useProviderAdminGeneralAddress', checked as boolean)
+                            viewModel.updateField(
+                              'useProviderAdminGeneralAddress',
+                              checked as boolean
+                            )
                           }
+                          data-testid="org-create-use-admin-general-address"
                         />
-                        <Label htmlFor="use-admin-general-address" className="text-gray-900 cursor-pointer text-sm">
+                        <Label
+                          htmlFor="use-admin-general-address"
+                          className="text-gray-900 cursor-pointer text-sm"
+                        >
                           Use General
                         </Label>
                       </div>
@@ -706,20 +723,26 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                     className="p-4 rounded-lg transition-all duration-200"
                     style={GLASSMORPHISM_CARD_STYLE}
                     {...createCardHoverHandlers()}
+                    data-testid="org-create-admin-phone"
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Provider Admin Phone
-                      </h3>
+                      <h3 className="text-lg font-semibold text-gray-900">Provider Admin Phone</h3>
                       <div className="flex items-center gap-2">
                         <Checkbox
                           id="use-admin-general-phone"
                           checked={formData.useProviderAdminGeneralPhone}
                           onCheckedChange={(checked) =>
-                            viewModel.updateField('useProviderAdminGeneralPhone', checked as boolean)
+                            viewModel.updateField(
+                              'useProviderAdminGeneralPhone',
+                              checked as boolean
+                            )
                           }
+                          data-testid="org-create-use-admin-general-phone"
                         />
-                        <Label htmlFor="use-admin-general-phone" className="text-gray-900 cursor-pointer text-sm">
+                        <Label
+                          htmlFor="use-admin-general-phone"
+                          className="text-gray-900 cursor-pointer text-sm"
+                        >
                           Use General
                         </Label>
                       </div>
@@ -739,16 +762,24 @@ export const OrganizationCreatePage: React.FC = observer(() => {
           <div className="flex items-center justify-between pt-6">
             <div className="flex items-center gap-4">
               {viewModel.lastSavedAt && (
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-gray-600" data-testid="org-create-last-saved">
                   Last saved: {viewModel.lastSavedAt.toLocaleTimeString()}
                 </span>
               )}
-              {viewModel.isAutoSaving && (
-                <span className="text-sm text-amber-600">Saving...</span>
-              )}
+              {viewModel.isAutoSaving && <span className="text-sm text-amber-600">Saving...</span>}
             </div>
 
             <div className="flex items-center gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                className="text-gray-700"
+                data-testid="org-create-cancel-btn"
+              >
+                Cancel
+              </Button>
+
               <Button
                 type="button"
                 variant="outline"
@@ -756,8 +787,9 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                 className="bg-white/70 border-gray-300 text-gray-900 hover:bg-white/90"
                 style={{
                   backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)'
+                  WebkitBackdropFilter: 'blur(10px)',
                 }}
+                data-testid="org-create-save-draft-btn"
               >
                 <Save className="w-4 h-4 mr-2" />
                 Save Draft
@@ -767,6 +799,7 @@ export const OrganizationCreatePage: React.FC = observer(() => {
                 type="submit"
                 disabled={!viewModel.canSubmit || isSubmitting}
                 className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold hover:from-blue-700 hover:to-indigo-700"
+                data-testid="org-create-submit-btn"
               >
                 <Send className="w-4 h-4 mr-2" />
                 {isSubmitting ? 'Submitting...' : 'Submit Organization'}
@@ -780,12 +813,11 @@ export const OrganizationCreatePage: React.FC = observer(() => {
               className="mt-6 p-4 rounded-lg"
               style={{
                 background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.3)'
+                border: '1px solid rgba(239, 68, 68, 0.3)',
               }}
+              data-testid="org-create-validation-errors"
             >
-              <h4 className="text-red-700 font-semibold mb-2">
-                Please fix the following errors:
-              </h4>
+              <h4 className="text-red-700 font-semibold mb-2">Please fix the following errors:</h4>
               <ul className="list-disc list-inside space-y-1">
                 {viewModel.validationErrors.map((error, index) => (
                   <li key={index} className="text-red-600 text-sm">
@@ -797,6 +829,6 @@ export const OrganizationCreatePage: React.FC = observer(() => {
           )}
         </form>
       </div>
-    </div>
-  );
-});
+    );
+  }
+);

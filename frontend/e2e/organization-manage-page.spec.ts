@@ -22,7 +22,7 @@ const BASE_URL = 'http://localhost:3458';
 
 /** Navigate to manage page and wait for it to fully render */
 async function navigateToManagePage(page: Page, params?: string) {
-  await page.goto(`${BASE_URL}/organizations/manage${params ? `?${params}` : ''}`);
+  await page.goto(`${BASE_URL}/organizations${params ? `?${params}` : ''}`);
 
   // Safety net: if redirected to login (e.g. server reused without VITE_FORCE_MOCK),
   // auto-login with the super_admin email so tests can still proceed
@@ -35,7 +35,7 @@ async function navigateToManagePage(page: Page, params?: string) {
     await page.fill('#password', 'any-password');
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/(clients|organizations|dashboard|settings)/, { timeout: 10000 });
-    await page.goto(`${BASE_URL}/organizations/manage${params ? `?${params}` : ''}`);
+    await page.goto(`${BASE_URL}/organizations${params ? `?${params}` : ''}`);
   }
 
   await page.waitForSelector('[data-testid="org-manage-page"]', { timeout: 15000 });
@@ -137,11 +137,9 @@ test.describe('TS-01: Navigation & Page Load', () => {
     await switchToProfile(page, 'dev@example.com');
     // Use SPA navigation (click nav link) — page.goto() causes a full reload which
     // resets DevAuth back to VITE_DEV_PROFILE=super_admin, defeating the profile switch.
-    await page
-      .locator('a[href="/organizations/manage"]')
-      .waitFor({ state: 'visible', timeout: 5000 });
-    await page.locator('a[href="/organizations/manage"]').click();
-    await page.waitForURL(/\/organizations\/manage/, { timeout: 10000 });
+    await page.locator('a[href="/organizations"]').waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('a[href="/organizations"]').click();
+    await page.waitForURL(/\/organizations/, { timeout: 10000 });
     await page.waitForSelector('[data-testid="org-manage-page"]', { timeout: 15000 });
     await expect(page.locator('[data-testid="org-list-panel"]')).not.toBeVisible();
   });
@@ -151,11 +149,9 @@ test.describe('TS-01: Navigation & Page Load', () => {
     await switchToProfile(page, 'partner.admin@example.com');
     // Use SPA navigation (click nav link) — page.goto() causes a full reload which
     // resets DevAuth back to VITE_DEV_PROFILE=super_admin, defeating the profile switch.
-    await page
-      .locator('a[href="/organizations/manage"]')
-      .waitFor({ state: 'visible', timeout: 5000 });
-    await page.locator('a[href="/organizations/manage"]').click();
-    await page.waitForURL(/\/organizations\/manage/, { timeout: 10000 });
+    await page.locator('a[href="/organizations"]').waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('a[href="/organizations"]').click();
+    await page.waitForURL(/\/organizations/, { timeout: 10000 });
     await page.waitForSelector('[data-testid="org-manage-page"]', { timeout: 15000 });
     await expect(page.locator('[data-testid="org-list-panel"]')).not.toBeVisible();
   });
@@ -813,7 +809,7 @@ test.describe('TS-11: Danger Zone Toggle', () => {
     // Even if they could, isPlatformOwner=false means DangerZone is not rendered.
     // We verify the structural check: after switching to provider_admin, danger-zone is absent.
     await switchToProfile(page, 'dev@example.com');
-    await page.goto(`${BASE_URL}/organizations/manage`);
+    await page.goto(`${BASE_URL}/organizations`);
     await page.waitForSelector('[data-testid="org-manage-page"]', { timeout: 15000 });
     // No org auto-selected for provider_admin (mock limitation), so danger-zone won't render
     await expect(page.locator('[data-testid="danger-zone"]')).not.toBeVisible();

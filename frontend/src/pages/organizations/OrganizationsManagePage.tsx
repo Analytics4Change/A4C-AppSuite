@@ -8,12 +8,12 @@
  * Features:
  * - Split view layout (list 1/3 + form 2/3)
  * - Select org -> shows editable form with entity sections
- * - No create mode (orgs created via bootstrap workflow)
+ * - Create mode: platform owner can create new orgs via embedded form
  * - Role-based editability (platform owner edits name + lifecycle; provider admin edits details)
  * - DangerZone for platform owner (deactivate/reactivate/delete)
  * - Unsaved changes warning
  *
- * Route: /organizations/manage
+ * Route: /organizations
  * Permission: organization.update
  */
 
@@ -25,6 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DangerZone } from '@/components/ui/DangerZone';
+import { OrganizationCreateForm } from '@/pages/organizations/OrganizationCreateForm';
 import { OrganizationManageListViewModel } from '@/viewModels/organization/OrganizationManageListViewModel';
 import { OrganizationManageFormViewModel } from '@/viewModels/organization/OrganizationManageFormViewModel';
 import type {
@@ -59,8 +60,8 @@ import { cn } from '@/components/ui/utils';
 
 const log = Logger.getLogger('component');
 
-/** Panel mode: empty (no selection) or edit (org selected) */
-type PanelMode = 'empty' | 'edit';
+/** Panel mode: empty (no selection), edit (org selected), or create (new org form) */
+type PanelMode = 'empty' | 'edit' | 'create';
 
 /** Discriminated union for dialog state */
 type DialogState =
@@ -331,7 +332,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
     (orgId: string) => {
       if (orgId === listVM.selectedOrgId && panelMode === 'edit') return;
 
-      if (formVM?.isDirty) {
+      if (panelMode === 'create' || formVM?.isDirty) {
         pendingActionRef.current = { type: 'select', orgId };
         setDialogState({ type: 'discard' });
       } else {
@@ -347,10 +348,41 @@ export const OrganizationsManagePage: React.FC = observer(() => {
     setDialogState({ type: 'none' });
     pendingActionRef.current = null;
 
-    if (pending?.type === 'select' && pending.orgId) {
-      selectAndLoadOrg(pending.orgId);
+    if (pending?.type === 'select') {
+      if (pending.orgId === '__create__') {
+        listVM.selectOrganization('');
+        setFormVM(null);
+        setPanelMode('create');
+      } else if (pending.orgId) {
+        selectAndLoadOrg(pending.orgId);
+      }
     }
-  }, [selectAndLoadOrg]);
+  }, [selectAndLoadOrg, listVM]);
+
+  // Handle create button click
+  const handleCreateClick = useCallback(() => {
+    if (formVM?.isDirty) {
+      pendingActionRef.current = { type: 'select', orgId: '__create__' };
+      setDialogState({ type: 'discard' });
+    } else {
+      listVM.selectOrganization('');
+      setFormVM(null);
+      setPanelMode('create');
+    }
+  }, [formVM, listVM]);
+
+  // Handle create form success
+  const handleCreateSuccess = useCallback(
+    (organizationId: string) => {
+      navigate(`/organizations/${organizationId}/bootstrap`);
+    },
+    [navigate]
+  );
+
+  // Handle create form cancel
+  const handleCreateCancel = useCallback(() => {
+    setPanelMode('empty');
+  }, []);
 
   // Handle form submission (update org fields)
   const handleSubmit = useCallback(
@@ -745,16 +777,29 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                     <CardTitle className="text-lg font-semibold text-gray-900">
                       Organizations
                     </CardTitle>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => listVM.refresh()}
-                      disabled={listVM.isLoading}
-                      aria-label="Refresh organization list"
-                      data-testid="org-list-refresh-btn"
-                    >
-                      <RefreshCw className={cn('w-4 h-4', listVM.isLoading && 'animate-spin')} />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCreateClick}
+                        aria-label="Create new organization"
+                        data-testid="org-list-create-btn"
+                        className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Create
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => listVM.refresh()}
+                        disabled={listVM.isLoading}
+                        aria-label="Refresh organization list"
+                        data-testid="org-list-refresh-btn"
+                      >
+                        <RefreshCw className={cn('w-4 h-4', listVM.isLoading && 'animate-spin')} />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 h-[calc(100%-80px)] flex flex-col">
@@ -847,6 +892,14 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                   </p>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Create Mode */}
+            {panelMode === 'create' && (
+              <OrganizationCreateForm
+                onSubmitSuccess={handleCreateSuccess}
+                onCancel={handleCreateCancel}
+              />
             )}
 
             {/* Edit Mode */}

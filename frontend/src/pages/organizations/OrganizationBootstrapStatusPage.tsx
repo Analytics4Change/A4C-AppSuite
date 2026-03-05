@@ -16,13 +16,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  CheckCircle,
-  XCircle,
-  Loader2,
-  AlertCircle,
-  Home
-} from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, AlertCircle, Home } from 'lucide-react';
 import { WorkflowClientFactory } from '@/services/workflow/WorkflowClientFactory';
 import type { WorkflowStatus } from '@/types';
 import { Logger } from '@/utils/logger';
@@ -66,8 +60,7 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
         setIsLoading(false);
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to fetch workflow status';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch workflow status';
       setError(errorMessage);
       setIsLoading(false);
       log.error('Error fetching workflow status', err);
@@ -181,12 +174,8 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
     <div className="max-w-3xl mx-auto">
       {/* Page Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">
-          Organization Bootstrap
-        </h1>
-        <p className="text-gray-600 mt-1">
-          Tracking workflow progress for organization setup
-        </p>
+        <h1 className="text-3xl font-bold text-gray-900">Organization Bootstrap</h1>
+        <p className="text-gray-600 mt-1">Tracking workflow progress for organization setup</p>
       </div>
 
       {/* Error State */}
@@ -196,7 +185,7 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
           style={{
             background: 'rgba(254, 242, 242, 0.9)',
             backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(239, 68, 68, 0.3)'
+            border: '1px solid rgba(239, 68, 68, 0.3)',
           }}
         >
           <CardContent className="pt-6">
@@ -208,10 +197,7 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => navigate('/organizations')}
-              >
+              <Button variant="outline" onClick={() => navigate('/organizations')}>
                 Return to Organizations
               </Button>
               <Button onClick={() => fetchStatus()}>Retry</Button>
@@ -229,7 +215,7 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.3)',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
           }}
         >
           <CardHeader>
@@ -245,9 +231,7 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
           <CardContent>
             {/* Organization ID */}
             <div className="mb-6 p-3 bg-gray-50 rounded-md">
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
-                Organization ID
-              </p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Organization ID</p>
               <p className="text-sm font-mono text-gray-700">{organizationId}</p>
             </div>
 
@@ -268,7 +252,7 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
                       ? 'rgba(34, 197, 94, 0.2)'
                       : step.error
                         ? 'rgba(239, 68, 68, 0.2)'
-                        : 'rgba(59, 130, 246, 0.2)'
+                        : 'rgba(59, 130, 246, 0.2)',
                   }}
                 >
                   {getStepIcon(step.completed, !!step.error)}
@@ -284,9 +268,7 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
                     >
                       {step.step}
                     </h4>
-                    {step.error && (
-                      <p className="text-sm text-red-600 mt-1">{step.error}</p>
-                    )}
+                    {step.error && <p className="text-sm text-red-600 mt-1">{step.error}</p>}
                   </div>
                 </div>
               ))}
@@ -306,12 +288,10 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
                     <strong>Domain:</strong> {status.result.domain}
                   </p>
                   <p>
-                    <strong>DNS Configured:</strong>{' '}
-                    {status.result.dnsConfigured ? 'Yes' : 'No'}
+                    <strong>DNS Configured:</strong> {status.result.dnsConfigured ? 'Yes' : 'No'}
                   </p>
                   <p>
-                    <strong>Invitations Sent:</strong>{' '}
-                    {status.result.invitationsSent}
+                    <strong>Invitations Sent:</strong> {status.result.invitationsSent}
                   </p>
                 </div>
               </div>
@@ -337,10 +317,7 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
               )}
 
               {(status.status === 'failed' || status.status === 'cancelled') && (
-                <Button
-                  variant="outline"
-                  onClick={() => navigate('/organizations/create')}
-                >
+                <Button variant="outline" onClick={() => navigate('/organizations')}>
                   Start Over
                 </Button>
               )}

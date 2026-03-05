@@ -83,13 +83,6 @@ export const MainLayout: React.FC = () => {
       to: '/organizations',
       icon: Building,
       label: 'Organizations',
-      permission: 'organization.create',
-      showForOrgTypes: ['platform_owner'],
-    },
-    {
-      to: '/organizations/manage',
-      icon: Building,
-      label: 'Manage Organization',
       permission: 'organization.update',
     },
     {
