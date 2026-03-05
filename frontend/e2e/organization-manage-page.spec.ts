@@ -327,7 +327,7 @@ test.describe('TS-03: Form Field Editability', () => {
   });
 
   test('TC-03-05: provider_admin cannot edit Organization Name [mock limitation]', async ({
-    page,
+    page: _page,
   }) => {
     // Mock limitation: provider_admin org_id does not match any mock org.
     // The edit form never loads for provider_admin in mock mode.
@@ -336,7 +336,7 @@ test.describe('TS-03: Form Field Editability', () => {
   });
 
   test('TC-03-06: provider_admin -- non-name fields are editable [mock limitation]', async ({
-    page,
+    page: _page,
   }) => {
     test.skip(true, 'Mock limitation: provider_admin auto-select fails -- org_id not in mock data');
   });
