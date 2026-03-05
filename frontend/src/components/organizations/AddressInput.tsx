@@ -1,8 +1,8 @@
-import { forwardRef, type ComponentPropsWithoutRef } from "react";
-import * as Select from "@radix-ui/react-select";
-import { ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { AddressFormData } from "@/types/organization.types";
+import { forwardRef, type ComponentPropsWithoutRef } from 'react';
+import * as Select from '@radix-ui/react-select';
+import { ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { AddressFormData } from '@/types/organization.types';
 
 /**
  * AddressInput - Address information input component with label and type classification
@@ -25,16 +25,16 @@ import type { AddressFormData } from "@/types/organization.types";
  * ```
  */
 
-interface AddressInputProps extends Omit<ComponentPropsWithoutRef<"div">, "onChange"> {
+interface AddressInputProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onChange'> {
   value: AddressFormData;
   onChange: (address: AddressFormData) => void;
   disabled?: boolean;
 }
 
 const ADDRESS_TYPES = [
-  { value: "physical", label: "Physical" },
-  { value: "mailing", label: "Mailing" },
-  { value: "billing", label: "Billing" },
+  { value: 'physical', label: 'Physical' },
+  { value: 'mailing', label: 'Mailing' },
+  { value: 'billing', label: 'Billing' },
 ] as const;
 
 export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
@@ -48,14 +48,14 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
         <div className="bg-white shadow rounded-lg p-6">
           <div className="space-y-3">
             {/* Address Label */}
-            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+            <div className="flex flex-col gap-1">
               <label className="block text-sm font-medium text-gray-700">
                 Address Label<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.label}
-                onChange={(e) => handleChange("label", e.target.value)}
+                onChange={(e) => handleChange('label', e.target.value)}
                 disabled={disabled}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Address label"
@@ -64,22 +64,22 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
             </div>
 
             {/* Address Type Dropdown */}
-            <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+            <div className="flex flex-col gap-1">
               <label className="block text-sm font-medium text-gray-700">
                 Address Type<span className="text-red-500">*</span>
               </label>
               <Select.Root
                 value={value.type}
-                onValueChange={(newType: string) => handleChange("type", newType)}
+                onValueChange={(newType: string) => handleChange('type', newType)}
                 disabled={disabled}
               >
                 <Select.Trigger
                   className={cn(
-                    "w-full px-3 py-2 rounded-md border border-input bg-background",
-                    "flex items-center justify-between",
-                    "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                    "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                    "transition-colors"
+                    'w-full px-3 py-2 rounded-md border border-input bg-background',
+                    'flex items-center justify-between',
+                    'focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent',
+                    'disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed',
+                    'transition-colors'
                   )}
                   aria-label="Address type"
                   aria-required="true"
@@ -92,8 +92,8 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
                 <Select.Portal>
                   <Select.Content
                     className={cn(
-                      "overflow-hidden bg-popover rounded-md border border-border shadow-md",
-                      "z-50"
+                      'overflow-hidden bg-popover rounded-md border border-border shadow-md',
+                      'z-50'
                     )}
                   >
                     <Select.Viewport className="p-1">
@@ -102,11 +102,11 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
                           key={type.value}
                           value={type.value}
                           className={cn(
-                            "relative flex items-center px-8 py-2 rounded-sm",
-                            "cursor-pointer select-none outline-none",
-                            "hover:bg-accent hover:text-accent-foreground",
-                            "focus:bg-accent focus:text-accent-foreground",
-                            "data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
+                            'relative flex items-center px-8 py-2 rounded-sm',
+                            'cursor-pointer select-none outline-none',
+                            'hover:bg-accent hover:text-accent-foreground',
+                            'focus:bg-accent focus:text-accent-foreground',
+                            'data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground'
                           )}
                         >
                           <Select.ItemText>{type.label}</Select.ItemText>
@@ -119,14 +119,14 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
             </div>
 
             {/* Street Address Line 1 */}
-            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+            <div className="flex flex-col gap-1">
               <label className="block text-sm font-medium text-gray-700">
                 Street Line 1<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.street1}
-                onChange={(e) => handleChange("street1", e.target.value)}
+                onChange={(e) => handleChange('street1', e.target.value)}
                 disabled={disabled}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Street address line 1"
@@ -135,14 +135,12 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
             </div>
 
             {/* Street Address Line 2 (Optional) */}
-            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="block text-sm font-medium text-gray-700">
-                Street Line 2
-              </label>
+            <div className="flex flex-col gap-1">
+              <label className="block text-sm font-medium text-gray-700">Street Line 2</label>
               <input
                 type="text"
-                value={value.street2 || ""}
-                onChange={(e) => handleChange("street2", e.target.value)}
+                value={value.street2 || ''}
+                onChange={(e) => handleChange('street2', e.target.value)}
                 disabled={disabled}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Street address line 2 (optional)"
@@ -150,14 +148,14 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
             </div>
 
             {/* City */}
-            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+            <div className="flex flex-col gap-1">
               <label className="block text-sm font-medium text-gray-700">
                 City<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.city}
-                onChange={(e) => handleChange("city", e.target.value)}
+                onChange={(e) => handleChange('city', e.target.value)}
                 disabled={disabled}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="City"
@@ -166,14 +164,14 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
             </div>
 
             {/* State */}
-            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+            <div className="flex flex-col gap-1">
               <label className="block text-sm font-medium text-gray-700">
                 State<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.state}
-                onChange={(e) => handleChange("state", e.target.value)}
+                onChange={(e) => handleChange('state', e.target.value)}
                 disabled={disabled}
                 maxLength={2}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -183,14 +181,14 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
             </div>
 
             {/* Zip Code */}
-            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+            <div className="flex flex-col gap-1">
               <label className="block text-sm font-medium text-gray-700">
                 Zip Code<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.zipCode}
-                onChange={(e) => handleChange("zipCode", e.target.value)}
+                onChange={(e) => handleChange('zipCode', e.target.value)}
                 disabled={disabled}
                 maxLength={10}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -205,4 +203,4 @@ export const AddressInput = forwardRef<HTMLDivElement, AddressInputProps>(
   }
 );
 
-AddressInput.displayName = "AddressInput";
+AddressInput.displayName = 'AddressInput';

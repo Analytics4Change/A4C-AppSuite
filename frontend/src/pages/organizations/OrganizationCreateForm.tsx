@@ -192,7 +192,7 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
     const isPartner = formData.type === 'provider_partner';
 
     return (
-      <div data-testid="org-create-form">
+      <div data-testid="org-create-form" className="@container">
         <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="space-y-6">
           {/* Submission Error Banner */}
           {viewModel.submissionError && (
@@ -279,7 +279,7 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
             {!generalCollapsed && (
               <CardContent className="p-6">
                 {/* Three-card layout: Organization | Address | Phone */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 @lg:grid-cols-2 @3xl:grid-cols-3 gap-6">
                   {/* Card 1: Organization Details */}
                   <div
                     className="p-4 rounded-lg transition-all duration-200"
@@ -293,7 +293,7 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
                       </h3>
 
                       {/* Organization Type */}
-                      <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+                      <div className="flex flex-col gap-1">
                         <label className="block text-sm font-medium text-gray-700">
                           Organization Type<span className="text-red-500">*</span>
                         </label>
@@ -334,7 +334,7 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
 
                       {/* Partner Type (conditional) */}
                       {isPartner && (
-                        <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+                        <div className="flex flex-col gap-1">
                           <label className="block text-sm font-medium text-gray-700">
                             Partner Type<span className="text-red-500">*</span>
                           </label>
@@ -378,8 +378,8 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
                       )}
 
                       {/* Organization Name */}
-                      <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-                        <label className="block text-sm font-medium text-gray-700 pt-2">
+                      <div className="flex flex-col gap-1">
+                        <label className="block text-sm font-medium text-gray-700">
                           Organization Name<span className="text-red-500">*</span>
                         </label>
                         <div>
@@ -402,8 +402,8 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
                       </div>
 
                       {/* Display Name */}
-                      <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-                        <label className="block text-sm font-medium text-gray-700 pt-2">
+                      <div className="flex flex-col gap-1">
+                        <label className="block text-sm font-medium text-gray-700">
                           Display Name<span className="text-red-500">*</span>
                         </label>
                         <div>
@@ -439,7 +439,7 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
                       )}
 
                       {/* Time Zone */}
-                      <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+                      <div className="flex flex-col gap-1">
                         <label className="block text-sm font-medium text-gray-700">
                           Time Zone<span className="text-red-500">*</span>
                         </label>
@@ -549,7 +549,7 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
               {!billingCollapsed && (
                 <CardContent className="p-6">
                   {/* Three-card layout: Contact | Address | Phone */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 @lg:grid-cols-2 @3xl:grid-cols-3 gap-6">
                     {/* Billing Contact Card */}
                     <div
                       className="p-4 rounded-lg transition-all duration-200"
@@ -662,7 +662,7 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
             {!adminCollapsed && (
               <CardContent className="p-6">
                 {/* Three-card layout: Contact | Address | Phone */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 @lg:grid-cols-2 @3xl:grid-cols-3 gap-6">
                   {/* Provider Admin Contact Card */}
                   <div
                     className="p-4 rounded-lg transition-all duration-200"

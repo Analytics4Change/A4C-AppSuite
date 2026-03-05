@@ -27,9 +27,6 @@ const HEADER = `/**
  * If you need to change event structure, modify the AsyncAPI spec and regenerate.
  */
 
-/* eslint-disable */
-/* tslint:disable */
-
 `;
 
 // Base types that Modelina doesn't extract from components/schemas

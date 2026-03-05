@@ -1,9 +1,9 @@
-import { forwardRef, type ComponentPropsWithoutRef } from "react";
-import * as Select from "@radix-ui/react-select";
-import { ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { ContactFormData } from "@/types/organization.types";
-import { CONTACT_TYPES } from "@/constants/organization.constants";
+import { forwardRef, type ComponentPropsWithoutRef } from 'react';
+import * as Select from '@radix-ui/react-select';
+import { ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { ContactFormData } from '@/types/organization.types';
+import { CONTACT_TYPES } from '@/constants/organization.constants';
 
 /**
  * ContactInput - Contact information input component with label and type classification
@@ -26,7 +26,7 @@ import { CONTACT_TYPES } from "@/constants/organization.constants";
  * ```
  */
 
-interface ContactInputProps extends Omit<ComponentPropsWithoutRef<"div">, "onChange"> {
+interface ContactInputProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onChange'> {
   value: ContactFormData;
   onChange: (contact: ContactFormData) => void;
   disabled?: boolean;
@@ -34,7 +34,10 @@ interface ContactInputProps extends Omit<ComponentPropsWithoutRef<"div">, "onCha
 }
 
 export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
-  ({ value, onChange, disabled = false, showEmailConfirmation = false, className, ...props }, ref) => {
+  (
+    { value, onChange, disabled = false, showEmailConfirmation = false, className, ...props },
+    ref
+  ) => {
     const handleChange = (field: keyof ContactFormData, newValue: string) => {
       onChange({ ...value, [field]: newValue });
     };
@@ -44,14 +47,14 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
         <div className="bg-white shadow rounded-lg p-6">
           <div className="space-y-3">
             {/* Contact Label */}
-            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+            <div className="flex flex-col gap-1">
               <label className="block text-sm font-medium text-gray-700">
                 Contact Label<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.label}
-                onChange={(e) => handleChange("label", e.target.value)}
+                onChange={(e) => handleChange('label', e.target.value)}
                 disabled={disabled}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Contact label"
@@ -60,22 +63,22 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
             </div>
 
             {/* Contact Type Dropdown */}
-            <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+            <div className="flex flex-col gap-1">
               <label className="block text-sm font-medium text-gray-700">
                 Contact Type<span className="text-red-500">*</span>
               </label>
               <Select.Root
                 value={value.type}
-                onValueChange={(newType: string) => handleChange("type", newType)}
+                onValueChange={(newType: string) => handleChange('type', newType)}
                 disabled={disabled}
               >
                 <Select.Trigger
                   className={cn(
-                    "w-full px-3 py-2 rounded-md border border-input bg-background",
-                    "flex items-center justify-between",
-                    "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                    "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed",
-                    "transition-colors"
+                    'w-full px-3 py-2 rounded-md border border-input bg-background',
+                    'flex items-center justify-between',
+                    'focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent',
+                    'disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed',
+                    'transition-colors'
                   )}
                   aria-label="Contact type"
                   aria-required="true"
@@ -88,8 +91,8 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
                 <Select.Portal>
                   <Select.Content
                     className={cn(
-                      "overflow-hidden bg-popover rounded-md border border-border shadow-md",
-                      "z-50"
+                      'overflow-hidden bg-popover rounded-md border border-border shadow-md',
+                      'z-50'
                     )}
                   >
                     <Select.Viewport className="p-1">
@@ -98,11 +101,11 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
                           key={type.value}
                           value={type.value}
                           className={cn(
-                            "relative flex items-center px-8 py-2 rounded-sm",
-                            "cursor-pointer select-none outline-none",
-                            "hover:bg-accent hover:text-accent-foreground",
-                            "focus:bg-accent focus:text-accent-foreground",
-                            "data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
+                            'relative flex items-center px-8 py-2 rounded-sm',
+                            'cursor-pointer select-none outline-none',
+                            'hover:bg-accent hover:text-accent-foreground',
+                            'focus:bg-accent focus:text-accent-foreground',
+                            'data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground'
                           )}
                         >
                           <Select.ItemText>{type.label}</Select.ItemText>
@@ -115,14 +118,14 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
             </div>
 
             {/* First Name */}
-            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+            <div className="flex flex-col gap-1">
               <label className="block text-sm font-medium text-gray-700">
                 First Name<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.firstName}
-                onChange={(e) => handleChange("firstName", e.target.value)}
+                onChange={(e) => handleChange('firstName', e.target.value)}
                 disabled={disabled}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="First name"
@@ -131,14 +134,14 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
             </div>
 
             {/* Last Name */}
-            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+            <div className="flex flex-col gap-1">
               <label className="block text-sm font-medium text-gray-700">
                 Last Name<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={value.lastName}
-                onChange={(e) => handleChange("lastName", e.target.value)}
+                onChange={(e) => handleChange('lastName', e.target.value)}
                 disabled={disabled}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Last name"
@@ -147,14 +150,14 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
             </div>
 
             {/* Email */}
-            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+            <div className="flex flex-col gap-1">
               <label className="block text-sm font-medium text-gray-700">
                 Email Address<span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
                 value={value.email}
-                onChange={(e) => handleChange("email", e.target.value)}
+                onChange={(e) => handleChange('email', e.target.value)}
                 disabled={disabled}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Email address"
@@ -164,14 +167,14 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
 
             {/* Email Confirmation (Provider Admin only) */}
             {showEmailConfirmation && (
-              <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+              <div className="flex flex-col gap-1">
                 <label className="block text-sm font-medium text-gray-700">
                   Confirm Email<span className="text-red-500">*</span>
                 </label>
                 <input
                   type="email"
-                  value={value.emailConfirmation || ""}
-                  onChange={(e) => handleChange("emailConfirmation", e.target.value)}
+                  value={value.emailConfirmation || ''}
+                  onChange={(e) => handleChange('emailConfirmation', e.target.value)}
                   onPaste={(e) => e.preventDefault()}
                   disabled={disabled}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -183,14 +186,12 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
             )}
 
             {/* Title (Optional) */}
-            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="block text-sm font-medium text-gray-700">
-                Title
-              </label>
+            <div className="flex flex-col gap-1">
+              <label className="block text-sm font-medium text-gray-700">Title</label>
               <input
                 type="text"
-                value={value.title || ""}
-                onChange={(e) => handleChange("title", e.target.value)}
+                value={value.title || ''}
+                onChange={(e) => handleChange('title', e.target.value)}
                 disabled={disabled}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Job title (optional)"
@@ -198,14 +199,12 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
             </div>
 
             {/* Department (Optional) */}
-            <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-              <label className="block text-sm font-medium text-gray-700">
-                Department
-              </label>
+            <div className="flex flex-col gap-1">
+              <label className="block text-sm font-medium text-gray-700">Department</label>
               <input
                 type="text"
-                value={value.department || ""}
-                onChange={(e) => handleChange("department", e.target.value)}
+                value={value.department || ''}
+                onChange={(e) => handleChange('department', e.target.value)}
                 disabled={disabled}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 aria-label="Department (optional)"
@@ -218,4 +217,4 @@ export const ContactInput = forwardRef<HTMLDivElement, ContactInputProps>(
   }
 );
 
-ContactInput.displayName = "ContactInput";
+ContactInput.displayName = 'ContactInput';

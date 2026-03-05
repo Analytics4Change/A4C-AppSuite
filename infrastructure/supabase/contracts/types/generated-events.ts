@@ -11,9 +11,6 @@
  * If you need to change event structure, modify the AsyncAPI spec and regenerate.
  */
 
-/* eslint-disable */
-/* tslint:disable */
-
 // =============================================================================
 // Base Types (from components/schemas.yaml)
 // =============================================================================

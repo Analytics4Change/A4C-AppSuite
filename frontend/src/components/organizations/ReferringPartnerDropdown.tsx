@@ -1,10 +1,10 @@
-import { forwardRef, useEffect, useState, type ComponentPropsWithoutRef } from "react";
-import { observer } from "mobx-react-lite";
-import * as Select from "@radix-ui/react-select";
-import { ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { getOrganizationQueryService } from "@/services/organization/OrganizationQueryServiceFactory";
-import type { Organization } from "@/types/organization.types";
+import { forwardRef, useEffect, useState, type ComponentPropsWithoutRef } from 'react';
+import { observer } from 'mobx-react-lite';
+import * as Select from '@radix-ui/react-select';
+import { ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { getOrganizationQueryService } from '@/services/organization/OrganizationQueryServiceFactory';
+import type { Organization } from '@/types/organization.types';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('organization');
@@ -30,7 +30,7 @@ const log = Logger.getLogger('organization');
  * ```
  */
 
-interface ReferringPartnerDropdownProps extends Omit<ComponentPropsWithoutRef<"div">, "onChange"> {
+interface ReferringPartnerDropdownProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onChange'> {
   value?: string; // Partner org ID or undefined
   onChange: (partnerId: string | undefined) => void;
   disabled?: boolean;
@@ -71,7 +71,7 @@ export const ReferringPartnerDropdown = observer(
 
       const handleValueChange = (newValue: string) => {
         // "none" represents "Not Applicable"
-        if (newValue === "none") {
+        if (newValue === 'none') {
           onChange(undefined);
         } else {
           onChange(newValue);
@@ -79,13 +79,11 @@ export const ReferringPartnerDropdown = observer(
       };
 
       return (
-        <div ref={ref} className={cn("grid grid-cols-[160px_1fr] items-start gap-4", className)} {...props}>
-          <label className="block text-sm font-medium text-gray-700 pt-2">
-            Referring Partner
-          </label>
+        <div ref={ref} className={cn('flex flex-col gap-1', className)} {...props}>
+          <label className="block text-sm font-medium text-gray-700">Referring Partner</label>
           <div className="space-y-2">
             <Select.Root
-              value={value || "none"}
+              value={value || 'none'}
               onValueChange={handleValueChange}
               disabled={disabled || loading}
             >
@@ -99,62 +97,58 @@ export const ReferringPartnerDropdown = observer(
                   <ChevronDown className="h-4 w-4 opacity-50" />
                 </Select.Icon>
               </Select.Trigger>
-            <Select.Portal>
-              <Select.Content
-                className={cn(
-                  "overflow-hidden bg-popover rounded-md border border-border shadow-md",
-                  "z-50"
-                )}
-              >
-                <Select.Viewport className="p-1">
-                  {/* Not Applicable Option (Default) */}
-                  <Select.Item
-                    value="none"
-                    className={cn(
-                      "relative flex items-center px-8 py-2 rounded-sm",
-                      "cursor-pointer select-none outline-none",
-                      "hover:bg-accent hover:text-accent-foreground",
-                      "focus:bg-accent focus:text-accent-foreground",
-                      "data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
-                    )}
-                  >
-                    <Select.ItemText>Not Applicable</Select.ItemText>
-                  </Select.Item>
-
-                  {/* VAR Partners */}
-                  {varPartners.map((partner) => (
+              <Select.Portal>
+                <Select.Content
+                  className={cn(
+                    'overflow-hidden bg-popover rounded-md border border-border shadow-md',
+                    'z-50'
+                  )}
+                >
+                  <Select.Viewport className="p-1">
+                    {/* Not Applicable Option (Default) */}
                     <Select.Item
-                      key={partner.id}
-                      value={partner.id}
+                      value="none"
                       className={cn(
-                        "relative flex items-center px-8 py-2 rounded-sm",
-                        "cursor-pointer select-none outline-none",
-                        "hover:bg-accent hover:text-accent-foreground",
-                        "focus:bg-accent focus:text-accent-foreground",
-                        "data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
+                        'relative flex items-center px-8 py-2 rounded-sm',
+                        'cursor-pointer select-none outline-none',
+                        'hover:bg-accent hover:text-accent-foreground',
+                        'focus:bg-accent focus:text-accent-foreground',
+                        'data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground'
                       )}
                     >
-                      <Select.ItemText>{partner.display_name || partner.name}</Select.ItemText>
+                      <Select.ItemText>Not Applicable</Select.ItemText>
                     </Select.Item>
-                  ))}
 
-                  {/* Error State */}
-                  {error && (
-                    <div className="px-8 py-2 text-sm text-destructive">
-                      {error}
-                    </div>
-                  )}
+                    {/* VAR Partners */}
+                    {varPartners.map((partner) => (
+                      <Select.Item
+                        key={partner.id}
+                        value={partner.id}
+                        className={cn(
+                          'relative flex items-center px-8 py-2 rounded-sm',
+                          'cursor-pointer select-none outline-none',
+                          'hover:bg-accent hover:text-accent-foreground',
+                          'focus:bg-accent focus:text-accent-foreground',
+                          'data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground'
+                        )}
+                      >
+                        <Select.ItemText>{partner.display_name || partner.name}</Select.ItemText>
+                      </Select.Item>
+                    ))}
 
-                  {/* Empty State */}
-                  {!loading && varPartners.length === 0 && !error && (
-                    <div className="px-8 py-2 text-sm text-muted-foreground">
-                      No VAR partners found
-                    </div>
-                  )}
-                </Select.Viewport>
-              </Select.Content>
-            </Select.Portal>
-          </Select.Root>
+                    {/* Error State */}
+                    {error && <div className="px-8 py-2 text-sm text-destructive">{error}</div>}
+
+                    {/* Empty State */}
+                    {!loading && varPartners.length === 0 && !error && (
+                      <div className="px-8 py-2 text-sm text-muted-foreground">
+                        No VAR partners found
+                      </div>
+                    )}
+                  </Select.Viewport>
+                </Select.Content>
+              </Select.Portal>
+            </Select.Root>
             <p id="referring-partner-description" className="text-sm text-gray-500">
               Select the VAR partner who referred this organization (optional)
             </p>
@@ -165,4 +159,4 @@ export const ReferringPartnerDropdown = observer(
   )
 );
 
-ReferringPartnerDropdown.displayName = "ReferringPartnerDropdown";
+ReferringPartnerDropdown.displayName = 'ReferringPartnerDropdown';

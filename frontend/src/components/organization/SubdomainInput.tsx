@@ -56,7 +56,7 @@ export const SubdomainInput: React.FC<SubdomainInputProps> = ({
   error,
   required = false,
   disabled = false,
-  tabIndex
+  tabIndex,
 }) => {
   /**
    * Handle input change with auto-formatting
@@ -76,8 +76,8 @@ export const SubdomainInput: React.FC<SubdomainInputProps> = ({
   const fullDomain = value ? `${value}.a4c.app` : '';
 
   return (
-    <div className="grid grid-cols-[160px_1fr] items-start gap-4">
-      <label htmlFor={id} className="block text-sm font-medium text-gray-700 pt-2">
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
@@ -96,13 +96,7 @@ export const SubdomainInput: React.FC<SubdomainInputProps> = ({
             aria-label={label}
             aria-required={required}
             aria-invalid={!!error}
-            aria-describedby={
-              error
-                ? `${id}-error`
-                : fullDomain
-                  ? `${id}-preview`
-                  : undefined
-            }
+            aria-describedby={error ? `${id}-error` : fullDomain ? `${id}-preview` : undefined}
             className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm font-mono ${error ? 'border-red-500' : ''}`}
           />
           <span className="text-gray-500">.a4c.app</span>
@@ -121,8 +115,7 @@ export const SubdomainInput: React.FC<SubdomainInputProps> = ({
         )}
 
         <p className="text-xs text-gray-500">
-          Must start with a letter, use lowercase letters, numbers, and hyphens
-          (3-63 characters)
+          Must start with a letter, use lowercase letters, numbers, and hyphens (3-63 characters)
         </p>
       </div>
     </div>
