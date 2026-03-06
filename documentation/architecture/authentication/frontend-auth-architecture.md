@@ -232,7 +232,6 @@ npm run preview    # Test production build locally
 # Presence of credentials → auto-detects real mode
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
-VITE_BACKEND_API_URL=https://api-a4c.firstovertheline.com
 VITE_DEBUG_MOBX=false
 ```
 

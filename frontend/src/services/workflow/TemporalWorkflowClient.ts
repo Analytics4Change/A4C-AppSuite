@@ -1,19 +1,17 @@
 /**
  * Temporal Workflow Client Implementation
  *
- * Production workflow client that communicates with Temporal via the Backend API.
- * This client does NOT directly interact with Temporal - all operations go through
- * the authenticated Backend API service running inside the k8s cluster.
+ * Production workflow client that communicates with Temporal via Edge Functions.
+ * All three operations route through Supabase Edge Functions, which handle
+ * authentication, permission validation, and forwarding to the Backend API.
  *
- * Architecture (2-hop):
- * Frontend → Backend API (k8s) → Temporal → Domain Events → PostgreSQL Triggers
+ * Architecture (3-hop):
+ * Frontend → Edge Function (auth + forwarding) → Backend API (k8s) → Temporal
  *
- * Backend API Endpoints:
- * - POST /api/v1/workflows/organization-bootstrap: Start bootstrap workflow
- *
- * Legacy Edge Functions (for operations not yet migrated):
- * - /workflow-status: Get workflow status
- * - /workflow-cancel: Cancel running workflow
+ * Edge Functions:
+ * - organization-bootstrap: Start bootstrap workflow
+ * - workflow-status: Get workflow status
+ * - workflow-cancel: Cancel running workflow
  *
  * All operations are event-driven - NO direct database writes.
  */
@@ -21,46 +19,38 @@
 import type { IWorkflowClient } from './IWorkflowClient';
 import type { OrganizationBootstrapParams, WorkflowStatus } from '@/types/organization.types';
 import { supabaseService } from '@/services/auth/supabase.service';
-import { getBackendApiUrl } from '@/lib/backend-api';
 import { Logger } from '@/utils/logger';
-import { generateCorrelationId, generateTraceparentHeader } from '@/utils/trace-ids';
 import { extractEdgeFunctionError } from '@/utils/edge-function-errors';
 
 const log = Logger.getLogger('workflow');
 
 /**
- * Backend API endpoints for workflow operations
- */
-const API_ENDPOINTS = {
-  ORGANIZATION_BOOTSTRAP: '/api/v1/workflows/organization-bootstrap',
-} as const;
-
-/**
- * Legacy Edge Function endpoints (for operations not yet migrated to Backend API)
+ * Edge Function endpoints for workflow operations
  */
 const EDGE_FUNCTIONS = {
+  BOOTSTRAP: 'organization-bootstrap',
   GET_STATUS: 'workflow-status',
   CANCEL_WORKFLOW: 'workflow-cancel',
 } as const;
 
 /**
- * Production workflow client using Temporal via Backend API
+ * Production workflow client using Temporal via Edge Functions
  *
  * Event-Driven Architecture:
  * - NO direct database inserts/updates
  * - All state changes via domain events
  * - PostgreSQL triggers update CQRS projections
  *
- * The Backend API runs inside the k8s cluster and can access Temporal directly.
- * Edge Functions cannot reach Temporal (runs in Deno Deploy, external to cluster).
+ * Edge Functions run in Supabase (Deno Deploy) and forward to the Backend API,
+ * which runs inside the k8s cluster and can access Temporal directly.
  */
 export class TemporalWorkflowClient implements IWorkflowClient {
   /**
    * Start organization bootstrap workflow
    *
    * Flow:
-   * 1. Get JWT token from current Supabase session
-   * 2. Call Backend API with authenticated request
+   * 1. Call Edge Function (handles JWT validation + permission check)
+   * 2. Edge Function forwards to Backend API
    * 3. Backend API starts Temporal workflow
    * 4. Workflow emits domain events
    * 5. PostgreSQL triggers update projections
@@ -74,8 +64,8 @@ export class TemporalWorkflowClient implements IWorkflowClient {
    * - UserInvited
    *
    * @param params - Organization bootstrap parameters
-   * @returns Workflow ID for status tracking
-   * @throws Error if Backend API call fails or user not authenticated
+   * @returns Organization ID for status tracking
+   * @throws Error if Edge Function call fails or user not authenticated
    */
   async startBootstrapWorkflow(params: OrganizationBootstrapParams): Promise<string> {
     try {
@@ -84,58 +74,18 @@ export class TemporalWorkflowClient implements IWorkflowClient {
         orgType: params.orgData.type,
       });
 
-      // Get Backend API URL (validates based on deployment mode)
-      const apiUrl = getBackendApiUrl();
-      if (!apiUrl) {
-        throw new Error(
-          'Backend API not available in current mode. ' +
-            'Workflow operations require production or integration-auth mode.'
-        );
-      }
-
-      // Get current session for JWT token
       const client = supabaseService.getClient();
-      const {
-        data: { session },
-        error: sessionError,
-      } = await client.auth.getSession();
-
-      if (sessionError) {
-        log.error('Failed to get session', sessionError);
-        throw new Error(`Authentication error: ${sessionError.message}`);
-      }
-
-      if (!session?.access_token) {
-        throw new Error('Authentication required to start workflow');
-      }
-
-      // Call Backend API
-      const response = await fetch(`${apiUrl}${API_ENDPOINTS.ORGANIZATION_BOOTSTRAP}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-          'X-Correlation-ID': generateCorrelationId(),
-          traceparent: generateTraceparentHeader(),
-        },
-        body: JSON.stringify(params),
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.BOOTSTRAP, {
+        body: params,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        // Prefer details (real error) over error (may be generic wrapper like "Backend API error")
-        const errorMessage =
-          errorData.details || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
-        const correlationRef = errorData.correlation_id
-          ? ` (Ref: ${errorData.correlation_id})`
-          : '';
-        log.error('Backend API error', { status: response.status, error: errorData });
-        throw new Error(`Failed to start workflow: ${errorMessage}${correlationRef}`);
+      if (error) {
+        const extracted = await extractEdgeFunctionError(error, 'Start bootstrap workflow');
+        const correlationRef = extracted.correlationId ? ` (Ref: ${extracted.correlationId})` : '';
+        throw new Error(`Failed to start workflow: ${extracted.message}${correlationRef}`);
       }
 
-      const data = await response.json();
-
-      // API now only returns organizationId (unified ID system)
+      // API returns organizationId (unified ID system)
       if (!data?.organizationId) {
         throw new Error('Invalid response from workflow service');
       }

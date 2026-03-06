@@ -21,10 +21,6 @@ interface ImportMetaEnv {
   /** Supabase anonymous key (required in production/integration) */
   readonly VITE_SUPABASE_ANON_KEY?: string;
 
-  // === Backend API ===
-  /** Backend API URL for workflow operations */
-  readonly VITE_BACKEND_API_URL?: string;
-
   // === Platform Domain ===
   /**
    * Platform base domain for cross-subdomain session sharing.

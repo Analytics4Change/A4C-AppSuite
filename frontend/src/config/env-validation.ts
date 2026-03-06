@@ -47,9 +47,6 @@ const frontendEnvSchema = z.object({
   VITE_SUPABASE_URL: z.string().url().optional(),
   VITE_SUPABASE_ANON_KEY: z.string().min(1).optional(),
 
-  // === Backend API ===
-  VITE_BACKEND_API_URL: z.string().url().optional(),
-
   // === Platform Domain (Optional - auto-derived from hostname in production) ===
   // Can be explicitly set to override auto-detection
   // See: documentation/infrastructure/operations/configuration/ENVIRONMENT_VARIABLES.md
@@ -127,7 +124,6 @@ export function validateEnvironment(): FrontendEnv {
     VITE_FORCE_MOCK: import.meta.env.VITE_FORCE_MOCK,
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
-    VITE_BACKEND_API_URL: import.meta.env.VITE_BACKEND_API_URL,
     VITE_PLATFORM_BASE_DOMAIN: import.meta.env.VITE_PLATFORM_BASE_DOMAIN,
     VITE_USE_RXNORM_API: import.meta.env.VITE_USE_RXNORM_API,
     VITE_USE_RXNORM: import.meta.env.VITE_USE_RXNORM,
@@ -172,7 +168,7 @@ export function validateEnvironment(): FrontendEnv {
     // Determine effective mode for display
     const hasCredentials = !!rawEnv.VITE_SUPABASE_URL;
     const forceMock = rawEnv.VITE_FORCE_MOCK === 'true';
-    const effectiveMode = (hasCredentials && !forceMock) ? 'real' : 'mock';
+    const effectiveMode = hasCredentials && !forceMock ? 'real' : 'mock';
 
     const _errorMessage = `
 ╔══════════════════════════════════════════════════════════════════╗
@@ -196,7 +192,7 @@ ${errors}
 
   // Log detected configuration
   const hasCredentials = !!validatedEnv.VITE_SUPABASE_URL;
-  const effectiveMode = (hasCredentials && !validatedEnv.VITE_FORCE_MOCK) ? 'real' : 'mock';
+  const effectiveMode = hasCredentials && !validatedEnv.VITE_FORCE_MOCK ? 'real' : 'mock';
   log.info('Environment validated', {
     effectiveMode,
     hasSupabaseCredentials: hasCredentials,

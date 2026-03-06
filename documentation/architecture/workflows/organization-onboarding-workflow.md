@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2026-02-07
+last_updated: 2026-03-05
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Temporal implementation of organization bootstrap workflow with unified ID system, 2-hop architecture (Frontend → Backend API → Temporal), DNS provisioning, and invitation sending.
+**Summary**: Temporal implementation of organization bootstrap workflow with unified ID system, 3-hop architecture (Frontend → Edge Function → Backend API → Temporal), DNS provisioning, and invitation sending.
 
 **When to read**:
 - Implementing or debugging organization bootstrap
@@ -16,7 +16,7 @@ last_updated: 2026-02-07
 
 **Prerequisites**: [temporal-overview.md](temporal-overview.md), [event-driven-workflow-triggering.md](event-driven-workflow-triggering.md)
 
-**Key topics**: `organization-bootstrap`, `temporal`, `dns-provisioning`, `invitations`, `unified-id`, `2-hop-architecture`
+**Key topics**: `organization-bootstrap`, `temporal`, `dns-provisioning`, `invitations`, `unified-id`, `3-hop-architecture`
 
 **Estimated read time**: 18 minutes
 <!-- TL;DR-END -->
@@ -26,7 +26,7 @@ last_updated: 2026-02-07
 **Status**: ✅ Fully Implemented and Deployed (2025-12-01)
 **Priority**: Critical - Core business process
 **Pattern**: Workflow-First with Event-Driven Activities
-**Architecture**: 2-Hop (Frontend → Backend API → Temporal)
+**Architecture**: 3-Hop (Frontend → Edge Function → Backend API → Temporal)
 
 ## Unified ID System (Updated 2025-12-09)
 
@@ -79,10 +79,12 @@ The Organization Onboarding Workflow orchestrates the complete bootstrap process
 6. **User Invitations**: Generate secure invitation tokens + send emails
 7. **Organization Activation**: Mark organization as active
 
-**Architecture**: 2-Hop Direct RPC
+**Architecture**: 3-Hop via Edge Function
 ```
 Frontend (React)
-     ↓ POST /api/v1/workflows/organization-bootstrap
+     ↓ supabase.functions.invoke('organization-bootstrap', { body: params })
+Supabase Edge Function (organization-bootstrap)
+     ↓ POST /api/v1/workflows/organization-bootstrap (with JWT forwarding)
 Backend API (Fastify @ api-a4c.firstovertheline.com)
      ↓ client.workflow.start()
 Temporal Server (temporal-frontend.temporal.svc.cluster.local:7233)

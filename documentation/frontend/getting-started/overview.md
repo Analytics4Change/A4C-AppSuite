@@ -392,7 +392,6 @@ onBlur={() => setTimeout(() => setShow(false), 200)}
 # .env.local - Real Supabase auth
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
-VITE_BACKEND_API_URL=https://api-a4c.firstovertheline.com
 
 # Optional: Force mock mode
 # VITE_FORCE_MOCK=true

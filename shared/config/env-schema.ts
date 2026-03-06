@@ -48,9 +48,6 @@ export const frontendEnvSchema = z.object({
   VITE_SUPABASE_URL: z.string().url(),
   VITE_SUPABASE_ANON_KEY: z.string().min(1),
 
-  // === Backend API ===
-  VITE_BACKEND_API_URL: z.string().url().optional(),
-
   // === Medication Search ===
   VITE_USE_RXNORM_API: booleanString,
   VITE_USE_RXNORM: booleanString,

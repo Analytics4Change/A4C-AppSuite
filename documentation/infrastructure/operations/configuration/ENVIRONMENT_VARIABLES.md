@@ -1552,7 +1552,6 @@ VITE_USE_RXNORM_API=false
 # Presence of credentials → auto-detects real auth mode
 VITE_SUPABASE_URL=https://tmrjlswbsxmbglmaclxu.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGci...
-VITE_BACKEND_API_URL=https://api-a4c.firstovertheline.com
 VITE_USE_RXNORM_API=false
 ```
 
@@ -1617,7 +1616,6 @@ All environment configurations are validated on application startup using **Zod 
 - `VITE_SUPABASE_ANON_KEY` - Optional (required if VITE_SUPABASE_URL is set)
 - `VITE_FORCE_MOCK` - Optional boolean string
 - `VITE_PLATFORM_BASE_DOMAIN` - Optional string (auto-derived in production)
-- `VITE_BACKEND_API_URL` - Optional URL format validation
 
 **Workflows** (`workflows/src/shared/config/env-schema.ts`):
 - `WORKFLOW_MODE` - Enum: `mock`, `development`, `production`

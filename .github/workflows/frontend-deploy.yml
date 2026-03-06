@@ -59,9 +59,6 @@ jobs:
         VITE_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
         VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
-        # Backend API (k8s service for Temporal workflow operations)
-        VITE_BACKEND_API_URL=https://api-a4c.firstovertheline.com
-
         # Platform domain for cross-subdomain session sharing
         # Used for cookie scoping and redirect URL validation
         VITE_PLATFORM_BASE_DOMAIN=firstovertheline.com

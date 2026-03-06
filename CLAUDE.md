@@ -239,8 +239,9 @@ The frontend supports three authentication modes for different development needs
 ### Data Flow
 1. Frontend React app (`frontend/`)
 2. Supabase Auth for authentication (`infrastructure/supabase/`)
-3. Temporal workflows for orchestration (`workflows/`)
-4. PostgreSQL with RLS and CQRS projections (`infrastructure/supabase/supabase/migrations/`)
+3. Supabase Edge Functions for workflow operations (auth + forwarding to Backend API)
+4. Temporal workflows for orchestration (`workflows/`)
+5. PostgreSQL with RLS and CQRS projections (`infrastructure/supabase/supabase/migrations/`)
 
 ### Event-Driven Architecture
 - **Domain events**: All state changes recorded as immutable events
@@ -289,10 +290,6 @@ The frontend supports three authentication modes for different development needs
 VITE_RXNORM_API_URL=https://rxnav.nlm.nih.gov/REST
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
-
-# Backend API for workflow operations (organization bootstrap, etc.)
-# Required in production/integration modes, not needed in mock mode
-VITE_BACKEND_API_URL=https://api-a4c.firstovertheline.com
 ```
 
 ### Workflows (`workflows/.env` for local development)
