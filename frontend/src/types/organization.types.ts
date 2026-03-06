@@ -225,6 +225,8 @@ export interface WorkflowStatus {
    */
   organizationId: string;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
+  /** Error message when status is 'failed' — from the workflow failure event */
+  error?: string;
   progress: Array<{
     step: string;
     completed: boolean;

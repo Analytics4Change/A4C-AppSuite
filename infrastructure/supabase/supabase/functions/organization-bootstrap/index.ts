@@ -19,6 +19,10 @@ import { JWTPayload, hasPermission } from '../_shared/types.ts';
 import {
   createInternalError,
   createCorsPreflightResponse,
+  createUnauthorizedError,
+  createValidationError,
+  createErrorResponse,
+  ErrorCodes,
   standardCorsHeaders,
 } from '../_shared/error-response.ts';
 import {
@@ -142,10 +146,7 @@ serve(async (req) => {
     // Verify authorization (JWT token)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createUnauthorizedError(correlationId, corsHeaders, 'Missing authorization header');
     }
 
     // Extract and decode JWT token to access custom claims
@@ -155,10 +156,7 @@ serve(async (req) => {
     const jwtParts = jwt.split('.');
 
     if (jwtParts.length !== 3) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid JWT token format' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createUnauthorizedError(correlationId, corsHeaders, 'Invalid JWT token format');
     }
 
     // Decode JWT payload (base64)
@@ -166,10 +164,7 @@ serve(async (req) => {
     try {
       jwtPayload = JSON.parse(atob(jwtParts[1]));
     } catch (_e) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to decode JWT token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createUnauthorizedError(correlationId, corsHeaders, 'Failed to decode JWT token');
     }
 
     // Create client with user's JWT for auth validation
@@ -184,19 +179,18 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
 
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createUnauthorizedError(correlationId, corsHeaders, authError?.message || 'Authentication failed');
     }
 
     // Check if user's organization is deactivated (access blocked via JWT hook)
     if (jwtPayload.access_blocked) {
       console.log(`[organization-bootstrap ${DEPLOY_VERSION}] Access blocked for user ${user.id}: ${jwtPayload.access_block_reason || 'organization_deactivated'}`);
-      return new Response(
-        JSON.stringify({ error: 'Access blocked: organization is deactivated' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createErrorResponse({
+        error: 'Access blocked: organization is deactivated',
+        code: ErrorCodes.FORBIDDEN,
+        status: 403,
+        correlationId,
+      }, corsHeaders);
     }
 
     // Extract custom claims from JWT payload (not from user.app_metadata!)
@@ -210,13 +204,13 @@ serve(async (req) => {
         required: 'organization.create_root'
       });
 
-      return new Response(
-        JSON.stringify({
-          error: 'Forbidden: organization.create_root permission required to bootstrap organizations',
-          required_permission: 'organization.create_root'
-        }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createErrorResponse({
+        error: 'Forbidden: organization.create_root permission required to bootstrap organizations',
+        code: ErrorCodes.FORBIDDEN,
+        status: 403,
+        correlationId,
+        context: { required_permission: 'organization.create_root' },
+      }, corsHeaders);
     }
 
     console.log('[organization-bootstrap] Permission check passed:', {
@@ -231,30 +225,15 @@ serve(async (req) => {
       requestData = await req.json();
     } catch (parseError) {
       console.error(`[organization-bootstrap ${DEPLOY_VERSION}] Failed to parse request body:`, parseError);
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid request body',
-          details: 'Could not parse JSON',
-          version: DEPLOY_VERSION
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createValidationError('Invalid request body: could not parse JSON', correlationId, corsHeaders);
     }
 
     // Validate required fields (AsyncAPI contract enforcement)
     if (!requestData.subdomain || !requestData.orgData || !requestData.users) {
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid request payload',
-          details: 'Required fields: subdomain, orgData, users',
-          received: {
-            subdomain: !!requestData.subdomain,
-            orgData: !!requestData.orgData,
-            users: !!requestData.users
-          },
-          version: DEPLOY_VERSION
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return createValidationError(
+        'Invalid request payload: required fields: subdomain, orgData, users',
+        correlationId,
+        corsHeaders,
       );
     }
 
@@ -302,18 +281,13 @@ serve(async (req) => {
           status: apiResponse.status,
           response: responseData,
         });
-        return new Response(
-          JSON.stringify({
-            error: 'Backend API error',
-            details: responseData.error || responseData.message || 'Unknown error',
-            backendStatus: apiResponse.status,
-            version: DEPLOY_VERSION
-          }),
-          {
-            status: apiResponse.status,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+        return createErrorResponse({
+          error: responseData.error || responseData.message || 'Unknown backend error',
+          code: 'BACKEND_ERROR',
+          status: apiResponse.status,
+          details: JSON.stringify(responseData),
+          correlationId,
+        }, corsHeaders);
       }
 
       // End span with success status
@@ -337,15 +311,12 @@ serve(async (req) => {
     } catch (fetchError) {
       const completedSpan = endSpan(span, 'error');
       console.error(`[organization-bootstrap ${DEPLOY_VERSION}] Failed to call Backend API after ${completedSpan.durationMs}ms:`, fetchError);
-      return new Response(
-        JSON.stringify({
-          error: 'Failed to reach Backend API',
-          details: fetchError.message,
-          endpoint: apiEndpoint,
-          version: DEPLOY_VERSION
-        }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createErrorResponse({
+        error: `Failed to reach Backend API: ${fetchError.message}`,
+        code: ErrorCodes.SERVICE_UNAVAILABLE,
+        status: 502,
+        correlationId,
+      }, corsHeaders);
     }
 
   } catch (error) {

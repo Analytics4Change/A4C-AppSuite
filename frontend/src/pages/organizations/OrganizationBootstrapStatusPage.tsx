@@ -16,7 +16,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, XCircle, Loader2, AlertCircle, Home } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, AlertCircle, AlertTriangle, Home } from 'lucide-react';
 import { WorkflowClientFactory } from '@/services/workflow/WorkflowClientFactory';
 import type { WorkflowStatus } from '@/types';
 import { Logger } from '@/utils/logger';
@@ -273,6 +273,19 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
                 </div>
               ))}
             </div>
+
+            {/* Workflow Failure Error */}
+            {status.status === 'failed' && status.error && (
+              <div className="mt-6 p-4 bg-red-50 rounded-lg border border-red-300" role="alert">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="text-red-500 mt-0.5 shrink-0" size={20} />
+                  <div>
+                    <h4 className="font-semibold text-red-900">Bootstrap Failed</h4>
+                    <p className="text-sm text-red-800 mt-1">{status.error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Result Information */}
             {status.status === 'completed' && status.result && (

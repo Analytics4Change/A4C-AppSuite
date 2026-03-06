@@ -16,20 +16,16 @@
  * All operations are event-driven - NO direct database writes.
  */
 
-import {
-  FunctionsHttpError,
-  FunctionsRelayError,
-  FunctionsFetchError,
-} from '@supabase/supabase-js';
 import type { IInvitationService } from './IInvitationService';
 import type {
   InvitationDetails,
   UserCredentials,
-  AcceptInvitationResult
+  AcceptInvitationResult,
 } from '@/types/organization.types';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
 import { buildHeadersFromContext, createTracingContext } from '@/utils/tracing';
+import { extractEdgeFunctionError } from '@/utils/edge-function-errors';
 
 const log = Logger.getLogger('invitation');
 
@@ -39,85 +35,8 @@ const log = Logger.getLogger('invitation');
 const EDGE_FUNCTIONS = {
   VALIDATE: 'validate-invitation',
   ACCEPT: 'accept-invitation',
-  RESEND: 'resend-invitation'
+  RESEND: 'resend-invitation',
 } as const;
-
-/**
- * Result from extracting Edge Function errors
- */
-interface EdgeFunctionErrorResult {
-  message: string;
-  details?: string;
-  /** Correlation ID from response headers for support tickets */
-  correlationId?: string;
-}
-
-/**
- * Extract detailed error from Supabase Edge Function error response.
- *
- * When Edge Functions return non-2xx status codes, the Supabase SDK wraps
- * the response in a FunctionsHttpError. The actual error message from the
- * Edge Function is accessible via `error.context.json()`.
- *
- * Also extracts the X-Correlation-ID header if present for support tickets.
- *
- * @param error - The error from functions.invoke()
- * @param operation - Human-readable operation name for fallback messages
- * @returns Object with error message, optional details, and correlation ID
- */
-async function extractEdgeFunctionError(
-  error: unknown,
-  operation: string
-): Promise<EdgeFunctionErrorResult> {
-  if (error instanceof FunctionsHttpError) {
-    // Try to extract correlation ID from response headers
-    const correlationId = error.context.headers.get('x-correlation-id') ?? undefined;
-
-    try {
-      const body = await error.context.json();
-      log.error(`Edge Function HTTP error for ${operation}`, {
-        status: error.context.status,
-        correlationId,
-        body,
-      });
-      return {
-        message: body?.message ?? body?.error ?? `${operation} failed`,
-        details: body?.details,
-        correlationId,
-      };
-    } catch {
-      // Response body wasn't JSON - use status code
-      log.error(`Edge Function error (non-JSON response) for ${operation}`, {
-        status: error.context.status,
-        correlationId,
-      });
-      return {
-        message: `${operation} failed (HTTP ${error.context.status})`,
-        correlationId,
-      };
-    }
-  }
-
-  if (error instanceof FunctionsRelayError) {
-    log.error(`Edge Function relay error for ${operation}`, error);
-    return {
-      message: `Network error: ${error.message}`,
-    };
-  }
-
-  if (error instanceof FunctionsFetchError) {
-    log.error(`Edge Function fetch error for ${operation}`, error);
-    return {
-      message: `Connection error: ${error.message}`,
-    };
-  }
-
-  // Unknown error type
-  log.error(`Unknown error for ${operation}`, error);
-  return {
-    message: error instanceof Error ? error.message : 'Unknown error',
-  };
-}
 
 /**
  * Production invitation service using Supabase Edge Functions
@@ -148,13 +67,10 @@ export class SupabaseInvitationService implements IInvitationService {
 
       const client = supabaseService.getClient();
       const headers = buildHeadersFromContext(tracingContext);
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.VALIDATE,
-        {
-          body: { token },
-          headers,
-        }
-      );
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.VALIDATE, {
+        body: { token },
+        headers,
+      });
 
       if (error) {
         const extracted = await extractEdgeFunctionError(error, 'Validate invitation');
@@ -170,7 +86,7 @@ export class SupabaseInvitationService implements IInvitationService {
 
       log.info('Invitation validated', {
         orgName: data.orgName,
-        role: data.role
+        role: data.role,
       });
 
       return {
@@ -178,7 +94,7 @@ export class SupabaseInvitationService implements IInvitationService {
         role: data.role,
         inviterName: data.inviterName,
         expiresAt: new Date(data.expiresAt),
-        email: data.email
+        email: data.email,
       };
     } catch (error) {
       log.error('Error validating invitation', error);
@@ -221,21 +137,18 @@ export class SupabaseInvitationService implements IInvitationService {
     try {
       log.info('Accepting invitation', {
         token,
-        authMethod: credentials.authMethod?.type || 'email_password'
+        authMethod: credentials.authMethod?.type || 'email_password',
       });
 
       const client = supabaseService.getClient();
       const headers = buildHeadersFromContext(tracingContext);
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.ACCEPT,
-        {
-          body: {
-            token,
-            credentials
-          },
-          headers,
-        }
-      );
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.ACCEPT, {
+        body: {
+          token,
+          credentials,
+        },
+        headers,
+      });
 
       if (error) {
         const extracted = await extractEdgeFunctionError(error, 'Accept invitation');
@@ -262,7 +175,7 @@ export class SupabaseInvitationService implements IInvitationService {
       return {
         userId: data.userId,
         orgId: data.orgId,
-        redirectUrl: data.redirectUrl
+        redirectUrl: data.redirectUrl,
       };
     } catch (error) {
       log.error('Error accepting invitation', error);
@@ -292,13 +205,10 @@ export class SupabaseInvitationService implements IInvitationService {
 
       const client = supabaseService.getClient();
       const headers = buildHeadersFromContext(tracingContext);
-      const { data, error } = await client.functions.invoke(
-        EDGE_FUNCTIONS.RESEND,
-        {
-          body: { invitationId },
-          headers,
-        }
-      );
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.RESEND, {
+        body: { invitationId },
+        headers,
+      });
 
       if (error) {
         const extracted = await extractEdgeFunctionError(error, 'Resend invitation');
@@ -309,10 +219,7 @@ export class SupabaseInvitationService implements IInvitationService {
       }
 
       const success = data?.sent === true;
-      log.info(
-        success ? 'Invitation resent' : 'Failed to resend invitation',
-        { invitationId }
-      );
+      log.info(success ? 'Invitation resent' : 'Failed to resend invitation', { invitationId });
 
       return success;
     } catch (error) {

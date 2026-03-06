@@ -14,11 +14,6 @@
  * @see IUserCommandService for interface documentation
  */
 
-import {
-  FunctionsHttpError,
-  FunctionsRelayError,
-  FunctionsFetchError,
-} from '@supabase/supabase-js';
 import type { IUserCommandService } from './IUserCommandService';
 import type {
   InviteUserRequest,
@@ -41,100 +36,9 @@ import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
 import { buildHeadersFromContext, createTracingContext } from '@/utils/tracing';
 import { decodeJWT } from '@/utils/jwt';
+import { extractEdgeFunctionError } from '@/utils/edge-function-errors';
 
 const log = Logger.getLogger('api');
-
-/**
- * Edge Function error extraction result
- */
-interface EdgeFunctionErrorResult {
-  message: string;
-  code: UserOperationErrorCode;
-  details?: string;
-  /** Full errorDetails object from Edge Function response (for role validation errors, etc.) */
-  errorDetails?: Record<string, unknown>;
-  /** Correlation ID from response headers for support tickets */
-  correlationId?: string;
-}
-
-/**
- * Extract detailed error from Supabase Edge Function error response.
- *
- * When Edge Functions return non-2xx status codes, the Supabase SDK wraps
- * the response in a FunctionsHttpError. The actual error message from the
- * Edge Function is accessible via `error.context.json()`.
- *
- * Also extracts the X-Correlation-ID header if present for support tickets.
- *
- * @param error - The error from functions.invoke()
- * @param operation - Human-readable operation name for fallback messages
- * @returns Object with error message, code, details, full errorDetails object, and correlation ID
- */
-async function extractEdgeFunctionError(
-  error: unknown,
-  operation: string
-): Promise<EdgeFunctionErrorResult> {
-  if (error instanceof FunctionsHttpError) {
-    // Try to extract correlation ID from response headers
-    const correlationId = error.context.headers.get('x-correlation-id') ?? undefined;
-
-    try {
-      const body = await error.context.json();
-      log.error(`Edge Function HTTP error for ${operation}`, {
-        status: error.context.status,
-        correlationId,
-        body,
-      });
-      return {
-        message: body?.error ?? `${operation} failed`,
-        // Extract code from errorDetails if present, otherwise from top-level
-        code:
-          (body?.errorDetails?.code as UserOperationErrorCode) ??
-          (body?.code as UserOperationErrorCode) ??
-          'HTTP_ERROR',
-        details: body?.details,
-        // Pass through the full errorDetails object for rich error information
-        errorDetails: body?.errorDetails,
-        correlationId,
-      };
-    } catch {
-      // Response body wasn't JSON - use status code
-      log.error(`Edge Function error (non-JSON response) for ${operation}`, {
-        status: error.context.status,
-        correlationId,
-      });
-      return {
-        message: `${operation} failed (HTTP ${error.context.status})`,
-        code: 'HTTP_ERROR',
-        correlationId,
-      };
-    }
-  }
-
-  if (error instanceof FunctionsRelayError) {
-    log.error(`Edge Function relay error for ${operation}`, error);
-    return {
-      message: `Network error: ${error.message}`,
-      code: 'RELAY_ERROR',
-    };
-  }
-
-  if (error instanceof FunctionsFetchError) {
-    log.error(`Edge Function fetch error for ${operation}`, error);
-    return {
-      message: `Connection error: ${error.message}`,
-      code: 'FETCH_ERROR',
-    };
-  }
-
-  // Unknown error type
-  const msg = error instanceof Error ? error.message : 'Unknown error';
-  log.error(`Unknown error type for ${operation}`, error);
-  return {
-    message: `${operation} failed: ${msg}`,
-    code: 'UNKNOWN',
-  };
-}
 
 /**
  * Edge Function endpoints
@@ -198,7 +102,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
           success: false,
           error: errorMessage,
           errorDetails: {
-            code: errorInfo.code,
+            code: (errorInfo.code ?? 'UNKNOWN') as UserOperationErrorCode,
             message: errorInfo.message,
             // Pass through full errorDetails from Edge Function for rich error display
             context:
@@ -288,7 +192,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
           success: false,
           error: errorMessage,
           errorDetails: {
-            code: errorInfo.code,
+            code: (errorInfo.code ?? 'UNKNOWN') as UserOperationErrorCode,
             message: errorInfo.message,
             context: errorInfo.details ? { details: errorInfo.details } : undefined,
             correlationId: errorInfo.correlationId,
@@ -348,7 +252,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
           success: false,
           error: errorMessage,
           errorDetails: {
-            code: errorInfo.code,
+            code: (errorInfo.code ?? 'UNKNOWN') as UserOperationErrorCode,
             message: errorInfo.message,
             context: errorInfo.details ? { details: errorInfo.details } : undefined,
             correlationId: errorInfo.correlationId,
@@ -411,7 +315,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
           success: false,
           error: errorMessage,
           errorDetails: {
-            code: errorInfo.code,
+            code: (errorInfo.code ?? 'UNKNOWN') as UserOperationErrorCode,
             message: errorInfo.message,
             context: errorInfo.details ? { details: errorInfo.details } : undefined,
             correlationId: errorInfo.correlationId,
@@ -478,7 +382,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
           success: false,
           error: errorMessage,
           errorDetails: {
-            code: errorInfo.code,
+            code: (errorInfo.code ?? 'UNKNOWN') as UserOperationErrorCode,
             message: errorInfo.message,
             context: errorInfo.details ? { details: errorInfo.details } : undefined,
             correlationId: errorInfo.correlationId,
@@ -546,7 +450,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
           success: false,
           error: errorMessage,
           errorDetails: {
-            code: errorInfo.code,
+            code: (errorInfo.code ?? 'UNKNOWN') as UserOperationErrorCode,
             message: errorInfo.message,
             context: errorInfo.details ? { details: errorInfo.details } : undefined,
             correlationId: errorInfo.correlationId,
@@ -703,7 +607,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
           success: false,
           error: errorMessage,
           errorDetails: {
-            code: errorInfo.code,
+            code: (errorInfo.code ?? 'UNKNOWN') as UserOperationErrorCode,
             message: errorInfo.message,
             context:
               errorInfo.errorDetails ??
@@ -1177,7 +1081,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
           success: false,
           error: errorMessage,
           errorDetails: {
-            code: errorInfo.code,
+            code: (errorInfo.code ?? 'UNKNOWN') as UserOperationErrorCode,
             message: errorInfo.message,
             context: errorInfo.details ? { details: errorInfo.details } : undefined,
             correlationId: errorInfo.correlationId,

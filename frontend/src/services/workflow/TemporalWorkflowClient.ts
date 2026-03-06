@@ -24,6 +24,7 @@ import { supabaseService } from '@/services/auth/supabase.service';
 import { getBackendApiUrl } from '@/lib/backend-api';
 import { Logger } from '@/utils/logger';
 import { generateCorrelationId, generateTraceparentHeader } from '@/utils/trace-ids';
+import { extractEdgeFunctionError } from '@/utils/edge-function-errors';
 
 const log = Logger.getLogger('workflow');
 
@@ -122,9 +123,14 @@ export class TemporalWorkflowClient implements IWorkflowClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+        // Prefer details (real error) over error (may be generic wrapper like "Backend API error")
+        const errorMessage =
+          errorData.details || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+        const correlationRef = errorData.correlation_id
+          ? ` (Ref: ${errorData.correlation_id})`
+          : '';
         log.error('Backend API error', { status: response.status, error: errorData });
-        throw new Error(`Failed to start workflow: ${errorMessage}`);
+        throw new Error(`Failed to start workflow: ${errorMessage}${correlationRef}`);
       }
 
       const data = await response.json();
@@ -169,8 +175,9 @@ export class TemporalWorkflowClient implements IWorkflowClient {
       });
 
       if (error) {
-        log.error('Failed to fetch workflow status', error);
-        throw new Error(`Failed to fetch status: ${error.message}`);
+        const extracted = await extractEdgeFunctionError(error, 'Fetch workflow status');
+        const correlationRef = extracted.correlationId ? ` (Ref: ${extracted.correlationId})` : '';
+        throw new Error(`Failed to fetch status: ${extracted.message}${correlationRef}`);
       }
 
       if (!data?.status) {
@@ -193,6 +200,8 @@ export class TemporalWorkflowClient implements IWorkflowClient {
             error: stage.error,
           })
         ),
+        // Workflow failure error message (from Edge Function's status.error_message)
+        error: data.error || undefined,
         // Result populated with data from events (domain, dnsConfigured, invitationsSent)
         result: data.organizationId
           ? {
@@ -232,8 +241,9 @@ export class TemporalWorkflowClient implements IWorkflowClient {
       });
 
       if (error) {
-        log.error('Failed to cancel workflow', error);
-        throw new Error(`Failed to cancel: ${error.message}`);
+        const extracted = await extractEdgeFunctionError(error, 'Cancel workflow');
+        const correlationRef = extracted.correlationId ? ` (Ref: ${extracted.correlationId})` : '';
+        throw new Error(`Failed to cancel: ${extracted.message}${correlationRef}`);
       }
 
       const success = data?.cancelled === true;
