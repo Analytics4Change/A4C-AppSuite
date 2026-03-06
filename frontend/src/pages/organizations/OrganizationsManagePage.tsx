@@ -29,7 +29,6 @@ import { OrganizationCreateForm } from '@/pages/organizations/OrganizationCreate
 import { OrganizationManageListViewModel } from '@/viewModels/organization/OrganizationManageListViewModel';
 import { OrganizationManageFormViewModel } from '@/viewModels/organization/OrganizationManageFormViewModel';
 import type {
-  Organization,
   OrganizationContact,
   OrganizationAddress,
   OrganizationPhone,
@@ -39,7 +38,6 @@ import type {
 } from '@/types/organization.types';
 
 import {
-  RefreshCw,
   ArrowLeft,
   Building,
   AlertTriangle,
@@ -47,7 +45,6 @@ import {
   XCircle,
   CheckCircle,
   Save,
-  Search,
   Plus,
   Trash2,
   MapPin,
@@ -143,48 +140,6 @@ const EMPTY_PHONE: PhoneFormState = {
 // Sub-components
 // ============================================================================
 
-/** Organization list item in left panel */
-const OrgListItem: React.FC<{
-  org: Organization;
-  isSelected: boolean;
-  onSelect: (id: string) => void;
-}> = ({ org, isSelected, onSelect }) => (
-  <button
-    type="button"
-    onClick={() => onSelect(org.id)}
-    className={cn(
-      'w-full text-left px-3 py-2.5 rounded-lg transition-colors',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-      isSelected
-        ? 'bg-blue-50 border border-blue-200'
-        : 'hover:bg-gray-50 border border-transparent'
-    )}
-    aria-selected={isSelected}
-    role="option"
-    data-testid={`org-list-item-${org.id}`}
-  >
-    <div className="flex items-center justify-between">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-gray-900 truncate" data-testid="org-list-item-name">
-          {org.display_name || org.name}
-        </p>
-        <p className="text-xs text-gray-500 truncate" data-testid="org-list-item-type">
-          {org.type}
-        </p>
-      </div>
-      <span
-        className={cn(
-          'inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 ml-2',
-          org.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-        )}
-        data-testid="org-list-item-status-badge"
-      >
-        {org.is_active ? 'Active' : 'Inactive'}
-      </span>
-    </div>
-  </button>
-);
-
 /** Form field row */
 const FormField: React.FC<{
   label: string;
@@ -243,12 +198,15 @@ export const OrganizationsManagePage: React.FC = observer(() => {
   // Read initial params from URL
   const initialStatus = searchParams.get('status') as 'all' | 'active' | 'inactive' | null;
   const initialOrgId = searchParams.get('orgId');
+  const initialMode = searchParams.get('mode'); // 'create' or null
 
   // List ViewModel
   const [listVM] = useState(() => new OrganizationManageListViewModel());
 
-  // Panel mode
-  const [panelMode, setPanelMode] = useState<PanelMode>('empty');
+  // Panel mode — ?mode=create takes precedence over ?orgId= (S7 collision guard)
+  const [panelMode, setPanelMode] = useState<PanelMode>(
+    initialMode === 'create' ? 'create' : 'empty'
+  );
 
   // Form ViewModel (for edit mode)
   const [formVM, setFormVM] = useState<OrganizationManageFormViewModel | null>(null);
@@ -259,9 +217,6 @@ export const OrganizationsManagePage: React.FC = observer(() => {
 
   // Error state
   const [operationError, setOperationError] = useState<string | null>(null);
-
-  // Search filter (local)
-  const [searchTerm, setSearchTerm] = useState('');
 
   // Entity form state (for inline add/edit dialogs)
   const [contactForm, setContactForm] = useState<ContactFormState>(EMPTY_CONTACT);
@@ -293,10 +248,11 @@ export const OrganizationsManagePage: React.FC = observer(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: only on load complete
   }, [isPlatformOwner, userOrgId, listVM.isLoading, listVM.organizations.length]);
 
-  // Handle orgId from URL (platform owners)
+  // Handle orgId from URL (platform owners) — skip if create mode (S7 collision guard)
   useEffect(() => {
     if (
       initialOrgId &&
+      initialMode !== 'create' &&
       isPlatformOwner &&
       !listVM.isLoading &&
       listVM.organizations.length > 0 &&
@@ -306,7 +262,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
       selectAndLoadOrg(initialOrgId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
-  }, [initialOrgId, isPlatformOwner, listVM.isLoading, listVM.organizations.length]);
+  }, [initialOrgId, initialMode, isPlatformOwner, listVM.isLoading, listVM.organizations.length]);
 
   // Select and load an organization for editing
   const selectAndLoadOrg = useCallback(
@@ -327,21 +283,6 @@ export const OrganizationsManagePage: React.FC = observer(() => {
     [isPlatformOwner, listVM]
   );
 
-  // Handle org list selection with dirty check
-  const handleOrgSelect = useCallback(
-    (orgId: string) => {
-      if (orgId === listVM.selectedOrgId && panelMode === 'edit') return;
-
-      if (panelMode === 'create' || formVM?.isDirty) {
-        pendingActionRef.current = { type: 'select', orgId };
-        setDialogState({ type: 'discard' });
-      } else {
-        selectAndLoadOrg(orgId);
-      }
-    },
-    [listVM.selectedOrgId, panelMode, formVM, selectAndLoadOrg]
-  );
-
   // Handle discard changes
   const handleDiscardChanges = useCallback(() => {
     const pending = pendingActionRef.current;
@@ -353,11 +294,12 @@ export const OrganizationsManagePage: React.FC = observer(() => {
         listVM.selectOrganization('');
         setFormVM(null);
         setPanelMode('create');
+        setSearchParams({ mode: 'create' }, { replace: true });
       } else if (pending.orgId) {
         selectAndLoadOrg(pending.orgId);
       }
     }
-  }, [selectAndLoadOrg, listVM]);
+  }, [selectAndLoadOrg, listVM, setSearchParams]);
 
   // Handle create button click
   const handleCreateClick = useCallback(() => {
@@ -368,8 +310,10 @@ export const OrganizationsManagePage: React.FC = observer(() => {
       listVM.selectOrganization('');
       setFormVM(null);
       setPanelMode('create');
+      // Update URL to reflect create mode
+      setSearchParams({ mode: 'create' }, { replace: true });
     }
-  }, [formVM, listVM]);
+  }, [formVM, listVM, setSearchParams]);
 
   // Handle create form success
   const handleCreateSuccess = useCallback(
@@ -404,35 +348,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
   );
 
   // Navigation
-  const handleBackClick = () => navigate('/settings');
-
-  // Filter handlers
-  const handleSearchChange = useCallback(
-    async (term: string) => {
-      setSearchTerm(term);
-      await listVM.setSearchFilter(term);
-    },
-    [listVM]
-  );
-
-  const handleStatusChange = useCallback(
-    async (status: 'all' | 'active' | 'inactive') => {
-      await listVM.setStatusFilter(status);
-      setSearchParams(
-        (prev) => {
-          const newParams = new URLSearchParams(prev);
-          if (status === 'all') {
-            newParams.delete('status');
-          } else {
-            newParams.set('status', status);
-          }
-          return newParams;
-        },
-        { replace: true }
-      );
-    },
-    [listVM, setSearchParams]
-  );
+  const handleBackClick = () => navigate('/organizations');
 
   // ========================================================================
   // Lifecycle operations (platform owner only)
@@ -693,15 +609,6 @@ export const OrganizationsManagePage: React.FC = observer(() => {
   // Render helpers
   // ========================================================================
 
-  const filteredOrgs = listVM.organizations.filter((org) => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      org.name.toLowerCase().includes(term) ||
-      (org.display_name && org.display_name.toLowerCase().includes(term))
-    );
-  });
-
   return (
     <div
       className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 p-8"
@@ -710,7 +617,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
       <div className="max-w-7xl mx-auto">
         {/* Page Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center justify-between mb-4">
             <Button
               variant="outline"
               size="sm"
@@ -719,8 +626,18 @@ export const OrganizationsManagePage: React.FC = observer(() => {
               data-testid="org-manage-back-btn"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
-              Back to Settings
+              {isPlatformOwner ? 'Back to Organizations' : 'Back'}
             </Button>
+            {isPlatformOwner && panelMode !== 'create' && (
+              <Button
+                className="flex items-center gap-2"
+                onClick={handleCreateClick}
+                data-testid="org-manage-create-btn"
+              >
+                <Plus className="w-4 h-4" />
+                Create Organization
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <Building className="w-8 h-8 text-blue-600" />
@@ -766,117 +683,9 @@ export const OrganizationsManagePage: React.FC = observer(() => {
           </div>
         )}
 
-        {/* Split View Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Panel: Org List */}
-          {isPlatformOwner && (
-            <div className="lg:col-span-1">
-              <Card className="shadow-lg h-[calc(100vh-280px)]" data-testid="org-list-panel">
-                <CardHeader className="border-b border-gray-200 pb-4">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-semibold text-gray-900">
-                      Organizations
-                    </CardTitle>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCreateClick}
-                        aria-label="Create new organization"
-                        data-testid="org-list-create-btn"
-                        className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                      >
-                        <Plus className="w-4 h-4 mr-1" />
-                        Create
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => listVM.refresh()}
-                        disabled={listVM.isLoading}
-                        aria-label="Refresh organization list"
-                        data-testid="org-list-refresh-btn"
-                      >
-                        <RefreshCw className={cn('w-4 h-4', listVM.isLoading && 'animate-spin')} />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 h-[calc(100%-80px)] flex flex-col">
-                  {/* Search */}
-                  <div className="relative mb-3">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search organizations..."
-                      value={searchTerm}
-                      onChange={(e) => handleSearchChange(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      aria-label="Search organizations"
-                      data-testid="org-list-search-input"
-                    />
-                  </div>
-
-                  {/* Status Filter */}
-                  <div className="flex gap-1 mb-3">
-                    {(['all', 'active', 'inactive'] as const).map((status) => (
-                      <button
-                        key={status}
-                        type="button"
-                        onClick={() => handleStatusChange(status)}
-                        data-testid={`org-list-filter-${status}-btn`}
-                        className={cn(
-                          'px-2.5 py-1 text-xs font-medium rounded-md transition-colors',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-                          listVM.filters.status === status
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'text-gray-600 hover:bg-gray-100'
-                        )}
-                      >
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* List */}
-                  <div
-                    className="flex-1 overflow-y-auto space-y-1"
-                    role="listbox"
-                    aria-label="Organization list"
-                    data-testid="org-list"
-                  >
-                    {listVM.isLoading ? (
-                      <div
-                        className="text-center text-sm text-gray-500 py-8"
-                        data-testid="org-list-loading"
-                      >
-                        Loading...
-                      </div>
-                    ) : filteredOrgs.length === 0 ? (
-                      <div
-                        className="text-center text-sm text-gray-500 py-8"
-                        data-testid="org-list-empty"
-                      >
-                        No organizations found
-                      </div>
-                    ) : (
-                      filteredOrgs.map((org) => (
-                        <OrgListItem
-                          key={org.id}
-                          org={org}
-                          isSelected={org.id === listVM.selectedOrgId}
-                          onSelect={handleOrgSelect}
-                        />
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Right Panel: Form */}
-          <div className={isPlatformOwner ? 'lg:col-span-2' : 'lg:col-span-3'}>
+        {/* Form Panel (full-width — list is now on /organizations) */}
+        <div>
+          <div>
             {/* Empty State */}
             {panelMode === 'empty' && (
               <Card className="shadow-lg" data-testid="org-form-empty-state">
@@ -887,7 +696,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                   </h3>
                   <p className="text-gray-500 max-w-md mx-auto">
                     {isPlatformOwner
-                      ? 'Select an organization from the list to view and edit its details.'
+                      ? 'Select an organization from the list page, or create a new one.'
                       : 'Loading your organization details...'}
                   </p>
                 </CardContent>

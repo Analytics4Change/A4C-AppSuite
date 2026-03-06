@@ -38,6 +38,9 @@ interface OrganizationRow {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  provider_admin_name: string | null;
+  provider_admin_email: string | null;
+  provider_admin_phone: string | null;
 }
 
 /**
@@ -69,6 +72,9 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
       referring_partner_id: undefined, // Not in database - frontend will need to store elsewhere
       created_at: new Date(row.created_at),
       updated_at: new Date(row.updated_at),
+      provider_admin_name: row.provider_admin_name ?? undefined,
+      provider_admin_email: row.provider_admin_email ?? undefined,
+      provider_admin_phone: row.provider_admin_phone ?? undefined,
     };
   }
 

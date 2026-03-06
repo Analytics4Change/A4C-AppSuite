@@ -253,6 +253,25 @@
 ### Existing Files Modified (Phase 11 — Create Form UAT Tests)
 - `frontend/e2e/organization-manage-page.spec.ts` — added TS-18 through TS-24 (31 new test cases, 112 total), added `reactFill()`/`reactFillScoped()`/`enterCreateMode()`/`fillMinimalProviderForm()` helpers, fixed TC-16-01 tab order for Create button, updated header comment
 
+### Post-Completion Fixes (2026-03-05)
+
+**Create form layout** (`bf002211`):
+- `frontend/src/pages/organizations/OrganizationCreateForm.tsx` — stacked labels + container queries for responsive form layout in narrow 3-col grid panel
+- `frontend/src/components/organizations/AddressInput.tsx`, `ContactInput.tsx`, `PhoneInputEnhanced.tsx`, `ReferringPartnerDropdown.tsx` — responsive layout fixes
+- `frontend/src/components/organization/SubdomainInput.tsx` — layout fix
+
+**Bootstrap CORS fix** (`d2d56a55`, `bd9f998d`):
+- `frontend/src/lib/backend-api.ts` — DELETED (direct backend API calls removed, all routing now via Edge Functions)
+- `frontend/src/services/workflow/TemporalWorkflowClient.ts` — refactored to call Edge Functions instead of backend API directly
+- `frontend/src/services/invitation/SupabaseInvitationService.ts` — simplified (Edge Function routing)
+- `frontend/src/services/users/SupabaseUserCommandService.ts` — simplified (Edge Function routing)
+- `infrastructure/supabase/supabase/functions/organization-bootstrap/index.ts` — updated to handle workflow routing
+- `frontend/src/utils/edge-function-errors.ts` — NEW: standardized Edge Function error handling utility
+- `frontend/src/config/env-validation.ts` — removed `VITE_BACKEND_API_URL`
+- `frontend/.env.example` — removed backend API URL
+- `frontend/src/types/organization.types.ts` — added 2 fields
+- Multiple docs updated to remove backend API URL references
+
 ## Why This Approach?
 - **Dedicated RPCs** over raw `emit_domain_event`: Moves event emission responsibility to backend (consistent with schedule/role pattern), enables proper permission checks, metadata population, and read-back guards server-side. Frontend only needs to call typed RPC functions.
 - **Temporal for deletion only**: Deactivation/reactivation are simple atomic operations. Deletion involves unreliable external calls (DNS, Supabase Admin API) that benefit from Temporal's retry and durability.

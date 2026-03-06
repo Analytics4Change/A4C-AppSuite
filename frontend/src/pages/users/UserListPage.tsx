@@ -21,15 +21,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { UserCard } from '@/components/users';
 import { UsersViewModel } from '@/viewModels/users/UsersViewModel';
 import { getUserQueryService, getUserCommandService } from '@/services/users';
-import {
-  Plus,
-  Search,
-  Users,
-  UserCheck,
-  Clock,
-  UserX,
-  RefreshCw,
-} from 'lucide-react';
+import { Plus, Search, Users, UserCheck, Clock, UserX, RefreshCw } from 'lucide-react';
 import type { UserListItem, UserDisplayStatus } from '@/types/user.types';
 import { Logger } from '@/utils/logger';
 
@@ -124,9 +116,7 @@ export const UserListPage: React.FC = observer(() => {
       setDialogState({
         type: 'deactivate',
         userId,
-        userName: user.firstName
-          ? `${user.firstName} ${user.lastName || ''}`.trim()
-          : user.email,
+        userName: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email,
         isLoading: false,
       });
     }
@@ -151,9 +141,7 @@ export const UserListPage: React.FC = observer(() => {
       setDialogState({
         type: 'reactivate',
         userId,
-        userName: user.firstName
-          ? `${user.firstName} ${user.lastName || ''}`.trim()
-          : user.email,
+        userName: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email,
         isLoading: false,
       });
     }
@@ -246,9 +234,7 @@ export const UserListPage: React.FC = observer(() => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-600 mt-1">
-            Manage users and pending invitations
-          </p>
+          <p className="text-gray-600 mt-1">Manage users and pending invitations</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -257,10 +243,7 @@ export const UserListPage: React.FC = observer(() => {
             onClick={() => viewModel.loadAll()}
             disabled={viewModel.isLoading}
           >
-            <RefreshCw
-              size={16}
-              className={viewModel.isLoading ? 'animate-spin' : ''}
-            />
+            <RefreshCw size={16} className={viewModel.isLoading ? 'animate-spin' : ''} />
           </Button>
           <Button
             className="flex items-center gap-2"
@@ -273,65 +256,71 @@ export const UserListPage: React.FC = observer(() => {
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-2 mb-4" role="group" aria-label="Filter by status">
-        <Button
-          variant={statusFilter === 'all' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setStatusFilter('all')}
-          aria-pressed={statusFilter === 'all'}
-          className="flex items-center gap-1.5"
-        >
-          <Users size={14} />
-          All ({statusCounts.all})
-        </Button>
-        <Button
-          variant={statusFilter === 'active' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setStatusFilter('active')}
-          aria-pressed={statusFilter === 'active'}
-          className="flex items-center gap-1.5"
-        >
-          <UserCheck size={14} />
-          Active ({statusCounts.active})
-        </Button>
-        <Button
-          variant={statusFilter === 'pending' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setStatusFilter('pending')}
-          aria-pressed={statusFilter === 'pending'}
-          className="flex items-center gap-1.5"
-        >
-          <Clock size={14} />
-          Pending ({statusCounts.pending})
-        </Button>
-        <Button
-          variant={statusFilter === 'deactivated' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setStatusFilter('deactivated')}
-          aria-pressed={statusFilter === 'deactivated'}
-          className="flex items-center gap-1.5"
-        >
-          <UserX size={14} />
-          Inactive ({statusCounts.deactivated})
-        </Button>
-      </div>
+      {/* Sticky Filter + Search */}
+      <div
+        className="sticky top-0 z-10 bg-white/95 motion-safe:backdrop-blur-sm pb-4"
+        role="search"
+      >
+        {/* Filter Tabs */}
+        <div className="flex flex-wrap gap-2 mb-4" role="group" aria-label="Filter by status">
+          <Button
+            variant={statusFilter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStatusFilter('all')}
+            aria-pressed={statusFilter === 'all'}
+            className="flex items-center gap-1.5"
+          >
+            <Users size={14} />
+            All ({statusCounts.all})
+          </Button>
+          <Button
+            variant={statusFilter === 'active' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStatusFilter('active')}
+            aria-pressed={statusFilter === 'active'}
+            className="flex items-center gap-1.5"
+          >
+            <UserCheck size={14} />
+            Active ({statusCounts.active})
+          </Button>
+          <Button
+            variant={statusFilter === 'pending' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStatusFilter('pending')}
+            aria-pressed={statusFilter === 'pending'}
+            className="flex items-center gap-1.5"
+          >
+            <Clock size={14} />
+            Pending ({statusCounts.pending})
+          </Button>
+          <Button
+            variant={statusFilter === 'deactivated' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStatusFilter('deactivated')}
+            aria-pressed={statusFilter === 'deactivated'}
+            className="flex items-center gap-1.5"
+          >
+            <UserX size={14} />
+            Inactive ({statusCounts.deactivated})
+          </Button>
+        </div>
 
-      {/* Search Bar */}
-      <div className="relative mb-6">
-        <Search
-          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-          size={20}
-          aria-hidden="true"
-        />
-        <Input
-          type="search"
-          placeholder="Search by name or email..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 max-w-md"
-          aria-label="Search users"
-        />
+        {/* Search Bar */}
+        <div className="relative">
+          <Search
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+            size={20}
+            aria-hidden="true"
+          />
+          <Input
+            type="search"
+            placeholder="Search by name or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 max-w-md"
+            aria-label="Search users"
+          />
+        </div>
       </div>
 
       {/* Error Display */}
@@ -390,9 +379,7 @@ export const UserListPage: React.FC = observer(() => {
           {viewModel.totalCount === 0 ? (
             <div>
               <Users className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500 mb-4">
-                No users in this organization yet.
-              </p>
+              <p className="text-gray-500 mb-4">No users in this organization yet.</p>
               <Button onClick={handleCreateClick}>
                 <Plus size={16} className="mr-2" />
                 Invite Your First User
@@ -401,9 +388,7 @@ export const UserListPage: React.FC = observer(() => {
           ) : (
             <div>
               <Users className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">
-                No users found matching your search.
-              </p>
+              <p className="text-gray-500">No users found matching your search.</p>
             </div>
           )}
         </div>

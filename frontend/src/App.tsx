@@ -17,6 +17,7 @@ import { MedicationManagementPage } from '@/pages/medications/MedicationManageme
 import { OrganizationBootstrapStatusPage } from '@/pages/organizations/OrganizationBootstrapStatusPage';
 import { OrganizationDashboard } from '@/pages/organizations/OrganizationDashboard';
 import { OrganizationsManagePage } from '@/pages/organizations/OrganizationsManagePage';
+import { OrganizationListPage } from '@/pages/organizations/OrganizationListPage';
 import { AcceptInvitationPage } from '@/pages/organizations/AcceptInvitationPage';
 import { AccessBlockedPage } from '@/pages/auth/AccessBlockedPage';
 import { OrganizationUnitsManagePage } from '@/pages/organization-units';
@@ -92,6 +93,14 @@ function App() {
                 {/* Organization Management routes */}
                 <Route
                   path="/organizations"
+                  element={
+                    <RequirePermission permission="organization.update" fallback="/clients">
+                      <OrganizationListPage />
+                    </RequirePermission>
+                  }
+                />
+                <Route
+                  path="/organizations/manage"
                   element={
                     <RequirePermission permission="organization.update" fallback="/clients">
                       <OrganizationsManagePage />

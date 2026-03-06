@@ -317,6 +317,9 @@ export interface Organization {
   referring_partner_id?: string; // NEW: VAR partner who referred this organization
   created_at: Date;
   updated_at: Date;
+  provider_admin_name?: string;
+  provider_admin_email?: string;
+  provider_admin_phone?: string;
 }
 
 /**

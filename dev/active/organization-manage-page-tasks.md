@@ -236,10 +236,22 @@
 - [x] Fix TC-16-01 (pre-existing): Tab order updated to include Create button (Back → Create → Refresh → Search → Filters)
 - [x] All 112 tests pass (110 passed + 2 skipped, 0 failures)
 
+## Post-Completion Fixes (2026-03-05)
+
+- [x] Fix create form layout: stacked labels + container queries for proper responsive behavior in 3-col grid (`bf002211`)
+- [x] Fix bootstrap error propagation: Edge Function chain now surfaces detailed error messages (`d2d56a55`)
+- [x] Fix bootstrap CORS: route bootstrap workflow through Edge Function instead of direct backend-api call (`bd9f998d`)
+  - Removed `frontend/src/lib/backend-api.ts` (direct backend calls)
+  - `TemporalWorkflowClient` refactored to call Edge Functions instead
+  - `SupabaseInvitationService` + `SupabaseUserCommandService` simplified (Edge Function routing)
+  - `organization-bootstrap` Edge Function updated to handle workflow routing
+  - Added `frontend/src/utils/edge-function-errors.ts` for standardized error handling
+  - Removed `VITE_BACKEND_API_URL` from env config (no longer needed)
+
 ## Current Status
 
-**Phase**: All phases complete (0–11)
+**Phase**: All phases complete (0–11) + 3 post-completion fixes
 **Status**: ✅ FEATURE COMPLETE
-**Last Updated**: 2026-03-05
-**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (`72f4666f`), Phase 7 (`cab2cf9c`), Phase 8 (docs update), Phase 9A (`6d89795a`, `45b99a99`), Phase 9B (`0f71b00e`), Phase 9C (81/81 UAT tests pass), Phase 10 (`c0c3ce49`), Phase 11 (31 new create form tests, 112 total)
-**Next Step**: Commit Phase 11 changes. Then archive dev-docs to `dev/archived/organization-manage-page/`. Remaining unchecked items are integration validation (require live Temporal + Supabase environment).
+**Last Updated**: 2026-03-06
+**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (`72f4666f`), Phase 7 (`cab2cf9c`), Phase 8 (docs update), Phase 9A (`6d89795a`, `45b99a99`), Phase 9B (`0f71b00e`), Phase 9C (81/81 UAT tests pass), Phase 10 (`c0c3ce49`), Phase 11 (`f6960d0b`), Post-fixes (`bf002211`, `d2d56a55`, `bd9f998d`)
+**Next Step**: Archive dev-docs to `dev/archived/organization-manage-page/`. Then begin org-ux-refactor (plan at `dev/active/org-ux-refactor-plan.md`). Remaining unchecked items are integration validation (require live Temporal + Supabase environment).

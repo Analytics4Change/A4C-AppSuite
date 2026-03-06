@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-26
+last_updated: 2026-03-06
 purpose: agent-navigation
 ---
 
@@ -144,8 +144,10 @@ purpose: agent-navigation
 | `okta` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | supabase-auth-overview.md |
 | `otlp-export` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `organization` | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | organization-management-architecture.md |
+| `organization-card` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | organizations_projection.md |
 | `organization-deletion` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | activities-reference.md, temporal-overview.md |
 | `organization-lifecycle` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | organizations_projection.md, JWT-CLAIMS-SETUP.md |
+| `organization-list` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | organizations_projection.md |
 | `organization-manage` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | schedule-management.md |
 | `organization-addresses` | [organization_addresses.md](infrastructure/reference/database/tables/organization_addresses.md) | addresses_projection.md |
 | `organization-contacts` | [organization_contacts.md](infrastructure/reference/database/tables/organization_contacts.md) | contacts_projection.md |
@@ -172,6 +174,7 @@ purpose: agent-navigation
 | `projection` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | organizations_projection.md, table-template.md |
 | `projection-guard` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md, infrastructure/CLAUDE.md |
 | `provider-admin` | [provider-admin-permissions-architecture.md](architecture/authorization/provider-admin-permissions-architecture.md) | role_permission_templates.md |
+| `provider-admin-redirect` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | organizations_projection.md |
 | `provider-onboarding` | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | organization-bootstrap-workflow-design.md |
 | `provider-partners` | [provider-partners-architecture.md](architecture/data/provider-partners-architecture.md) | var-partnerships.md |
 | `rbac` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | rbac-implementation-guide.md, scoping-architecture.md |

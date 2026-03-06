@@ -91,9 +91,7 @@ export const RolesPage: React.FC = observer(() => {
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       roles = roles.filter(
-        (r) =>
-          r.name.toLowerCase().includes(term) ||
-          r.description.toLowerCase().includes(term)
+        (r) => r.name.toLowerCase().includes(term) || r.description.toLowerCase().includes(term)
       );
     }
 
@@ -168,63 +166,69 @@ export const RolesPage: React.FC = observer(() => {
         </Button>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 mb-4" role="group" aria-label="Filter by status">
-        <Button
-          variant={statusFilter === 'all' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => handleStatusFilterChange('all')}
-          aria-pressed={statusFilter === 'all'}
-          className={
-            statusFilter === 'all'
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'hover:bg-gray-100'
-          }
-        >
-          All ({viewModel.roleCount})
-        </Button>
-        <Button
-          variant={statusFilter === 'active' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => handleStatusFilterChange('active')}
-          aria-pressed={statusFilter === 'active'}
-          className={
-            statusFilter === 'active'
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'hover:bg-gray-100'
-          }
-        >
-          Active ({viewModel.activeRoleCount})
-        </Button>
-        <Button
-          variant={statusFilter === 'inactive' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => handleStatusFilterChange('inactive')}
-          aria-pressed={statusFilter === 'inactive'}
-          className={
-            statusFilter === 'inactive'
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'hover:bg-gray-100'
-          }
-        >
-          Inactive ({viewModel.roleCount - viewModel.activeRoleCount})
-        </Button>
-      </div>
+      {/* Sticky Filter + Search */}
+      <div
+        className="sticky top-0 z-10 bg-white/95 motion-safe:backdrop-blur-sm pb-4"
+        role="search"
+      >
+        {/* Filter Tabs */}
+        <div className="flex gap-2 mb-4" role="group" aria-label="Filter by status">
+          <Button
+            variant={statusFilter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleStatusFilterChange('all')}
+            aria-pressed={statusFilter === 'all'}
+            className={
+              statusFilter === 'all'
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'hover:bg-gray-100'
+            }
+          >
+            All ({viewModel.roleCount})
+          </Button>
+          <Button
+            variant={statusFilter === 'active' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleStatusFilterChange('active')}
+            aria-pressed={statusFilter === 'active'}
+            className={
+              statusFilter === 'active'
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'hover:bg-gray-100'
+            }
+          >
+            Active ({viewModel.activeRoleCount})
+          </Button>
+          <Button
+            variant={statusFilter === 'inactive' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleStatusFilterChange('inactive')}
+            aria-pressed={statusFilter === 'inactive'}
+            className={
+              statusFilter === 'inactive'
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'hover:bg-gray-100'
+            }
+          >
+            Inactive ({viewModel.roleCount - viewModel.activeRoleCount})
+          </Button>
+        </div>
 
-      {/* Search Bar */}
-      <div className="relative mb-6">
-        <Search
-          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-          size={20}
-        />
-        <Input
-          type="search"
-          placeholder="Search by name or description..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 max-w-md"
-          aria-label="Search roles"
-        />
+        {/* Search Bar */}
+        <div className="relative">
+          <Search
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+            size={20}
+          />
+          <Input
+            type="search"
+            placeholder="Search by name or description..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 max-w-md"
+            aria-label="Search roles"
+          />
+        </div>
       </div>
 
       {/* Error Display */}
@@ -256,10 +260,7 @@ export const RolesPage: React.FC = observer(() => {
       )}
 
       {/* Role Grid */}
-      <div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-        data-testid="role-list"
-      >
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="role-list">
         {filteredRoles.map((role) => (
           <RoleCard
             key={role.id}
@@ -292,9 +293,7 @@ export const RolesPage: React.FC = observer(() => {
       {/* Confirmation Dialog */}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
-        title={
-          confirmDialog.action === 'deactivate' ? 'Deactivate Role' : 'Reactivate Role'
-        }
+        title={confirmDialog.action === 'deactivate' ? 'Deactivate Role' : 'Reactivate Role'}
         message={
           confirmDialog.action === 'deactivate'
             ? `Are you sure you want to deactivate "${confirmDialog.roleName}"? Users with this role will lose their permissions until the role is reactivated.`

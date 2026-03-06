@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-04
+last_updated: 2026-03-06
 ---
 
 <!-- TL;DR-START -->
@@ -375,6 +375,25 @@ CHECK (
 **Rationale**: This table is a CQRS projection maintained by event processors in the application layer, not by database triggers.
 
 **Event Processing**: Updates are handled by Temporal workflows and Edge Functions that emit domain events, which are then processed to update this projection.
+
+## API Functions
+
+### api.get_organizations
+
+Returns all non-deleted organizations visible to the current user (RLS-enforced). Extended with provider admin information via LEFT JOIN LATERAL.
+
+**Return columns** (beyond table columns):
+| Column | Type | Description |
+|--------|------|-------------|
+| provider_admin_name | text | Full name of most recently assigned provider_admin user (NULL if none) |
+| provider_admin_email | text | Email of most recently assigned provider_admin user (NULL if none) |
+| provider_admin_phone | text | Primary active phone number of provider_admin user (NULL if none) |
+
+**Join strategy**: LEFT JOIN LATERAL through `user_roles_projection` → `roles_projection` (where `role_name = 'provider_admin'`) → `users` → `user_phones` (where `is_primary = true AND is_active = true`), ordered by `assigned_at DESC LIMIT 1`.
+
+### api.get_organizations_paginated
+
+Same as `api.get_organizations` with pagination support (`p_page`, `p_page_size`). Returns same provider admin columns plus `total_count`.
 
 ## Usage Examples
 

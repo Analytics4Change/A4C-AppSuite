@@ -34,6 +34,9 @@ const MOCK_ORGANIZATIONS: Organization[] = [
     path: 'a4c-platform-id',
     created_at: new Date('2024-01-01'),
     updated_at: new Date('2024-01-01'),
+    provider_admin_name: 'Lars Tice',
+    provider_admin_email: 'lars@analytics4change.com',
+    provider_admin_phone: '(801) 555-0100',
   },
 
   // Provider organizations
@@ -50,6 +53,9 @@ const MOCK_ORGANIZATIONS: Organization[] = [
     path: 'a4c-platform-id.provider-abc-healthcare-id',
     created_at: new Date('2024-02-01'),
     updated_at: new Date('2024-02-01'),
+    provider_admin_name: 'Dr. Sarah Chen',
+    provider_admin_email: 'sarah.chen@abchealthcare.com',
+    provider_admin_phone: '(555) 234-5678',
   },
   {
     id: 'provider-xyz-medical-id',
@@ -64,6 +70,8 @@ const MOCK_ORGANIZATIONS: Organization[] = [
     path: 'a4c-platform-id.provider-xyz-medical-id',
     created_at: new Date('2024-02-15'),
     updated_at: new Date('2024-02-15'),
+    provider_admin_name: 'Michael Rodriguez',
+    provider_admin_email: 'mrodriguez@xyzmedical.com',
   },
   {
     id: 'provider-summit-health-id',
@@ -78,6 +86,7 @@ const MOCK_ORGANIZATIONS: Organization[] = [
     path: 'a4c-platform-id.provider-summit-health-id',
     created_at: new Date('2024-01-20'),
     updated_at: new Date('2024-03-10'),
+    // No provider admin — demonstrates "No admin assigned" card state
   },
 
   // VAR partner organizations

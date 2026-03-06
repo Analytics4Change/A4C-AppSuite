@@ -195,48 +195,54 @@ export const ScheduleListPage: React.FC = observer(() => {
         </Button>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 mb-4" role="group" aria-label="Filter by status">
-        {(['all', 'active', 'inactive'] as const).map((status) => {
-          const count =
-            status === 'all'
-              ? viewModel.templateCount
-              : status === 'active'
-                ? viewModel.activeTemplateCount
-                : viewModel.templateCount - viewModel.activeTemplateCount;
-          return (
-            <Button
-              key={status}
-              variant={statusFilter === status ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => handleStatusFilterChange(status)}
-              aria-pressed={statusFilter === status}
-              className={
-                statusFilter === status
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'hover:bg-gray-100'
-              }
-            >
-              {status.charAt(0).toUpperCase() + status.slice(1)} ({count})
-            </Button>
-          );
-        })}
-      </div>
+      {/* Sticky Filter + Search */}
+      <div
+        className="sticky top-0 z-10 bg-white/95 motion-safe:backdrop-blur-sm pb-4"
+        role="search"
+      >
+        {/* Filter Tabs */}
+        <div className="flex gap-2 mb-4" role="group" aria-label="Filter by status">
+          {(['all', 'active', 'inactive'] as const).map((status) => {
+            const count =
+              status === 'all'
+                ? viewModel.templateCount
+                : status === 'active'
+                  ? viewModel.activeTemplateCount
+                  : viewModel.templateCount - viewModel.activeTemplateCount;
+            return (
+              <Button
+                key={status}
+                variant={statusFilter === status ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleStatusFilterChange(status)}
+                aria-pressed={statusFilter === status}
+                className={
+                  statusFilter === status
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'hover:bg-gray-100'
+                }
+              >
+                {status.charAt(0).toUpperCase() + status.slice(1)} ({count})
+              </Button>
+            );
+          })}
+        </div>
 
-      {/* Search Bar */}
-      <div className="relative mb-6">
-        <Search
-          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-          size={20}
-        />
-        <Input
-          type="search"
-          placeholder="Search by name or unit..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 max-w-md"
-          aria-label="Search schedule templates"
-        />
+        {/* Search Bar */}
+        <div className="relative">
+          <Search
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+            size={20}
+          />
+          <Input
+            type="search"
+            placeholder="Search by name or unit..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 max-w-md"
+            aria-label="Search schedule templates"
+          />
+        </div>
       </div>
 
       {/* Error */}

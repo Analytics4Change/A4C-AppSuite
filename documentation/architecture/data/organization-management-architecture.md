@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2026-02-26
+last_updated: 2026-03-06
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Complete architecture for organization management module including frontend manage page (React/MobX), service layer with factory pattern, organization lifecycle operations (deactivate/reactivate/delete), contact/address/phone CRUD, Temporal deletion workflow, and event-driven CQRS backend with JWT access_blocked guard.
+**Summary**: Complete architecture for organization management module including two-route frontend pattern (list page with cards + manage page), provider admin redirect, service layer with factory pattern, organization lifecycle operations (deactivate/reactivate/delete), contact/address/phone CRUD, Temporal deletion workflow, and event-driven CQRS backend with JWT access_blocked guard.
 
 **When to read**:
 - Understanding organization management module architecture
@@ -164,10 +164,13 @@ The frontend follows strict Model-View-ViewModel separation:
    - Error handling and retry
 
 3. **OrganizationListPage** (`frontend/src/pages/organizations/OrganizationListPage.tsx`)
-   - Organization grid view (351 lines)
-   - Draft management (resume/delete)
-   - Search and filtering
-   - Role-based visibility
+   - **Route**: `/organizations` (platform owner only; provider admins redirect to `/organizations/manage`)
+   - Glassmorphism card grid (1/2/3 columns responsive) via `OrganizationCard` component
+   - Cards display: org name, status badge, type badge, provider admin name/email/phone
+   - Sticky filter tabs (All/Active/Inactive) with counts + sticky search bar
+   - Search across name, display_name, subdomain, provider admin name/email
+   - Create button in page header (navigates to `/organizations/manage?mode=create`)
+   - Reuses `OrganizationManageListViewModel`
 
 4. **OrganizationDashboard** (`frontend/src/pages/organizations/OrganizationDashboard.tsx`)
    - Minimal MVP dashboard (282 lines)
@@ -181,15 +184,15 @@ The frontend follows strict Model-View-ViewModel separation:
    - Error states (expired, already accepted)
 
 6. **OrganizationsManagePage** (`frontend/src/pages/organizations/OrganizationsManagePage.tsx`)
-   - Split-panel manage page (~1500 lines) following `RolesManagePage` pattern
-   - **Left panel** (platform owner only): Organization list with search, status badges
-   - **Right panel**: Organization details form, contacts/addresses/phones entity sections
+   - Full-width manage page (~1400 lines) following `RolesManagePage` pattern
+   - **Entry paths**: (a) card click from list page `?orgId=<uuid>`, (b) provider admin redirect (auto-loads own org from JWT), (c) `?mode=create` for create form
+   - Organization details form, contacts/addresses/phones entity sections
    - **Entity CRUD**: Inline add/edit/delete for contacts, addresses, phones via `EntityFormDialog`
    - **DangerZone**: Deactivate/reactivate/delete with `ConfirmDialog` (platform owner only)
-   - **Role-based behavior**: Platform owners see all orgs; provider admins auto-select own org (full-width)
+   - **Role-based behavior**: Platform owners see Back + Create buttons in header; provider admins see full-width form (no list, no create, no delete)
    - **Field editability**: Platform owners edit all fields including `name`; others edit display_name, tax_number, phone_number, timezone only
    - **Route**: `/organizations/manage` with `RequirePermission("organization.update")`
-   - **Nav**: "Manage Organization" visible to all org types with `organization.update` permission
+   - **Query params**: `?orgId=<uuid>` to load specific org, `?mode=create` for create form (create wins if both present)
 
 7. **AccessBlockedPage** (`frontend/src/pages/auth/AccessBlockedPage.tsx`)
    - Displayed when JWT `access_blocked` claim is true (e.g., org deactivated)

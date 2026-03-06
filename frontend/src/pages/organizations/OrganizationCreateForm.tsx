@@ -2,10 +2,11 @@
  * Organization Create Form
  *
  * Extracted from OrganizationCreatePage for embedding in the manage page's right panel.
- * Complete implementation with 3-section structure:
- * - General Information (Organization + Headquarters)
- * - Billing Information (Contact + Address + Phone) - Conditional for providers
- * - Provider Admin Information (Contact + Address + Phone)
+ * Card-based layout matching edit mode structure:
+ * - Organization Details card (create-only fields + shared fields)
+ * - Headquarters card (address + phone)
+ * - Billing Information card (conditional for providers)
+ * - Provider Admin Information card
  *
  * Features:
  * - Dynamic section visibility based on organization type
@@ -32,69 +33,12 @@ import { ReferringPartnerDropdown } from '@/components/organizations/ReferringPa
 import { SubdomainInput } from '@/components/organization/SubdomainInput';
 import { OrganizationFormViewModel } from '@/viewModels/organization/OrganizationFormViewModel';
 import { US_TIME_ZONES, ORGANIZATION_TYPES, PARTNER_TYPES } from '@/constants';
-import { Save, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, Send, ChevronDown, AlertTriangle, X, User, MapPin, Phone } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import { Logger } from '@/utils/logger';
 import { useAuth } from '@/contexts/AuthContext';
 
 const log = Logger.getLogger('component');
-
-// =============================================================================
-// Glassmorphism Style Constants
-// =============================================================================
-
-/**
- * Glassmorphism styles for main section cards (3 sections)
- */
-const GLASSMORPHISM_SECTION_STYLE: React.CSSProperties = {
-  background: 'rgba(255, 255, 255, 0.75)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: '1px solid',
-  borderImage:
-    'linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.5) 100%) 1',
-  boxShadow: `
-    0 0 0 1px rgba(255, 255, 255, 0.18) inset,
-    0 2px 4px rgba(0, 0, 0, 0.04),
-    0 4px 8px rgba(0, 0, 0, 0.04),
-    0 8px 16px rgba(0, 0, 0, 0.04),
-    0 0 24px rgba(59, 130, 246, 0.03)
-  `.trim(),
-};
-
-/**
- * Glassmorphism styles for inner cards (9 sub-cards)
- */
-const GLASSMORPHISM_CARD_STYLE: React.CSSProperties = {
-  background: 'rgba(255, 255, 255, 0.7)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: '1px solid rgba(255, 255, 255, 0.3)',
-  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-};
-
-/**
- * Hover shadow for inner cards
- */
-const CARD_HOVER_SHADOW = `
-  0 0 0 1px rgba(255, 255, 255, 0.25) inset,
-  0 0 20px rgba(59, 130, 246, 0.15) inset,
-  0 12px 24px rgba(0, 0, 0, 0.08)
-`.trim();
-
-/**
- * Create hover handlers for glassmorphism cards
- */
-const createCardHoverHandlers = () => ({
-  onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => {
-    e.currentTarget.style.boxShadow = CARD_HOVER_SHADOW;
-    e.currentTarget.style.transform = 'translateY(-2px)';
-  },
-  onMouseLeave: (e: React.MouseEvent<HTMLDivElement>) => {
-    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-    e.currentTarget.style.transform = 'translateY(0)';
-  },
-});
 
 // =============================================================================
 // Props Interface
@@ -105,21 +49,155 @@ export interface OrganizationCreateFormProps {
   onCancel: () => void;
 }
 
-/**
- * Organization Create Form Component
- *
- * Full 3-section form with dynamic visibility and "Use General Information" support.
- */
+// =============================================================================
+// Reusable Select Field
+// =============================================================================
+
+interface SelectFieldProps {
+  label: string;
+  value: string;
+  onValueChange: (value: string) => void;
+  options: readonly { readonly value: string; readonly label: string }[];
+  required?: boolean;
+  ariaLabel: string;
+  testId: string;
+  maxHeight?: string;
+}
+
+const SelectField: React.FC<SelectFieldProps> = ({
+  label,
+  value,
+  onValueChange,
+  options,
+  required,
+  ariaLabel,
+  testId,
+  maxHeight,
+}) => (
+  <div className="flex flex-col gap-1">
+    <label className="block text-sm font-medium text-gray-700">
+      {label}
+      {required && <span className="text-red-500">*</span>}
+    </label>
+    <Select.Root value={value} onValueChange={onValueChange}>
+      <Select.Trigger
+        className="w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+        aria-label={ariaLabel}
+        aria-required={required ? 'true' : undefined}
+        data-testid={testId}
+      >
+        <Select.Value />
+        <Select.Icon>
+          <ChevronDown className="h-4 w-4" />
+        </Select.Icon>
+      </Select.Trigger>
+      <Select.Portal>
+        <Select.Content
+          className={`bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50${maxHeight ? ` ${maxHeight}` : ''}`}
+        >
+          <Select.Viewport className="p-1">
+            {options.map((opt) => (
+              <Select.Item
+                key={opt.value}
+                value={opt.value}
+                className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
+              >
+                <Select.ItemText>{opt.label}</Select.ItemText>
+              </Select.Item>
+            ))}
+          </Select.Viewport>
+        </Select.Content>
+      </Select.Portal>
+    </Select.Root>
+  </div>
+);
+
+// =============================================================================
+// Reusable Text Field
+// =============================================================================
+
+interface TextFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+  ariaLabel: string;
+  testId: string;
+  error?: string | null;
+}
+
+const TextField: React.FC<TextFieldProps> = ({
+  label,
+  value,
+  onChange,
+  required,
+  ariaLabel,
+  testId,
+  error,
+}) => (
+  <div className="flex flex-col gap-1">
+    <label className="block text-sm font-medium text-gray-700">
+      {label}
+      {required && <span className="text-red-500">*</span>}
+    </label>
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+      aria-label={ariaLabel}
+      aria-required={required ? 'true' : undefined}
+      aria-invalid={!!error}
+      data-testid={testId}
+    />
+    {error && <p className="text-red-600 text-sm mt-1">{error}</p>}
+  </div>
+);
+
+// =============================================================================
+// "Use General" Checkbox Header
+// =============================================================================
+
+interface UseGeneralHeaderProps {
+  title: string;
+  checkboxId: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  testId: string;
+}
+
+const UseGeneralHeader: React.FC<UseGeneralHeaderProps> = ({
+  title,
+  checkboxId,
+  checked,
+  onCheckedChange,
+  testId,
+}) => (
+  <div className="flex items-center justify-between mb-3">
+    <h4 className="text-sm font-semibold text-gray-700">{title}</h4>
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id={checkboxId}
+        checked={checked}
+        onCheckedChange={(c) => onCheckedChange(c as boolean)}
+        data-testid={testId}
+      />
+      <Label htmlFor={checkboxId} className="text-gray-900 cursor-pointer text-sm">
+        Use General
+      </Label>
+    </div>
+  </div>
+);
+
+// =============================================================================
+// Organization Create Form Component
+// =============================================================================
+
 export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = observer(
   ({ onSubmitSuccess, onCancel }) => {
-    useAuth(); // For auth context availability
+    useAuth();
     const [viewModel] = useState(() => new OrganizationFormViewModel());
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // Section collapse states
-    const [generalCollapsed, setGeneralCollapsed] = useState(false);
-    const [billingCollapsed, setBillingCollapsed] = useState(false);
-    const [adminCollapsed, setAdminCollapsed] = useState(false);
 
     // Auto-save effect (debounced)
     useEffect(() => {
@@ -153,12 +231,10 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
           log.info('Organization workflow started', { organizationId });
           onSubmitSuccess(organizationId);
         } else {
-          // Submission failed - error is already displayed in submissionError
           log.warn('Organization submission returned null - staying on form');
         }
       } catch (error) {
         log.error('Failed to submit organization', error);
-        // Error is already handled in viewModel.submit() catch block
       } finally {
         setIsSubmitting(false);
       }
@@ -167,10 +243,6 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
     /**
      * Prevent Enter key from submitting form when in text inputs.
      * Complex multi-field forms should require explicit Submit button click.
-     * Enter still works for:
-     * - Radix Select dropdowns (item selection)
-     * - Submit button when focused
-     * - Non-text inputs (checkboxes, radios, etc.)
      */
     const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
       if (e.key === 'Enter') {
@@ -192,43 +264,21 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
     const isPartner = formData.type === 'provider_partner';
 
     return (
-      <div data-testid="org-create-form" className="@container">
-        <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="space-y-6">
+      <div data-testid="org-create-form">
+        <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="space-y-4">
           {/* Submission Error Banner */}
           {viewModel.submissionError && (
             <div
-              className="mb-6 p-4 rounded-lg border border-red-300"
-              style={{
-                background: 'rgba(239, 68, 68, 0.1)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-              }}
+              className="p-4 rounded-lg border border-red-300 bg-red-50"
               role="alert"
               aria-live="assertive"
               data-testid="org-create-submit-error"
             >
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <svg
-                    className="w-6 h-6 text-red-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
-                  </svg>
-                </div>
+                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <h3 className="text-red-800 font-semibold mb-1">
-                    Organization Submission Failed
-                  </h3>
-                  <p className="text-red-700 text-sm">{viewModel.submissionError}</p>
+                  <h3 className="text-red-800 font-semibold">Organization Submission Failed</h3>
+                  <p className="text-red-700 text-sm mt-1">{viewModel.submissionError}</p>
                   <p className="text-red-600 text-xs mt-2">
                     Please check the form and try again. If the problem persists, contact support.
                   </p>
@@ -239,527 +289,258 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
                   className="flex-shrink-0 text-red-600 hover:text-red-800"
                   aria-label="Dismiss error"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
           )}
 
-          {/* Section 1: General Information */}
-          <Card
-            className="transition-all duration-200"
-            style={GLASSMORPHISM_SECTION_STYLE}
-            data-testid="org-create-section-general"
-          >
-            <CardHeader
-              className="border-b border-gray-200/50 cursor-pointer"
-              onClick={() => setGeneralCollapsed(!generalCollapsed)}
-            >
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  <span>1. General Information</span>
-                  <span className="text-sm font-normal text-gray-600">
-                    (Organization Details + Headquarters)
-                  </span>
-                </CardTitle>
-                {generalCollapsed ? (
-                  <ChevronDown className="w-6 h-6 text-gray-700" />
-                ) : (
-                  <ChevronUp className="w-6 h-6 text-gray-700" />
+          {/* Organization Details Card */}
+          <Card className="shadow-lg" data-testid="org-create-section-general">
+            <CardHeader className="border-b border-gray-200">
+              <CardTitle className="text-xl font-semibold text-gray-900">
+                Organization Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <SelectField
+                  label="Organization Type"
+                  value={formData.type}
+                  onValueChange={(v) =>
+                    viewModel.updateField('type', v as 'provider' | 'provider_partner')
+                  }
+                  options={ORGANIZATION_TYPES}
+                  required
+                  ariaLabel="Organization Type"
+                  testId="org-create-type-select"
+                />
+
+                {isPartner && (
+                  <SelectField
+                    label="Partner Type"
+                    value={formData.partnerType || ''}
+                    onValueChange={(v) =>
+                      viewModel.updateField(
+                        'partnerType',
+                        v as 'var' | 'family' | 'court' | 'other'
+                      )
+                    }
+                    options={PARTNER_TYPES}
+                    required
+                    ariaLabel="Partner Type"
+                    testId="org-create-partner-type-select"
+                  />
+                )}
+
+                <TextField
+                  label="Organization Name"
+                  value={formData.name}
+                  onChange={(v) => viewModel.updateField('name', v)}
+                  required
+                  ariaLabel="Organization Name"
+                  testId="org-create-name-input"
+                  error={viewModel.getFieldError('name')}
+                />
+
+                <TextField
+                  label="Display Name"
+                  value={formData.displayName}
+                  onChange={(v) => viewModel.updateField('displayName', v)}
+                  required
+                  ariaLabel="Display Name"
+                  testId="org-create-display-name-input"
+                  error={viewModel.getFieldError('displayName')}
+                />
+
+                {viewModel.isSubdomainRequired && (
+                  <SubdomainInput
+                    id="subdomain"
+                    label="Subdomain"
+                    value={formData.subdomain}
+                    onChange={(value) => viewModel.updateSubdomain(value)}
+                    error={viewModel.getFieldError('subdomain')}
+                    required
+                    data-testid="org-create-subdomain-input"
+                  />
+                )}
+
+                <SelectField
+                  label="Time Zone"
+                  value={formData.timeZone}
+                  onValueChange={(v) => viewModel.updateField('timeZone', v)}
+                  options={US_TIME_ZONES}
+                  required
+                  ariaLabel="Time Zone"
+                  testId="org-create-timezone-select"
+                  maxHeight="max-h-[300px]"
+                />
+
+                {isProvider && (
+                  <ReferringPartnerDropdown
+                    value={formData.referringPartnerId}
+                    onChange={(value) => viewModel.updateField('referringPartnerId', value)}
+                    data-testid="org-create-referring-partner"
+                  />
                 )}
               </div>
-            </CardHeader>
-            {!generalCollapsed && (
-              <CardContent className="p-6">
-                {/* Three-card layout: Organization | Address | Phone */}
-                <div className="grid grid-cols-1 @lg:grid-cols-2 @3xl:grid-cols-3 gap-6">
-                  {/* Card 1: Organization Details */}
-                  <div
-                    className="p-4 rounded-lg transition-all duration-200"
-                    style={GLASSMORPHISM_CARD_STYLE}
-                    {...createCardHoverHandlers()}
-                  >
-                    <div className="space-y-3">
-                      {/* Organization Info */}
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                        Organization Info
-                      </h3>
-
-                      {/* Organization Type */}
-                      <div className="flex flex-col gap-1">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Organization Type<span className="text-red-500">*</span>
-                        </label>
-                        <Select.Root
-                          value={formData.type}
-                          onValueChange={(value) =>
-                            viewModel.updateField('type', value as 'provider' | 'provider_partner')
-                          }
-                        >
-                          <Select.Trigger
-                            className="w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
-                            aria-label="Organization Type"
-                            aria-required="true"
-                            data-testid="org-create-type-select"
-                          >
-                            <Select.Value />
-                            <Select.Icon>
-                              <ChevronDown className="h-4 w-4" />
-                            </Select.Icon>
-                          </Select.Trigger>
-                          <Select.Portal>
-                            <Select.Content className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50">
-                              <Select.Viewport className="p-1">
-                                {ORGANIZATION_TYPES.map((type) => (
-                                  <Select.Item
-                                    key={type.value}
-                                    value={type.value}
-                                    className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
-                                  >
-                                    <Select.ItemText>{type.label}</Select.ItemText>
-                                  </Select.Item>
-                                ))}
-                              </Select.Viewport>
-                            </Select.Content>
-                          </Select.Portal>
-                        </Select.Root>
-                      </div>
-
-                      {/* Partner Type (conditional) */}
-                      {isPartner && (
-                        <div className="flex flex-col gap-1">
-                          <label className="block text-sm font-medium text-gray-700">
-                            Partner Type<span className="text-red-500">*</span>
-                          </label>
-                          <Select.Root
-                            value={formData.partnerType || ''}
-                            onValueChange={(value) =>
-                              viewModel.updateField(
-                                'partnerType',
-                                value as 'var' | 'family' | 'court' | 'other'
-                              )
-                            }
-                          >
-                            <Select.Trigger
-                              className="w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
-                              aria-label="Partner Type"
-                              aria-required="true"
-                              data-testid="org-create-partner-type-select"
-                            >
-                              <Select.Value />
-                              <Select.Icon>
-                                <ChevronDown className="h-4 w-4" />
-                              </Select.Icon>
-                            </Select.Trigger>
-                            <Select.Portal>
-                              <Select.Content className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50">
-                                <Select.Viewport className="p-1">
-                                  {PARTNER_TYPES.map((type) => (
-                                    <Select.Item
-                                      key={type.value}
-                                      value={type.value}
-                                      className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
-                                    >
-                                      <Select.ItemText>{type.label}</Select.ItemText>
-                                    </Select.Item>
-                                  ))}
-                                </Select.Viewport>
-                              </Select.Content>
-                            </Select.Portal>
-                          </Select.Root>
-                        </div>
-                      )}
-
-                      {/* Organization Name */}
-                      <div className="flex flex-col gap-1">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Organization Name<span className="text-red-500">*</span>
-                        </label>
-                        <div>
-                          <input
-                            type="text"
-                            value={formData.name}
-                            onChange={(e) => viewModel.updateField('name', e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                            aria-label="Organization Name"
-                            aria-required="true"
-                            aria-invalid={!!viewModel.getFieldError('name')}
-                            data-testid="org-create-name-input"
-                          />
-                          {viewModel.getFieldError('name') && (
-                            <p className="text-red-600 text-sm mt-1">
-                              {viewModel.getFieldError('name')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Display Name */}
-                      <div className="flex flex-col gap-1">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Display Name<span className="text-red-500">*</span>
-                        </label>
-                        <div>
-                          <input
-                            type="text"
-                            value={formData.displayName}
-                            onChange={(e) => viewModel.updateField('displayName', e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                            aria-label="Display Name"
-                            aria-required="true"
-                            aria-invalid={!!viewModel.getFieldError('displayName')}
-                            data-testid="org-create-display-name-input"
-                          />
-                          {viewModel.getFieldError('displayName') && (
-                            <p className="text-red-600 text-sm mt-1">
-                              {viewModel.getFieldError('displayName')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Subdomain (conditional) */}
-                      {viewModel.isSubdomainRequired && (
-                        <SubdomainInput
-                          id="subdomain"
-                          label="Subdomain"
-                          value={formData.subdomain}
-                          onChange={(value) => viewModel.updateSubdomain(value)}
-                          error={viewModel.getFieldError('subdomain')}
-                          required
-                          data-testid="org-create-subdomain-input"
-                        />
-                      )}
-
-                      {/* Time Zone */}
-                      <div className="flex flex-col gap-1">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Time Zone<span className="text-red-500">*</span>
-                        </label>
-                        <Select.Root
-                          value={formData.timeZone}
-                          onValueChange={(value) => viewModel.updateField('timeZone', value)}
-                        >
-                          <Select.Trigger
-                            className="w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
-                            aria-label="Time Zone"
-                            aria-required="true"
-                            data-testid="org-create-timezone-select"
-                          >
-                            <Select.Value />
-                            <Select.Icon>
-                              <ChevronDown className="h-4 w-4" />
-                            </Select.Icon>
-                          </Select.Trigger>
-                          <Select.Portal>
-                            <Select.Content className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50 max-h-[300px]">
-                              <Select.Viewport className="p-1">
-                                {US_TIME_ZONES.map((tz) => (
-                                  <Select.Item
-                                    key={tz.value}
-                                    value={tz.value}
-                                    className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded outline-none data-[highlighted]:bg-gray-100"
-                                  >
-                                    <Select.ItemText>{tz.label}</Select.ItemText>
-                                  </Select.Item>
-                                ))}
-                              </Select.Viewport>
-                            </Select.Content>
-                          </Select.Portal>
-                        </Select.Root>
-                      </div>
-
-                      {/* Referring Partner (conditional - only for providers) */}
-                      {isProvider && (
-                        <ReferringPartnerDropdown
-                          value={formData.referringPartnerId}
-                          onChange={(value) => viewModel.updateField('referringPartnerId', value)}
-                          data-testid="org-create-referring-partner"
-                        />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Card 2: Headquarters Address */}
-                  <div
-                    className="p-4 rounded-lg transition-all duration-200"
-                    style={GLASSMORPHISM_CARD_STYLE}
-                    {...createCardHoverHandlers()}
-                    data-testid="org-create-general-address"
-                  >
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Headquarters Address
-                    </h3>
-                    <AddressInput
-                      value={formData.generalAddress}
-                      onChange={(address) => viewModel.updateField('generalAddress', address)}
-                    />
-                  </div>
-
-                  {/* Card 3: Main Office Phone */}
-                  <div
-                    className="p-4 rounded-lg transition-all duration-200"
-                    style={GLASSMORPHISM_CARD_STYLE}
-                    {...createCardHoverHandlers()}
-                    data-testid="org-create-general-phone"
-                  >
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Main Office Phone</h3>
-                    <PhoneInputEnhanced
-                      value={formData.generalPhone}
-                      onChange={(phone) => viewModel.updateField('generalPhone', phone)}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            )}
+            </CardContent>
           </Card>
 
-          {/* Section 2: Billing Information (conditional for providers) */}
-          {isProvider && (
-            <Card
-              className="transition-all duration-200"
-              style={GLASSMORPHISM_SECTION_STYLE}
-              data-testid="org-create-section-billing"
-            >
-              <CardHeader
-                className="border-b border-gray-200/50 cursor-pointer"
-                onClick={() => setBillingCollapsed(!billingCollapsed)}
-              >
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                    <span>2. Billing Information</span>
-                    <span className="text-sm font-normal text-gray-600">
-                      (Contact + Address + Phone)
-                    </span>
-                  </CardTitle>
-                  {billingCollapsed ? (
-                    <ChevronDown className="w-6 h-6 text-gray-700" />
-                  ) : (
-                    <ChevronUp className="w-6 h-6 text-gray-700" />
-                  )}
+          {/* Headquarters Card */}
+          <Card className="shadow-lg" data-testid="org-create-headquarters-card">
+            <CardHeader className="border-b border-gray-200">
+              <CardTitle className="text-xl font-semibold text-gray-900">Headquarters</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div data-testid="org-create-general-address">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                    <MapPin className="w-4 h-4 inline-block mr-1 text-blue-600" />
+                    Address
+                  </h4>
+                  <AddressInput
+                    value={formData.generalAddress}
+                    onChange={(address) => viewModel.updateField('generalAddress', address)}
+                  />
                 </div>
+                <div data-testid="org-create-general-phone">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                    <Phone className="w-4 h-4 inline-block mr-1 text-blue-600" />
+                    Main Office Phone
+                  </h4>
+                  <PhoneInputEnhanced
+                    value={formData.generalPhone}
+                    onChange={(phone) => viewModel.updateField('generalPhone', phone)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Billing Information Card (conditional for providers) */}
+          {isProvider && (
+            <Card className="shadow-lg" data-testid="org-create-section-billing">
+              <CardHeader className="border-b border-gray-200">
+                <CardTitle className="text-xl font-semibold text-gray-900">
+                  Billing Information
+                </CardTitle>
               </CardHeader>
-              {!billingCollapsed && (
-                <CardContent className="p-6">
-                  {/* Three-card layout: Contact | Address | Phone */}
-                  <div className="grid grid-cols-1 @lg:grid-cols-2 @3xl:grid-cols-3 gap-6">
-                    {/* Billing Contact Card */}
-                    <div
-                      className="p-4 rounded-lg transition-all duration-200"
-                      style={GLASSMORPHISM_CARD_STYLE}
-                      {...createCardHoverHandlers()}
-                      data-testid="org-create-billing-contact"
-                    >
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Billing Contact</h3>
-                      <ContactInput
-                        value={formData.billingContact}
-                        onChange={(contact) => viewModel.updateField('billingContact', contact)}
-                      />
-                    </div>
+              <CardContent className="p-6 space-y-6">
+                {/* Billing Contact */}
+                <div data-testid="org-create-billing-contact">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                    <User className="w-4 h-4 inline-block mr-1 text-blue-600" />
+                    Billing Contact
+                  </h4>
+                  <ContactInput
+                    value={formData.billingContact}
+                    onChange={(contact) => viewModel.updateField('billingContact', contact)}
+                  />
+                </div>
 
-                    {/* Billing Address Card */}
-                    <div
-                      className="p-4 rounded-lg transition-all duration-200"
-                      style={GLASSMORPHISM_CARD_STYLE}
-                      {...createCardHoverHandlers()}
-                      data-testid="org-create-billing-address"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900">Billing Address</h3>
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            id="use-billing-general-address"
-                            checked={formData.useBillingGeneralAddress}
-                            onCheckedChange={(checked) =>
-                              viewModel.updateField('useBillingGeneralAddress', checked as boolean)
-                            }
-                            data-testid="org-create-use-billing-general-address"
-                          />
-                          <Label
-                            htmlFor="use-billing-general-address"
-                            className="text-gray-900 cursor-pointer text-sm"
-                          >
-                            Use General
-                          </Label>
-                        </div>
-                      </div>
-                      <AddressInput
-                        value={formData.billingAddress}
-                        onChange={(address) => viewModel.updateField('billingAddress', address)}
-                        disabled={formData.useBillingGeneralAddress}
-                      />
-                    </div>
+                <hr className="border-gray-200" />
 
-                    {/* Billing Phone Card */}
-                    <div
-                      className="p-4 rounded-lg transition-all duration-200"
-                      style={GLASSMORPHISM_CARD_STYLE}
-                      {...createCardHoverHandlers()}
-                      data-testid="org-create-billing-phone"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900">Billing Phone</h3>
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            id="use-billing-general-phone"
-                            checked={formData.useBillingGeneralPhone}
-                            onCheckedChange={(checked) =>
-                              viewModel.updateField('useBillingGeneralPhone', checked as boolean)
-                            }
-                            data-testid="org-create-use-billing-general-phone"
-                          />
-                          <Label
-                            htmlFor="use-billing-general-phone"
-                            className="text-gray-900 cursor-pointer text-sm"
-                          >
-                            Use General
-                          </Label>
-                        </div>
-                      </div>
-                      <PhoneInputEnhanced
-                        value={formData.billingPhone}
-                        onChange={(phone) => viewModel.updateField('billingPhone', phone)}
-                        disabled={formData.useBillingGeneralPhone}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              )}
+                {/* Billing Address */}
+                <div data-testid="org-create-billing-address">
+                  <UseGeneralHeader
+                    title="Billing Address"
+                    checkboxId="use-billing-general-address"
+                    checked={formData.useBillingGeneralAddress}
+                    onCheckedChange={(c) => viewModel.updateField('useBillingGeneralAddress', c)}
+                    testId="org-create-use-billing-general-address"
+                  />
+                  <AddressInput
+                    value={formData.billingAddress}
+                    onChange={(address) => viewModel.updateField('billingAddress', address)}
+                    disabled={formData.useBillingGeneralAddress}
+                  />
+                </div>
+
+                <hr className="border-gray-200" />
+
+                {/* Billing Phone */}
+                <div data-testid="org-create-billing-phone">
+                  <UseGeneralHeader
+                    title="Billing Phone"
+                    checkboxId="use-billing-general-phone"
+                    checked={formData.useBillingGeneralPhone}
+                    onCheckedChange={(c) => viewModel.updateField('useBillingGeneralPhone', c)}
+                    testId="org-create-use-billing-general-phone"
+                  />
+                  <PhoneInputEnhanced
+                    value={formData.billingPhone}
+                    onChange={(phone) => viewModel.updateField('billingPhone', phone)}
+                    disabled={formData.useBillingGeneralPhone}
+                  />
+                </div>
+              </CardContent>
             </Card>
           )}
 
-          {/* Section 3: Provider Admin Information (always visible) */}
-          <Card
-            className="transition-all duration-200"
-            style={GLASSMORPHISM_SECTION_STYLE}
-            data-testid="org-create-section-provider-admin"
-          >
-            <CardHeader
-              className="border-b border-gray-200/50 cursor-pointer"
-              onClick={() => setAdminCollapsed(!adminCollapsed)}
-            >
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  <span>{isProvider ? '3' : '2'}. Provider Admin Information</span>
-                  <span className="text-sm font-normal text-gray-600">
-                    (Contact + Address + Phone)
-                  </span>
-                </CardTitle>
-                {adminCollapsed ? (
-                  <ChevronDown className="w-6 h-6 text-gray-700" />
-                ) : (
-                  <ChevronUp className="w-6 h-6 text-gray-700" />
-                )}
-              </div>
+          {/* Provider Admin Information Card */}
+          <Card className="shadow-lg" data-testid="org-create-section-provider-admin">
+            <CardHeader className="border-b border-gray-200">
+              <CardTitle className="text-xl font-semibold text-gray-900">
+                Provider Admin Information
+              </CardTitle>
             </CardHeader>
-            {!adminCollapsed && (
-              <CardContent className="p-6">
-                {/* Three-card layout: Contact | Address | Phone */}
-                <div className="grid grid-cols-1 @lg:grid-cols-2 @3xl:grid-cols-3 gap-6">
-                  {/* Provider Admin Contact Card */}
-                  <div
-                    className="p-4 rounded-lg transition-all duration-200"
-                    style={GLASSMORPHISM_CARD_STYLE}
-                    {...createCardHoverHandlers()}
-                    data-testid="org-create-admin-contact"
-                  >
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Provider Admin Contact
-                    </h3>
-                    <ContactInput
-                      value={formData.providerAdminContact}
-                      onChange={(contact) => viewModel.updateField('providerAdminContact', contact)}
-                      showEmailConfirmation={true}
-                    />
-                  </div>
+            <CardContent className="p-6 space-y-6">
+              {/* Admin Contact */}
+              <div data-testid="org-create-admin-contact">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                  <User className="w-4 h-4 inline-block mr-1 text-blue-600" />
+                  Provider Admin Contact
+                </h4>
+                <ContactInput
+                  value={formData.providerAdminContact}
+                  onChange={(contact) => viewModel.updateField('providerAdminContact', contact)}
+                  showEmailConfirmation={true}
+                />
+              </div>
 
-                  {/* Provider Admin Address Card */}
-                  <div
-                    className="p-4 rounded-lg transition-all duration-200"
-                    style={GLASSMORPHISM_CARD_STYLE}
-                    {...createCardHoverHandlers()}
-                    data-testid="org-create-admin-address"
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Provider Admin Address
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="use-admin-general-address"
-                          checked={formData.useProviderAdminGeneralAddress}
-                          onCheckedChange={(checked) =>
-                            viewModel.updateField(
-                              'useProviderAdminGeneralAddress',
-                              checked as boolean
-                            )
-                          }
-                          data-testid="org-create-use-admin-general-address"
-                        />
-                        <Label
-                          htmlFor="use-admin-general-address"
-                          className="text-gray-900 cursor-pointer text-sm"
-                        >
-                          Use General
-                        </Label>
-                      </div>
-                    </div>
-                    <AddressInput
-                      value={formData.providerAdminAddress}
-                      onChange={(address) => viewModel.updateField('providerAdminAddress', address)}
-                      disabled={formData.useProviderAdminGeneralAddress}
-                    />
-                  </div>
+              <hr className="border-gray-200" />
 
-                  {/* Provider Admin Phone Card */}
-                  <div
-                    className="p-4 rounded-lg transition-all duration-200"
-                    style={GLASSMORPHISM_CARD_STYLE}
-                    {...createCardHoverHandlers()}
-                    data-testid="org-create-admin-phone"
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900">Provider Admin Phone</h3>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="use-admin-general-phone"
-                          checked={formData.useProviderAdminGeneralPhone}
-                          onCheckedChange={(checked) =>
-                            viewModel.updateField(
-                              'useProviderAdminGeneralPhone',
-                              checked as boolean
-                            )
-                          }
-                          data-testid="org-create-use-admin-general-phone"
-                        />
-                        <Label
-                          htmlFor="use-admin-general-phone"
-                          className="text-gray-900 cursor-pointer text-sm"
-                        >
-                          Use General
-                        </Label>
-                      </div>
-                    </div>
-                    <PhoneInputEnhanced
-                      value={formData.providerAdminPhone}
-                      onChange={(phone) => viewModel.updateField('providerAdminPhone', phone)}
-                      disabled={formData.useProviderAdminGeneralPhone}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            )}
+              {/* Admin Address */}
+              <div data-testid="org-create-admin-address">
+                <UseGeneralHeader
+                  title="Provider Admin Address"
+                  checkboxId="use-admin-general-address"
+                  checked={formData.useProviderAdminGeneralAddress}
+                  onCheckedChange={(c) =>
+                    viewModel.updateField('useProviderAdminGeneralAddress', c)
+                  }
+                  testId="org-create-use-admin-general-address"
+                />
+                <AddressInput
+                  value={formData.providerAdminAddress}
+                  onChange={(address) => viewModel.updateField('providerAdminAddress', address)}
+                  disabled={formData.useProviderAdminGeneralAddress}
+                />
+              </div>
+
+              <hr className="border-gray-200" />
+
+              {/* Admin Phone */}
+              <div data-testid="org-create-admin-phone">
+                <UseGeneralHeader
+                  title="Provider Admin Phone"
+                  checkboxId="use-admin-general-phone"
+                  checked={formData.useProviderAdminGeneralPhone}
+                  onCheckedChange={(c) => viewModel.updateField('useProviderAdminGeneralPhone', c)}
+                  testId="org-create-use-admin-general-phone"
+                />
+                <PhoneInputEnhanced
+                  value={formData.providerAdminPhone}
+                  onChange={(phone) => viewModel.updateField('providerAdminPhone', phone)}
+                  disabled={formData.useProviderAdminGeneralPhone}
+                />
+              </div>
+            </CardContent>
           </Card>
 
           {/* Form Actions */}
-          <div className="flex items-center justify-between pt-6">
+          <div className="flex items-center justify-between pt-2">
             <div className="flex items-center gap-4">
               {viewModel.lastSavedAt && (
                 <span className="text-sm text-gray-600" data-testid="org-create-last-saved">
@@ -784,11 +565,6 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
                 type="button"
                 variant="outline"
                 onClick={() => viewModel.saveDraft()}
-                className="bg-white/70 border-gray-300 text-gray-900 hover:bg-white/90"
-                style={{
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                }}
                 data-testid="org-create-save-draft-btn"
               >
                 <Save className="w-4 h-4 mr-2" />
@@ -798,7 +574,7 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
               <Button
                 type="submit"
                 disabled={!viewModel.canSubmit || isSubmitting}
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold hover:from-blue-700 hover:to-indigo-700"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
                 data-testid="org-create-submit-btn"
               >
                 <Send className="w-4 h-4 mr-2" />
@@ -810,11 +586,7 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
           {/* Validation Errors Summary */}
           {viewModel.validationErrors.length > 0 && (
             <div
-              className="mt-6 p-4 rounded-lg"
-              style={{
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-              }}
+              className="p-4 rounded-lg border border-red-300 bg-red-50"
               data-testid="org-create-validation-errors"
             >
               <h4 className="text-red-700 font-semibold mb-2">Please fix the following errors:</h4>

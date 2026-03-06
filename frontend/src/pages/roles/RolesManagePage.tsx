@@ -526,10 +526,18 @@ export const RolesManagePage: React.FC = observer(() => {
       <div className="max-w-7xl mx-auto">
         {/* Page Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center justify-between mb-4">
             <Button variant="outline" size="sm" onClick={handleBackClick} className="text-gray-600">
               <ArrowLeft className="w-4 h-4 mr-1" />
               Back to Settings
+            </Button>
+            <Button
+              onClick={handleCreateClick}
+              disabled={viewModel.isLoading}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create New Role
             </Button>
           </div>
           <div className="flex items-center gap-3">
@@ -601,16 +609,6 @@ export const RolesManagePage: React.FC = observer(() => {
 
           {/* Right Panel: Form Panel */}
           <div className="lg:col-span-2">
-            {/* Create Button */}
-            <Button
-              onClick={handleCreateClick}
-              disabled={viewModel.isLoading}
-              className="w-full mb-4 bg-blue-600 hover:bg-blue-700 text-white justify-start"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create New Role
-            </Button>
-
             {/* Empty State */}
             {panelMode === 'empty' && (
               <Card className="shadow-lg">
