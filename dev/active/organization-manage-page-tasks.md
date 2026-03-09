@@ -248,10 +248,25 @@
   - Added `frontend/src/utils/edge-function-errors.ts` for standardized error handling
   - Removed `VITE_BACKEND_API_URL` from env config (no longer needed)
 
+## Post-Completion Fixes (2026-03-08)
+
+- [x] Fix `api.get_organizations` SECURITY DEFINER: migration `20260308191000_fix_get_organizations_security_definer.sql`
+- [x] Restore split panel for platform owners on manage page (removed by org-ux-refactor commit `9910c531`)
+- [x] Update TC-01-01 for split panel: asserts panel attached, visibility check desktop-only
+- [x] Add `hidden lg:block` to left panel for mobile viewport safety
+- [x] Fix pre-existing mobile `switchToProfile` issue: viewport-aware helpers (hamburger menu + evaluate click + clickSidebarLink)
+- [x] Fix mock data compatibility for provider_admin/partner_admin tests (TC-03-05, TC-03-06)
+  - Aligned `DEFAULT_DEV_USER.org_id` → `'provider-abc-healthcare-id'` (was UUID not in mock data)
+  - Aligned `partner_admin.org_id` → `'var-partner-techsolutions-id'` (was UUID not in mock data)
+  - Updated `org_name` and `scope_path` to match mock org data
+  - Unskipped TC-03-05 (provider_admin cannot edit org name) and TC-03-06 (non-name fields editable)
+  - Updated TC-11-04 comment (no longer a mock limitation)
+  - All 122 UAT tests pass (0 skipped, 0 failed)
+
 ## Current Status
 
-**Phase**: All phases complete (0–11) + 3 post-completion fixes
-**Status**: ✅ FEATURE COMPLETE
-**Last Updated**: 2026-03-06
-**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (`72f4666f`), Phase 7 (`cab2cf9c`), Phase 8 (docs update), Phase 9A (`6d89795a`, `45b99a99`), Phase 9B (`0f71b00e`), Phase 9C (81/81 UAT tests pass), Phase 10 (`c0c3ce49`), Phase 11 (`f6960d0b`), Post-fixes (`bf002211`, `d2d56a55`, `bd9f998d`)
-**Next Step**: Archive dev-docs to `dev/archived/organization-manage-page/`. Then begin org-ux-refactor (plan at `dev/active/org-ux-refactor-plan.md`). Remaining unchecked items are integration validation (require live Temporal + Supabase environment).
+**Phase**: All phases complete (0–11) + post-completion fixes (2026-03-05 + 2026-03-08)
+**Status**: ✅ FEATURE COMPLETE (all tests pass: 122 passed, 0 skipped, 0 failed)
+**Last Updated**: 2026-03-08
+**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (`72f4666f`), Phase 7 (`cab2cf9c`), Phase 8 (docs update), Phase 9A (`6d89795a`, `45b99a99`), Phase 9B (`0f71b00e`), Phase 9C (81/81 UAT tests pass), Phase 10 (`c0c3ce49`), Phase 11 (`f6960d0b`), Post-fixes (`bf002211`, `d2d56a55`, `bd9f998d`), Security definer fix + split panel restore + mock data alignment (2026-03-08)
+**Next Step**: Commit changes and archive dev-docs.

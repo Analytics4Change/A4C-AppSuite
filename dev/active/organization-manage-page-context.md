@@ -235,6 +235,14 @@
 
 37. **ORGANIZATION_TYPES constant labels**: `organization.constants.ts` defines `ORGANIZATION_TYPES = [{ value: 'provider', label: 'Provider Organization' }, { value: 'provider_partner', label: 'Provider Partner' }]`. Tests must use the full label text ("Provider Organization", not "Provider") for exact matching. - Added 2026-03-05
 
+38. **Split panel restored for platform owners on manage page** (decided 2026-03-08): The org-ux-refactor (commit `9910c531`) removed the left panel from `OrganizationsManagePage`. This was restored — platform owners see `lg:grid-cols-3` (left 1/3 org list, right 2/3 form). Provider admins keep full-width. Left panel uses `hidden lg:block` to prevent layout issues on mobile. - Added 2026-03-08
+
+39. **`api.get_organizations` SECURITY DEFINER fix** (decided 2026-03-08): `api.get_organizations` was `SECURITY INVOKER` while `api.get_organizations_paginated` was `SECURITY DEFINER`. The LATERAL join to `user_phones` fails for provider admins because `user_phones` has no `GRANT SELECT` for `authenticated`. Fixed via migration `20260308191000`. - Added 2026-03-08
+
+40. **Mobile `switchToProfile` pre-existing issue**: On Mobile Chrome + Mobile Safari, the Logout button is in the sidebar (hidden via `transform -translate-x-full` on mobile). `switchToProfile()` helper calls `page.click('button:has-text("Logout")')` which fails because button is outside viewport. The `MoreMenuSheet` also has a Logout button but requires opening via bottom nav "More" button first. 6 tests affected: TC-01-03, TC-01-04, TC-11-04 × 2 mobile viewports. - Added 2026-03-08
+
+41. **Mock profile org_ids must match mock org data**: `DEFAULT_DEV_USER` (provider_admin) and `partner_admin` in `dev-auth.config.ts` had UUIDs (`dev-org-660e8400-...`, `dev-partner-org-770e8400-...`) that didn't match any org in `MockOrganizationQueryService.ts`. When `OrganizationsManagePage` auto-selects the provider's org via `getOrganizationDetails(orgId)`, it returns `null` → form never loads. Fixed by aligning org_ids to existing mock orgs: provider_admin → `'provider-abc-healthcare-id'` (ABC Healthcare Partners), partner_admin → `'var-partner-techsolutions-id'` (TechSolutions VAR). Also updated `org_name` and `scope_path` to match. - Added 2026-03-08
+
 ### Existing Files Modified (Phase 10 — Route Consolidation)
 - `frontend/src/pages/organizations/OrganizationsManagePage.tsx` — added `'create'` panel mode, "Create" button in left panel header, renders `OrganizationCreateForm`, updated doc comment route to `/organizations`
 - `frontend/src/App.tsx` — removed `OrganizationListPage`/`OrganizationCreatePage` imports, consolidated 5 org routes to 2

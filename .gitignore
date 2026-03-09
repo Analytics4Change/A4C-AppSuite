@@ -61,6 +61,7 @@ build/
 
 # Testing
 coverage/
+infrastructure/supabase/test-results/
 
 # Terraform
 *.tfstate

@@ -124,11 +124,39 @@
 - [x] Full UAT suite: **120 passed, 2 skipped, 0 failed** (was 112 tests, now 122)
 - [ ] Run `npm run build && npm run lint && npm run typecheck` (typecheck passed earlier, full build not yet verified after final selector fix)
 
+## Phase 6: Split Panel Restoration + Permission Fix ✅ DONE
+
+### 6A: Fix `api.get_organizations` SECURITY DEFINER
+- [x] Root cause: `api.get_organizations` is `SECURITY INVOKER`, `api.get_organizations_paginated` is `SECURITY DEFINER`. Provider admins get `permission denied for table user_phones` because `user_phones` has no `GRANT SELECT` for `authenticated`.
+- [x] Created migration `20260308191000_fix_get_organizations_security_definer.sql` — DROP + CREATE with `SECURITY DEFINER` added (function body unchanged from `20260306214844`)
+- [x] Applied via `supabase db push --linked`
+- [x] Verified both functions now have `prosecdef=true` in live DB
+
+### 6B: Restore split panel for platform owners on manage page
+- [x] Added left panel (org list with search, status filter tabs, scrollable list) to `OrganizationsManagePage.tsx`
+- [x] Conditional grid: `isPlatformOwner` → `lg:grid-cols-3` (left panel + right panel), else full-width
+- [x] Left panel hidden on mobile: `hidden lg:block` (prevents layout push on small viewports)
+- [x] `handleOrgSelect` with dirty check + URL param update (`?orgId=`)
+- [x] `handleSearchChange` and `handleStatusChange` handlers
+- [x] Updated `handleDiscardChanges` to update URL params on list selection
+- [x] Typecheck + lint + build all pass
+
+### 6C: UAT test updates
+- [x] Updated TC-01-01: asserts split panel IS attached, visibility check only on desktop (width >= 1024)
+- [x] Full E2E suite: 834 passed, 6 failed (pre-existing mobile `switchToProfile` failures)
+- [x] Confirmed 6 mobile failures are pre-existing: stashed changes, ran TC-01-03 on original code → same failure
+
+### 6D: Pre-existing mobile `switchToProfile` issue ✅
+- [x] Fix `switchToProfile()` for Mobile Chrome + Mobile Safari viewports
+- Root cause: Logout button in sidebar (hidden on mobile), nav links also in sidebar only
+- Fix: viewport-aware helpers — `switchToProfile` opens hamburger menu + `evaluate` click on Logout; `clickSidebarLink` opens hamburger menu before clicking nav links
+- Full suite: 840 passed, 14 skipped, 0 failed
+
 ## Current Status
 
-**Phase**: All 5 phases complete
-**Status**: ✅ NEARLY COMPLETE
-**Last Updated**: 2026-03-06
+**Phase**: All phases complete (1–6)
+**Status**: ✅ COMPLETE
+**Last Updated**: 2026-03-08
 **Plan file**: `/home/lars/.claude/plans/humble-waddling-flamingo.md`
 **Architect review**: All 4 Major (MA1–MA4), 7 Minor (M1–M7), and 8 Suggestions (S1–S8) resolved — see `org-ux-refactor-context.md` "Architect Review Resolutions" section
-**Next Step**: Run `npm run build && npm run lint && npm run typecheck` to verify final build, then commit all changes and archive dev-docs
+**Next Step**: Fix `switchToProfile` for mobile viewports (6 pre-existing failures), then commit and archive

@@ -165,10 +165,10 @@ export const DEFAULT_DEV_USER: DevUserProfile = {
   email: import.meta.env.VITE_DEV_USER_EMAIL || 'dev@example.com',
   name: import.meta.env.VITE_DEV_USER_NAME || 'Dev User (Provider Admin)',
   role: (import.meta.env.VITE_DEV_USER_ROLE as UserRole) || 'provider_admin',
-  org_id: import.meta.env.VITE_DEV_ORG_ID || 'dev-org-660e8400-e29b-41d4-a716-446655440000',
+  org_id: import.meta.env.VITE_DEV_ORG_ID || 'provider-abc-healthcare-id',
   org_type: 'provider',
-  org_name: 'Development Organization',
-  scope_path: import.meta.env.VITE_DEV_SCOPE_PATH || 'org_dev_organization',
+  org_name: 'ABC Healthcare Partners',
+  scope_path: import.meta.env.VITE_DEV_SCOPE_PATH || 'a4c-platform-id.provider-abc-healthcare-id',
   permissions: import.meta.env.VITE_DEV_PERMISSIONS
     ? import.meta.env.VITE_DEV_PERMISSIONS.split(',')
     : getDevProfilePermissions(
@@ -207,10 +207,10 @@ export const DEV_USER_PROFILES: Record<string, DevUserProfile> = {
     email: 'partner.admin@example.com',
     name: 'Dev Partner Admin',
     role: 'partner_admin',
-    org_id: 'dev-partner-org-770e8400-e29b-41d4-a716-446655440000',
+    org_id: 'var-partner-techsolutions-id',
     org_type: 'provider_partner',
-    org_name: 'Development Partner Organization',
-    scope_path: 'org_dev_partner_organization',
+    org_name: 'TechSolutions VAR',
+    scope_path: 'a4c-platform-id.var-partner-techsolutions-id',
     permissions: getDevProfilePermissions('partner_admin'),
     picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=partner-admin',
   },

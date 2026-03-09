@@ -102,12 +102,34 @@ async function selectOrg(page: Page, orgId: string) {
 
 /** Switch user profile by logging out and logging in with a new email */
 async function switchToProfile(page: Page, email: string) {
-  await page.click('button:has-text("Logout")');
+  const viewport = page.viewportSize();
+  if (viewport && viewport.width < 1024) {
+    // Mobile: open hamburger menu, then programmatically click Logout
+    // (sidebar bottom section has overlapping elements that intercept pointer events)
+    await page.click('button[aria-label="Open navigation menu"]');
+    const logoutBtn = page.locator('#mobile-sidebar button:has-text("Logout")');
+    await logoutBtn.scrollIntoViewIfNeeded();
+    await logoutBtn.evaluate((el) => (el as HTMLElement).click());
+  } else {
+    await page.click('button:has-text("Logout")');
+  }
   await page.waitForURL(/\/login/, { timeout: 8000 });
   await page.fill('#email', email);
   await page.fill('#password', 'any-password');
   await page.click('button[type="submit"]');
   await page.waitForURL(/\/(clients|organizations|dashboard|settings)/, { timeout: 10000 });
+}
+
+/** Click a sidebar nav link, opening the hamburger menu first on mobile */
+async function clickSidebarLink(page: Page, href: string) {
+  const viewport = page.viewportSize();
+  if (viewport && viewport.width < 1024) {
+    await page.click('button[aria-label="Open navigation menu"]');
+    await page
+      .locator(`#mobile-sidebar a[href="${href}"]`)
+      .waitFor({ state: 'visible', timeout: 3000 });
+  }
+  await page.locator(`a[href="${href}"]`).click();
 }
 
 /** Expand the DangerZone if it is currently collapsed */
@@ -125,13 +147,20 @@ async function expandDangerZone(page: Page) {
 // TS-01: Navigation & Page Load (5 cases)
 // ============================================================================
 test.describe('TS-01: Navigation & Page Load', () => {
-  test('TC-01-01: super_admin sees manage page with empty state (no left panel)', async ({
+  test('TC-01-01: super_admin sees manage page with split panel (left org list + right empty state)', async ({
     page,
   }) => {
     await navigateToManagePage(page);
     await expect(page.locator('[data-testid="org-form-empty-state"]')).toBeVisible();
-    // No list panel on manage page after route split
-    await expect(page.locator('[data-testid="org-list-panel"]')).not.toBeAttached();
+    // Platform owner has left org list panel in DOM (hidden on mobile via lg:block)
+    await expect(page.locator('[data-testid="org-list-panel"]')).toBeAttached();
+    // On desktop viewports the panel is visible with search and list
+    const viewport = page.viewportSize();
+    if (viewport && viewport.width >= 1024) {
+      await expect(page.locator('[data-testid="org-list-panel"]')).toBeVisible();
+      await expect(page.locator('[data-testid="org-list-search-input"]')).toBeVisible();
+      await expect(page.locator('[data-testid="org-list-items"]')).toBeVisible();
+    }
   });
 
   test('TC-01-02: Page heading is "Organization Management" with correct subtitle', async ({
@@ -152,8 +181,7 @@ test.describe('TS-01: Navigation & Page Load', () => {
     await navigateToManagePage(page);
     await switchToProfile(page, 'dev@example.com');
     // SPA navigate to list page — provider_admin should redirect to manage page
-    await page.locator('a[href="/organizations"]').waitFor({ state: 'visible', timeout: 5000 });
-    await page.locator('a[href="/organizations"]').click();
+    await clickSidebarLink(page, '/organizations');
     // Should redirect to /organizations/manage
     await page.waitForURL(/\/organizations\/manage/, { timeout: 10000 });
     await page.waitForSelector('[data-testid="org-manage-page"]', { timeout: 15000 });
@@ -162,8 +190,7 @@ test.describe('TS-01: Navigation & Page Load', () => {
   test('TC-01-04: partner_admin is redirected from list page to manage page', async ({ page }) => {
     await navigateToManagePage(page);
     await switchToProfile(page, 'partner.admin@example.com');
-    await page.locator('a[href="/organizations"]').waitFor({ state: 'visible', timeout: 5000 });
-    await page.locator('a[href="/organizations"]').click();
+    await clickSidebarLink(page, '/organizations');
     await page.waitForURL(/\/organizations\/manage/, { timeout: 10000 });
     await page.waitForSelector('[data-testid="org-manage-page"]', { timeout: 15000 });
   });
@@ -319,16 +346,27 @@ test.describe('TS-03: Form Field Editability', () => {
     await expect(page.locator('[data-testid="org-form-save-btn"]')).toBeDisabled();
   });
 
-  test('TC-03-05: provider_admin cannot edit Organization Name [mock limitation]', async ({
-    page: _page,
-  }) => {
-    test.skip(true, 'Mock limitation: provider_admin auto-select fails -- org_id not in mock data');
+  test('TC-03-05: provider_admin cannot edit Organization Name', async ({ page }) => {
+    await navigateToManagePage(page);
+    await switchToProfile(page, 'dev@example.com');
+    await clickSidebarLink(page, '/organizations');
+    await page.waitForURL(/\/organizations\/manage/, { timeout: 10000 });
+    await page.waitForSelector('[data-testid="org-manage-page"]', { timeout: 15000 });
+    await waitForDetailsLoaded(page);
+    await expect(page.locator('#org-name')).toBeDisabled();
   });
 
-  test('TC-03-06: provider_admin -- non-name fields are editable [mock limitation]', async ({
-    page: _page,
-  }) => {
-    test.skip(true, 'Mock limitation: provider_admin auto-select fails -- org_id not in mock data');
+  test('TC-03-06: provider_admin -- non-name fields are editable', async ({ page }) => {
+    await navigateToManagePage(page);
+    await switchToProfile(page, 'dev@example.com');
+    await clickSidebarLink(page, '/organizations');
+    await page.waitForURL(/\/organizations\/manage/, { timeout: 10000 });
+    await page.waitForSelector('[data-testid="org-manage-page"]', { timeout: 15000 });
+    await waitForDetailsLoaded(page);
+    await expect(page.locator('#org-display-name')).not.toBeDisabled();
+    await expect(page.locator('#org-tax-number')).not.toBeDisabled();
+    await expect(page.locator('#org-phone-number')).not.toBeDisabled();
+    await expect(page.locator('#org-timezone')).not.toBeDisabled();
   });
 });
 
@@ -761,11 +799,10 @@ test.describe('TS-11: Danger Zone Toggle', () => {
     await expect(page.locator('[data-testid="danger-zone-content"]')).not.toBeVisible();
   });
 
-  test('TC-11-04: provider_admin does NOT see Danger Zone [mock limitation]', async ({ page }) => {
-    // Switch to provider_admin who cannot load any org in mock mode
+  test('TC-11-04: provider_admin does NOT see Danger Zone', async ({ page }) => {
+    // Switch to provider_admin — org auto-loads but Danger Zone requires platform permissions
     await switchToProfile(page, 'dev@example.com');
-    await page.locator('a[href="/organizations"]').waitFor({ state: 'visible', timeout: 5000 });
-    await page.locator('a[href="/organizations"]').click();
+    await clickSidebarLink(page, '/organizations');
     // Provider admin redirected to manage page
     await page.waitForURL(/\/organizations\/manage/, { timeout: 10000 });
     await page.waitForSelector('[data-testid="org-manage-page"]', { timeout: 15000 });
