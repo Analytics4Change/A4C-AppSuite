@@ -4,6 +4,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { RequirePermission } from '@/components/auth/RequirePermission';
 import { FailedEventsPage } from '@/pages/admin/FailedEventsPage';
+import { OrphanedDeletionsPage } from '@/pages/admin/OrphanedDeletionsPage';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { AuthCallback } from '@/pages/auth/AuthCallback';
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
@@ -219,6 +220,14 @@ function App() {
                   element={
                     <RequirePermission permission="organization.create" fallback="/clients">
                       <FailedEventsPage />
+                    </RequirePermission>
+                  }
+                />
+                <Route
+                  path="/admin/deletions"
+                  element={
+                    <RequirePermission permission="organization.delete" fallback="/clients">
+                      <OrphanedDeletionsPage />
                     </RequirePermission>
                   }
                 />

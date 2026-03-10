@@ -16,6 +16,7 @@ import type {
   OrganizationOperationResult,
 } from '@/types/organization.types';
 import type { IOrganizationCommandService } from './IOrganizationCommandService';
+import { WorkflowClientFactory } from '@/services/workflow/WorkflowClientFactory';
 
 const log = Logger.getLogger('api');
 
@@ -128,6 +129,19 @@ export class SupabaseOrganizationCommandService implements IOrganizationCommandS
       }
 
       log.info('Organization deleted', { orgId, organization: result.organization });
+
+      // Fire-and-forget: trigger async cleanup workflow (DNS removal, user banning, etc.)
+      try {
+        const workflowClient = WorkflowClientFactory.create();
+        await workflowClient.startDeletionWorkflow(orgId, reason ?? 'Organization deleted');
+        log.info('Deletion workflow triggered', { orgId });
+      } catch (workflowError) {
+        log.warn('Failed to trigger deletion workflow (org is already soft-deleted)', {
+          orgId,
+          error: workflowError instanceof Error ? workflowError.message : 'Unknown error',
+        });
+      }
+
       return { success: true, organization: result.organization };
     } catch (error) {
       log.error('Error in deleteOrganization', { error, orgId });

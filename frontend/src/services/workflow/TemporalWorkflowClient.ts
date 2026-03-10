@@ -29,6 +29,7 @@ const log = Logger.getLogger('workflow');
  */
 const EDGE_FUNCTIONS = {
   BOOTSTRAP: 'organization-bootstrap',
+  DELETE: 'organization-delete',
   GET_STATUS: 'workflow-status',
   CANCEL_WORKFLOW: 'workflow-cancel',
 } as const;
@@ -101,6 +102,46 @@ export class TemporalWorkflowClient implements IWorkflowClient {
       return data.organizationId;
     } catch (error) {
       log.error('Error starting bootstrap workflow', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start organization deletion workflow (fire-and-forget)
+   *
+   * Flow:
+   * 1. Call Edge Function (handles JWT validation + permission check)
+   * 2. Edge Function forwards to Backend API
+   * 3. Backend API starts Temporal deletion workflow
+   * 4. Workflow handles async cleanup (DNS, banning, revocation)
+   */
+  async startDeletionWorkflow(organizationId: string, reason: string): Promise<string> {
+    try {
+      log.info('Starting organization deletion workflow', { organizationId });
+
+      const client = supabaseService.getClient();
+      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.DELETE, {
+        body: { organizationId, reason },
+      });
+
+      if (error) {
+        const extracted = await extractEdgeFunctionError(error, 'Start deletion workflow');
+        const correlationRef = extracted.correlationId ? ` (Ref: ${extracted.correlationId})` : '';
+        throw new Error(`Failed to start deletion workflow: ${extracted.message}${correlationRef}`);
+      }
+
+      if (!data?.workflowId) {
+        throw new Error('Invalid response from deletion workflow service');
+      }
+
+      log.info('Deletion workflow started', {
+        organizationId,
+        workflowId: data.workflowId,
+      });
+
+      return data.workflowId;
+    } catch (error) {
+      log.error('Error starting deletion workflow', error);
       throw error;
     }
   }

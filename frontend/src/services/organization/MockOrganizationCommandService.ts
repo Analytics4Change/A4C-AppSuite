@@ -60,6 +60,7 @@ export class MockOrganizationCommandService implements IOrganizationCommandServi
   async deleteOrganization(orgId: string, reason?: string): Promise<OrganizationOperationResult> {
     await this.simulateDelay();
     log.info('Mock: Organization deleted', { orgId, reason });
+    log.debug('Deletion workflow skipped in mock mode');
     return {
       success: true,
       organization: {

@@ -320,7 +320,7 @@ export function registerWorkflowRoutes(server: FastifyInstance): void {
   server.delete<{ Params: { id: string }; Body: DeleteOrganizationRequest }>(
     '/api/v1/organizations/:id',
     {
-      preHandler: [authMiddleware, requirePermission('organization.create_root')]
+      preHandler: [authMiddleware, requirePermission('organization.delete')]
     },
     deleteOrganizationHandler
   );

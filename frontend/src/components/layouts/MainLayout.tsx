@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Calendar,
   UserCheck,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ImpersonationBanner } from '@/components/auth/ImpersonationBanner';
@@ -133,6 +134,13 @@ export const MainLayout: React.FC = () => {
       icon: AlertTriangle,
       label: 'Event Monitor',
       permission: 'organization.create',
+      showForOrgTypes: ['platform_owner'],
+    },
+    {
+      to: '/admin/deletions',
+      icon: Trash2,
+      label: 'Deletion Monitor',
+      permission: 'organization.delete',
       showForOrgTypes: ['platform_owner'],
     },
   ];

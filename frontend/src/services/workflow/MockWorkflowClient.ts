@@ -19,7 +19,7 @@ import type { IWorkflowClient } from './IWorkflowClient';
 import type {
   OrganizationBootstrapParams,
   WorkflowStatus,
-  OrganizationBootstrapResult
+  OrganizationBootstrapResult,
 } from '@/types/organization.types';
 
 /**
@@ -27,7 +27,7 @@ import type {
  */
 const STORAGE_KEYS = {
   WORKFLOWS: 'mock_workflows',
-  COUNTER: 'mock_workflow_counter'
+  COUNTER: 'mock_workflow_counter',
 } as const;
 
 /**
@@ -39,7 +39,7 @@ const WORKFLOW_STEPS = [
   'Waiting for DNS propagation',
   'Creating admin user',
   'Sending invitation email',
-  'Finalizing setup'
+  'Finalizing setup',
 ] as const;
 
 /**
@@ -61,9 +61,7 @@ export class MockWorkflowClient implements IWorkflowClient {
    * @param params - Organization bootstrap parameters
    * @returns Workflow ID for status tracking
    */
-  async startBootstrapWorkflow(
-    params: OrganizationBootstrapParams
-  ): Promise<string> {
+  async startBootstrapWorkflow(params: OrganizationBootstrapParams): Promise<string> {
     // Generate unique workflow ID
     const workflowId = this.generateWorkflowId();
 
@@ -71,12 +69,12 @@ export class MockWorkflowClient implements IWorkflowClient {
     // In unified ID system, workflowId and organizationId are the same
     const initialStatus: WorkflowStatus = {
       workflowId,
-      organizationId: workflowId,  // Unified ID system
+      organizationId: workflowId, // Unified ID system
       status: 'running',
       progress: WORKFLOW_STEPS.map((step) => ({
         step,
-        completed: false
-      }))
+        completed: false,
+      })),
     };
 
     // Persist initial status
@@ -104,6 +102,19 @@ export class MockWorkflowClient implements IWorkflowClient {
     }
 
     return status;
+  }
+
+  /**
+   * Start organization deletion workflow (fire-and-forget mock)
+   */
+  async startDeletionWorkflow(organizationId: string, reason: string): Promise<string> {
+    const workflowId = `mock-deletion-${organizationId}-${Date.now()}`;
+    console.log('[MockWorkflowClient] Deletion workflow started (mock)', {
+      organizationId,
+      reason,
+      workflowId,
+    });
+    return workflowId;
   }
 
   /**
@@ -143,10 +154,7 @@ export class MockWorkflowClient implements IWorkflowClient {
    * Get and increment workflow counter
    */
   private getNextCounter(): number {
-    const current = parseInt(
-      localStorage.getItem(STORAGE_KEYS.COUNTER) || '0',
-      10
-    );
+    const current = parseInt(localStorage.getItem(STORAGE_KEYS.COUNTER) || '0', 10);
     const next = current + 1;
     localStorage.setItem(STORAGE_KEYS.COUNTER, next.toString());
     return next;
@@ -172,10 +180,7 @@ export class MockWorkflowClient implements IWorkflowClient {
   /**
    * Save workflow status to localStorage
    */
-  private saveWorkflowStatus(
-    workflowId: string,
-    status: WorkflowStatus
-  ): void {
+  private saveWorkflowStatus(workflowId: string, status: WorkflowStatus): void {
     const workflows = this.loadWorkflows();
     workflows.set(workflowId, status);
 
@@ -229,9 +234,7 @@ export class MockWorkflowClient implements IWorkflowClient {
    *
    * Updated to use nested orgData structure matching workflow contract.
    */
-  private generateMockResult(
-    params: OrganizationBootstrapParams
-  ): OrganizationBootstrapResult {
+  private generateMockResult(params: OrganizationBootstrapParams): OrganizationBootstrapResult {
     // Generate org ID from organization name (slugified + timestamp for uniqueness)
     const orgSlug = params.orgData.name
       .toLowerCase()
@@ -245,8 +248,7 @@ export class MockWorkflowClient implements IWorkflowClient {
 
     // Provider admin is always the last contact in the orgData.contacts array
     // (Providers: billing + providerAdmin, Partners: providerAdmin only)
-    const providerAdminContact =
-      params.orgData.contacts[params.orgData.contacts.length - 1];
+    const providerAdminContact = params.orgData.contacts[params.orgData.contacts.length - 1];
 
     return {
       orgId,
@@ -258,10 +260,10 @@ export class MockWorkflowClient implements IWorkflowClient {
         email: providerAdminContact.email,
         firstName: providerAdminContact.firstName,
         lastName: providerAdminContact.lastName,
-        role: 'provider_admin'
+        role: 'provider_admin',
       },
       invitationsSent: params.users.length, // One invitation per user
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
   }
 

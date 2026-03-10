@@ -10,10 +10,7 @@
  * WorkflowClientFactory reads appConfig.workflow.useMock to select implementation.
  */
 
-import type {
-  OrganizationBootstrapParams,
-  WorkflowStatus
-} from '@/types/organization.types';
+import type { OrganizationBootstrapParams, WorkflowStatus } from '@/types/organization.types';
 
 /**
  * Workflow client interface for organization bootstrap operations
@@ -58,4 +55,17 @@ export interface IWorkflowClient {
    * Note: Cancellation may not be immediate for Temporal workflows
    */
   cancelWorkflow(workflowId: string): Promise<boolean>;
+
+  /**
+   * Start organization deletion workflow (fire-and-forget)
+   *
+   * Triggers async cleanup after org is already soft-deleted via RPC.
+   * Cleanup includes DNS removal, user banning, invitation revocation.
+   *
+   * @param organizationId - Organization UUID to clean up
+   * @param reason - Deletion reason for audit trail
+   * @returns Workflow ID (caller may discard)
+   * @throws Error if workflow cannot be started
+   */
+  startDeletionWorkflow(organizationId: string, reason: string): Promise<string>;
 }
