@@ -82,8 +82,8 @@ export const OrganizationListPage: React.FC = observer(() => {
       orgs = orgs.filter(
         (o) =>
           o.name.toLowerCase().includes(term) ||
-          o.display_name.toLowerCase().includes(term) ||
-          o.subdomain.toLowerCase().includes(term) ||
+          (o.display_name && o.display_name.toLowerCase().includes(term)) ||
+          (o.subdomain && o.subdomain.toLowerCase().includes(term)) ||
           (o.provider_admin_name && o.provider_admin_name.toLowerCase().includes(term)) ||
           (o.provider_admin_email && o.provider_admin_email.toLowerCase().includes(term))
       );
