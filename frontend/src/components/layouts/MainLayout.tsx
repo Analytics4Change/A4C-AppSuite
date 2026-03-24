@@ -1,37 +1,16 @@
 import React, { useRef, useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { OrganizationType } from '@/types/auth.types';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
-import { BottomNavigation, MoreMenuSheet } from '@/components/navigation';
-import {
-  Users,
-  UsersRound,
-  Pill,
-  FileText,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  Building,
-  UserCog,
-  FolderTree,
-  Shield,
-  AlertTriangle,
-  Calendar,
-  UserCheck,
-  Trash2,
-} from 'lucide-react';
+import { BottomNavigation, MoreMenuSheet, SidebarNavigation } from '@/components/navigation';
+import { LogOut, Menu, X, UserCog } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ImpersonationBanner } from '@/components/auth/ImpersonationBanner';
 import { ImpersonationModal } from '@/components/auth/ImpersonationModal';
 import { useImpersonationUI } from '@/hooks/useImpersonationUI';
-import { Logger } from '@/utils/logger';
-
-const log = Logger.getLogger('navigation');
 
 export const MainLayout: React.FC = () => {
-  const { user, logout, session: authSession, hasPermission } = useAuth();
+  const { user, logout, session: authSession } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -62,160 +41,6 @@ export const MainLayout: React.FC = () => {
     logout();
     navigate('/login');
   };
-
-  // Nav item definition with permission and org type filters
-  interface NavItem {
-    to: string;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
-    label: string;
-    permission?: string;
-    hideForOrgTypes?: OrganizationType[];
-    showForOrgTypes?: OrganizationType[]; // Only show for these org types (inclusion pattern)
-  }
-
-  // Define all possible nav items with permission and org type filters
-  // Org type visibility:
-  // - platform_owner: Organizations, Reports, Settings
-  // - provider: Clients, Organization Units, Medication Management, Reports, Settings
-  // - provider_partner: Clients, Reports, Settings
-  const allNavItems: NavItem[] = [
-    { to: '/clients', icon: Users, label: 'Clients', hideForOrgTypes: ['platform_owner'] },
-    {
-      to: '/organizations',
-      icon: Building,
-      label: 'Organizations',
-      permission: 'organization.update',
-    },
-    {
-      to: '/organization-units',
-      icon: FolderTree,
-      label: 'Organization Units',
-      permission: 'organization.view_ou',
-      showForOrgTypes: ['provider'],
-    },
-    {
-      to: '/roles',
-      icon: Shield,
-      label: 'Roles',
-      permission: 'role.create',
-      showForOrgTypes: ['provider'],
-    },
-    {
-      to: '/users',
-      icon: UsersRound,
-      label: 'User Management',
-      permission: 'user.view',
-      showForOrgTypes: ['provider'],
-    },
-    {
-      to: '/schedules',
-      icon: Calendar,
-      label: 'Staff Schedules',
-      permission: 'user.schedule_manage',
-      showForOrgTypes: ['provider'],
-    },
-    {
-      to: '/assignments',
-      icon: UserCheck,
-      label: 'Client Assignments',
-      permission: 'user.client_assign',
-      showForOrgTypes: ['provider'],
-    },
-    {
-      to: '/medications',
-      icon: Pill,
-      label: 'Medication Management',
-      hideForOrgTypes: ['platform_owner', 'provider_partner'],
-    },
-    { to: '/reports', icon: FileText, label: 'Reports' },
-    { to: '/settings', icon: Settings, label: 'Settings' },
-    {
-      to: '/admin/events',
-      icon: AlertTriangle,
-      label: 'Event Monitor',
-      permission: 'organization.create',
-      showForOrgTypes: ['platform_owner'],
-    },
-    {
-      to: '/admin/deletions',
-      icon: Trash2,
-      label: 'Deletion Monitor',
-      permission: 'organization.delete',
-      showForOrgTypes: ['platform_owner'],
-    },
-  ];
-
-  // Filter nav items based on permissions and org type
-  const [navItems, setNavItems] = React.useState<typeof allNavItems>([]);
-
-  const userOrgType = authSession?.claims.org_type;
-  log.debug('Current user', {
-    email: user?.email,
-    orgType: userOrgType,
-  });
-
-  // Filter nav items by permission AND org type (async)
-  React.useEffect(() => {
-    const filterItems = async () => {
-      log.debug('Filtering nav items', {
-        userOrgType,
-        allNavItemsCount: allNavItems.length,
-      });
-
-      const filtered: NavItem[] = [];
-
-      for (const item of allNavItems) {
-        // Check org type filter (showForOrgTypes - inclusion pattern)
-        if (item.showForOrgTypes && userOrgType) {
-          if (!item.showForOrgTypes.includes(userOrgType)) {
-            log.debug(`Hiding ${item.label}: org type not in showForOrgTypes`, {
-              userOrgType,
-              showForOrgTypes: item.showForOrgTypes,
-            });
-            continue;
-          }
-        }
-
-        // Check org type filter (hideForOrgTypes - exclusion pattern)
-        if (item.hideForOrgTypes && userOrgType && item.hideForOrgTypes.includes(userOrgType)) {
-          log.debug(`Hiding ${item.label}: org type excluded`, {
-            userOrgType,
-            hideForOrgTypes: item.hideForOrgTypes,
-          });
-          continue;
-        }
-
-        // If item requires permission, check it
-        if (item.permission) {
-          const allowed = await hasPermission(item.permission);
-          log.debug(`${item.label}: permission check`, {
-            requiredPermission: item.permission,
-            allowed,
-          });
-
-          if (allowed) {
-            filtered.push(item);
-          } else {
-            log.warn(`Hiding ${item.label}: missing permission`, { permission: item.permission });
-          }
-        } else {
-          // No permission required, visible to all authenticated users
-          log.debug(`Showing ${item.label}: no permission required`);
-          filtered.push(item);
-        }
-      }
-
-      log.debug('Final nav items', {
-        count: filtered.length,
-        items: filtered.map((i) => i.label),
-      });
-
-      setNavItems(filtered);
-    };
-
-    filterItems();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- allNavItems is a module-level constant
-  }, [authSession, userOrgType, hasPermission]);
 
   return (
     <>
@@ -267,8 +92,6 @@ export const MainLayout: React.FC = () => {
         <aside
           ref={sidebarRef}
           id="mobile-sidebar"
-          role="navigation"
-          aria-label="Main navigation"
           className={`
           fixed lg:static inset-y-0 left-0 z-40
           w-[280px] sm:w-72 lg:w-64
@@ -298,27 +121,8 @@ export const MainLayout: React.FC = () => {
             <img src="/logo.png" alt="Analytics4Change" className="h-24 w-auto" />
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-2">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) => `
-                  flex items-center gap-3 px-4 py-3 rounded-xl
-                  transition-all duration-300 group
-                  ${isActive ? 'glass-nav-active' : 'glass-nav-inactive'}
-                `}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <Icon size={20} className={navItems.find((n) => n.to === item.to) ? '' : ''} />
-                  <span className="font-medium">{item.label}</span>
-                </NavLink>
-              );
-            })}
-          </nav>
+          {/* Navigation — collapsible tree structure */}
+          <SidebarNavigation onNavClick={() => setSidebarOpen(false)} />
 
           {/* User Section */}
           <div
