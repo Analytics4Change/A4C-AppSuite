@@ -241,6 +241,8 @@
 
 40. **Mobile `switchToProfile` pre-existing issue**: On Mobile Chrome + Mobile Safari, the Logout button is in the sidebar (hidden via `transform -translate-x-full` on mobile). `switchToProfile()` helper calls `page.click('button:has-text("Logout")')` which fails because button is outside viewport. The `MoreMenuSheet` also has a Logout button but requires opening via bottom nav "More" button first. 6 tests affected: TC-01-03, TC-01-04, TC-11-04 × 2 mobile viewports. - Added 2026-03-08
 
+42. **`OrganizationListPage` search filter null crash** (fixed 2026-03-09): `OrganizationListPage.tsx` line 84-86 called `.toLowerCase()` on `o.display_name` and `o.subdomain` without null guards. The `Organization` TypeScript type declares `display_name: string` but the RPC can return `null`. Fixed by adding `&&` guards matching the pattern already used for `provider_admin_name`/`provider_admin_email` on lines 87-88. Note: `OrganizationListPage` was NOT deleted in Phase 10 — it's still the active route at `/organizations` (App.tsx line 98). The org-ux-refactor created a separate list page. - Added 2026-03-09
+
 41. **Mock profile org_ids must match mock org data**: `DEFAULT_DEV_USER` (provider_admin) and `partner_admin` in `dev-auth.config.ts` had UUIDs (`dev-org-660e8400-...`, `dev-partner-org-770e8400-...`) that didn't match any org in `MockOrganizationQueryService.ts`. When `OrganizationsManagePage` auto-selects the provider's org via `getOrganizationDetails(orgId)`, it returns `null` → form never loads. Fixed by aligning org_ids to existing mock orgs: provider_admin → `'provider-abc-healthcare-id'` (ABC Healthcare Partners), partner_admin → `'var-partner-techsolutions-id'` (TechSolutions VAR). Also updated `org_name` and `scope_path` to match. - Added 2026-03-08
 
 ### Existing Files Modified (Phase 10 — Route Consolidation)
@@ -279,6 +281,26 @@
 - `frontend/.env.example` — removed backend API URL
 - `frontend/src/types/organization.types.ts` — added 2 fields
 - Multiple docs updated to remove backend API URL references
+
+43. **Deletion workflow trigger wired as fire-and-forget** (committed 2026-03-09, `8eaefa9a`): The Temporal `organizationDeletionWorkflow` existed (Phase 5) but was never triggered from the frontend. Now `SupabaseOrganizationCommandService.deleteOrganization()` calls `WorkflowClientFactory.create().startDeletionWorkflow()` after successful RPC soft-delete. Error is caught and logged as warning (org already soft-deleted; workflow is supplementary). New Edge Function `organization-delete` mirrors `organization-bootstrap` pattern. Backend API permission fixed from `organization.create_root` to `organization.delete` (MAJOR-1 from architecture review). - Added 2026-03-09
+
+44. **Orphaned deletion monitoring admin page** (committed 2026-03-09, `8eaefa9a`): New `/admin/deletions` route for platform owners. Two new RPCs: `api.get_orphaned_deletions(p_hours_threshold)` finds soft-deleted orgs without `organization.deletion.completed` event; `api.retry_deletion_workflow(p_org_id)` re-emits `organization.deleted` event. Frontend service + page follows `FailedEventsPage` pattern. Nav item uses `Trash2` icon, `permission: 'organization.delete'`, `showForOrgTypes: ['platform_owner']`. - Added 2026-03-09
+
+### New Files Created (Deletion Workflow Trigger — 2026-03-09)
+- `infrastructure/supabase/supabase/functions/organization-delete/index.ts` — Edge Function (~190 lines), auth + permission + access_blocked guard, forwards DELETE to Backend API
+- `infrastructure/supabase/supabase/migrations/20260310004215_orphaned_deletion_monitoring.sql` — `api.get_orphaned_deletions` + `api.retry_deletion_workflow` RPCs
+- `frontend/src/services/admin/OrphanedDeletionService.ts` — service for orphaned deletion queries + retry
+- `frontend/src/pages/admin/OrphanedDeletionsPage.tsx` — admin monitoring page with stats, table, retry, auto-refresh
+
+### Existing Files Modified (Deletion Workflow Trigger — 2026-03-09)
+- `frontend/src/services/workflow/IWorkflowClient.ts` — added `startDeletionWorkflow()` method
+- `frontend/src/services/workflow/TemporalWorkflowClient.ts` — added `EDGE_FUNCTIONS.DELETE` + implementation
+- `frontend/src/services/workflow/MockWorkflowClient.ts` — mock `startDeletionWorkflow()`
+- `frontend/src/services/organization/SupabaseOrganizationCommandService.ts` — fire-and-forget workflow trigger after soft-delete
+- `frontend/src/services/organization/MockOrganizationCommandService.ts` — added mock mode debug log
+- `workflows/src/api/routes/workflows.ts` (line 323) — permission `organization.create_root` → `organization.delete`
+- `frontend/src/App.tsx` — added `/admin/deletions` route
+- `frontend/src/components/layouts/MainLayout.tsx` — added Deletion Monitor nav item
 
 ## Why This Approach?
 - **Dedicated RPCs** over raw `emit_domain_event`: Moves event emission responsibility to backend (consistent with schedule/role pattern), enables proper permission checks, metadata population, and read-back guards server-side. Frontend only needs to call typed RPC functions.

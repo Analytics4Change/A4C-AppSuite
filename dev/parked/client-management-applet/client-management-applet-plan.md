@@ -29,13 +29,15 @@ This ~1,150-line plan file contains:
 - Found: 2 AsyncAPI naming mismatches, 3 missing contracts, 9 RAISE WARNING fixes
 - Plan written and ready for approval
 
-### Phase 2: Schema Foundation ⏸️ PENDING
-5 migrations planned:
-1. `clients_projection` + indexes + RLS + FK + junction tables + junction RLS
-2. `client_field_definitions_projection` + `client_reference_values` + seeds + RLS
-3. Dispatcher update + 2 routers + 11 handlers + 6 junction CASE lines + 9 RAISE WARNING fixes
-4. 20 API functions (10 client CRUD + 6 junction link/unlink + 4 field definition)
-5. `event_types` seed (110 events) + AsyncAPI contracts + TypeScript types
+### Phase 2: Schema Foundation ⏸️ PENDING (scope expanded 2026-03-14, updated 2026-03-19)
+Migrations planned:
+1. `clients_projection` (~50 typed columns + custom_fields JSONB) + indexes + RLS + FK — reduced from ~55 (dropped internal_case_number, county, email, phones, preferred_communication_method)
+1b. Client-owned contact tables (`client_phones`, `client_emails`, `client_addresses` — standalone, NOT junctions) + contact-designation model (12 designations)
+1c. `client_insurance_policies_projection` (CQRS event-sourced, new table)
+2. `client_field_definitions_projection` + `client_reference_values` + `client_field_categories` + seeds + RLS
+3. Dispatcher update + 2 routers + ~23 handlers (expanded for insurance + discharge + client contact sub-entities) + 9 RAISE WARNING fixes
+4. ~34 API functions (expanded client CRUD + insurance + client contact CRUD + field definitions + contact-designation)
+5. `event_types` seed (expanded) + AsyncAPI contracts + TypeScript types
 
 ### Phase 3: Event Integration ⏸️ PENDING
 Covered by migrations 3-5 above. Also includes:
@@ -51,6 +53,41 @@ Covered by migrations 3-5 above. Also includes:
 
 ### Phase 5: Frontend Intake Form (Future)
 _Deferred — this plan covers foundation only._
+
+## Plan Updates (2026-03-19) — Field Classification & Contact Architecture
+
+### Full Field Classification via CSV Review
+All ~80 fields classified. Mandatory core reduced from 14 to 7 user-facing fields at intake (+ 3 at discharge). Nearly all non-core fields changed to `configurable_presence` + `optional`. Key changes:
+- Race, ethnicity, primary language, interpreter needed → configurable_presence + optional (were mandatory)
+- admission_type → configurable_presence + optional (was mandatory)
+- Discharge date/reason/type → mandatory at discharge time only (not at intake)
+- internal_case_number, county, preferred_communication_method → DROPPED
+
+### Option B: Client-Owned Contact Tables (Decision 57)
+Client contact info (phone, email, address) moved from flat text columns on `clients_projection` to dedicated `client_phones`, `client_emails`, `client_addresses` tables. Event-sourced sub-entities. Replaces originally planned junction tables to shared projections.
+
+### Configurable Label + Conforming Dimension Mapping (Decisions 59-60)
+All 12 contact designations + `state_agency` gain configurable labels (org can rename display) and conforming dimension mapping (canonical key stays for cross-org Cube.js analytics).
+
+### Allergy Type Enum Expanded (Decision 68)
+`medication`/`general` → `medication`/`food`/`environmental`.
+
+## Plan Updates (2026-03-14) — Enterprise EMR Expansion
+
+### Scope Expansion: 17-Category Enterprise EMR Field List
+User provided comprehensive EMR field list covering 17 categories. Cross-reference analysis found ~40% already decided, ~15% partial, ~45% genuinely new. Key changes:
+- **~35 new typed columns** on `clients_projection` (demographics, contact, referral, admission, clinical, medical, legal, discharge)
+- **New table**: `client_insurance_policies_projection` (CQRS event-sourced, sub-entity of `client`)
+- **Contact designations**: 7 → 12 values (added program_manager, primary_care_physician, prescriber, probation_officer, caseworker)
+- **6 categories deferred**: Assessments (9), Consents (12), Docs (15) as future applets; Guardian person data (3), Family contacts (11) to contact management applet; Financial (14) to billing module
+- **Intake UX**: Wizard-style multi-step form with progressive disclosure (~10 steps)
+- **Per-org payer config**: Toggles on `direct_care_settings` JSONB
+- **Referral upgraded**: Plain text → structured fields (type enum, organization, date, reason)
+- **Clinical profile**: Typed columns as intake snapshot (diagnoses, risk, trauma, substance use)
+- **Medical expansion**: Allergy types merged, chronic illness flag added, new columns for immunization/dietary/special needs
+
+### Decisions 34-56 (23 new decisions)
+All documented in `dev/active/client-management-applet-context.md`.
 
 ## Plan Updates (2026-02-12)
 

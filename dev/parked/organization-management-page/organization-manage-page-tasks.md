@@ -263,10 +263,35 @@
   - Updated TC-11-04 comment (no longer a mock limitation)
   - All 122 UAT tests pass (0 skipped, 0 failed)
 
+## Post-Completion Fixes (2026-03-09)
+
+- [x] Fix `OrganizationListPage` search crash: `Cannot read properties of null (reading 'toLowerCase')`
+  - **Root cause**: `display_name` can be `null` from RPC but `Organization` type declares it as `string`
+  - **Fix**: Added null guards on `display_name` and `subdomain` in client-side search filter (lines 84-86), matching existing pattern for `provider_admin_name`/`provider_admin_email`
+  - Commit: `96318bc8`
+
+## Post-Completion Enhancement: Wire Deletion Workflow Trigger (2026-03-09)
+
+- [x] Add `startDeletionWorkflow()` to `IWorkflowClient` interface
+- [x] Implement in `TemporalWorkflowClient` (Edge Function `organization-delete`)
+- [x] Implement in `MockWorkflowClient` (console log + mock workflow ID)
+- [x] Wire fire-and-forget trigger in `SupabaseOrganizationCommandService.deleteOrganization()`
+- [x] Add debug log in `MockOrganizationCommandService` for deletion workflow skip
+- [x] Create Edge Function `organization-delete` (auth, permission, access_blocked guard, forward to Backend API)
+- [x] Fix Backend API permission: `organization.create_root` → `organization.delete` (MAJOR-1)
+- [x] Create migration `20260310004215_orphaned_deletion_monitoring.sql` (2 RPCs)
+- [x] Create `OrphanedDeletionService` (frontend service)
+- [x] Create `OrphanedDeletionsPage` (admin monitoring page)
+- [x] Add `/admin/deletions` route in App.tsx
+- [x] Add Deletion Monitor nav item in MainLayout.tsx
+- [x] Typecheck passes, lint passes, build succeeds
+- [x] All 6 GitHub Actions deployments passed (DB migrations, docs, Edge Functions, frontend, workers, backend API)
+- Commit: `8eaefa9a`
+
 ## Current Status
 
-**Phase**: All phases complete (0–11) + post-completion fixes (2026-03-05 + 2026-03-08)
+**Phase**: All phases complete (0–11) + post-completion fixes + deletion workflow trigger wiring
 **Status**: ✅ FEATURE COMPLETE (all tests pass: 122 passed, 0 skipped, 0 failed)
-**Last Updated**: 2026-03-08
-**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (`72f4666f`), Phase 7 (`cab2cf9c`), Phase 8 (docs update), Phase 9A (`6d89795a`, `45b99a99`), Phase 9B (`0f71b00e`), Phase 9C (81/81 UAT tests pass), Phase 10 (`c0c3ce49`), Phase 11 (`f6960d0b`), Post-fixes (`bf002211`, `d2d56a55`, `bd9f998d`), Security definer fix + split panel restore + mock data alignment (2026-03-08)
-**Next Step**: Commit changes and archive dev-docs.
+**Last Updated**: 2026-03-09
+**Completed**: Phase 0 (`dcfb4197`), Phase 1 (`27c6442a`), Phase 1B+2 (`549c7c74`), Phase 3 (`a720f9e8`), Phase 4 (`b1a2540a`), Phase 5 (`4167876c`), Phase 6 (`72f4666f`), Phase 7 (`cab2cf9c`), Phase 8 (docs update), Phase 9A (`6d89795a`, `45b99a99`), Phase 9B (`0f71b00e`), Phase 9C (81/81 UAT tests pass), Phase 10 (`c0c3ce49`), Phase 11 (`f6960d0b`), Post-fixes (`bf002211`, `d2d56a55`, `bd9f998d`), Security definer fix + split panel restore + mock data alignment (`a2f55e1f`), Org list search null guard (`96318bc8`), Deletion workflow trigger + orphaned deletion monitor (`8eaefa9a`)
+**Next Step**: Archive dev-docs when feature is fully stable. Integration test: delete org in dev:auth mode → verify Temporal workflow fires → check /admin/deletions page.

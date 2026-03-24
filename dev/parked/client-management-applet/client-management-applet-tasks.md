@@ -13,56 +13,107 @@
 - [x] Identify 2 AsyncAPI naming mismatches, 3 missing contracts, 9 RAISE WARNING fixes
 - [x] Design comprehensive `event_types` seed (all 110 events)
 - [x] Write detailed implementation plan (`.claude/plans/spicy-bubbling-quail.md`, ~1,150 lines)
+- [x] Resolve `photo_url` — Mandatory + NULLABLE, not org-configurable (2026-03-09)
+- [x] Resolve `notes` — DROPPED from schema (2026-03-09)
+- [x] Resolve `middle_name` — Mandatory + NULLABLE, detail-level reporting only (2026-03-09)
+- [x] Resolve `preferred_name` — Optional, nullable, no reporting (2026-03-09)
+- [x] Confirm `custom_fields` JSONB design (2026-03-09)
+- [x] Design `client_field_categories` reference table — seeded fixed set + org-defined (2026-03-09)
+- [x] Confirm audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) — confirmed 2026-03-09: all NOT NULL, system-managed, no UI
+- [x] Resolve EMR expansion: 17-category enterprise EMR field list cross-referenced (2026-03-14)
+- [x] Resolve 4 architectural scoping questions: guardian, insurance, clinical profile, referral (2026-03-14)
+- [x] Classify all new fields per category (decisions 37-56, 2026-03-14)
+- [x] Deferred categories identified: 9, 12, 15 (applets), 3/11 (contact mgmt), 14 (billing) (2026-03-14)
+- [x] Classify remaining field properties: reporting dimension, configurable presence for all new fields (2026-03-19 — via CSV review, all 43 fields classified)
+- [x] Resolve allergy_type enum: medication/general → medication/food/environmental (2026-03-19)
+- [x] Drop `internal_case_number` — UUID is internal ID, mrn covers org numbering (2026-03-19)
+- [x] Drop `county` (2026-03-19)
+- [x] Drop `preferred_communication_method` (2026-03-19)
+- [x] Decision: Option B client-owned contact tables for client phone/email/address (2026-03-19)
+- [x] Decision: configurable_label + conforming_dimension_mapping for 12 designations + state_agency (2026-03-19)
+- [x] Decision: Mandatory core reduced to 7 intake fields + 3 discharge fields (2026-03-19)
+- [x] Decision: Race/ethnicity/language/interpreter changed to configurable_presence + optional (2026-03-19)
+- [x] Decision: admission_type changed to optional + configurable_presence (2026-03-19)
+- [x] Decision: Discharge fields mandatory at discharge time only (2026-03-19)
 - [ ] Draft ADR document for client management schema decisions
 - [ ] Review with stakeholder and finalize field list
 
 ## Phase 2: Schema Foundation ⏸️ PENDING
 
-- [ ] Create migration 1: `clients_projection` table with all typed columns + `custom_fields JSONB`
-- [ ] Create migration 1: indexes (org, org+status, name, dob, ou, clinician, GIN, active)
-- [ ] Create migration 1: RLS policies (SELECT, INSERT, UPDATE, DELETE) for `clients_projection`
-- [ ] Create migration 1: FK from `user_client_assignments_projection` to `clients_projection`
-- [ ] Create migration 1: GRANTs for authenticated + service_role
-- [ ] Create migration 1b: Junction tables (`client_phones`, `client_addresses`)
-- [ ] Create migration 1b: `contacts_projection` — add `user_id` FK column (nullable, FK → users)
-- [ ] Create migration 1b: `contact_designations_projection` table + indexes + RLS + UNIQUE constraint
-- [ ] Create migration 1b: `client_contact_assignments` table + indexes + RLS + UNIQUE constraint (replaces originally planned `client_contacts`)
-- [ ] Create migration 1b: Junction/assignment RLS policies (org-scoped via subquery + permission check)
-- [ ] Create migration 1b: Platform admin override policies for junction + assignment tables
-- [ ] Create migration 1b: Junction/assignment GRANTs
-- [ ] Create migration 2: `client_field_definitions_projection` table + indexes + RLS
-- [ ] Create migration 2: `client_reference_values` table + indexes + RLS (read-only)
-- [ ] Create migration 2: Seed `client_reference_values` (ISO 639 languages 20 only — gender/race/ethnicity hardcoded in frontend)
+### Migration 1: `clients_projection` (expanded — ~55 typed columns + custom_fields JSONB)
+- [ ] Create `clients_projection` table with ALL typed columns (demographics, contact, referral, admission, clinical, medical, legal, discharge + custom_fields JSONB)
+- [ ] Create indexes (org, org+status, name, dob, ou, GIN on custom_fields, status+org, referral_source_type, admission_type)
+- [ ] Create RLS policies (SELECT, INSERT, UPDATE, DELETE) for `clients_projection`
+- [ ] Create FK from `user_client_assignments_projection` to `clients_projection`
+- [ ] Create GRANTs for authenticated + service_role
+
+### Migration 1b: Client-owned contact tables + contact-designation model
+- [ ] `client_phones` table (standalone, NOT junction) + indexes + RLS
+- [ ] `client_emails` table (standalone, NOT junction) + indexes + RLS
+- [ ] `client_addresses` table (standalone, NOT junction) + indexes + RLS
+- [ ] `contacts_projection` — add `user_id` FK column (nullable, FK → users)
+- [ ] `contact_designations_projection` table + indexes + RLS + UNIQUE + CHECK constraint (12 designations)
+- [ ] `client_contact_assignments` table + indexes + RLS + UNIQUE constraint
+- [ ] RLS policies for all 5 new tables (org-scoped via subquery + permission check)
+- [ ] Platform admin override policies for all new tables
+- [ ] GRANTs for all new tables
+
+### Migration 1c: `client_insurance_policies_projection` (Decision 38) + `client_funding_sources_projection` (Decision 76)
+- [ ] Create `client_insurance_policies_projection` table (payer, member_id, group_number, subscriber info, coverage dates, auth fields, policy_type: primary/secondary/medicaid/medicare)
+- [ ] Create `client_funding_sources_projection` table (funding_source_key, source_name, source_id, amount, dates, notes)
+- [ ] Create indexes (client_id, org_id) for both tables
+- [ ] Create RLS policies for both tables
+- [ ] Create GRANTs for both tables
+
+### Migration 2: Field registry + reference tables
+- [ ] `client_field_categories` table + indexes + RLS + seed fixed set
+- [ ] `client_field_definitions_projection` table + indexes + RLS + FK to categories
+- [ ] `client_reference_values` table + indexes + RLS + seed (ISO 639 languages only)
+
+### Verification
 - [ ] Test RLS policies with different JWT claim profiles
+- [ ] Verify all ~55 columns present on `clients_projection`
+- [ ] Verify insurance table supports primary + secondary + medicaid rows
+- [ ] Verify 12 designations in CHECK constraint
 
 ## Phase 3: Event Integration ⏸️ PENDING
 
-- [ ] Create migration 3: Add `client` + `client_field_definition` stream_type CASE lines to `process_domain_event()`
-- [ ] Create migration 3: `process_client_event()` router (8 event types)
-- [ ] Create migration 3: `process_client_field_definition_event()` router (3 event types)
-- [ ] Create migration 3: 6 client handlers (registered, updated, admitted, discharged, status_changed, custom_fields_updated) — clinician_assigned/manager_assigned dropped, handled by contact-designation model
-- [ ] Create migration 3: 3 field definition handlers (created, updated, deactivated)
-- [ ] Create migration 3: Add client junction CASE lines to `process_junction_event()` (client_phone, client_address linked/unlinked)
-- [ ] Create migration 3: Contact-designation event handlers (`handle_contact_designation_created`, `handle_contact_designation_deactivated`) — add 2 CASE branches to `process_contact_event()`
-- [ ] Create migration 3: Client contact assignment handlers (`handle_client_contact_assigned`, `handle_client_contact_unassigned`) — add 2 CASE branches to `process_client_event()`
-- [ ] Create migration 3: Fix RAISE WARNING → RAISE EXCEPTION in 9 existing routers
-- [ ] Create migration 4: 8 client API functions (register, update, admit, discharge, change_status, update_custom_fields, get, list)
-- [ ] Create migration 4: 4 junction API functions (link/unlink client_phone, client_address)
-- [ ] Create migration 4: Contact-designation API functions — 3 individual (`api.create_contact_designation`, `api.assign_client_contact`, `api.unassign_client_contact`) + 1 wrapper (`api.assign_client_clinician`) + `api.list_client_contacts`
-- [ ] Create migration 4: 4 field definition API functions (create, update, deactivate, list)
-- [ ] Create migration 4: GRANTs for all `api.*` functions
-- [ ] Create migration 5: `event_types` seed data (110 event types — 93 existing + 17 new)
-- [ ] Update handler reference files (13 new + 11 updated existing)
+### Migration 3: Dispatcher + routers + handlers
+- [ ] Add `client` + `client_field_definition` stream_type CASE lines to `process_domain_event()`
+- [ ] `process_client_event()` router (expanded: ~11 event types including insurance sub-entity + contact assignment + lifecycle)
+- [ ] `process_client_field_definition_event()` router (3 event types)
+- [ ] Client handlers: registered, updated, admitted, discharged, reverse_discharged, readmitted, status_changed, custom_fields_updated
+- [ ] Insurance handlers: insurance_policy_added, insurance_policy_updated, insurance_policy_removed
+- [ ] Client contact assignment handlers: contact_assigned, contact_unassigned
+- [ ] 3 field definition handlers (created, updated, deactivated)
+- [ ] Client contact sub-entity handlers: phone added/updated/removed, email added/updated/removed, address added/updated/removed (9 handlers)
+- [ ] Contact-designation handlers (`handle_contact_designation_created`, `handle_contact_designation_deactivated`) — 2 CASE branches in `process_contact_event()`
+- [ ] Fix RAISE WARNING → RAISE EXCEPTION in 9 existing routers
+
+### Migration 4: API functions (expanded)
+- [ ] ~10 client API functions (register, update, admit, discharge, reverse_discharge, readmit, change_status, update_custom_fields, get, list)
+- [ ] 3 insurance API functions (add_policy, update_policy, remove_policy)
+- [ ] 9 client contact API functions (add/update/remove phone, email, address)
+- [ ] Contact-designation API functions — 3 individual + 1 wrapper + `api.list_client_contacts`
+- [ ] 4 field definition API functions (create, update, deactivate, list)
+- [ ] GRANTs for all `api.*` functions
+
+### Migration 5: Event registry + AsyncAPI
+- [ ] `event_types` seed data (93 existing + expanded new client events)
+- [ ] Update handler reference files
 - [ ] Create AsyncAPI contracts: `client.yaml`, `client_field_definition.yaml`
-- [ ] Update AsyncAPI: `junction.yaml` (6 client junction messages)
+- [ ] Update AsyncAPI: `junction.yaml` (client junction messages)
 - [ ] Fix AsyncAPI naming mismatches: `user.yaml` (access_dates), `organization.yaml` (subdomain.failed)
-- [ ] Add missing AsyncAPI contracts: `user.schedule.reactivated`, `user.schedule.deleted`, `organization.subdomain_status.changed`
+- [ ] Add missing AsyncAPI contracts
 - [ ] Update `asyncapi.yaml` (stream_type enum + $ref entries)
 - [ ] Generate TypeScript types from AsyncAPI
-- [ ] Verify: plpgsql_check passes (`supabase db lint --level error`)
-- [ ] Verify: AsyncAPI validates (`npm run check`)
-- [ ] Verify: event_types count = 110
-- [ ] Verify: client CRUD event flow via SQL
+
+### Verification
+- [ ] plpgsql_check passes (`supabase db lint --level error`)
+- [ ] AsyncAPI validates (`npm run check`)
+- [ ] event_types count matches total
+- [ ] Client CRUD event flow via SQL
+- [ ] Insurance policy CRUD event flow via SQL
 
 ## Phase 4: Analytics Foundation ⏸️ PENDING
 
@@ -105,15 +156,24 @@
 
 ## Documentation Tasks (after Phase 3)
 
+**Source**: `dev/active/client-management-applet-schema-diagrams.md` — use as partial source per `documentation/AGENT-GUIDELINES.md`
+
 - [ ] Create table docs: `clients_projection.md`
+- [ ] Create table docs: `client_phones.md`
+- [ ] Create table docs: `client_emails.md`
+- [ ] Create table docs: `client_addresses.md`
+- [ ] Create table docs: `client_insurance_policies_projection.md`
 - [ ] Create table docs: `client_field_definitions_projection.md`
+- [ ] Create table docs: `client_field_categories.md`
 - [ ] Create table docs: `client_reference_values.md`
 - [ ] Create table docs: `contact_designations_projection.md`
 - [ ] Create table docs: `client_contact_assignments.md`
+- [ ] Create architecture doc: `documentation/architecture/data/client-data-model.md` — derived from schema diagrams
 - [ ] Update `contacts_projection.md` — document `user_id` FK addition
 - [ ] Update `user_client_assignments_projection.md` — note new FK
 - [ ] Update `clients.md` — redirect to clients_projection.md
 - [ ] Update `documentation/AGENT-INDEX.md` — add client keywords
+- [ ] Update `documentation/README.md` — add client docs to table of contents
 - [ ] Update `dev/active/client-management-applet-tasks.md` — mark complete
 
 ## Success Validation Checkpoints
@@ -158,10 +218,36 @@
 
 ## Current Status
 
-**Phase**: 1 — Research & Discovery (nearly complete, pending ADR + remaining field discussions)
-**Status**: Clinical contact field UX fully designed (decisions 20-26). ClinicalContactField plan at `.claude/plans/woolly-beaming-teacup.md` — PENDING USER APPROVAL. Remaining: 6 undiscussed fields + ADR.
-**Last Updated**: 2026-03-04
-**Next Step**: (1) Get user approval on `woolly-beaming-teacup.md` plan. (2) Resolve remaining undiscussed fields (`photo_url`, `notes`, `middle_name`, `preferred_name`, `custom_fields`, audit columns). (3) Update main plan at `.claude/plans/spicy-bubbling-quail.md` with all new decisions (14-26 in context.md) and finalize for approval.
+**Phase**: 1 — Research & Discovery (nearing completion — 2 tasks remain: ADR draft + stakeholder review)
+**Status**: All 77 decisions complete (9 new decisions 2026-03-23: #69–#77). Key changes this session:
+- `is_required` configurable per-org for typed columns (Decision 69)
+- Language selection → runtime search, no admin config (Decision 70)
+- Pronouns → runtime free text, no admin config (Decision 71)
+- Citizenship status → hardcoded 6-value dropdown (Decision 72)
+- `initial_risk_level` → 4-value enum, promoted to reporting dimension (Decision 73)
+- Medicare added as 5th payer type (Decision 74)
+- `state` payer type removed, replaced by `client_funding_sources_projection` table (Decision 76, supersedes 75)
+- Funding sources get `custom_fields` JSONB for non-standard fields (Decision 77)
+- New table count: 11 (was 10)
+**Last Updated**: 2026-03-23
+**Next Step**: (1) Draft ADR document. (2) Review with stakeholder and finalize field list. (3) Update main plan file (`.claude/plans/spicy-bubbling-quail.md`) with all post-2026-03-14 changes. (4) Begin Phase 2 implementation.
+
+### Static Configuration Prototype Created (2026-03-23)
+- Static HTML/CSS/JS prototype at `~/tmp/client-intake-config-prototype/` (not in git)
+- 13 horizontal tabs covering all wizard steps + custom fields + categories
+- Glassmorphism design matching existing app (extracted from `frontend/src/index.css`)
+- 56 "Required when visible" checkboxes on all configurable_presence fields (Decision 69)
+- 9 designation cards with configurable label rename inputs
+- State agency configurable label
+- Custom field management (add/edit/delete with type, category, dimension, required flags)
+- Category management (5 locked system + org-defined custom)
+- Language selection grid REMOVED (Decision 70) — runtime search at intake instead
+- Pronouns changed to free text (Decision 71)
+- Citizenship status changed to hardcoded dropdown (Decision 72)
+- Initial risk level defined with 4 values + reporting dimension badge (Decision 73)
+- Medicare added to payer type toggles (Decision 74)
+- State Program payer replaced by External Funding Sources section with dynamic slots + configurable labels (Decision 76)
+- Upload to Google Drive for stakeholder review
 
 ### Clinical Contact Field UX Designed (2026-03-04)
 - 4 clinical contact fields on intake form: Clinician, Therapist, Psychiatrist, Behavioral Analyst

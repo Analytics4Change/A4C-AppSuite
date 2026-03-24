@@ -23,11 +23,11 @@
 
 6. **Race/ethnicity capture**: Federally mandated by CMS, SAMHSA, and state licensing. OMB two-question format: ethnicity first (Hispanic/Latino or not), then race as multi-select. Required for health disparity analysis — a core analytical use case.
 
-7. **Pronouns**: Free text field, not enum. LGBTQ+ youth overrepresented in residential care (30%+ of foster care population). Clinical relevance and state regulatory requirements (CA, NY, IL).
+7. **Pronouns**: Free text input at runtime, not enum or org-configured dropdown (updated 2026-03-23, Decision 71). LGBTQ+ youth overrepresented in residential care (30%+ of foster care population). Clinical relevance and state regulatory requirements (CA, NY, IL). Not a reporting dimension — no analytical reason to constrain values. Placeholder text guides format (e.g., "he/him, she/her, they/them").
 
 8. **SSN handling**: Capture last 4 digits only (or skip entirely). Use Medicaid ID as primary insurance identifier. Full SSN creates liability under HIPAA breach notification.
 
-9. **Junction tables for contact/phone/address** (decided 2026-02-12, updated 2026-03-04): Reuse existing `phones_projection`, `addresses_projection` via junction tables (`client_phones`, `client_addresses`). Originally planned `client_contacts` junction replaced by 4NF `client_contact_assignments` model (see Decision 13). Junction events auto-routed by `process_domain_event()` via `LIKE '%.linked' OR LIKE '%.unlinked'` suffix check — no dispatcher CASE change needed.
+9. **~~Junction tables for contact/phone/address~~** (decided 2026-02-12, updated 2026-03-04, **SUPERSEDED 2026-03-19 by Decision 57**): ~~Reuse existing `phones_projection`, `addresses_projection` via junction tables (`client_phones`, `client_addresses`).~~ **Now using Option B: client-owned contact tables** — dedicated `client_phones`, `client_emails`, `client_addresses` as standalone tables, not junctions to shared projections. See Decision 57. The 4NF `client_contact_assignments` model for clinical staff assignment (Decision 13) is unchanged.
 
 10. **Value set reference table** (decided 2026-02-12): Single `client_reference_values` table with `category` column (race, ethnicity, language, gender). App-owner-managed via migrations/seeds. Read-only for tenants. Seeded with OMB + ISO 639 standards.
 
@@ -49,6 +49,46 @@
 
 19. **Contact-designation model included in Phases 2-3** (decided 2026-03-04): Ships with client management migrations, not deferred to a follow-up phase. Client registration form needs clinician assignment from day one.
 
+57. **Option B: Client-owned contact tables** (decided 2026-03-19): Client's own contact info (phone, email, address) stored in dedicated `client_phones`, `client_emails`, `client_addresses` tables — NOT flat text columns on `clients_projection`, NOT junctions to shared `phones_projection`/`addresses_projection`, NOT the 4NF contact-designation model. Each table has `client_id` FK, `organization_id` for RLS, type enum, `is_primary` flag. Event-sourced as sub-entity events (`client.phone.added/updated/removed`, etc.) via `process_client_event()`.
+
+58. **Client contact info is configurable_presence + optional** (decided 2026-03-19): Org admin toggles whether contact section appears. Not mandatory at intake.
+
+59. **Configurable label + conforming dimension mapping for designations** (decided 2026-03-19): All 12 contact designations have `configurable_label` (org can rename display label, e.g., "Clinician" → "Primary Counselor") and `conforming_dimension_mapping` (canonical key stays unchanged for cross-org Cube.js analytics). Fixed CHECK constraint set of 12 designation keys is unchanged — orgs relabel only, cannot add new designations. Labels stored in `client_field_definitions_projection`.
+
+60. **`state_agency` configurable label + conforming dimension mapping** (decided 2026-03-19): Same pattern as designations — org can relabel the display name, canonical key stays for analytics.
+
+61. **`admission_type` changed to optional + configurable_presence** (decided 2026-03-19): Was erroneously marked mandatory. Now org-togglable and optional.
+
+62. **Discharge fields mandatory at discharge time only** (decided 2026-03-19): `discharge_date`, `discharge_reason`, `discharge_type` are mandatory when performing a discharge action, NOT at intake registration. `discharge_diagnosis` and `discharge_placement` are configurable_presence + optional.
+
+63. **`internal_case_number` dropped** (decided 2026-03-19): UUID `id` serves as internal identifier. `mrn` covers org's own numbering. Removes the only renamable-label field (superseded by state_agency + designation labels).
+
+64. **`county` dropped** (decided 2026-03-19): Not needed.
+
+65. **`preferred_communication_method` dropped** (decided 2026-03-19): Removed from schema entirely.
+
+66. **Race/ethnicity/primary_language/interpreter_needed changed to configurable_presence + optional** (decided 2026-03-19): Were previously mandatory NOT NULL. Now org-togglable. Orgs that need OMB compliance can enable them; others can skip.
+
+69. **`is_required` configurable per-org for typed columns** (decided 2026-03-23): Org admin can mark any `configurable_presence` typed column as "Required when visible" via the existing `is_required` boolean on `client_field_definitions_projection`. No schema change needed — the column already exists. Enforcement: (1) frontend validation reads org's field definitions, (2) `api.register_client()` validates non-null for `is_required` fields before emitting domain event. Database columns stay nullable — required-ness is a per-org business rule, not a schema invariant.
+
+70. **Language selection changed from org-configured list to runtime search** (decided 2026-03-23): Primary and secondary language fields use a runtime searchbox at intake (similar to medication/ICD-10 search pattern) instead of org admin pre-selecting a subset from the ISO 639 master list. `client_reference_values` remains as the backend lookup table but has no admin UI surface. Removes the language selection grid from the configuration UI entirely.
+
+71. **Pronouns changed from org-configured dropdown to runtime free text** (decided 2026-03-23): Was org-admin-configurable dropdown options stored in `client_field_definitions_projection` with "Other → free text" escape hatch. Now plain free text input at intake. Not a reporting dimension — no analytical reason to constrain values. Placeholder text guides format. Removes pronouns from `client_field_definitions_projection` usage (was the only field with org-configured dropdown values).
+
+72. **Citizenship status changed from free text to hardcoded dropdown** (decided 2026-03-23): Was free text, now a standardized 6-value dropdown hardcoded in frontend: `U.S. Citizen`, `Lawful Permanent Resident (Green Card Holder)`, `Nonimmigrant Visa Holder (Temporary Status)`, `Refugee or Asylee`, `Other Immigration Status`, `Prefer not to answer`. Selected at runtime when field is enabled. DB column remains `text` (stores selected value).
+
+73. **`initial_risk_level` defined as 4-value hardcoded enum, now a reporting dimension** (decided 2026-03-23): Was "Enum TBD". Now: `Low Risk`, `Moderate Risk`, `High Risk`, `Critical/Imminent Risk`. Hardcoded in frontend. Promoted to reporting dimension — conforming across orgs, sliceable in Cube.js PatientDimension.
+
+74. **`medicare` added as 5th payer type** (decided 2026-03-23): `policy_type` enum on `client_insurance_policies_projection` expanded from `primary | secondary | medicaid | state` to `primary | secondary | medicaid | medicare | state`. Applies for youth with disabilities (SSI → Medicare eligibility).
+
+75. **~~"State Program" payer type gets configurable label~~** — **SUPERSEDED by Decision 76**.
+
+76. **`state` payer type replaced by `client_funding_sources_projection` table (Option B)** (decided 2026-03-23): The `state` value is removed from `policy_type` enum (now `primary | secondary | medicaid | medicare`). External funding sources are a separate concept from insurance policies — different data shape, no payer/subscriber/coverage fields. New table `client_funding_sources_projection` supports dynamic, multi-instance funding sources. Org admin defines funding source slots (`external_funding_source_1`, `external_funding_source_2`, ...) in `client_field_definitions_projection`, each with a `configurable_label`. Staff adds funding source rows at intake. Event-sourced sub-entity of `client` (`client.funding_source.added/updated/removed`) via `process_client_event()`. NOT a reporting dimension. Includes `custom_fields jsonb DEFAULT '{}'` for non-standard fields per funding source row (Decision 77).
+
+67. **Mandatory core reduced to 7 fields at intake** (decided 2026-03-19): `first_name`, `last_name`, `date_of_birth`, `gender`, `admission_date`, `allergies`, `medical_conditions`. All other fields are optional and/or configurable_presence. 3 additional fields mandatory at discharge: `discharge_date`, `discharge_reason`, `discharge_type`.
+
+68. **Allergy type enum expanded** (decided 2026-03-19): `allergy_type` on each allergy item changed from `medication`/`general` to `medication`/`food`/`environmental`. Standard EMR categorization.
+
 20. **4 clinical contact fields on intake form** (decided 2026-03-04): Separate fields for Assigned Clinician, Therapist, Psychiatrist, and Behavioral Analyst. All share the same reusable `ClinicalContactField` component parameterized by designation. All nullable.
 
 21. **Client-side Jaro-Winkler fuzzy search for clinical contacts** (decided 2026-03-04): Preload all org staff + external contacts on form mount (one RPC call, cached). Score client-side with Jaro-Winkler (threshold ≥ 0.85) on every keystroke. Chosen over Fuse.js (Bitap algorithm penalizes transpositions as 2 edits — too harsh for short names like "Jonh"→"John"). Chosen over server-side `pg_trgm` (unnecessary round trips for 50-500 person pool). ~30 lines TypeScript, no dependency.
@@ -62,6 +102,66 @@
 25. **Failed event detection via RPC read-back guard** (decided 2026-03-04): All event-emitting RPCs include projection read-back after emit. Returns `{success: false, error, correlation_id}` on failure. Frontend surfaces error with correlation ID reference for support. No polling needed — synchronous detection.
 
 26. **data-testid on all interactive elements** (decided 2026-03-04): Designation-interpolated IDs for Playwright UAT (e.g., `clinical-contact-search-clinician`, `clinical-contact-add-new-therapist`). 15 test IDs per field instance × 4 designations.
+
+27. **`photo_url` — Mandatory + NULLABLE** (decided 2026-03-09): Always present as column, not required at registration, uploadable later. Not org-configurable (always available). Not a reporting dimension.
+
+28. **`notes` — DROPPED** (decided 2026-03-09): Omitted entirely from schema. Clinical notes/progress notes would be a separate applet if needed.
+
+29. **`middle_name` — Mandatory + NULLABLE** (decided 2026-03-09): Not required at registration. Not a reporting dimension, but may appear in detail-level reporting (not sliceable).
+
+30. **`preferred_name` — Optional, nullable** (decided 2026-03-09): No reporting requirements for sliceability.
+
+31. **`custom_fields` JSONB confirmed** (decided 2026-03-09): `custom_fields jsonb DEFAULT '{}'` on `clients_projection`. Flat key/value storage. Structure/metadata in `client_field_definitions_projection`. Semantic keys only.
+
+32. **`client_field_categories` reference table** (decided 2026-03-09): Separate config table (not free-text on field definitions). Seeded fixed set: `clinical`, `administrative`, `education`, `insurance`, `legal`. Orgs can add custom categories. No event sourcing (config data). Categories drive UI section grouping and Cube.js schema explorer — NOT analytical dimensions (not sliceable). `client_field_definitions_projection.category_id` FKs to this table.
+
+33. **Audit columns confirmed** (decided 2026-03-09): `created_at` (timestamptz NOT NULL), `updated_at` (timestamptz NOT NULL), `created_by` (uuid NOT NULL), `updated_by` (uuid NOT NULL). All system-managed — no UI rendering in intake form or configuration form. Set by API functions and event handlers.
+
+34. **Enterprise EMR field expansion** (decided 2026-03-09): User provided 17-category enterprise EMR field list. Cross-reference analysis identified ~40% already decided, ~15% partially decided, ~45% genuinely new. Wizard-style multi-step intake form with progressive disclosure — each category gets its own step, user clicks "Next" between categories.
+
+35. **Categories 9, 12, 15 deferred as separate applets** (decided 2026-03-09): Behavioral Health Assessments (Category 9), Consents & Authorizations (Category 12), and Documentation & Attachments (Category 15) are fully longitudinal/ongoing data — no intake-only fields within them. Deferred to future applets. Leaves 14 categories for intake schema.
+
+36. **Architectural scoping questions resolved** (2026-03-14): All 4 questions answered — see decisions 37-41.
+
+37. **Guardian split** (decided 2026-03-14): Guardian *person* data (name, relationship, address, phone, email, custody documents) deferred to contact management applet. Client *legal status* fields captured on `clients_projection` now: `legal_custody_status`, `court_ordered_placement`, `financial_guarantor_type`.
+
+38. **Insurance as normalized CQRS table** (decided 2026-03-14): `client_insurance_policies_projection` table, event-sourced. Events are sub-entity of `client` (`client.insurance_policy.added/updated/removed`) routed through `process_client_event()`. Supports primary + secondary + Medicaid rows.
+
+39. **Per-org payer type configuration** (decided 2026-03-14): Toggles on `organizations_projection.direct_care_settings` JSONB (existing pattern). Controls which insurance sections appear in intake wizard.
+
+40. **Clinical profile as typed columns** (decided 2026-03-14): Intake snapshot on `clients_projection`. Longitudinal tracking adds separate tables later.
+
+41. **Referral upgraded to structured fields** (decided 2026-03-14): Replace `referral_source` plain text with `referral_source_type` (enum), `referral_organization`, `referral_date`, `reason_for_referral`. Referring provider deferred to contact management applet.
+
+42. **Demographics additions** (decided 2026-03-14): `gender_identity` (free text, nullable), `secondary_language` (nullable, same org-configurable pattern), `marital_status` (enum, nullable), `citizenship_status` (text, nullable/optional).
+
+43. **Identifier fields** (decided 2026-03-14): `mrn` (text, nullable, org-assigned), `external_id` (text, nullable, for imports), `drivers_license` (text, nullable).
+
+44. **Client direct contact attributes** (decided 2026-03-14): `email`, `phone_primary`, `phone_secondary`, `preferred_communication_method` (enum), `county` — all on `clients_projection` directly, all nullable. Junction tables remain for additional/related contact points. County is an intake/reporting attribute, not a property of addresses_projection.
+
+45. **Admission fields** (decided 2026-03-14): `admission_type` (enum NOT NULL: planned/emergency/transfer/readmission), `level_of_care` (text, nullable), `expected_length_of_stay` (integer days, nullable), `initial_risk_level` (enum, nullable), `discharge_plan_status` (enum, nullable, updated over time).
+
+46. **Program manager as 8th→ designation** (decided 2026-03-14): Expanded designations. Now 12 total: clinician, therapist, psychiatrist, behavioral_analyst, case_worker, guardian, emergency_contact, program_manager, primary_care_physician, prescriber, probation_officer, caseworker.
+
+47. **Discharge fields** (decided 2026-03-14): `discharge_reason` (text), `discharge_type` (enum: planned/ama/transfer/runaway/etc.), `discharge_diagnosis` (JSONB ICD-10 array), `discharge_placement` (text). All set via `client.discharged` event payload.
+
+48. **Clinical profile fields** (decided 2026-03-14): `primary_diagnosis` (JSONB ICD-10), `secondary_diagnoses` (JSONB array), `dsm5_diagnoses` (JSONB array), `presenting_problem` (text), `suicide_risk_status` (enum), `violence_risk_status` (enum), `trauma_history_indicator` (boolean), `substance_use_history` (text), `developmental_history` (text), `previous_treatment_history` (text). All nullable intake snapshots.
+
+49. **Medical info expansion** (decided 2026-03-14): PCP and prescriber as contact designations (10th, 11th). Allergy type ('medication' vs 'general') merged into existing allergies JSONB items. New columns: `immunization_status`, `dietary_restrictions`, `special_medical_needs`. All nullable.
+
+50. **Legal & compliance fields** (decided 2026-03-14): Probation officer and caseworker as designations (11th, 12th). Typed columns: `court_case_number`, `state_agency`, `legal_status` (enum, reinstated), `legal_custody_status`, `court_ordered_placement` (boolean), `financial_guarantor_type`, `mandated_reporting_status` (boolean), `protective_services_involvement` (boolean), `safety_plan_required` (boolean).
+
+51. **Client Supports & Family deferred** (decided 2026-03-14): Deferred to contact management applet alongside guardian person data. Family contacts + HIPAA release tracking = contact relationship data.
+
+52. **Program config via custom_fields, financial deferred** (decided 2026-03-14): Category 13 (house assignment, privilege level, behavior levels) handled by existing `custom_fields` JSONB + `client_field_definitions_projection`. Category 14 (billing, payment plans) deferred to future billing module.
+
+53. **`data_source` metadata column** (decided 2026-03-14): Enum: manual, api, import. System-managed, not user-facing.
+
+54. **Intake coordinator as staff assignment** (decided 2026-03-14): Via `user_client_assignments_projection`, not a contact designation. Operational role.
+
+55. **Current medications deferred** (decided 2026-03-14): Deferred to medication management applet. No duplicate capture on intake form.
+
+56. **Chronic illnesses merged** (decided 2026-03-14): Add `is_chronic: boolean` to each item in `medical_conditions` JSONB. No new column.
 
 ## Technical Context
 
@@ -175,9 +275,9 @@ Full audit of all event types across 12 routers + dispatcher vs 14 AsyncAPI doma
 | ~~assigned_clinician_id~~ | ~~High~~ — Replaced by 4NF contact-designation model |
 | `contact_designations_projection` (new table) | High |
 | `client_contact_assignments` (new table) | High |
-| custom_fields (JSONB) | High |
-| photo_url | Low |
-| height_cm, weight_kg | Medium |
+| custom_fields (JSONB) | High — **CONFIRMED** (2026-03-09) |
+| `client_field_categories` (new table) | High — **NEW** (2026-03-09) |
+| photo_url | Medium — **Mandatory + NULLABLE** (2026-03-09) |
 | RLS policies (zero currently) | Critical |
 | Domain event integration | Critical |
 | API RPC functions | Critical |
@@ -213,6 +313,9 @@ Full audit of all event types across 12 routers + dispatcher vs 14 AsyncAPI doma
 ### Plan Files
 - `.claude/plans/spicy-bubbling-quail.md` — Complete implementation plan with 5 migrations, cross-correlation audit, all SQL schemas, handler specs, API function signatures, AsyncAPI contract updates, verification plan, and implementation order
 - `.claude/plans/woolly-beaming-teacup.md` — Clinical Contact Assignment Field UX plan: two-phase field component, Jaro-Winkler search, observability, data-testid, component architecture
+
+### Schema Diagrams (documentation source)
+- `dev/active/client-management-applet-schema-diagrams.md` — Mermaid ER diagram (all 10 new tables + 2 modified + 6 existing), event flow diagram, table inventory, RLS patterns. **Serves as partial source for documentation artifacts** (table reference docs, architecture doc, AGENT-INDEX updates) per `documentation/AGENT-GUIDELINES.md`.
 
 ## Important Constraints
 
