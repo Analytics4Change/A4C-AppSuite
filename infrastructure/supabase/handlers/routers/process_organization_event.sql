@@ -20,6 +20,8 @@ BEGIN
     WHEN 'organization.bootstrap.completed' THEN PERFORM handle_bootstrap_completed(p_event);
     WHEN 'organization.bootstrap.failed' THEN PERFORM handle_bootstrap_failed(p_event);
     WHEN 'organization.bootstrap.cancelled' THEN PERFORM handle_bootstrap_cancelled(p_event);
+    WHEN 'organization.bootstrap.step_completed' THEN
+      NULL;  -- Progress tracking event, queried at read time by get_bootstrap_status()
     -- Deletion workflow events (no projection update needed)
     WHEN 'organization.deletion.initiated' THEN NULL; -- Temporal workflow tracking
     WHEN 'organization.deletion.completed' THEN NULL; -- org already marked deleted by organization.deleted

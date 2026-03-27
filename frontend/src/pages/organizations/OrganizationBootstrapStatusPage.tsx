@@ -240,6 +240,7 @@ export const OrganizationBootstrapStatusPage: React.FC = () => {
               {(status.progress ?? []).map((step, index) => (
                 <div
                   key={index}
+                  data-testid={`bootstrap-step-${step.step.toLowerCase().replace(/\s+/g, '_')}`}
                   className="flex items-start gap-3 p-3 rounded-lg transition-all"
                   style={{
                     background: step.completed

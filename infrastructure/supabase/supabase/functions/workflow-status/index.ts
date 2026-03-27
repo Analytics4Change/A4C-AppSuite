@@ -23,7 +23,7 @@ import {
 import { extractTracingContext } from '../_shared/tracing-context.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v26-access-blocked-guard';
+const DEPLOY_VERSION = 'v27-dynamic-bootstrap-stages';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -153,53 +153,15 @@ serve(async (req) => {
 
     const status = statusData[0];
 
-    // Map database status to workflow stages
-    const stages: WorkflowStage[] = [
-      {
-        name: 'Initialize Organization',
-        status: getStageStatus(status.current_stage, 'temporal_workflow_started'),
-      },
-      {
-        name: 'Create Organization Record',
-        status: getStageStatus(status.current_stage, 'organization_creation'),
-      },
-      {
-        name: 'Create Contacts',
-        status: getStageStatus(status.current_stage, 'contact_creation'),
-      },
-      {
-        name: 'Create Addresses',
-        status: getStageStatus(status.current_stage, 'address_creation'),
-      },
-      {
-        name: 'Create Phones',
-        status: getStageStatus(status.current_stage, 'phone_creation'),
-      },
-      {
-        name: 'Create Program',
-        status: getStageStatus(status.current_stage, 'program_creation'),
-      },
-      {
-        name: 'Configure DNS',
-        status: getStageStatus(status.current_stage, 'dns_provisioning'),
-      },
-      {
-        name: 'Verify DNS',
-        status: getStageStatus(status.current_stage, 'dns_verification'),
-      },
-      {
-        name: 'Assign Admin Role',
-        status: getStageStatus(status.current_stage, 'role_assignment'),
-      },
-      {
-        name: 'Send Invitations',
-        status: getStageStatus(status.current_stage, 'invitation_email'),
-      },
-      {
-        name: 'Complete Bootstrap',
-        status: getStageStatus(status.current_stage, 'completed'),
-      },
-    ];
+    // Stages are built dynamically by the RPC from a CTE-based step manifest.
+    // The workflow emits organization.bootstrap.step_completed events, and
+    // the RPC reads them to build the stages array. No hardcoded list needed here.
+    const stages: WorkflowStage[] = (status.stages || []).map(
+      (stage: { name: string; key: string; status: string }) => ({
+        name: stage.name,
+        status: stage.status as WorkflowStage['status'],
+      })
+    );
 
     // Build response with result data from events (P1 #4)
     const response: WorkflowStatusResponse = {
@@ -230,41 +192,3 @@ serve(async (req) => {
   }
 });
 
-/**
- * Determine stage status based on current workflow stage
- */
-function getStageStatus(currentStage: string, stageName: string): 'pending' | 'in_progress' | 'completed' | 'failed' {
-  const stageOrder = [
-    'temporal_workflow_started',
-    'organization_creation',
-    'contact_creation',
-    'address_creation',
-    'phone_creation',
-    'program_creation',
-    'dns_provisioning',
-    'dns_verification',
-    'role_assignment',
-    'invitation_email',
-    'completed',
-  ];
-
-  const currentIndex = stageOrder.indexOf(currentStage);
-  const stageIndex = stageOrder.indexOf(stageName);
-
-  if (currentIndex < 0) {
-    return 'pending'; // Unknown stage
-  }
-
-  if (stageIndex < currentIndex) {
-    return 'completed';
-  } else if (stageIndex === currentIndex) {
-    // Special case: 'completed' is a terminal stage, not an in-progress stage
-    // When we're AT the completed stage, the workflow IS completed
-    if (stageName === 'completed') {
-      return 'completed';
-    }
-    return 'in_progress';
-  } else {
-    return 'pending';
-  }
-}

@@ -44,6 +44,7 @@ export {
   // Organization bootstrap event emitters
   emitBootstrapFailed,
   emitBootstrapCompleted,
+  emitBootstrapStepCompleted,
   // Organization deletion event emitters
   emitDeletionInitiated,
   emitDeletionCompleted,

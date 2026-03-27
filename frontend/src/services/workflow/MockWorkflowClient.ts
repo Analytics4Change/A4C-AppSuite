@@ -21,6 +21,7 @@ import type {
   WorkflowStatus,
   OrganizationBootstrapResult,
 } from '@/types/organization.types';
+import { BOOTSTRAP_STEPS } from '@/constants/bootstrap-steps';
 
 /**
  * Storage keys for mock workflow persistence
@@ -29,18 +30,6 @@ const STORAGE_KEYS = {
   WORKFLOWS: 'mock_workflows',
   COUNTER: 'mock_workflow_counter',
 } as const;
-
-/**
- * Workflow step definitions for simulation
- */
-const WORKFLOW_STEPS = [
-  'Creating organization record',
-  'Configuring DNS subdomain',
-  'Waiting for DNS propagation',
-  'Creating admin user',
-  'Sending invitation email',
-  'Finalizing setup',
-] as const;
 
 /**
  * Mock workflow client for development mode
@@ -71,8 +60,8 @@ export class MockWorkflowClient implements IWorkflowClient {
       workflowId,
       organizationId: workflowId, // Unified ID system
       status: 'running',
-      progress: WORKFLOW_STEPS.map((step) => ({
-        step,
+      progress: BOOTSTRAP_STEPS.map((s) => ({
+        step: s.label,
         completed: false,
       })),
     };
@@ -202,7 +191,7 @@ export class MockWorkflowClient implements IWorkflowClient {
     params: OrganizationBootstrapParams
   ): Promise<void> {
     // Execute steps with delays
-    for (let i = 0; i < WORKFLOW_STEPS.length; i++) {
+    for (let i = 0; i < BOOTSTRAP_STEPS.length; i++) {
       // Wait 1-2 seconds per step for realistic simulation
       await this.delay(1000 + Math.random() * 1000);
 
@@ -216,7 +205,7 @@ export class MockWorkflowClient implements IWorkflowClient {
       currentStatus.progress[i].completed = true;
 
       // Update status
-      if (i === WORKFLOW_STEPS.length - 1) {
+      if (i === BOOTSTRAP_STEPS.length - 1) {
         // Final step - mark as completed
         currentStatus.status = 'completed';
         currentStatus.result = this.generateMockResult(params);

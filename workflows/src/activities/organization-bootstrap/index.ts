@@ -44,3 +44,4 @@ export { deletePhones } from './delete-phones';
 export { deleteEmails } from './delete-emails';
 export { deactivateOrganization } from './deactivate-organization';
 export { seedFieldDefinitions, deleteFieldDefinitions } from './seed-field-definitions';
+export { emitBootstrapStepCompletedActivity } from './emit-step-completed';

@@ -131,6 +131,14 @@ components:
       payload:
         $ref: '#/components/schemas/OrganizationBootstrapCancelledEvent'
 
+    OrganizationBootstrapStepCompleted:
+      name: organization.bootstrap.step_completed
+      title: Organization Bootstrap Step Completed
+      summary: A bootstrap workflow step completed successfully (progress tracking)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrganizationBootstrapStepCompletedEvent'
+
     # Subdomain Provisioning Events
     OrganizationSubdomainDnsCreated:
       name: organization.subdomain.dns_created
@@ -966,6 +974,45 @@ components:
         original_failure_stage:
           type: string
           description: Original stage where bootstrap failed
+
+    # Bootstrap Step Progress Event Schemas
+    OrganizationBootstrapStepCompletedEvent:
+      title: OrganizationBootstrapStepCompletedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: organization
+        event_type:
+          type: string
+          const: organization.bootstrap.step_completed
+        event_data:
+          $ref: '#/components/schemas/OrganizationBootstrapStepCompletedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    OrganizationBootstrapStepCompletedData:
+      title: OrganizationBootstrapStepCompletedData
+      type: object
+      required:
+        - organization_id
+        - step_key
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization being bootstrapped
+        step_key:
+          $ref: ../components/enums.yaml#/components/schemas/BootstrapStepKey
 
     # Subdomain Provisioning Event Schemas
     OrganizationSubdomainDnsCreatedEvent:

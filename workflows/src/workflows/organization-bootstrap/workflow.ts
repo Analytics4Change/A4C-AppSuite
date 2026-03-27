@@ -64,7 +64,8 @@ const {
   deletePhones,
   deactivateOrganization,
   seedFieldDefinitions,
-  deleteFieldDefinitions
+  deleteFieldDefinitions,
+  emitBootstrapStepCompletedActivity
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: '10 minutes',
   retry: {
@@ -191,6 +192,7 @@ export async function organizationBootstrapWorkflow(
     });
 
     state.orgCreated = true;
+    await emitBootstrapStepCompletedActivity({ orgId: state.orgId!, stepKey: 'create_organization', tracing: params.tracing });
     // Store contactsByEmail for use in generateInvitations
     const contactsByEmail = createOrgResult.contactsByEmail;
     log.info('Organization created', {
@@ -212,6 +214,7 @@ export async function organizationBootstrapWorkflow(
 
     const permResult = await grantProviderAdminPermissions({ orgId: state.orgId!, scopePath, tracing: params.tracing });
 
+    await emitBootstrapStepCompletedActivity({ orgId: state.orgId!, stepKey: 'grant_permissions', tracing: params.tracing });
     log.info('Provider admin permissions granted', {
       orgId: state.orgId,
       roleId: permResult.roleId,
@@ -232,6 +235,7 @@ export async function organizationBootstrapWorkflow(
     });
 
     state.fieldDefinitionsSeeded = true;
+    await emitBootstrapStepCompletedActivity({ orgId: state.orgId!, stepKey: 'seed_field_definitions', tracing: params.tracing });
     log.info('Client field definitions seeded', {
       orgId: state.orgId,
       definitionsSeeded: seedResult.definitionsSeeded,
@@ -279,6 +283,7 @@ export async function organizationBootstrapWorkflow(
           // Only set dnsSuccess AFTER verifyDNS succeeds
           // This ensures the retry loop continues if verification fails
           dnsSuccess = true;
+          await emitBootstrapStepCompletedActivity({ orgId: state.orgId!, stepKey: 'configure_dns', tracing: params.tracing });
 
         } catch (error) {
           dnsRetryCount++;
@@ -331,6 +336,7 @@ export async function organizationBootstrapWorkflow(
       tracing: params.tracing
     });
 
+    await emitBootstrapStepCompletedActivity({ orgId: state.orgId!, stepKey: 'generate_invitations', tracing: params.tracing });
     log.info('Invitations generated', {
       count: state.invitations.length
     });
@@ -352,6 +358,7 @@ export async function organizationBootstrapWorkflow(
     });
 
     state.invitationsSent = true;
+    await emitBootstrapStepCompletedActivity({ orgId: state.orgId!, stepKey: 'send_invitation_emails', tracing: params.tracing });
 
     log.info('Invitation emails sent', {
       successCount: emailResult.successCount,
@@ -379,6 +386,7 @@ export async function organizationBootstrapWorkflow(
       tracing: params.tracing,
     });
 
+    await emitBootstrapStepCompletedActivity({ orgId: state.orgId!, stepKey: 'activate_organization', tracing: params.tracing });
     log.info('Organization activated via bootstrap completed event', { orgId: state.orgId });
 
     // ========================================

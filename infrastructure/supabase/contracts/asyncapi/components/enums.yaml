@@ -150,6 +150,11 @@ components:
       title: BootstrapFailureStage
       enum: [organization_creation, dns_provisioning, admin_user_creation, role_assignment, permission_grants, invitation_email]
 
+    BootstrapStepKey:
+      type: string
+      title: BootstrapStepKey
+      enum: [create_organization, grant_permissions, seed_field_definitions, configure_dns, generate_invitations, send_invitation_emails, activate_organization]
+
     # Authentication & Invitation
     AuthMethod:
       type: string

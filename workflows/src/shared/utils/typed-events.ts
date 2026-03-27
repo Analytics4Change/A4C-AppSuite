@@ -54,6 +54,7 @@ import {
   OrganizationDnsRemovedData,
   OrganizationBootstrapFailureData,
   OrganizationBootstrapCompletionData,
+  OrganizationBootstrapStepCompletedData,
   OrganizationDeletionInitiationData,
   OrganizationDeletionCompletionData,
   // Invitation data types
@@ -865,6 +866,25 @@ export async function emitBootstrapCompleted(
     event_data: data as unknown as Record<string, unknown>,
     tags,
     ...buildTracingForEvent(tracing, 'emitBootstrapCompleted'),
+  });
+}
+
+/**
+ * Emit an organization.bootstrap.step_completed event
+ */
+export async function emitBootstrapStepCompleted(
+  orgId: string,
+  data: OrganizationBootstrapStepCompletedData,
+  tracing?: WorkflowTracingParams
+): Promise<string> {
+  const tags = buildTags();
+  return emitEvent({
+    event_type: 'organization.bootstrap.step_completed',
+    aggregate_type: 'organization',
+    aggregate_id: orgId,
+    event_data: data as unknown as Record<string, unknown>,
+    tags,
+    ...buildTracingForEvent(tracing, 'emitBootstrapStepCompleted'),
   });
 }
 

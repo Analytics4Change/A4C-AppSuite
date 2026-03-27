@@ -6695,6 +6695,115 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
+          - name: organization.bootstrap.step_completed
+            title: Organization Bootstrap Step Completed
+            summary: >-
+              A bootstrap workflow step completed successfully (progress
+              tracking)
+            contentType: application/json
+            payload:
+              title: OrganizationBootstrapStepCompletedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  const: organization
+                event_type:
+                  type: string
+                  const: organization.bootstrap.step_completed
+                event_data:
+                  title: OrganizationBootstrapStepCompletedData
+                  type: object
+                  required:
+                    - organization_id
+                    - step_key
+                  properties:
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: Organization being bootstrapped
+                    step_key:
+                      type: string
+                      title: BootstrapStepKey
+                      enum:
+                        - create_organization
+                        - grant_permissions
+                        - seed_field_definitions
+                        - configure_dns
+                        - generate_invitations
+                        - send_invitation_emails
+                        - activate_organization
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
           - name: program.created
             title: Program Created
             summary: >-
@@ -13081,6 +13190,629 @@ channels:
                         - Court case closed, access no longer required
                         - VAR contract terminated
                         - Parental custody changed, consent withdrawn
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_definition.created
+            title: Client Field Definition Created
+            summary: >-
+              A field definition has been created for an organization (via
+              bootstrap seed or manual creation)
+            contentType: application/json
+            payload:
+              title: ClientFieldDefinitionCreatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field definition UUID
+                stream_type:
+                  type: string
+                  const: client_field_definition
+                event_type:
+                  type: string
+                  const: client_field_definition.created
+                event_data:
+                  title: ClientFieldDefinitionCreatedData
+                  type: object
+                  description: >-
+                    Full field definition data for creation (bootstrap seed or
+                    manual)
+                  required:
+                    - field_id
+                    - organization_id
+                    - category_id
+                    - field_key
+                    - display_name
+                  properties:
+                    field_id:
+                      type: string
+                      format: uuid
+                      description: Unique ID for the field definition
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: Organization this definition belongs to
+                    category_id:
+                      type: string
+                      format: uuid
+                      description: FK to client_field_categories
+                    field_key:
+                      type: string
+                      description: >-
+                        Semantic key matching column on clients_projection or
+                        custom_fields key
+                      examples:
+                        - race
+                        - admission_type
+                        - house_assignment
+                    display_name:
+                      type: string
+                      description: Human-readable label shown in configuration UI
+                      examples:
+                        - Race
+                        - Admission Type
+                    field_type:
+                      type: string
+                      enum:
+                        - text
+                        - number
+                        - date
+                        - enum
+                        - multi_enum
+                        - boolean
+                        - jsonb
+                      default: text
+                    is_visible:
+                      type: boolean
+                      default: true
+                      description: Whether field appears in intake/discharge form
+                    is_required:
+                      type: boolean
+                      default: false
+                      description: Whether field is required when visible (Decision 69)
+                    validation_rules:
+                      type: object
+                      nullable: true
+                      description: Optional validation constraints (min, max, pattern)
+                    is_dimension:
+                      type: boolean
+                      default: false
+                      description: Whether field is exposed as Cube.js dimension
+                    sort_order:
+                      type: integer
+                      default: 0
+                    configurable_label:
+                      type: string
+                      nullable: true
+                      description: Org-level display label override
+                    conforming_dimension_mapping:
+                      type: string
+                      nullable: true
+                      description: Canonical key for cross-org analytics
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_definition.updated
+            title: Client Field Definition Updated
+            summary: >-
+              A field definition's visibility, required flag, label, or other
+              properties have been modified
+            contentType: application/json
+            payload:
+              title: ClientFieldDefinitionUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field definition UUID
+                stream_type:
+                  type: string
+                  const: client_field_definition
+                event_type:
+                  type: string
+                  const: client_field_definition.updated
+                event_data:
+                  title: ClientFieldDefinitionUpdatedData
+                  type: object
+                  description: Partial update — only changed fields included
+                  required:
+                    - field_id
+                    - organization_id
+                  properties:
+                    field_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    display_name:
+                      type: string
+                    category_id:
+                      type: string
+                      format: uuid
+                    field_type:
+                      type: string
+                      enum:
+                        - text
+                        - number
+                        - date
+                        - enum
+                        - multi_enum
+                        - boolean
+                        - jsonb
+                    is_visible:
+                      type: boolean
+                    is_required:
+                      type: boolean
+                    validation_rules:
+                      type: object
+                      nullable: true
+                    is_dimension:
+                      type: boolean
+                    sort_order:
+                      type: integer
+                    configurable_label:
+                      type: string
+                      nullable: true
+                    conforming_dimension_mapping:
+                      type: string
+                      nullable: true
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_definition.deactivated
+            title: Client Field Definition Deactivated
+            summary: >-
+              A field definition has been deactivated (hidden from
+              configuration, one-way)
+            contentType: application/json
+            payload:
+              title: ClientFieldDefinitionDeactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field definition UUID
+                stream_type:
+                  type: string
+                  const: client_field_definition
+                event_type:
+                  type: string
+                  const: client_field_definition.deactivated
+                event_data:
+                  title: ClientFieldDefinitionDeactivatedData
+                  type: object
+                  description: Data for field definition deactivation
+                  required:
+                    - field_id
+                    - organization_id
+                  properties:
+                    field_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_category.created
+            title: Client Field Category Created
+            summary: >-
+              An org-defined field category has been created for grouping field
+              definitions
+            contentType: application/json
+            payload:
+              title: ClientFieldCategoryCreatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field category UUID
+                stream_type:
+                  type: string
+                  const: client_field_category
+                event_type:
+                  type: string
+                  const: client_field_category.created
+                event_data:
+                  title: ClientFieldCategoryCreatedData
+                  type: object
+                  description: Data for org-defined field category creation
+                  required:
+                    - category_id
+                    - organization_id
+                    - name
+                    - slug
+                  properties:
+                    category_id:
+                      type: string
+                      format: uuid
+                      description: Unique ID for the category
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: Organization this category belongs to
+                    name:
+                      type: string
+                      description: Display name for the category
+                      examples:
+                        - Program-Specific
+                        - Behavioral
+                    slug:
+                      type: string
+                      description: URL-safe identifier, unique per org
+                      examples:
+                        - program_specific
+                        - behavioral
+                    sort_order:
+                      type: integer
+                      default: 0
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_category.deactivated
+            title: Client Field Category Deactivated
+            summary: An org-defined field category has been deactivated
+            contentType: application/json
+            payload:
+              title: ClientFieldCategoryDeactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field category UUID
+                stream_type:
+                  type: string
+                  const: client_field_category
+                event_type:
+                  type: string
+                  const: client_field_category.deactivated
+                event_data:
+                  title: ClientFieldCategoryDeactivatedData
+                  type: object
+                  description: Data for field category deactivation
+                  required:
+                    - category_id
+                    - organization_id
+                  properties:
+                    category_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
                 event_metadata:
                   title: EventMetadata
                   type: object
@@ -19812,6 +20544,115 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
+          - name: organization.bootstrap.step_completed
+            title: Organization Bootstrap Step Completed
+            summary: >-
+              A bootstrap workflow step completed successfully (progress
+              tracking)
+            contentType: application/json
+            payload:
+              title: OrganizationBootstrapStepCompletedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  const: organization
+                event_type:
+                  type: string
+                  const: organization.bootstrap.step_completed
+                event_data:
+                  title: OrganizationBootstrapStepCompletedData
+                  type: object
+                  required:
+                    - organization_id
+                    - step_key
+                  properties:
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: Organization being bootstrapped
+                    step_key:
+                      type: string
+                      title: BootstrapStepKey
+                      enum:
+                        - create_organization
+                        - grant_permissions
+                        - seed_field_definitions
+                        - configure_dns
+                        - generate_invitations
+                        - send_invitation_emails
+                        - activate_organization
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
           - name: program.created
             title: Program Created
             summary: >-
@@ -26198,6 +27039,629 @@ channels:
                         - Court case closed, access no longer required
                         - VAR contract terminated
                         - Parental custody changed, consent withdrawn
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_definition.created
+            title: Client Field Definition Created
+            summary: >-
+              A field definition has been created for an organization (via
+              bootstrap seed or manual creation)
+            contentType: application/json
+            payload:
+              title: ClientFieldDefinitionCreatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field definition UUID
+                stream_type:
+                  type: string
+                  const: client_field_definition
+                event_type:
+                  type: string
+                  const: client_field_definition.created
+                event_data:
+                  title: ClientFieldDefinitionCreatedData
+                  type: object
+                  description: >-
+                    Full field definition data for creation (bootstrap seed or
+                    manual)
+                  required:
+                    - field_id
+                    - organization_id
+                    - category_id
+                    - field_key
+                    - display_name
+                  properties:
+                    field_id:
+                      type: string
+                      format: uuid
+                      description: Unique ID for the field definition
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: Organization this definition belongs to
+                    category_id:
+                      type: string
+                      format: uuid
+                      description: FK to client_field_categories
+                    field_key:
+                      type: string
+                      description: >-
+                        Semantic key matching column on clients_projection or
+                        custom_fields key
+                      examples:
+                        - race
+                        - admission_type
+                        - house_assignment
+                    display_name:
+                      type: string
+                      description: Human-readable label shown in configuration UI
+                      examples:
+                        - Race
+                        - Admission Type
+                    field_type:
+                      type: string
+                      enum:
+                        - text
+                        - number
+                        - date
+                        - enum
+                        - multi_enum
+                        - boolean
+                        - jsonb
+                      default: text
+                    is_visible:
+                      type: boolean
+                      default: true
+                      description: Whether field appears in intake/discharge form
+                    is_required:
+                      type: boolean
+                      default: false
+                      description: Whether field is required when visible (Decision 69)
+                    validation_rules:
+                      type: object
+                      nullable: true
+                      description: Optional validation constraints (min, max, pattern)
+                    is_dimension:
+                      type: boolean
+                      default: false
+                      description: Whether field is exposed as Cube.js dimension
+                    sort_order:
+                      type: integer
+                      default: 0
+                    configurable_label:
+                      type: string
+                      nullable: true
+                      description: Org-level display label override
+                    conforming_dimension_mapping:
+                      type: string
+                      nullable: true
+                      description: Canonical key for cross-org analytics
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_definition.updated
+            title: Client Field Definition Updated
+            summary: >-
+              A field definition's visibility, required flag, label, or other
+              properties have been modified
+            contentType: application/json
+            payload:
+              title: ClientFieldDefinitionUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field definition UUID
+                stream_type:
+                  type: string
+                  const: client_field_definition
+                event_type:
+                  type: string
+                  const: client_field_definition.updated
+                event_data:
+                  title: ClientFieldDefinitionUpdatedData
+                  type: object
+                  description: Partial update — only changed fields included
+                  required:
+                    - field_id
+                    - organization_id
+                  properties:
+                    field_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    display_name:
+                      type: string
+                    category_id:
+                      type: string
+                      format: uuid
+                    field_type:
+                      type: string
+                      enum:
+                        - text
+                        - number
+                        - date
+                        - enum
+                        - multi_enum
+                        - boolean
+                        - jsonb
+                    is_visible:
+                      type: boolean
+                    is_required:
+                      type: boolean
+                    validation_rules:
+                      type: object
+                      nullable: true
+                    is_dimension:
+                      type: boolean
+                    sort_order:
+                      type: integer
+                    configurable_label:
+                      type: string
+                      nullable: true
+                    conforming_dimension_mapping:
+                      type: string
+                      nullable: true
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_definition.deactivated
+            title: Client Field Definition Deactivated
+            summary: >-
+              A field definition has been deactivated (hidden from
+              configuration, one-way)
+            contentType: application/json
+            payload:
+              title: ClientFieldDefinitionDeactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field definition UUID
+                stream_type:
+                  type: string
+                  const: client_field_definition
+                event_type:
+                  type: string
+                  const: client_field_definition.deactivated
+                event_data:
+                  title: ClientFieldDefinitionDeactivatedData
+                  type: object
+                  description: Data for field definition deactivation
+                  required:
+                    - field_id
+                    - organization_id
+                  properties:
+                    field_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_category.created
+            title: Client Field Category Created
+            summary: >-
+              An org-defined field category has been created for grouping field
+              definitions
+            contentType: application/json
+            payload:
+              title: ClientFieldCategoryCreatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field category UUID
+                stream_type:
+                  type: string
+                  const: client_field_category
+                event_type:
+                  type: string
+                  const: client_field_category.created
+                event_data:
+                  title: ClientFieldCategoryCreatedData
+                  type: object
+                  description: Data for org-defined field category creation
+                  required:
+                    - category_id
+                    - organization_id
+                    - name
+                    - slug
+                  properties:
+                    category_id:
+                      type: string
+                      format: uuid
+                      description: Unique ID for the category
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: Organization this category belongs to
+                    name:
+                      type: string
+                      description: Display name for the category
+                      examples:
+                        - Program-Specific
+                        - Behavioral
+                    slug:
+                      type: string
+                      description: URL-safe identifier, unique per org
+                      examples:
+                        - program_specific
+                        - behavioral
+                    sort_order:
+                      type: integer
+                      default: 0
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_category.deactivated
+            title: Client Field Category Deactivated
+            summary: An org-defined field category has been deactivated
+            contentType: application/json
+            payload:
+              title: ClientFieldCategoryDeactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field category UUID
+                stream_type:
+                  type: string
+                  const: client_field_category
+                event_type:
+                  type: string
+                  const: client_field_category.deactivated
+                event_data:
+                  title: ClientFieldCategoryDeactivatedData
+                  type: object
+                  description: Data for field category deactivation
+                  required:
+                    - category_id
+                    - organization_id
+                  properties:
+                    category_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
                 event_metadata:
                   title: EventMetadata
                   type: object

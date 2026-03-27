@@ -3,7 +3,7 @@
  *
  * Generated from AsyncAPI specification by Modelina
  * Source: infrastructure/supabase/contracts/asyncapi/
- * Generated: 2026-02-26T00:35:03.437Z
+ * Generated: 2026-03-27T22:38:53.009Z
  *
  * To regenerate: cd infrastructure/supabase/contracts && npm run generate:types
  *
@@ -215,17 +215,47 @@ export enum DnsRemovalStatus {
   ERROR = "error",
 }
 
+export enum BootstrapStepKey {
+  CREATE_ORGANIZATION = "create_organization",
+  GRANT_PERMISSIONS = "grant_permissions",
+  SEED_FIELD_DEFINITIONS = "seed_field_definitions",
+  CONFIGURE_DNS = "configure_dns",
+  GENERATE_INVITATIONS = "generate_invitations",
+  SEND_INVITATION_EMAILS = "send_invitation_emails",
+  ACTIVATE_ORGANIZATION = "activate_organization",
+}
+
 export enum RoleScope {
   GLOBAL = "global",
   ORGANIZATION = "organization",
   UNIT = "unit",
 }
 
+export enum AnonymousSchema_4769 {
+  RESERVED_TEXT = "text",
+  RESERVED_NUMBER = "number",
+  DATE = "date",
+  RESERVED_ENUM = "enum",
+  MULTI_ENUM = "multi_enum",
+  RESERVED_BOOLEAN = "boolean",
+  JSONB = "jsonb",
+}
+
+export enum AnonymousSchema_4797 {
+  RESERVED_TEXT = "text",
+  RESERVED_NUMBER = "number",
+  DATE = "date",
+  RESERVED_ENUM = "enum",
+  MULTI_ENUM = "multi_enum",
+  RESERVED_BOOLEAN = "boolean",
+  JSONB = "jsonb",
+}
+
 // =============================================================================
 // Interfaces
 // =============================================================================
 
-export type DomainEvents = UserSyncedFromAuthEvent | UserCreatedEvent | UserProfileUpdatedEvent | UserOrgSwitchedEvent | UserAccessDatesUpdatedEvent | UserNotificationPreferencesUpdatedEvent | UserAddressAddedEvent | UserAddressUpdatedEvent | UserAddressRemovedEvent | UserPhoneAddedEvent | UserPhoneUpdatedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | ScheduleCreatedEvent | ScheduleUpdatedEvent | ScheduleDeactivatedEvent | ScheduleReactivatedEvent | ScheduleDeletedEvent | ScheduleUserAssignedEvent | ScheduleUserUnassignedEvent | UserClientAssignedEvent | UserClientUnassignedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationReactivatedEvent | OrganizationDeletedEvent | OrganizationDeletionInitiatedEvent | OrganizationDeletionCompletedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | PermissionUpdatedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent;
+export type DomainEvents = UserSyncedFromAuthEvent | UserCreatedEvent | UserProfileUpdatedEvent | UserOrgSwitchedEvent | UserAccessDatesUpdatedEvent | UserNotificationPreferencesUpdatedEvent | UserAddressAddedEvent | UserAddressUpdatedEvent | UserAddressRemovedEvent | UserPhoneAddedEvent | UserPhoneUpdatedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | ScheduleCreatedEvent | ScheduleUpdatedEvent | ScheduleDeactivatedEvent | ScheduleReactivatedEvent | ScheduleDeletedEvent | ScheduleUserAssignedEvent | ScheduleUserUnassignedEvent | UserClientAssignedEvent | UserClientUnassignedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationReactivatedEvent | OrganizationDeletedEvent | OrganizationDeletionInitiatedEvent | OrganizationDeletionCompletedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | OrganizationBootstrapStepCompletedEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | PermissionUpdatedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent | ClientFieldDefinitionCreatedEvent | ClientFieldDefinitionUpdatedEvent | ClientFieldDefinitionDeactivatedEvent | ClientFieldCategoryCreatedEvent | ClientFieldCategoryDeactivatedEvent;
 
 export interface UserSyncedFromAuthEvent {
   'stream_id': string;
@@ -395,12 +425,12 @@ export interface UserAddressUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.updated';
-  'event_data': AnonymousSchema_2486;
+  'event_data': AnonymousSchema_2618;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2486 {
+export interface AnonymousSchema_2618 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -422,12 +452,12 @@ export interface UserAddressRemovedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.removed';
-  'event_data': AnonymousSchema_2518;
+  'event_data': AnonymousSchema_2650;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2518 {
+export interface AnonymousSchema_2650 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -463,12 +493,12 @@ export interface UserPhoneUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.phone.updated';
-  'event_data': AnonymousSchema_2567;
+  'event_data': AnonymousSchema_2699;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2567 {
+export interface AnonymousSchema_2699 {
   'phone_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -1184,6 +1214,21 @@ export interface OrganizationBootstrapCancellationData {
   'cleanup_completed': boolean;
   'cleanup_actions'?: string[];
   'original_failure_stage'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface OrganizationBootstrapStepCompletedEvent {
+  'stream_id': string;
+  'stream_type': 'organization';
+  'event_type': 'organization.bootstrap.step_completed';
+  'event_data': OrganizationBootstrapStepCompletedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface OrganizationBootstrapStepCompletedData {
+  'organization_id': string;
+  'step_key': BootstrapStepKey;
   'additionalProperties'?: Map<string, any>;
 }
 
@@ -2156,5 +2201,104 @@ export interface AccessGrantRevokedData {
   'grant_id': string;
   'revoked_by': string;
   'revocation_reason': string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFieldDefinitionCreatedEvent {
+  'stream_id': string;
+  'stream_type': 'client_field_definition';
+  'event_type': 'client_field_definition.created';
+  'event_data': ClientFieldDefinitionCreatedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFieldDefinitionCreatedData {
+  'field_id': string;
+  'organization_id': string;
+  'category_id': string;
+  'field_key': string;
+  'display_name': string;
+  'field_type'?: AnonymousSchema_4769;
+  'is_visible'?: boolean;
+  'is_required'?: boolean;
+  'validation_rules'?: Map<string, any>;
+  'is_dimension'?: boolean;
+  'sort_order'?: number;
+  'configurable_label'?: string;
+  'conforming_dimension_mapping'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFieldDefinitionUpdatedEvent {
+  'stream_id': string;
+  'stream_type': 'client_field_definition';
+  'event_type': 'client_field_definition.updated';
+  'event_data': ClientFieldDefinitionUpdatedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFieldDefinitionUpdatedData {
+  'field_id': string;
+  'organization_id': string;
+  'display_name'?: string;
+  'category_id'?: string;
+  'field_type'?: AnonymousSchema_4797;
+  'is_visible'?: boolean;
+  'is_required'?: boolean;
+  'validation_rules'?: Map<string, any>;
+  'is_dimension'?: boolean;
+  'sort_order'?: number;
+  'configurable_label'?: string;
+  'conforming_dimension_mapping'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFieldDefinitionDeactivatedEvent {
+  'stream_id': string;
+  'stream_type': 'client_field_definition';
+  'event_type': 'client_field_definition.deactivated';
+  'event_data': ClientFieldDefinitionDeactivatedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFieldDefinitionDeactivatedData {
+  'field_id': string;
+  'organization_id': string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFieldCategoryCreatedEvent {
+  'stream_id': string;
+  'stream_type': 'client_field_category';
+  'event_type': 'client_field_category.created';
+  'event_data': ClientFieldCategoryCreatedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFieldCategoryCreatedData {
+  'category_id': string;
+  'organization_id': string;
+  'name': string;
+  'slug': string;
+  'sort_order'?: number;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFieldCategoryDeactivatedEvent {
+  'stream_id': string;
+  'stream_type': 'client_field_category';
+  'event_type': 'client_field_category.deactivated';
+  'event_data': ClientFieldCategoryDeactivatedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFieldCategoryDeactivatedData {
+  'category_id': string;
+  'organization_id': string;
   'additionalProperties'?: Map<string, any>;
 }

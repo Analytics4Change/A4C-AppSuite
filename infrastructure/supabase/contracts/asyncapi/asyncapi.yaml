@@ -88,6 +88,7 @@ channels:
           - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapCompleted'
           - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapFailed'
           - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapCancelled'
+          - $ref: './domains/organization.yaml#/components/messages/OrganizationBootstrapStepCompleted'
           - $ref: './domains/program.yaml#/components/messages/ProgramCreated'
           # Organization Unit events (sub-organizations within provider hierarchy)
           - $ref: './domains/organization-unit.yaml#/components/messages/OrganizationUnitCreated'
