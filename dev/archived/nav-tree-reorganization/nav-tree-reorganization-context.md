@@ -28,6 +28,22 @@
 - `frontend/src/components/navigation/MoreMenuSheet.tsx` — shared filtering + heading dividers
 - `frontend/src/components/navigation/index.ts` — added new exports
 
+## Deployment
+
+- **Commit**: `e61f076d` — feat: reorganize sidebar navigation into collapsible tree structure
+- **CI/CD**: Both Deploy Frontend and Validate Frontend Documentation pipelines passed
+- **Live**: Deployed to K8s cluster (2026-03-24)
+
+## GitHub Actions Upgrade (same session)
+
+Also upgraded all 9 GitHub Actions workflows from Node.js 20 → Node.js 24 compatible versions:
+- `actions/checkout` v4→v5, `actions/setup-node` v4→v5
+- `docker/build-push-action` v5→v7, `docker/login-action` v3→v4
+- `docker/metadata-action` v5→v6, `docker/setup-buildx-action` v3→v4
+- `azure/setup-kubectl` v3→v4 (still Node.js 20 upstream — no v5 from Azure yet)
+- **Commits**: `7e528d20`, `ba925982`
+- **All 5 deploy pipelines passed**
+
 ## Important Constraints
 - No route changes
 - Bottom navigation keeps its own curated 4-item list

@@ -32,8 +32,17 @@
 - [ ] Screen reader: aria-expanded announced
 - [ ] E2E selectors: data-testid queryable
 
+## Phase 6: GitHub Actions Node.js 24 Upgrade ✅ COMPLETE
+- [x] Upgrade all 9 workflow files (27 deprecated action instances)
+- [x] actions/checkout v4→v5, actions/setup-node v4→v5
+- [x] docker/build-push-action v5→v7, docker/login-action v3→v4
+- [x] docker/metadata-action v5→v6, docker/setup-buildx-action v3→v4
+- [x] azure/setup-kubectl v3→v4 (still Node.js 20 upstream — no fix available)
+- [x] All 5 deploy pipelines passed
+- [x] Only remaining warning: azure/setup-kubectl@v4 (upstream issue)
+
 ## Current Status
-**Phase**: 5 (Validation — manual testing remaining)
-**Status**: ✅ Code complete, build passes
-**Last Updated**: 2026-03-24
-**Next Step**: Manual testing with different org_types
+**Phase**: 5 (Validation — manual testing remaining for nav tree)
+**Status**: ✅ Code complete, deployed, CI/CD upgraded
+**Last Updated**: 2026-03-25
+**Next Step**: Manual testing of nav tree with different org_types (provider, platform_owner, provider_partner). Also verify collapse/expand localStorage persistence, keyboard nav, and screen reader announcements.
