@@ -13,7 +13,7 @@
 
 ## Overview
 
-**New tables**: 10 (9 projection/data + 1 reference)
+**New tables**: 12 (10 projection/data + 1 reference + 1 history)
 **Modified tables**: 2 (`contacts_projection` adds `user_id` FK, `user_client_assignments_projection` adds FK to `clients_projection`)
 **Existing tables referenced**: 6 (via FK or join path)
 
@@ -65,6 +65,7 @@ erDiagram
         integer expected_length_of_stay "nullable, days"
         text initial_risk_level "nullable"
         text discharge_plan_status "nullable - not_started | in_progress | complete"
+        text placement_arrangement "nullable - 13-value enum, denormalized from history"
         %% --- Insurance IDs (Step 6) ---
         text medicaid_id "nullable, configurable_presence"
         text medicare_id "nullable, configurable_presence"
@@ -95,12 +96,12 @@ erDiagram
         boolean mandated_reporting_status "nullable"
         boolean protective_services_involvement "nullable"
         boolean safety_plan_required "nullable"
-        %% --- Discharge (Step 10) ---
+        %% --- Discharge (Step 10, Decision 78) ---
         date discharge_date "nullable - mandatory at discharge"
-        text discharge_reason "nullable - mandatory at discharge"
-        text discharge_type "nullable - planned | ama | transfer | runaway"
+        text discharge_outcome "nullable - successful | unsuccessful - mandatory at discharge"
+        text discharge_reason "nullable - 14-value enum - mandatory at discharge"
         jsonb discharge_diagnosis "nullable - ICD-10 array"
-        text discharge_placement "nullable"
+        text discharge_placement "nullable - 9-value enum - configurable_presence"
         %% --- Education ---
         text education_status "nullable, configurable_presence"
         text grade_level "nullable, configurable_presence"
@@ -185,6 +186,19 @@ erDiagram
         text notes "nullable"
         jsonb custom_fields "DEFAULT '{}' - non-standard fields"
         boolean is_active "default true"
+        timestamptz created_at "NOT NULL"
+        timestamptz updated_at "NOT NULL"
+    }
+
+    client_placement_history {
+        uuid id PK
+        uuid client_id FK "-> clients_projection"
+        uuid organization_id FK "-> organizations_projection (RLS)"
+        text placement_arrangement "NOT NULL - 13-value enum"
+        date start_date "NOT NULL"
+        date end_date "nullable - NULL = current"
+        text reason_for_change "nullable"
+        boolean is_current "default true"
         timestamptz created_at "NOT NULL"
         timestamptz updated_at "NOT NULL"
     }
@@ -373,6 +387,9 @@ erDiagram
     %% --- Funding sources sub-entity ---
     clients_projection ||--o{ client_funding_sources_projection : "client_id"
 
+    %% --- Placement history ---
+    clients_projection ||--o{ client_placement_history : "client_id"
+
     %% --- 4NF Contact-Designation model ---
     contacts_projection ||--o{ contact_designations_projection : "contact_id"
     contact_designations_projection ||--o{ client_contact_assignments : "designation_id"
@@ -408,6 +425,7 @@ erDiagram
     domain_events ||--o{ client_emails : "client.email.* events"
     domain_events ||--o{ client_addresses : "client.address.* events"
     domain_events ||--o{ client_funding_sources_projection : "client.funding_source.* events"
+    domain_events ||--o{ client_placement_history : "client.placement.* events"
 ```
 
 ---
@@ -482,7 +500,7 @@ flowchart TD
 
 ## Table Inventory Summary
 
-### New Tables (11)
+### New Tables (12)
 
 | Table | Stream Type | Event Count | Purpose |
 |-------|------------|-------------|---------|
@@ -492,6 +510,7 @@ flowchart TD
 | `client_addresses` | `client` (sub-entity) | 3 events | Client's own addresses |
 | `client_insurance_policies_projection` | `client` (sub-entity) | 3 events | Insurance/payer records per client |
 | `client_funding_sources_projection` | `client` (sub-entity) | 3 events | Dynamic external funding sources (Decision 76) |
+| `client_placement_history` | `client` (sub-entity) | 2 events | Placement trajectory with date ranges (Decision 83) |
 | `contact_designations_projection` | `contact` (sub-entity) | 2 events | Clinical designation per contact per org |
 | `client_contact_assignments` | `client` (sub-entity) | 2 events | 4NF junction: client + contact + designation |
 | `client_field_definitions_projection` | `client_field_definition` | 3 events | Org-configurable field registry |
@@ -554,6 +573,7 @@ Per `documentation/AGENT-GUIDELINES.md`, the following docs should be created us
 | `client_emails.md` | same | ER diagram (client_emails entity) |
 | `client_addresses.md` | same | ER diagram (client_addresses entity) |
 | `client_insurance_policies_projection.md` | same | ER diagram (insurance entity) |
+| `client_placement_history.md` | same | ER diagram (placement history entity) |
 | `contact_designations_projection.md` | same | ER diagram + Designation CHECK values |
 | `client_contact_assignments.md` | same | ER diagram (assignments entity) |
 | `client_field_definitions_projection.md` | same | ER diagram (field definitions entity) |

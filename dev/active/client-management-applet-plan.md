@@ -29,14 +29,15 @@ This ~1,150-line plan file contains:
 - Found: 2 AsyncAPI naming mismatches, 3 missing contracts, 9 RAISE WARNING fixes
 - Plan written and ready for approval
 
-### Phase 2: Schema Foundation ⏸️ PENDING (scope expanded 2026-03-14, updated 2026-03-19)
+### Phase 2: Schema Foundation ⏸️ PENDING (scope expanded 2026-03-14, updated 2026-03-26)
 Migrations planned:
-1. `clients_projection` (~50 typed columns + custom_fields JSONB) + indexes + RLS + FK — reduced from ~55 (dropped internal_case_number, county, email, phones, preferred_communication_method)
+1. `clients_projection` (~50 typed columns + `placement_arrangement` + custom_fields JSONB) + indexes + RLS + FK — reduced from ~55 (dropped internal_case_number, county, email, phones, preferred_communication_method)
 1b. Client-owned contact tables (`client_phones`, `client_emails`, `client_addresses` — standalone, NOT junctions) + contact-designation model (12 designations)
-1c. `client_insurance_policies_projection` (CQRS event-sourced, new table)
+1c. `client_insurance_policies_projection` (CQRS event-sourced) + `client_funding_sources_projection`
+1d. `client_placement_history` (CQRS event-sourced, placement trajectory with date ranges — Decision 83)
 2. `client_field_definitions_projection` + `client_reference_values` + `client_field_categories` + seeds + RLS
-3. Dispatcher update + 2 routers + ~23 handlers (expanded for insurance + discharge + client contact sub-entities) + 9 RAISE WARNING fixes
-4. ~34 API functions (expanded client CRUD + insurance + client contact CRUD + field definitions + contact-designation)
+3. Dispatcher update + 2 routers + ~25 handlers (expanded for insurance + discharge + placement + client contact sub-entities) + 9 RAISE WARNING fixes
+4. ~36 API functions (expanded client CRUD + insurance + placement + client contact CRUD + field definitions + contact-designation)
 5. `event_types` seed (expanded) + AsyncAPI contracts + TypeScript types
 
 ### Phase 3: Event Integration ⏸️ PENDING
@@ -53,6 +54,98 @@ Covered by migrations 3-5 above. Also includes:
 
 ### Phase 5: Frontend Intake Form (Future)
 _Deferred — this plan covers foundation only._
+
+## Plan Updates (2026-03-26) — Enum Definitions & Discharge Decomposition
+
+### Discharge Three-Field Decomposition (Decision 78)
+`discharge_type` replaced by three orthogonal fields. Informed by external LLM analysis of discharge classification in residential behavioral health:
+- **`discharge_outcome`**: Binary (`successful` | `unsuccessful`) — mandatory at discharge, primary reporting dimension
+- **`discharge_reason`**: 14 values — mandatory at discharge (graduated_program, achieved_treatment_goals, awol, ama, administrative, hospitalization_medical, insufficient_progress, intermediate_secure_care, secure_care, ten_day_notice, court_ordered, deceased, transfer, medical)
+- **`discharge_placement`**: 9 values — configurable presence + optional (home, lower_level_of_care, higher_level_of_care, secure_care, intermediate_secure_care, other_program, hospitalization, incarceration, other)
+- Mandatory-at-discharge fields updated: `discharge_date`, `discharge_outcome`, `discharge_reason` (was: `discharge_date`, `discharge_reason`, `discharge_type`)
+- Full 4NF discharge management (reporting flags, compliance actions) deferred to future applet
+
+### Enum Values Defined (Decisions 79-80)
+- `marital_status`: single, married, divorced, separated, widowed, domestic_partnership
+- `suicide_risk_status`: low_risk, moderate_risk, high_risk
+
+### Legal Custody Status Separated from Placement (Decision 82)
+`legal_custody_status` = who holds legal authority (6 values: `parent_guardian`, `state_child_welfare`, `juvenile_justice`, `guardianship`, `emancipated_minor`, `other`). No required elaboration for `other`. Replaces old values (`voluntary`, `court_ordered`, `guardianship`).
+
+### Placement Arrangement — New Field + History Table (Decision 83)
+- `placement_arrangement` on `clients_projection` — denormalized current placement, 13 values (SAMHSA/state Medicaid standard), configurable_presence + optional, **reporting dimension**
+- `client_placement_history` — CQRS event-sourced history table with date ranges. Events: `client.placement.changed`, `client.placement.ended`
+- Intake captures initial placement; transition UI deferred
+- **New table count: 12** (was 11). Added Migration 1d.
+
+### Financial Guarantor Type Defined (Decision 84)
+8 values: `parent_guardian`, `state_agency`, `juvenile_justice`, `self`, `insurance_only`, `tribal_agency`, `va`, `other`. All TBD enums now resolved.
+
+### Implementation Plan File — Recreated (2026-03-27)
+New plan file: `.claude/plans/peaceful-marinating-bonbon.md` — covers Client Field Configuration project (8 migrations + frontend).
+Architecture review: `.claude/plans/peaceful-marinating-bonbon-agent-af9009328e6dbb9f1.md` — 5 Major + 6 Minor findings, all remediated.
+
+## Plan Updates (2026-03-27) — Implementation Split & Architecture Review
+
+### Implementation Split into Two Projects
+1. **Client Field Configuration** (current focus) — Settings page + backend for configuring field visibility, required flags, labels, custom fields, categories. 8 migrations + frontend. Plan: `.claude/plans/peaceful-marinating-bonbon.md`
+2. **Client Intake** (future) — Actual intake form, registration API, client lifecycle events, sub-entity tables, contact assignments.
+
+### Page Renamed
+"Client Intake Configuration" → **"Client Field Configuration"** at `/settings/client-fields`. The page manages fields across all lifecycle operations (intake, discharge, placement), not just intake.
+
+### Architecture Review Findings (software-architect-dbc agent)
+5 Major findings remediated:
+- **M1**: Missing AsyncAPI contracts → added `client-field-definition.yaml` + `client-field-category.yaml` + type generation
+- **M2**: Missing `event_types` seed → added 5 new event types
+- **M3**: Bootstrap activity not specified → added `client_field_definition_templates` table + `seedFieldDefinitions` activity + compensation
+- **M4**: `p_correlation_id` missing from write RPCs → added to all signatures
+- **M5**: `client_field_categories` CQRS violation → now event-sourced with `client_field_category` stream type
+
+6 Minor findings remediated:
+- m1: Read RLS relaxed to org-member match (no permission check)
+- m2: Batch RPC `api.batch_update_field_definitions()` for single network call
+- m3: Tab navigation documented as intentional, WAI-ARIA Tabs Pattern required
+- m4: `p_include_inactive` param added to `api.list_field_definitions()`
+- m5: `#variable_conflict use_column` required in all RETURNS TABLE functions
+- m6: Handler reference files explicitly listed (5 handlers + 2 routers)
+
+### New Stream Types (from architecture review)
+- `client_field_category` (2 events: created, deactivated) — M5 remediation
+- Total new event types in this implementation: 5 (3 field definition + 2 category)
+
+### Migration Count Updated
+8 migrations (was 5 in Phase 2 tasks):
+1. `clients_projection` DDL
+2. Field registry + reference tables + templates
+3. `contact_designations_projection` DDL
+4. Field definition event infrastructure (dispatcher + router + 3 handlers)
+5. Field category event infrastructure (dispatcher + router + 2 handlers)
+6. API functions (5 field def + 3 category)
+7. AsyncAPI contracts + `event_types` seed
+8. Bootstrap workflow activity + compensation
+
+### UX Prototype Archived
+Static HTML prototype moved from `~/tmp/` to `dev/active/client-management-applet-ux-prototype/` (zipped). Design reference only — divergences from authoritative design documented in plan.
+
+## Plan Updates (2026-03-27) — All 8 Backend Migrations Implemented
+
+### Implementation Session Summary
+All 8 backend migrations for Client Field Configuration implemented in a single session. All 7 SQL migrations pass `supabase db push --linked --dry-run`. TypeScript + ESLint clean.
+
+### Key Implementation Details
+- **`clients_projection`**: 53 typed columns (not 55 — `email`, `phone_primary`, `phone_secondary`, `preferred_communication_method`, `county` dropped per Decisions 57/64/65). Status CHECK: `active | inactive | discharged` (3 values, not 2).
+- **Field categories**: 11 system categories (demographics through education), matching wizard steps. Was 5 in Decision 32 but expanded to cover all wizard sections.
+- **Template seeds**: 66 field definition templates covering all 11 categories. 7 mandatory fields locked (`is_locked = true`).
+- **Language seeds**: 40 ISO 639 entries ranked by US healthcare relevance.
+- **RLS pattern**: CQRS projections use org-scoped SELECT only — no INSERT/UPDATE/DELETE for `authenticated` (service_role writes via event handlers bypass RLS). Matches `schedule_templates_projection` precedent.
+- **Handler pattern**: `handle_client_field_definition_updated` uses COALESCE for non-nullable fields + CASE/`?` for nullable fields (partial update support).
+- **Workflow integration**: Step 1.6 (after permissions, before DNS). Compensation deactivates field definitions (before deleteContacts in reverse order).
+- **Untyped Supabase tables**: Activity uses `(supabase as any).from('new_table')` with eslint-disable blocks since generated types don't include new tables yet. Types will be regenerated after migration push.
+- **Plan file**: `.claude/plans/peaceful-marinating-bonbon.md` was cleaned up and does not exist. All implementation was driven from dev-docs files directly.
+
+### Migrations NOT Pushed
+All 7 SQL migrations are local only — `supabase db push --linked` has NOT been run. Next session should push or review before pushing.
 
 ## Plan Updates (2026-03-19) — Field Classification & Contact Architecture
 

@@ -271,6 +271,7 @@ purpose: agent-navigation
 | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | Hierarchical permission scoping with ltree | `scoping`, `ltree`, `permissions` | 2800 |
 | [adr-multi-role-effective-permissions.md](architecture/authorization/adr-multi-role-effective-permissions.md) | ADR: RBAC + Effective Permissions over ReBAC | `adr`, `multi-role`, `effective-permissions`, `capability-accountability` | 2500 |
 | [adr-cqrs-dual-write-remediation.md](architecture/decisions/adr-cqrs-dual-write-remediation.md) | ADR: CQRS dual-write audit and remediation | `adr`, `cqrs-compliance`, `dual-write`, `event-type-naming`, `remediation` | 1500 |
+| [adr-client-management-schema.md](architecture/decisions/adr-client-management-schema.md) | ADR: Client management schema — 12 tables, 84 decisions, intake/lifecycle | `adr`, `client-management`, `schema-design`, `intake-form`, `configurable-fields`, `contact-designation`, `placement-history`, `discharge`, `analytics-dimensions`, `enum-reference` | 5000 |
 | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | Organization isolation via RLS and JWT claims | `rls`, `multi-tenant`, `org_id` | 2800 |
 | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | CQRS pattern, domain events, projections | `cqrs`, `events`, `projections` | 2500 |
 | [temporal-overview.md](architecture/workflows/temporal-overview.md) | Workflow orchestration concepts and patterns | `temporal`, `workflow`, `saga` | 3200 |

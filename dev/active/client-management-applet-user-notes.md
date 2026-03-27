@@ -195,6 +195,45 @@ There will be no `court_case_number` core field.
 - `client.reverse_discharge` — undoes an accidental or unintended discharge (restores previous state)
 - `client.readmitted` — re-admits a previously discharged client (new service engagement, distinct from reverse_discharge)
 
+### Three-Field Decomposition (Decision 78, 2026-03-26)
+
+Former `discharge_type` replaced by three orthogonal fields. Informed by external LLM analysis of discharge classification patterns in residential behavioral health.
+
+**`discharge_outcome`** (replaces `discharge_type`): Binary — `successful` | `unsuccessful`. Mandatory at discharge. The primary Cube.js reporting dimension for program success rates.
+
+**`discharge_reason`** (14 values): `graduated_program`, `achieved_treatment_goals`, `awol`, `ama`, `administrative`, `hospitalization_medical`, `insufficient_progress`, `intermediate_secure_care`, `secure_care`, `ten_day_notice`, `court_ordered`, `deceased`, `transfer`, `medical`. Mandatory at discharge.
+
+**`discharge_placement`** (9 values): `home`, `lower_level_of_care`, `higher_level_of_care`, `secure_care`, `intermediate_secure_care`, `other_program`, `hospitalization`, `incarceration`, `other`. Configurable presence + optional.
+
+**Why**: User's real-world discharge list contained composite values (e.g., "Successful - Graduated Program / Achieved Treatment Goals - Home") encoding 3 independent dimensions. Single enum creates combinatorial explosion. Three fields give clean analytics slicing by outcome × reason × placement.
+
+**Deferred**: Full 4NF discharge management (reporting flags, compliance actions, notifications, follow-up tasks) — future discharge management applet.
+
+## Placement Arrangement Architecture (decided 2026-03-26)
+
+### Background
+Not all A4C providers operate residential treatment programs. Providers may run group homes, therapeutic foster care, outpatient/home-based services, or other program types. `placement_arrangement` captures where the client physically lives/receives services — distinct from `legal_custody_status` (who holds legal authority).
+
+### Design: Option C Backend, Frontend Deferred
+- **`clients_projection.placement_arrangement`**: Denormalized current placement (13-value enum). Configurable_presence + optional. **Reporting dimension** for Cube.js.
+- **`client_placement_history`**: CQRS event-sourced history table with `start_date`/`end_date` ranges. Full trajectory for analytics.
+- **Events**: `client.placement.changed` (closes previous, opens new) and `client.placement.ended` (closes without opening) via `process_client_event()`.
+- **Intake**: Initial placement captured on intake form → emits `client.placement.changed` as first history entry.
+- **Transition UI**: Deferred. Table and events exist, but no frontend for recording step-downs/transfers/level-of-care changes yet.
+
+### 13 Placement Values (SAMHSA/state Medicaid standard)
+```
+residential_treatment, therapeutic_foster_care, group_home, foster_care,
+kinship_placement, adoptive_placement, independent_living, home_based,
+detention, secure_residential, hospital_inpatient, shelter, other
+```
+
+### Analytics Enabled (when transition UI is built)
+- Length-of-stay per placement type
+- Step-down success rates (residential → group home → home)
+- Point-in-time placement at time of incident
+- Placement trajectory visualization
+
 ## Clinical Contact Assignment Architecture (decided 2026-03-04)
 
 ### Problem

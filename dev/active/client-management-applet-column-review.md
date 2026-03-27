@@ -55,7 +55,7 @@ The intake form is a wizard-style multi-step form with progressive disclosure. E
 | `pronouns` | text | No | — (free text, placeholder guides format) | No | Changed from org-configured dropdown to free text (Decision 71, 2026-03-23) |
 | `gender_identity` | text | No | — (free text) | No | Separate from Sex at Birth (Decision 42) |
 | `secondary_language` | text | No | Org-configurable from `client_reference_values` master list | No | Same pattern as primary_language (Decision 42) |
-| `marital_status` | text | No | Enum dropdown | No | (Decision 42) |
+| `marital_status` | text | No | Hardcoded (6 values: single, married, divorced, separated, widowed, domestic_partnership) | No | (Decisions 42, 79) |
 | `citizenship_status` | text | No | Hardcoded (6 values) | No | Changed from free text to standardized dropdown (Decision 72, 2026-03-23) |
 | `mrn` | text | No | — | No | Medical Record Number, org-assigned |
 | `external_id` | text | No | — | No | For imports from other systems |
@@ -79,9 +79,9 @@ Guardian *person* data (name, relationship, address, phone, email, custody docum
 
 | Field | Type | Nullable | Notes |
 |-------|------|----------|-------|
-| `legal_custody_status` | text | YES | Enum: voluntary, court_ordered, guardianship, etc. |
+| `legal_custody_status` | text | YES | Enum: `parent_guardian`, `state_child_welfare`, `juvenile_justice`, `guardianship`, `emancipated_minor`, `other` (Decision 82). No required elaboration for `other`. |
 | `court_ordered_placement` | boolean | YES | |
-| `financial_guarantor_type` | text | YES | Enum: parent, state, self, etc. |
+| `financial_guarantor_type` | text | YES | Enum: `parent_guardian`, `state_agency`, `juvenile_justice`, `self`, `insurance_only`, `tribal_agency`, `va`, `other` (Decision 84) |
 
 ### Step 4: Referral Information (Category 4) — Decision 41
 
@@ -106,6 +106,7 @@ Replaces former `referral_source` plain text field.
 | `expected_length_of_stay` | integer | YES | Days. Configurable presence + optional |
 | `initial_risk_level` | text | YES | Enum: Low Risk, Moderate Risk, High Risk, Critical/Imminent Risk. Configurable presence + optional. **Reporting dimension** (Decision 73, 2026-03-23) |
 | `discharge_plan_status` | text | YES | Enum: not_started, in_progress, complete. Optional (no configurable_presence) |
+| `placement_arrangement` | text | YES | Enum: 13 values (residential_treatment, therapeutic_foster_care, group_home, foster_care, kinship_placement, adoptive_placement, independent_living, home_based, detention, secure_residential, hospital_inpatient, shelter, other). Configurable presence + optional. **Reporting dimension.** Denormalized current placement — source of truth is `client_placement_history` table. (Decision 83, 2026-03-26) |
 
 **Via contact-designation model** (not columns): Assigned Therapist, Psychiatrist, Case Manager, Program Manager.
 
@@ -132,8 +133,8 @@ All intake snapshots. Longitudinal tracking adds separate tables later.
 | `secondary_diagnoses` | jsonb | YES | Array of ICD-10 |
 | `dsm5_diagnoses` | jsonb | YES | Array of DSM-5 |
 | `presenting_problem` | text | YES | |
-| `suicide_risk_status` | text | YES | Enum TBD |
-| `violence_risk_status` | text | YES | Enum TBD |
+| `suicide_risk_status` | text | YES | Enum: `low_risk`, `moderate_risk`, `high_risk` (Decision 80) |
+| `violence_risk_status` | text | YES | Enum: `low_risk`, `moderate_risk`, `high_risk` (Decision 81) |
 | `trauma_history_indicator` | boolean | YES | |
 | `substance_use_history` | text | YES | Text (may become JSONB) |
 | `developmental_history` | text | YES | |
@@ -167,24 +168,24 @@ All intake snapshots. Longitudinal tracking adds separate tables later.
 
 **Note**: `legal_custody_status`, `court_ordered_placement`, `financial_guarantor_type` are in Step 3 (Guardian section).
 
-### Step 10: Discharge Information (Category 17) — Decisions 47, 62
+### Step 10: Discharge Information (Category 17) — Decisions 47, 62, 78
 
-Populated when discharge occurs. **Not filled at intake.**
+Populated when discharge occurs. **Not filled at intake.** Three-field decomposition (Decision 78, 2026-03-26) replaces single `discharge_type` with `discharge_outcome` + `discharge_reason` + `discharge_placement` capturing orthogonal dimensions.
 
 #### Mandatory at Discharge Time
 
 | Field | Type | Nullable | Notes |
 |-------|------|----------|-------|
 | `discharge_date` | date | YES | Provider-specified, set via `client.discharged` event payload. Required when discharging. |
-| `discharge_reason` | text | YES | Required when discharging. |
-| `discharge_type` | text | YES | Enum: planned, ama, transfer, runaway, etc. Required when discharging. |
+| `discharge_outcome` | text | YES | Enum: `successful`, `unsuccessful`. Binary program success indicator. Required when discharging. **Reporting dimension.** (Decision 78, replaces `discharge_type`) |
+| `discharge_reason` | text | YES | Enum: `graduated_program`, `achieved_treatment_goals`, `awol`, `ama`, `administrative`, `hospitalization_medical`, `insufficient_progress`, `intermediate_secure_care`, `secure_care`, `ten_day_notice`, `court_ordered`, `deceased`, `transfer`, `medical`. Required when discharging. **Reporting dimension.** |
 
 #### Configurable Presence + Optional at Discharge
 
 | Field | Type | Nullable | Notes |
 |-------|------|----------|-------|
 | `discharge_diagnosis` | jsonb | YES | ICD-10 array |
-| `discharge_placement` | text | YES | Where client went |
+| `discharge_placement` | text | YES | Enum: `home`, `lower_level_of_care`, `higher_level_of_care`, `secure_care`, `intermediate_secure_care`, `other_program`, `hospitalization`, `incarceration`, `other`. Where client went. **Reporting dimension.** |
 
 ---
 
@@ -291,6 +292,31 @@ Org admin defines funding source slots dynamically in `client_field_definitions_
 | `updated_at` | timestamptz | NO | |
 
 **Note**: Fields TBD — the above is a starting proposal. Actual fields will be refined during implementation.
+
+---
+
+## `client_placement_history` Table (Decision 83, 2026-03-26)
+
+CQRS event-sourced history table. Tracks full placement trajectory with date ranges. Sub-entity events via `process_client_event()`:
+- `client.placement.changed` — closes previous row (sets `end_date`), inserts new row, updates `clients_projection.placement_arrangement`
+- `client.placement.ended` — closes current row without opening a new one
+
+Intake form captures initial placement → emits `client.placement.changed` as first entry. Frontend for placement transitions (step-downs, transfers) deferred.
+
+| Column | Type | Nullable | Notes |
+|--------|------|----------|-------|
+| `id` | uuid | NO | PK |
+| `client_id` | uuid | NO | FK → `clients_projection` |
+| `organization_id` | uuid | NO | FK → `organizations_projection` (RLS) |
+| `placement_arrangement` | text | NO | 13-value enum (same as `clients_projection.placement_arrangement`) |
+| `start_date` | date | NO | When this placement began |
+| `end_date` | date | YES | When this placement ended (NULL = current) |
+| `reason_for_change` | text | YES | Why placement changed |
+| `is_current` | boolean | NO | Default true. Only one current row per client. |
+| `created_at` | timestamptz | NO | |
+| `updated_at` | timestamptz | NO | |
+
+**Constraints**: UNIQUE on `(client_id, start_date)` — one placement per client per date.
 
 ---
 

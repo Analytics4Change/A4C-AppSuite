@@ -174,6 +174,9 @@ Cross-cutting architectural decisions that span multiple components
   - [Tenants as Organizations](./architecture/data/tenants-as-organizations.md) - Multi-tenancy design
   - [Provider Partners Architecture](./architecture/data/provider-partners-architecture.md) - Partner ecosystem
   - [VAR Partnerships](./architecture/data/var-partnerships.md) - Value-added reseller partnerships (aspirational)
+- **[Decisions](./architecture/decisions/)**
+  - [ADR: CQRS Dual-Write Remediation](./architecture/decisions/adr-cqrs-dual-write-remediation.md) - CQRS violation audit and fix ✅
+  - [ADR: Client Management Schema](./architecture/decisions/adr-client-management-schema.md) - 12-table client schema design, 84 decisions ✅
 - **[Workflows](./architecture/workflows/)**
   - [Temporal Overview](./architecture/workflows/temporal-overview.md) - Workflow orchestration architecture ✅
   - [Organization Onboarding Workflow](./architecture/workflows/organization-onboarding-workflow.md) - Organization bootstrap workflow

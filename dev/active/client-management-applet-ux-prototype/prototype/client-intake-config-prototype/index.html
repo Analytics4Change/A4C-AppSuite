@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Client Intake Configuration — A4C-AppSuite Prototype</title>
+  <link rel="stylesheet" href="styles.css?v=3">
+</head>
+<body>
+  <div class="app-layout">
+
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-icon">A4C</div>
+        <div class="sidebar-logo-text">AppSuite</div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Clients
+        </a>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Medications
+        </a>
+        <a class="nav-item active" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          Settings
+        </a>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+          Users
+        </a>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Roles
+        </a>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Schedules
+        </a>
+      </nav>
+
+      <div class="sidebar-user">
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-avatar">JT</div>
+          <div>
+            <div class="sidebar-user-name">John Tice</div>
+            <div class="sidebar-user-role">Provider Admin</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============ MAIN CONTENT ============ -->
+    <main class="main-content">
+
+      <div class="breadcrumb">
+        <a href="#">Settings</a>
+        <span class="breadcrumb-sep">/</span>
+        <span>Client Intake Configuration</span>
+      </div>
+
+      <div class="page-header">
+        <h1>Client Intake Configuration</h1>
+        <p>Configure which fields appear on the client intake form and customize labels for your organization.</p>
+      </div>
+
+      <!-- ============ TAB BAR ============ -->
+      <div class="tab-bar-wrapper">
+        <button class="tab-scroll-arrow tab-scroll-left" aria-label="Scroll tabs left">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="tab-bar" role="tablist">
+          <button class="tab-btn active" data-tab="tab-demographics" role="tab" aria-selected="true">Demographics</button>
+          <button class="tab-btn" data-tab="tab-contact" role="tab">Contact Info</button>
+          <button class="tab-btn" data-tab="tab-guardian" role="tab">Guardian</button>
+          <button class="tab-btn" data-tab="tab-referral" role="tab">Referral</button>
+          <button class="tab-btn" data-tab="tab-admission" role="tab">Admission</button>
+          <button class="tab-btn" data-tab="tab-insurance" role="tab">Insurance</button>
+          <button class="tab-btn" data-tab="tab-clinical" role="tab">Clinical</button>
+          <button class="tab-btn" data-tab="tab-medical" role="tab">Medical</button>
+          <button class="tab-btn" data-tab="tab-legal" role="tab">Legal</button>
+          <button class="tab-btn" data-tab="tab-discharge" role="tab">Discharge</button>
+          <button class="tab-btn" data-tab="tab-education" role="tab">Education</button>
+          <button class="tab-btn" data-tab="tab-custom" role="tab">Custom Fields</button>
+          <button class="tab-btn" data-tab="tab-categories" role="tab">Categories</button>
+        </div>
+        <button class="tab-scroll-arrow tab-scroll-right" aria-label="Scroll tabs right">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+
+      <!-- ============ TAB 1: DEMOGRAPHICS ============ -->
+      <div id="tab-demographics" class="tab-panel active" role="tabpanel">
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Demographics</h2>
+            <span class="badge badge-count">15 configurable</span>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Race</div>
+              <div class="toggle-desc">Multi-select from 7 standard OMB race categories</div>
+
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Ethnicity</div>
+              <div class="toggle-desc">OMB two-question format: Hispanic/Latino or Not Hispanic/Latino</div>
+
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Primary Language</div>
+              <div class="toggle-desc">Org selects subset from ISO 639 master list. Defaults: English, Spanish.</div>
+
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Secondary Language</div>
+              <div class="toggle-desc">Same selectable list as primary language</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Interpreter Needed</div>
+              <div class="toggle-desc">Yes/No field on the intake form</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Pronouns</div>
+              <div class="toggle-desc">Organization-configured list of options. Always includes "Other" with a free-text field.</div>
+
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Gender Identity</div>
+              <div class="toggle-desc">Free text field, separate from Sex at Birth</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Preferred Name</div>
+              <div class="toggle-desc">Optional display name preference</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Middle Name</div>
+              <div class="toggle-desc">Detail-level reporting only, not sliceable</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Photo</div>
+              <div class="toggle-desc">Uploadable client photo, not required at registration</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Marital Status</div>
+              <div class="toggle-desc">Selectable list of options</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Citizenship Status</div>
+              <div class="toggle-desc">Free text field</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">MRN (Medical Record Number)</div>
+              <div class="toggle-desc">Org-assigned identifier</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">External ID</div>
+              <div class="toggle-desc">For imports from other systems</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Driver's License / State ID</div>
+              <div class="toggle-desc">For older youth and young adults</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TAB 2: CONTACT INFO ============ -->
+      <div id="tab-contact" class="tab-panel" role="tabpanel">
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Contact Information</h2>
+            <span class="badge badge-count">3 sections</span>
+          </div>
+          <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:1rem;">Toggle whether each contact section appears on the intake form. Each section allows multiple entries with a primary flag.</p>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Phone Numbers</div>
+              <div class="toggle-desc">Client's own phone numbers. Types: mobile, home, work, other. Supports multiple entries with primary designation.</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Email Addresses</div>
+              <div class="toggle-desc">Client's own email addresses. Types: personal, school, work, other. Supports multiple entries with primary designation.</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Addresses</div>
+              <div class="toggle-desc">Client's addresses. Types: home, mailing, previous, other. Full address fields (street, city, state, zip).</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TAB 3: GUARDIAN ============ -->
+      <div id="tab-guardian" class="tab-panel" role="tabpanel">
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Guardian / Legal Status</h2>
+            <span class="badge badge-count">3 configurable</span>
+          </div>
+          <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:1rem;">Guardian person data (name, relationship, contact info) is managed in the Contact Management applet. These fields capture the client's legal status only.</p>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Legal Custody Status</div>
+              <div class="toggle-desc">Possible values: Voluntary, Court-Ordered, Guardianship, etc.</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Court-Ordered Placement</div>
+              <div class="toggle-desc">Yes/No: indicates whether placement is court-ordered</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Financial Guarantor Type</div>
+              <div class="toggle-desc">Possible values: Parent, State, Self, etc.</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TAB 4: REFERRAL ============ -->
+      <div id="tab-referral" class="tab-panel" role="tabpanel">
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Referral Information</h2>
+            <span class="badge badge-count">4 configurable</span>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Referral Source Type</div>
+              <div class="toggle-desc">Possible values: Self, Parent/Guardian, Therapist, School, Court, Hospital, Agency, Insurance, Other</div>
+
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Referral Organization</div>
+              <div class="toggle-desc">Name of referring organization</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Referral Date</div>
+              <div class="toggle-desc">Date of referral</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Reason for Referral</div>
+              <div class="toggle-desc">Text description of why client was referred</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TAB 5: ADMISSION ============ -->
+      <div id="tab-admission" class="tab-panel" role="tabpanel">
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Admission Details</h2>
+            <span class="badge badge-count">5 configurable</span>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Admission Type</div>
+              <div class="toggle-desc">Possible values: Planned, Emergency, Transfer, Readmission</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Level of Care</div>
+              <div class="toggle-desc">Text field for care level designation</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Expected Length of Stay</div>
+              <div class="toggle-desc">Number of days</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Initial Risk Level</div>
+              <div class="toggle-desc">Selectable risk rating captured at time of admission</div>
+
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Discharge Plan Status</div>
+              <div class="toggle-desc">Possible values: Not Started, In Progress, Complete. Updated over time.</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+        </div>
+
+        <!-- Clinical Team Designations -->
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Clinical Team Assignments</h2>
+            <span class="badge badge-count">5 designations</span>
+          </div>
+          <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:1rem;">Configure which clinical team roles appear on the intake form and customize their display labels. The canonical key remains unchanged for cross-org analytics.</p>
+
+          <div class="designation-card">
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">Clinician</div>
+                <div class="toggle-desc">Primary assigned clinician</div>
+  
+                <div class="label-rename">
+                  <span class="label-rename-label">Display label:</span>
+                  <input type="text" placeholder="Clinician" value="Clinician">
+                </div>
+              </div>
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+            </div>
+          </div>
+
+          <div class="designation-card">
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">Therapist</div>
+                <div class="toggle-desc">Assigned therapist</div>
+  
+                <div class="label-rename">
+                  <span class="label-rename-label">Display label:</span>
+                  <input type="text" placeholder="Therapist" value="Therapist">
+                </div>
+              </div>
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+            </div>
+          </div>
+
+          <div class="designation-card">
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">Psychiatrist</div>
+                <div class="toggle-desc">Assigned psychiatrist</div>
+  
+                <div class="label-rename">
+                  <span class="label-rename-label">Display label:</span>
+                  <input type="text" placeholder="Psychiatrist" value="Psychiatrist">
+                </div>
+              </div>
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+            </div>
+          </div>
+
+          <div class="designation-card">
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">Behavioral Analyst</div>
+                <div class="toggle-desc">Assigned behavioral analyst (BCBA)</div>
+  
+                <div class="label-rename">
+                  <span class="label-rename-label">Display label:</span>
+                  <input type="text" placeholder="Behavioral Analyst" value="Behavioral Analyst">
+                </div>
+              </div>
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+            </div>
+          </div>
+
+          <div class="designation-card">
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">Program Manager</div>
+                <div class="toggle-desc">Program oversight manager</div>
+  
+                <div class="label-rename">
+                  <span class="label-rename-label">Display label:</span>
+                  <input type="text" placeholder="Program Manager" value="Program Manager">
+                </div>
+              </div>
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TAB 6: INSURANCE ============ -->
+      <div id="tab-insurance" class="tab-panel" role="tabpanel">
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Insurance Identifiers</h2>
+            <span class="badge badge-count">2 configurable</span>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Medicaid ID</div>
+              <div class="toggle-desc">State Medicaid identifier</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Medicare ID</div>
+              <div class="toggle-desc">Federal Medicare identifier</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Insurance Policies Section</h2>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Enable Insurance Policies</div>
+              <div class="toggle-desc">Allow intake form to capture full insurance policy details (payer, member ID, coverage dates, authorization)</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Payer Type Configuration</h2>
+          </div>
+          <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:1rem;">Select which payer types are available when adding insurance policies.</p>
+          <div class="payer-toggles">
+            <div class="payer-toggle">
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+              <span class="payer-toggle-label">Primary Insurance</span>
+            </div>
+            <div class="payer-toggle">
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+              <span class="payer-toggle-label">Secondary Insurance</span>
+            </div>
+            <div class="payer-toggle">
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+              <span class="payer-toggle-label">Medicaid</span>
+            </div>
+            <div class="payer-toggle">
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+              <span class="payer-toggle-label">Medicare</span>
+            </div>
+            <div class="payer-toggle payer-toggle-configurable">
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+              <div class="payer-toggle-info">
+                <span class="payer-toggle-label">External Funding Source 1</span>
+                <div class="label-rename">
+                  <span class="label-rename-label">Display label:</span>
+                  <input type="text" placeholder="External Funding Source 1" value="External Funding Source 1">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:1rem;">
+            <button id="add-funding-source-btn" class="btn btn-secondary btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Funding Source
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TAB 7: CLINICAL PROFILE ============ -->
+      <div id="tab-clinical" class="tab-panel" role="tabpanel">
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Clinical Profile</h2>
+            <span class="badge badge-count">10 configurable</span>
+          </div>
+          <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:1rem;">Intake snapshot fields. Longitudinal tracking will be added in future applets.</p>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Primary Diagnosis</div>
+              <div class="toggle-desc">Single ICD-10 code with description. Autocomplete search.</div>
+
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Secondary Diagnoses</div>
+              <div class="toggle-desc">List of ICD-10 codes. Supports multiple entries.</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">DSM-5 Diagnoses</div>
+              <div class="toggle-desc">List of DSM-5 diagnostic codes. Supports multiple entries.</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Presenting Problem</div>
+              <div class="toggle-desc">Text description of primary presenting concern</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Suicide Risk Status</div>
+              <div class="toggle-desc">Selectable risk assessment rating</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Violence Risk Status</div>
+              <div class="toggle-desc">Selectable risk assessment rating</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Trauma History Indicator</div>
+              <div class="toggle-desc">Yes/No: indicates documented trauma history</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Substance Use History</div>
+              <div class="toggle-desc">Text summary of substance use</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Developmental History</div>
+              <div class="toggle-desc">Text summary of developmental milestones and concerns</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Previous Treatment History</div>
+              <div class="toggle-desc">Prior treatment engagements and outcomes</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TAB 8: MEDICAL ============ -->
+      <div id="tab-medical" class="tab-panel" role="tabpanel">
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Medical Information</h2>
+            <span class="badge badge-count">3 configurable</span>
+          </div>
+
+<div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Immunization Status</div>
+              <div class="toggle-desc">Text field for immunization records summary</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Dietary Restrictions</div>
+              <div class="toggle-desc">Text field for dietary needs and restrictions</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Special Medical Needs</div>
+              <div class="toggle-desc">Text field for ongoing medical care requirements</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+        </div>
+
+        <!-- Medical Designations -->
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Medical Provider Assignments</h2>
+            <span class="badge badge-count">2 designations</span>
+          </div>
+
+          <div class="designation-card">
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">Primary Care Physician</div>
+                <div class="toggle-desc">Client's PCP</div>
+  
+                <div class="label-rename">
+                  <span class="label-rename-label">Display label:</span>
+                  <input type="text" placeholder="Primary Care Physician" value="Primary Care Physician">
+                </div>
+              </div>
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+            </div>
+          </div>
+
+          <div class="designation-card">
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">Prescriber</div>
+                <div class="toggle-desc">Medication prescribing provider</div>
+  
+                <div class="label-rename">
+                  <span class="label-rename-label">Display label:</span>
+                  <input type="text" placeholder="Prescriber" value="Prescriber">
+                </div>
+              </div>
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TAB 9: LEGAL ============ -->
+      <div id="tab-legal" class="tab-panel" role="tabpanel">
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Legal &amp; Compliance</h2>
+            <span class="badge badge-count">6 configurable</span>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Court Case Number</div>
+              <div class="toggle-desc">Text field for court case reference</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">State Agency</div>
+              <div class="toggle-desc">DCFS, DHS, etc. Canonical key preserved for cross-org analytics.</div>
+
+              <div class="label-rename">
+                <span class="label-rename-label">Display label:</span>
+                <input type="text" placeholder="State Agency" value="State Agency">
+              </div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Legal Status</div>
+              <div class="toggle-desc">Possible values: Voluntary, Court-Ordered, Guardianship</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Mandated Reporting Status</div>
+              <div class="toggle-desc">Yes/No: indicates whether mandated reporting applies</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Protective Services Involvement</div>
+              <div class="toggle-desc">Yes/No: indicates an active protective services case</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Safety Plan Required</div>
+              <div class="toggle-desc">Yes/No: indicates whether a safety plan is required</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+        </div>
+
+        <!-- Legal Designations -->
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Legal Contact Assignments</h2>
+            <span class="badge badge-count">2 designations</span>
+          </div>
+
+          <div class="designation-card">
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">Probation Officer</div>
+                <div class="toggle-desc">Assigned probation/parole officer</div>
+  
+                <div class="label-rename">
+                  <span class="label-rename-label">Display label:</span>
+                  <input type="text" placeholder="Probation Officer" value="Probation Officer">
+                </div>
+              </div>
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+            </div>
+          </div>
+
+          <div class="designation-card">
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">Caseworker</div>
+                <div class="toggle-desc">Assigned state/agency caseworker</div>
+  
+                <div class="label-rename">
+                  <span class="label-rename-label">Display label:</span>
+                  <input type="text" placeholder="Caseworker" value="Caseworker">
+                </div>
+              </div>
+              <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TAB 10: DISCHARGE ============ -->
+      <div id="tab-discharge" class="tab-panel" role="tabpanel">
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Discharge Information</h2>
+            <span class="badge badge-count">2 configurable</span>
+          </div>
+          <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:1rem;">These fields are populated when a discharge action is performed, not at intake. Mandatory fields are always collected at discharge time.</p>
+
+          <div class="mandatory-section">
+            <h3>
+              
+              Mandatory at Discharge
+            </h3>
+            <div class="mandatory-field">
+              
+              Discharge Date
+              <span class="field-type">date, required at discharge</span>
+            </div>
+            <div class="mandatory-field">
+              
+              Discharge Reason
+              <span class="field-type">text, required at discharge</span>
+            </div>
+            <div class="mandatory-field">
+              
+              Discharge Type
+              <span class="field-type">enum: planned, ama, transfer, runaway</span>
+            </div>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Discharge Diagnosis</div>
+              <div class="toggle-desc">List of ICD-10 codes captured at discharge</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Discharge Placement</div>
+              <div class="toggle-desc">Where client went after discharge</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TAB 11: EDUCATION ============ -->
+      <div id="tab-education" class="tab-panel" role="tabpanel">
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Education</h2>
+            <span class="badge badge-count">3 configurable</span>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Education Status</div>
+              <div class="toggle-desc">Possible values: Enrolled, Not Enrolled, Homeschool, GED Program, Graduated, etc.</div>
+
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">Grade Level</div>
+              <div class="toggle-desc">Free text field for current grade</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-label">IEP Status</div>
+              <div class="toggle-desc">Yes/No: indicates whether client has an Individualized Education Program</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TAB 12: CUSTOM FIELDS ============ -->
+      <div id="tab-custom" class="tab-panel" role="tabpanel">
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Custom Fields</h2>
+            <span class="badge badge-count">Optional</span>
+          </div>
+          <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:1rem;">Add fields unique to your organization that don't appear in the standard intake form. Give each field a clear, meaningful name that describes what it captures — for example, use "Placement Type" rather than "Custom Field 1".</p>
+
+          <table class="custom-fields-table">
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Display Name</th>
+                <th>Type</th>
+                <th>Category</th>
+                <th>Flags</th>
+                <th style="width:80px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="custom-fields-tbody">
+              <tr>
+                <td><span class="field-key">placement_type</span></td>
+                <td>Placement Type</td>
+                <td>Single Select</td>
+                <td>administrative</td>
+                <td><span class="badge-dimension">Dimension</span></td>
+                <td class="actions">
+                  <button class="btn btn-ghost btn-icon" title="Edit">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                  </button>
+                  <button class="btn btn-danger-ghost btn-icon" title="Delete">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  </button>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="field-key">care_level</span></td>
+                <td>Care Level</td>
+                <td>Single Select</td>
+                <td>clinical</td>
+                <td><span class="badge-dimension">Dimension</span></td>
+                <td class="actions">
+                  <button class="btn btn-ghost btn-icon" title="Edit">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                  </button>
+                  <button class="btn btn-danger-ghost btn-icon" title="Delete">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  </button>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="field-key">house_assignment</span></td>
+                <td>House Assignment</td>
+                <td>Text</td>
+                <td>administrative</td>
+                <td></td>
+                <td class="actions">
+                  <button class="btn btn-ghost btn-icon" title="Edit">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                  </button>
+                  <button class="btn btn-danger-ghost btn-icon" title="Delete">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  </button>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="field-key">behavioral_tier</span></td>
+                <td>Behavioral Tier</td>
+                <td>Single Select</td>
+                <td>clinical</td>
+                <td><span class="badge-dimension">Dimension</span></td>
+                <td class="actions">
+                  <button class="btn btn-ghost btn-icon" title="Edit">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                  </button>
+                  <button class="btn btn-danger-ghost btn-icon" title="Delete">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top:1rem;">
+            <button id="add-custom-field-btn" class="btn btn-secondary btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Custom Field
+            </button>
+          </div>
+
+          <div id="add-custom-field-form" class="inline-form" style="display:none;">
+            <h4>New Custom Field</h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="cf-key">Field Key <span style="font-weight:400;color:var(--text-muted);font-size:0.7rem;">(auto-generated)</span></label>
+                <input type="text" id="cf-key" placeholder="derived from display name" readonly style="background:var(--bg-secondary);color:var(--text-muted);cursor:default;">
+              </div>
+              <div class="form-group">
+                <label for="cf-name">Display Name</label>
+                <input type="text" id="cf-name" placeholder="e.g., Privilege Level">
+              </div>
+              <div class="form-group">
+                <label for="cf-type">Field Type</label>
+                <select id="cf-type">
+                  <option value="text">Text</option>
+                  <option value="number">Number</option>
+                  <option value="date">Date</option>
+                  <option value="enum">Single Select</option>
+                  <option value="multi_enum">Multi-Select</option>
+                  <option value="boolean">True/False</option>
+                </select>
+              </div>
+              <div class="form-group cf-options-group" id="cf-options-group" style="display:none;grid-column:1/-1;">
+                <label>Options <span style="font-weight:400;color:var(--text-muted);font-size:0.7rem;">— define the selectable values</span></label>
+                <div id="cf-options-list" class="cf-options-list"></div>
+                <div class="cf-option-input-row">
+                  <input type="text" id="cf-option-input" placeholder="Type an option and press Enter">
+                  <button type="button" id="cf-option-add-btn" class="btn btn-secondary btn-sm">Add</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="cf-category">Category</label>
+                <select id="cf-category">
+                  <option value="clinical">Clinical</option>
+                  <option value="administrative">Administrative</option>
+                  <option value="education">Education</option>
+                  <option value="insurance">Insurance</option>
+                  <option value="legal">Legal</option>
+                </select>
+              </div>
+              <div class="form-group" style="flex-direction:row;align-items:center;gap:1rem;">
+                <label style="display:flex;align-items:center;gap:0.375rem;cursor:pointer;">
+                  <input type="checkbox" id="cf-required" style="width:16px;height:16px;accent-color:var(--primary);">
+                  Required
+                </label>
+              </div>
+            </div>
+            <div class="inline-form-actions">
+              <button id="cancel-custom-field" class="btn btn-secondary btn-sm">Cancel</button>
+              <button id="save-custom-field" class="btn btn-primary btn-sm">Add Field</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TAB 13: CATEGORIES ============ -->
+      <div id="tab-categories" class="tab-panel" role="tabpanel">
+        <div class="glass-card">
+          <div class="section-header">
+            <h2>Field Categories</h2>
+            <span class="badge badge-count">5 fixed + custom</span>
+          </div>
+          <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:1rem;">Categories organize custom fields in the UI and Cube.js schema explorer. Fixed categories cannot be modified.</p>
+
+          <div id="categories-list">
+            <div class="category-item">
+              <div>
+                <div class="category-name">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Clinical
+                </div>
+                <div class="category-slug">clinical</div>
+              </div>
+              <span style="font-size:0.6875rem;color:var(--text-muted);">System</span>
+            </div>
+            <div class="category-item">
+              <div>
+                <div class="category-name">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Administrative
+                </div>
+                <div class="category-slug">administrative</div>
+              </div>
+              <span style="font-size:0.6875rem;color:var(--text-muted);">System</span>
+            </div>
+            <div class="category-item">
+              <div>
+                <div class="category-name">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Education
+                </div>
+                <div class="category-slug">education</div>
+              </div>
+              <span style="font-size:0.6875rem;color:var(--text-muted);">System</span>
+            </div>
+            <div class="category-item">
+              <div>
+                <div class="category-name">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Insurance
+                </div>
+                <div class="category-slug">insurance</div>
+              </div>
+              <span style="font-size:0.6875rem;color:var(--text-muted);">System</span>
+            </div>
+            <div class="category-item">
+              <div>
+                <div class="category-name">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Legal
+                </div>
+                <div class="category-slug">legal</div>
+              </div>
+              <span style="font-size:0.6875rem;color:var(--text-muted);">System</span>
+            </div>
+          </div>
+
+          <div style="margin-top:1rem;">
+            <button id="add-category-btn" class="btn btn-secondary btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Category
+            </button>
+          </div>
+
+          <div id="add-category-form" class="inline-form" style="display:none;">
+            <h4>New Category</h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="cat-name">Category Name</label>
+                <input type="text" id="cat-name" placeholder="e.g., Behavioral">
+              </div>
+              <div class="form-group">
+                <label for="cat-slug">Slug</label>
+                <input type="text" id="cat-slug" placeholder="e.g., behavioral">
+              </div>
+            </div>
+            <div class="inline-form-actions">
+              <button id="cancel-category" class="btn btn-secondary btn-sm">Cancel</button>
+              <button id="save-category" class="btn btn-primary btn-sm">Add Category</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ FOOTER ============ -->
+      <div class="config-footer">
+        <div id="unsaved-indicator" class="unsaved-indicator" style="display:none;">
+          <span class="unsaved-dot"></span>
+          Unsaved changes
+        </div>
+        <div style="flex:1;"></div>
+        <div class="config-footer-actions">
+          <button id="reset-config-btn" class="btn btn-secondary">Reset to Defaults</button>
+          <button id="save-config-btn" class="btn btn-primary">Save Configuration</button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="script.js?v=3"></script>
+</body>
+</html>

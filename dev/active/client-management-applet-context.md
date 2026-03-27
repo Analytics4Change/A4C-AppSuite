@@ -85,7 +85,46 @@
 
 76. **`state` payer type replaced by `client_funding_sources_projection` table (Option B)** (decided 2026-03-23): The `state` value is removed from `policy_type` enum (now `primary | secondary | medicaid | medicare`). External funding sources are a separate concept from insurance policies — different data shape, no payer/subscriber/coverage fields. New table `client_funding_sources_projection` supports dynamic, multi-instance funding sources. Org admin defines funding source slots (`external_funding_source_1`, `external_funding_source_2`, ...) in `client_field_definitions_projection`, each with a `configurable_label`. Staff adds funding source rows at intake. Event-sourced sub-entity of `client` (`client.funding_source.added/updated/removed`) via `process_client_event()`. NOT a reporting dimension. Includes `custom_fields jsonb DEFAULT '{}'` for non-standard fields per funding source row (Decision 77).
 
-67. **Mandatory core reduced to 7 fields at intake** (decided 2026-03-19): `first_name`, `last_name`, `date_of_birth`, `gender`, `admission_date`, `allergies`, `medical_conditions`. All other fields are optional and/or configurable_presence. 3 additional fields mandatory at discharge: `discharge_date`, `discharge_reason`, `discharge_type`.
+67. **Mandatory core reduced to 7 fields at intake** (decided 2026-03-19): `first_name`, `last_name`, `date_of_birth`, `gender`, `admission_date`, `allergies`, `medical_conditions`. All other fields are optional and/or configurable_presence. 3 additional fields mandatory at discharge: `discharge_date`, `discharge_outcome`, `discharge_reason` (updated 2026-03-26 per Decision 78).
+
+78. **Discharge three-field decomposition** (decided 2026-03-26): `discharge_type` replaced by three independent fields capturing orthogonal dimensions. Informed by external LLM analysis of discharge classification in residential behavioral health (`~/Downloads/full_discharge_conversation.md`).
+   - **`discharge_outcome`** (new, replaces `discharge_type`): Binary — `successful`, `unsuccessful`. Mandatory at discharge. Primary reporting dimension for program success rates.
+   - **`discharge_reason`** (existing, now enum): 14 values — `graduated_program`, `achieved_treatment_goals`, `awol`, `ama`, `administrative`, `hospitalization_medical`, `insufficient_progress`, `intermediate_secure_care`, `secure_care`, `ten_day_notice`, `court_ordered`, `deceased`, `transfer`, `medical`. Mandatory at discharge.
+   - **`discharge_placement`** (existing, now enum): 9 values — `home`, `lower_level_of_care`, `higher_level_of_care`, `secure_care`, `intermediate_secure_care`, `other_program`, `hospitalization`, `incarceration`, `other`. Configurable presence + optional.
+   - **Why decompose**: User's real-world discharge list (e.g., "Successful - Graduated Program / Achieved Treatment Goals - Home") revealed composite values encoding 3 independent dimensions. Single enum creates combinatorial explosion; three fields give clean Cube.js slicing by outcome × reason × placement independently.
+   - **Deferred**: Full 4NF discharge management (reporting flags, compliance actions, notifications, follow-up tasks) — future discharge management applet. Three-field decomposition is the foundation.
+
+79. **`marital_status` enum defined** (decided 2026-03-26): 6 values — `single`, `married`, `divorced`, `separated`, `widowed`, `domestic_partnership`. Hardcoded in frontend.
+
+80. **`suicide_risk_status` enum defined** (decided 2026-03-26): 3 values — `low_risk`, `moderate_risk`, `high_risk`. Hardcoded in frontend.
+
+81. **`violence_risk_status` enum defined** (decided 2026-03-26): 3 values — `low_risk`, `moderate_risk`, `high_risk`. Same scale as `suicide_risk_status` (Decision 80) — both are clinical screening assessments using standard behavioral health severity scale. Hardcoded in frontend.
+
+82. **`legal_custody_status` enum defined, separated from placement** (decided 2026-03-26): 6 values — `parent_guardian`, `state_child_welfare`, `juvenile_justice`, `guardianship`, `emancipated_minor`, `other`. `other` does NOT require elaboration. Custody is who holds legal authority over the minor — distinct from placement arrangement (where the client physically lives). Original values (`voluntary`, `court_ordered`, `guardianship` + "etc.") replaced — those described the *legal basis for placement*, not the custodian. External LLM-generated list conflated custody with placement; decomposed into two separate fields.
+
+83. **`placement_arrangement` — new field + `client_placement_history` table (Option C backend, frontend deferred)** (decided 2026-03-26): Not all A4C providers operate residential programs — providers may run group homes, foster care, outpatient, etc. Placement arrangement is a core dimension, not an assumption.
+   - **New column**: `placement_arrangement` on `clients_projection` — denormalized current placement, configurable_presence + optional, **reporting dimension**. 13 values: `residential_treatment`, `therapeutic_foster_care`, `group_home`, `foster_care`, `kinship_placement`, `adoptive_placement`, `independent_living`, `home_based`, `detention`, `secure_residential`, `hospital_inpatient`, `shelter`, `other`.
+   - **New table**: `client_placement_history` — CQRS event-sourced, full placement trajectory with date ranges. Columns: `id`, `client_id` (FK), `organization_id` (FK, RLS), `placement_arrangement` (text), `start_date` (date NOT NULL), `end_date` (date nullable), `reason_for_change` (text nullable), `is_current` (boolean), `created_at`, `updated_at`. UNIQUE on `(client_id, start_date)`.
+   - **Events**: `client.placement.changed` and `client.placement.ended` via `process_client_event()`.
+   - **Handler**: On `client.placement.changed` — closes previous row (`end_date`), inserts new row, updates `clients_projection.placement_arrangement`.
+   - **Intake**: Captures initial placement → emits `client.placement.changed` as first history entry. No placement transition UI on intake form.
+   - **Frontend for transitions**: Deferred — table and events exist, no UI for step-downs/transfers yet.
+   - **Why**: Full trajectory analytics (length-of-stay per placement, step-down success rates, point-in-time incident correlation) require history table. Intake form stays simple. Middle ground between snapshot-only and full feature.
+   - **New table count**: 12 (was 11).
+
+84. **`financial_guarantor_type` enum defined** (decided 2026-03-26): 8 values — `parent_guardian`, `state_agency`, `juvenile_justice`, `self`, `insurance_only`, `tribal_agency`, `va`, `other`. No required elaboration for `other`. Distinct from `legal_custody_status` — custody = who has legal authority, guarantor = who pays. A youth can be in `parent_guardian` custody but `state_agency` as financial guarantor (e.g., state-funded placement with parental custody retained). `tribal_agency` covers IHS-eligible youth. `va` added for military-connected families. `insurance_only` covers cases where no individual guarantor exists and insurance is sole payer.
+
+85. **Implementation split into two projects** (decided 2026-03-27): (1) Client Field Configuration — settings page + backend for field visibility/required/labels/custom fields/categories. (2) Client Intake — actual intake form, registration API, client lifecycle events. Separate projects because configuration is operationally distinct and provides value before intake form exists.
+
+86. **Page renamed to "Client Field Configuration"** (decided 2026-03-27): Was "Client Intake Configuration". The configuration manages fields across intake, discharge, and placement transitions — not just intake. Route: `/settings/client-fields`.
+
+87. **`client_field_categories` event-sourced** (decided 2026-03-27, architecture review M5): Was marked "not event-sourced (config data)" but org admin can create custom categories — direct writes without events violate CQRS. New stream type `client_field_category` with 2 events: `client_field_category.created`, `client_field_category.deactivated`. Router: `process_client_field_category_event()`.
+
+88. **Batch update RPC for field definitions** (decided 2026-03-27, architecture review m2/R2): `api.batch_update_field_definitions(p_org_id, p_changes jsonb, p_reason text, p_correlation_id uuid DEFAULT NULL)` — single network call, emits individual `client_field_definition.updated` events per changed field internally with shared correlation ID. Follows `api.sync_schedule_assignments()` pattern.
+
+89. **Read RLS relaxed for field definitions** (decided 2026-03-27, architecture review m1): SELECT on `client_field_definitions_projection` requires org-member match only (no permission check). Intake form reads field definitions to know which fields to show — clinicians need read access without `organization.view`. Writes still gated by `organization.update`.
+
+90. **Discharge fields excluded from configuration UI scope** (decided 2026-03-27): The Client Field Configuration page manages Steps 1-10 fields, but discharge configuration (separate operational concern) is a future project. Field definitions for discharge fields are seeded but not exposed in the configuration UI.
 
 68. **Allergy type enum expanded** (decided 2026-03-19): `allergy_type` on each allergy item changed from `medication`/`general` to `medication`/`food`/`environmental`. Standard EMR categorization.
 
@@ -311,11 +350,19 @@ Full audit of all event types across 12 routers + dispatcher vs 14 AsyncAPI doma
 - [Event Metadata Schema](../../documentation/workflows/reference/event-metadata-schema.md) — Full JSONB metadata structure
 
 ### Plan Files
-- `.claude/plans/spicy-bubbling-quail.md` — Complete implementation plan with 5 migrations, cross-correlation audit, all SQL schemas, handler specs, API function signatures, AsyncAPI contract updates, verification plan, and implementation order
-- `.claude/plans/woolly-beaming-teacup.md` — Clinical Contact Assignment Field UX plan: two-phase field component, Jaro-Winkler search, observability, data-testid, component architecture
+- `.claude/plans/peaceful-marinating-bonbon.md` — **CURRENT**: Client Field Configuration implementation plan (8 migrations + frontend). Architecture-reviewed, approved 2026-03-27.
+- `.claude/plans/peaceful-marinating-bonbon-agent-af9009328e6dbb9f1.md` — Architecture review by software-architect-dbc agent (5 Major + 6 Minor findings, Design by Contract specs)
+- `.claude/plans/woolly-beaming-teacup.md` — Clinical Contact Assignment Field UX plan (deferred to Client Intake project)
+- `.claude/plans/spicy-bubbling-quail.md` — **ARCHIVED** (no longer exists, superseded by peaceful-marinating-bonbon)
+
+### ADR
+- `documentation/architecture/decisions/adr-client-management-schema.md` — Approved ADR: 12 tables, 84 decisions, 7 architectural themes, complete enum reference (2026-03-27)
+
+### UX Prototype
+- `dev/active/client-management-applet-ux-prototype/` — Static HTML/CSS/JS prototype (zipped). Design reference only — divergences from authoritative design documented in plan.
 
 ### Schema Diagrams (documentation source)
-- `dev/active/client-management-applet-schema-diagrams.md` — Mermaid ER diagram (all 10 new tables + 2 modified + 6 existing), event flow diagram, table inventory, RLS patterns. **Serves as partial source for documentation artifacts** (table reference docs, architecture doc, AGENT-INDEX updates) per `documentation/AGENT-GUIDELINES.md`.
+- `dev/active/client-management-applet-schema-diagrams.md` — Mermaid ER diagram (all 12 new tables + 2 modified + 6 existing), event flow diagram, table inventory, RLS patterns. **Serves as partial source for documentation artifacts** (table reference docs, architecture doc, AGENT-INDEX updates) per `documentation/AGENT-GUIDELINES.md`.
 
 ## Important Constraints
 
