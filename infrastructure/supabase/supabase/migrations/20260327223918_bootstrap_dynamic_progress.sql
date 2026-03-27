@@ -309,11 +309,17 @@ GRANT EXECUTE ON FUNCTION api.get_bootstrap_status(uuid) TO service_role;
 -- 4. Seed organization.bootstrap.step_completed in event_types
 -- -----------------------------------------------------------------------------
 
-INSERT INTO event_types (event_type, stream_type, description, category)
+INSERT INTO "public"."event_types" (
+    "event_type", "stream_type", "event_schema", "description",
+    "projection_function", "projection_tables", "is_active"
+)
 VALUES (
-  'organization.bootstrap.step_completed',
-  'organization',
-  'A bootstrap workflow step completed successfully (progress tracking)',
-  'bootstrap'
+    'organization.bootstrap.step_completed',
+    'organization',
+    '{"type": "object", "required": ["organization_id", "step_key"]}'::jsonb,
+    'A bootstrap workflow step completed successfully (progress tracking). Queried by get_bootstrap_status() to build dynamic stages array.',
+    NULL,
+    NULL,
+    true
 )
 ON CONFLICT (event_type) DO NOTHING;
