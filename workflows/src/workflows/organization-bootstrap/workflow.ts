@@ -62,7 +62,9 @@ const {
   deleteContacts,
   deleteAddresses,
   deletePhones,
-  deactivateOrganization
+  deactivateOrganization,
+  seedFieldDefinitions,
+  deleteFieldDefinitions
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: '10 minutes',
   retry: {
@@ -155,6 +157,7 @@ export async function organizationBootstrapWorkflow(
   const state: WorkflowState = {
     orgId: params.organizationId,  // Pre-set from API-generated ID
     orgCreated: false,
+    fieldDefinitionsSeeded: false,
     dnsConfigured: false,
     dnsSkipped: false,
     invitationsSent: false,
@@ -214,6 +217,25 @@ export async function organizationBootstrapWorkflow(
       roleId: permResult.roleId,
       permissionsGranted: permResult.permissionsGranted,
       roleAlreadyExisted: permResult.roleAlreadyExisted
+    });
+
+    // ========================================
+    // Step 1.6: Seed Client Field Definitions
+    // ========================================
+    // Copies field definition templates to org-specific projection rows.
+    // Each template becomes a client_field_definition.created event.
+    log.info('Step 1.6: Seeding client field definitions', { orgId: state.orgId });
+
+    const seedResult = await seedFieldDefinitions({
+      orgId: state.orgId!,
+      tracing: params.tracing
+    });
+
+    state.fieldDefinitionsSeeded = true;
+    log.info('Client field definitions seeded', {
+      orgId: state.orgId,
+      definitionsSeeded: seedResult.definitionsSeeded,
+      alreadySeeded: seedResult.alreadySeeded
     });
 
     // ========================================
@@ -501,6 +523,19 @@ export async function organizationBootstrapWorkflow(
         const compErrorMsg = compError instanceof Error ? compError.message : 'Unknown error';
         log.error('Compensation failed: delete contacts', { error: compErrorMsg });
         state.compensationErrors.push(`Failed to delete contacts: ${compErrorMsg}`);
+      }
+
+      // Delete field definitions (if seeded)
+      if (state.fieldDefinitionsSeeded) {
+        try {
+          log.info('Compensation: Deleting field definitions', { orgId: state.orgId });
+          await deleteFieldDefinitions({ orgId: state.orgId });
+          log.info('Field definitions deleted', { orgId: state.orgId });
+        } catch (compError) {
+          const compErrorMsg = compError instanceof Error ? compError.message : 'Unknown error';
+          log.error('Compensation failed: delete field definitions', { error: compErrorMsg });
+          state.compensationErrors.push(`Failed to delete field definitions: ${compErrorMsg}`);
+        }
       }
 
       // Deactivate organization (safety net)

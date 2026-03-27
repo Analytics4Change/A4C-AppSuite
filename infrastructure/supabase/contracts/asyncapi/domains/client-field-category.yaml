@@ -1,0 +1,125 @@
+components:
+  messages:
+    ClientFieldCategoryCreated:
+      name: client_field_category.created
+      title: Client Field Category Created
+      summary: An org-defined field category has been created for grouping field definitions
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientFieldCategoryCreatedEvent'
+
+    ClientFieldCategoryDeactivated:
+      name: client_field_category.deactivated
+      title: Client Field Category Deactivated
+      summary: An org-defined field category has been deactivated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientFieldCategoryDeactivatedEvent'
+
+  schemas:
+    # =========================================================================
+    # Event Envelope Schemas
+    # =========================================================================
+
+    ClientFieldCategoryCreatedEvent:
+      title: ClientFieldCategoryCreatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Field category UUID
+        stream_type:
+          type: string
+          const: client_field_category
+        event_type:
+          type: string
+          const: client_field_category.created
+        event_data:
+          $ref: '#/components/schemas/ClientFieldCategoryCreatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientFieldCategoryDeactivatedEvent:
+      title: ClientFieldCategoryDeactivatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Field category UUID
+        stream_type:
+          type: string
+          const: client_field_category
+        event_type:
+          type: string
+          const: client_field_category.deactivated
+        event_data:
+          $ref: '#/components/schemas/ClientFieldCategoryDeactivatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    # =========================================================================
+    # Data Schemas
+    # =========================================================================
+
+    ClientFieldCategoryCreatedData:
+      title: ClientFieldCategoryCreatedData
+      type: object
+      description: Data for org-defined field category creation
+      required:
+        - category_id
+        - organization_id
+        - name
+        - slug
+      properties:
+        category_id:
+          type: string
+          format: uuid
+          description: Unique ID for the category
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization this category belongs to
+        name:
+          type: string
+          description: Display name for the category
+          examples:
+            - "Program-Specific"
+            - "Behavioral"
+        slug:
+          type: string
+          description: URL-safe identifier, unique per org
+          examples:
+            - "program_specific"
+            - "behavioral"
+        sort_order:
+          type: integer
+          default: 0
+
+    ClientFieldCategoryDeactivatedData:
+      title: ClientFieldCategoryDeactivatedData
+      type: object
+      description: Data for field category deactivation
+      required:
+        - category_id
+        - organization_id
+      properties:
+        category_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid

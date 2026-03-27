@@ -174,6 +174,9 @@ export interface WorkflowState {
   /** Whether DNS was skipped (no subdomain required) */
   dnsSkipped: boolean;
 
+  /** Whether field definitions were seeded */
+  fieldDefinitionsSeeded: boolean;
+
   /** Whether invitations were sent */
   invitationsSent: boolean;
 

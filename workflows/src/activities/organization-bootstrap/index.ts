@@ -3,9 +3,10 @@
  *
  * Exports all activities for organization provisioning workflow.
  *
- * Forward Activities (7):
+ * Forward Activities (8):
  * - createOrganization: Create organization record with contacts/addresses/phones/emails
  * - grantProviderAdminPermissions: Create provider_admin role and grant 23 permissions
+ * - seedFieldDefinitions: Seed client field definitions from templates (~66 fields)
  * - configureDNS: Create DNS CNAME record (conditional)
  * - verifyDNS: Verify DNS propagation
  * - generateInvitations: Generate invitation tokens
@@ -16,13 +17,14 @@
  * - emitBootstrapCompletedActivity: Emit bootstrap completed event
  * - emitBootstrapFailedActivity: Emit bootstrap failure event (handler sets is_active = false)
  *
- * Compensation Activities (6):
+ * Compensation Activities (8):
  * - revokeInvitations: Revoke pending invitations (rollback)
  * - removeDNS: Delete DNS record (rollback)
  * - deletePhones: Delete phone records (rollback)
  * - deleteEmails: Delete email records (rollback)
  * - deleteAddresses: Delete address records (rollback)
  * - deleteContacts: Delete contact records (rollback)
+ * - deleteFieldDefinitions: Deactivate field definitions (rollback)
  * - deactivateOrganization: Safety net direct-write deactivation (fallback)
  */
 
@@ -41,3 +43,4 @@ export { deleteAddresses } from './delete-addresses';
 export { deletePhones } from './delete-phones';
 export { deleteEmails } from './delete-emails';
 export { deactivateOrganization } from './deactivate-organization';
+export { seedFieldDefinitions, deleteFieldDefinitions } from './seed-field-definitions';

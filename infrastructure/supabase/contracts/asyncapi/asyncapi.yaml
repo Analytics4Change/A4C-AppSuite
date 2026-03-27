@@ -153,6 +153,13 @@ channels:
           - $ref: './domains/rbac.yaml#/components/messages/UserRoleRevoked'
           - $ref: './domains/rbac.yaml#/components/messages/AccessGrantCreated'
           - $ref: './domains/rbac.yaml#/components/messages/AccessGrantRevoked'
+          # Client field definition events (field configuration registry)
+          - $ref: './domains/client-field-definition.yaml#/components/messages/ClientFieldDefinitionCreated'
+          - $ref: './domains/client-field-definition.yaml#/components/messages/ClientFieldDefinitionUpdated'
+          - $ref: './domains/client-field-definition.yaml#/components/messages/ClientFieldDefinitionDeactivated'
+          # Client field category events (org-defined field categories)
+          - $ref: './domains/client-field-category.yaml#/components/messages/ClientFieldCategoryCreated'
+          - $ref: './domains/client-field-category.yaml#/components/messages/ClientFieldCategoryDeactivated'
     subscribe:
       summary: Subscribe to domain events
       operationId: onDomainEvent

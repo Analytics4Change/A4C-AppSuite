@@ -1,0 +1,246 @@
+components:
+  messages:
+    ClientFieldDefinitionCreated:
+      name: client_field_definition.created
+      title: Client Field Definition Created
+      summary: A field definition has been created for an organization (via bootstrap seed or manual creation)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientFieldDefinitionCreatedEvent'
+
+    ClientFieldDefinitionUpdated:
+      name: client_field_definition.updated
+      title: Client Field Definition Updated
+      summary: A field definition's visibility, required flag, label, or other properties have been modified
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientFieldDefinitionUpdatedEvent'
+
+    ClientFieldDefinitionDeactivated:
+      name: client_field_definition.deactivated
+      title: Client Field Definition Deactivated
+      summary: A field definition has been deactivated (hidden from configuration, one-way)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientFieldDefinitionDeactivatedEvent'
+
+  schemas:
+    # =========================================================================
+    # Event Envelope Schemas
+    # =========================================================================
+
+    ClientFieldDefinitionCreatedEvent:
+      title: ClientFieldDefinitionCreatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Field definition UUID
+        stream_type:
+          type: string
+          const: client_field_definition
+        event_type:
+          type: string
+          const: client_field_definition.created
+        event_data:
+          $ref: '#/components/schemas/ClientFieldDefinitionCreatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientFieldDefinitionUpdatedEvent:
+      title: ClientFieldDefinitionUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Field definition UUID
+        stream_type:
+          type: string
+          const: client_field_definition
+        event_type:
+          type: string
+          const: client_field_definition.updated
+        event_data:
+          $ref: '#/components/schemas/ClientFieldDefinitionUpdatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientFieldDefinitionDeactivatedEvent:
+      title: ClientFieldDefinitionDeactivatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Field definition UUID
+        stream_type:
+          type: string
+          const: client_field_definition
+        event_type:
+          type: string
+          const: client_field_definition.deactivated
+        event_data:
+          $ref: '#/components/schemas/ClientFieldDefinitionDeactivatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    # =========================================================================
+    # Data Schemas
+    # =========================================================================
+
+    ClientFieldDefinitionCreatedData:
+      title: ClientFieldDefinitionCreatedData
+      type: object
+      description: Full field definition data for creation (bootstrap seed or manual)
+      required:
+        - field_id
+        - organization_id
+        - category_id
+        - field_key
+        - display_name
+      properties:
+        field_id:
+          type: string
+          format: uuid
+          description: Unique ID for the field definition
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization this definition belongs to
+        category_id:
+          type: string
+          format: uuid
+          description: FK to client_field_categories
+        field_key:
+          type: string
+          description: Semantic key matching column on clients_projection or custom_fields key
+          examples:
+            - "race"
+            - "admission_type"
+            - "house_assignment"
+        display_name:
+          type: string
+          description: Human-readable label shown in configuration UI
+          examples:
+            - "Race"
+            - "Admission Type"
+        field_type:
+          type: string
+          enum:
+            - text
+            - number
+            - date
+            - enum
+            - multi_enum
+            - boolean
+            - jsonb
+          default: text
+        is_visible:
+          type: boolean
+          default: true
+          description: Whether field appears in intake/discharge form
+        is_required:
+          type: boolean
+          default: false
+          description: Whether field is required when visible (Decision 69)
+        validation_rules:
+          type: object
+          nullable: true
+          description: Optional validation constraints (min, max, pattern)
+        is_dimension:
+          type: boolean
+          default: false
+          description: Whether field is exposed as Cube.js dimension
+        sort_order:
+          type: integer
+          default: 0
+        configurable_label:
+          type: string
+          nullable: true
+          description: Org-level display label override
+        conforming_dimension_mapping:
+          type: string
+          nullable: true
+          description: Canonical key for cross-org analytics
+
+    ClientFieldDefinitionUpdatedData:
+      title: ClientFieldDefinitionUpdatedData
+      type: object
+      description: Partial update — only changed fields included
+      required:
+        - field_id
+        - organization_id
+      properties:
+        field_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        category_id:
+          type: string
+          format: uuid
+        field_type:
+          type: string
+          enum:
+            - text
+            - number
+            - date
+            - enum
+            - multi_enum
+            - boolean
+            - jsonb
+        is_visible:
+          type: boolean
+        is_required:
+          type: boolean
+        validation_rules:
+          type: object
+          nullable: true
+        is_dimension:
+          type: boolean
+        sort_order:
+          type: integer
+        configurable_label:
+          type: string
+          nullable: true
+        conforming_dimension_mapping:
+          type: string
+          nullable: true
+
+    ClientFieldDefinitionDeactivatedData:
+      title: ClientFieldDefinitionDeactivatedData
+      type: object
+      description: Data for field definition deactivation
+      required:
+        - field_id
+        - organization_id
+      properties:
+        field_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid

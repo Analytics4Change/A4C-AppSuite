@@ -30,7 +30,9 @@ BEGIN
                 WHEN 'email'             THEN PERFORM process_email_event(NEW);
                 WHEN 'invitation'        THEN PERFORM process_invitation_event(NEW);
                 WHEN 'access_grant'      THEN PERFORM process_access_grant_event(NEW);
-                WHEN 'impersonation'     THEN PERFORM process_impersonation_event(NEW);
+                WHEN 'impersonation'            THEN PERFORM process_impersonation_event(NEW);
+                WHEN 'client_field_definition'  THEN PERFORM process_client_field_definition_event(NEW);
+                WHEN 'client_field_category'    THEN PERFORM process_client_field_category_event(NEW);
                 -- Administrative stream_types — No projection needed
                 WHEN 'platform_admin'    THEN NULL;
                 WHEN 'workflow_queue'    THEN NULL;
