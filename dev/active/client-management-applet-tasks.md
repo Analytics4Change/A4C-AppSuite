@@ -80,11 +80,11 @@ _Placement history table deferred to Client Intake implementation._
 - [x] `client_field_definition_templates` table + RLS + 66 template row seeds
 - Migration: `20260327210520_client_field_registry.sql`
 
-### Verification
-- [ ] Test RLS policies with different JWT claim profiles
-- [ ] Verify all ~55 columns present on `clients_projection`
-- [ ] Verify insurance table supports primary + secondary + medicaid rows
-- [ ] Verify 12 designations in CHECK constraint
+### Verification ✅ COMPLETE (2026-03-27)
+- [x] Test RLS policies with different JWT claim profiles — 11 assertions passed via Supabase MCP `execute_sql`
+- [x] Verify all columns present on `clients_projection` — 75 total (53 typed data + system columns)
+- [ ] Verify insurance table supports primary + secondary + medicaid rows — DEFERRED (table not yet created)
+- [x] Verify 12 designations in CHECK constraint — confirmed 12 values
 
 ## Phase 3: Event Integration — Client Field Configuration ✅ COMPLETE (2026-03-27)
 
@@ -162,17 +162,20 @@ _Placement history table deferred to Client Intake implementation._
 
 ## Phase 5: Frontend Intake Form ⏸️ PENDING
 
-### 5.0 Scope Decisions (resolve before implementation)
-- [ ] Decide navigation placement: intake config under `/settings/organization` or dedicated `/settings/intake-form` sub-route
-- [ ] Decide configurability UX: toggle switches vs drag-and-drop ordering vs section-based grouping
+### 5.0 Scope Decisions ✅ COMPLETE (2026-03-27)
+- [x] Decide navigation placement → dedicated `/settings/client-fields` sub-route (Decision 88)
+- [x] Decide configurability UX → toggle switches with "Required when visible" pattern + tabbed categories
 
-### 5.1 Intake Form Configuration (Settings UI)
-- [ ] Add "Client Intake Configuration" card to SettingsPage hub (reuse glassmorphism card pattern)
-- [ ] Define `IntakeFormConfig` TypeScript interface
-- [ ] Create `IIntakeFormConfigService` + Supabase + Mock implementations
-- [ ] Create `IntakeFormConfigViewModel` (mirror DirectCareSettingsViewModel: observable state, dirty tracking, save/reset, audit)
-- [ ] Create IntakeFormConfigSection component (core fields read-only, optional field toggles)
-- [ ] Permission gate on `organization.update`
+### 5.1 Client Field Configuration (Settings UI) ✅ COMPLETE (2026-03-27)
+- [x] Add "Client Field Configuration" card to SettingsPage hub (emerald icon, glassmorphism card)
+- [x] Define TypeScript interfaces (`client-field-settings.types.ts`: FieldDefinition, FieldCategory, BatchUpdateResult, etc.)
+- [x] Create `IClientFieldService` + `SupabaseClientFieldService` + `MockClientFieldService` + factory
+- [x] Create `ClientFieldSettingsViewModel` (MobX: batch save, dirty tracking, custom field/category CRUD)
+- [x] Create 6 UI components: `ClientFieldSettingsPage`, `ClientFieldTabBar`, `FieldDefinitionTab`, `FieldDefinitionRow`, `CustomFieldsTab`, `CategoriesTab`
+- [x] Route at `/settings/client-fields` with `RequirePermission` gate on `organization.update`
+- [x] `LOCKED_FIELD_KEYS` constant for 7 mandatory fields (lock icon, disabled toggles)
+- [x] WAI-ARIA Tabs pattern with keyboard navigation (Arrow keys, Home/End)
+- [x] Mock service seeded with 66 fields + 11 categories (matches bootstrap)
 
 ### 5.2 Client Intake Form
 - [ ] Create `ClientIntakeFormViewModel` (mirror OrganizationFormViewModel: multi-section, validation, draft management)
@@ -255,11 +258,11 @@ _Placement history table deferred to Client Intake implementation._
 
 ## Current Status
 
-**Phase**: Client Field Configuration — Backend COMPLETE, Frontend PENDING
-**Status**: All 8 backend migrations implemented and validated (dry-run passed). No migrations pushed to remote yet.
+**Phase**: Client Field Configuration — Backend DEPLOYED, Frontend IMPLEMENTED (not yet deployed)
+**Status**: All 8 backend migrations deployed. Frontend `/settings/client-fields` page implemented (12 new files, 4 modified). Phase 2 RLS verification passed (11 assertions). Build + lint clean.
 
-### Completed (2026-03-27):
-- **7 SQL migrations** (all pass `supabase db push --linked --dry-run`):
+### Deployed (2026-03-27):
+- **8 SQL migrations** (all deployed via CI/CD):
   1. `20260327205738_clients_projection.sql` — 53-column CQRS projection
   2. `20260327210520_client_field_registry.sql` — 4 tables + seeds (categories, definitions, references, templates)
   3. `20260327210838_contact_designations_projection.sql` — 12-value designation model
@@ -267,20 +270,30 @@ _Placement history table deferred to Client Intake implementation._
   5. `20260327211636_client_field_category_events.sql` — dispatcher + router + 2 handlers
   6. `20260327212247_client_field_api_functions.sql` — 8 API RPCs
   7. `20260327212739_client_field_event_types_seed.sql` — 5 event_types + AsyncAPI contracts
-- **1 Temporal workflow change** (Migration 8):
-  - `seedFieldDefinitions` activity + `deleteFieldDefinitions` compensation
-  - Workflow Step 1.6, TypeScript + ESLint clean
-- **Handler reference files**: 5 new handlers + 2 routers + updated dispatcher
-- **AsyncAPI contracts**: 2 new domain files, 5 new $ref entries in asyncapi.yaml
+  8. `20260327223918_bootstrap_dynamic_progress.sql` — dynamic bootstrap progress (RPC rewrite + router CASE)
+- **Temporal workflow changes**:
+  - `seedFieldDefinitions` activity + `deleteFieldDefinitions` compensation (Step 1.6)
+  - `emitBootstrapStepCompletedActivity` — 7 progress events per bootstrap
+- **Handler reference files**: 5 new handlers + 2 routers + updated dispatcher + updated org router
+- **AsyncAPI contracts**: 3 new domain files (field-definition, field-category, step-completed), `BootstrapStepKey` enum
+- **Edge Function**: `workflow-status` v27 — removed hardcoded stages, passthrough from RPC
+- **Frontend**: `BOOTSTRAP_STEPS` shared constant, `MockWorkflowClient` updated, `data-testid` on status page
 
 ### New tables created (7):
 `clients_projection`, `client_field_categories`, `client_field_definitions_projection`, `client_reference_values`, `client_field_definition_templates`, `contact_designations_projection` + FK added on `user_client_assignments_projection`
 
-### New functions created (13):
-5 handlers + 2 routers + 8 API RPCs (5 field def + 3 category)
+### New functions created/modified (14):
+5 handlers + 2 routers + 8 API RPCs (5 field def + 3 category) + rewritten `get_bootstrap_status()` (public + api)
+
+### Bootstrap Progress Tracking (2026-03-27):
+- **Problem solved**: 3 hardcoded stage lists (DB RPC, Edge Function, Mock client) drifted from actual workflow
+- **Solution**: Workflow emits `organization.bootstrap.step_completed` events to org stream; RPC reads them via CTE manifest
+- **Architecture review**: software-architect-dbc agent — 4 Major + 7 Minor findings, all remediated
+- **Plan file**: `.claude/plans/vectorized-bouncing-iverson.md`
+- **Gotcha**: `event_types` table has `event_schema` (jsonb NOT NULL), not `category` — CI caught this, fixed in follow-up commit
 
 **Last Updated**: 2026-03-27
-**Next Step**: Push migrations to remote (`supabase db push --linked`), then begin frontend implementation of `/settings/client-fields` page. Or run `npm run generate:types` in contracts/ to regenerate TypeScript types from AsyncAPI.
+**Next Step**: Commit frontend changes + RLS test script + documentation updates. Then deploy via `git push` (triggers CI/CD). After deploy, test in mock mode at `/settings/client-fields`.
 
 ### Static Configuration Prototype Created (2026-03-23, archived 2026-03-27)
 - Static HTML/CSS/JS prototype archived at `dev/active/client-management-applet-ux-prototype/` (zipped)

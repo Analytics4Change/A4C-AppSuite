@@ -10,7 +10,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building, ChevronRight, Settings } from 'lucide-react';
+import { Building, ClipboardList, ChevronRight, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const glassCardStyle = {
@@ -36,7 +36,9 @@ export const SettingsPage: React.FC = observer(() => {
         setCanUpdateOrg(result);
       }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [hasPermission]);
 
   const showOrgSettings = isProvider && canUpdateOrg;
@@ -85,15 +87,46 @@ export const SettingsPage: React.FC = observer(() => {
           </Card>
         )}
 
+        {/* Client Field Configuration Card */}
+        {showOrgSettings && (
+          <Card
+            style={glassCardStyle}
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => navigate('/settings/client-fields')}
+            role="link"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate('/settings/client-fields');
+              }
+            }}
+            aria-label="Client Field Configuration"
+          >
+            <CardContent className="flex items-center gap-4 py-4">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600">
+                <ClipboardList size={20} />
+              </div>
+              <div className="flex-1">
+                <CardHeader className="p-0">
+                  <CardTitle className="text-base">Client Field Configuration</CardTitle>
+                </CardHeader>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Configure intake form fields, visibility, required flags, and custom labels.
+                </p>
+              </div>
+              <ChevronRight size={20} className="text-gray-400" />
+            </CardContent>
+          </Card>
+        )}
+
         {/* Placeholder for future settings */}
         {!showOrgSettings && (
           <Card style={glassCardStyle}>
             <CardContent className="pt-6">
               <div className="text-center py-8">
                 <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                  Settings
-                </h2>
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">Settings</h2>
                 <p className="text-gray-600">
                   Additional settings will be available here in future updates.
                 </p>

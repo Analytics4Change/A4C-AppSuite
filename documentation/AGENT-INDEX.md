@@ -181,8 +181,9 @@ purpose: agent-navigation
 | `resend` | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | activities-reference.md |
 | `retention-policy` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `retry-policies` | [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | activities-reference.md |
-| `rls` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | table-template.md, SQL_IDEMPOTENCY_AUDIT.md |
+| `rls` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | table-template.md, SQL_IDEMPOTENCY_AUDIT.md, DAY0-MIGRATION-GUIDE.md |
 | `rls-gap` | [clients.md](infrastructure/reference/database/tables/clients.md) | medications.md |
+| `rls-verification` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | multi-tenancy-architecture.md |
 | `rollback` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `role-access-dates` | [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | rbac-architecture.md |
 | `role-modification` | [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | user_roles_projection.md, rbac-architecture.md |
@@ -294,7 +295,7 @@ purpose: agent-navigation
 
 | Document | Summary | Keywords | ~Tokens |
 |----------|---------|----------|---------|
-| [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | Day Zero baseline consolidation, handler reference files for resets | `day0-migration`, `baseline`, `migration-tracking`, `rollback`, `supabase-cli` | 3800 |
+| [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | Day Zero baseline consolidation, handler reference files, RLS verification after resets | `day0-migration`, `baseline`, `migration-tracking`, `rollback`, `supabase-cli`, `rls-verification` | 4400 |
 | [SQL_IDEMPOTENCY_AUDIT.md](infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md) | Idempotent SQL migration patterns | `migration`, `sql`, `idempotent` | 2400 |
 | [DEPLOYMENT_INSTRUCTIONS.md](infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) | Step-by-step deployment procedures | `deployment`, `supabase`, `edge-functions` | 2100 |
 | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | Google OAuth testing guide | `oauth`, `testing`, `google` | 1400 |

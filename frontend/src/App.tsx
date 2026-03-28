@@ -24,7 +24,7 @@ import { AccessBlockedPage } from '@/pages/auth/AccessBlockedPage';
 import { OrganizationUnitsManagePage } from '@/pages/organization-units';
 import { RolesPage, RolesManagePage } from '@/pages/roles';
 import { UserListPage, UsersManagePage } from '@/pages/users';
-import { SettingsPage, OrganizationSettingsPage } from '@/pages/settings';
+import { SettingsPage, OrganizationSettingsPage, ClientFieldSettingsPage } from '@/pages/settings';
 import { ScheduleListPage, SchedulesManagePage } from '@/pages/schedules';
 import { AssignmentListPage, UserCaseloadPage } from '@/pages/assignments';
 import { DebugControlPanel } from '@/components/debug/DebugControlPanel';
@@ -210,6 +210,14 @@ function App() {
                   element={
                     <RequirePermission permission="organization.update" fallback="/settings">
                       <OrganizationSettingsPage />
+                    </RequirePermission>
+                  }
+                />
+                <Route
+                  path="/settings/client-fields"
+                  element={
+                    <RequirePermission permission="organization.update" fallback="/settings">
+                      <ClientFieldSettingsPage />
                     </RequirePermission>
                   }
                 />

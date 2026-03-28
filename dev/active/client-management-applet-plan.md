@@ -128,6 +128,34 @@ Architecture review: `.claude/plans/peaceful-marinating-bonbon-agent-af9009328e6
 ### UX Prototype Archived
 Static HTML prototype moved from `~/tmp/` to `dev/active/client-management-applet-ux-prototype/` (zipped). Design reference only — divergences from authoritative design documented in plan.
 
+## Plan Updates (2026-03-27) — Frontend Settings Page + RLS Verification
+
+### Frontend `/settings/client-fields` Implemented
+12 new files + 4 modified files. Build + lint clean. Pattern follows DirectCareSettings exactly.
+
+**New files created**:
+- `frontend/src/types/client-field-settings.types.ts` — FieldDefinition, FieldCategory, BatchUpdateResult, LOCKED_FIELD_KEYS
+- `frontend/src/services/client-fields/` — IClientFieldService, SupabaseClientFieldService, MockClientFieldService, ClientFieldServiceFactory
+- `frontend/src/viewModels/settings/ClientFieldSettingsViewModel.ts` — MobX VM with batch save, dirty tracking, CRUD
+- `frontend/src/pages/settings/ClientFieldSettingsPage.tsx` — Page shell with save/reset actions
+- `frontend/src/pages/settings/client-fields/` — ClientFieldTabBar, FieldDefinitionTab, FieldDefinitionRow, CustomFieldsTab, CategoriesTab
+
+**Modified files**:
+- `frontend/src/App.tsx` — added `/settings/client-fields` route with RequirePermission
+- `frontend/src/pages/settings/SettingsPage.tsx` — added "Client Field Configuration" card (emerald ClipboardList icon)
+- `frontend/src/pages/settings/index.ts` — added ClientFieldSettingsPage export
+
+### Phase 2 RLS Verification Completed
+11 RLS assertions passed via Supabase MCP `execute_sql` tool:
+- Org isolation (field definitions, categories), bogus org sees 0, system categories visible to all
+- Platform admin cross-org access, write denial for authenticated role
+- Test script: `infrastructure/supabase/scripts/test-client-field-rls.sql`
+- Note: `client_field_definitions_projection` is empty (existing orgs bootstrapped before seedFieldDefinitions activity)
+
+### Documentation Updated
+- `DAY0-MIGRATION-GUIDE.md` — new "Post-Reset RLS Verification" section (why, how, future pgTAP)
+- `AGENT-INDEX.md` — added `rls-verification` keyword, updated catalog entry
+
 ## Plan Updates (2026-03-27) — All 8 Backend Migrations Implemented
 
 ### Implementation Session Summary
@@ -144,8 +172,34 @@ All 8 backend migrations for Client Field Configuration implemented in a single 
 - **Untyped Supabase tables**: Activity uses `(supabase as any).from('new_table')` with eslint-disable blocks since generated types don't include new tables yet. Types will be regenerated after migration push.
 - **Plan file**: `.claude/plans/peaceful-marinating-bonbon.md` was cleaned up and does not exist. All implementation was driven from dev-docs files directly.
 
-### Migrations NOT Pushed
-All 7 SQL migrations are local only — `supabase db push --linked` has NOT been run. Next session should push or review before pushing.
+### All Migrations Deployed (2026-03-27)
+All 8 SQL migrations deployed via CI/CD (`git push` → GitHub Actions). 5 pipelines passed:
+- Deploy Database Migrations (8 migrations applied)
+- Deploy Temporal Workers (Docker build + k8s rollout)
+- Deploy Frontend (mock client + data-testid)
+- Deploy Edge Functions (workflow-status v27)
+- Validate Frontend Documentation
+
+## Plan Updates (2026-03-27) — Dynamic Bootstrap Progress Tracking
+
+### Problem
+Bootstrap status page had hardcoded stage lists in 3 places (DB RPC, Edge Function, Mock client) that drifted from the actual workflow. Adding Step 1.6 exposed the drift.
+
+### Solution
+- Workflow emits `organization.bootstrap.step_completed` events (7 per bootstrap) to org stream
+- `get_bootstrap_status()` RPC rewritten with CTE-based step manifest → `stages` JSONB array
+- Edge Function simplified to passthrough (removed 11-stage hardcoded list + `getStageStatus()`)
+- Mock client uses shared `BOOTSTRAP_STEPS` constant from `frontend/src/constants/bootstrap-steps.ts`
+- Architecture review by software-architect-dbc: 4 Major + 7 Minor findings, all remediated
+- Plan file: `.claude/plans/vectorized-bouncing-iverson.md`
+
+### Key Implementation Details
+- **Migration**: `20260327223918_bootstrap_dynamic_progress.sql` — router CASE + RPC rewrite + API wrapper + event_types seed
+- **Typed event helper**: `emitBootstrapStepCompleted()` in `typed-events.ts` with AsyncAPI-generated `BootstrapStepKey` enum
+- **Activity**: `emit-step-completed.ts` — lightweight activity called after each workflow step
+- **Temporal replay safety (M1)**: Verified zero in-flight workflows before deploying via `temporal workflow list`
+- **Legacy compat (M3)**: Pre-existing orgs show `status='completed'` with empty stages array (acceptable — status page only visible during active bootstrap)
+- **Gotcha**: `event_types` table has `event_schema` (jsonb NOT NULL), not `category` — first deploy failed, fixed in follow-up commit `5d53c890`
 
 ## Plan Updates (2026-03-19) — Field Classification & Contact Architecture
 

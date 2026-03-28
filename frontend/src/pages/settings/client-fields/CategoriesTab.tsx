@@ -1,0 +1,203 @@
+/**
+ * Categories Tab
+ *
+ * Manage field categories: system categories shown read-only,
+ * org-defined categories can be created and deactivated.
+ */
+
+import React, { useState } from 'react';
+import { observer } from 'mobx-react-lite';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Plus, Trash2, Lock, Loader2, AlertCircle } from 'lucide-react';
+import type { FieldCategory } from '@/types/client-field-settings.types';
+import type { ClientFieldSettingsViewModel } from '@/viewModels/settings/ClientFieldSettingsViewModel';
+
+const glassCardStyle = {
+  background: 'rgba(255, 255, 255, 0.7)',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  border: '1px solid rgba(255, 255, 255, 0.3)',
+  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+};
+
+interface CategoriesTabProps {
+  viewModel: ClientFieldSettingsViewModel;
+  categories: FieldCategory[];
+  orgId: string;
+}
+
+export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
+  ({ viewModel, categories, orgId }) => {
+    const [showForm, setShowForm] = useState(false);
+    const [name, setName] = useState('');
+    const [slug, setSlug] = useState('');
+
+    const activeCategories = categories.filter((c) => c.is_active);
+    const canCreate = name.trim().length > 0 && slug.trim().length > 0;
+
+    const autoSlug = (value: string) => {
+      setName(value);
+      setSlug(
+        value
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9\s]/g, '')
+          .replace(/\s+/g, '_')
+      );
+    };
+
+    const handleCreate = async () => {
+      if (!canCreate) return;
+      const success = await viewModel.createCategory(name.trim(), slug.trim(), orgId);
+      if (success) {
+        setName('');
+        setSlug('');
+        setShowForm(false);
+      }
+    };
+
+    const handleDeactivate = async (categoryId: string, categoryName: string) => {
+      await viewModel.deactivateCategory(categoryId, `Removed category: ${categoryName}`, orgId);
+    };
+
+    return (
+      <div
+        role="tabpanel"
+        aria-labelledby="tab-categories"
+        id="tabpanel-categories"
+        data-testid="tabpanel-categories"
+      >
+        <Card style={glassCardStyle}>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Field Categories</CardTitle>
+              {!showForm && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowForm(true)}
+                  data-testid="add-category-btn"
+                >
+                  <Plus size={16} className="mr-1" />
+                  Add Category
+                </Button>
+              )}
+            </div>
+            <p className="text-sm text-gray-600 mt-1">
+              System categories cannot be removed. You can add custom categories for organizing
+              additional fields.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Create form */}
+            {showForm && (
+              <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-white/50">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="cat-name">Category Name</Label>
+                    <input
+                      id="cat-name"
+                      type="text"
+                      value={name}
+                      onChange={(e) => autoSlug(e.target.value)}
+                      placeholder="e.g., Behavioral"
+                      className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      data-testid="cat-name-input"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="cat-slug">Slug</Label>
+                    <input
+                      id="cat-slug"
+                      type="text"
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value)}
+                      placeholder="e.g., behavioral"
+                      className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      data-testid="cat-slug-input"
+                    />
+                  </div>
+                </div>
+
+                {viewModel.createCategoryError && (
+                  <div
+                    role="alert"
+                    className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-sm"
+                  >
+                    <AlertCircle size={14} />
+                    {viewModel.createCategoryError}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleCreate}
+                    disabled={!canCreate || viewModel.isCreatingCategory}
+                    data-testid="cat-save-btn"
+                  >
+                    {viewModel.isCreatingCategory ? (
+                      <Loader2 size={14} className="mr-1 animate-spin" />
+                    ) : (
+                      <Plus size={14} className="mr-1" />
+                    )}
+                    Create Category
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowForm(false);
+                      setName('');
+                      setSlug('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Categories list */}
+            <div className="divide-y divide-gray-100">
+              {activeCategories.map((cat) => (
+                <div
+                  key={cat.id}
+                  className="flex items-center justify-between py-3"
+                  data-testid={`category-${cat.slug}`}
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{cat.name}</span>
+                      {cat.is_system && (
+                        <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                          <Lock size={10} />
+                          System
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">{cat.slug}</p>
+                  </div>
+                  {!cat.is_system && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeactivate(cat.id, cat.name)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      aria-label={`Remove ${cat.name}`}
+                      data-testid={`cat-remove-${cat.slug}`}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+);

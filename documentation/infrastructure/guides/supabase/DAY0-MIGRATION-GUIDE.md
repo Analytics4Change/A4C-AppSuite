@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-11
+last_updated: 2026-03-27
 ---
 
 <!-- TL;DR-START -->
@@ -11,12 +11,13 @@ last_updated: 2026-02-11
 **When to read**:
 - Consolidating multiple migrations into a fresh baseline
 - Using handler reference files during baseline consolidation
+- Verifying RLS policies after a baseline reset
 - Transitioning to Supabase CLI from manual SQL deployment
 - Troubleshooting migration history issues
 
 **Prerequisites**: Supabase CLI installed, project access
 
-**Key topics**: `day0-migration`, `supabase-cli`, `baseline`, `migration-tracking`, `rollback`
+**Key topics**: `day0-migration`, `supabase-cli`, `baseline`, `migration-tracking`, `rollback`, `rls-verification`
 
 **Estimated read time**: 12 minutes
 <!-- TL;DR-END -->
@@ -432,10 +433,86 @@ supabase db push --linked
 - Rollback capability via `migration repair`
 - Clean starting point for new developers (single file vs 25+)
 
+## Post-Reset RLS Verification
+
+### Why RLS Verification Matters
+
+RLS policy failures are **silent** — a broken policy returns empty results instead of raising an error. In a multi-tenant healthcare application handling PHI, a missing or misconfigured policy means one organization's data leaks to another with no visible indication. Day 0 baseline resets rewrite every RLS policy from scratch, making regression likely if not explicitly verified.
+
+### Current Methodology
+
+RLS policies are verified using manual SQL test scripts that simulate authenticated users with synthetic JWT claims. The pattern:
+
+```sql
+-- 1. Inject JWT claims to simulate a specific user/org context
+PERFORM set_config('request.jwt.claims', json_build_object(
+  'sub', v_user_id,
+  'org_id', v_org_id,
+  'org_type', 'provider',
+  'effective_permissions', json_build_array(),
+  'claims_version', 4
+)::text, true);
+
+-- 2. Switch to the authenticated role (activates RLS)
+PERFORM set_config('role', 'authenticated', true);
+
+-- 3. Query — RLS now enforces org isolation
+SELECT count(*) INTO v_count FROM target_table;
+
+-- 4. Reset role before next test
+RESET ROLE;
+```
+
+### What to Verify Per Table
+
+For every table with org-scoped RLS:
+
+| Assertion | Method |
+|-----------|--------|
+| **Org isolation** | Set JWT to Org A, verify 0 rows from Org B visible |
+| **Bogus org** | Set JWT to non-existent org, verify 0 rows |
+| **System data visibility** | Tables with `organization_id IS NULL` rows (e.g., system categories) visible to any org |
+| **Platform admin override** | Set JWT with `platform.admin` permission, verify cross-org access |
+| **Write denial** | Attempt INSERT as `authenticated` role on CQRS projections — must be denied |
+
+### Test Scripts
+
+Existing verification scripts in `infrastructure/supabase/scripts/`:
+
+| Script | Tables Covered |
+|--------|---------------|
+| `test-client-field-rls.sql` | `clients_projection`, `client_field_definitions_projection`, `client_field_categories`, `client_reference_values`, `contact_designations_projection` |
+| `test-schedule-assignment-rpcs.sql` | Schedule assignment RPC functions with JWT context |
+
+### How to Run
+
+Three execution options:
+
+1. **Supabase SQL Editor** — paste script into dashboard SQL Editor
+2. **psql** — `psql $DATABASE_URL -f infrastructure/supabase/scripts/test-client-field-rls.sql`
+3. **Supabase MCP server** — use `execute_sql` tool (note: `RAISE NOTICE` output is not returned; use `RAISE EXCEPTION` trick or result-set queries for assertions)
+
+All scripts are wrapped in `BEGIN`/`ROLLBACK` for zero persistent changes.
+
+### Future Enhancement: pgTAP
+
+The target automation framework is [pgTAP](https://pgtap.org/) — PostgreSQL's native TAP-compliant testing extension. pgTAP would enable:
+
+- Declarative test assertions (`SELECT ok(...)`, `SELECT is(...)`)
+- CI integration via `pg_prove`
+- Automated regression detection on every migration push
+
+**Not yet justified** — current table count (~5 RLS-protected projection tables) and infrequent policy changes don't warrant the infrastructure investment. **Trigger conditions** for adopting pgTAP:
+
+- Frequent Day 0 resets (more than quarterly)
+- 10+ RLS-protected tables (likely with Client Intake project)
+- CI pipeline already includes local Supabase instance (for `plpgsql_check` or similar)
+
 ## Related Documentation
 
 - [Handler Reference Files](../../../../infrastructure/supabase/handlers/README.md) - Canonical SQL for copy/paste during baseline consolidation
 - [SQL Idempotency Audit](./SQL_IDEMPOTENCY_AUDIT.md) - Idempotent migration patterns
 - [Deployment Instructions](./DEPLOYMENT_INSTRUCTIONS.md) - Step-by-step deployment procedures
 - [Event Handler Pattern](../../patterns/event-handler-pattern.md) - Split handler architecture and reference file workflow
+- [Multi-Tenancy Architecture](../../architecture/data/multi-tenancy-architecture.md) - RLS design and org isolation patterns
 - [infrastructure/CLAUDE.md](../../../../infrastructure/CLAUDE.md) - Infrastructure development guidance
