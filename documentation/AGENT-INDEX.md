@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-03-06
+last_updated: 2026-03-28
 purpose: agent-navigation
 ---
 
@@ -58,7 +58,13 @@ purpose: agent-navigation
 | `cascade-deactivation` | [organization_units_projection.md](infrastructure/reference/database/tables/organization_units_projection.md) | user_roles_projection.md |
 | `caseload` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | schedule_user_assignments_projection.md |
 | `client-assignment` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | organizations_projection.md |
-| `clients` | [clients.md](infrastructure/reference/database/tables/clients.md) | medication_history.md |
+| `client` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | client_field_definitions_projection.md, contact_designations_projection.md |
+| `client-data-model` | [client-data-model.md](architecture/data/client-data-model.md) | clients_projection.md, client_field_definitions_projection.md |
+| `client-field-config` | [client_field_definitions_projection.md](infrastructure/reference/database/tables/client_field_definitions_projection.md) | client_field_categories.md, client_field_definition_templates.md |
+| `clients` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | medication_history.md, client-data-model.md |
+| `contact-designation` | [contact_designations_projection.md](infrastructure/reference/database/tables/contact_designations_projection.md) | contacts_projection.md, client-data-model.md |
+| `custom-fields` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | client_field_definitions_projection.md |
+| `discharge` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | client-data-model.md |
 | `compensation` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
 | `compliance` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | dosage_info.md |
 | `contact-addresses` | [contact_addresses.md](infrastructure/reference/database/tables/contact_addresses.md) | contacts_projection.md |
@@ -105,6 +111,10 @@ purpose: agent-navigation
 | `failed-events` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md |
 | `hipaa` | [enterprise-sso-guide.md](architecture/authentication/enterprise-sso-guide.md) | impersonation-security-controls.md |
 | `feature-flag` | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | user_client_assignments_projection.md |
+| `field-category` | [client_field_categories.md](infrastructure/reference/database/tables/client_field_categories.md) | client_field_definitions_projection.md |
+| `field-definition` | [client_field_definitions_projection.md](infrastructure/reference/database/tables/client_field_definitions_projection.md) | client_field_categories.md |
+| `field-registry` | [client_field_definitions_projection.md](infrastructure/reference/database/tables/client_field_definitions_projection.md) | client_field_definition_templates.md, client_field_categories.md |
+| `field-template` | [client_field_definition_templates.md](infrastructure/reference/database/tables/client_field_definition_templates.md) | client_field_definitions_projection.md |
 | `forgot-password` | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | LoginPage, supabase-auth-overview.md |
 | `formulary` | [medications.md](infrastructure/reference/database/tables/medications.md) | medication_history.md |
 | `generated-events` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | workflows/CLAUDE.md, event-sourcing-overview.md |
@@ -115,7 +125,9 @@ purpose: agent-navigation
 | `impersonation` | [impersonation-architecture.md](architecture/authentication/impersonation-architecture.md) | impersonation-security-controls.md |
 | `impersonation-sessions` | [impersonation_sessions_projection.md](infrastructure/reference/database/tables/impersonation_sessions_projection.md) | impersonation-architecture.md |
 | `integration-testing` | [integration-testing.md](workflows/guides/integration-testing.md) | triggering-workflows.md |
+| `intake` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | client-data-model.md, client_field_definitions_projection.md |
 | `invitation` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | organizations_projection.md |
+| `iso-639` | [client_reference_values.md](infrastructure/reference/database/tables/client_reference_values.md) | clients_projection.md |
 | `invitation-emails` | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | activities-reference.md |
 | `invitation-oauth` | [oauth-invitation-acceptance.md](architecture/authentication/oauth-invitation-acceptance.md) | invitations_projection.md, frontend-auth-architecture.md |
 | `jwt` | [custom-claims-setup.md](architecture/authentication/custom-claims-setup.md) | frontend-auth-architecture.md, supabase-auth-overview.md |
@@ -163,7 +175,9 @@ purpose: agent-navigation
 | `permission-grants` | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | rbac-architecture.md |
 | `pg-notify` | [event-driven-workflow-triggering.md](architecture/workflows/event-driven-workflow-triggering.md) | triggering-workflows.md |
 | `pg-notify-pattern` | [event-driven-workflow-triggering.md](architecture/workflows/event-driven-workflow-triggering.md) | event-processing-patterns.md |
-| `phi` | [clients.md](infrastructure/reference/database/tables/clients.md) | dosage_info.md |
+| `patient` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | client-data-model.md |
+| `phi` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | dosage_info.md |
+| `placement` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | client-data-model.md |
 | `phone-addresses` | [phone_addresses.md](infrastructure/reference/database/tables/phone_addresses.md) | phones_projection.md |
 | `phones` | [phones_projection.md](infrastructure/reference/database/tables/phones_projection.md) | addresses_projection.md |
 | `precursor-question` | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | ui-patterns.md |
@@ -342,7 +356,14 @@ purpose: agent-navigation
 | [medications.md](infrastructure/reference/database/tables/medications.md) | Medication catalog | `medication`, `formulary`, `rxnorm` | 600 |
 | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | Prescription records | `prescriptions`, `compliance`, `controlled-substances` | 720 |
 | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | MAR tracking | `dosage-info`, `mar`, `medication-administration` | 800 |
-| [clients.md](infrastructure/reference/database/tables/clients.md) | Client/patient records | `clients`, `phi`, `hipaa` | 550 |
+| [clients.md](infrastructure/reference/database/tables/clients.md) | (LEGACY) Old clients table — superseded by clients_projection | `deprecated` | 100 |
+| [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | Client/patient records — ~50 typed columns, CQRS projection | `client`, `patient`, `intake`, `discharge`, `demographics`, `custom-fields`, `placement`, `phi` | 1200 |
+| [client_field_definitions_projection.md](infrastructure/reference/database/tables/client_field_definitions_projection.md) | Per-org field visibility/required configuration | `field-definition`, `field-registry`, `client-field-config` | 650 |
+| [client_field_categories.md](infrastructure/reference/database/tables/client_field_categories.md) | Field grouping categories (11 system + org-defined) | `field-category`, `client-field-config`, `intake-wizard` | 450 |
+| [client_field_definition_templates.md](infrastructure/reference/database/tables/client_field_definition_templates.md) | Bootstrap seed templates (67 rows) | `field-template`, `bootstrap-seed` | 400 |
+| [client_reference_values.md](infrastructure/reference/database/tables/client_reference_values.md) | Global reference data (ISO 639 languages) | `reference-values`, `iso-639`, `language` | 300 |
+| [contact_designations_projection.md](infrastructure/reference/database/tables/contact_designations_projection.md) | 12-value contact designation model (4NF) | `contact-designation`, `clinical-contact`, `designation` | 500 |
+| [client-data-model.md](architecture/data/client-data-model.md) | Client data model architecture — CQRS projections, field registry, contact designations | `client-data-model`, `client`, `field-registry`, `contact-designation`, `intake`, `discharge` | 800 |
 | [schedule_templates_projection.md](infrastructure/reference/database/tables/schedule_templates_projection.md) | Schedule template definitions | `schedule`, `schedule-template`, `staff-schedule`, `weekly-schedule` | 500 |
 | [schedule_user_assignments_projection.md](infrastructure/reference/database/tables/schedule_user_assignments_projection.md) | User-to-schedule-template assignments | `schedule-assignment`, `user-assignment` | 350 |
 | [schedule-management.md](frontend/reference/schedule-management.md) | Schedule template management frontend reference (MVVM, service layer, types) | `schedule-crud`, `schedule-form`, `weekly-grid`, `schedule-management`, `schedule-template` | 350 |

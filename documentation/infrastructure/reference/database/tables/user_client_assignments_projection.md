@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2026-02-02
+last_updated: 2026-03-28
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: CQRS projection for client-staff assignment mappings. Tracks which clients are assigned to which staff members within an organization. Unique constraint on `(user_id, client_id)` with upsert semantics — re-assigning reactivates. No FK to clients table (client domain not yet event-driven). Controlled by `enable_staff_client_mapping` feature flag in `organizations_projection.direct_care_settings`.
+**Summary**: CQRS projection for client-staff assignment mappings. Tracks which clients are assigned to which staff members within an organization. Unique constraint on `(user_id, client_id)` with upsert semantics — re-assigning reactivates. FK to `clients_projection` added 2026-03-27. Controlled by `enable_staff_client_mapping` feature flag in `organizations_projection.direct_care_settings`.
 
 **When to read**:
 - Building client assignment / caseload management UI
@@ -39,7 +39,7 @@ Key characteristics:
 |--------|------|----------|---------|-------------|
 | id | uuid | NO | gen_random_uuid() | Primary key |
 | user_id | uuid | NO | - | FK to `users(id)` — the staff member |
-| client_id | uuid | NO | - | Client UUID (no FK — client domain pending) |
+| client_id | uuid | NO | - | FK to `clients_projection(id)` — the client being assigned |
 | organization_id | uuid | NO | - | FK to `organizations_projection(id)` — owning org |
 | assigned_at | timestamptz | YES | now() | When the assignment was created |
 | assigned_until | timestamptz | YES | - | Optional expiration (null = indefinite) |
@@ -58,8 +58,7 @@ Key characteristics:
 | `user_client_assignments_unique` | UNIQUE | `(user_id, client_id)` |
 | `user_client_assignments_projection_user_id_fkey` | FOREIGN KEY | `user_id → users(id)` |
 | `user_client_assignments_projection_organization_id_fkey` | FOREIGN KEY | `organization_id → organizations_projection(id)` |
-
-Note: No FK on `client_id` — the client domain has not yet been rebuilt with the event-driven architecture. Client IDs are displayed as raw UUIDs in the UI until the client projection is available.
+| `user_client_assignments_projection_client_id_fkey` | FOREIGN KEY | `client_id → clients_projection(id)` |
 
 ## Indexes
 
@@ -100,6 +99,6 @@ The client assignment UI is gated by `organizations_projection.direct_care_setti
 
 ## See Also
 
+- [clients_projection](./clients_projection.md) — Client records (FK target)
 - [organizations_projection](./organizations_projection.md) — Parent organization + feature flag
 - [users](./users.md) — Staff member reference
-- [user_schedule_policies_projection](./user_schedule_policies_projection.md) — Related: staff work schedules

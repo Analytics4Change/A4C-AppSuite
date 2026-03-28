@@ -164,7 +164,7 @@ All 8 backend migrations for Client Field Configuration implemented in a single 
 ### Key Implementation Details
 - **`clients_projection`**: 53 typed columns (not 55 — `email`, `phone_primary`, `phone_secondary`, `preferred_communication_method`, `county` dropped per Decisions 57/64/65). Status CHECK: `active | inactive | discharged` (3 values, not 2).
 - **Field categories**: 11 system categories (demographics through education), matching wizard steps. Was 5 in Decision 32 but expanded to cover all wizard sections.
-- **Template seeds**: 66 field definition templates covering all 11 categories. 7 mandatory fields locked (`is_locked = true`).
+- **Template seeds**: 67 field definition templates covering all 11 categories. 7 mandatory fields locked (`is_locked = true`).
 - **Language seeds**: 40 ISO 639 entries ranked by US healthcare relevance.
 - **RLS pattern**: CQRS projections use org-scoped SELECT only — no INSERT/UPDATE/DELETE for `authenticated` (service_role writes via event handlers bypass RLS). Matches `schedule_templates_projection` precedent.
 - **Handler pattern**: `handle_client_field_definition_updated` uses COALESCE for non-nullable fields + CASE/`?` for nullable fields (partial update support).
