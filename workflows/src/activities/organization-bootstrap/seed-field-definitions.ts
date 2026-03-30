@@ -73,18 +73,19 @@ export async function seedFieldDefinitions(
 
   log.info('Starting field definitions seed', { orgId });
 
-  // Layer 2 Idempotency: Check if already seeded via api.list_field_definitions
+  // Layer 2 Idempotency: Check if already seeded via api.check_field_definitions_exist
+  // Uses explicit p_org_id since service_role has no JWT org context
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-  const { data: existing, error: checkError } = await (supabase.schema('api') as any).rpc(
-    'list_field_definitions',
-    { p_org_id: orgId, p_include_inactive: false }
-  ) as { data: unknown[] | null; error: { message: string } | null };
+  const { data: alreadyExists, error: checkError } = await (supabase.schema('api') as any).rpc(
+    'check_field_definitions_exist',
+    { p_org_id: orgId }
+  ) as { data: boolean | null; error: { message: string } | null };
 
   if (checkError) {
     throw new Error(`Failed to check existing field definitions: ${checkError.message}`);
   }
 
-  if (existing && Array.isArray(existing) && existing.length > 0) {
+  if (alreadyExists) {
     log.info('Field definitions already seeded, skipping', { orgId });
     return { definitionsSeeded: 0, alreadySeeded: true };
   }
