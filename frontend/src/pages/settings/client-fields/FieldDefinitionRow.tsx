@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Lock, BarChart3 } from 'lucide-react';
 import type { FieldDefinition } from '@/types/client-field-settings.types';
-import { LOCKED_FIELD_KEYS } from '@/types/client-field-settings.types';
+import { LOCKED_FIELD_KEYS, FIELD_TYPE_DISPLAY_LABELS } from '@/types/client-field-settings.types';
 
 interface FieldDefinitionRowProps {
   field: FieldDefinition;
@@ -57,7 +57,7 @@ export const FieldDefinitionRow: React.FC<FieldDefinitionRowProps> = observer(
             )}
           </div>
           <p id={descId} className="text-sm text-gray-500">
-            {field.field_type}
+            {FIELD_TYPE_DISPLAY_LABELS[field.field_type]}
             {field.configurable_label ? ` — Label: "${field.configurable_label}"` : ''}
           </p>
 

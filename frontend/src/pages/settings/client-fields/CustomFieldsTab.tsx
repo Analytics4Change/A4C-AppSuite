@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import type { FieldDefinition, FieldCategory } from '@/types/client-field-settings.types';
-import { LOCKED_FIELD_KEYS } from '@/types/client-field-settings.types';
+import { SYSTEM_FIELD_KEYS, FIELD_TYPE_DISPLAY_LABELS } from '@/types/client-field-settings.types';
 import type { ClientFieldSettingsViewModel } from '@/viewModels/settings/ClientFieldSettingsViewModel';
 
 const glassCardStyle = {
@@ -24,13 +24,13 @@ const glassCardStyle = {
 };
 
 const FIELD_TYPES = [
-  { value: 'text', label: 'Text' },
-  { value: 'number', label: 'Number' },
-  { value: 'date', label: 'Date' },
-  { value: 'enum', label: 'Dropdown' },
-  { value: 'multi_enum', label: 'Multi-Select' },
-  { value: 'boolean', label: 'Yes/No' },
-  { value: 'jsonb', label: 'Structured Data' },
+  { value: 'text', label: FIELD_TYPE_DISPLAY_LABELS.text },
+  { value: 'number', label: FIELD_TYPE_DISPLAY_LABELS.number },
+  { value: 'date', label: FIELD_TYPE_DISPLAY_LABELS.date },
+  { value: 'enum', label: FIELD_TYPE_DISPLAY_LABELS.enum },
+  { value: 'multi_enum', label: FIELD_TYPE_DISPLAY_LABELS.multi_enum },
+  { value: 'boolean', label: FIELD_TYPE_DISPLAY_LABELS.boolean },
+  { value: 'jsonb', label: FIELD_TYPE_DISPLAY_LABELS.jsonb },
 ];
 
 interface CustomFieldsTabProps {
@@ -49,7 +49,7 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
     const [isRequired, setIsRequired] = useState(false);
 
     // Custom fields = non-locked, org-created fields (across all categories)
-    const customFields = fields.filter((f) => !LOCKED_FIELD_KEYS.has(f.field_key) && f.is_active);
+    const customFields = fields.filter((f) => !SYSTEM_FIELD_KEYS.has(f.field_key) && f.is_active);
 
     const fieldKey = name
       .toLowerCase()
@@ -239,7 +239,7 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">{field.display_name}</span>
                         <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
-                          {field.field_type}
+                          {FIELD_TYPE_DISPLAY_LABELS[field.field_type] ?? field.field_type}
                         </span>
                         {field.is_required && (
                           <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
