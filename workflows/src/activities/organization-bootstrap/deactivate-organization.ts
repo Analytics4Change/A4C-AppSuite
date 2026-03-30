@@ -46,54 +46,36 @@ export async function deactivateOrganization(
   const supabase = getSupabaseClient();
 
   try {
-    // Check current status (idempotency)
-    const { data: org, error: checkError } = await supabase
-      .from('organizations_projection')
-      .select('id, is_active, deleted_at')
-      .eq('id', params.orgId)
-      .maybeSingle();
+    // Use api.safety_net_deactivate_organization RPC — direct .from() queries
+    // fail because PostgREST only exposes the api schema.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const { data: result, error } = await (supabase.schema('api') as any).rpc(
+      'safety_net_deactivate_organization',
+      { p_org_id: params.orgId }
+    ) as { data: { found: boolean; already_deactivated?: boolean; deactivated?: boolean; deactivated_at?: string } | null; error: { message: string } | null };
 
-    if (checkError) {
-      log.warn('Safety net: error checking org status, attempting update anyway', {
+    if (error) {
+      log.error('Safety net: RPC failed', {
         orgId: params.orgId,
-        error: checkError.message,
-      });
-    }
-
-    if (!org) {
-      log.info('Safety net: organization not found, skipping', { orgId: params.orgId });
-      return true;
-    }
-
-    if (!org.is_active && org.deleted_at) {
-      log.info('Safety net: organization already deactivated', { orgId: params.orgId });
-      return true;
-    }
-
-    // Direct-write to projection (justified CQRS exception for safety net)
-    const deactivatedAt = new Date().toISOString();
-    const { error: updateError } = await supabase
-      .from('organizations_projection')
-      .update({
-        is_active: false,
-        deactivated_at: deactivatedAt,
-        deleted_at: deactivatedAt,
-        updated_at: deactivatedAt,
-      })
-      .eq('id', params.orgId);
-
-    if (updateError) {
-      log.error('Safety net: failed to deactivate organization', {
-        orgId: params.orgId,
-        error: updateError.message,
+        error: error.message,
       });
       // Don't throw — compensation must not fail the workflow
       return true;
     }
 
-    log.info('Safety net: organization deactivated via direct write', {
+    if (!result?.found) {
+      log.info('Safety net: organization not found, skipping', { orgId: params.orgId });
+      return true;
+    }
+
+    if (result.already_deactivated) {
+      log.info('Safety net: organization already deactivated', { orgId: params.orgId });
+      return true;
+    }
+
+    log.info('Safety net: organization deactivated via RPC', {
       orgId: params.orgId,
-      deactivatedAt,
+      deactivatedAt: result.deactivated_at,
     });
 
     return true;

@@ -9,23 +9,27 @@
  * which the synchronous handler inserts into client_field_definitions_projection.
  *
  * Idempotency:
- * - Checks if field definitions already exist for this org
+ * - Checks if field definitions already exist for this org via api.list_field_definitions
  * - If any exist, returns early (already seeded)
  * - ON CONFLICT in handler handles event replay
  *
  * Events Emitted:
- * - client_field_definition.created: One per template row (~66 fields)
+ * - client_field_definition.created: One per template row (~67 fields)
  *
  * Compensation:
- * - deleteFieldDefinitions: Deactivates all field definitions for the org
+ * - deleteFieldDefinitions: Deactivates all field definitions for the org via api RPC
+ *
+ * IMPORTANT: All queries use api.* schema RPCs — direct .from() queries
+ * against public schema tables are rejected by PostgREST (only api schema exposed).
  */
 
 import { getSupabaseClient, getLogger } from '@shared/utils';
+import { emitEvent } from '@shared/utils/emit-event';
 import type { WorkflowTracingParams } from '@shared/types';
 
 const log = getLogger('SeedFieldDefinitions');
 
-// Type definitions for tables not yet in generated Supabase types
+// Type definitions for RPC return types
 interface FieldDefinitionTemplate {
   field_key: string;
   category_slug: string;
@@ -57,8 +61,8 @@ export interface SeedFieldDefinitionsResult {
 /**
  * Seed client field definitions from templates for a new organization.
  *
- * Reads client_field_definition_templates and client_field_categories,
- * then emits a client_field_definition.created event per template row.
+ * Reads templates and categories via api.* RPCs, then emits a
+ * client_field_definition.created event per template row via emitEvent().
  * The handler's ON CONFLICT ensures idempotency on replay.
  */
 export async function seedFieldDefinitions(
@@ -69,34 +73,27 @@ export async function seedFieldDefinitions(
 
   log.info('Starting field definitions seed', { orgId });
 
-  // Layer 2 Idempotency: Check if already seeded
-  // Note: New tables not yet in generated Supabase types — cast through unknown
-  /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-  const { data: existing, error: checkError } = await (supabase as any)
-    .from('client_field_definitions_projection')
-    .select('id')
-    .eq('organization_id', orgId)
-    .limit(1) as { data: { id: string }[] | null; error: { message: string } | null };
-  /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+  // Layer 2 Idempotency: Check if already seeded via api.list_field_definitions
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  const { data: existing, error: checkError } = await (supabase.schema('api') as any).rpc(
+    'list_field_definitions',
+    { p_org_id: orgId, p_include_inactive: false }
+  ) as { data: unknown[] | null; error: { message: string } | null };
 
   if (checkError) {
     throw new Error(`Failed to check existing field definitions: ${checkError.message}`);
   }
 
-  if (existing && existing.length > 0) {
+  if (existing && Array.isArray(existing) && existing.length > 0) {
     log.info('Field definitions already seeded, skipping', { orgId });
     return { definitionsSeeded: 0, alreadySeeded: true };
   }
 
-  // Load templates
-  /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-  const { data: templates, error: templateError } = await (supabase as any)
-    .from('client_field_definition_templates')
-    .select('*')
-    .eq('is_active', true)
-    .order('category_slug')
-    .order('sort_order') as { data: FieldDefinitionTemplate[] | null; error: { message: string } | null };
-  /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+  // Load templates via api.list_field_definition_templates()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  const { data: templates, error: templateError } = await (supabase.schema('api') as any).rpc(
+    'list_field_definition_templates'
+  ) as { data: FieldDefinitionTemplate[] | null; error: { message: string } | null };
 
   if (templateError) {
     throw new Error(`Failed to load field definition templates: ${templateError.message}`);
@@ -107,13 +104,11 @@ export async function seedFieldDefinitions(
     return { definitionsSeeded: 0, alreadySeeded: false };
   }
 
-  // Load system categories to resolve slug → id
-  /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-  const { data: categories, error: catError } = await (supabase as any)
-    .from('client_field_categories')
-    .select('id, slug')
-    .is('organization_id', null) as { data: FieldCategory[] | null; error: { message: string } | null };
-  /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+  // Load system categories via api.list_system_field_categories()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  const { data: categories, error: catError } = await (supabase.schema('api') as any).rpc(
+    'list_system_field_categories'
+  ) as { data: FieldCategory[] | null; error: { message: string } | null };
 
   if (catError) {
     throw new Error(`Failed to load field categories: ${catError.message}`);
@@ -124,7 +119,7 @@ export async function seedFieldDefinitions(
     categoryMap.set(cat.slug, cat.id);
   }
 
-  // Emit one event per template row
+  // Emit one event per template row via emitEvent()
   let seededCount = 0;
   const correlationId = tracing?.correlationId || crypto.randomUUID();
 
@@ -140,39 +135,28 @@ export async function seedFieldDefinitions(
 
     const fieldId = crypto.randomUUID();
 
-    const { error: emitError } = await supabase
-      .from('domain_events')
-      .insert({
-        stream_id: fieldId,
-        stream_type: 'client_field_definition',
-        stream_version: 1,
-        event_type: 'client_field_definition.created',
-        event_data: {
-          field_id: fieldId,
-          organization_id: orgId,
-          category_id: categoryId,
-          field_key: tmpl.field_key,
-          display_name: tmpl.display_name,
-          field_type: tmpl.field_type,
-          is_visible: tmpl.is_visible,
-          is_required: tmpl.is_required,
-          is_dimension: tmpl.is_dimension,
-          sort_order: tmpl.sort_order,
-          configurable_label: tmpl.configurable_label,
-          conforming_dimension_mapping: tmpl.conforming_dimension_mapping
-        },
-        event_metadata: {
-          user_id: 'system',
-          organization_id: orgId,
-          reason: 'Organization bootstrap: seed field definitions from templates',
-          correlation_id: correlationId,
-          source: 'seedFieldDefinitions'
-        }
-      });
-
-    if (emitError) {
-      throw new Error(`Failed to emit field definition event for ${tmpl.field_key}: ${emitError.message}`);
-    }
+    await emitEvent({
+      event_type: 'client_field_definition.created',
+      aggregate_type: 'client_field_definition',
+      aggregate_id: fieldId,
+      event_data: {
+        field_id: fieldId,
+        organization_id: orgId,
+        category_id: categoryId,
+        field_key: tmpl.field_key,
+        display_name: tmpl.display_name,
+        field_type: tmpl.field_type,
+        is_visible: tmpl.is_visible,
+        is_required: tmpl.is_required,
+        is_dimension: tmpl.is_dimension,
+        sort_order: tmpl.sort_order,
+        configurable_label: tmpl.configurable_label,
+        conforming_dimension_mapping: tmpl.conforming_dimension_mapping
+      },
+      correlation_id: correlationId,
+      user_id: 'system',
+      reason: 'Organization bootstrap: seed field definitions from templates'
+    });
 
     seededCount++;
   }
@@ -187,8 +171,9 @@ export async function seedFieldDefinitions(
 }
 
 /**
- * Compensation: Delete (deactivate) all field definitions for an org.
+ * Compensation: Deactivate all field definitions for an org.
  * Used during Saga rollback if a later bootstrap step fails.
+ * Uses api.deactivate_all_field_definitions() RPC.
  */
 export async function deleteFieldDefinitions(
   params: { orgId: string; tracing?: WorkflowTracingParams }
@@ -199,12 +184,11 @@ export async function deleteFieldDefinitions(
 
   const supabase = getSupabaseClient();
 
-  /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-  const { error } = await (supabase as any)
-    .from('client_field_definitions_projection')
-    .update({ is_active: false, updated_at: new Date().toISOString() })
-    .eq('organization_id', params.orgId) as { error: { message: string } | null };
-  /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  const { data: deactivatedCount, error } = await (supabase.schema('api') as any).rpc(
+    'deactivate_all_field_definitions',
+    { p_org_id: params.orgId }
+  ) as { data: number | null; error: { message: string } | null };
 
   if (error) {
     logComp.error('Failed to deactivate field definitions', {
@@ -214,5 +198,8 @@ export async function deleteFieldDefinitions(
     throw new Error(`Failed to deactivate field definitions: ${error.message}`);
   }
 
-  logComp.info('Field definitions deactivated', { orgId: params.orgId });
+  logComp.info('Field definitions deactivated', {
+    orgId: params.orgId,
+    count: deactivatedCount
+  });
 }
