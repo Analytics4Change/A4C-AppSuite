@@ -566,18 +566,6 @@ function buildSeedFields(): FieldDefinition[] {
       'cat-05',
       'Admission',
       'admission',
-      'discharge_plan_status',
-      'Discharge Plan Status',
-      'enum',
-      false,
-      false,
-      6
-    ),
-    f(
-      id(),
-      'cat-05',
-      'Admission',
-      'admission',
       'placement_arrangement',
       'Placement Arrangement',
       'enum',

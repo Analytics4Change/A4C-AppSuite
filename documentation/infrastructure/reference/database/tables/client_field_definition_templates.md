@@ -6,7 +6,7 @@ last_updated: 2026-03-28
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Bootstrap seed templates for client field definitions — 67 rows copied to `client_field_definitions_projection` during org bootstrap. Analogous to `role_permission_templates`.
+**Summary**: Bootstrap seed templates for client field definitions — 66 rows copied to `client_field_definitions_projection` during org bootstrap. Analogous to `role_permission_templates`.
 
 **When to read**:
 - Understanding which fields are seeded for new organizations
@@ -27,7 +27,7 @@ last_updated: 2026-03-28
 Platform-managed seed templates for client field definitions. During organization bootstrap, the `seedFieldDefinitions` Temporal activity reads these templates, resolves `category_slug` to `category_id`, and emits `client_field_definition.created` events to populate `client_field_definitions_projection` for the new org.
 
 Key characteristics:
-- **67 templates**: Covering all 11 wizard categories (demographics through education)
+- **66 templates**: Covering all 11 wizard categories (demographics through education)
 - **10 locked fields**: 7 mandatory at intake (`first_name`, `last_name`, `date_of_birth`, `gender`, `admission_date`, `allergies`, `medical_conditions`) + 3 mandatory at discharge (`discharge_date`, `discharge_outcome`, `discharge_reason`) — cannot be hidden by org admin
 - **All visible by default**: Every field starts visible; orgs toggle off what they don't need
 - **Category by slug**: References `client_field_categories.slug` (not UUID) for portability
@@ -62,14 +62,14 @@ Key characteristics:
 | Contact Information | 3 | - |
 | Guardian | 3 | - |
 | Referral | 4 | - |
-| Admission | 7 | admission_date |
+| Admission | 6 | admission_date |
 | Insurance | 2 | - |
 | Clinical Profile | 10 | - |
 | Medical | 5 | allergies, medical_conditions |
 | Legal & Compliance | 6 | - |
 | Discharge | 5 | discharge_date, discharge_outcome, discharge_reason |
 | Education | 3 | - |
-| **Total** | **67** | **10** |
+| **Total** | **66** | **10** |
 
 ## Constraints
 
@@ -89,7 +89,7 @@ Key characteristics:
 
 | Date | Migration | Changes |
 |------|-----------|---------|
-| 2026-03-27 | `20260327210520_client_field_registry.sql` | Initial creation with 67 template seeds |
+| 2026-03-27 | `20260327210520_client_field_registry.sql` | Initial creation with 67 template seeds (66 active after discharge_plan_status removed) |
 
 ## See Also
 

@@ -56,7 +56,7 @@ The central client record with ~50 typed columns organized by intake wizard step
 | Contact Info | 2 | _(sub-entity tables, deferred)_ | Client phones/emails/addresses |
 | Guardian | 3 | legal_custody_status, court_ordered_placement, financial_guarantor_type | Separated from placement (Decision 82) |
 | Referral | 4 | referral_source_type, referral_organization, referral_date, reason_for_referral | Structured fields (not plain text) |
-| Admission | 5 | admission_date, admission_type, level_of_care, placement_arrangement | Placement denormalized from history |
+| Admission | 5 | admission_date, admission_type, level_of_care, placement_arrangement | Placement denormalized from history. `discharge_plan_status` removed — treatment plan IS the discharge plan |
 | Insurance | 6 | medicaid_id, medicare_id | Full policy table deferred |
 | Clinical Profile | 7 | primary_diagnosis, dsm5_diagnoses, suicide_risk_status, violence_risk_status | Intake snapshot (longitudinal tracking deferred) |
 | Medical | 8 | allergies, medical_conditions, immunization_status | JSONB with NKA/NKMC defaults |
@@ -74,7 +74,7 @@ The field registry enables per-org configuration of which fields appear in intak
 
 1. **`client_field_definitions_projection`** — Per-org field config (visibility, required, labels). Seeded from templates at bootstrap. Stream type: `client_field_definition`.
 2. **`client_field_categories`** — 11 system categories + org-defined custom categories. Matches wizard step ordering. Stream type: `client_field_category`.
-3. **`client_field_definition_templates`** — 67 seed templates copied to each new org. 10 locked fields (7 mandatory at intake + 3 mandatory at discharge).
+3. **`client_field_definition_templates`** — 66 active seed templates copied to each new org. 10 locked fields (7 mandatory at intake + 3 mandatory at discharge).
 
 **Configuration UI**: `/settings/client-fields` — tabbed by category, toggle switches for visibility/required.
 

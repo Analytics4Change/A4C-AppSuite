@@ -6,7 +6,7 @@ last_updated: 2026-03-28
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: CQRS projection for client (patient) records in residential behavioral healthcare — ~50 typed columns covering demographics, referral, admission, clinical profile, medical, legal, discharge, education, and org-defined custom fields (JSONB).
+**Summary**: CQRS projection for client (patient) records in residential behavioral healthcare — ~49 typed columns covering demographics, referral, admission, clinical profile, medical, legal, discharge, education, and org-defined custom fields (JSONB).
 
 **When to read**:
 - Building client intake or discharge forms
@@ -28,7 +28,7 @@ last_updated: 2026-03-28
 CQRS projection table that stores the core client (patient) record for residential behavioral healthcare. Each row represents a youth placed in habilitative care within an organization. The source of truth is `client.*` events in the `domain_events` table, processed by the `process_client_event()` router (not yet implemented — table created ahead of event infrastructure in the Client Intake project).
 
 Key characteristics:
-- **~50 typed columns**: Demographics, referral, admission, clinical profile, medical, legal, discharge, education
+- **~49 typed columns**: Demographics, referral, admission, clinical profile, medical, legal, discharge, education
 - **Custom fields**: Org-defined fields stored in `custom_fields` JSONB, controlled by `client_field_definitions_projection`
 - **Three-status lifecycle**: `active` (enrolled) → `inactive` (paused) → `discharged` (completed care)
 - **Three-field discharge**: `discharge_outcome` (binary), `discharge_reason` (14 values), `discharge_placement` (9 values) per Decision 78
@@ -73,7 +73,6 @@ Key characteristics:
 | level_of_care | text | YES | - | Current level of care |
 | expected_length_of_stay | integer | YES | - | Expected days in program |
 | initial_risk_level | text | YES | - | 4 values: low, moderate, high, critical |
-| discharge_plan_status | text | YES | - | Discharge planning status |
 | placement_arrangement | text | YES | - | Current placement (13 SAMHSA/Medicaid values, Decision 83) |
 | medicaid_id | text | YES | - | Medicaid identifier |
 | medicare_id | text | YES | - | Medicare identifier |

@@ -138,13 +138,12 @@ export const SYSTEM_FIELD_KEYS = new Set([
   'referral_organization',
   'referral_date',
   'reason_for_referral',
-  // Admission (7)
+  // Admission (6)
   'admission_date',
   'admission_type',
   'level_of_care',
   'expected_length_of_stay',
   'initial_risk_level',
-  'discharge_plan_status',
   'placement_arrangement',
   // Insurance (2)
   'medicaid_id',
