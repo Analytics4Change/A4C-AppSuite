@@ -54,11 +54,10 @@ ON CONFLICT DO NOTHING;
 -- =============================================================================
 
 -- For each existing org that has a provider_admin role, grant client.discharge
-INSERT INTO role_permissions_projection (role_id, permission_id, organization_id, granted_at)
+INSERT INTO role_permissions_projection (role_id, permission_id, granted_at)
 SELECT
     rp.id AS role_id,
     pp.id AS permission_id,
-    rp.organization_id,
     now()
 FROM roles_projection rp
 CROSS JOIN permissions_projection pp
@@ -72,11 +71,10 @@ WHERE rp.name = 'provider_admin'
 ON CONFLICT DO NOTHING;
 
 -- Same for clinician role
-INSERT INTO role_permissions_projection (role_id, permission_id, organization_id, granted_at)
+INSERT INTO role_permissions_projection (role_id, permission_id, granted_at)
 SELECT
     rp.id AS role_id,
     pp.id AS permission_id,
-    rp.organization_id,
     now()
 FROM roles_projection rp
 CROSS JOIN permissions_projection pp
