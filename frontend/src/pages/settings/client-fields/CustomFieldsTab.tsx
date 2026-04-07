@@ -185,6 +185,7 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                   <div
                     role="alert"
                     className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-sm"
+                    data-testid="cf-error-alert"
                   >
                     <AlertCircle size={14} />
                     {viewModel.createFieldError}
@@ -215,6 +216,7 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                       setCategoryId('');
                       setIsRequired(false);
                     }}
+                    data-testid="cf-cancel-btn"
                   >
                     Cancel
                   </Button>

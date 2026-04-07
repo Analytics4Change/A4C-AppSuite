@@ -69,6 +69,7 @@ export const SettingsPage: React.FC = observer(() => {
               }
             }}
             aria-label="Organization Settings"
+            data-testid="settings-org-card"
           >
             <CardContent className="flex items-center gap-4 py-4">
               <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 text-blue-600">
@@ -102,6 +103,7 @@ export const SettingsPage: React.FC = observer(() => {
               }
             }}
             aria-label="Client Field Configuration"
+            data-testid="settings-client-fields-card"
           >
             <CardContent className="flex items-center gap-4 py-4">
               <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600">

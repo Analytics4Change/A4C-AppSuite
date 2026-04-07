@@ -15,9 +15,13 @@
 -- ============================================
 
 -- ============================================
--- CLINICIAN ROLE (4 permissions)
+-- CLINICIAN ROLE (5 permissions)
 -- Basic clinical staff with client and medication access
 -- ============================================
+
+INSERT INTO role_permission_templates (role_name, permission_name, is_active)
+VALUES ('clinician', 'client.discharge', true)
+ON CONFLICT (role_name, permission_name) DO NOTHING;
 
 INSERT INTO role_permission_templates (role_name, permission_name, is_active)
 VALUES ('clinician', 'client.update', true)
@@ -57,7 +61,7 @@ VALUES ('partner_admin', 'user.view', true)
 ON CONFLICT (role_name, permission_name) DO NOTHING;
 
 -- ============================================
--- PROVIDER_ADMIN ROLE (29 permissions)
+-- PROVIDER_ADMIN ROLE (30 permissions)
 -- Full organization administrator with all org-scoped permissions
 -- ============================================
 
@@ -67,6 +71,10 @@ ON CONFLICT (role_name, permission_name) DO NOTHING;
 
 INSERT INTO role_permission_templates (role_name, permission_name, is_active)
 VALUES ('provider_admin', 'client.delete', true)
+ON CONFLICT (role_name, permission_name) DO NOTHING;
+
+INSERT INTO role_permission_templates (role_name, permission_name, is_active)
+VALUES ('provider_admin', 'client.discharge', true)
 ON CONFLICT (role_name, permission_name) DO NOTHING;
 
 INSERT INTO role_permission_templates (role_name, permission_name, is_active)

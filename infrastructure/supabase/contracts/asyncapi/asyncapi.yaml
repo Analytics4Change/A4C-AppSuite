@@ -113,6 +113,9 @@ channels:
           - $ref: './domains/contact.yaml#/components/messages/ContactDeleted'
           - $ref: './domains/contact.yaml#/components/messages/ContactUserLinked'
           - $ref: './domains/contact.yaml#/components/messages/ContactUserUnlinked'
+          # Contact designation events (clinical contact designations)
+          - $ref: './domains/contact.yaml#/components/messages/ContactDesignationCreated'
+          - $ref: './domains/contact.yaml#/components/messages/ContactDesignationDeactivated'
           # Phone entity events
           - $ref: './domains/phone.yaml#/components/messages/PhoneCreated'
           - $ref: './domains/phone.yaml#/components/messages/PhoneUpdated'
@@ -161,6 +164,37 @@ channels:
           # Client field category events (org-defined field categories)
           - $ref: './domains/client-field-category.yaml#/components/messages/ClientFieldCategoryCreated'
           - $ref: './domains/client-field-category.yaml#/components/messages/ClientFieldCategoryDeactivated'
+          # Client lifecycle events (client intake and management)
+          - $ref: './domains/client.yaml#/components/messages/ClientRegistered'
+          - $ref: './domains/client.yaml#/components/messages/ClientInformationUpdated'
+          - $ref: './domains/client.yaml#/components/messages/ClientAdmitted'
+          - $ref: './domains/client.yaml#/components/messages/ClientDischarged'
+          # Client phone sub-entity events
+          - $ref: './domains/client.yaml#/components/messages/ClientPhoneAdded'
+          - $ref: './domains/client.yaml#/components/messages/ClientPhoneUpdated'
+          - $ref: './domains/client.yaml#/components/messages/ClientPhoneRemoved'
+          # Client email sub-entity events
+          - $ref: './domains/client.yaml#/components/messages/ClientEmailAdded'
+          - $ref: './domains/client.yaml#/components/messages/ClientEmailUpdated'
+          - $ref: './domains/client.yaml#/components/messages/ClientEmailRemoved'
+          # Client address sub-entity events
+          - $ref: './domains/client.yaml#/components/messages/ClientAddressAdded'
+          - $ref: './domains/client.yaml#/components/messages/ClientAddressUpdated'
+          - $ref: './domains/client.yaml#/components/messages/ClientAddressRemoved'
+          # Client insurance sub-entity events
+          - $ref: './domains/client.yaml#/components/messages/ClientInsuranceAdded'
+          - $ref: './domains/client.yaml#/components/messages/ClientInsuranceUpdated'
+          - $ref: './domains/client.yaml#/components/messages/ClientInsuranceRemoved'
+          # Client placement sub-entity events
+          - $ref: './domains/client.yaml#/components/messages/ClientPlacementChanged'
+          - $ref: './domains/client.yaml#/components/messages/ClientPlacementEnded'
+          # Client funding source sub-entity events
+          - $ref: './domains/client.yaml#/components/messages/ClientFundingSourceAdded'
+          - $ref: './domains/client.yaml#/components/messages/ClientFundingSourceUpdated'
+          - $ref: './domains/client.yaml#/components/messages/ClientFundingSourceRemoved'
+          # Client contact assignment events
+          - $ref: './domains/client.yaml#/components/messages/ClientContactAssigned'
+          - $ref: './domains/client.yaml#/components/messages/ClientContactUnassigned'
     subscribe:
       summary: Subscribe to domain events
       operationId: onDomainEvent
@@ -192,8 +226,6 @@ components:
         stream_type:
           type: string
           enum:
-            # NOTE: client, medication, medication_history, dosage removed (2025-01-10)
-            # Legacy CRUD tables dropped - will be redefined with proper event-driven architecture
             - user
             - organization
             - organization_unit
@@ -210,6 +242,9 @@ components:
             - access_grant
             - junction
             - schedule
+            - client
+            - client_field_definition
+            - client_field_category
           description: Type of entity this event affects
         stream_version:
           type: integer

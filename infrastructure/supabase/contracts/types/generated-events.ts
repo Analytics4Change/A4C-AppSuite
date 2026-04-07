@@ -3,7 +3,7 @@
  *
  * Generated from AsyncAPI specification by Modelina
  * Source: infrastructure/supabase/contracts/asyncapi/
- * Generated: 2026-03-28T01:33:53.653Z
+ * Generated: 2026-04-06T22:53:06.373Z
  *
  * To regenerate: cd infrastructure/supabase/contracts && npm run generate:types
  *
@@ -231,7 +231,7 @@ export enum RoleScope {
   UNIT = "unit",
 }
 
-export enum AnonymousSchema_4769 {
+export enum AnonymousSchema_5412 {
   RESERVED_TEXT = "text",
   RESERVED_NUMBER = "number",
   DATE = "date",
@@ -241,7 +241,7 @@ export enum AnonymousSchema_4769 {
   JSONB = "jsonb",
 }
 
-export enum AnonymousSchema_4797 {
+export enum AnonymousSchema_5440 {
   RESERVED_TEXT = "text",
   RESERVED_NUMBER = "number",
   DATE = "date",
@@ -255,7 +255,7 @@ export enum AnonymousSchema_4797 {
 // Interfaces
 // =============================================================================
 
-export type DomainEvents = UserSyncedFromAuthEvent | UserCreatedEvent | UserProfileUpdatedEvent | UserOrgSwitchedEvent | UserAccessDatesUpdatedEvent | UserNotificationPreferencesUpdatedEvent | UserAddressAddedEvent | UserAddressUpdatedEvent | UserAddressRemovedEvent | UserPhoneAddedEvent | UserPhoneUpdatedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | ScheduleCreatedEvent | ScheduleUpdatedEvent | ScheduleDeactivatedEvent | ScheduleReactivatedEvent | ScheduleDeletedEvent | ScheduleUserAssignedEvent | ScheduleUserUnassignedEvent | UserClientAssignedEvent | UserClientUnassignedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationReactivatedEvent | OrganizationDeletedEvent | OrganizationDeletionInitiatedEvent | OrganizationDeletionCompletedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | OrganizationBootstrapStepCompletedEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | PermissionUpdatedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent | ClientFieldDefinitionCreatedEvent | ClientFieldDefinitionUpdatedEvent | ClientFieldDefinitionDeactivatedEvent | ClientFieldCategoryCreatedEvent | ClientFieldCategoryDeactivatedEvent;
+export type DomainEvents = UserSyncedFromAuthEvent | UserCreatedEvent | UserProfileUpdatedEvent | UserOrgSwitchedEvent | UserAccessDatesUpdatedEvent | UserNotificationPreferencesUpdatedEvent | UserAddressAddedEvent | UserAddressUpdatedEvent | UserAddressRemovedEvent | UserPhoneAddedEvent | UserPhoneUpdatedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | ScheduleCreatedEvent | ScheduleUpdatedEvent | ScheduleDeactivatedEvent | ScheduleReactivatedEvent | ScheduleDeletedEvent | ScheduleUserAssignedEvent | ScheduleUserUnassignedEvent | UserClientAssignedEvent | UserClientUnassignedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationReactivatedEvent | OrganizationDeletedEvent | OrganizationDeletionInitiatedEvent | OrganizationDeletionCompletedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | OrganizationBootstrapStepCompletedEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | ContactDesignationCreatedEvent | ContactDesignationDeactivatedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | PermissionUpdatedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent | ClientFieldDefinitionCreatedEvent | ClientFieldDefinitionUpdatedEvent | ClientFieldDefinitionDeactivatedEvent | ClientFieldCategoryCreatedEvent | ClientFieldCategoryDeactivatedEvent | ClientRegisteredEvent | ClientInformationUpdatedEvent | ClientAdmittedEvent | ClientDischargedEvent | ClientPhoneAddedEvent | ClientPhoneUpdatedEvent | ClientPhoneRemovedEvent | ClientEmailAddedEvent | ClientEmailUpdatedEvent | ClientEmailRemovedEvent | ClientAddressAddedEvent | ClientAddressUpdatedEvent | ClientAddressRemovedEvent | ClientInsuranceAddedEvent | ClientInsuranceUpdatedEvent | ClientInsuranceRemovedEvent | ClientPlacementChangedEvent | ClientPlacementEndedEvent | ClientFundingSourceAddedEvent | ClientFundingSourceUpdatedEvent | ClientFundingSourceRemovedEvent | ClientContactAssignedEvent | ClientContactUnassignedEvent;
 
 export interface UserSyncedFromAuthEvent {
   'stream_id': string;
@@ -425,12 +425,12 @@ export interface UserAddressUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.updated';
-  'event_data': AnonymousSchema_2618;
+  'event_data': AnonymousSchema_3224;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2618 {
+export interface AnonymousSchema_3224 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -452,12 +452,12 @@ export interface UserAddressRemovedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.removed';
-  'event_data': AnonymousSchema_2650;
+  'event_data': AnonymousSchema_3256;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2650 {
+export interface AnonymousSchema_3256 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -493,12 +493,12 @@ export interface UserPhoneUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.phone.updated';
-  'event_data': AnonymousSchema_2699;
+  'event_data': AnonymousSchema_3305;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_2699 {
+export interface AnonymousSchema_3305 {
   'phone_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -1609,6 +1609,37 @@ export interface ContactUserUnlinkData {
   'additionalProperties'?: Map<string, any>;
 }
 
+export interface ContactDesignationCreatedEvent {
+  'stream_id': string;
+  'stream_type': 'contact';
+  'event_type': 'contact.designation.created';
+  'event_data': ContactDesignationData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ContactDesignationData {
+  'designation_id': string;
+  'designation': string;
+  'organization_id': string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ContactDesignationDeactivatedEvent {
+  'stream_id': string;
+  'stream_type': 'contact';
+  'event_type': 'contact.designation.deactivated';
+  'event_data': ContactDesignationDeactivationData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ContactDesignationDeactivationData {
+  'designation': string;
+  'organization_id': string;
+  'additionalProperties'?: Map<string, any>;
+}
+
 export interface PhoneCreatedEvent {
   'stream_id': string;
   'stream_type': 'phone';
@@ -2219,7 +2250,7 @@ export interface ClientFieldDefinitionCreatedData {
   'category_id': string;
   'field_key': string;
   'display_name': string;
-  'field_type'?: AnonymousSchema_4769;
+  'field_type'?: AnonymousSchema_5412;
   'is_visible'?: boolean;
   'is_required'?: boolean;
   'validation_rules'?: Map<string, any>;
@@ -2244,7 +2275,7 @@ export interface ClientFieldDefinitionUpdatedData {
   'organization_id': string;
   'display_name'?: string;
   'category_id'?: string;
-  'field_type'?: AnonymousSchema_4797;
+  'field_type'?: AnonymousSchema_5440;
   'is_visible'?: boolean;
   'is_required'?: boolean;
   'validation_rules'?: Map<string, any>;
@@ -2300,5 +2331,464 @@ export interface ClientFieldCategoryDeactivatedEvent {
 export interface ClientFieldCategoryDeactivatedData {
   'category_id': string;
   'organization_id': string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientRegisteredEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.registered';
+  'event_data': ClientRegistrationData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientRegistrationData {
+  'organization_id': string;
+  'organization_unit_id'?: string;
+  'status'?: string;
+  'data_source'?: string;
+  'first_name': string;
+  'last_name': string;
+  'date_of_birth': string;
+  'gender': string;
+  'race': string[];
+  'ethnicity': string;
+  'primary_language': string;
+  'middle_name'?: string;
+  'preferred_name'?: string;
+  'gender_identity'?: string;
+  'pronouns'?: string;
+  'secondary_language'?: string;
+  'interpreter_needed'?: boolean;
+  'marital_status'?: string;
+  'citizenship_status'?: string;
+  'photo_url'?: string;
+  'mrn'?: string;
+  'external_id'?: string;
+  'drivers_license'?: string;
+  'referral_source_type'?: string;
+  'referral_organization'?: string;
+  'referral_date'?: string;
+  'reason_for_referral'?: string;
+  'admission_date'?: string;
+  'admission_type'?: string;
+  'level_of_care'?: string;
+  'expected_length_of_stay'?: number;
+  'initial_risk_level'?: string;
+  'discharge_plan_status'?: string;
+  'placement_arrangement'?: string;
+  'medicaid_id'?: string;
+  'medicare_id'?: string;
+  'primary_diagnosis'?: Map<string, any>;
+  'secondary_diagnoses'?: Map<string, any>;
+  'dsm5_diagnoses'?: Map<string, any>;
+  'presenting_problem'?: string;
+  'suicide_risk_status'?: string;
+  'violence_risk_status'?: string;
+  'trauma_history_indicator'?: boolean;
+  'substance_use_history'?: string;
+  'developmental_history'?: string;
+  'previous_treatment_history'?: string;
+  'allergies'?: Map<string, any>;
+  'medical_conditions'?: Map<string, any>;
+  'immunization_status'?: string;
+  'dietary_restrictions'?: string;
+  'special_medical_needs'?: string;
+  'legal_custody_status'?: string;
+  'court_ordered_placement'?: boolean;
+  'financial_guarantor_type'?: string;
+  'court_case_number'?: string;
+  'state_agency'?: string;
+  'legal_status'?: string;
+  'mandated_reporting_status'?: boolean;
+  'protective_services_involvement'?: boolean;
+  'safety_plan_required'?: boolean;
+  'education_status'?: string;
+  'grade_level'?: string;
+  'iep_status'?: boolean;
+  'custom_fields'?: Map<string, any>;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientInformationUpdatedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.information_updated';
+  'event_data': ClientInformationUpdateData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientInformationUpdateData {
+  'organization_id': string;
+  'changes': Map<string, any>;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientAdmittedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.admitted';
+  'event_data': ClientAdmissionData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientAdmissionData {
+  'organization_id': string;
+  'admission_date'?: string;
+  'admission_type'?: string;
+  'level_of_care'?: string;
+  'expected_length_of_stay'?: number;
+  'initial_risk_level'?: string;
+  'organization_unit_id'?: string;
+  'primary_diagnosis'?: Map<string, any>;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientDischargedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.discharged';
+  'event_data': ClientDischargeData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientDischargeData {
+  'organization_id': string;
+  'discharge_date': string;
+  'discharge_outcome': string;
+  'discharge_reason': string;
+  'discharge_diagnosis'?: Map<string, any>;
+  'discharge_placement'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientPhoneAddedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.phone.added';
+  'event_data': ClientPhoneData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientPhoneData {
+  'organization_id': string;
+  'phone_id': string;
+  'phone_number': string;
+  'phone_type'?: string;
+  'is_primary'?: boolean;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientPhoneUpdatedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.phone.updated';
+  'event_data': ClientPhoneUpdateData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientPhoneUpdateData {
+  'organization_id': string;
+  'phone_id': string;
+  'phone_number'?: string;
+  'phone_type'?: string;
+  'is_primary'?: boolean;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientPhoneRemovedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.phone.removed';
+  'event_data': ClientSubEntityRemovalData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientSubEntityRemovalData {
+  'organization_id': string;
+  'phone_id'?: string;
+  'email_id'?: string;
+  'address_id'?: string;
+  'policy_id'?: string;
+  'funding_source_id'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientEmailAddedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.email.added';
+  'event_data': ClientEmailData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientEmailData {
+  'organization_id': string;
+  'email_id': string;
+  'email': string;
+  'email_type'?: string;
+  'is_primary'?: boolean;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientEmailUpdatedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.email.updated';
+  'event_data': ClientEmailUpdateData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientEmailUpdateData {
+  'organization_id': string;
+  'email_id': string;
+  'email'?: string;
+  'email_type'?: string;
+  'is_primary'?: boolean;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientEmailRemovedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.email.removed';
+  'event_data': ClientSubEntityRemovalData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientAddressAddedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.address.added';
+  'event_data': ClientAddressData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientAddressData {
+  'organization_id': string;
+  'address_id': string;
+  'address_type'?: string;
+  'street1': string;
+  'street2'?: string;
+  'city': string;
+  'state': string;
+  'zip': string;
+  'country'?: string;
+  'is_primary'?: boolean;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientAddressUpdatedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.address.updated';
+  'event_data': ClientAddressUpdateData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientAddressUpdateData {
+  'organization_id': string;
+  'address_id': string;
+  'address_type'?: string;
+  'street1'?: string;
+  'street2'?: string;
+  'city'?: string;
+  'state'?: string;
+  'zip'?: string;
+  'country'?: string;
+  'is_primary'?: boolean;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientAddressRemovedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.address.removed';
+  'event_data': ClientSubEntityRemovalData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientInsuranceAddedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.insurance.added';
+  'event_data': ClientInsuranceData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientInsuranceData {
+  'organization_id': string;
+  'policy_id': string;
+  'policy_type': string;
+  'payer_name': string;
+  'policy_number'?: string;
+  'group_number'?: string;
+  'subscriber_name'?: string;
+  'subscriber_relation'?: string;
+  'coverage_start_date'?: string;
+  'coverage_end_date'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientInsuranceUpdatedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.insurance.updated';
+  'event_data': ClientInsuranceUpdateData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientInsuranceUpdateData {
+  'organization_id': string;
+  'policy_id': string;
+  'payer_name'?: string;
+  'policy_number'?: string;
+  'group_number'?: string;
+  'subscriber_name'?: string;
+  'subscriber_relation'?: string;
+  'coverage_start_date'?: string;
+  'coverage_end_date'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientInsuranceRemovedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.insurance.removed';
+  'event_data': ClientSubEntityRemovalData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientPlacementChangedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.placement.changed';
+  'event_data': ClientPlacementChangeData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientPlacementChangeData {
+  'organization_id': string;
+  'placement_id': string;
+  'placement_arrangement': string;
+  'start_date': string;
+  'reason'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientPlacementEndedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.placement.ended';
+  'event_data': ClientPlacementEndData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientPlacementEndData {
+  'organization_id': string;
+  'end_date'?: string;
+  'reason'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFundingSourceAddedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.funding_source.added';
+  'event_data': ClientFundingSourceData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFundingSourceData {
+  'organization_id': string;
+  'funding_source_id': string;
+  'source_type': string;
+  'source_name': string;
+  'reference_number'?: string;
+  'start_date'?: string;
+  'end_date'?: string;
+  'custom_fields'?: Map<string, any>;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFundingSourceUpdatedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.funding_source.updated';
+  'event_data': ClientFundingSourceUpdateData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFundingSourceUpdateData {
+  'organization_id': string;
+  'funding_source_id': string;
+  'source_type'?: string;
+  'source_name'?: string;
+  'reference_number'?: string;
+  'start_date'?: string;
+  'end_date'?: string;
+  'custom_fields'?: Map<string, any>;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFundingSourceRemovedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.funding_source.removed';
+  'event_data': ClientSubEntityRemovalData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientContactAssignedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.contact.assigned';
+  'event_data': ClientContactAssignmentData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientContactAssignmentData {
+  'organization_id': string;
+  'assignment_id': string;
+  'contact_id': string;
+  'designation': string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientContactUnassignedEvent {
+  'stream_id': string;
+  'stream_type': 'client';
+  'event_type': 'client.contact.unassigned';
+  'event_data': ClientContactUnassignmentData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientContactUnassignmentData {
+  'organization_id': string;
+  'contact_id': string;
+  'designation': string;
   'additionalProperties'?: Map<string, any>;
 }

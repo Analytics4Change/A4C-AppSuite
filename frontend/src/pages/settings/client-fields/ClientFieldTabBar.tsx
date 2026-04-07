@@ -71,6 +71,7 @@ export const ClientFieldTabBar: React.FC<ClientFieldTabBarProps> = observer(
             onClick={() => scroll('left')}
             className="shrink-0 p-1 text-gray-400 hover:text-gray-600"
             aria-label="Scroll tabs left"
+            data-testid="scroll-tabs-left-btn"
           >
             <ChevronLeft size={16} />
           </button>
@@ -110,6 +111,7 @@ export const ClientFieldTabBar: React.FC<ClientFieldTabBarProps> = observer(
             onClick={() => scroll('right')}
             className="shrink-0 p-1 text-gray-400 hover:text-gray-600"
             aria-label="Scroll tabs right"
+            data-testid="scroll-tabs-right-btn"
           >
             <ChevronRight size={16} />
           </button>

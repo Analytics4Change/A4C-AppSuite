@@ -7,16 +7,14 @@ import { ArrowLeft, User, Calendar } from 'lucide-react';
 export const ClientDetailLayout: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  
-  const client = mockClients.find(c => c.id === clientId);
-  
+
+  const client = mockClients.find((c) => c.id === clientId);
+
   if (!client) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500 mb-4">Client not found</p>
-        <Button onClick={() => navigate('/clients')}>
-          Back to Clients
-        </Button>
+        <Button onClick={() => navigate('/clients')}>Back to Clients</Button>
       </div>
     );
   }
@@ -36,6 +34,7 @@ export const ClientDetailLayout: React.FC = () => {
         size="sm"
         onClick={() => navigate('/clients')}
         className="mb-4"
+        data-testid="back-to-clients-btn"
       >
         <ArrowLeft size={16} className="mr-2" />
         Back to Clients
@@ -65,16 +64,18 @@ export const ClientDetailLayout: React.FC = () => {
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-6">
         <nav className="flex space-x-8">
-          {tabs.map(tab => (
+          {tabs.map((tab) => (
             <NavLink
               key={tab.path}
               to={tab.path}
               end={tab.exact}
+              data-testid={`client-detail-tab-${tab.label.toLowerCase()}`}
               className={({ isActive }) => `
                 py-2 px-1 border-b-2 font-medium text-sm transition-colors
-                ${isActive
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ${
+                  isActive
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }
               `}
             >

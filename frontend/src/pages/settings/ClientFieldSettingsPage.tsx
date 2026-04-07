@@ -123,7 +123,12 @@ export const ClientFieldSettingsPage: React.FC = observer(() => {
       {/* Page Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/settings')}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/settings')}
+            data-testid="back-to-settings-btn"
+          >
             <ArrowLeft size={16} className="mr-2" />
             Settings
           </Button>

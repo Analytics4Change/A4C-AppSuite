@@ -272,18 +272,59 @@ The client management applet is the central entity in the A4C data model. It sit
 - 2 new CASE branches in `process_contact_event()` for designation events
 - 2 new CASE branches in `process_client_event()` for assignment events
 
+91. **`/clients/register` route for intake, `/clients/:clientId` for post-registration** (decided 2026-04-06): Intake form at `/clients/register` captures initial data only (demographics, contact info, admission, staff assignment, clinical, medical). All post-registration management (discharge, contact info management, insurance, placement changes, contact reassignment, record editing) lives on `/clients/:clientId` detail page. Route order: `/clients/register` declared before `/clients/:clientId` to avoid React Router matching "register" as clientId param.
+
+92. **`api.register_client(p_client_data jsonb, ...)` — JSONB payload, not positional params** (decided 2026-04-06, architecture review M2): Single JSONB parameter for ~50 client fields avoids ~40 positional parameters. Handler extracts fields via `p_event.event_data->>'field_name'`.
+
+93. **`validate_client_required_fields()` helper** (decided 2026-04-06, architecture review M6): Public schema function reads `client_field_definitions_projection` for org-specific required field enforcement. Returns array of missing field keys. Called by `api.register_client()` after validating 7 hardcoded mandatory fields.
+
+94. **`client.discharge` permission** (decided 2026-04-06): New permission added to `permissions_projection`. Assigned to `provider_admin` and `clinician` roles. Implies `client.view` + `client.update`. Backfilled to existing orgs via migration.
+
+95. **`_projection` suffix on `client_placement_history`** (decided 2026-04-06, m1 remediation): All event-sourced tables use `_projection` suffix for consistency. Table is `client_placement_history_projection` (not `client_placement_history`).
+
 ## Current State
 
-### Existing Files
-- `documentation/infrastructure/reference/database/tables/clients.md` — Current table docs (v1 schema, pre-CQRS)
-- `documentation/infrastructure/reference/database/tables/user_client_assignments_projection.md` — Staff-client mapping
-- No client event handlers exist (`infrastructure/supabase/handlers/` has no `client` files)
-- No `api.*` RPC functions for client CRUD exist
-- No AsyncAPI contract for client domain exists (archived v1 at `contracts/asyncapi/domains.archived/client.yaml`)
+### Phase B Backend — 7 Migrations Written (2026-04-06, pending push)
+All 7 migrations pass `supabase db push --linked --dry-run`.
 
-### Detailed Implementation Plan
-- **Primary plan file**: `.claude/plans/spicy-bubbling-quail.md` — ~1,150 lines, covers all 5 migrations, cross-correlation audit, handler specs, API signatures, AsyncAPI contracts, verification plan
-- **Status**: Plan complete, awaiting user approval before implementation begins
+| Migration | Content |
+|-----------|---------|
+| `20260406221732_client_contact_tables.sql` | 4 tables: client_phones/emails/addresses/contact_assignments_projection |
+| `20260406221738_client_insurance_placement_tables.sql` | 3 tables: client_insurance_policies/placement_history/funding_sources_projection |
+| `20260406221739_client_permissions_seed.sql` | client.discharge permission + role templates + implications + backfill |
+| `20260406222201_client_lifecycle_event_handlers.sql` | Dispatcher + process_client_event() router + 4 lifecycle handlers |
+| `20260406222642_client_sub_entity_event_handlers.sql` | Extended router (23 CASE) + 19 sub-entity handlers |
+| `20260406222759_contact_designation_event_handlers.sql` | Extended process_contact_event() + 2 designation handlers |
+| `20260406222857_client_api_functions.sql` | 25 RPCs + validate_client_required_fields() helper |
+
+### Handler Reference Files Created
+- `handlers/client/` — 23 files (4 lifecycle + 19 sub-entity)
+- `handlers/contact/` — 2 files (designation handlers)
+- `handlers/routers/process_client_event.sql` — 23 CASE branches
+- `handlers/routers/process_contact_event.sql` — 7 CASE branches (5 existing + 2 designation)
+- `handlers/trigger/process_domain_event.sql` — updated with `WHEN 'client'`
+
+### AsyncAPI Contracts (B4a, 2026-04-06)
+- **New**: `infrastructure/supabase/contracts/asyncapi/domains/client.yaml` — 23 event messages + 37 schemas
+  - 4 lifecycle (registered, information_updated, admitted, discharged)
+  - 3 phone, 3 email, 3 address, 3 insurance, 3 funding source sub-entity events (add/update/remove)
+  - 2 placement (changed, ended), 2 contact assignment (assigned, unassigned)
+  - Shared `ClientSubEntityRemovalData` for all remove events
+- **Updated**: `contact.yaml` — 2 designation events added (contact.designation.created/deactivated) + 4 schemas
+- **Updated**: `asyncapi.yaml` — 25 new channel refs + `client`, `client_field_definition`, `client_field_category` added to stream_type enum
+- **Generated**: `types/generated-events.ts` — 38 enums, 271 interfaces (copied to frontend)
+- Archived `domains.archived/client.yaml` is now superseded (was 4 events with stale field schemas)
+
+### Existing Files (from Phase 2-3, already deployed)
+- `clients_projection` table (53 typed columns) — deployed 2026-03-27
+- `client_field_definitions_projection`, `client_field_categories`, `client_reference_values`, `client_field_definition_templates` — deployed 2026-03-27
+- `contact_designations_projection` (12-value CHECK) — deployed 2026-03-27
+- 8 API RPCs for field definitions/categories — deployed 2026-03-27
+- Handler reference files for field definition/category handlers — deployed 2026-03-27
+- Frontend Client Field Settings page at `/settings/client-fields` — deployed 2026-03-28
+
+### Implementation Plan
+- **Primary plan file**: `.claude/plans/golden-booping-rainbow.md` — Phase B full-stack plan with sequencing
 
 ### Cross-Correlation Audit (completed 2026-02-12)
 Full audit of all event types across 12 routers + dispatcher vs 14 AsyncAPI domain files. Findings:
@@ -405,8 +446,35 @@ When the frontend intake form is built, these existing patterns apply:
 - Root `/` redirects to `/clients`
 
 ### Open Frontend Questions (resolve before Phase 5)
-- **Navigation**: Intake form configuration under `/settings/organization` (alongside DirectCareSettings) or dedicated `/settings/intake-form` sub-route?
-- **Configurability UX**: Toggle switches (like DirectCareSettings) vs. drag-and-drop field ordering vs. section-based grouping?
+- ~~**Navigation**: Intake form configuration under `/settings/organization` (alongside DirectCareSettings) or dedicated `/settings/intake-form` sub-route?~~ **RESOLVED** (Decision 88): Dedicated `/settings/client-fields` sub-route.
+- ~~**Configurability UX**: Toggle switches (like DirectCareSettings) vs. drag-and-drop field ordering vs. section-based grouping?~~ **RESOLVED**: Toggle switches + tabbed categories with "Required when visible" pattern.
+
+### Phase A Test Suite ✅ COMPLETE (2026-04-06)
+
+**139 tests total, all passing**:
+- `frontend/src/viewModels/settings/__tests__/ClientFieldSettingsViewModel.test.ts` — 56 Vitest unit tests
+- `workflows/src/__tests__/activities/seed-field-definitions.test.ts` — 12 Jest unit tests
+- `frontend/src/services/client-fields/__tests__/SupabaseClientFieldService.test.ts` — 26 Vitest unit tests
+- `frontend/e2e/client-field-settings.spec.ts` — 26 Playwright E2E tests
+- `frontend/playwright.client-fields.config.ts` — Dedicated Playwright config (port 3457, VITE_FORCE_MOCK=true, VITE_DEV_PROFILE=provider_admin)
+- `infrastructure/supabase/scripts/test-client-field-rls.sql` — 19 RLS verification tests (run via MCP execute_sql or psql)
+- `workflows/jest.config.js` + `workflows/src/test-setup.ts` — First Jest tests in workflows project
+
+**RLS test coverage** (19 tests across 7 tables):
+- Org isolation: field definitions (own rows, cross-org, bogus org), categories (system + custom cross-org), clients projection, contact designations
+- Global-read: reference values (USING true), templates (USING true)
+- Platform admin: cross-org override on field defs + templates
+- Write denial: INSERT on all 6 projection/reference tables, UPDATE + DELETE on field definitions
+
+**Test infrastructure created (workflows)**:
+- `workflows/jest.config.js` — ts-jest preset with path aliases
+- `workflows/src/test-setup.ts` — Jest setup file
+
+**E2E config gotcha**: `super_admin` profile has `org_type: 'platform_owner'`, but SettingsPage gates the client fields card on `org_type === 'provider'`. Must use `provider_admin` profile for E2E tests.
+
+**E2E auth gotcha**: When `.env.local` has Supabase credentials, the dev server uses real auth (not mock). The dedicated playwright config sets `VITE_FORCE_MOCK=true` to force mock mode regardless.
+
+**RLS test gotcha**: MCP `execute_sql` doesn't return RAISE NOTICE output. The script is designed for psql/SQL Editor. To verify via MCP, run individual assertions as SELECT queries (see verification pattern in conversation history).
 
 ## Why This Approach?
 

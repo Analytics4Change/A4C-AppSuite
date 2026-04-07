@@ -40,6 +40,23 @@ components:
       payload:
         $ref: '#/components/schemas/ContactUserUnlinkedEvent'
 
+    # Designation events (Phase B2b — clinical contact designations)
+    ContactDesignationCreated:
+      name: contact.designation.created
+      title: Contact Designation Created
+      summary: A clinical designation has been assigned to a contact for an organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ContactDesignationCreatedEvent'
+
+    ContactDesignationDeactivated:
+      name: contact.designation.deactivated
+      title: Contact Designation Deactivated
+      summary: A clinical designation has been deactivated for a contact
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ContactDesignationDeactivatedEvent'
+
   schemas:
     ContactCreatedEvent:
       title: ContactCreatedEvent
@@ -368,3 +385,93 @@ components:
             - "user_deleted"
             - "manual_unlink"
             - "duplicate_resolution"
+
+    # =========================================================================
+    # Contact Designation Schemas
+    # =========================================================================
+
+    ContactDesignationCreatedEvent:
+      title: ContactDesignationCreatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Contact UUID
+        stream_type:
+          type: string
+          const: contact
+        event_type:
+          type: string
+          const: contact.designation.created
+        event_data:
+          $ref: '#/components/schemas/ContactDesignationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ContactDesignationData:
+      title: ContactDesignationData
+      type: object
+      required:
+        - designation_id
+        - designation
+        - organization_id
+      properties:
+        designation_id:
+          type: string
+          format: uuid
+          description: Designation record UUID
+        designation:
+          type: string
+          description: >
+            Clinical designation type (clinician, therapist, psychiatrist,
+            behavioral_analyst, case_worker, guardian, emergency_contact)
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization context for this designation
+
+    ContactDesignationDeactivatedEvent:
+      title: ContactDesignationDeactivatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Contact UUID
+        stream_type:
+          type: string
+          const: contact
+        event_type:
+          type: string
+          const: contact.designation.deactivated
+        event_data:
+          $ref: '#/components/schemas/ContactDesignationDeactivationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ContactDesignationDeactivationData:
+      title: ContactDesignationDeactivationData
+      type: object
+      required:
+        - designation
+        - organization_id
+      properties:
+        designation:
+          type: string
+          description: Designation being deactivated
+        organization_id:
+          type: string
+          format: uuid

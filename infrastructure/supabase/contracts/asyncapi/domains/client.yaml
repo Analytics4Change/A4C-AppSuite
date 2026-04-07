@@ -1,0 +1,1481 @@
+components:
+  messages:
+    # =========================================================================
+    # Client Lifecycle Events (4)
+    # =========================================================================
+    ClientRegistered:
+      name: client.registered
+      title: Client Registered
+      summary: A new client has been registered via intake form (JSONB payload with mandatory + org-configurable fields)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientRegisteredEvent'
+
+    ClientInformationUpdated:
+      name: client.information_updated
+      title: Client Information Updated
+      summary: Client record fields have been modified (partial update via changes JSONB)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientInformationUpdatedEvent'
+
+    ClientAdmitted:
+      name: client.admitted
+      title: Client Admitted
+      summary: A client has been admitted (sets status=active, updates admission fields)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientAdmittedEvent'
+
+    ClientDischarged:
+      name: client.discharged
+      title: Client Discharged
+      summary: A client has been discharged (Decision 78 three-field decomposition)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientDischargedEvent'
+
+    # =========================================================================
+    # Phone Sub-Entity Events (3)
+    # =========================================================================
+    ClientPhoneAdded:
+      name: client.phone.added
+      title: Client Phone Added
+      summary: A phone number has been added to a client record
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientPhoneAddedEvent'
+
+    ClientPhoneUpdated:
+      name: client.phone.updated
+      title: Client Phone Updated
+      summary: A client phone number has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientPhoneUpdatedEvent'
+
+    ClientPhoneRemoved:
+      name: client.phone.removed
+      title: Client Phone Removed
+      summary: A client phone number has been soft-deleted (is_active=false)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientPhoneRemovedEvent'
+
+    # =========================================================================
+    # Email Sub-Entity Events (3)
+    # =========================================================================
+    ClientEmailAdded:
+      name: client.email.added
+      title: Client Email Added
+      summary: An email address has been added to a client record
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientEmailAddedEvent'
+
+    ClientEmailUpdated:
+      name: client.email.updated
+      title: Client Email Updated
+      summary: A client email address has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientEmailUpdatedEvent'
+
+    ClientEmailRemoved:
+      name: client.email.removed
+      title: Client Email Removed
+      summary: A client email has been soft-deleted (is_active=false)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientEmailRemovedEvent'
+
+    # =========================================================================
+    # Address Sub-Entity Events (3)
+    # =========================================================================
+    ClientAddressAdded:
+      name: client.address.added
+      title: Client Address Added
+      summary: An address has been added to a client record
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientAddressAddedEvent'
+
+    ClientAddressUpdated:
+      name: client.address.updated
+      title: Client Address Updated
+      summary: A client address has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientAddressUpdatedEvent'
+
+    ClientAddressRemoved:
+      name: client.address.removed
+      title: Client Address Removed
+      summary: A client address has been soft-deleted (is_active=false)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientAddressRemovedEvent'
+
+    # =========================================================================
+    # Insurance Sub-Entity Events (3)
+    # =========================================================================
+    ClientInsuranceAdded:
+      name: client.insurance.added
+      title: Client Insurance Added
+      summary: An insurance policy has been added to a client record
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientInsuranceAddedEvent'
+
+    ClientInsuranceUpdated:
+      name: client.insurance.updated
+      title: Client Insurance Updated
+      summary: A client insurance policy has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientInsuranceUpdatedEvent'
+
+    ClientInsuranceRemoved:
+      name: client.insurance.removed
+      title: Client Insurance Removed
+      summary: A client insurance policy has been soft-deleted (is_active=false)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientInsuranceRemovedEvent'
+
+    # =========================================================================
+    # Placement Sub-Entity Events (2)
+    # =========================================================================
+    ClientPlacementChanged:
+      name: client.placement.changed
+      title: Client Placement Changed
+      summary: Client placement arrangement has changed (closes previous, inserts new, denormalizes to clients_projection)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientPlacementChangedEvent'
+
+    ClientPlacementEnded:
+      name: client.placement.ended
+      title: Client Placement Ended
+      summary: Current client placement has ended (is_current=false, clears denormalized field)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientPlacementEndedEvent'
+
+    # =========================================================================
+    # Funding Source Sub-Entity Events (3)
+    # =========================================================================
+    ClientFundingSourceAdded:
+      name: client.funding_source.added
+      title: Client Funding Source Added
+      summary: A funding source has been added to a client record
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientFundingSourceAddedEvent'
+
+    ClientFundingSourceUpdated:
+      name: client.funding_source.updated
+      title: Client Funding Source Updated
+      summary: A client funding source has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientFundingSourceUpdatedEvent'
+
+    ClientFundingSourceRemoved:
+      name: client.funding_source.removed
+      title: Client Funding Source Removed
+      summary: A client funding source has been soft-deleted (is_active=false)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientFundingSourceRemovedEvent'
+
+    # =========================================================================
+    # Contact Assignment Events (2)
+    # =========================================================================
+    ClientContactAssigned:
+      name: client.contact.assigned
+      title: Client Contact Assigned
+      summary: A contact has been assigned to a client with a designation (4NF model)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientContactAssignedEvent'
+
+    ClientContactUnassigned:
+      name: client.contact.unassigned
+      title: Client Contact Unassigned
+      summary: A contact has been unassigned from a client (is_active=false)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientContactUnassignedEvent'
+
+  schemas:
+    # =========================================================================
+    # Client Lifecycle Event Schemas
+    # =========================================================================
+
+    ClientRegisteredEvent:
+      title: ClientRegisteredEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The client UUID
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.registered
+        event_data:
+          $ref: '#/components/schemas/ClientRegistrationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientRegistrationData:
+      title: ClientRegistrationData
+      type: object
+      description: >
+        Full JSONB payload for client registration. 7 mandatory fields enforced by
+        validate_client_required_fields() helper. All other fields are optional and
+        org-configurable via client_field_definitions_projection.
+      required:
+        - organization_id
+        - first_name
+        - last_name
+        - date_of_birth
+        - gender
+        - race
+        - ethnicity
+        - primary_language
+      properties:
+        # Identity
+        organization_id:
+          type: string
+          format: uuid
+          description: Organization this client belongs to
+        organization_unit_id:
+          type: string
+          format: uuid
+          description: Organization unit (facility/program)
+        status:
+          type: string
+          default: active
+          description: Initial client status
+        data_source:
+          type: string
+          default: manual
+          description: How this record was created (manual, import, api)
+        # Demographics (mandatory)
+        first_name:
+          type: string
+          description: Client's legal first name
+        last_name:
+          type: string
+          description: Client's legal last name
+        date_of_birth:
+          type: string
+          format: date
+          description: Client's date of birth (YYYY-MM-DD)
+        gender:
+          type: string
+          description: Client's gender
+        race:
+          type: array
+          items:
+            type: string
+          description: OMB race categories (multi-select)
+        ethnicity:
+          type: string
+          description: OMB ethnicity (Hispanic/Latino or not)
+        primary_language:
+          type: string
+          description: Primary language (ISO 639)
+        # Demographics (optional)
+        middle_name:
+          type: string
+        preferred_name:
+          type: string
+        gender_identity:
+          type: string
+        pronouns:
+          type: string
+          description: Free text (e.g., "he/him, she/her, they/them")
+        secondary_language:
+          type: string
+        interpreter_needed:
+          type: boolean
+        marital_status:
+          type: string
+        citizenship_status:
+          type: string
+        photo_url:
+          type: string
+        mrn:
+          type: string
+          description: Medical record number
+        external_id:
+          type: string
+        drivers_license:
+          type: string
+        # Referral
+        referral_source_type:
+          type: string
+        referral_organization:
+          type: string
+        referral_date:
+          type: string
+          format: date
+        reason_for_referral:
+          type: string
+        # Admission
+        admission_date:
+          type: string
+          format: date
+        admission_type:
+          type: string
+        level_of_care:
+          type: string
+        expected_length_of_stay:
+          type: integer
+          minimum: 1
+        initial_risk_level:
+          type: string
+        discharge_plan_status:
+          type: string
+        placement_arrangement:
+          type: string
+        # Insurance IDs
+        medicaid_id:
+          type: string
+        medicare_id:
+          type: string
+        # Clinical
+        primary_diagnosis:
+          type: object
+          description: JSONB diagnosis object
+        secondary_diagnoses:
+          type: object
+          description: JSONB array of secondary diagnoses
+        dsm5_diagnoses:
+          type: object
+          description: JSONB array of DSM-5 diagnoses
+        presenting_problem:
+          type: string
+        suicide_risk_status:
+          type: string
+        violence_risk_status:
+          type: string
+        trauma_history_indicator:
+          type: boolean
+        substance_use_history:
+          type: string
+        developmental_history:
+          type: string
+        previous_treatment_history:
+          type: string
+        # Medical
+        allergies:
+          type: object
+          description: 'JSONB object: {nka: boolean, items: string[]}'
+        medical_conditions:
+          type: object
+          description: 'JSONB object: {nkmc: boolean, items: string[]}'
+        immunization_status:
+          type: string
+        dietary_restrictions:
+          type: string
+        special_medical_needs:
+          type: string
+        # Legal
+        legal_custody_status:
+          type: string
+        court_ordered_placement:
+          type: boolean
+        financial_guarantor_type:
+          type: string
+        court_case_number:
+          type: string
+        state_agency:
+          type: string
+        legal_status:
+          type: string
+        mandated_reporting_status:
+          type: boolean
+        protective_services_involvement:
+          type: boolean
+        safety_plan_required:
+          type: boolean
+        # Education
+        education_status:
+          type: string
+        grade_level:
+          type: string
+        iep_status:
+          type: boolean
+        # Custom fields
+        custom_fields:
+          type: object
+          description: Org-defined custom fields (JSONB)
+
+    ClientInformationUpdatedEvent:
+      title: ClientInformationUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The client UUID
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.information_updated
+        event_data:
+          $ref: '#/components/schemas/ClientInformationUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientInformationUpdateData:
+      title: ClientInformationUpdateData
+      type: object
+      description: Partial update via changes JSONB. Only changed fields included.
+      required:
+        - organization_id
+        - changes
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        changes:
+          type: object
+          description: >
+            Object containing only the fields being changed. Keys match
+            ClientRegistrationData property names. Custom fields merge (don't replace).
+
+    ClientAdmittedEvent:
+      title: ClientAdmittedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The client UUID
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.admitted
+        event_data:
+          $ref: '#/components/schemas/ClientAdmissionData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientAdmissionData:
+      title: ClientAdmissionData
+      type: object
+      required:
+        - organization_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        admission_date:
+          type: string
+          format: date
+        admission_type:
+          type: string
+        level_of_care:
+          type: string
+        expected_length_of_stay:
+          type: integer
+          minimum: 1
+        initial_risk_level:
+          type: string
+        organization_unit_id:
+          type: string
+          format: uuid
+        primary_diagnosis:
+          type: object
+          description: JSONB diagnosis object
+
+    ClientDischargedEvent:
+      title: ClientDischargedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The client UUID
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.discharged
+        event_data:
+          $ref: '#/components/schemas/ClientDischargeData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientDischargeData:
+      title: ClientDischargeData
+      type: object
+      description: Decision 78 three-field decomposition for discharge
+      required:
+        - organization_id
+        - discharge_date
+        - discharge_outcome
+        - discharge_reason
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        discharge_date:
+          type: string
+          format: date
+        discharge_outcome:
+          type: string
+          description: High-level outcome (e.g., completed, against_medical_advice, transfer)
+        discharge_reason:
+          type: string
+          description: Human-readable reason for discharge
+        discharge_diagnosis:
+          type: object
+          description: JSONB discharge diagnosis
+        discharge_placement:
+          type: string
+          description: Where client went after discharge
+
+    # =========================================================================
+    # Phone Sub-Entity Event Schemas
+    # =========================================================================
+
+    ClientPhoneAddedEvent:
+      title: ClientPhoneAddedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The client UUID
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.phone.added
+        event_data:
+          $ref: '#/components/schemas/ClientPhoneData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientPhoneData:
+      title: ClientPhoneData
+      type: object
+      required:
+        - organization_id
+        - phone_id
+        - phone_number
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        phone_id:
+          type: string
+          format: uuid
+          description: Sub-entity UUID
+        phone_number:
+          type: string
+        phone_type:
+          type: string
+          default: mobile
+          description: Phone type (mobile, home, work, fax)
+        is_primary:
+          type: boolean
+          default: false
+
+    ClientPhoneUpdatedEvent:
+      title: ClientPhoneUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.phone.updated
+        event_data:
+          $ref: '#/components/schemas/ClientPhoneUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientPhoneUpdateData:
+      title: ClientPhoneUpdateData
+      type: object
+      description: Partial update — only changed fields included
+      required:
+        - organization_id
+        - phone_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        phone_id:
+          type: string
+          format: uuid
+        phone_number:
+          type: string
+        phone_type:
+          type: string
+        is_primary:
+          type: boolean
+
+    ClientPhoneRemovedEvent:
+      title: ClientPhoneRemovedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.phone.removed
+        event_data:
+          $ref: '#/components/schemas/ClientSubEntityRemovalData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    # =========================================================================
+    # Email Sub-Entity Event Schemas
+    # =========================================================================
+
+    ClientEmailAddedEvent:
+      title: ClientEmailAddedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The client UUID
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.email.added
+        event_data:
+          $ref: '#/components/schemas/ClientEmailData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientEmailData:
+      title: ClientEmailData
+      type: object
+      required:
+        - organization_id
+        - email_id
+        - email
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        email_id:
+          type: string
+          format: uuid
+          description: Sub-entity UUID
+        email:
+          type: string
+          format: email
+        email_type:
+          type: string
+          default: personal
+          description: Email type (personal, work, school)
+        is_primary:
+          type: boolean
+          default: false
+
+    ClientEmailUpdatedEvent:
+      title: ClientEmailUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.email.updated
+        event_data:
+          $ref: '#/components/schemas/ClientEmailUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientEmailUpdateData:
+      title: ClientEmailUpdateData
+      type: object
+      description: Partial update — only changed fields included
+      required:
+        - organization_id
+        - email_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        email_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        email_type:
+          type: string
+        is_primary:
+          type: boolean
+
+    ClientEmailRemovedEvent:
+      title: ClientEmailRemovedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.email.removed
+        event_data:
+          $ref: '#/components/schemas/ClientSubEntityRemovalData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    # =========================================================================
+    # Address Sub-Entity Event Schemas
+    # =========================================================================
+
+    ClientAddressAddedEvent:
+      title: ClientAddressAddedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The client UUID
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.address.added
+        event_data:
+          $ref: '#/components/schemas/ClientAddressData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientAddressData:
+      title: ClientAddressData
+      type: object
+      required:
+        - organization_id
+        - address_id
+        - street1
+        - city
+        - state
+        - zip
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        address_id:
+          type: string
+          format: uuid
+          description: Sub-entity UUID
+        address_type:
+          type: string
+          default: home
+          description: Address type (home, mailing, previous)
+        street1:
+          type: string
+        street2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        zip:
+          type: string
+        country:
+          type: string
+          default: US
+        is_primary:
+          type: boolean
+          default: false
+
+    ClientAddressUpdatedEvent:
+      title: ClientAddressUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.address.updated
+        event_data:
+          $ref: '#/components/schemas/ClientAddressUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientAddressUpdateData:
+      title: ClientAddressUpdateData
+      type: object
+      description: Partial update — only changed fields included
+      required:
+        - organization_id
+        - address_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        address_id:
+          type: string
+          format: uuid
+        address_type:
+          type: string
+        street1:
+          type: string
+        street2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        zip:
+          type: string
+        country:
+          type: string
+        is_primary:
+          type: boolean
+
+    ClientAddressRemovedEvent:
+      title: ClientAddressRemovedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.address.removed
+        event_data:
+          $ref: '#/components/schemas/ClientSubEntityRemovalData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    # =========================================================================
+    # Insurance Sub-Entity Event Schemas
+    # =========================================================================
+
+    ClientInsuranceAddedEvent:
+      title: ClientInsuranceAddedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The client UUID
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.insurance.added
+        event_data:
+          $ref: '#/components/schemas/ClientInsuranceData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientInsuranceData:
+      title: ClientInsuranceData
+      type: object
+      required:
+        - organization_id
+        - policy_id
+        - policy_type
+        - payer_name
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        policy_id:
+          type: string
+          format: uuid
+          description: Sub-entity UUID
+        policy_type:
+          type: string
+          description: Insurance type (primary, secondary, tertiary, dental, vision, behavioral_health)
+        payer_name:
+          type: string
+          description: Insurance company name
+        policy_number:
+          type: string
+        group_number:
+          type: string
+        subscriber_name:
+          type: string
+        subscriber_relation:
+          type: string
+          description: Relation to subscriber (self, parent, spouse, guardian, other)
+        coverage_start_date:
+          type: string
+          format: date
+        coverage_end_date:
+          type: string
+          format: date
+
+    ClientInsuranceUpdatedEvent:
+      title: ClientInsuranceUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.insurance.updated
+        event_data:
+          $ref: '#/components/schemas/ClientInsuranceUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientInsuranceUpdateData:
+      title: ClientInsuranceUpdateData
+      type: object
+      description: Partial update — only changed fields included
+      required:
+        - organization_id
+        - policy_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        policy_id:
+          type: string
+          format: uuid
+        payer_name:
+          type: string
+        policy_number:
+          type: string
+        group_number:
+          type: string
+        subscriber_name:
+          type: string
+        subscriber_relation:
+          type: string
+        coverage_start_date:
+          type: string
+          format: date
+        coverage_end_date:
+          type: string
+          format: date
+
+    ClientInsuranceRemovedEvent:
+      title: ClientInsuranceRemovedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.insurance.removed
+        event_data:
+          $ref: '#/components/schemas/ClientSubEntityRemovalData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    # =========================================================================
+    # Placement Sub-Entity Event Schemas
+    # =========================================================================
+
+    ClientPlacementChangedEvent:
+      title: ClientPlacementChangedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The client UUID
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.placement.changed
+        event_data:
+          $ref: '#/components/schemas/ClientPlacementChangeData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientPlacementChangeData:
+      title: ClientPlacementChangeData
+      type: object
+      required:
+        - organization_id
+        - placement_id
+        - placement_arrangement
+        - start_date
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        placement_id:
+          type: string
+          format: uuid
+          description: Sub-entity UUID for placement history record
+        placement_arrangement:
+          type: string
+          description: Placement type (e.g., residential, foster_care, group_home)
+        start_date:
+          type: string
+          format: date
+        reason:
+          type: string
+          description: Reason for placement change
+
+    ClientPlacementEndedEvent:
+      title: ClientPlacementEndedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.placement.ended
+        event_data:
+          $ref: '#/components/schemas/ClientPlacementEndData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientPlacementEndData:
+      title: ClientPlacementEndData
+      type: object
+      required:
+        - organization_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        end_date:
+          type: string
+          format: date
+          description: Defaults to CURRENT_DATE if omitted
+        reason:
+          type: string
+
+    # =========================================================================
+    # Funding Source Sub-Entity Event Schemas
+    # =========================================================================
+
+    ClientFundingSourceAddedEvent:
+      title: ClientFundingSourceAddedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The client UUID
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.funding_source.added
+        event_data:
+          $ref: '#/components/schemas/ClientFundingSourceData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientFundingSourceData:
+      title: ClientFundingSourceData
+      type: object
+      required:
+        - organization_id
+        - funding_source_id
+        - source_type
+        - source_name
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        funding_source_id:
+          type: string
+          format: uuid
+          description: Sub-entity UUID
+        source_type:
+          type: string
+          description: Funding type (medicaid, state_block_grant, private_pay, title_iv_e, etc.)
+        source_name:
+          type: string
+          description: Name of funding source/agency
+        reference_number:
+          type: string
+          description: Grant/contract reference number
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        custom_fields:
+          type: object
+          description: Additional funding-specific fields (JSONB)
+
+    ClientFundingSourceUpdatedEvent:
+      title: ClientFundingSourceUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.funding_source.updated
+        event_data:
+          $ref: '#/components/schemas/ClientFundingSourceUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientFundingSourceUpdateData:
+      title: ClientFundingSourceUpdateData
+      type: object
+      description: Partial update — only changed fields included
+      required:
+        - organization_id
+        - funding_source_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        funding_source_id:
+          type: string
+          format: uuid
+        source_type:
+          type: string
+        source_name:
+          type: string
+        reference_number:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        custom_fields:
+          type: object
+
+    ClientFundingSourceRemovedEvent:
+      title: ClientFundingSourceRemovedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.funding_source.removed
+        event_data:
+          $ref: '#/components/schemas/ClientSubEntityRemovalData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    # =========================================================================
+    # Contact Assignment Event Schemas
+    # =========================================================================
+
+    ClientContactAssignedEvent:
+      title: ClientContactAssignedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The client UUID
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.contact.assigned
+        event_data:
+          $ref: '#/components/schemas/ClientContactAssignmentData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientContactAssignmentData:
+      title: ClientContactAssignmentData
+      type: object
+      required:
+        - organization_id
+        - assignment_id
+        - contact_id
+        - designation
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        assignment_id:
+          type: string
+          format: uuid
+          description: Assignment junction record UUID
+        contact_id:
+          type: string
+          format: uuid
+          description: Contact being assigned
+        designation:
+          type: string
+          description: >
+            Clinical designation (clinician, therapist, psychiatrist,
+            behavioral_analyst, case_worker, guardian, emergency_contact)
+
+    ClientContactUnassignedEvent:
+      title: ClientContactUnassignedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: The client UUID
+        stream_type:
+          type: string
+          const: client
+        event_type:
+          type: string
+          const: client.contact.unassigned
+        event_data:
+          $ref: '#/components/schemas/ClientContactUnassignmentData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientContactUnassignmentData:
+      title: ClientContactUnassignmentData
+      type: object
+      required:
+        - organization_id
+        - contact_id
+        - designation
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        contact_id:
+          type: string
+          format: uuid
+        designation:
+          type: string
+
+    # =========================================================================
+    # Shared Sub-Entity Schemas
+    # =========================================================================
+
+    ClientSubEntityRemovalData:
+      title: ClientSubEntityRemovalData
+      type: object
+      description: >
+        Shared removal data for phone/email/address/insurance/funding_source.
+        Uses the sub-entity-specific ID field name (phone_id, email_id, etc.)
+        from the handler — this schema documents the common pattern.
+      required:
+        - organization_id
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        phone_id:
+          type: string
+          format: uuid
+        email_id:
+          type: string
+          format: uuid
+        address_id:
+          type: string
+          format: uuid
+        policy_id:
+          type: string
+          format: uuid
+        funding_source_id:
+          type: string
+          format: uuid

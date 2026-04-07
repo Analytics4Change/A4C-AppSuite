@@ -282,9 +282,124 @@ Changed from `clients` (direct table) to `clients_projection` (full CQRS project
 | Conforming dimension mapping overhead | Operational burden on orgs | Push app-owner value sets; mapping table is opt-in for edge cases |
 | RAISE WARNING fixes break existing events | Unhandled event types would fail loudly | These are coding convention fixes — unhandled types were silently dropped before, now they'll be caught and recorded in `processing_error` |
 
+## Plan Updates (2026-04-06) — Test Suite + Client Intake Full-Stack Plan
+
+### Implementation Plan Created
+Comprehensive plan at `.claude/plans/cached-shimmying-feigenbaum.md` covering:
+- **Phase A0**: Data-testid instrumentation (✅ COMPLETE — 14 testids across 7 files)
+- **Phase A**: Full test suite for Client Field Configuration (ViewModel, activity, service, E2E, RLS)
+- **Phase B**: Full-spec Client Intake (7 sub-entity tables, ~21 event handlers, ~24 API RPCs, 7 frontend form sections)
+
+### Architecture Review (software-architect-dbc, 2026-04-06)
+Review at `.claude/plans/cached-shimmying-feigenbaum-agent-ada0924ae4c589c74.md`.
+6 Major + 10 Minor findings, all remediated in plan:
+- **M1**: B2c (RAISE WARNING fix) already done in `20260220185837` — removed from plan
+- **M2**: `register_client` uses `p_client_data jsonb` payload (not ~40 positional params)
+- **M3**: All write RPCs include `p_event_metadata jsonb DEFAULT NULL` for audit
+- **M4**: B2a split into lifecycle (4 handlers) + sub-entity (17 handlers) for reviewability
+- **M5**: B4 split into AsyncAPI contracts (early) + seed migration (after handlers)
+- **M6**: Added `validate_client_required_fields()` helper for org-specific validation
+- **m1**: All event-sourced sub-entity tables use `_projection` suffix (verified: codebase convention applies to ALL event-sourced tables including junctions)
+- **m8**: Clinical contact testids renamed `intake-clinical-contact-{designation}` (avoid collision with contact info section)
+- **m9**: 4 permission keys specified: `client.create`, `client.view`, `client.update`, `client.discharge`
+- **m10**: Draft uses `sessionStorage` (not localStorage) — PII safety
+
+### Key Sequencing Decision (User Choice)
+1. Full test suite for deployed Client Field Configuration first
+2. Then full-spec Client Intake (all ~21 event types + sub-entity tables)
+
+## Plan Updates (2026-04-06) — Phase B Backend Implemented
+
+### 7 Backend Migrations Written (all dry-run validated)
+Full plan at `.claude/plans/golden-booping-rainbow.md`.
+
+**B1a-c** (3 table + seed migrations):
+- 7 new tables: `client_phones_projection`, `client_emails_projection`, `client_addresses_projection`, `client_contact_assignments_projection`, `client_insurance_policies_projection`, `client_placement_history_projection`, `client_funding_sources_projection`
+- `client.discharge` permission seeded (only new one — other 4 client.* permissions already in baseline)
+- Permission implications: discharge → view + update. Backfill for existing orgs.
+- `_projection` suffix on `client_placement_history_projection` per m1 remediation
+
+**B2a-1** (lifecycle handlers):
+- Added `WHEN 'client'` to dispatcher
+- `process_client_event()` router: 4 lifecycle CASE branches
+- `handle_client_registered`: INSERT ON CONFLICT (full 50+ column insert from JSONB payload)
+- `handle_client_information_updated`: Partial UPDATE via `changes` JSONB with `?` key-presence checks
+- `handle_client_admitted`, `handle_client_discharged`: Status transitions + field updates
+
+**B2a-2** (sub-entity handlers):
+- Router extended to 23 CASE branches
+- 19 handlers: phone(3) + email(3) + address(3) + insurance(3) + placement(2) + funding(3) + contact_assignment(2)
+- Placement handler: closes previous (is_current=false, end_date set), inserts new, denormalizes to `clients_projection.placement_arrangement`
+- Contact assignment: ON CONFLICT reactivation pattern
+
+**B2b** (contact designation handlers):
+- 2 CASE branches added to `process_contact_event()` (now 7 total)
+- `handle_contact_designation_created`, `handle_contact_designation_deactivated`
+
+**B3** (API functions):
+- `validate_client_required_fields()` helper — reads org field definitions for per-org required field enforcement
+- 4 lifecycle RPCs: `register_client` (JSONB payload, 7 mandatory + org-specific validation, read-back guard), `update_client`, `admit_client`, `discharge_client`
+- 2 query RPCs: `list_clients` (status filter + search), `get_client` (full record with sub-entity lateral joins)
+- 15 sub-entity CRUD RPCs: phone(3) + email(3) + address(3) + insurance(3) + funding(3)
+- 2 placement RPCs: `change_client_placement`, `end_client_placement`
+- 2 contact assignment RPCs: `assign_client_contact`, `unassign_client_contact`
+- Total: 25 RPCs + 1 helper
+
+### Handler Reference Files
+- `handlers/client/` — 23 files (4 lifecycle + 19 sub-entity)
+- `handlers/contact/` — 2 new files
+- Updated routers: `process_client_event.sql` (23 CASE), `process_contact_event.sql` (7 CASE)
+- Updated dispatcher: `process_domain_event.sql` (16 stream_types + 3 admin)
+
+### Routing Decision (2026-04-06)
+- `/clients/register` — initial intake form only (demographics, contact, admission, staff, clinical, medical)
+- `/clients/:clientId` — all post-registration management (discharge, contact CRUD, insurance, placement, edit record)
+- Route order matters: `/clients/register` before `/:clientId` to avoid "register" matching as clientId param
+
+### What Remains
+- ~~**B4a**: AsyncAPI contracts~~ ✅ DONE
+- ~~**B4b**: event_types seed migration + type generation~~ ✅ DONE
+- ~~**B5a-c**: Frontend types, service layer, ViewModel~~ ✅ DONE
+- **B6a-b**: 7 intake form sections + ClientIntakePage at `/clients/register`
+- **B6c-d**: Rewrite ClientListPage + ClientDetailLayout on new types/service (delete legacy model)
+- **B7**: Tests (ViewModel, service, E2E, RLS) + documentation (7 table docs, AGENT-INDEX)
+
+## Plan Updates (2026-04-07) — B4b + B5a-c Frontend Layer Implemented
+
+### B4b: Event Types Seed Migration
+- Migration `20260406225150_client_event_types_seed.sql` — 25 event types seeded (23 client + 2 contact designation)
+- Each entry has `event_schema` (required fields JSONB), `projection_function`, `projection_tables`
+- AsyncAPI types regenerated (38 enums, 271 interfaces) and copied to frontend
+
+### B5a: Client Types (`frontend/src/types/client.types.ts`)
+- **Design decision**: Independent `Client` interface (read-model from `api.get_client`), NOT re-exported from generated `ClientRegistrationData` (event payload). They diverge: `Client` has id, timestamps, created_by, sub-entity arrays; generated type uses `Map<string, any>` for JSONB (Modelina artifact).
+- 17 union types matching DB CHECK constraints exactly
+- Display label const objects for all enums
+- 7 sub-entity interfaces matching projection table columns
+- `Client` (50+ fields + sub-entity arrays), `ClientListItem` (list subset)
+- Params types for all write RPCs + `ClientRpcResult`
+- `discharge_plan_status` excluded — dropped in migration `20260330204308`
+
+### B5b: Client Service Layer (`frontend/src/services/clients/`)
+- `IClientService.ts` — 25 methods mapping 1:1 to API RPCs
+- `SupabaseClientService.ts` — all calls via `supabase.schema('api').rpc()`, `parseResponse()` helper for JSON.parse string responses
+- `MockClientService.ts` — 3 seeded clients (Marcus Johnson/active, Sofia Ramirez/active, Jayden Williams/discharged), in-memory sub-entity arrays, `simulateDelay()`, deep copies
+- `ClientServiceFactory.ts` — `getDeploymentConfig()` detection, singleton with `resetClientService()`
+
+### B5c: ClientIntakeFormViewModel (`frontend/src/viewModels/client/ClientIntakeFormViewModel.ts`)
+- 10-section fixed navigation: demographics → contact_info → guardian → referral → admission → insurance → clinical → medical → legal → education
+- Field-definition-driven validation from `IClientFieldService.listFieldDefinitions()`
+- Draft sub-entity types: `DraftPhone`, `DraftEmail`, `DraftAddress`, `DraftInsurance`, `DraftClinicalContact`
+- sessionStorage drafts (`a4c-client-intake-draft` key) — PII safety per Decision m10
+- Submit: `registerClient()` first, then `Promise.allSettled` sub-entity RPCs with shared `correlation_id` (Decision 24)
+
+### Legacy Model Deletion (B6c/B6d)
+- Delete `frontend/src/types/models/Client.ts` (camelCase, minimal) and `frontend/src/mocks/data/clients.mock.ts`
+- Rewrite all consumers: `ClientListPage`, `ClientDetailLayout`, `ClientSelectionViewModel` on new `client.types.ts` + `IClientService`
+- No backward compatibility — complete replacement
+
 ## Next Steps After Completion
 
-1. **Frontend intake form** — Configurable form driven by field registry
-2. **Behavioral incidents domain** — Second fact table for analytics correlation
-3. **Cube.js integration** — Semantic layer connecting client dimensions to fact tables
-4. **Self-service BI** — Query builder with conforming dimension enforcement
+1. **Behavioral incidents domain** — Second fact table for analytics correlation
+2. **Cube.js integration** — Semantic layer connecting client dimensions to fact tables
+3. **Self-service BI** — Query builder with conforming dimension enforcement

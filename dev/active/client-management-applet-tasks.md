@@ -266,10 +266,101 @@ _Placement history table deferred to Client Intake implementation._
 - [ ] Client list shows real data from `api.list_clients()` RPC
 - [ ] WCAG 2.1 AA compliant (keyboard nav, ARIA, focus management)
 
+## Phase A0: Data-TestID Instrumentation ✅ COMPLETE (2026-04-06)
+
+- [x] A0a: Add data-testid to Client Field Settings components (8 testids: SettingsPage 2 cards, ClientFieldSettingsPage back btn, TabBar scroll btns, CustomFieldsTab cancel+error, CategoriesTab cancel+error)
+- [x] A0b: Add data-testid to Client List & Detail pages (6 testids: ClientListPage add btn+search+cards, ClientDetailLayout back btn+tabs)
+- [x] Verify build clean after all changes
+
+## Phase A: Client Field Configuration Test Suite ✅ COMPLETE (2026-04-06)
+
+- [x] A1: ClientFieldSettingsViewModel unit test (56 cases) — `frontend/src/viewModels/settings/__tests__/ClientFieldSettingsViewModel.test.ts` (2026-04-06)
+- [x] A2: seedFieldDefinitions activity unit test (12 cases) — `workflows/src/__tests__/activities/seed-field-definitions.test.ts` (2026-04-06)
+  - Also created `workflows/jest.config.js` and `workflows/src/test-setup.ts` (first Jest tests in workflows project)
+- [x] A3: SupabaseClientFieldService unit tests (26 cases) — `frontend/src/services/client-fields/__tests__/SupabaseClientFieldService.test.ts` (2026-04-06)
+- [x] A4: E2E tests for Client Field Settings page (26 cases) — `frontend/e2e/client-field-settings.spec.ts` + `frontend/playwright.client-fields.config.ts` (2026-04-06)
+- [x] A5: RLS verification script — 19 tests across 7 tables (org isolation, cross-org, bogus org, platform admin, global-read, write denial INSERT/UPDATE/DELETE) — `infrastructure/supabase/scripts/test-client-field-rls.sql` (2026-04-06)
+
+## Phase B: Client Intake Full-Stack 🔄 IN PROGRESS
+
+_Full plan at `.claude/plans/golden-booping-rainbow.md`._
+_Key remediations: M1 (B2c removed — already done), M2 (JSONB payload), M3 (p_event_metadata), M4 (split B2a), M5 (split B4), M6 (validation helper), m1 (_projection suffix on all event-sourced tables)._
+
+- [x] B1a: `client_contact_tables` migration — 4 tables (client_phones_projection, client_emails_projection, client_addresses_projection, client_contact_assignments_projection)
+  - Migration: `20260406221732_client_contact_tables.sql`
+- [x] B1b: `client_insurance_placement_tables` migration — 3 tables (client_insurance_policies_projection, client_placement_history_projection, client_funding_sources_projection)
+  - Migration: `20260406221738_client_insurance_placement_tables.sql`
+  - Note: `client_placement_history_projection` uses `_projection` suffix per m1 remediation
+- [x] B1c: `client_permissions_seed` migration — only `client.discharge` is new (other 4 already in baseline)
+  - Migration: `20260406221739_client_permissions_seed.sql`
+  - Backfills existing provider_admin + clinician roles, adds permission implications
+  - Updated authoritative seed files: `001-permissions-seed.sql` (reference), `002-role-permission-templates-seed.sql`
+- [x] B2a-1: `client_lifecycle_event_handlers` migration — dispatcher + router + 4 lifecycle handlers
+  - Migration: `20260406222201_client_lifecycle_event_handlers.sql`
+  - Dispatcher: added `WHEN 'client' THEN PERFORM process_client_event(NEW)`
+  - Router: `process_client_event()` with 4 CASE branches
+  - Handlers: `handle_client_registered` (INSERT ON CONFLICT), `handle_client_information_updated` (partial UPDATE via changes JSONB), `handle_client_admitted`, `handle_client_discharged` (Decision 78 three-field decomposition)
+  - Handler reference files: `handlers/client/` (4 files) + `handlers/routers/process_client_event.sql` + updated `handlers/trigger/process_domain_event.sql`
+- [x] B2a-2: `client_sub_entity_event_handlers` migration — 19 sub-entity handlers + extended router (23 CASE branches)
+  - Migration: `20260406222642_client_sub_entity_event_handlers.sql`
+  - Phone (3), Email (3), Address (3), Insurance (3), Placement (2), Funding (3), Contact Assignment (2)
+  - Placement handler: closes previous (is_current=false), inserts new, denormalizes to clients_projection.placement_arrangement
+  - Handler reference files: `handlers/client/` (19 new files) + updated `handlers/routers/process_client_event.sql`
+- [x] B2b: `contact_designation_event_handlers` migration — 2 handlers in process_contact_event()
+  - Migration: `20260406222759_contact_designation_event_handlers.sql`
+  - Added `contact.designation.created` + `contact.designation.deactivated` CASE branches
+  - Handler reference files: `handlers/contact/` (2 files) + updated `handlers/routers/process_contact_event.sql`
+- [x] B3: `client_api_functions` migration — 22 RPCs + validate_client_required_fields() helper
+  - Migration: `20260406222857_client_api_functions.sql`
+  - Lifecycle: register_client (JSONB payload, 7 mandatory + org-specific validation), update_client, admit_client, discharge_client
+  - Query: list_clients (status filter + search), get_client (full record with sub-entity lateral joins)
+  - Sub-entity CRUD: add/update/remove × phone/email/address/insurance (12 RPCs)
+  - Placement: change_client_placement, end_client_placement
+  - Contact: assign_client_contact, unassign_client_contact
+  - All write RPCs include p_event_metadata + p_correlation_id, permission checks, org-scoped
+- [x] B4a: AsyncAPI contracts — new `client.yaml` (23 events, 37 schemas), 2 designation events + 4 schemas added to `contact.yaml`, `asyncapi.yaml` channel refs + stream_type enum updated, types regenerated + copied to frontend
+- [x] B4b: `client_event_types_seed` migration + type generation
+  - Migration: `20260406225150_client_event_types_seed.sql`
+  - 25 event types seeded: 23 client (lifecycle + sub-entity CRUD + placement + contact assignment) + 2 contact designation
+  - AsyncAPI types regenerated (38 enums, 271 interfaces) and copied to frontend
+- [x] B5a: Client types (`frontend/src/types/client.types.ts`)
+  - 17 union types (matching DB CHECK constraints), display label maps, 7 sub-entity interfaces
+  - `Client` (full read model, 50+ fields + sub-entity arrays), `ClientListItem` (list subset)
+  - Params types (Register, Update, Admit, Discharge, sub-entity CRUD), `ClientRpcResult`
+- [x] B5b: Client service layer (IClientService, Supabase, Mock, Factory)
+  - `frontend/src/services/clients/` — 5 files, 25 methods on IClientService
+  - SupabaseClientService: all calls via `supabase.schema('api').rpc()`, JSON.parse responses
+  - MockClientService: 3 seeded clients, in-memory CRUD, simulateDelay, deep copies
+  - ClientServiceFactory: getDeploymentConfig() detection, singleton with reset
+- [x] B5c: ClientIntakeFormViewModel (multi-section, validation, sessionStorage draft)
+  - `frontend/src/viewModels/client/ClientIntakeFormViewModel.ts`
+  - 10-section navigation, field-definition-driven validation, sessionStorage drafts
+  - Submit orchestration: registerClient + Promise.allSettled sub-entity RPCs with shared correlation ID
+  - Draft types: DraftPhone, DraftEmail, DraftAddress, DraftInsurance, DraftClinicalContact
+- [ ] B6a: 7 intake form section components
+- [ ] B6b: ClientIntakePage (multi-section layout, route: /clients/register)
+- [ ] B6c: Rewrite ClientListPage on new types/service + delete legacy `types/models/Client.ts` and `mocks/data/clients.mock.ts`
+- [ ] B6d: Rewrite ClientDetailLayout (full record display, discharge action) + update ClientSelectionViewModel
+- [ ] B7: Integration testing + documentation (7 table docs, E2E, RLS, AGENT-INDEX)
+
 ## Current Status
 
-**Phase**: Client Field Configuration — ✅ COMPLETE (Backend + Frontend DEPLOYED)
-**Status**: All 8 backend migrations + frontend deployed. Phase 3 verification passed (2026-03-28): AsyncAPI valid, event_types seeded, plpgsql_check known limitation documented. Remaining Phase 3 items (client CRUD, RAISE WARNING fixes, full event_types seed) deferred to Client Intake project.
+**Phase**: Phase B — Client Intake Full-Stack 🔄 IN PROGRESS
+**Status**: B1a-c + B2a-1 + B2a-2 + B2b + B3 + B4a + B4b + B5a-c complete. Next: B6a (intake form sections).
+**Migrations**: 8 pending push — `20260406221732` through `20260406225150`
+
+**Last Updated**: 2026-04-07
+**Next Step**: B6a — 7 intake form section components. Then B6b (ClientIntakePage), B6c-d (update list/detail pages), B7 (tests + docs).
+**Plan file**: Plan files expired (session-scoped). Full plan details in `dev/active/client-management-applet-plan.md`.
+
+### Test Files Created (2026-04-06):
+- `frontend/src/viewModels/settings/__tests__/ClientFieldSettingsViewModel.test.ts` — 56 tests (Vitest): default state, loadData, computed properties (fieldsByCategory, tabList, configurableFieldCount), toggle/set actions, change tracking (locked field skip, multi-change, toggle-back), reason validation, canSave, saveChanges (success/reload/failure/partial), resetChanges, custom field CRUD (create/deactivate success/failure/exception), category CRUD (create/deactivate success/failure/exception)
+- `workflows/src/__tests__/activities/seed-field-definitions.test.ts` — 12 tests (Jest): idempotency guard, empty/null templates, 3 RPC error cases, happy path event emission (2 templates → 2 events with correct params), category slug mismatch skip, correlation ID from tracing vs generated, deleteFieldDefinitions RPC call + error
+- `frontend/src/services/client-fields/__tests__/SupabaseClientFieldService.test.ts` — 26 tests (Vitest): all 7 methods success + error paths, null→empty array, JSON string parse, default parameter values, stringified p_changes
+- `frontend/e2e/client-field-settings.spec.ts` — 26 tests (Playwright E2E): navigation (settings hub → client fields, back button, page header), tab bar (system tabs, click switch, keyboard nav, WAI-ARIA attributes), field definitions (display, locked indicator, disabled toggle, visibility toggle, required toggle, label input), save/reset (no panel without changes, reason validation, reset, save success), custom fields (empty state, form open/close, create, deactivate), categories (system lock, form open/close, auto-slug, create, deactivate)
+- `frontend/playwright.client-fields.config.ts` — Dedicated Playwright config (port 3457, VITE_FORCE_MOCK=true, VITE_DEV_PROFILE=provider_admin)
+- `workflows/jest.config.js` — Jest config with ts-jest preset and path aliases
+- `workflows/src/test-setup.ts` — Jest setup file
 
 ### Deployed (2026-03-27):
 - **8 SQL migrations** (all deployed via CI/CD):
@@ -302,8 +393,7 @@ _Placement history table deferred to Client Intake implementation._
 - **Plan file**: `.claude/plans/vectorized-bouncing-iverson.md`
 - **Gotcha**: `event_types` table has `event_schema` (jsonb NOT NULL), not `category` — CI caught this, fixed in follow-up commit
 
-**Last Updated**: 2026-03-28
-**Next Step**: Documentation tasks (table docs, architecture doc, AGENT-INDEX updates). Then Client Intake project or Phase 4 Analytics Foundation.
+**Plan**: `.claude/plans/cached-shimmying-feigenbaum.md` (may have been cleaned up — work from dev-docs directly if missing).
 
 ### Static Configuration Prototype Created (2026-03-23, archived 2026-03-27)
 - Static HTML/CSS/JS prototype archived at `dev/active/client-management-applet-ux-prototype/` (zipped)

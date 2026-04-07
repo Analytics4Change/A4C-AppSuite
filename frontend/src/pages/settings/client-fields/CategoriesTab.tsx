@@ -125,6 +125,7 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
                   <div
                     role="alert"
                     className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-sm"
+                    data-testid="cat-error-alert"
                   >
                     <AlertCircle size={14} />
                     {viewModel.createCategoryError}
@@ -153,6 +154,7 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
                       setName('');
                       setSlug('');
                     }}
+                    data-testid="cat-cancel-btn"
                   >
                     Cancel
                   </Button>
