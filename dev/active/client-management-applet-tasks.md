@@ -296,16 +296,16 @@ Plan: `.claude/plans/jazzy-watching-creek.md`
 - [x] Item 7: api.update_field_category() RPC + handler + router CASE + event_types seed
 - [x] Item 1: 9 new contact designation template seeds with validation_rules widget hints
 - [x] Handler reference files updated (1 new, 1 updated)
-- [ ] Deploy migration via `supabase db push --linked` (pending code review)
+- [x] Deploy migration via CI/CD (commit `5d479918`, 2026-04-08)
 
 ### Playwright E2E Tests ✅ COMPLETE
 - [x] 25 new test cases (54 total), all passing
 - [x] Covers: prev/next nav, create another, enum values, structured removed, edit fields, edit categories, tab ordering, designation fields
 
 ### Remaining (deferred)
-- [ ] AsyncAPI contract for `client_field_category.updated` (M3 — schema file not created)
+- [x] AsyncAPI contract for `client_field_category.updated` (M3) — added to client-field-category.yaml, types regenerated (273 interfaces)
 - [ ] AsyncAPI `validation_rules` shape documentation (m1)
-- [ ] AsyncAPI type regeneration after schema updates
+- [x] AsyncAPI type regeneration after schema updates (2026-04-08)
 
 ## Phase A0: Data-TestID Instrumentation ✅ COMPLETE (2026-04-06)
 
@@ -402,18 +402,17 @@ _Key remediations: M1 (B2c removed — already done), M2 (JSONB payload), M3 (p_
   - Migration `20260408012329_fix_batch_update_jsonb_scalar.sql` — DEPLOYED (2026-04-08)
   - Root cause: PostgREST wraps jsonb array params as string scalars; server-side unwrap via `jsonb_typeof` + `#>> '{}'`
   - Also applied live via `execute_sql` before CI/CD deploy for immediate testing
-- [ ] B7: Integration testing + documentation (7 table docs, E2E, RLS, AGENT-INDEX)
+- [x] B7: Integration testing + documentation (7 table docs, E2E, RLS, AGENT-INDEX) (2026-04-08)
 
 ## Current Status
 
-**Phase**: Phase B — Client Intake Full-Stack 🔄 IN PROGRESS
-**Status**: B1-B6 complete + all review fixes deployed. 10 migrations total deployed. B7 (testing + docs) remaining.
-**Migrations**: 10 deployed (8 original + architecture review fix + batch update scalar fix).
+**Phase**: Phase B — Client Intake Full-Stack ✅ COMPLETE
+**Status**: All B1-B7 complete. 11 migrations deployed. All testing + documentation done.
+**Migrations**: 11 deployed (8 original + architecture review fix + batch update scalar fix + field config enhancements).
 
 **Last Updated**: 2026-04-08
-**Next Step**: B7 — integration testing + documentation (7 table docs, E2E tests, RLS verification, AGENT-INDEX updates).
+**Next Phase**: Phase 4 (Analytics Foundation) or Phase 5 (Frontend Intake Enhancements)
 **Plan file**: Plan files expired (session-scoped). Full plan details in `dev/active/client-management-applet-plan.md`.
-10. ~~**Bug fix**: `SupabaseClientFieldService.ts` double JSON serialization~~ — **COMMITTED + DEPLOYED** (commit `4849122b`, 2026-04-08)
 
 ### Test Files Created (2026-04-06):
 - `frontend/src/viewModels/settings/__tests__/ClientFieldSettingsViewModel.test.ts` — 56 tests (Vitest): default state, loadData, computed properties (fieldsByCategory, tabList, configurableFieldCount), toggle/set actions, change tracking (locked field skip, multi-change, toggle-back), reason validation, canSave, saveChanges (success/reload/failure/partial), resetChanges, custom field CRUD (create/deactivate success/failure/exception), category CRUD (create/deactivate success/failure/exception)

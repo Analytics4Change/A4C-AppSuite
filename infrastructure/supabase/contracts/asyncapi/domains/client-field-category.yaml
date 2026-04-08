@@ -8,6 +8,14 @@ components:
       payload:
         $ref: '#/components/schemas/ClientFieldCategoryCreatedEvent'
 
+    ClientFieldCategoryUpdated:
+      name: client_field_category.updated
+      title: Client Field Category Updated
+      summary: An org-defined field category has been renamed or reordered
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientFieldCategoryUpdatedEvent'
+
     ClientFieldCategoryDeactivated:
       name: client_field_category.deactivated
       title: Client Field Category Deactivated
@@ -43,6 +51,31 @@ components:
           const: client_field_category.created
         event_data:
           $ref: '#/components/schemas/ClientFieldCategoryCreatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientFieldCategoryUpdatedEvent:
+      title: ClientFieldCategoryUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Field category UUID
+        stream_type:
+          type: string
+          const: client_field_category
+        event_type:
+          type: string
+          const: client_field_category.updated
+        event_data:
+          $ref: '#/components/schemas/ClientFieldCategoryUpdatedData'
         event_metadata:
           $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
 
@@ -108,6 +141,29 @@ components:
         sort_order:
           type: integer
           default: 0
+
+    ClientFieldCategoryUpdatedData:
+      title: ClientFieldCategoryUpdatedData
+      type: object
+      description: Data for field category rename or reorder
+      required:
+        - category_id
+        - organization_id
+      properties:
+        category_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Updated display name (if changed)
+          examples:
+            - "Behavioral Health"
+        sort_order:
+          type: integer
+          description: Updated sort order (if changed)
 
     ClientFieldCategoryDeactivatedData:
       title: ClientFieldCategoryDeactivatedData

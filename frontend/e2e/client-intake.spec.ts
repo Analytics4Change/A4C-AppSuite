@@ -1,0 +1,558 @@
+/**
+ * Client Intake E2E Tests
+ *
+ * Tests the Client List page (/clients), Client Intake form (/clients/register),
+ * and Client Detail view (/clients/:id) in mock mode.
+ *
+ * Run with:
+ *   cd frontend && npx playwright test --config playwright.client-intake.config.ts
+ *
+ * Prerequisites:
+ *   - Uses playwright.client-intake.config.ts (VITE_FORCE_MOCK=true, VITE_DEV_PROFILE=provider_admin)
+ *   - Mock data: Marcus Johnson (active), Sofia (Sofi) Ramirez (active), Jayden (Jay) Williams (discharged)
+ *   - Mock client IDs are stable UUIDs defined in MockClientService seed data
+ */
+
+import { test, expect, Page } from '@playwright/test';
+
+const BASE_URL = 'http://localhost:3458';
+
+// Stable mock client IDs from MockClientService seed data
+const MOCK_CLIENT_IDS = {
+  marcus: 'c0000000-0000-0000-0000-000000000001',
+  sofia: 'c0000000-0000-0000-0000-000000000002',
+  jayden: 'c0000000-0000-0000-0000-000000000003',
+} as const;
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/** Authenticate via mock mode login page if not already authenticated */
+async function ensureAuthenticated(page: Page) {
+  await page.goto(BASE_URL);
+
+  const isLoginPage = await page
+    .locator('[data-testid="login-page"]')
+    .isVisible({ timeout: 5000 })
+    .catch(() => false);
+
+  if (isLoginPage) {
+    await page.fill('#email', 'dev@example.com');
+    await page.fill('#password', 'any-password');
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/(clients|organizations|dashboard|settings)/, { timeout: 10000 });
+  }
+}
+
+/** Navigate to /clients and wait for the client grid to be present */
+async function navigateToClientList(page: Page) {
+  await ensureAuthenticated(page);
+  await page.goto(`${BASE_URL}/clients`);
+  // Wait for loading to finish — either a client card or the empty state appears
+  await page.waitForSelector('[data-testid="client-grid"], [data-testid="client-list-empty"]', {
+    timeout: 15000,
+  });
+}
+
+/** Navigate to the intake form */
+async function navigateToIntakeForm(page: Page) {
+  await ensureAuthenticated(page);
+  await page.goto(`${BASE_URL}/clients/register`);
+  await page.waitForSelector('[data-testid="client-intake-page"]', { timeout: 15000 });
+}
+
+/** Navigate to a specific client's detail page */
+async function navigateToClientDetail(page: Page, clientId: string) {
+  await ensureAuthenticated(page);
+  await page.goto(`${BASE_URL}/clients/${clientId}`);
+  // Wait for the layout to finish loading — either the header or an error state
+  await page.waitForSelector(
+    '[data-testid="back-to-clients-btn"], [data-testid="client-detail-loading"]',
+    { timeout: 15000 }
+  );
+  // If still loading, wait for it to resolve
+  await page.waitForSelector('[data-testid="back-to-clients-btn"]', { timeout: 15000 });
+}
+
+// ============================================================================
+// Client List Page
+// ============================================================================
+
+test.describe('Client List Page', () => {
+  test('page loads with heading and register button', async ({ page }) => {
+    await navigateToClientList(page);
+
+    await expect(page.getByRole('heading', { name: 'Clients' })).toBeVisible();
+    await expect(page.locator('[data-testid="register-client-btn"]')).toBeVisible();
+  });
+
+  test('shows three mock clients from seed data', async ({ page }) => {
+    await navigateToClientList(page);
+
+    const grid = page.locator('[data-testid="client-grid"]');
+    await expect(grid).toBeVisible();
+
+    // All three seed clients must appear
+    await expect(page.getByText('Marcus Johnson')).toBeVisible();
+    // Sofia has preferred_name 'Sofi' — displayed as "Sofi (Sofia) Ramirez"
+    await expect(page.getByText(/Sofi \(Sofia\) Ramirez/)).toBeVisible();
+    // Jayden has preferred_name 'Jay' — displayed as "Jay (Jayden) Williams"
+    await expect(page.getByText(/Jay \(Jayden\) Williams/)).toBeVisible();
+  });
+
+  test('client cards show status badges', async ({ page }) => {
+    await navigateToClientList(page);
+
+    const badges = page.locator('[data-testid="client-status-badge"]');
+    await expect(badges).toHaveCount(3);
+
+    // Two active clients, one discharged
+    const badgeTexts = await badges.allTextContents();
+    const activeCount = badgeTexts.filter((t) => t === 'Active').length;
+    const dischargedCount = badgeTexts.filter((t) => t === 'Discharged').length;
+    expect(activeCount).toBe(2);
+    expect(dischargedCount).toBe(1);
+  });
+
+  test('status tabs are rendered with correct labels', async ({ page }) => {
+    await navigateToClientList(page);
+
+    await expect(page.locator('[data-testid="status-tab-all"]')).toBeVisible();
+    await expect(page.locator('[data-testid="status-tab-active"]')).toBeVisible();
+    await expect(page.locator('[data-testid="status-tab-discharged"]')).toBeVisible();
+    await expect(page.locator('[data-testid="status-tab-inactive"]')).toBeVisible();
+  });
+
+  test('"All" tab is selected by default', async ({ page }) => {
+    await navigateToClientList(page);
+
+    const allTab = page.locator('[data-testid="status-tab-all"]');
+    await expect(allTab).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('Active tab filters to only active clients', async ({ page }) => {
+    await navigateToClientList(page);
+
+    await page.click('[data-testid="status-tab-active"]');
+    await page.waitForTimeout(400); // debounce + mock delay
+
+    const grid = page.locator('[data-testid="client-grid"]');
+    await expect(grid).toBeVisible();
+
+    // Only the 2 active clients
+    await expect(page.getByText('Marcus Johnson')).toBeVisible();
+    await expect(page.getByText(/Sofi \(Sofia\) Ramirez/)).toBeVisible();
+    // Jayden is discharged — should not appear
+    await expect(page.getByText(/Jay \(Jayden\) Williams/)).not.toBeVisible();
+  });
+
+  test('Discharged tab filters to only discharged clients', async ({ page }) => {
+    await navigateToClientList(page);
+
+    await page.click('[data-testid="status-tab-discharged"]');
+    await page.waitForTimeout(400);
+
+    await expect(page.getByText(/Jay \(Jayden\) Williams/)).toBeVisible();
+    await expect(page.getByText('Marcus Johnson')).not.toBeVisible();
+    await expect(page.getByText(/Sofi \(Sofia\) Ramirez/)).not.toBeVisible();
+  });
+
+  test('search input filters clients by name', async ({ page }) => {
+    await navigateToClientList(page);
+
+    const searchInput = page.locator('[data-testid="client-search-input"]');
+    await expect(searchInput).toBeVisible();
+
+    await searchInput.fill('Marcus');
+    await page.waitForTimeout(500); // debounce delay
+
+    await expect(page.getByText('Marcus Johnson')).toBeVisible();
+    await expect(page.getByText(/Sofi \(Sofia\) Ramirez/)).not.toBeVisible();
+    await expect(page.getByText(/Jay \(Jayden\) Williams/)).not.toBeVisible();
+  });
+
+  test('search with no match shows empty state', async ({ page }) => {
+    await navigateToClientList(page);
+
+    await page.locator('[data-testid="client-search-input"]').fill('zzznomatch');
+    await page.waitForTimeout(500);
+
+    await expect(page.locator('[data-testid="client-list-empty"]')).toBeVisible();
+    await expect(page.getByText('No clients found')).toBeVisible();
+  });
+
+  test('"Register New Client" button navigates to intake form', async ({ page }) => {
+    await navigateToClientList(page);
+
+    await page.click('[data-testid="register-client-btn"]');
+    await page.waitForURL(/\/clients\/register/, { timeout: 5000 });
+
+    await expect(page.locator('[data-testid="client-intake-page"]')).toBeVisible();
+  });
+
+  test('clicking a client card navigates to client detail', async ({ page }) => {
+    await navigateToClientList(page);
+
+    await page.click(`[data-testid="client-card-${MOCK_CLIENT_IDS.marcus}"]`);
+    await page.waitForURL(new RegExp(`/clients/${MOCK_CLIENT_IDS.marcus}`), { timeout: 5000 });
+
+    await expect(page.getByRole('heading', { name: 'Marcus Johnson' })).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Client Intake Page
+// ============================================================================
+
+test.describe('Client Intake Page', () => {
+  test('page loads with heading and progress bar', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    await expect(page.getByRole('heading', { name: 'Register New Client' })).toBeVisible();
+    await expect(page.locator('[data-testid="intake-progress"]')).toBeVisible();
+    await expect(page.getByRole('progressbar')).toBeVisible();
+  });
+
+  test('sidebar navigation is visible with all 10 sections', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    const sidebar = page.locator('[data-testid="intake-sidebar"]');
+    await expect(sidebar).toBeVisible();
+
+    // Verify all 10 section nav buttons by their data-testid
+    const expectedSections = [
+      'demographics',
+      'contact_info',
+      'guardian',
+      'referral',
+      'admission',
+      'insurance',
+      'clinical',
+      'medical',
+      'legal',
+      'education',
+    ];
+
+    for (const section of expectedSections) {
+      await expect(page.locator(`[data-testid="intake-nav-${section}"]`)).toBeVisible();
+    }
+  });
+
+  test('Demographics section is active by default', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    const demographicsNav = page.locator('[data-testid="intake-nav-demographics"]');
+    await expect(demographicsNav).toHaveAttribute('aria-current', 'step');
+
+    // Demographics section content is rendered
+    await expect(page.locator('[data-testid="intake-section-demographics"]')).toBeVisible();
+  });
+
+  test('Demographics section renders form fields', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    // The section content area should be visible
+    await expect(page.locator('[data-testid="intake-section-content"]')).toBeVisible();
+
+    // The "Demographics" heading inside the section
+    await expect(
+      page.locator('[data-testid="intake-section-demographics"]').getByText('Demographics')
+    ).toBeVisible();
+
+    // Key form inputs that are always enabled in demographics
+    // Text inputs for name fields
+    await expect(page.getByLabel(/First Name/i)).toBeVisible();
+    await expect(page.getByLabel(/Last Name/i)).toBeVisible();
+    await expect(page.getByLabel(/Date of Birth/i)).toBeVisible();
+  });
+
+  test('clicking sidebar section navigates to that section', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    // Click on "Admission" section
+    await page.click('[data-testid="intake-nav-admission"]');
+
+    // Admission should now be the active section
+    await expect(page.locator('[data-testid="intake-nav-admission"]')).toHaveAttribute(
+      'aria-current',
+      'step'
+    );
+    // Demographics should no longer be active
+    await expect(page.locator('[data-testid="intake-nav-demographics"]')).not.toHaveAttribute(
+      'aria-current',
+      'step'
+    );
+  });
+
+  test('Previous button is disabled on first section', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    const prevBtn = page.locator('[data-testid="intake-prev-button"]');
+    await expect(prevBtn).toBeVisible();
+    await expect(prevBtn).toBeDisabled();
+  });
+
+  test('Next button advances to next section', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    // Start on Demographics (index 0)
+    await expect(page.locator('[data-testid="intake-nav-demographics"]')).toHaveAttribute(
+      'aria-current',
+      'step'
+    );
+
+    await page.click('[data-testid="intake-next-button"]');
+
+    // Should now be on Contact Info (index 1)
+    await expect(page.locator('[data-testid="intake-nav-contact_info"]')).toHaveAttribute(
+      'aria-current',
+      'step'
+    );
+  });
+
+  test('Previous button navigates back after advancing', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    // Advance to Contact Info
+    await page.click('[data-testid="intake-next-button"]');
+    await expect(page.locator('[data-testid="intake-nav-contact_info"]')).toHaveAttribute(
+      'aria-current',
+      'step'
+    );
+
+    // Go back to Demographics
+    await page.click('[data-testid="intake-prev-button"]');
+    await expect(page.locator('[data-testid="intake-nav-demographics"]')).toHaveAttribute(
+      'aria-current',
+      'step'
+    );
+  });
+
+  test('Submit button appears on last section (Education)', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    // Click directly to the last section via sidebar
+    await page.click('[data-testid="intake-nav-education"]');
+
+    // Next button should not be visible; Submit button should appear
+    await expect(page.locator('[data-testid="intake-next-button"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="intake-submit-button"]')).toBeVisible();
+  });
+
+  test('Next button is not shown on last section', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    await page.click('[data-testid="intake-nav-education"]');
+
+    await expect(page.locator('[data-testid="intake-next-button"]')).not.toBeVisible();
+  });
+
+  test('footer navigation row is always visible', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    await expect(page.locator('[data-testid="intake-footer"]')).toBeVisible();
+  });
+
+  test('back button navigates to client list', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    await page.click('[data-testid="intake-back-button"]');
+    await page.waitForURL(/\/clients$/, { timeout: 5000 });
+  });
+
+  test('section content area updates when navigating', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    const sectionContent = page.locator('[data-testid="intake-section-content"]');
+
+    // Check demographics section is visible initially
+    await expect(page.locator('[data-testid="intake-section-demographics"]')).toBeVisible();
+
+    // Navigate to Referral section
+    await page.click('[data-testid="intake-nav-referral"]');
+
+    // Demographics sub-testid should no longer be present (different component renders)
+    await expect(page.locator('[data-testid="intake-section-demographics"]')).not.toBeVisible();
+
+    // The section content wrapper should still be there
+    await expect(sectionContent).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Client Detail Page
+// ============================================================================
+
+test.describe('Client Detail Page', () => {
+  test('displays client name in header for Marcus Johnson', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.marcus);
+
+    await expect(page.getByRole('heading', { name: 'Marcus Johnson' })).toBeVisible();
+  });
+
+  test('displays preferred name format for Sofia Ramirez', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.sofia);
+
+    // Sofia has preferred_name 'Sofi' → "Sofi (Sofia) Ramirez"
+    await expect(page.getByRole('heading', { name: /Sofi \(Sofia\) Ramirez/ })).toBeVisible();
+  });
+
+  test('shows green Active status badge for active client', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.marcus);
+
+    const badge = page.locator('[data-testid="client-status-badge"]');
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveText('Active');
+  });
+
+  test('shows amber Discharged status badge for discharged client', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.jayden);
+
+    const badge = page.locator('[data-testid="client-status-badge"]');
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveText('Discharged');
+  });
+
+  test('detail page tab bar shows Overview, Medications, History, Documents', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.marcus);
+
+    await expect(page.locator('[data-testid="client-detail-tab-overview"]')).toBeVisible();
+    await expect(page.locator('[data-testid="client-detail-tab-medications"]')).toBeVisible();
+    await expect(page.locator('[data-testid="client-detail-tab-history"]')).toBeVisible();
+    await expect(page.locator('[data-testid="client-detail-tab-documents"]')).toBeVisible();
+  });
+
+  test('Overview page renders Demographics section', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.marcus);
+
+    await expect(page.locator('[data-testid="client-overview"]')).toBeVisible();
+    await expect(page.locator('[data-testid="section-demographics"]')).toBeVisible();
+  });
+
+  test('Overview page renders Contact Information section', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.marcus);
+
+    await expect(page.locator('[data-testid="section-contact"]')).toBeVisible();
+  });
+
+  test('Overview page renders multiple record sections', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.marcus);
+
+    const expectedSections = [
+      'section-demographics',
+      'section-contact',
+      'section-guardian',
+      'section-referral',
+      'section-admission',
+      'section-insurance',
+      'section-clinical',
+      'section-medical',
+      'section-legal',
+      'section-education',
+    ];
+
+    for (const sectionId of expectedSections) {
+      await expect(page.locator(`[data-testid="${sectionId}"]`)).toBeVisible();
+    }
+  });
+
+  test('Discharge button is visible for active client', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.marcus);
+
+    await expect(page.locator('[data-testid="discharge-client-btn"]')).toBeVisible();
+  });
+
+  test('Discharge button is NOT visible for discharged client', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.jayden);
+
+    await expect(page.locator('[data-testid="discharge-client-btn"]')).not.toBeVisible();
+  });
+
+  test('discharged client shows discharged banner on Overview', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.jayden);
+
+    await expect(page.locator('[data-testid="client-discharged-banner"]')).toBeVisible();
+    await expect(page.getByText(/discharged on/i)).toBeVisible();
+  });
+
+  test('discharged client shows Discharge section on Overview', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.jayden);
+
+    await expect(page.locator('[data-testid="section-discharge"]')).toBeVisible();
+  });
+
+  test('Discharge dialog opens with required fields when button clicked', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.marcus);
+
+    await page.click('[data-testid="discharge-client-btn"]');
+
+    const dialog = page.locator('[data-testid="discharge-dialog"]');
+    await expect(dialog).toBeVisible();
+
+    // Required fields must be present
+    await expect(page.locator('[data-testid="discharge-date-input"]')).toBeVisible();
+    await expect(page.locator('[data-testid="discharge-outcome-select"]')).toBeVisible();
+    await expect(page.locator('[data-testid="discharge-reason-select"]')).toBeVisible();
+
+    // Optional placement field
+    await expect(page.locator('[data-testid="discharge-placement-select"]')).toBeVisible();
+  });
+
+  test('Discharge dialog Confirm button is disabled until all required fields filled', async ({
+    page,
+  }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.marcus);
+
+    await page.click('[data-testid="discharge-client-btn"]');
+
+    // Confirm should be disabled initially (outcome and reason are empty)
+    const confirmBtn = page.locator('[data-testid="discharge-confirm-btn"]');
+    await expect(confirmBtn).toBeDisabled();
+  });
+
+  test('Discharge dialog Cancel button closes the dialog', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.marcus);
+
+    await page.click('[data-testid="discharge-client-btn"]');
+    await expect(page.locator('[data-testid="discharge-dialog"]')).toBeVisible();
+
+    await page.click('[data-testid="discharge-cancel-btn"]');
+    await expect(page.locator('[data-testid="discharge-dialog"]')).not.toBeVisible();
+  });
+
+  test('Discharge confirm button becomes enabled when all required fields filled', async ({
+    page,
+  }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.sofia);
+
+    await page.click('[data-testid="discharge-client-btn"]');
+
+    // Fill all three required fields
+    // Date is auto-populated; select outcome and reason
+    await page.selectOption('[data-testid="discharge-outcome-select"]', 'successful');
+    await page.selectOption('[data-testid="discharge-reason-select"]', 'graduated_program');
+
+    const confirmBtn = page.locator('[data-testid="discharge-confirm-btn"]');
+    await expect(confirmBtn).toBeEnabled();
+  });
+
+  test('back button returns to client list', async ({ page }) => {
+    await navigateToClientDetail(page, MOCK_CLIENT_IDS.marcus);
+
+    await page.click('[data-testid="back-to-clients-btn"]');
+    await page.waitForURL(/\/clients$/, { timeout: 5000 });
+  });
+
+  test('navigating from client list to detail works end-to-end', async ({ page }) => {
+    await navigateToClientList(page);
+
+    // Click Marcus's card
+    await page.click(`[data-testid="client-card-${MOCK_CLIENT_IDS.marcus}"]`);
+    await page.waitForURL(new RegExp(`/clients/${MOCK_CLIENT_IDS.marcus}`), { timeout: 5000 });
+
+    // Verify we landed on his detail page
+    await expect(page.getByRole('heading', { name: 'Marcus Johnson' })).toBeVisible();
+    await expect(page.locator('[data-testid="client-overview"]')).toBeVisible();
+  });
+});

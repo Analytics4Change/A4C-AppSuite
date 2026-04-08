@@ -163,6 +163,7 @@ channels:
           - $ref: './domains/client-field-definition.yaml#/components/messages/ClientFieldDefinitionDeactivated'
           # Client field category events (org-defined field categories)
           - $ref: './domains/client-field-category.yaml#/components/messages/ClientFieldCategoryCreated'
+          - $ref: './domains/client-field-category.yaml#/components/messages/ClientFieldCategoryUpdated'
           - $ref: './domains/client-field-category.yaml#/components/messages/ClientFieldCategoryDeactivated'
           # Client lifecycle events (client intake and management)
           - $ref: './domains/client.yaml#/components/messages/ClientRegistered'

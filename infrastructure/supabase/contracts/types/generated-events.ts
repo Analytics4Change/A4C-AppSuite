@@ -3,7 +3,7 @@
  *
  * Generated from AsyncAPI specification by Modelina
  * Source: infrastructure/supabase/contracts/asyncapi/
- * Generated: 2026-04-06T22:53:06.373Z
+ * Generated: 2026-04-08T15:45:42.298Z
  *
  * To regenerate: cd infrastructure/supabase/contracts && npm run generate:types
  *
@@ -231,7 +231,7 @@ export enum RoleScope {
   UNIT = "unit",
 }
 
-export enum AnonymousSchema_5412 {
+export enum AnonymousSchema_5432 {
   RESERVED_TEXT = "text",
   RESERVED_NUMBER = "number",
   DATE = "date",
@@ -241,7 +241,7 @@ export enum AnonymousSchema_5412 {
   JSONB = "jsonb",
 }
 
-export enum AnonymousSchema_5440 {
+export enum AnonymousSchema_5460 {
   RESERVED_TEXT = "text",
   RESERVED_NUMBER = "number",
   DATE = "date",
@@ -255,7 +255,7 @@ export enum AnonymousSchema_5440 {
 // Interfaces
 // =============================================================================
 
-export type DomainEvents = UserSyncedFromAuthEvent | UserCreatedEvent | UserProfileUpdatedEvent | UserOrgSwitchedEvent | UserAccessDatesUpdatedEvent | UserNotificationPreferencesUpdatedEvent | UserAddressAddedEvent | UserAddressUpdatedEvent | UserAddressRemovedEvent | UserPhoneAddedEvent | UserPhoneUpdatedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | ScheduleCreatedEvent | ScheduleUpdatedEvent | ScheduleDeactivatedEvent | ScheduleReactivatedEvent | ScheduleDeletedEvent | ScheduleUserAssignedEvent | ScheduleUserUnassignedEvent | UserClientAssignedEvent | UserClientUnassignedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationReactivatedEvent | OrganizationDeletedEvent | OrganizationDeletionInitiatedEvent | OrganizationDeletionCompletedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | OrganizationBootstrapStepCompletedEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | ContactDesignationCreatedEvent | ContactDesignationDeactivatedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | PermissionUpdatedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent | ClientFieldDefinitionCreatedEvent | ClientFieldDefinitionUpdatedEvent | ClientFieldDefinitionDeactivatedEvent | ClientFieldCategoryCreatedEvent | ClientFieldCategoryDeactivatedEvent | ClientRegisteredEvent | ClientInformationUpdatedEvent | ClientAdmittedEvent | ClientDischargedEvent | ClientPhoneAddedEvent | ClientPhoneUpdatedEvent | ClientPhoneRemovedEvent | ClientEmailAddedEvent | ClientEmailUpdatedEvent | ClientEmailRemovedEvent | ClientAddressAddedEvent | ClientAddressUpdatedEvent | ClientAddressRemovedEvent | ClientInsuranceAddedEvent | ClientInsuranceUpdatedEvent | ClientInsuranceRemovedEvent | ClientPlacementChangedEvent | ClientPlacementEndedEvent | ClientFundingSourceAddedEvent | ClientFundingSourceUpdatedEvent | ClientFundingSourceRemovedEvent | ClientContactAssignedEvent | ClientContactUnassignedEvent;
+export type DomainEvents = UserSyncedFromAuthEvent | UserCreatedEvent | UserProfileUpdatedEvent | UserOrgSwitchedEvent | UserAccessDatesUpdatedEvent | UserNotificationPreferencesUpdatedEvent | UserAddressAddedEvent | UserAddressUpdatedEvent | UserAddressRemovedEvent | UserPhoneAddedEvent | UserPhoneUpdatedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | ScheduleCreatedEvent | ScheduleUpdatedEvent | ScheduleDeactivatedEvent | ScheduleReactivatedEvent | ScheduleDeletedEvent | ScheduleUserAssignedEvent | ScheduleUserUnassignedEvent | UserClientAssignedEvent | UserClientUnassignedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationReactivatedEvent | OrganizationDeletedEvent | OrganizationDeletionInitiatedEvent | OrganizationDeletionCompletedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | OrganizationBootstrapStepCompletedEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | ContactDesignationCreatedEvent | ContactDesignationDeactivatedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | PermissionUpdatedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent | ClientFieldDefinitionCreatedEvent | ClientFieldDefinitionUpdatedEvent | ClientFieldDefinitionDeactivatedEvent | ClientFieldCategoryCreatedEvent | ClientFieldCategoryUpdatedEvent | ClientFieldCategoryDeactivatedEvent | ClientRegisteredEvent | ClientInformationUpdatedEvent | ClientAdmittedEvent | ClientDischargedEvent | ClientPhoneAddedEvent | ClientPhoneUpdatedEvent | ClientPhoneRemovedEvent | ClientEmailAddedEvent | ClientEmailUpdatedEvent | ClientEmailRemovedEvent | ClientAddressAddedEvent | ClientAddressUpdatedEvent | ClientAddressRemovedEvent | ClientInsuranceAddedEvent | ClientInsuranceUpdatedEvent | ClientInsuranceRemovedEvent | ClientPlacementChangedEvent | ClientPlacementEndedEvent | ClientFundingSourceAddedEvent | ClientFundingSourceUpdatedEvent | ClientFundingSourceRemovedEvent | ClientContactAssignedEvent | ClientContactUnassignedEvent;
 
 export interface UserSyncedFromAuthEvent {
   'stream_id': string;
@@ -425,12 +425,12 @@ export interface UserAddressUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.updated';
-  'event_data': AnonymousSchema_3224;
+  'event_data': AnonymousSchema_3244;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3224 {
+export interface AnonymousSchema_3244 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -452,12 +452,12 @@ export interface UserAddressRemovedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.removed';
-  'event_data': AnonymousSchema_3256;
+  'event_data': AnonymousSchema_3276;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3256 {
+export interface AnonymousSchema_3276 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -493,12 +493,12 @@ export interface UserPhoneUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.phone.updated';
-  'event_data': AnonymousSchema_3305;
+  'event_data': AnonymousSchema_3325;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3305 {
+export interface AnonymousSchema_3325 {
   'phone_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -2250,7 +2250,7 @@ export interface ClientFieldDefinitionCreatedData {
   'category_id': string;
   'field_key': string;
   'display_name': string;
-  'field_type'?: AnonymousSchema_5412;
+  'field_type'?: AnonymousSchema_5432;
   'is_visible'?: boolean;
   'is_required'?: boolean;
   'validation_rules'?: Map<string, any>;
@@ -2275,7 +2275,7 @@ export interface ClientFieldDefinitionUpdatedData {
   'organization_id': string;
   'display_name'?: string;
   'category_id'?: string;
-  'field_type'?: AnonymousSchema_5440;
+  'field_type'?: AnonymousSchema_5460;
   'is_visible'?: boolean;
   'is_required'?: boolean;
   'validation_rules'?: Map<string, any>;
@@ -2315,6 +2315,23 @@ export interface ClientFieldCategoryCreatedData {
   'organization_id': string;
   'name': string;
   'slug': string;
+  'sort_order'?: number;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFieldCategoryUpdatedEvent {
+  'stream_id': string;
+  'stream_type': 'client_field_category';
+  'event_type': 'client_field_category.updated';
+  'event_data': ClientFieldCategoryUpdatedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface ClientFieldCategoryUpdatedData {
+  'category_id': string;
+  'organization_id': string;
+  'name'?: string;
   'sort_order'?: number;
   'additionalProperties'?: Map<string, any>;
 }

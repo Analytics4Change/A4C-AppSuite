@@ -60,7 +60,14 @@ purpose: agent-navigation
 | `client-assignment` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | organizations_projection.md |
 | `client` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | client_field_definitions_projection.md, contact_designations_projection.md |
 | `client-data-model` | [client-data-model.md](architecture/data/client-data-model.md) | clients_projection.md, client_field_definitions_projection.md |
+| `client-address` | [client_addresses_projection.md](infrastructure/reference/database/tables/client_addresses_projection.md) | clients_projection.md, client-data-model.md |
+| `client-contact-assignment` | [client_contact_assignments_projection.md](infrastructure/reference/database/tables/client_contact_assignments_projection.md) | contacts_projection.md, contact_designations_projection.md |
+| `client-email` | [client_emails_projection.md](infrastructure/reference/database/tables/client_emails_projection.md) | clients_projection.md, client-data-model.md |
 | `client-field-config` | [client_field_definitions_projection.md](infrastructure/reference/database/tables/client_field_definitions_projection.md) | client_field_categories.md, client_field_definition_templates.md |
+| `client-funding` | [client_funding_sources_projection.md](infrastructure/reference/database/tables/client_funding_sources_projection.md) | clients_projection.md, client-data-model.md |
+| `client-insurance` | [client_insurance_policies_projection.md](infrastructure/reference/database/tables/client_insurance_policies_projection.md) | clients_projection.md, client-data-model.md |
+| `client-phone` | [client_phones_projection.md](infrastructure/reference/database/tables/client_phones_projection.md) | clients_projection.md, client-data-model.md |
+| `client-placement` | [client_placement_history_projection.md](infrastructure/reference/database/tables/client_placement_history_projection.md) | clients_projection.md, client-data-model.md |
 | `clients` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | medication_history.md, client-data-model.md |
 | `contact-designation` | [contact_designations_projection.md](infrastructure/reference/database/tables/contact_designations_projection.md) | contacts_projection.md, client-data-model.md |
 | `custom-fields` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | client_field_definitions_projection.md |
@@ -177,7 +184,7 @@ purpose: agent-navigation
 | `pg-notify-pattern` | [event-driven-workflow-triggering.md](architecture/workflows/event-driven-workflow-triggering.md) | event-processing-patterns.md |
 | `patient` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | client-data-model.md |
 | `phi` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | dosage_info.md |
-| `placement` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | client-data-model.md |
+| `placement` | [client_placement_history_projection.md](infrastructure/reference/database/tables/client_placement_history_projection.md) | clients_projection.md, client-data-model.md |
 | `phone-addresses` | [phone_addresses.md](infrastructure/reference/database/tables/phone_addresses.md) | phones_projection.md |
 | `phones` | [phones_projection.md](infrastructure/reference/database/tables/phones_projection.md) | addresses_projection.md |
 | `precursor-question` | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | ui-patterns.md |
@@ -362,6 +369,13 @@ purpose: agent-navigation
 | [client_field_categories.md](infrastructure/reference/database/tables/client_field_categories.md) | Field grouping categories (11 system + org-defined) | `field-category`, `client-field-config`, `intake-wizard` | 450 |
 | [client_field_definition_templates.md](infrastructure/reference/database/tables/client_field_definition_templates.md) | Bootstrap seed templates (67 rows) | `field-template`, `bootstrap-seed` | 400 |
 | [client_reference_values.md](infrastructure/reference/database/tables/client_reference_values.md) | Global reference data (ISO 639 languages) | `reference-values`, `iso-639`, `language` | 300 |
+| [client_phones_projection.md](infrastructure/reference/database/tables/client_phones_projection.md) | Client phone numbers (sub-entity) | `client-phone`, `client`, `sub-entity` | 350 |
+| [client_emails_projection.md](infrastructure/reference/database/tables/client_emails_projection.md) | Client email addresses (sub-entity) | `client-email`, `client`, `sub-entity` | 350 |
+| [client_addresses_projection.md](infrastructure/reference/database/tables/client_addresses_projection.md) | Client addresses (sub-entity) | `client-address`, `client`, `sub-entity` | 400 |
+| [client_contact_assignments_projection.md](infrastructure/reference/database/tables/client_contact_assignments_projection.md) | Client-to-contact assignments with designations (4NF) | `client-contact-assignment`, `designation`, `clinical-contact` | 450 |
+| [client_insurance_policies_projection.md](infrastructure/reference/database/tables/client_insurance_policies_projection.md) | Client insurance policies (primary/secondary/medicaid/medicare) | `client-insurance`, `insurance`, `payer` | 400 |
+| [client_placement_history_projection.md](infrastructure/reference/database/tables/client_placement_history_projection.md) | Placement trajectory with date ranges (13 SAMHSA types) | `client-placement`, `placement`, `samhsa` | 450 |
+| [client_funding_sources_projection.md](infrastructure/reference/database/tables/client_funding_sources_projection.md) | External funding sources (org-defined types) | `client-funding`, `funding`, `payer` | 350 |
 | [contact_designations_projection.md](infrastructure/reference/database/tables/contact_designations_projection.md) | 12-value contact designation model (4NF) | `contact-designation`, `clinical-contact`, `designation` | 500 |
 | [client-data-model.md](architecture/data/client-data-model.md) | Client data model architecture — CQRS projections, field registry, contact designations | `client-data-model`, `client`, `field-registry`, `contact-designation`, `intake`, `discharge` | 800 |
 | [schedule_templates_projection.md](infrastructure/reference/database/tables/schedule_templates_projection.md) | Schedule template definitions | `schedule`, `schedule-template`, `staff-schedule`, `weekly-schedule` | 500 |

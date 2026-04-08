@@ -13984,6 +13984,114 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
+          - name: client_field_category.updated
+            title: Client Field Category Updated
+            summary: An org-defined field category has been renamed or reordered
+            contentType: application/json
+            payload:
+              title: ClientFieldCategoryUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field category UUID
+                stream_type:
+                  type: string
+                  const: client_field_category
+                event_type:
+                  type: string
+                  const: client_field_category.updated
+                event_data:
+                  title: ClientFieldCategoryUpdatedData
+                  type: object
+                  description: Data for field category rename or reorder
+                  required:
+                    - category_id
+                    - organization_id
+                  properties:
+                    category_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                      description: Updated display name (if changed)
+                      examples:
+                        - Behavioral Health
+                    sort_order:
+                      type: integer
+                      description: Updated sort order (if changed)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
           - name: client_field_category.deactivated
             title: Client Field Category Deactivated
             summary: An org-defined field category has been deactivated
@@ -30734,6 +30842,114 @@ channels:
                     sort_order:
                       type: integer
                       default: 0
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_category.updated
+            title: Client Field Category Updated
+            summary: An org-defined field category has been renamed or reordered
+            contentType: application/json
+            payload:
+              title: ClientFieldCategoryUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field category UUID
+                stream_type:
+                  type: string
+                  const: client_field_category
+                event_type:
+                  type: string
+                  const: client_field_category.updated
+                event_data:
+                  title: ClientFieldCategoryUpdatedData
+                  type: object
+                  description: Data for field category rename or reorder
+                  required:
+                    - category_id
+                    - organization_id
+                  properties:
+                    category_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                      description: Updated display name (if changed)
+                      examples:
+                        - Behavioral Health
+                    sort_order:
+                      type: integer
+                      description: Updated sort order (if changed)
                 event_metadata:
                   title: EventMetadata
                   type: object
