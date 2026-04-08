@@ -42,7 +42,7 @@ export class SupabaseClientFieldService implements IClientFieldService {
     log.debug('Batch updating field definitions', { changeCount: changes.length, reason });
 
     const { data, error } = await supabase.schema('api').rpc('batch_update_field_definitions', {
-      p_changes: JSON.stringify(changes),
+      p_changes: changes,
       p_reason: reason,
     });
 
