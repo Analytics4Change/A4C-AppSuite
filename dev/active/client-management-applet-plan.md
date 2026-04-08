@@ -398,6 +398,161 @@ Full plan at `.claude/plans/golden-booping-rainbow.md`.
 - Rewrite all consumers: `ClientListPage`, `ClientDetailLayout`, `ClientSelectionViewModel` on new `client.types.ts` + `IClientService`
 - No backward compatibility — complete replacement
 
+## Plan Updates (2026-04-07) — All Phase B Backend Migrations Deployed
+
+### Deployment
+All 8 migrations pushed to production via CI/CD. All 5 pipelines green:
+- Deploy Database Migrations (8 migrations applied)
+- Deploy Temporal Workers
+- Deploy Frontend
+- Validate Frontend Documentation
+
+### Gotcha: `role_permissions_projection` has no `organization_id` column
+Migration `20260406221739_client_permissions_seed.sql` initially failed because the backfill INSERT included `organization_id` — that column doesn't exist on `role_permissions_projection` (only `role_id`, `permission_id`, `granted_at`). Org scope is implicit via `role_id` FK to `roles_projection`. Fix: commit `61caf26e`.
+
+**Lesson**: Always verify projection table schemas before writing backfill migrations. The handler reference files at `handlers/rbac/` show the actual columns.
+
+### Updated Counts (Post-Deployment)
+- 5 trigger functions, 15 active routers, 74 handlers, 97 .sql reference files
+- 43 event types seeded in `event_types` table (18 prior + 25 new)
+- 14 new tables total (7 from Phase 2 field config + 7 from Phase B client intake)
+
+## Plan Updates (2026-04-07) — B6a Intake Form Section Components
+
+### B6a: 10 Intake Form Section Components
+Created `frontend/src/pages/clients/intake/` with 14 files:
+
+**Shared infrastructure**:
+- `IntakeFormField.tsx` — generic field renderer supporting text/date/number/enum/multi_enum/boolean/jsonb
+- `useFieldProps.ts` — `getFieldProps(vm, fieldKey)` derives visibility/required/error from ViewModel field definitions
+- `types.ts` — shared `IntakeSectionProps` (just `{ viewModel: ClientIntakeFormViewModel }`)
+- `index.ts` — barrel exports
+
+**10 section components** (all `observer`-wrapped, field-definition-driven):
+1. `DemographicsSection` — 19 fields: names, DOB, gender (5 options), race (OMB multi-select 7 options), ethnicity (3), language, pronouns (free text), marital status, citizenship (6 options), identifiers
+2. `ContactInfoSection` — sub-entity collections: phones/emails/addresses with add/remove, type select, is_primary toggle. Visibility controlled by `client_phones`/`client_emails`/`client_addresses` field definitions
+3. `GuardianSection` — legal_custody_status (6 options), court_ordered_placement (bool), financial_guarantor_type (8 options)
+4. `ReferralSection` — referral_source_type (10 options), referral_organization, referral_date, reason_for_referral
+5. `AdmissionSection` — admission_date, admission_type (5 options), level_of_care, expected_length_of_stay (number), initial_risk_level (4 options), placement_arrangement (13 options)
+6. `InsuranceSection` — medicaid_id, medicare_id + insurance policy sub-entity collection (type/payer/policy#/group#/subscriber/dates)
+7. `ClinicalSection` — primary_diagnosis/secondary/DSM-5 (JSONB), presenting_problem, suicide_risk_status (3), violence_risk_status (3), trauma history, substance/developmental/treatment history
+8. `MedicalSection` — allergies, medical_conditions (both required JSONB), immunization_status, dietary_restrictions, special_medical_needs
+9. `LegalSection` — court_case_number, state_agency, legal_status (4 options), mandated_reporting/protective_services/safety_plan (booleans)
+10. `EducationSection` — education_status (8 options), grade_level, iep_status (bool)
+
+**Design decisions**:
+- Task said "7 sections" but ViewModel has 10 `INTAKE_SECTIONS` — built all 10 for 1:1 mapping
+- Enum options are hardcoded const arrays (not fetched from `client_reference_values`) for gender, ethnicity, race, citizenship, admission_type, referral_source, education_status, legal_status — these are app-owner-defined per Decision 3
+- `reason_for_referral`, `presenting_problem`, `substance_use_history` etc. use `fieldType="jsonb"` override to render as textarea even though their FieldDefinition field_type is `text` — better UX for long-form content
+- Contact sub-entity sections check `vm.visibleFieldKeys.has('client_phones')` etc. for section-level visibility
+- All fields use `getFieldProps()` which reads from `vm.fieldDefinitions` — if an org hasn't seeded field definitions yet, fields won't render (graceful degradation)
+
+## Plan Updates (2026-04-07) — B6b ClientIntakePage
+
+### B6b: ClientIntakePage at `/clients/register`
+Created `frontend/src/pages/clients/ClientIntakePage.tsx` — multi-section intake form page.
+
+**Features**:
+- **Section sidebar** (desktop): 10-item nav with validation status icons (CheckCircle/AlertCircle/Circle) from `vm.sectionValidation`
+- **Mobile fallback**: `<select>` dropdown with unicode status indicators
+- **Progress bar**: ARIA progressbar driven by `vm.completionPercentage`, animated width transition
+- **Active section rendering**: `SECTION_COMPONENTS` map → one of 10 `*Section` components, all receiving ViewModel as prop
+- **Navigation footer**: Previous/Next buttons cycle through `INTAKE_SECTIONS`, Submit button replaces Next on last section
+- **Submit**: Calls `vm.submit(orgId)` where orgId comes from `useAuth().session.claims.org_id`
+- **Success redirect**: `useEffect` watching `vm.submitSuccess` → `navigate(/clients/:registeredClientId)`
+- **Error handling**: Submit error (red alert), sub-entity warnings (amber alert with list)
+- **Loading/error states**: Spinner while loading field definitions, retry on failure
+- **Glassmorphism**: `glassCardStyle` matching existing settings pages (rgba white, blur backdrop)
+
+**Route wiring** (`App.tsx`):
+- `/clients/register` added BEFORE `/:clientId` (route order matters — "register" would match as clientId param)
+- Import added for `ClientIntakePage`
+
+**Design decisions**:
+- ViewModel created via `useMemo` (one per page mount), `loadFieldDefinitions()` called in `useEffect`
+- Section labels are a static `SECTION_LABELS` record (not derived from field categories) — simpler, matches section component names
+- No `RequirePermission` wrapper on route — the submit RPC enforces `client.create` server-side. Can add frontend guard later if needed.
+
+## Plan Updates (2026-04-07) — B6d ClientDetailLayout Rewrite
+
+### B6d: ClientOverviewPage — Full Client Record Display
+Complete rewrite of `ClientOverviewPage.tsx` (was ~77 lines placeholder with `client: any` and camelCase fields, now ~300 lines with typed `Client` interface).
+
+**12 sections** organized as cards with icons:
+1. **Demographics** — 19 fields (names, DOB, gender, race, ethnicity, language, marital status, citizenship, identifiers)
+2. **Contact Info** — Sub-entity card lists for phones, emails, addresses (filtered to `is_active`, with primary badges)
+3. **Guardian/Custody** — legal_custody_status, court_ordered_placement, financial_guarantor_type
+4. **Referral** — source type, organization, date, reason
+5. **Admission** — date, type, level of care, expected LOS, initial risk level, current placement
+6. **Placement History** — Timeline cards (current highlighted green, sorted by date range)
+7. **Insurance** — Medicaid/Medicare IDs + policy cards (type badge, payer, policy#, group#, dates)
+8. **Funding Sources** — Conditional section (only shown if sources exist)
+9. **Clinical Profile** — Diagnoses (JSONB display), risk statuses, trauma/substance/treatment history
+10. **Medical** — Allergies, conditions (both JSONB), immunization, dietary, special needs
+11. **Legal** — Court case, state agency, legal status, mandated reporting booleans
+12. **Education** — Status, grade level, IEP status
+13. **Assigned Contacts** — Designation badge cards with contact name/email
+14. **Discharge** — Conditional (only for discharged clients): date, outcome, reason, placement, diagnosis
+
+**Helper utilities** (inline, not extracted):
+- `Field` component: label + value renderer, returns null for empty values
+- `fmtDate()`, `labelOf()`, `fmtJson()` formatters
+- `Section` wrapper: Card with icon + title + 3-col grid
+- `EmptyList` for empty sub-entity collections
+
+**Discharged client UX**:
+- Amber banner at top of overview: "This client was discharged on [date]"
+- Discharge section rendered at bottom with all discharge fields
+
+### B6d: ClientDetailLayout — Discharge Action
+Enhanced header with:
+- **Status badge** in header (green=active, amber=discharged, gray=inactive)
+- **Discharge button** (amber outline, `LogOut` icon) — only visible when `client.status === 'active'`
+- **Custom DischargeDialog** (inline component, not reusing ConfirmDialog — needs 4 form fields):
+  - `discharge_date` (date input, required, defaults to today)
+  - `discharge_outcome` (select, required): Successful / Unsuccessful
+  - `discharge_reason` (select, required): 14 options from `DISCHARGE_REASON_LABELS`
+  - `discharge_placement` (select, optional): 9 options from `DISCHARGE_PLACEMENT_LABELS`
+  - Confirm button disabled until all required fields filled
+  - Error display inline in dialog
+  - On success: dialog closes, `loadClient()` refreshes data (status → discharged)
+- **Refactored loading**: Extracted `loadClient()` as `useCallback` for reuse after discharge
+
+**Files modified**:
+- `frontend/src/pages/clients/ClientOverviewPage.tsx` — Full rewrite (~300 lines)
+- `frontend/src/pages/clients/ClientDetailLayout.tsx` — Discharge action + status badge (~355 lines)
+
+**Build + lint**: Clean (zero errors, zero warnings).
+
+## Plan Updates (2026-04-08) — Architecture Review Fix Migration
+
+### Architecture Review by software-architect-dbc Agent
+Reviewed all committed + uncommitted Phase B work against 95 design decisions.
+
+**5 Major + 4 Minor findings**, all remediated in:
+- **Migration**: `20260408000351_fix_client_api_architecture_review.sql` (NOT YET DEPLOYED, dry-run passes)
+- **Frontend**: 2 file edits (NOT YET COMMITTED)
+
+### Key Fixes
+1. **Read-back guards** added to `api.update_client`, `api.admit_client`, `api.discharge_client` + 7 sub-entity "add" RPCs (M3/M4/M5)
+2. **`discharge_plan_status`** removed from `handle_client_registered` and `handle_client_information_updated` — column was dropped in `20260330204308` but handlers still referenced it (m1, upgraded to Major — would cause runtime failure)
+3. **`admission_type` enum** in `AdmissionSection.tsx` fixed: `voluntary/involuntary/court_ordered` → `planned/emergency/transfer/readmission` per Decision 45 (M6)
+4. **"All" status tab** in `SupabaseClientService.ts` fixed: `status ?? 'active'` → `status ?? null` (m4)
+5. **`event_types` seed** for `client.registered` corrected: stale `race/ethnicity/primary_language` → `admission_date/allergies/medical_conditions` per Decision 67 (M2)
+6. **`UNIQUE(client_id, start_date)`** added to `client_placement_history_projection` per Decision 83 (m7)
+7. **`api.get_client`** contact_assignments lateral join expanded to return all `ClientContactAssignment` fields (m6)
+
+### Gotcha: `discharge_plan_status` column timeline
+- `20260327205738` created `clients_projection` WITH the column
+- `20260330204308` DROPPED the column
+- `20260406222201` created handlers that REFERENCED the dropped column
+- `20260408000351` fixes the handlers
+
+### What Remains
+- Commit all uncommitted work (B6a-d frontend + review fixes)
+- Push to deploy (CI/CD will apply fix migration)
+- B7: Integration testing + documentation
+
 ## Next Steps After Completion
 
 1. **Behavioral incidents domain** — Second fact table for analytics correlation

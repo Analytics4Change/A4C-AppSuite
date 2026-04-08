@@ -11,6 +11,7 @@ import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { ClientListPage } from '@/pages/clients/ClientListPage';
+import { ClientIntakePage } from '@/pages/clients/ClientIntakePage';
 import { ClientDetailLayout } from '@/pages/clients/ClientDetailLayout';
 import { ClientOverviewPage } from '@/pages/clients/ClientOverviewPage';
 import { ClientMedicationsPage } from '@/pages/clients/ClientMedicationsPage';
@@ -83,6 +84,7 @@ function App() {
               <Route element={<MainLayout />}>
                 {/* Client routes */}
                 <Route path="/clients" element={<ClientListPage />} />
+                <Route path="/clients/register" element={<ClientIntakePage />} />
                 <Route path="/clients/:clientId" element={<ClientDetailLayout />}>
                   <Route index element={<ClientOverviewPage />} />
                   <Route path="medications" element={<ClientMedicationsPage />} />

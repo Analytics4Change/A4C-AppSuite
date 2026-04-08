@@ -2,10 +2,10 @@ import { useMemo } from 'react';
 import { IMedicationApi } from '@/services/api/interfaces/IMedicationApi';
 import { MockMedicationApi } from '@/services/mock/MockMedicationApi';
 import { RXNormMedicationApi } from '@/services/api/RXNormMedicationApi';
-import { MockClientApi } from '@/services/mock/MockClientApi';
 import { DosageValidator } from '@/services/validation/DosageValidator';
 import { MedicationManagementViewModel } from '@/viewModels/medication/MedicationManagementViewModel';
 import { ClientSelectionViewModel } from '@/viewModels/client/ClientSelectionViewModel';
+import { getClientService } from '@/services/clients';
 import { serviceFactory } from '@/services/ServiceFactory';
 import { Logger } from '@/utils/logger';
 
@@ -19,7 +19,6 @@ const medicationApi: IMedicationApi = USE_RXNORM
   ? new RXNormMedicationApi()
   : new MockMedicationApi();
 
-const clientApi = new MockClientApi();
 const dosageValidator = new DosageValidator();
 const organizationService = serviceFactory.getOrganizationService();
 
@@ -31,9 +30,7 @@ if (import.meta.env.DEV) {
 // Store view model instances to reuse them
 const viewModelInstances = new Map();
 
-export function useViewModel<T>(
-  ViewModelClass: new (...args: any[]) => T
-): T {
+export function useViewModel<T>(ViewModelClass: new (...args: any[]) => T): T {
   const viewModel = useMemo(() => {
     // Check if we already have an instance
     const className = ViewModelClass.name;
@@ -43,10 +40,14 @@ export function useViewModel<T>(
 
     let instance: T;
 
-    if (ViewModelClass === MedicationManagementViewModel as any) {
-      instance = new MedicationManagementViewModel(medicationApi, dosageValidator, organizationService) as T;
-    } else if (ViewModelClass === ClientSelectionViewModel as any) {
-      instance = new ClientSelectionViewModel(clientApi) as T;
+    if (ViewModelClass === (MedicationManagementViewModel as any)) {
+      instance = new MedicationManagementViewModel(
+        medicationApi,
+        dosageValidator,
+        organizationService
+      ) as T;
+    } else if (ViewModelClass === (ClientSelectionViewModel as any)) {
+      instance = new ClientSelectionViewModel(getClientService()) as T;
     } else {
       throw new Error(`Unknown ViewModel class: ${className}`);
     }

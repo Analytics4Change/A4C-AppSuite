@@ -44,7 +44,7 @@ export class SupabaseClientService implements IClientService {
     log.debug('Listing clients', { status, searchTerm });
 
     const { data, error } = await supabase.schema('api').rpc('list_clients', {
-      p_status: status ?? 'active',
+      p_status: status ?? null,
       p_search_term: searchTerm ?? null,
     });
 
