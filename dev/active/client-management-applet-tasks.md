@@ -355,31 +355,23 @@ _Key remediations: M1 (B2c removed — already done), M2 (JSONB payload), M3 (p_
 - [x] B6c: Rewrite ClientListPage on new types/service + delete legacy `types/models/Client.ts` and `mocks/data/clients.mock.ts`
 - [x] B6d: Rewrite ClientDetailLayout (full record display, discharge action)
 - [x] B6-review: Architecture review by software-architect-dbc — 5 Major + 4 Minor findings (2026-04-08)
-  - Migration `20260408000351_fix_client_api_architecture_review.sql` — NOT YET DEPLOYED (dry-run passed)
-  - Frontend: AdmissionSection enum fix + SupabaseClientService "All" tab fix — NOT YET COMMITTED
+  - Migration `20260408000351_fix_client_api_architecture_review.sql` — DEPLOYED (2026-04-08)
+  - Frontend: AdmissionSection enum fix + SupabaseClientService "All" tab fix — DEPLOYED (2026-04-08)
+- [x] B6-scalar-fix: PostgREST jsonb scalar wrapping fix for batch_update_field_definitions (2026-04-08)
+  - Migration `20260408012329_fix_batch_update_jsonb_scalar.sql` — DEPLOYED (2026-04-08)
+  - Root cause: PostgREST wraps jsonb array params as string scalars; server-side unwrap via `jsonb_typeof` + `#>> '{}'`
+  - Also applied live via `execute_sql` before CI/CD deploy for immediate testing
 - [ ] B7: Integration testing + documentation (7 table docs, E2E, RLS, AGENT-INDEX)
 
 ## Current Status
 
 **Phase**: Phase B — Client Intake Full-Stack 🔄 IN PROGRESS
-**Status**: B1-B6d complete + B6-review fix migration written. All B1-B6d deployed. Review fix migration + frontend changes NOT YET committed or deployed.
-**Migrations**: 8 deployed (2026-04-07) + 1 pending (`20260408000351`, dry-run passed).
+**Status**: B1-B6 complete + all review fixes deployed. 10 migrations total deployed. B7 (testing + docs) remaining.
+**Migrations**: 10 deployed (8 original + architecture review fix + batch update scalar fix).
 
 **Last Updated**: 2026-04-08
-**Next Step**: Commit all uncommitted work (B6a-d frontend + B6-review fixes + architecture review migration), then push to deploy. After that: B7 (integration testing + documentation).
+**Next Step**: B7 — integration testing + documentation (7 table docs, E2E tests, RLS verification, AGENT-INDEX updates).
 **Plan file**: Plan files expired (session-scoped). Full plan details in `dev/active/client-management-applet-plan.md`.
-
-### Uncommitted Work Summary (2026-04-08)
-All of the following are in the working tree, NOT committed:
-1. **10 intake form sections** (`frontend/src/pages/clients/intake/` — 14 files)
-2. **ClientIntakePage** (`frontend/src/pages/clients/ClientIntakePage.tsx`)
-3. **ClientListPage rewrite** (new types/service, status tabs, search)
-4. **ClientOverviewPage rewrite** (12 sections, typed Client, discharge banner)
-5. **ClientDetailLayout rewrite** (status badge, discharge dialog)
-6. **Legacy deletions** (Client.ts, clients.mock.ts, MockClientApi.ts, IClientApi.ts)
-7. **Rewired files** (useViewModel.ts, ClientSelectionViewModel.ts, ClientSelector.tsx, App.tsx)
-8. **Architecture review fix migration** (`20260408000351_fix_client_api_architecture_review.sql`)
-9. **Frontend fixes** (AdmissionSection enum, SupabaseClientService "All" tab)
 10. ~~**Bug fix**: `SupabaseClientFieldService.ts` double JSON serialization~~ — **COMMITTED + DEPLOYED** (commit `4849122b`, 2026-04-08)
 
 ### Test Files Created (2026-04-06):

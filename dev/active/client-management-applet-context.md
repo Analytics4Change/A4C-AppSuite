@@ -282,6 +282,8 @@ The client management applet is the central entity in the A4C data model. It sit
 
 95. **`_projection` suffix on `client_placement_history`** (decided 2026-04-06, m1 remediation): All event-sourced tables use `_projection` suffix for consistency. Table is `client_placement_history_projection` (not `client_placement_history`).
 
+96. **PostgREST jsonb array param unwrap guard** (decided 2026-04-08): PostgREST (via Supabase SDK `.rpc()`) wraps jsonb ARRAY parameters as jsonb STRING SCALARS. Any RPC function that takes a `jsonb` param expecting an array must include a server-side unwrap guard: `IF jsonb_typeof(p_changes) = 'string' THEN v_changes := (p_changes #>> '{}')::jsonb; ELSE v_changes := p_changes; END IF;`. The `#>> '{}'` operator extracts the text content of a jsonb string, then `::jsonb` re-parses it as an actual jsonb array. This pattern is required for ALL future RPCs with jsonb array parameters. Frontend `JSON.stringify` removal alone does NOT fix the issue — the problem is PostgREST's parameter binding layer.
+
 ## Current State
 
 ### Phase B Backend — 8 Migrations Deployed (2026-04-07)
@@ -330,8 +332,28 @@ All 8 migrations deployed to production via CI/CD. All 5 pipelines green.
   - 10 sections: Demographics(19), ContactInfo(sub-entities), Guardian(3), Referral(4), Admission(6), Insurance(2+sub-entity), Clinical(10), Medical(5), Legal(6), Education(3)
   - All `observer`-wrapped, field-definition-driven, `data-testid` throughout
 
-### Deployment Gotcha (2026-04-07)
-Migration `20260406221739_client_permissions_seed.sql` initially failed: `role_permissions_projection` has no `organization_id` column (only `role_id`, `permission_id`, `granted_at`). Org scope is implicit via `role_id` FK. Fix: commit `61caf26e`. The migration ran in a transaction so the failure was clean (no partial state).
+### Additional Migrations Deployed (2026-04-08)
+
+| Migration | Content |
+|-----------|---------|
+| `20260408000351_fix_client_api_architecture_review.sql` | Read-back guards on update/admit/discharge/add RPCs, UNIQUE(client_id, start_date) on placement history, stale discharge_plan_status removal, expanded get_client lateral join |
+| `20260408012329_fix_batch_update_jsonb_scalar.sql` | PostgREST jsonb scalar unwrap for batch_update_field_definitions |
+
+### All Frontend B6 Work Deployed (2026-04-08, commit `5bfe06b7`)
+- 10 intake form sections (`frontend/src/pages/clients/intake/` — 14 files)
+- `ClientIntakePage` at `/clients/register`
+- Rewritten `ClientListPage` (status tabs, debounced search, new types/service)
+- Rewritten `ClientOverviewPage` (12 typed sections, discharge banner)
+- Enhanced `ClientDetailLayout` (status badge, inline discharge dialog)
+- Legacy deletions: `Client.ts`, `clients.mock.ts`, `MockClientApi.ts`, `IClientApi.ts`
+- Rewired: `useViewModel.ts`, `ClientSelectionViewModel.ts`, `ClientSelector.tsx`, `App.tsx`
+- Frontend fixes: AdmissionSection enum (Decision 45), SupabaseClientService "All" tab null status
+
+### Deployment Gotchas
+
+**Gotcha 1 (2026-04-07)**: Migration `20260406221739_client_permissions_seed.sql` initially failed: `role_permissions_projection` has no `organization_id` column (only `role_id`, `permission_id`, `granted_at`). Org scope is implicit via `role_id` FK. Fix: commit `61caf26e`. The migration ran in a transaction so the failure was clean (no partial state).
+
+**Gotcha 2 (2026-04-08)**: `api.batch_update_field_definitions` — PostgREST wraps jsonb array RPC params as string scalars. `jsonb_array_elements()` fails with "cannot extract elements from a scalar". Fix: server-side unwrap guard `IF jsonb_typeof(p_changes) = 'string' THEN v_changes := (p_changes #>> '{}')::jsonb`. Frontend `JSON.stringify` removal (commit `4849122b`) was insufficient — the problem is in PostgREST's parameter binding, not the SDK. **Any future RPC that takes a jsonb array param needs this guard.**
 
 ### Implementation Plan
 - **Primary plan file**: `.claude/plans/golden-booping-rainbow.md` — Phase B full-stack plan with sequencing (session-scoped, may be cleaned up)

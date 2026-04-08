@@ -360,8 +360,10 @@ Full plan at `.claude/plans/golden-booping-rainbow.md`.
 - ~~**B4a**: AsyncAPI contracts~~ ✅ DONE
 - ~~**B4b**: event_types seed migration + type generation~~ ✅ DONE
 - ~~**B5a-c**: Frontend types, service layer, ViewModel~~ ✅ DONE
-- **B6a-b**: 7 intake form sections + ClientIntakePage at `/clients/register`
-- **B6c-d**: Rewrite ClientListPage + ClientDetailLayout on new types/service (delete legacy model)
+- ~~**B6a-b**: 10 intake form sections + ClientIntakePage~~ ✅ DONE (deployed 2026-04-08, commit `5bfe06b7`)
+- ~~**B6c-d**: Rewrite ClientListPage + ClientDetailLayout~~ ✅ DONE (deployed 2026-04-08, commit `5bfe06b7`)
+- ~~**B6-review**: Architecture review fixes~~ ✅ DONE (migration `20260408000351`, deployed 2026-04-08)
+- ~~**B6-scalar-fix**: PostgREST jsonb scalar fix~~ ✅ DONE (migration `20260408012329`, deployed 2026-04-08)
 - **B7**: Tests (ViewModel, service, E2E, RLS) + documentation (7 table docs, AGENT-INDEX)
 
 ## Plan Updates (2026-04-07) — B4b + B5a-c Frontend Layer Implemented
@@ -530,8 +532,8 @@ Enhanced header with:
 Reviewed all committed + uncommitted Phase B work against 95 design decisions.
 
 **5 Major + 4 Minor findings**, all remediated in:
-- **Migration**: `20260408000351_fix_client_api_architecture_review.sql` (NOT YET DEPLOYED, dry-run passes)
-- **Frontend**: 2 file edits (NOT YET COMMITTED)
+- **Migration**: `20260408000351_fix_client_api_architecture_review.sql` (DEPLOYED 2026-04-08)
+- **Frontend**: 2 file edits (DEPLOYED 2026-04-08, commit `5bfe06b7`)
 
 ### Key Fixes
 1. **Read-back guards** added to `api.update_client`, `api.admit_client`, `api.discharge_client` + 7 sub-entity "add" RPCs (M3/M4/M5)
@@ -549,9 +551,48 @@ Reviewed all committed + uncommitted Phase B work against 95 design decisions.
 - `20260408000351` fixes the handlers
 
 ### What Remains
-- Commit all uncommitted work (B6a-d frontend + review fixes)
-- Push to deploy (CI/CD will apply fix migration)
+- ~~Commit all uncommitted work~~ ✅ DONE (commit `5bfe06b7`, deployed 2026-04-08)
 - B7: Integration testing + documentation
+
+## Plan Updates (2026-04-08) — All B6 Deployed + PostgREST Scalar Fix
+
+### Full Deployment (commit `5bfe06b7`)
+All B6 frontend + architecture review fix + batch update scalar fix deployed. 3 CI/CD pipelines green:
+- Deploy Database Migrations (2 migrations: `20260408000351` + `20260408012329`)
+- Deploy Frontend (intake form sections, page rewrites, legacy deletions)
+- Validate Frontend Documentation
+
+### PostgREST jsonb Scalar Fix (Decision 96)
+**Problem**: `api.batch_update_field_definitions` failed with "cannot extract elements from a scalar" even after removing `JSON.stringify` from frontend (commit `4849122b`).
+
+**Root cause**: PostgREST wraps jsonb ARRAY parameters as jsonb STRING SCALARS during RPC parameter binding. The `jsonb_array_elements()` call receives `"[...]"` (a jsonb text scalar) instead of `[...]` (a jsonb array). This is a PostgREST behavior, not a Supabase SDK issue.
+
+**Fix**: Server-side unwrap guard in the SQL function:
+```sql
+IF jsonb_typeof(p_changes) = 'string' THEN
+    v_changes := (p_changes #>> '{}')::jsonb;
+ELSE
+    v_changes := p_changes;
+END IF;
+```
+
+**Migration**: `20260408012329_fix_batch_update_jsonb_scalar.sql`
+**Also applied live** via Supabase MCP `execute_sql` before CI/CD deploy for immediate testing.
+
+**Pattern for future**: Any RPC that takes a `jsonb` param expecting an array MUST include this unwrap guard. The frontend `JSON.stringify` removal was correct but insufficient — the problem is at the PostgREST layer.
+
+### Migration Count
+10 total deployed migrations for Phase B:
+1. `20260406221732_client_contact_tables.sql`
+2. `20260406221738_client_insurance_placement_tables.sql`
+3. `20260406221739_client_permissions_seed.sql`
+4. `20260406222201_client_lifecycle_event_handlers.sql`
+5. `20260406222642_client_sub_entity_event_handlers.sql`
+6. `20260406222759_contact_designation_event_handlers.sql`
+7. `20260406222857_client_api_functions.sql`
+8. `20260406225150_client_event_types_seed.sql`
+9. `20260408000351_fix_client_api_architecture_review.sql`
+10. `20260408012329_fix_batch_update_jsonb_scalar.sql`
 
 ## Next Steps After Completion
 
