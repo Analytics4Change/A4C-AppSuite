@@ -337,21 +337,50 @@ _Key remediations: M1 (B2c removed — already done), M2 (JSONB payload), M3 (p_
   - 10-section navigation, field-definition-driven validation, sessionStorage drafts
   - Submit orchestration: registerClient + Promise.allSettled sub-entity RPCs with shared correlation ID
   - Draft types: DraftPhone, DraftEmail, DraftAddress, DraftInsurance, DraftClinicalContact
-- [ ] B6a: 7 intake form section components
-- [ ] B6b: ClientIntakePage (multi-section layout, route: /clients/register)
-- [ ] B6c: Rewrite ClientListPage on new types/service + delete legacy `types/models/Client.ts` and `mocks/data/clients.mock.ts`
-- [ ] B6d: Rewrite ClientDetailLayout (full record display, discharge action) + update ClientSelectionViewModel
+- [x] B6a: 10 intake form section components + IntakeFormField helper + getFieldProps utility
+  - `frontend/src/pages/clients/intake/` — 14 files (10 sections, helper, field props util, types, barrel index)
+  - IntakeFormField: renders text/date/number/enum/multi_enum/boolean/jsonb based on FieldDefinition metadata
+  - getFieldProps: derives field props from ViewModel (visibility, required, validation errors)
+  - DemographicsSection: 19 fields (names, DOB, gender, race/ethnicity, language, identifiers)
+  - ContactInfoSection: sub-entity collections (phones, emails, addresses) with add/remove/type/primary
+  - GuardianSection: legal_custody_status, court_ordered_placement, financial_guarantor_type
+  - ReferralSection: referral source, org, date, reason
+  - AdmissionSection: admission date/type, level of care, risk level, placement arrangement
+  - InsuranceSection: medicaid/medicare IDs + insurance policy sub-entity collection
+  - ClinicalSection: diagnoses (JSONB), risk statuses, trauma/substance/developmental/treatment history
+  - MedicalSection: allergies, conditions, immunization, dietary, special needs
+  - LegalSection: court case, state agency, legal status, mandated reporting, protective services, safety plan
+  - EducationSection: education status, grade level, IEP status
+- [x] B6b: ClientIntakePage (multi-section layout, route: /clients/register)
+- [x] B6c: Rewrite ClientListPage on new types/service + delete legacy `types/models/Client.ts` and `mocks/data/clients.mock.ts`
+- [x] B6d: Rewrite ClientDetailLayout (full record display, discharge action)
+- [x] B6-review: Architecture review by software-architect-dbc — 5 Major + 4 Minor findings (2026-04-08)
+  - Migration `20260408000351_fix_client_api_architecture_review.sql` — NOT YET DEPLOYED (dry-run passed)
+  - Frontend: AdmissionSection enum fix + SupabaseClientService "All" tab fix — NOT YET COMMITTED
 - [ ] B7: Integration testing + documentation (7 table docs, E2E, RLS, AGENT-INDEX)
 
 ## Current Status
 
 **Phase**: Phase B — Client Intake Full-Stack 🔄 IN PROGRESS
-**Status**: B1a-c + B2a-1 + B2a-2 + B2b + B3 + B4a + B4b + B5a-c complete. Next: B6a (intake form sections).
-**Migrations**: 8 pending push — `20260406221732` through `20260406225150`
+**Status**: B1-B6d complete + B6-review fix migration written. All B1-B6d deployed. Review fix migration + frontend changes NOT YET committed or deployed.
+**Migrations**: 8 deployed (2026-04-07) + 1 pending (`20260408000351`, dry-run passed).
 
-**Last Updated**: 2026-04-07
-**Next Step**: B6a — 7 intake form section components. Then B6b (ClientIntakePage), B6c-d (update list/detail pages), B7 (tests + docs).
+**Last Updated**: 2026-04-08
+**Next Step**: Commit all uncommitted work (B6a-d frontend + B6-review fixes + architecture review migration), then push to deploy. After that: B7 (integration testing + documentation).
 **Plan file**: Plan files expired (session-scoped). Full plan details in `dev/active/client-management-applet-plan.md`.
+
+### Uncommitted Work Summary (2026-04-08)
+All of the following are in the working tree, NOT committed:
+1. **10 intake form sections** (`frontend/src/pages/clients/intake/` — 14 files)
+2. **ClientIntakePage** (`frontend/src/pages/clients/ClientIntakePage.tsx`)
+3. **ClientListPage rewrite** (new types/service, status tabs, search)
+4. **ClientOverviewPage rewrite** (12 sections, typed Client, discharge banner)
+5. **ClientDetailLayout rewrite** (status badge, discharge dialog)
+6. **Legacy deletions** (Client.ts, clients.mock.ts, MockClientApi.ts, IClientApi.ts)
+7. **Rewired files** (useViewModel.ts, ClientSelectionViewModel.ts, ClientSelector.tsx, App.tsx)
+8. **Architecture review fix migration** (`20260408000351_fix_client_api_architecture_review.sql`)
+9. **Frontend fixes** (AdmissionSection enum, SupabaseClientService "All" tab)
+10. ~~**Bug fix**: `SupabaseClientFieldService.ts` double JSON serialization~~ — **COMMITTED + DEPLOYED** (commit `4849122b`, 2026-04-08)
 
 ### Test Files Created (2026-04-06):
 - `frontend/src/viewModels/settings/__tests__/ClientFieldSettingsViewModel.test.ts` — 56 tests (Vitest): default state, loadData, computed properties (fieldsByCategory, tabList, configurableFieldCount), toggle/set actions, change tracking (locked field skip, multi-change, toggle-back), reason validation, canSave, saveChanges (success/reload/failure/partial), resetChanges, custom field CRUD (create/deactivate success/failure/exception), category CRUD (create/deactivate success/failure/exception)

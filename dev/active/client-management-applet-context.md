@@ -284,8 +284,8 @@ The client management applet is the central entity in the A4C data model. It sit
 
 ## Current State
 
-### Phase B Backend — 7 Migrations Written (2026-04-06, pending push)
-All 7 migrations pass `supabase db push --linked --dry-run`.
+### Phase B Backend — 8 Migrations Deployed (2026-04-07)
+All 8 migrations deployed to production via CI/CD. All 5 pipelines green.
 
 | Migration | Content |
 |-----------|---------|
@@ -296,6 +296,7 @@ All 7 migrations pass `supabase db push --linked --dry-run`.
 | `20260406222642_client_sub_entity_event_handlers.sql` | Extended router (23 CASE) + 19 sub-entity handlers |
 | `20260406222759_contact_designation_event_handlers.sql` | Extended process_contact_event() + 2 designation handlers |
 | `20260406222857_client_api_functions.sql` | 25 RPCs + validate_client_required_fields() helper |
+| `20260406225150_client_event_types_seed.sql` | 25 event types seeded (23 client + 2 contact designation) |
 
 ### Handler Reference Files Created
 - `handlers/client/` — 23 files (4 lifecycle + 19 sub-entity)
@@ -322,9 +323,18 @@ All 7 migrations pass `supabase db push --linked --dry-run`.
 - 8 API RPCs for field definitions/categories — deployed 2026-03-27
 - Handler reference files for field definition/category handlers — deployed 2026-03-27
 - Frontend Client Field Settings page at `/settings/client-fields` — deployed 2026-03-28
+- Frontend client types + service layer + ViewModel — B5a-c complete 2026-04-07
+- **B6a: 10 intake form section components** — `frontend/src/pages/clients/intake/` (14 files) — 2026-04-07
+  - `IntakeFormField.tsx`: renders text/date/number/enum/multi_enum/boolean/jsonb from FieldDefinition
+  - `useFieldProps.ts`: derives props (visibility, required, error) from ViewModel
+  - 10 sections: Demographics(19), ContactInfo(sub-entities), Guardian(3), Referral(4), Admission(6), Insurance(2+sub-entity), Clinical(10), Medical(5), Legal(6), Education(3)
+  - All `observer`-wrapped, field-definition-driven, `data-testid` throughout
+
+### Deployment Gotcha (2026-04-07)
+Migration `20260406221739_client_permissions_seed.sql` initially failed: `role_permissions_projection` has no `organization_id` column (only `role_id`, `permission_id`, `granted_at`). Org scope is implicit via `role_id` FK. Fix: commit `61caf26e`. The migration ran in a transaction so the failure was clean (no partial state).
 
 ### Implementation Plan
-- **Primary plan file**: `.claude/plans/golden-booping-rainbow.md` — Phase B full-stack plan with sequencing
+- **Primary plan file**: `.claude/plans/golden-booping-rainbow.md` — Phase B full-stack plan with sequencing (session-scoped, may be cleaned up)
 
 ### Cross-Correlation Audit (completed 2026-02-12)
 Full audit of all event types across 12 routers + dispatcher vs 14 AsyncAPI domain files. Findings:
@@ -475,6 +485,112 @@ When the frontend intake form is built, these existing patterns apply:
 **E2E auth gotcha**: When `.env.local` has Supabase credentials, the dev server uses real auth (not mock). The dedicated playwright config sets `VITE_FORCE_MOCK=true` to force mock mode regardless.
 
 **RLS test gotcha**: MCP `execute_sql` doesn't return RAISE NOTICE output. The script is designed for psql/SQL Editor. To verify via MCP, run individual assertions as SELECT queries (see verification pattern in conversation history).
+
+### B6b: ClientIntakePage ✅ COMPLETE (2026-04-07)
+
+**New file**: `frontend/src/pages/clients/ClientIntakePage.tsx`
+- Multi-section intake form with sidebar nav (desktop) + mobile dropdown fallback
+- Validation status icons per section (valid/invalid/incomplete from `vm.sectionValidation`)
+- Progress bar from `vm.completionPercentage`
+- Previous/Next/Submit footer navigation
+- Submit calls `vm.submit(orgId)`, success redirects to `/clients/:id`
+- Sub-entity error warnings (amber), submit error (red)
+- Glassmorphism card styling
+- Route: `/clients/register` in `App.tsx` (before `/:clientId`)
+
+### B6c: ClientListPage Rewrite + Legacy Deletion ✅ COMPLETE (2026-04-07)
+
+**Rewritten files**:
+- `frontend/src/pages/clients/ClientListPage.tsx` — Fully rewritten from scratch:
+  - Page-local MobX ViewModel (`ClientListViewModel`) wraps `getClientService().listClients()`
+  - Status filter tabs (All / Active / Discharged / Inactive) with `role="tablist"`
+  - Debounced search (300ms) by name, MRN, or external ID via ref-based pattern (avoids stale closure)
+  - "Register New Client" button → `/clients/register`
+  - Cards: display name (with preferred_name), DOB, admission date, risk level badge, status badge
+  - Loading (spinner), error (with retry button), and empty states
+  - Keyboard accessible: `role="button"`, `tabIndex={0}`, Enter/Space handlers, `aria-label`
+
+- `frontend/src/pages/clients/ClientDetailLayout.tsx` — Minimal migration (full rewrite is B6d):
+  - `mockClients.find()` → `getClientService().getClient()` with async loading state
+  - `useEffect` with cancellation flag for cleanup
+  - Uses `Client` type from `client.types.ts` (snake_case fields)
+  - Loading spinner + "Client not found" error state
+
+- `frontend/src/viewModels/client/ClientSelectionViewModel.ts` — Rewired:
+  - `IClientApi` → `IClientService` (from `@/services/clients`)
+  - `Client` type → `ClientListItem` type (from `@/types/client.types`)
+  - `searchClients()` now calls `service.listClients(undefined, query)` instead of `clientApi.searchClients(query)`
+  - `getClientFullName()` shows preferred name when available
+  - `handleError` param changed from `any` → `unknown`
+
+- `frontend/src/views/client/ClientSelector.tsx` — Field name migration:
+  - `client.firstName/lastName` → `client.first_name/last_name`
+  - `client.contactInfo?.phone` → `client.mrn` (phones are sub-entities now, MRN is on list item)
+  - `client.medicalConditions` section removed (not on ClientListItem)
+  - Import `ClientListItem` type for `handleClientClick` param
+
+- `frontend/src/hooks/useViewModel.ts` — Dependency update:
+  - Removed `MockClientApi` import + singleton
+  - `ClientSelectionViewModel` now receives `getClientService()` (singleton factory)
+
+**Deleted legacy files**:
+- `frontend/src/types/models/Client.ts` — Old `Client` interface (camelCase fields, medication IDs, emergency contact)
+- `frontend/src/mocks/data/clients.mock.ts` — 3 mock clients using old `Client` type
+- `frontend/src/services/mock/MockClientApi.ts` — Old mock implementing `IClientApi` (superseded by `MockClientService`)
+- `frontend/src/services/api/interfaces/IClientApi.ts` — Old interface (6 methods, superseded by `IClientService` with 25 methods)
+- `frontend/src/types/models/index.ts` — Removed `Client` re-export (Medication + Dosage remain)
+
+**Build + lint**: Clean (zero errors, zero warnings).
+
+### B6d: ClientDetailLayout + ClientOverviewPage Rewrite (2026-04-07)
+
+**Modified files**:
+- `frontend/src/pages/clients/ClientOverviewPage.tsx` — Complete rewrite (~300 lines). Was placeholder with `client: any` + camelCase fields + hardcoded stats. Now: 12 organized sections using typed `Client` interface from `client.types.ts`, all sub-entity arrays as card lists, all enum fields use label maps, discharged clients get amber banner + discharge section.
+- `frontend/src/pages/clients/ClientDetailLayout.tsx` — Enhanced (~355 lines). Added: status badge in header (green/amber/gray), discharge button (active clients only), inline `DischargeDialog` component with 4 fields (date/outcome/reason/placement), calls `clientService.dischargeClient()`, refreshes on success. Refactored loading into `useCallback` for reuse.
+
+**Design decisions**:
+- Used inline `DischargeDialog` instead of `ConfirmDialog` — ConfirmDialog only has message + confirm/cancel, discharge needs 4 form fields
+- `Field` component returns `null` for empty values — sections auto-collapse to show only populated data
+- Sub-entity lists filtered to `is_active` before rendering
+- `labelOf()` falls back to title-cased key for unknown enum values (defensive)
+- JSONB fields (diagnoses, allergies, conditions) rendered via `fmtJson()` — returns null for empty objects
+
+**Build + lint**: Clean (zero errors, zero warnings).
+
+### Architecture Review Fix Migration (2026-04-08)
+
+**software-architect-dbc agent** reviewed all committed + uncommitted Phase B work against 95 design decisions. Found 5 Major + 4 Minor issues. All fixed in one migration + 2 frontend edits.
+
+**Migration**: `20260408000351_fix_client_api_architecture_review.sql`
+
+| Finding | Severity | Fix |
+|---------|----------|-----|
+| m7: Missing `UNIQUE(client_id, start_date)` on placement history | Minor | Added constraint per Decision 83 |
+| M2: `event_types` seed has stale required fields for `client.registered` | Major | Updated to `admission_date, allergies, medical_conditions` per Decision 67 |
+| m1: `discharge_plan_status` in handlers — column dropped in `20260330204308` | Major (upgraded) | Removed from `handle_client_registered` + `handle_client_information_updated` |
+| M3: `api.update_client` missing read-back guard | Major | Added read-back guard following `register_client` pattern |
+| M3: `api.admit_client` missing read-back guard | Major | Added with status='active' verification |
+| M4: `api.discharge_client` missing read-back guard | Major | Added with status='discharged' verification |
+| m6: `api.get_client` contact_assignments returns field subset | Minor | Expanded lateral join to return all `ClientContactAssignment` fields |
+| M5: Sub-entity "add" RPCs missing read-back guards | Major | Added guards to 7 "add" RPCs (phone, email, address, insurance, funding_source, placement, contact_assignment) |
+
+**Frontend fixes** (same session, uncommitted):
+- **M6**: `AdmissionSection.tsx` — `admission_type` options changed from `voluntary/involuntary/court_ordered/emergency/transfer` to `planned/emergency/transfer/readmission` (Decision 45)
+- **m4**: `SupabaseClientService.ts:47` — `status ?? 'active'` → `status ?? null` so "All" tab shows all clients
+
+**Verification**: Frontend build clean, migration dry-run passes.
+
+**Note on M5 scope**: Read-back guards added to all "add" RPCs (new row creation) and all lifecycle RPCs (status transitions). "Update" and "remove" sub-entity RPCs NOT given guards — they modify existing rows where the delta is hard to verify, and the risk is lower (entity already exists).
+
+### Bug Fix: Client Field Batch Update Double Serialization (2026-04-08)
+
+**Symptom**: `/settings/client-fields` → toggle a field to required → fill reason → Save → error: "Failed to batch update cannot extract elements from a scalar"
+
+**Root cause**: `SupabaseClientFieldService.ts:45` had `p_changes: JSON.stringify(changes)`. Supabase SDK already serializes JS objects/arrays to JSONB for RPC params. `JSON.stringify()` created a scalar JSON string, which `jsonb_array_elements()` in `api.batch_update_field_definitions` cannot iterate.
+
+**Fix**: Removed `JSON.stringify()` — pass `changes` array directly. Commit `4849122b`, deployed via CI/CD (both pipelines green).
+
+**Why tests didn't catch it**: `MockClientFieldService.batchUpdateFieldDefinitions()` never calls the Supabase RPC — it returns a canned success response. Only the real Supabase backend path was affected.
 
 ## Why This Approach?
 
