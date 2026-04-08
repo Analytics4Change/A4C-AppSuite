@@ -87,10 +87,9 @@ These 13 values align with SAMHSA and state Medicaid standard placement taxonomy
 | `idx_client_placement_current` | `UNIQUE (client_id) WHERE is_current = true` — enforces single current placement |
 | `idx_client_placement_client` | `(client_id)` — full history lookup (no WHERE filter) |
 | `idx_client_placement_org` | `(organization_id)` — org-level history queries |
+| `client_placement_history_projection_client_id_start_date_key` | `UNIQUE (client_id, start_date)` — prevents duplicate placements on same date (m7) |
 
-The partial unique index `idx_client_placement_current` is the mechanism that enforces the business rule: at most one row per client may have `is_current = true`. The two non-unique indexes index all rows (not just active) because placement history reporting queries need the full timeline.
-
-> **Note**: The UNIQUE constraint on `(client_id, start_date)` referenced in the architecture review (m7) is not present in the migration as implemented. The partial unique index on `is_current` is the primary enforcement mechanism.
+The partial unique index `idx_client_placement_current` enforces the business rule: at most one row per client may have `is_current = true`. The `(client_id, start_date)` UNIQUE constraint (added in migration `20260408000351`) prevents duplicate placement records on the same date. The two non-unique indexes index all rows (not just active) because placement history reporting queries need the full timeline.
 
 ## RLS Policies
 
