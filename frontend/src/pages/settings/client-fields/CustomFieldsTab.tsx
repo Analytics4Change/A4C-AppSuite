@@ -5,15 +5,16 @@
  * Add custom field form + table of existing custom fields with deactivate.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Pencil, Loader2, AlertCircle, Check, X } from 'lucide-react';
 import type { FieldDefinition, FieldCategory } from '@/types/client-field-settings.types';
 import { SYSTEM_FIELD_KEYS, FIELD_TYPE_DISPLAY_LABELS } from '@/types/client-field-settings.types';
 import type { ClientFieldSettingsViewModel } from '@/viewModels/settings/ClientFieldSettingsViewModel';
+import { EnumValuesInput } from './EnumValuesInput';
 
 const glassCardStyle = {
   background: 'rgba(255, 255, 255, 0.7)',
@@ -30,7 +31,6 @@ const FIELD_TYPES = [
   { value: 'enum', label: FIELD_TYPE_DISPLAY_LABELS.enum },
   { value: 'multi_enum', label: FIELD_TYPE_DISPLAY_LABELS.multi_enum },
   { value: 'boolean', label: FIELD_TYPE_DISPLAY_LABELS.boolean },
-  { value: 'jsonb', label: FIELD_TYPE_DISPLAY_LABELS.jsonb },
 ];
 
 interface CustomFieldsTabProps {
@@ -47,6 +47,25 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
     const [fieldType, setFieldType] = useState('text');
     const [categoryId, setCategoryId] = useState('');
     const [isRequired, setIsRequired] = useState(false);
+    const [enumValues, setEnumValues] = useState<string[]>([]);
+
+    // Edit state
+    const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+    const [editName, setEditName] = useState('');
+    const [editCategoryId, setEditCategoryId] = useState('');
+    const [editIsRequired, setEditIsRequired] = useState(false);
+    const [editEnumValues, setEditEnumValues] = useState<string[]>([]);
+
+    const editNameRef = useRef<HTMLInputElement>(null);
+
+    const isEnumType = fieldType === 'enum' || fieldType === 'multi_enum';
+
+    // Focus the edit name input when edit form opens
+    useEffect(() => {
+      if (editingFieldId) {
+        editNameRef.current?.focus();
+      }
+    }, [editingFieldId]);
 
     // Custom fields = non-locked, org-created fields (across all categories)
     const customFields = fields.filter((f) => !SYSTEM_FIELD_KEYS.has(f.field_key) && f.is_active);
@@ -57,10 +76,24 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
       .replace(/[^a-z0-9\s]/g, '')
       .replace(/\s+/g, '_');
 
-    const canCreate = name.trim().length > 0 && fieldKey.length > 0 && categoryId.length > 0;
+    const canCreate =
+      name.trim().length > 0 &&
+      fieldKey.length > 0 &&
+      categoryId.length > 0 &&
+      (!isEnumType || enumValues.length > 0);
 
-    const handleCreate = async () => {
+    const resetForm = () => {
+      setName('');
+      setFieldType('text');
+      setCategoryId('');
+      setIsRequired(false);
+      setEnumValues([]);
+    };
+
+    const handleCreate = async (keepOpen = false) => {
       if (!canCreate) return;
+      const validationRules =
+        isEnumType && enumValues.length > 0 ? { enum_values: enumValues } : undefined;
       const success = await viewModel.createCustomField(
         {
           field_key: `custom_${fieldKey}`,
@@ -68,21 +101,64 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
           category_id: categoryId,
           field_type: fieldType,
           is_required: isRequired,
+          validation_rules: validationRules,
         },
         orgId
       );
 
       if (success) {
-        setName('');
-        setFieldType('text');
-        setCategoryId('');
-        setIsRequired(false);
-        setShowForm(false);
+        resetForm();
+        if (!keepOpen) {
+          setShowForm(false);
+        }
       }
     };
 
     const handleDeactivate = async (fieldId: string, fieldName: string) => {
       await viewModel.deactivateCustomField(fieldId, `Removed custom field: ${fieldName}`, orgId);
+    };
+
+    const startEditing = (field: FieldDefinition) => {
+      setEditingFieldId(field.id);
+      setEditName(field.display_name);
+      setEditCategoryId(field.category_id);
+      setEditIsRequired(field.is_required);
+      const existingValues = (field.validation_rules as Record<string, unknown> | null)
+        ?.enum_values;
+      setEditEnumValues(Array.isArray(existingValues) ? (existingValues as string[]) : []);
+    };
+
+    const cancelEditing = () => {
+      setEditingFieldId(null);
+      setEditName('');
+      viewModel.clearFieldErrors();
+      setEditCategoryId('');
+      setEditIsRequired(false);
+      setEditEnumValues([]);
+    };
+
+    const handleUpdate = async () => {
+      if (!editingFieldId || editName.trim().length === 0) return;
+      const editedField = customFields.find((f) => f.id === editingFieldId);
+      const isEditEnumType =
+        editedField?.field_type === 'enum' || editedField?.field_type === 'multi_enum';
+      if (isEditEnumType && editEnumValues.length === 0) return;
+      const editValidationRules =
+        isEditEnumType && editEnumValues.length > 0 ? { enum_values: editEnumValues } : undefined;
+      const success = await viewModel.updateCustomField(
+        editingFieldId,
+        {
+          display_name: editName.trim(),
+          category_id: editCategoryId,
+          is_required: editIsRequired,
+          validation_rules: editValidationRules,
+          reason: `Updated custom field: ${editName.trim()}`,
+        },
+        orgId
+      );
+      if (success) {
+        cancelEditing();
+      }
     };
 
     return (
@@ -181,6 +257,11 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                   </div>
                 </div>
 
+                {/* Enum values input — shown when field type is single/multi-select */}
+                {isEnumType && (
+                  <EnumValuesInput values={enumValues} onChange={setEnumValues} testIdPrefix="cf" />
+                )}
+
                 {viewModel.createFieldError && (
                   <div
                     role="alert"
@@ -195,7 +276,7 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                 <div className="flex gap-2">
                   <Button
                     size="sm"
-                    onClick={handleCreate}
+                    onClick={() => handleCreate(false)}
                     disabled={!canCreate || viewModel.isCreatingField}
                     data-testid="cf-save-btn"
                   >
@@ -207,14 +288,26 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                     Create Field
                   </Button>
                   <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => handleCreate(true)}
+                    disabled={!canCreate || viewModel.isCreatingField}
+                    data-testid="cf-save-another-btn"
+                  >
+                    {viewModel.isCreatingField ? (
+                      <Loader2 size={14} className="mr-1 animate-spin" />
+                    ) : (
+                      <Plus size={14} className="mr-1" />
+                    )}
+                    Create &amp; Add Another
+                  </Button>
+                  <Button
                     variant="outline"
                     size="sm"
                     onClick={() => {
                       setShowForm(false);
-                      setName('');
-                      setFieldType('text');
-                      setCategoryId('');
-                      setIsRequired(false);
+                      resetForm();
+                      viewModel.clearFieldErrors();
                     }}
                     data-testid="cf-cancel-btn"
                   >
@@ -231,40 +324,150 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
               </p>
             ) : (
               <div className="divide-y divide-gray-100">
-                {customFields.map((field) => (
-                  <div
-                    key={field.id}
-                    className="flex items-center justify-between py-3"
-                    data-testid={`custom-field-${field.field_key}`}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{field.display_name}</span>
-                        <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
-                          {FIELD_TYPE_DISPLAY_LABELS[field.field_type] ?? field.field_type}
-                        </span>
-                        {field.is_required && (
-                          <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                            Required
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {field.field_key} &middot; {field.category_name}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeactivate(field.id, field.display_name)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      aria-label={`Remove ${field.display_name}`}
-                      data-testid={`cf-remove-${field.field_key}`}
+                {customFields.map((field) =>
+                  editingFieldId === field.id ? (
+                    <div
+                      key={field.id}
+                      className="py-3 space-y-3 border border-blue-200 rounded-lg p-4 bg-blue-50/30"
+                      data-testid={`custom-field-edit-${field.field_key}`}
                     >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                ))}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label htmlFor="cf-edit-name">Display Name</Label>
+                          <input
+                            id="cf-edit-name"
+                            ref={editNameRef}
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            data-testid="cf-edit-name-input"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="cf-edit-category">Category</Label>
+                          <select
+                            id="cf-edit-category"
+                            value={editCategoryId}
+                            onChange={(e) => setEditCategoryId(e.target.value)}
+                            className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            data-testid="cf-edit-category-select"
+                          >
+                            {categories
+                              .filter((c) => c.is_active)
+                              .map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={editIsRequired}
+                            onChange={(e) => setEditIsRequired(e.target.checked)}
+                            className="rounded border-gray-300"
+                            data-testid="cf-edit-required-checkbox"
+                          />
+                          Required when visible
+                        </label>
+                        <span className="text-xs text-gray-400">
+                          Type: {FIELD_TYPE_DISPLAY_LABELS[field.field_type] ?? field.field_type}{' '}
+                          (not editable)
+                        </span>
+                      </div>
+                      {/* Enum values editing for single/multi-select fields */}
+                      {(field.field_type === 'enum' || field.field_type === 'multi_enum') && (
+                        <EnumValuesInput
+                          values={editEnumValues}
+                          onChange={setEditEnumValues}
+                          testIdPrefix="cf-edit"
+                        />
+                      )}
+                      {viewModel.updateFieldError && (
+                        <div
+                          role="alert"
+                          className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-sm"
+                        >
+                          <AlertCircle size={14} />
+                          {viewModel.updateFieldError}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={handleUpdate}
+                          disabled={editName.trim().length === 0 || viewModel.isUpdatingField}
+                          data-testid="cf-edit-save-btn"
+                        >
+                          {viewModel.isUpdatingField ? (
+                            <Loader2 size={14} className="mr-1 animate-spin" />
+                          ) : (
+                            <Check size={14} className="mr-1" />
+                          )}
+                          Save
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={cancelEditing}
+                          data-testid="cf-edit-cancel-btn"
+                        >
+                          <X size={14} className="mr-1" />
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      key={field.id}
+                      className="flex items-center justify-between py-3"
+                      data-testid={`custom-field-${field.field_key}`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{field.display_name}</span>
+                          <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                            {FIELD_TYPE_DISPLAY_LABELS[field.field_type] ?? field.field_type}
+                          </span>
+                          {field.is_required && (
+                            <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                              Required
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {field.field_key} &middot; {field.category_name}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditing(field)}
+                          className="text-gray-500 hover:text-blue-700 hover:bg-blue-50"
+                          aria-label={`Edit ${field.display_name}`}
+                          data-testid={`cf-edit-${field.field_key}`}
+                        >
+                          <Pencil size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeactivate(field.id, field.display_name)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          aria-label={`Remove ${field.display_name}`}
+                          data-testid={`cf-remove-${field.field_key}`}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                )}
               </div>
             )}
           </CardContent>

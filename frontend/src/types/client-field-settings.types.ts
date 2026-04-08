@@ -66,6 +66,16 @@ export interface CreateFieldDefinitionParams {
   validation_rules?: Record<string, unknown>;
 }
 
+/** Params for updating an existing custom field definition (m4: dedicated type, field_type excluded per m3) */
+export interface UpdateFieldDefinitionParams {
+  display_name?: string;
+  category_id?: string;
+  is_required?: boolean;
+  validation_rules?: Record<string, unknown> | null;
+  reason?: string;
+  correlation_id?: string;
+}
+
 /** RPC result envelope */
 export interface RpcResult {
   success: boolean;
@@ -148,7 +158,7 @@ export const SYSTEM_FIELD_KEYS = new Set([
   // Insurance (2)
   'medicaid_id',
   'medicare_id',
-  // Clinical (10)
+  // Clinical (10 + 7 contact designations)
   'primary_diagnosis',
   'secondary_diagnoses',
   'dsm5_diagnoses',
@@ -159,19 +169,28 @@ export const SYSTEM_FIELD_KEYS = new Set([
   'substance_use_history',
   'developmental_history',
   'previous_treatment_history',
+  'assigned_clinician',
+  'therapist',
+  'psychiatrist',
+  'behavioral_analyst',
+  'primary_care_physician',
+  'prescriber',
+  'program_manager',
   // Medical (5)
   'allergies',
   'medical_conditions',
   'immunization_status',
   'dietary_restrictions',
   'special_medical_needs',
-  // Legal (6)
+  // Legal (6 + 2 contact designations)
   'court_case_number',
   'state_agency',
   'legal_status',
   'mandated_reporting_status',
   'protective_services_involvement',
   'safety_plan_required',
+  'probation_officer',
+  'caseworker',
   // Discharge (5)
   'discharge_date',
   'discharge_outcome',

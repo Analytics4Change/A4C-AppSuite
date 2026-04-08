@@ -10,7 +10,7 @@ import { observer } from 'mobx-react-lite';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Pencil, Lock, Loader2, AlertCircle, Check, X } from 'lucide-react';
 import type { FieldCategory } from '@/types/client-field-settings.types';
 import type { ClientFieldSettingsViewModel } from '@/viewModels/settings/ClientFieldSettingsViewModel';
 
@@ -34,6 +34,10 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
     const [name, setName] = useState('');
     const [slug, setSlug] = useState('');
 
+    // Edit state
+    const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+    const [editName, setEditName] = useState('');
+
     const activeCategories = categories.filter((c) => c.is_active);
     const canCreate = name.trim().length > 0 && slug.trim().length > 0;
 
@@ -55,6 +59,25 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
         setName('');
         setSlug('');
         setShowForm(false);
+      }
+    };
+
+    const startEditing = (cat: { id: string; name: string }) => {
+      setEditingCategoryId(cat.id);
+      setEditName(cat.name);
+    };
+
+    const cancelEditing = () => {
+      setEditingCategoryId(null);
+      setEditName('');
+      viewModel.clearCategoryErrors();
+    };
+
+    const handleUpdate = async () => {
+      if (!editingCategoryId || editName.trim().length === 0) return;
+      const success = await viewModel.updateCategory(editingCategoryId, editName.trim(), orgId);
+      if (success) {
+        cancelEditing();
       }
     };
 
@@ -153,6 +176,7 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
                       setShowForm(false);
                       setName('');
                       setSlug('');
+                      viewModel.clearCategoryErrors();
                     }}
                     data-testid="cat-cancel-btn"
                   >
@@ -164,38 +188,104 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
 
             {/* Categories list */}
             <div className="divide-y divide-gray-100">
-              {activeCategories.map((cat) => (
-                <div
-                  key={cat.id}
-                  className="flex items-center justify-between py-3"
-                  data-testid={`category-${cat.slug}`}
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{cat.name}</span>
-                      {cat.is_system && (
-                        <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                          <Lock size={10} />
-                          System
-                        </span>
-                      )}
+              {activeCategories.map((cat) =>
+                editingCategoryId === cat.id ? (
+                  <div
+                    key={cat.id}
+                    className="py-3 space-y-3 border border-blue-200 rounded-lg p-4 bg-blue-50/30"
+                    data-testid={`category-edit-${cat.slug}`}
+                  >
+                    <div>
+                      <Label htmlFor="cat-edit-name">Category Name</Label>
+                      <input
+                        id="cat-edit-name"
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="mt-1 w-full max-w-xs rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        data-testid="cat-edit-name-input"
+                      />
+                      <p className="mt-1 text-xs text-gray-400">Slug: {cat.slug} (not editable)</p>
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{cat.slug}</p>
+                    {viewModel.updateCategoryError && (
+                      <div
+                        role="alert"
+                        className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-sm"
+                      >
+                        <AlertCircle size={14} />
+                        {viewModel.updateCategoryError}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={handleUpdate}
+                        disabled={editName.trim().length === 0 || viewModel.isUpdatingCategory}
+                        data-testid="cat-edit-save-btn"
+                      >
+                        {viewModel.isUpdatingCategory ? (
+                          <Loader2 size={14} className="mr-1 animate-spin" />
+                        ) : (
+                          <Check size={14} className="mr-1" />
+                        )}
+                        Save
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={cancelEditing}
+                        data-testid="cat-edit-cancel-btn"
+                      >
+                        <X size={14} className="mr-1" />
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
-                  {!cat.is_system && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeactivate(cat.id, cat.name)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      aria-label={`Remove ${cat.name}`}
-                      data-testid={`cat-remove-${cat.slug}`}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  )}
-                </div>
-              ))}
+                ) : (
+                  <div
+                    key={cat.id}
+                    className="flex items-center justify-between py-3"
+                    data-testid={`category-${cat.slug}`}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{cat.name}</span>
+                        {cat.is_system && (
+                          <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                            <Lock size={10} />
+                            System
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">{cat.slug}</p>
+                    </div>
+                    {!cat.is_system && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditing(cat)}
+                          className="text-gray-500 hover:text-blue-700 hover:bg-blue-50"
+                          aria-label={`Edit ${cat.name}`}
+                          data-testid={`cat-edit-${cat.slug}`}
+                        >
+                          <Pencil size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeactivate(cat.id, cat.name)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          aria-label={`Remove ${cat.name}`}
+                          data-testid={`cat-remove-${cat.slug}`}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )
+              )}
             </div>
           </CardContent>
         </Card>

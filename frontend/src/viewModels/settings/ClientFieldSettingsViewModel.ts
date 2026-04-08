@@ -12,6 +12,7 @@ import type {
   FieldCategory,
   FieldDefinitionChange,
   CreateFieldDefinitionParams,
+  UpdateFieldDefinitionParams,
 } from '@/types/client-field-settings.types';
 import { LOCKED_FIELD_KEYS } from '@/types/client-field-settings.types';
 import type { IClientFieldService } from '@/services/client-fields/IClientFieldService';
@@ -39,9 +40,17 @@ export class ClientFieldSettingsViewModel {
   isCreatingField = false;
   createFieldError: string | null = null;
 
+  // Custom field edit state
+  isUpdatingField = false;
+  updateFieldError: string | null = null;
+
   // Category form state
   isCreatingCategory = false;
   createCategoryError: string | null = null;
+
+  // Category edit state
+  isUpdatingCategory = false;
+  updateCategoryError: string | null = null;
 
   constructor(private service: IClientFieldService = getClientFieldService()) {
     makeAutoObservable(this, {
@@ -161,7 +170,35 @@ export class ClientFieldSettingsViewModel {
     return this.hasChanges && this.isReasonValid && !this.isSaving;
   }
 
+  get hasPreviousTab(): boolean {
+    const tabs = this.tabList;
+    const idx = tabs.findIndex((t) => t.slug === this.activeTab);
+    return idx > 0;
+  }
+
+  get hasNextTab(): boolean {
+    const tabs = this.tabList;
+    const idx = tabs.findIndex((t) => t.slug === this.activeTab);
+    return idx >= 0 && idx < tabs.length - 1;
+  }
+
   // ── Actions ──
+
+  previousTab(): void {
+    const tabs = this.tabList;
+    const idx = tabs.findIndex((t) => t.slug === this.activeTab);
+    if (idx > 0) {
+      this.setActiveTab(tabs[idx - 1].slug);
+    }
+  }
+
+  nextTab(): void {
+    const tabs = this.tabList;
+    const idx = tabs.findIndex((t) => t.slug === this.activeTab);
+    if (idx >= 0 && idx < tabs.length - 1) {
+      this.setActiveTab(tabs[idx + 1].slug);
+    }
+  }
 
   setActiveTab(slug: string): void {
     runInAction(() => {
@@ -223,7 +260,12 @@ export class ClientFieldSettingsViewModel {
       const changes = this.changedFields;
       log.debug('Saving field configuration', { changeCount: changes.length });
 
-      const result = await this.service.batchUpdateFieldDefinitions(changes, this.reason.trim());
+      const correlationId = globalThis.crypto.randomUUID();
+      const result = await this.service.batchUpdateFieldDefinitions(
+        changes,
+        this.reason.trim(),
+        correlationId
+      );
 
       if (!result.success) {
         throw new Error('Batch update failed');
@@ -264,6 +306,20 @@ export class ClientFieldSettingsViewModel {
     });
   }
 
+  clearFieldErrors(): void {
+    runInAction(() => {
+      this.createFieldError = null;
+      this.updateFieldError = null;
+    });
+  }
+
+  clearCategoryErrors(): void {
+    runInAction(() => {
+      this.createCategoryError = null;
+      this.updateCategoryError = null;
+    });
+  }
+
   // ── Custom Field CRUD ──
 
   async createCustomField(params: CreateFieldDefinitionParams, orgId: string): Promise<boolean> {
@@ -273,7 +329,8 @@ export class ClientFieldSettingsViewModel {
     });
 
     try {
-      const result = await this.service.createFieldDefinition(params);
+      const correlationId = globalThis.crypto.randomUUID();
+      const result = await this.service.createFieldDefinition(params, correlationId);
       if (!result.success) {
         runInAction(() => {
           this.createFieldError = result.error ?? 'Failed to create field';
@@ -299,11 +356,51 @@ export class ClientFieldSettingsViewModel {
 
   async deactivateCustomField(fieldId: string, reason: string, orgId: string): Promise<boolean> {
     try {
-      const result = await this.service.deactivateFieldDefinition(fieldId, reason);
+      const correlationId = globalThis.crypto.randomUUID();
+      const result = await this.service.deactivateFieldDefinition(fieldId, reason, correlationId);
       if (!result.success) return false;
       await this.loadData(orgId);
       return true;
     } catch {
+      return false;
+    }
+  }
+
+  async updateCustomField(
+    fieldId: string,
+    params: UpdateFieldDefinitionParams,
+    orgId: string
+  ): Promise<boolean> {
+    runInAction(() => {
+      this.isUpdatingField = true;
+      this.updateFieldError = null;
+    });
+
+    try {
+      const correlationId = globalThis.crypto.randomUUID();
+      const result = await this.service.updateFieldDefinition(fieldId, {
+        ...params,
+        correlation_id: correlationId,
+      });
+      if (!result.success) {
+        runInAction(() => {
+          this.updateFieldError = result.error ?? 'Failed to update field';
+          this.isUpdatingField = false;
+        });
+        return false;
+      }
+
+      await this.loadData(orgId);
+      runInAction(() => {
+        this.isUpdatingField = false;
+      });
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update field';
+      runInAction(() => {
+        this.updateFieldError = message;
+        this.isUpdatingField = false;
+      });
       return false;
     }
   }
@@ -317,7 +414,8 @@ export class ClientFieldSettingsViewModel {
     });
 
     try {
-      const result = await this.service.createFieldCategory(name, slug);
+      const correlationId = globalThis.crypto.randomUUID();
+      const result = await this.service.createFieldCategory(name, slug, undefined, correlationId);
       if (!result.success) {
         runInAction(() => {
           this.createCategoryError = result.error ?? 'Failed to create category';
@@ -341,9 +439,47 @@ export class ClientFieldSettingsViewModel {
     }
   }
 
+  async updateCategory(categoryId: string, name: string, orgId: string): Promise<boolean> {
+    runInAction(() => {
+      this.isUpdatingCategory = true;
+      this.updateCategoryError = null;
+    });
+
+    try {
+      const correlationId = globalThis.crypto.randomUUID();
+      const result = await this.service.updateFieldCategory(
+        categoryId,
+        name,
+        `Renamed category to: ${name}`,
+        correlationId
+      );
+      if (!result.success) {
+        runInAction(() => {
+          this.updateCategoryError = result.error ?? 'Failed to update category';
+          this.isUpdatingCategory = false;
+        });
+        return false;
+      }
+
+      await this.loadData(orgId);
+      runInAction(() => {
+        this.isUpdatingCategory = false;
+      });
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update category';
+      runInAction(() => {
+        this.updateCategoryError = message;
+        this.isUpdatingCategory = false;
+      });
+      return false;
+    }
+  }
+
   async deactivateCategory(categoryId: string, reason: string, orgId: string): Promise<boolean> {
     try {
-      const result = await this.service.deactivateFieldCategory(categoryId, reason);
+      const correlationId = globalThis.crypto.randomUUID();
+      const result = await this.service.deactivateFieldCategory(categoryId, reason, correlationId);
       if (!result.success) return false;
       await this.loadData(orgId);
       return true;

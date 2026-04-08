@@ -13,6 +13,7 @@ import type {
   FieldDefinitionChange,
   BatchUpdateResult,
   CreateFieldDefinitionParams,
+  UpdateFieldDefinitionParams,
   RpcResult,
 } from '@/types/client-field-settings.types';
 import type { IClientFieldService } from './IClientFieldService';
@@ -719,6 +720,69 @@ function buildSeedFields(): FieldDefinition[] {
       false,
       10
     ),
+    // Clinical — Contact Designations (7)
+    f(
+      id(),
+      'cat-07',
+      'Clinical',
+      'clinical',
+      'assigned_clinician',
+      'Assigned Clinician',
+      'text',
+      false,
+      false,
+      11
+    ),
+    f(id(), 'cat-07', 'Clinical', 'clinical', 'therapist', 'Therapist', 'text', false, false, 12),
+    f(
+      id(),
+      'cat-07',
+      'Clinical',
+      'clinical',
+      'psychiatrist',
+      'Psychiatrist',
+      'text',
+      false,
+      false,
+      13
+    ),
+    f(
+      id(),
+      'cat-07',
+      'Clinical',
+      'clinical',
+      'behavioral_analyst',
+      'Behavioral Analyst',
+      'text',
+      false,
+      false,
+      14
+    ),
+    f(
+      id(),
+      'cat-07',
+      'Clinical',
+      'clinical',
+      'primary_care_physician',
+      'Primary Care Physician',
+      'text',
+      false,
+      false,
+      15
+    ),
+    f(id(), 'cat-07', 'Clinical', 'clinical', 'prescriber', 'Prescriber', 'text', false, false, 16),
+    f(
+      id(),
+      'cat-07',
+      'Clinical',
+      'clinical',
+      'program_manager',
+      'Program Manager',
+      'text',
+      false,
+      false,
+      17
+    ),
     // Medical (5)
     f(id(), 'cat-08', 'Medical', 'medical', 'allergies', 'Allergies', 'jsonb', true, false, 1),
     f(
@@ -820,6 +884,20 @@ function buildSeedFields(): FieldDefinition[] {
       false,
       6
     ),
+    // Legal — Contact Designations (2)
+    f(
+      id(),
+      'cat-09',
+      'Legal',
+      'legal',
+      'probation_officer',
+      'Probation Officer',
+      'text',
+      false,
+      false,
+      7
+    ),
+    f(id(), 'cat-09', 'Legal', 'legal', 'caseworker', 'Caseworker', 'text', false, false, 8),
     // Discharge (5)
     f(
       id(),
@@ -937,7 +1015,8 @@ export class MockClientFieldService implements IClientFieldService {
 
   async batchUpdateFieldDefinitions(
     changes: FieldDefinitionChange[],
-    reason: string
+    reason: string,
+    _correlationId?: string
   ): Promise<BatchUpdateResult> {
     log.debug('[Mock] Batch updating field definitions', { changeCount: changes.length, reason });
     await this.simulateDelay();
@@ -970,7 +1049,10 @@ export class MockClientFieldService implements IClientFieldService {
     };
   }
 
-  async createFieldDefinition(params: CreateFieldDefinitionParams): Promise<RpcResult> {
+  async createFieldDefinition(
+    params: CreateFieldDefinitionParams,
+    _correlationId?: string
+  ): Promise<RpcResult> {
     log.debug('[Mock] Creating field definition', { params });
     await this.simulateDelay();
 
@@ -1006,7 +1088,39 @@ export class MockClientFieldService implements IClientFieldService {
     return { success: true, field_id: fieldId };
   }
 
-  async deactivateFieldDefinition(fieldId: string, reason: string): Promise<RpcResult> {
+  async updateFieldDefinition(
+    fieldId: string,
+    params: UpdateFieldDefinitionParams
+  ): Promise<RpcResult> {
+    log.debug('[Mock] Updating field definition', { fieldId, params });
+    await this.simulateDelay();
+
+    const field = this.fields.find((f) => f.id === fieldId && f.is_active);
+    if (!field) {
+      return { success: false, error: 'Field definition not found or inactive' };
+    }
+
+    if (params.display_name !== undefined) field.display_name = params.display_name;
+    if (params.category_id !== undefined) {
+      const cat = this.categories.find((c) => c.id === params.category_id);
+      if (cat) {
+        field.category_id = cat.id;
+        field.category_name = cat.name;
+        field.category_slug = cat.slug;
+      }
+    }
+    if (params.is_required !== undefined) field.is_required = params.is_required;
+    if (params.validation_rules !== undefined)
+      field.validation_rules = params.validation_rules as Record<string, unknown> | null;
+
+    return { success: true, field_id: fieldId };
+  }
+
+  async deactivateFieldDefinition(
+    fieldId: string,
+    reason: string,
+    _correlationId?: string
+  ): Promise<RpcResult> {
     log.debug('[Mock] Deactivating field definition', { fieldId, reason });
     await this.simulateDelay();
 
@@ -1026,7 +1140,30 @@ export class MockClientFieldService implements IClientFieldService {
     return this.categories.filter((c) => c.is_active).map((c) => ({ ...c }));
   }
 
-  async createFieldCategory(name: string, slug: string, sortOrder?: number): Promise<RpcResult> {
+  async updateFieldCategory(
+    categoryId: string,
+    name: string,
+    reason: string,
+    _correlationId?: string
+  ): Promise<RpcResult> {
+    log.debug('[Mock] Updating field category', { categoryId, name, reason });
+    await this.simulateDelay();
+
+    const cat = this.categories.find((c) => c.id === categoryId && c.is_active && !c.is_system);
+    if (!cat) {
+      return { success: false, error: 'Category not found, is a system category, or inactive' };
+    }
+
+    cat.name = name;
+    return { success: true, category_id: categoryId };
+  }
+
+  async createFieldCategory(
+    name: string,
+    slug: string,
+    sortOrder?: number,
+    _correlationId?: string
+  ): Promise<RpcResult> {
     log.debug('[Mock] Creating field category', { name, slug });
     await this.simulateDelay();
 
@@ -1049,7 +1186,11 @@ export class MockClientFieldService implements IClientFieldService {
     return { success: true, category_id: categoryId };
   }
 
-  async deactivateFieldCategory(categoryId: string, reason: string): Promise<RpcResult> {
+  async deactivateFieldCategory(
+    categoryId: string,
+    reason: string,
+    _correlationId?: string
+  ): Promise<RpcResult> {
     log.debug('[Mock] Deactivating field category', { categoryId, reason });
     await this.simulateDelay();
 

@@ -180,6 +180,55 @@ All 8 SQL migrations deployed via CI/CD (`git push` → GitHub Actions). 5 pipel
 - Deploy Edge Functions (workflow-status v27)
 - Validate Frontend Documentation
 
+## Plan Updates (2026-04-07) — Client Field Configuration UI Enhancements
+
+### 8 UX Defects Fixed
+Architecture review by software-architect-dbc agent (4 Major + 7 Minor findings, all remediated).
+Plan file: `.claude/plans/jazzy-watching-creek.md`
+
+**Items implemented** (all build + lint + 54 Playwright tests pass):
+1. **Item 5**: Removed `jsonb` ("Structured") from custom field creation dropdown (kept for system fields)
+2. **Item 8**: Server-side sort_order auto-assignment — custom categories appear after system tabs (M4: race condition fix)
+3. **Item 2**: Previous/Next tab navigation buttons below tab content
+4. **Item 3**: "Create & Add Another" button for custom field creation
+5. **Item 6**: Edit custom fields — pencil button + inline form (field_type locked in edit per m3)
+6. **Item 4**: Enum value configuration — chip-based UI for single/multi-select options, stored in `validation_rules` JSONB
+7. **Item 7**: Edit custom categories — rename via inline form (slug immutable per m5)
+8. **Item 1**: 9 contact designation field templates (7 Clinical, 2 Legal) with `validation_rules: {"widget":"contact_assignment"}` hint
+
+### Consolidated Migration
+`20260408023403_client_field_config_enhancements.sql` — single migration covers:
+- M2: Read-back guards on 4 existing RPCs (`create_field_definition`, `update_field_definition`, `create_field_category`, `deactivate_field_category`)
+- M4: Server-side `MAX(sort_order)+1` in `api.create_field_category()`
+- New `api.update_field_category()` RPC + `handle_client_field_category_updated()` handler + router CASE + event_types seed
+- 9 new template seeds with `validation_rules` JSONB widget hints
+- Handler reference files: `handle_client_field_category_updated.sql` (new), `process_client_field_category_event.sql` (updated)
+
+### Compliance Fixes (from audit)
+- **Correlation ID**: All 7 write methods now generate UUID per user action, forwarded end-to-end to event metadata
+- **WCAG aria-live**: Save-changes panel has `role="region" aria-live="polite"`
+- **Focus management**: Edit form auto-focuses name input via `useRef` + `useEffect`
+- **Enum validation**: Create button disabled when enum type has zero values; edit handler guards too
+- **Error clearing**: `clearFieldErrors()`/`clearCategoryErrors()` on all cancel handlers
+- **File extraction**: `EnumValuesInput` component extracted (94 lines), `CustomFieldsTab` reduced from 614→478 lines
+- **Loading spinner fix**: Full-page spinner only on initial load (no data), not on CRUD refreshes — prevents component unmount that reset local state
+
+### New Files Created
+- `frontend/src/pages/settings/client-fields/EnumValuesInput.tsx` — reusable chip-based enum values input
+- `infrastructure/supabase/handlers/client_field_category/handle_client_field_category_updated.sql` — handler reference
+- `infrastructure/supabase/supabase/migrations/20260408023403_client_field_config_enhancements.sql` — consolidated migration
+
+### Playwright Tests
+25 new test cases added to `frontend/e2e/client-field-settings.spec.ts` (54 total, all passing).
+Config: `playwright.client-fields.config.ts` (mock mode, provider_admin, port 3457).
+
+### Migration NOT YET DEPLOYED
+The consolidated migration has not been pushed/deployed. Local files only. Deploy via `supabase db push --linked` after code review.
+
+### Remaining (NOT in scope)
+- AsyncAPI contract update for `validation_rules` shape (m1) — tracked but deferred
+- AsyncAPI contract for `client_field_category.updated` event (M3) — schema file not yet created
+
 ## Plan Updates (2026-03-27) — Dynamic Bootstrap Progress Tracking
 
 ### Problem

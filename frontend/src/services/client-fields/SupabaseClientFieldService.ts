@@ -3,6 +3,7 @@
  *
  * Production implementation using api.* schema RPC functions.
  * Follows CQRS pattern: all queries via api schema RPCs.
+ * All write methods accept optional correlationId for audit trail grouping.
  */
 
 import { supabase } from '@/lib/supabase';
@@ -13,6 +14,7 @@ import type {
   FieldDefinitionChange,
   BatchUpdateResult,
   CreateFieldDefinitionParams,
+  UpdateFieldDefinitionParams,
   RpcResult,
 } from '@/types/client-field-settings.types';
 import type { IClientFieldService } from './IClientFieldService';
@@ -37,13 +39,15 @@ export class SupabaseClientFieldService implements IClientFieldService {
 
   async batchUpdateFieldDefinitions(
     changes: FieldDefinitionChange[],
-    reason: string
+    reason: string,
+    correlationId?: string
   ): Promise<BatchUpdateResult> {
     log.debug('Batch updating field definitions', { changeCount: changes.length, reason });
 
     const { data, error } = await supabase.schema('api').rpc('batch_update_field_definitions', {
       p_changes: changes,
       p_reason: reason,
+      p_correlation_id: correlationId ?? null,
     });
 
     if (error) {
@@ -56,7 +60,10 @@ export class SupabaseClientFieldService implements IClientFieldService {
     return result as BatchUpdateResult;
   }
 
-  async createFieldDefinition(params: CreateFieldDefinitionParams): Promise<RpcResult> {
+  async createFieldDefinition(
+    params: CreateFieldDefinitionParams,
+    correlationId?: string
+  ): Promise<RpcResult> {
     log.debug('Creating field definition', { params });
 
     const { data, error } = await supabase.schema('api').rpc('create_field_definition', {
@@ -69,6 +76,7 @@ export class SupabaseClientFieldService implements IClientFieldService {
       p_is_dimension: params.is_dimension ?? false,
       p_sort_order: params.sort_order ?? 0,
       p_validation_rules: params.validation_rules ? JSON.stringify(params.validation_rules) : null,
+      p_correlation_id: correlationId ?? null,
     });
 
     if (error) {
@@ -80,12 +88,42 @@ export class SupabaseClientFieldService implements IClientFieldService {
     return result as RpcResult;
   }
 
-  async deactivateFieldDefinition(fieldId: string, reason: string): Promise<RpcResult> {
+  async updateFieldDefinition(
+    fieldId: string,
+    params: UpdateFieldDefinitionParams
+  ): Promise<RpcResult> {
+    log.debug('Updating field definition', { fieldId, params });
+
+    const { data, error } = await supabase.schema('api').rpc('update_field_definition', {
+      p_field_id: fieldId,
+      p_display_name: params.display_name ?? null,
+      p_category_id: params.category_id ?? null,
+      p_is_required: params.is_required ?? null,
+      p_validation_rules: params.validation_rules ? JSON.stringify(params.validation_rules) : null,
+      p_reason: params.reason ?? 'Field definition updated',
+      p_correlation_id: params.correlation_id ?? null,
+    });
+
+    if (error) {
+      log.error('Failed to update field definition', { error });
+      throw new Error(`Failed to update field: ${error.message}`);
+    }
+
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    return result as RpcResult;
+  }
+
+  async deactivateFieldDefinition(
+    fieldId: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult> {
     log.debug('Deactivating field definition', { fieldId, reason });
 
     const { data, error } = await supabase.schema('api').rpc('deactivate_field_definition', {
       p_field_id: fieldId,
       p_reason: reason,
+      p_correlation_id: correlationId ?? null,
     });
 
     if (error) {
@@ -110,13 +148,19 @@ export class SupabaseClientFieldService implements IClientFieldService {
     return (data ?? []) as FieldCategory[];
   }
 
-  async createFieldCategory(name: string, slug: string, sortOrder?: number): Promise<RpcResult> {
+  async createFieldCategory(
+    name: string,
+    slug: string,
+    sortOrder?: number,
+    correlationId?: string
+  ): Promise<RpcResult> {
     log.debug('Creating field category', { name, slug, sortOrder });
 
     const { data, error } = await supabase.schema('api').rpc('create_field_category', {
       p_name: name,
       p_slug: slug,
       p_sort_order: sortOrder ?? 0,
+      p_correlation_id: correlationId ?? null,
     });
 
     if (error) {
@@ -128,12 +172,41 @@ export class SupabaseClientFieldService implements IClientFieldService {
     return result as RpcResult;
   }
 
-  async deactivateFieldCategory(categoryId: string, reason: string): Promise<RpcResult> {
+  async updateFieldCategory(
+    categoryId: string,
+    name: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult> {
+    log.debug('Updating field category', { categoryId, name, reason });
+
+    const { data, error } = await supabase.schema('api').rpc('update_field_category', {
+      p_category_id: categoryId,
+      p_name: name,
+      p_reason: reason,
+      p_correlation_id: correlationId ?? null,
+    });
+
+    if (error) {
+      log.error('Failed to update field category', { error });
+      throw new Error(`Failed to update category: ${error.message}`);
+    }
+
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    return result as RpcResult;
+  }
+
+  async deactivateFieldCategory(
+    categoryId: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult> {
     log.debug('Deactivating field category', { categoryId, reason });
 
     const { data, error } = await supabase.schema('api').rpc('deactivate_field_category', {
       p_category_id: categoryId,
       p_reason: reason,
+      p_correlation_id: correlationId ?? null,
     });
 
     if (error) {

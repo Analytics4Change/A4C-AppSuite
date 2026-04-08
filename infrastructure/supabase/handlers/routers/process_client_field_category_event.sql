@@ -9,6 +9,9 @@ BEGIN
         WHEN 'client_field_category.created' THEN
             PERFORM handle_client_field_category_created(p_event);
 
+        WHEN 'client_field_category.updated' THEN
+            PERFORM handle_client_field_category_updated(p_event);
+
         WHEN 'client_field_category.deactivated' THEN
             PERFORM handle_client_field_category_deactivated(p_event);
 

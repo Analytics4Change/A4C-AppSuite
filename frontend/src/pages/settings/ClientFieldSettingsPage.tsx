@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
   AlertCircle,
   Settings,
@@ -54,8 +56,9 @@ export const ClientFieldSettingsPage: React.FC = observer(() => {
     if (orgId) await viewModel.saveChanges(orgId);
   };
 
-  // Loading state
-  if (viewModel.isLoading) {
+  // Loading state — only show full-page spinner on initial load (no data yet)
+  // Refreshes after CRUD keep the current UI to preserve local component state
+  if (viewModel.isLoading && viewModel.fieldDefinitions.length === 0) {
     return (
       <div className="max-w-4xl mx-auto flex items-center justify-center py-20">
         <div className="text-center">
@@ -169,9 +172,45 @@ export const ClientFieldSettingsPage: React.FC = observer(() => {
         />
       )}
 
+      {/* Previous / Next Tab Navigation */}
+      <div className="flex items-center justify-between mt-4">
+        {viewModel.hasPreviousTab ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => viewModel.previousTab()}
+            data-testid="prev-tab-btn"
+          >
+            <ChevronLeft size={16} className="mr-1" />
+            Previous
+          </Button>
+        ) : (
+          <div />
+        )}
+        {viewModel.hasNextTab ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => viewModel.nextTab()}
+            data-testid="next-tab-btn"
+          >
+            Next
+            <ChevronRight size={16} className="ml-1" />
+          </Button>
+        ) : (
+          <div />
+        )}
+      </div>
+
       {/* Save/Reset Actions — shown when there are pending toggle/label changes */}
       {viewModel.hasChanges && (
-        <Card style={glassCardStyle} className="mt-4">
+        <Card
+          style={glassCardStyle}
+          className="mt-4"
+          role="region"
+          aria-live="polite"
+          aria-label="Unsaved changes"
+        >
           <CardContent className="pt-4 space-y-4">
             {/* Reason Input */}
             <div className="space-y-2">

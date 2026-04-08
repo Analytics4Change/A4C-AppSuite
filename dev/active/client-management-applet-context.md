@@ -126,6 +126,20 @@
 
 90. **Discharge fields excluded from configuration UI scope** (decided 2026-03-27): The Client Field Configuration page manages Steps 1-10 fields, but discharge configuration (separate operational concern) is a future project. Field definitions for discharge fields are seeded but not exposed in the configuration UI.
 
+91. **Contact designation fields as templates with widget hint** (decided 2026-04-07, architecture review M1): 9 contact designation fields seeded as `client_field_definition_templates` with `field_type='text'` + `validation_rules: {"widget":"contact_assignment","designation":"<key>"}`. The `widget` hint tells the intake form to render a contact search widget instead of a plain text input. 7 in Clinical Profile (assigned_clinician, therapist, psychiatrist, behavioral_analyst, primary_care_physician, prescriber, program_manager), 2 in Legal & Compliance (probation_officer, caseworker).
+
+92. **Enum values stored in validation_rules JSONB** (decided 2026-04-07): Custom fields with `field_type='enum'` or `'multi_enum'` store their dropdown options as `{ "enum_values": ["value1", "value2", ...] }` in the existing `validation_rules` JSONB column on `client_field_definitions_projection`. No new table needed. Minimum 1 value required to create/save an enum field.
+
+93. **Structured (jsonb) removed from custom field creation** (decided 2026-04-07): `jsonb` field type removed from the custom field creation dropdown. System fields (allergies, diagnoses) still use it and display "Structured" label. Orgs should not create arbitrary jsonb custom fields.
+
+94. **Field type immutable after creation** (decided 2026-04-07, architecture review m3): Custom field edit form disables field_type changes. Changing type after data exists could cause runtime errors. Create a new field if a different type is needed.
+
+95. **Category slug immutable** (decided 2026-04-07, architecture review m5): `api.update_field_category()` accepts only `p_name` and `p_sort_order`, no `p_slug`. Slug is part of the UNIQUE constraint and used as URL-safe tab identifier.
+
+96. **Server-side sort_order for categories** (decided 2026-04-07, architecture review M4): `api.create_field_category()` auto-computes `MAX(sort_order)+1` when `p_sort_order` is NULL or 0. Prevents race condition from client-side computation. Custom categories always appear after system categories (sort_order 1-11).
+
+97. **Read-back guards on all client field RPCs** (decided 2026-04-07, architecture review M2): All 4 write RPCs (`create_field_definition`, `update_field_definition`, `create_field_category`, `deactivate_field_category`) now include projection read-back + `processing_error` fetch after event emission. Prevents silent failures where handler errors are swallowed and `{success: true}` is returned. Same pattern as org unit delete fix (Decision from 2026-02-23).
+
 68. **Allergy type enum expanded** (decided 2026-03-19): `allergy_type` on each allergy item changed from `medication`/`general` to `medication`/`food`/`environmental`. Standard EMR categorization.
 
 20. **4 clinical contact fields on intake form** (decided 2026-03-04): Separate fields for Assigned Clinician, Therapist, Psychiatrist, and Behavioral Analyst. All share the same reusable `ClinicalContactField` component parameterized by designation. All nullable.

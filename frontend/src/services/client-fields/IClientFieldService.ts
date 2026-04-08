@@ -20,6 +20,7 @@ import type {
   FieldDefinitionChange,
   BatchUpdateResult,
   CreateFieldDefinitionParams,
+  UpdateFieldDefinitionParams,
   RpcResult,
 } from '@/types/client-field-settings.types';
 
@@ -30,21 +31,49 @@ export interface IClientFieldService {
   /** Batch update multiple field definitions in a single network call */
   batchUpdateFieldDefinitions(
     changes: FieldDefinitionChange[],
-    reason: string
+    reason: string,
+    correlationId?: string
   ): Promise<BatchUpdateResult>;
 
   /** Create a new custom field definition */
-  createFieldDefinition(params: CreateFieldDefinitionParams): Promise<RpcResult>;
+  createFieldDefinition(
+    params: CreateFieldDefinitionParams,
+    correlationId?: string
+  ): Promise<RpcResult>;
+
+  /** Update an existing custom field definition */
+  updateFieldDefinition(fieldId: string, params: UpdateFieldDefinitionParams): Promise<RpcResult>;
 
   /** Deactivate (soft-delete) a field definition */
-  deactivateFieldDefinition(fieldId: string, reason: string): Promise<RpcResult>;
+  deactivateFieldDefinition(
+    fieldId: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult>;
 
   /** List all field categories (system + org-defined) */
   listFieldCategories(): Promise<FieldCategory[]>;
 
   /** Create a new org-defined category */
-  createFieldCategory(name: string, slug: string, sortOrder?: number): Promise<RpcResult>;
+  createFieldCategory(
+    name: string,
+    slug: string,
+    sortOrder?: number,
+    correlationId?: string
+  ): Promise<RpcResult>;
+
+  /** Update an org-defined category (name only, slug immutable) */
+  updateFieldCategory(
+    categoryId: string,
+    name: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult>;
 
   /** Deactivate (soft-delete) an org-defined category */
-  deactivateFieldCategory(categoryId: string, reason: string): Promise<RpcResult>;
+  deactivateFieldCategory(
+    categoryId: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult>;
 }

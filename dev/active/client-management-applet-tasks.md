@@ -266,6 +266,47 @@ _Placement history table deferred to Client Intake implementation._
 - [ ] Client list shows real data from `api.list_clients()` RPC
 - [ ] WCAG 2.1 AA compliant (keyboard nav, ARIA, focus management)
 
+## Phase B7: Client Field Configuration UI Enhancements ✅ COMPLETE (2026-04-07)
+
+Architecture review: software-architect-dbc (4 Major + 7 Minor, all remediated).
+Plan: `.claude/plans/jazzy-watching-creek.md`
+
+### Frontend Changes ✅ COMPLETE
+- [x] Item 5: Remove `jsonb` from custom field creation dropdown
+- [x] Item 2: Previous/Next tab navigation buttons
+- [x] Item 3: "Create & Add Another" button for custom fields
+- [x] Item 4: Enum value configuration — chip UI for single/multi-select options
+- [x] Item 5: Remove Structured from custom field creation (1 line)
+- [x] Item 6: Edit custom fields — pencil button, inline form, field_type locked
+- [x] Item 7: Edit custom categories — rename inline form, slug immutable
+- [x] Item 1: 9 contact designation field templates in SYSTEM_FIELD_KEYS + MockClientFieldService
+
+### Compliance Fixes ✅ COMPLETE
+- [x] Correlation ID: All 7 write methods generate UUID per user action, forwarded end-to-end
+- [x] WCAG aria-live: Save-changes panel has `role="region" aria-live="polite"`
+- [x] Focus management: Edit form auto-focuses name input via useRef + useEffect
+- [x] Enum validation: Create disabled without values; edit handler guards
+- [x] Error clearing: clearFieldErrors()/clearCategoryErrors() on all cancel handlers
+- [x] File extraction: EnumValuesInput component (94 lines) extracted from CustomFieldsTab
+- [x] Loading spinner fix: Full-page spinner only on initial load to preserve local state
+
+### Consolidated Migration (NOT YET DEPLOYED)
+- [x] M2: Read-back guards on 4 existing RPCs
+- [x] M4: Server-side sort_order auto-assignment in api.create_field_category()
+- [x] Item 7: api.update_field_category() RPC + handler + router CASE + event_types seed
+- [x] Item 1: 9 new contact designation template seeds with validation_rules widget hints
+- [x] Handler reference files updated (1 new, 1 updated)
+- [ ] Deploy migration via `supabase db push --linked` (pending code review)
+
+### Playwright E2E Tests ✅ COMPLETE
+- [x] 25 new test cases (54 total), all passing
+- [x] Covers: prev/next nav, create another, enum values, structured removed, edit fields, edit categories, tab ordering, designation fields
+
+### Remaining (deferred)
+- [ ] AsyncAPI contract for `client_field_category.updated` (M3 — schema file not created)
+- [ ] AsyncAPI `validation_rules` shape documentation (m1)
+- [ ] AsyncAPI type regeneration after schema updates
+
 ## Phase A0: Data-TestID Instrumentation ✅ COMPLETE (2026-04-06)
 
 - [x] A0a: Add data-testid to Client Field Settings components (8 testids: SettingsPage 2 cards, ClientFieldSettingsPage back btn, TabBar scroll btns, CustomFieldsTab cancel+error, CategoriesTab cancel+error)
