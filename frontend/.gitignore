@@ -8,6 +8,8 @@ node_modules/
 test-results/
 playwright-report/
 playwright-report-uat/
+playwright-report-client-fields/
+playwright-report-client-intake/
 test-results.json
 test-results.xml
 user_unit_test_run*.txt
