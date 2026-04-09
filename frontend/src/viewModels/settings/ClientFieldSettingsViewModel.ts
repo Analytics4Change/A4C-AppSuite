@@ -52,6 +52,9 @@ export class ClientFieldSettingsViewModel {
   isUpdatingCategory = false;
   updateCategoryError: string | null = null;
 
+  // Session-scoped correlation ID: ties all CRUD + batch save into one audit trail
+  sessionCorrelationId: string | null = null;
+
   constructor(private service: IClientFieldService = getClientFieldService()) {
     makeAutoObservable(this, {
       fieldsByCategory: computed,
@@ -65,7 +68,21 @@ export class ClientFieldSettingsViewModel {
     log.debug('ClientFieldSettingsViewModel initialized');
   }
 
-  async loadData(orgId: string): Promise<void> {
+  /** Lazily generate a session correlation ID, shared across all writes until save/reset */
+  private getSessionCorrelationId(): string {
+    if (!this.sessionCorrelationId) {
+      runInAction(() => {
+        this.sessionCorrelationId = globalThis.crypto.randomUUID();
+      });
+    }
+    return this.sessionCorrelationId!;
+  }
+
+  async loadData(orgId: string, preserveChanges = false): Promise<void> {
+    // Snapshot pending diffs before fetch so we can re-apply after reload
+    const pendingChanges = preserveChanges ? this.changedFields : [];
+    const pendingReason = preserveChanges ? this.reason : '';
+
     runInAction(() => {
       this.isLoading = true;
       this.loadError = null;
@@ -73,7 +90,7 @@ export class ClientFieldSettingsViewModel {
     });
 
     try {
-      log.debug('Loading field definitions and categories', { orgId });
+      log.debug('Loading field definitions and categories', { orgId, preserveChanges });
       const [fields, categories] = await Promise.all([
         this.service.listFieldDefinitions(),
         this.service.listFieldCategories(),
@@ -84,7 +101,26 @@ export class ClientFieldSettingsViewModel {
         this.originalFieldDefinitions = fields.map((f) => ({ ...f }));
         this.categories = categories;
         this.isLoading = false;
-        this.reason = '';
+
+        // Re-apply pending field definition changes if preserving
+        if (pendingChanges.length > 0) {
+          this.fieldDefinitions = this.fieldDefinitions.map((field) => {
+            const pending = pendingChanges.find((c) => c.field_id === field.id);
+            if (!pending) return field;
+            return {
+              ...field,
+              ...(pending.is_visible !== undefined && { is_visible: pending.is_visible }),
+              ...(pending.is_required !== undefined && { is_required: pending.is_required }),
+              ...(pending.configurable_label !== undefined && {
+                configurable_label: pending.configurable_label || null,
+              }),
+            };
+          });
+          this.reason = pendingReason;
+          log.debug('Re-applied pending changes after reload', { count: pendingChanges.length });
+        } else {
+          this.reason = '';
+        }
       });
 
       log.info('Field settings loaded', {
@@ -260,7 +296,7 @@ export class ClientFieldSettingsViewModel {
       const changes = this.changedFields;
       log.debug('Saving field configuration', { changeCount: changes.length });
 
-      const correlationId = globalThis.crypto.randomUUID();
+      const correlationId = this.getSessionCorrelationId();
       const result = await this.service.batchUpdateFieldDefinitions(
         changes,
         this.reason.trim(),
@@ -275,13 +311,14 @@ export class ClientFieldSettingsViewModel {
         log.warn('Some fields failed to update', { failed: result.failed });
       }
 
-      // Reload to confirm server state
+      // Reload to confirm server state (clean slate — changes already saved)
       await this.loadData(orgId);
 
       runInAction(() => {
         this.isSaving = false;
         this.saveSuccess = true;
         this.reason = '';
+        this.sessionCorrelationId = null; // New session begins
       });
 
       log.info('Field configuration saved', { updatedCount: result.updated_count });
@@ -303,6 +340,7 @@ export class ClientFieldSettingsViewModel {
       this.reason = '';
       this.saveError = null;
       this.saveSuccess = false;
+      this.sessionCorrelationId = null; // New session begins
     });
   }
 
@@ -329,7 +367,7 @@ export class ClientFieldSettingsViewModel {
     });
 
     try {
-      const correlationId = globalThis.crypto.randomUUID();
+      const correlationId = this.getSessionCorrelationId();
       const result = await this.service.createFieldDefinition(params, correlationId);
       if (!result.success) {
         runInAction(() => {
@@ -339,7 +377,7 @@ export class ClientFieldSettingsViewModel {
         return false;
       }
 
-      await this.loadData(orgId);
+      await this.loadData(orgId, true);
       runInAction(() => {
         this.isCreatingField = false;
       });
@@ -356,10 +394,10 @@ export class ClientFieldSettingsViewModel {
 
   async deactivateCustomField(fieldId: string, reason: string, orgId: string): Promise<boolean> {
     try {
-      const correlationId = globalThis.crypto.randomUUID();
+      const correlationId = this.getSessionCorrelationId();
       const result = await this.service.deactivateFieldDefinition(fieldId, reason, correlationId);
       if (!result.success) return false;
-      await this.loadData(orgId);
+      await this.loadData(orgId, true);
       return true;
     } catch {
       return false;
@@ -377,7 +415,7 @@ export class ClientFieldSettingsViewModel {
     });
 
     try {
-      const correlationId = globalThis.crypto.randomUUID();
+      const correlationId = this.getSessionCorrelationId();
       const result = await this.service.updateFieldDefinition(fieldId, {
         ...params,
         correlation_id: correlationId,
@@ -390,7 +428,7 @@ export class ClientFieldSettingsViewModel {
         return false;
       }
 
-      await this.loadData(orgId);
+      await this.loadData(orgId, true);
       runInAction(() => {
         this.isUpdatingField = false;
       });
@@ -414,7 +452,7 @@ export class ClientFieldSettingsViewModel {
     });
 
     try {
-      const correlationId = globalThis.crypto.randomUUID();
+      const correlationId = this.getSessionCorrelationId();
       const result = await this.service.createFieldCategory(name, slug, undefined, correlationId);
       if (!result.success) {
         runInAction(() => {
@@ -424,7 +462,7 @@ export class ClientFieldSettingsViewModel {
         return false;
       }
 
-      await this.loadData(orgId);
+      await this.loadData(orgId, true);
       runInAction(() => {
         this.isCreatingCategory = false;
       });
@@ -446,7 +484,7 @@ export class ClientFieldSettingsViewModel {
     });
 
     try {
-      const correlationId = globalThis.crypto.randomUUID();
+      const correlationId = this.getSessionCorrelationId();
       const result = await this.service.updateFieldCategory(
         categoryId,
         name,
@@ -461,7 +499,7 @@ export class ClientFieldSettingsViewModel {
         return false;
       }
 
-      await this.loadData(orgId);
+      await this.loadData(orgId, true);
       runInAction(() => {
         this.isUpdatingCategory = false;
       });
@@ -478,10 +516,10 @@ export class ClientFieldSettingsViewModel {
 
   async deactivateCategory(categoryId: string, reason: string, orgId: string): Promise<boolean> {
     try {
-      const correlationId = globalThis.crypto.randomUUID();
+      const correlationId = this.getSessionCorrelationId();
       const result = await this.service.deactivateFieldCategory(categoryId, reason, correlationId);
       if (!result.success) return false;
-      await this.loadData(orgId);
+      await this.loadData(orgId, true);
       return true;
     } catch {
       return false;

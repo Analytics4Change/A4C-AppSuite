@@ -88,9 +88,11 @@ function createMockService(overrides?: Partial<IClientFieldService>): IClientFie
       correlation_id: 'test-corr-id',
     } satisfies BatchUpdateResult),
     createFieldDefinition: vi.fn().mockResolvedValue({ success: true, field_id: 'field-new' }),
+    updateFieldDefinition: vi.fn().mockResolvedValue({ success: true, field_id: 'field-cfg' }),
     deactivateFieldDefinition: vi.fn().mockResolvedValue({ success: true, field_id: 'field-cfg' }),
     listFieldCategories: vi.fn().mockResolvedValue(SEED_CATEGORIES),
     createFieldCategory: vi.fn().mockResolvedValue({ success: true, category_id: 'cat-new' }),
+    updateFieldCategory: vi.fn().mockResolvedValue({ success: true, category_id: 'cat-01' }),
     deactivateFieldCategory: vi.fn().mockResolvedValue({ success: true, category_id: 'cat-07' }),
     ...overrides,
   };
@@ -475,7 +477,8 @@ describe('ClientFieldSettingsViewModel', () => {
       expect(result).toBe(true);
       expect(mockService.batchUpdateFieldDefinitions).toHaveBeenCalledWith(
         [{ field_id: 'field-cfg', is_visible: false }],
-        'Hiding middle name field'
+        'Hiding middle name field',
+        expect.any(String)
       );
       expect(vm.isSaving).toBe(false);
       expect(vm.saveSuccess).toBe(true);
@@ -596,11 +599,14 @@ describe('ClientFieldSettingsViewModel', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockService.createFieldDefinition).toHaveBeenCalledWith({
-        field_key: 'custom_1',
-        display_name: 'Custom 1',
-        category_id: 'cat-01',
-      });
+      expect(mockService.createFieldDefinition).toHaveBeenCalledWith(
+        {
+          field_key: 'custom_1',
+          display_name: 'Custom 1',
+          category_id: 'cat-01',
+        },
+        expect.any(String)
+      );
       expect(vm.isCreatingField).toBe(false);
       // Reloaded
       expect(mockService.listFieldDefinitions).toHaveBeenCalledTimes(2);
@@ -653,7 +659,8 @@ describe('ClientFieldSettingsViewModel', () => {
       expect(result).toBe(true);
       expect(mockService.deactivateFieldDefinition).toHaveBeenCalledWith(
         'field-cfg',
-        'No longer needed'
+        'No longer needed',
+        expect.any(String)
       );
       expect(mockService.listFieldDefinitions).toHaveBeenCalledTimes(2);
     });
@@ -694,7 +701,12 @@ describe('ClientFieldSettingsViewModel', () => {
       const result = await vm.createCategory('Custom Cat', 'custom_cat', 'org-123');
 
       expect(result).toBe(true);
-      expect(mockService.createFieldCategory).toHaveBeenCalledWith('Custom Cat', 'custom_cat');
+      expect(mockService.createFieldCategory).toHaveBeenCalledWith(
+        'Custom Cat',
+        'custom_cat',
+        undefined,
+        expect.any(String)
+      );
       expect(vm.isCreatingCategory).toBe(false);
       expect(mockService.listFieldCategories).toHaveBeenCalledTimes(2);
     });
@@ -740,7 +752,8 @@ describe('ClientFieldSettingsViewModel', () => {
       expect(result).toBe(true);
       expect(mockService.deactivateFieldCategory).toHaveBeenCalledWith(
         'cat-07',
-        'Removing clinical'
+        'Removing clinical',
+        expect.any(String)
       );
       expect(mockService.listFieldCategories).toHaveBeenCalledTimes(2);
     });
@@ -767,6 +780,161 @@ describe('ClientFieldSettingsViewModel', () => {
 
       const result = await vm.deactivateCategory('cat-01', 'reason', 'org-123');
       expect(result).toBe(false);
+    });
+  });
+
+  // ── Preserve pending changes across CRUD reloads ──
+
+  describe('preserveChanges', () => {
+    it('createCategory preserves pending field definition changes', async () => {
+      await vm.loadData('org-123');
+      vm.toggleVisible('field-cfg'); // flip middle_name visibility
+      vm.setReason('Testing reason for save');
+      expect(vm.hasChanges).toBe(true);
+
+      await vm.createCategory('New', 'new', 'org-123');
+
+      // Pending changes should survive the reload
+      expect(vm.hasChanges).toBe(true);
+      expect(vm.changedFields).toHaveLength(1);
+      expect(vm.changedFields[0].field_id).toBe('field-cfg');
+      expect(vm.changedFields[0].is_visible).toBe(false);
+      expect(vm.reason).toBe('Testing reason for save');
+    });
+
+    it('createCustomField preserves pending changes', async () => {
+      await vm.loadData('org-123');
+      vm.toggleRequired('field-cfg');
+      expect(vm.hasChanges).toBe(true);
+
+      await vm.createCustomField(
+        {
+          field_key: 'custom_test',
+          display_name: 'Custom Test',
+          field_type: 'text',
+          category_id: 'cat-01',
+        },
+        'org-123'
+      );
+
+      expect(vm.hasChanges).toBe(true);
+      expect(vm.changedFields[0].is_required).toBe(true);
+    });
+
+    it('deactivateCustomField drops changes for deactivated field, preserves others', async () => {
+      // After deactivation, mock returns only LOCKED_FIELD and CLINICAL_FIELD
+      const svc = createMockService();
+      let callCount = 0;
+      (svc.listFieldDefinitions as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        callCount++;
+        // First call: all fields. Second call (after deactivate): field-cfg removed
+        if (callCount === 1) return Promise.resolve(SEED_FIELDS);
+        return Promise.resolve([LOCKED_FIELD, CLINICAL_FIELD]);
+      });
+      vm = new ClientFieldSettingsViewModel(svc);
+      await vm.loadData('org-123');
+
+      // Toggle both configurable fields
+      vm.toggleVisible('field-cfg');
+      vm.toggleVisible('field-clin');
+      expect(vm.changedFields).toHaveLength(2);
+
+      // Deactivate field-cfg
+      await vm.deactivateCustomField('field-cfg', 'no longer needed', 'org-123');
+
+      // field-cfg change dropped (field gone), field-clin change preserved
+      expect(vm.changedFields).toHaveLength(1);
+      expect(vm.changedFields[0].field_id).toBe('field-clin');
+    });
+
+    it('reason is preserved across CRUD reload', async () => {
+      await vm.loadData('org-123');
+      vm.toggleVisible('field-cfg');
+      vm.setReason('Important audit reason');
+
+      await vm.createCategory('Another', 'another', 'org-123');
+
+      expect(vm.reason).toBe('Important audit reason');
+    });
+
+    it('saveChanges does NOT preserve pending changes (clean slate)', async () => {
+      await vm.loadData('org-123');
+      vm.toggleVisible('field-cfg');
+      vm.setReason('A valid reason for the change');
+      expect(vm.hasChanges).toBe(true);
+
+      await vm.saveChanges('org-123');
+
+      expect(vm.hasChanges).toBe(false);
+      expect(vm.reason).toBe('');
+      expect(vm.saveSuccess).toBe(true);
+    });
+  });
+
+  // ── Session correlation ID ──
+
+  describe('sessionCorrelationId', () => {
+    it('shares the same correlation ID across CRUD operations and save', async () => {
+      await vm.loadData('org-123');
+
+      // First CRUD operation lazily creates the session ID
+      await vm.createCategory('Cat1', 'cat1', 'org-123');
+      const firstCallArgs = (mockService.createFieldCategory as ReturnType<typeof vi.fn>).mock
+        .calls[0];
+      const sessionId = firstCallArgs[3]; // correlationId is 4th arg
+      expect(sessionId).toBeTruthy();
+
+      // Second CRUD operation reuses the same session ID
+      await vm.createCustomField(
+        {
+          field_key: 'custom_x',
+          display_name: 'Custom X',
+          field_type: 'text',
+          category_id: 'cat-01',
+        },
+        'org-123'
+      );
+      const secondCallArgs = (mockService.createFieldDefinition as ReturnType<typeof vi.fn>).mock
+        .calls[0];
+      const secondId = secondCallArgs[1]; // correlationId is 2nd arg
+      expect(secondId).toBe(sessionId);
+
+      // Batch save also uses the same session ID
+      vm.toggleVisible('field-cfg');
+      vm.setReason('A valid reason for the change');
+      await vm.saveChanges('org-123');
+      const saveCallArgs = (mockService.batchUpdateFieldDefinitions as ReturnType<typeof vi.fn>)
+        .mock.calls[0];
+      const saveId = saveCallArgs[2]; // correlationId is 3rd arg
+      expect(saveId).toBe(sessionId);
+    });
+
+    it('resets after saveChanges succeeds', async () => {
+      await vm.loadData('org-123');
+      await vm.createCategory('Cat1', 'cat1', 'org-123');
+
+      const firstSessionId = vm.sessionCorrelationId;
+      expect(firstSessionId).toBeTruthy();
+
+      vm.toggleVisible('field-cfg');
+      vm.setReason('A valid reason for the change');
+      await vm.saveChanges('org-123');
+
+      expect(vm.sessionCorrelationId).toBeNull();
+
+      // Next operation gets a new session ID
+      await vm.createCategory('Cat2', 'cat2', 'org-123');
+      expect(vm.sessionCorrelationId).toBeTruthy();
+      expect(vm.sessionCorrelationId).not.toBe(firstSessionId);
+    });
+
+    it('resets on resetChanges', async () => {
+      await vm.loadData('org-123');
+      await vm.createCategory('Cat1', 'cat1', 'org-123');
+      expect(vm.sessionCorrelationId).toBeTruthy();
+
+      vm.resetChanges();
+      expect(vm.sessionCorrelationId).toBeNull();
     });
   });
 });
