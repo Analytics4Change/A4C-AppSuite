@@ -442,6 +442,16 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                         <p className="text-xs text-gray-400 mt-0.5">
                           {field.field_key} &middot; {field.category_name}
                         </p>
+                        {(field.field_type === 'enum' || field.field_type === 'multi_enum') &&
+                          (() => {
+                            const vals = (field.validation_rules as Record<string, unknown> | null)
+                              ?.enum_values;
+                            return Array.isArray(vals) && vals.length > 0 ? (
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                Options: {(vals as string[]).join(', ')}
+                              </p>
+                            ) : null;
+                          })()}
                       </div>
                       <div className="flex items-center gap-1">
                         <Button

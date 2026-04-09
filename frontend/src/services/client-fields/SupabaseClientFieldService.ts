@@ -75,7 +75,7 @@ export class SupabaseClientFieldService implements IClientFieldService {
       p_is_required: params.is_required ?? false,
       p_is_dimension: params.is_dimension ?? false,
       p_sort_order: params.sort_order ?? 0,
-      p_validation_rules: params.validation_rules ? JSON.stringify(params.validation_rules) : null,
+      p_validation_rules: params.validation_rules ?? null,
       p_correlation_id: correlationId ?? null,
     });
 
@@ -99,7 +99,7 @@ export class SupabaseClientFieldService implements IClientFieldService {
       p_display_name: params.display_name ?? null,
       p_category_id: params.category_id ?? null,
       p_is_required: params.is_required ?? null,
-      p_validation_rules: params.validation_rules ? JSON.stringify(params.validation_rules) : null,
+      p_validation_rules: params.validation_rules ?? null,
       p_reason: params.reason ?? 'Field definition updated',
       p_correlation_id: params.correlation_id ?? null,
     });
