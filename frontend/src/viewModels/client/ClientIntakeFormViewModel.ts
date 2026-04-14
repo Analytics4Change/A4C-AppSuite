@@ -140,6 +140,7 @@ export class ClientIntakeFormViewModel {
       canSubmit: computed,
       completionPercentage: computed,
       validationErrors: computed,
+      unfilledRequiredFields: computed,
     });
   }
 
@@ -176,13 +177,13 @@ export class ClientIntakeFormViewModel {
       );
 
       if (sectionFields.length === 0) {
-        result.set(section, 'valid');
+        result.set(section, this.visitedSections.has(section) ? 'valid' : 'incomplete');
         continue;
       }
 
       const requiredInSection = sectionFields.filter((fd) => fd.is_required);
       if (requiredInSection.length === 0) {
-        result.set(section, 'valid');
+        result.set(section, this.visitedSections.has(section) ? 'valid' : 'incomplete');
         continue;
       }
 
@@ -231,6 +232,26 @@ export class ClientIntakeFormViewModel {
       }
     }
     return errors;
+  }
+
+  get unfilledRequiredFields(): Array<{
+    fieldKey: string;
+    displayName: string;
+    section: string;
+  }> {
+    const unfilled: Array<{ fieldKey: string; displayName: string; section: string }> = [];
+    for (const fd of this.fieldDefinitions) {
+      if (!fd.is_required || !fd.is_visible || !fd.is_active) continue;
+      const value = this.formData[fd.field_key];
+      if (value === undefined || value === null || value === '') {
+        unfilled.push({
+          fieldKey: fd.field_key,
+          displayName: fd.configurable_label ?? fd.display_name,
+          section: fd.category_name,
+        });
+      }
+    }
+    return unfilled;
   }
 
   // -------------------------------------------------------------------------

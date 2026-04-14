@@ -628,6 +628,42 @@ When the frontend intake form is built, these existing patterns apply:
 
 **Why tests didn't catch it**: `MockClientFieldService.batchUpdateFieldDefinitions()` never calls the Supabase RPC — it returns a canned success response. Only the real Supabase backend path was affected.
 
+### Bug Fix: Enum validation_rules Double Serialization (2026-04-09)
+
+**Symptom**: Custom fields of type `enum`/`multi_enum` lose their select options after creation. "Weekend Reward" field in "Reward Preferences" category showed no options when viewing or editing.
+
+**Root cause**: Same bug class as `4849122b`. `SupabaseClientFieldService.createFieldDefinition()` (line 78) and `updateFieldDefinition()` (line 102) called `JSON.stringify()` on `p_validation_rules` — a `jsonb` RPC parameter. Supabase SDK already serializes; `JSON.stringify()` stored a jsonb STRING instead of a jsonb OBJECT. The previous fix (`4849122b`) only patched `batchUpdateFieldDefinitions` but missed create + update.
+
+**DB verification**: `jsonb_typeof(validation_rules)` returned `'string'` for `custom_weekend_reward` field. Values `["Cash", "Family Visit", "Social Outing"]` were present but double-wrapped in quotes.
+
+**Fix**: 
+1. Removed `JSON.stringify()` from both create and update calls — pass objects directly (`params.validation_rules ?? null`)
+2. Data repair migration `20260409154704_fix_enum_validation_rules_double_stringify.sql` — `(validation_rules #>> '{}')::jsonb` for all affected rows
+3. Added enum values display in non-edit custom field view (`CustomFieldsTab.tsx`)
+4. Commit `697068b8`, deployed via CI/CD (all 3 pipelines green: frontend + migrations + docs validation)
+
+**Gotcha**: After deploy, user tested with cached old JS bundle → re-corrupted the data. Required manual SQL repair + hard browser refresh.
+
+### ViewModel Fixes: Preserve Changes + Session Correlation ID (2026-04-09)
+
+**Two issues fixed in `ClientFieldSettingsViewModel.ts`** (commit `283a21f0`):
+1. **Lost pending changes**: CRUD operations (createCategory, createCustomField, etc.) called `loadData()` which silently wiped pending field definition toggles/labels. Fix: `loadData(orgId, preserveChanges = false)` — snapshots `changedFields` before fetch, re-applies after.
+2. **Fragmented audit trail**: Each CRUD operation generated its own `crypto.randomUUID()`. Fix: `sessionCorrelationId` observable — lazily initialized on first write, shared across all CRUD + batch save, reset after save/reset.
+
+8 new unit tests, 5 existing test assertions updated. All 64 tests + 54 E2E tests pass.
+
+### Backend Readiness Assessment (2026-04-13)
+
+Full assessment confirmed **backend is feature-complete** for client registration:
+- 7 projection tables (all with RLS)
+- 22 event handlers + `process_client_event()` router
+- 26 API RPC functions (4 lifecycle + 2 query + 18 sub-entity + validation)
+- 23 event types seeded in `event_types`
+- `SupabaseClientService` (520 lines) + `ClientIntakeFormViewModel` (612 lines) fully implemented
+- `ClientServiceFactory` correctly wired (mock vs supabase based on `getDeploymentConfig()`)
+
+**Co-owner reported**: Client registration does not work. E2E tests needed to surface the failure(s).
+
 ## Why This Approach?
 
 **Why JSONB + field registry instead of per-tenant schemas?**

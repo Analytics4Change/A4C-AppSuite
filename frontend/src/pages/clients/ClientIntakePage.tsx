@@ -297,20 +297,28 @@ export const ClientIntakePage: React.FC = observer(() => {
                   Next
                 </Button>
               ) : (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={!vm.canSubmit || !orgId}
-                  data-testid="intake-submit-button"
+                <div
+                  title={
+                    !vm.canSubmit && vm.unfilledRequiredFields.length > 0
+                      ? `Missing required fields:\n${vm.unfilledRequiredFields.map((f) => `• ${f.displayName} (${f.section})`).join('\n')}`
+                      : undefined
+                  }
                 >
-                  {vm.isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Registering...
-                    </>
-                  ) : (
-                    'Register Client'
-                  )}
-                </Button>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!vm.canSubmit || !orgId}
+                    data-testid="intake-submit-button"
+                  >
+                    {vm.isSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Registering...
+                      </>
+                    ) : (
+                      'Register Client'
+                    )}
+                  </Button>
+                </div>
               )}
             </div>
           </div>

@@ -135,15 +135,15 @@ _Placement history table deferred to Client Intake implementation._
 - Files: `workflows/src/activities/organization-bootstrap/seed-field-definitions.ts`
 - Modified: `workflow.ts`, `index.ts`, `shared/types/index.ts`
 
-### Remaining Event Integration (Client Intake project — FUTURE)
-- [ ] `process_client_event()` router (~11 event types)
-- [ ] Client lifecycle handlers (registered, updated, admitted, discharged, etc.)
-- [ ] Insurance/placement/contact sub-entity handlers
-- [ ] Contact-designation handlers in `process_contact_event()`
-- [ ] Client API functions (register, update, admit, discharge, etc.)
-- [ ] Fix RAISE WARNING → RAISE EXCEPTION in 9 existing routers
-- [ ] Full AsyncAPI cross-correlation audit (93 existing events)
-- [ ] Generate TypeScript types from AsyncAPI
+### Remaining Event Integration ✅ COMPLETE (2026-04-06)
+- [x] `process_client_event()` router (22 CASE branches) — migration `20260406221738_client_sub_entity_events.sql`
+- [x] Client lifecycle handlers (registered, updated, admitted, discharged) — 4 handlers
+- [x] Insurance/placement/contact sub-entity handlers — 18 handlers
+- [x] Client API functions (26 RPCs: 4 lifecycle + 2 query + 18 sub-entity + validation) — migration `20260406222857_client_api_functions.sql`
+- [x] AsyncAPI contracts — 21 event types in `infrastructure/supabase/contracts/asyncapi/domains/client.yaml`
+- [x] 23 event types seeded in `event_types` table
+- [x] Fix RAISE WARNING → RAISE EXCEPTION — fixed earlier in migration `20260220185837`
+- [x] TypeScript types generated from AsyncAPI
 
 ### Verification ✅ COMPLETE (2026-03-28)
 - [x] plpgsql_check (`supabase db lint --level error`) — ⚠️ known limitation: all handlers report `RECORD not assigned` (sqlState 55000) because `p_event RECORD` parameter structure is indeterminate at static analysis time. Pre-existing across ALL handlers, not specific to new code. Functions work correctly at runtime.
@@ -177,16 +177,25 @@ _Placement history table deferred to Client Intake implementation._
 - [x] WAI-ARIA Tabs pattern with keyboard navigation (Arrow keys, Home/End)
 - [x] Mock service seeded with 67 fields + 11 categories (matches bootstrap)
 
-### 5.2 Client Intake Form
-- [ ] Create `ClientIntakeFormViewModel` (mirror OrganizationFormViewModel: multi-section, validation, draft management)
-- [ ] Demographics section (name, DOB, gender dropdown, pronouns dropdown)
-- [ ] Race/ethnicity section (OMB two-question: ethnicity single-select → race multi-select via MultiSelectDropdown)
-- [ ] Contact section (phone, email, address, emergency contacts)
-- [ ] Administrative section (internal case number, external case numbers, admission date, org unit, referral source)
-- [ ] Staff assignment section (contact-designation model: assign clinician/therapist/etc. via contacts)
-- [ ] Conditional rendering based on org's intake form configuration
-- [ ] Validation (required fields, format checks)
-- [ ] WCAG 2.1 AA compliance (keyboard nav, ARIA, focus management)
+### 5.2 Client Intake Form ✅ COMPLETE (2026-04-07)
+- [x] Create `ClientIntakeFormViewModel` (612 lines: multi-section, validation, draft management, sub-entity collections)
+- [x] 10 intake section components: Demographics, ContactInfo, Guardian, Referral, Admission, Insurance, Clinical, Medical, Legal, Education
+- [x] `IntakeFormField` generic renderer (text, number, date, enum, multi_enum, boolean, jsonb)
+- [x] `useFieldProps` hook — maps ViewModel field definitions to component props
+- [x] Sub-entity collections: phones, emails, addresses, insurance policies, clinical contacts
+- [x] Conditional rendering based on org's intake form configuration (field definitions → visibility)
+- [x] Validation (required fields per section, sectionValidation computed)
+- [x] Draft persistence to sessionStorage (PII-safe)
+- [x] Submit flow: registerClient + parallel sub-entity RPCs with shared correlation ID
+- [x] `ClientIntakePage` with multi-section stepper, sidebar nav, progress bar, footer nav
+
+### 5.2b Client Intake E2E Tests ⏸️ IN PROGRESS (2026-04-13)
+- [ ] Registration happy path: fill required fields across sections → submit → verify redirect
+- [ ] Sub-entity collections: add phone/email/address → verify persistence across section nav
+- [ ] Validation: submit button disabled without required fields → enabled after filling
+- [ ] Draft persistence: fill fields → reload → verify data survives
+- [ ] Error handling: submit error display, sub-entity partial failure warnings
+- [ ] Diagnose co-owner-reported registration failure via E2E test failures
 
 ### 5.3 Client List Enhancements
 - [ ] Replace mock data with `api.list_clients()` RPC queries
@@ -406,13 +415,17 @@ _Key remediations: M1 (B2c removed — already done), M2 (JSONB payload), M3 (p_
 
 ## Current Status
 
-**Phase**: Phase B — Client Intake Full-Stack ✅ COMPLETE
-**Status**: All B1-B7 complete. 11 migrations deployed. All testing + documentation done.
-**Migrations**: 11 deployed (8 original + architecture review fix + batch update scalar fix + field config enhancements).
+**Phase**: Phase 5.2b — Client Intake E2E Tests ⏸️ IN PROGRESS
+**Status**: Backend fully built (26 RPCs, 22 handlers, 7 tables, 23 events). Frontend intake form complete. Co-owner reports registration doesn't work — writing E2E tests to surface failures.
+**Migrations**: 13 deployed (11 original + enum validation_rules fix + field config enhancements).
 
-**Last Updated**: 2026-04-08
-**Next Phase**: Phase 4 (Analytics Foundation) or Phase 5 (Frontend Intake Enhancements)
-**Plan file**: Plan files expired (session-scoped). Full plan details in `dev/active/client-management-applet-plan.md`.
+**Last Updated**: 2026-04-13
+**Next Step**: Write E2E tests in `frontend/e2e/client-intake.spec.ts` (append to existing 30 navigation tests). Focus on form fill + submit flow first — this is where the reported failure likely lives.
+**Plan file**: `.claude/plans/eventual-munching-flamingo.md` (E2E test plan).
+
+### Recent Fixes (2026-04-09):
+- `283a21f0`: ViewModel preserveChanges + session correlation ID
+- `697068b8`: Enum validation_rules double-stringification fix + data repair migration + enum display in read-only view
 
 ### Test Files Created (2026-04-06):
 - `frontend/src/viewModels/settings/__tests__/ClientFieldSettingsViewModel.test.ts` — 56 tests (Vitest): default state, loadData, computed properties (fieldsByCategory, tabList, configurableFieldCount), toggle/set actions, change tracking (locked field skip, multi-change, toggle-back), reason validation, canSave, saveChanges (success/reload/failure/partial), resetChanges, custom field CRUD (create/deactivate success/failure/exception), category CRUD (create/deactivate success/failure/exception)
