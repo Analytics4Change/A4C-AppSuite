@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Pencil, Lock, Loader2, AlertCircle, Check, X } from 'lucide-react';
 import type { FieldCategory } from '@/types/client-field-settings.types';
 import type { ClientFieldSettingsViewModel } from '@/viewModels/settings/ClientFieldSettingsViewModel';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 const glassCardStyle = {
   background: 'rgba(255, 255, 255, 0.7)',
@@ -81,8 +82,38 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
       }
     };
 
-    const handleDeactivate = async (categoryId: string, categoryName: string) => {
-      await viewModel.deactivateCategory(categoryId, `Removed category: ${categoryName}`, orgId);
+    // Deactivation confirmation state
+    const [deactivateTarget, setDeactivateTarget] = useState<{
+      id: string;
+      name: string;
+      fieldCount: number;
+      fieldNames: string[];
+    } | null>(null);
+    const [isCheckingFields, setIsCheckingFields] = useState(false);
+    const [isDeactivating, setIsDeactivating] = useState(false);
+
+    const handleDeactivateClick = async (cat: FieldCategory) => {
+      setIsCheckingFields(true);
+      const result = await viewModel.getCategoryFieldCount(cat.id);
+      setIsCheckingFields(false);
+      setDeactivateTarget({
+        id: cat.id,
+        name: cat.name,
+        fieldCount: result.count,
+        fieldNames: result.fields,
+      });
+    };
+
+    const confirmDeactivate = async () => {
+      if (!deactivateTarget) return;
+      setIsDeactivating(true);
+      await viewModel.deactivateCategory(
+        deactivateTarget.id,
+        `Removed category: ${deactivateTarget.name}`,
+        orgId
+      );
+      setIsDeactivating(false);
+      setDeactivateTarget(null);
     };
 
     return (
@@ -274,10 +305,11 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeactivate(cat.id, cat.name)}
+                          onClick={() => handleDeactivateClick(cat)}
+                          disabled={isCheckingFields}
                           className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          aria-label={`Remove ${cat.name}`}
-                          data-testid={`cat-remove-${cat.slug}`}
+                          aria-label={`Deactivate ${cat.name}`}
+                          data-testid={`cat-deactivate-${cat.slug}`}
                         >
                           <Trash2 size={14} />
                         </Button>
@@ -287,6 +319,28 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
                 )
               )}
             </div>
+
+            {/* Deactivation confirmation dialog */}
+            <ConfirmDialog
+              isOpen={deactivateTarget !== null}
+              title={`Deactivate "${deactivateTarget?.name}"?`}
+              message={
+                deactivateTarget && deactivateTarget.fieldCount > 0
+                  ? `This category contains ${deactivateTarget.fieldCount} active custom field(s). Deactivating will also deactivate all fields in this category.`
+                  : 'This will remove the category. No fields are affected.'
+              }
+              confirmLabel="Deactivate"
+              cancelLabel="Cancel"
+              variant="warning"
+              isLoading={isDeactivating}
+              details={
+                deactivateTarget && deactivateTarget.fieldCount > 0
+                  ? deactivateTarget.fieldNames
+                  : undefined
+              }
+              onConfirm={confirmDeactivate}
+              onCancel={() => setDeactivateTarget(null)}
+            />
           </CardContent>
         </Card>
       </div>

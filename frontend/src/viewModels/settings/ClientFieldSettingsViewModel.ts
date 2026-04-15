@@ -535,4 +535,24 @@ export class ClientFieldSettingsViewModel {
       return false;
     }
   }
+
+  async getFieldUsageCount(fieldKey: string): Promise<number> {
+    try {
+      const result = await this.service.getFieldUsageCount(fieldKey);
+      return result.success ? result.count : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  async getCategoryFieldCount(categoryId: string): Promise<{ count: number; fields: string[] }> {
+    try {
+      const result = await this.service.getCategoryFieldCount(categoryId);
+      return result.success
+        ? { count: result.count, fields: result.fields }
+        : { count: 0, fields: [] };
+    } catch {
+      return { count: 0, fields: [] };
+    }
+  }
 }

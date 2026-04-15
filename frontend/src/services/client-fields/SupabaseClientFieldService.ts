@@ -217,4 +217,38 @@ export class SupabaseClientFieldService implements IClientFieldService {
     const result = typeof data === 'string' ? JSON.parse(data) : data;
     return result as RpcResult;
   }
+
+  async getFieldUsageCount(fieldKey: string): Promise<{ success: boolean; count: number }> {
+    log.debug('Getting field usage count', { fieldKey });
+
+    const { data, error } = await supabase.schema('api').rpc('get_field_usage_count', {
+      p_field_key: fieldKey,
+    });
+
+    if (error) {
+      log.error('Failed to get field usage count', { error });
+      return { success: false, count: 0 };
+    }
+
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    return { success: true, count: result?.count ?? 0 };
+  }
+
+  async getCategoryFieldCount(
+    categoryId: string
+  ): Promise<{ success: boolean; count: number; fields: string[] }> {
+    log.debug('Getting category field count', { categoryId });
+
+    const { data, error } = await supabase.schema('api').rpc('get_category_field_count', {
+      p_category_id: categoryId,
+    });
+
+    if (error) {
+      log.error('Failed to get category field count', { error });
+      return { success: false, count: 0, fields: [] };
+    }
+
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    return { success: true, count: result?.count ?? 0, fields: result?.fields ?? [] };
+  }
 }

@@ -86,7 +86,7 @@ purpose: agent-navigation
 | `cross-tenant` | [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | var-partnerships.md |
 | `canonical-values` | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | ui-patterns.md, EVENT-DRIVEN-GUIDE.md |
 | `custom-claims` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | frontend-auth-architecture.md, custom-claims-setup.md |
-| `danger-zone` | [schedule-management.md](frontend/reference/schedule-management.md) | ui-patterns.md |
+| `danger-zone` | [danger-zone-pattern.md](frontend/patterns/danger-zone-pattern.md) | schedule-management.md, ui-patterns.md |
 | `day0-migration` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | handlers/README.md, DEPLOYMENT_INSTRUCTIONS.md |
 | `data-collection` | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | ui-patterns.md, EVENT-DRIVEN-GUIDE.md |
 | `database-hook` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | custom-claims-setup.md |

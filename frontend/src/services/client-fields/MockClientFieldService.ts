@@ -1204,8 +1204,34 @@ export class MockClientFieldService implements IClientFieldService {
       };
     }
 
+    // Cascade: deactivate all fields in this category (mirrors backend behavior)
+    for (const field of this.fields) {
+      if (field.category_id === categoryId && field.is_active) {
+        field.is_active = false;
+      }
+    }
+
     category.is_active = false;
     return { success: true, category_id: categoryId };
+  }
+
+  async getFieldUsageCount(fieldKey: string): Promise<{ success: boolean; count: number }> {
+    log.debug('[Mock] Getting field usage count', { fieldKey });
+    await this.simulateDelay();
+    // Mock: return 0 for most fields, simulate some usage for testing
+    const count = fieldKey.includes('weekend') ? 3 : 0;
+    return { success: true, count };
+  }
+
+  async getCategoryFieldCount(
+    categoryId: string
+  ): Promise<{ success: boolean; count: number; fields: string[] }> {
+    log.debug('[Mock] Getting category field count', { categoryId });
+    await this.simulateDelay();
+    const fields = this.fields
+      .filter((f) => f.category_id === categoryId && f.is_active)
+      .map((f) => f.display_name);
+    return { success: true, count: fields.length, fields };
   }
 
   private simulateDelay(): Promise<void> {

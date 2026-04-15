@@ -15,6 +15,7 @@ import type { FieldDefinition, FieldCategory } from '@/types/client-field-settin
 import { SYSTEM_FIELD_KEYS, FIELD_TYPE_DISPLAY_LABELS } from '@/types/client-field-settings.types';
 import type { ClientFieldSettingsViewModel } from '@/viewModels/settings/ClientFieldSettingsViewModel';
 import { EnumValuesInput } from './EnumValuesInput';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 const glassCardStyle = {
   background: 'rgba(255, 255, 255, 0.7)',
@@ -55,6 +56,16 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
     const [editCategoryId, setEditCategoryId] = useState('');
     const [editIsRequired, setEditIsRequired] = useState(false);
     const [editEnumValues, setEditEnumValues] = useState<string[]>([]);
+
+    // Deactivation confirmation state
+    const [deactivateTarget, setDeactivateTarget] = useState<{
+      id: string;
+      name: string;
+      fieldKey: string;
+      usageCount: number;
+    } | null>(null);
+    const [isCheckingUsage, setIsCheckingUsage] = useState(false);
+    const [isDeactivating, setIsDeactivating] = useState(false);
 
     const editNameRef = useRef<HTMLInputElement>(null);
 
@@ -116,8 +127,28 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
       }
     };
 
-    const handleDeactivate = async (fieldId: string, fieldName: string) => {
-      await viewModel.deactivateCustomField(fieldId, `Removed custom field: ${fieldName}`, orgId);
+    const handleDeactivateClick = async (field: FieldDefinition) => {
+      setIsCheckingUsage(true);
+      const count = await viewModel.getFieldUsageCount(field.field_key);
+      setIsCheckingUsage(false);
+      setDeactivateTarget({
+        id: field.id,
+        name: field.display_name,
+        fieldKey: field.field_key,
+        usageCount: count,
+      });
+    };
+
+    const confirmDeactivate = async () => {
+      if (!deactivateTarget) return;
+      setIsDeactivating(true);
+      await viewModel.deactivateCustomField(
+        deactivateTarget.id,
+        `Removed custom field: ${deactivateTarget.name}`,
+        orgId
+      );
+      setIsDeactivating(false);
+      setDeactivateTarget(null);
     };
 
     const startEditing = (field: FieldDefinition) => {
@@ -469,10 +500,11 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeactivate(field.id, field.display_name)}
+                          onClick={() => handleDeactivateClick(field)}
+                          disabled={isCheckingUsage}
                           className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          aria-label={`Remove ${field.display_name}`}
-                          data-testid={`cf-remove-${field.field_key}`}
+                          aria-label={`Deactivate ${field.display_name}`}
+                          data-testid={`cf-deactivate-${field.field_key}`}
                         >
                           <Trash2 size={14} />
                         </Button>
@@ -482,6 +514,23 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                 )}
               </div>
             )}
+
+            {/* Deactivation confirmation dialog */}
+            <ConfirmDialog
+              isOpen={deactivateTarget !== null}
+              title={`Deactivate "${deactivateTarget?.name}"?`}
+              message={
+                deactivateTarget && deactivateTarget.usageCount > 0
+                  ? `This field has data for ${deactivateTarget.usageCount} registered client(s). Deactivating will hide the field from the intake form but preserve existing data.`
+                  : 'This will remove the field from the intake form. No client data is affected.'
+              }
+              confirmLabel="Deactivate"
+              cancelLabel="Cancel"
+              variant="warning"
+              isLoading={isDeactivating}
+              onConfirm={confirmDeactivate}
+              onCancel={() => setDeactivateTarget(null)}
+            />
           </CardContent>
         </Card>
       </div>

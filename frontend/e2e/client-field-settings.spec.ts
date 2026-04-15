@@ -422,9 +422,13 @@ test.describe('Client Field Settings - Custom Fields', () => {
     await expect(page.locator('[data-testid="cf-name-input"]')).not.toBeVisible({ timeout: 5000 });
 
     // Now deactivate it
-    const removeBtn = page.locator('[data-testid="cf-remove-custom_temp_field"]');
+    const removeBtn = page.locator('[data-testid="cf-deactivate-custom_temp_field"]');
     if ((await removeBtn.count()) > 0) {
       await removeBtn.click();
+
+      // Confirm the deactivation dialog
+      await expect(page.locator('[data-testid="confirm-dialog"]')).toBeVisible({ timeout: 5000 });
+      await page.click('[data-testid="confirm-dialog-confirm-btn"]');
 
       // Field should disappear from list
       await expect(page.locator('[data-testid="custom-field-custom_temp_field"]')).not.toBeVisible({
@@ -449,7 +453,7 @@ test.describe('Client Field Settings - Categories', () => {
     await expect(demographicsRow.getByText('System')).toBeVisible();
 
     // System categories should NOT have a remove button
-    await expect(page.locator('[data-testid="cat-remove-demographics"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="cat-deactivate-demographics"]')).not.toBeVisible();
   });
 
   test('should open and close category create form', async ({ page }) => {
@@ -490,7 +494,7 @@ test.describe('Client Field Settings - Categories', () => {
     await expect(page.locator('[data-testid="category-behavioral"]')).toBeVisible();
 
     // Custom categories should have a remove button
-    await expect(page.locator('[data-testid="cat-remove-behavioral"]')).toBeVisible();
+    await expect(page.locator('[data-testid="cat-deactivate-behavioral"]')).toBeVisible();
   });
 
   test('should deactivate a custom category', async ({ page }) => {
@@ -504,9 +508,14 @@ test.describe('Client Field Settings - Categories', () => {
     await expect(page.locator('[data-testid="cat-name-input"]')).not.toBeVisible({ timeout: 5000 });
 
     // Deactivate
-    const removeBtn = page.locator('[data-testid="cat-remove-temp_category"]');
+    const removeBtn = page.locator('[data-testid="cat-deactivate-temp_category"]');
     if ((await removeBtn.count()) > 0) {
       await removeBtn.click();
+
+      // Confirm the deactivation dialog
+      await expect(page.locator('[data-testid="confirm-dialog"]')).toBeVisible({ timeout: 5000 });
+      await page.click('[data-testid="confirm-dialog-confirm-btn"]');
+
       await expect(page.locator('[data-testid="category-temp_category"]')).not.toBeVisible({
         timeout: 5000,
       });
@@ -808,7 +817,7 @@ test.describe('Client Field Settings - Edit Custom Fields', () => {
     const fieldKey = await createCustomField(page, 'Editable Field');
 
     await expect(page.locator(`[data-testid="cf-edit-${fieldKey}"]`)).toBeVisible();
-    await expect(page.locator(`[data-testid="cf-remove-${fieldKey}"]`)).toBeVisible();
+    await expect(page.locator(`[data-testid="cf-deactivate-${fieldKey}"]`)).toBeVisible();
   });
 
   test('should open edit form with pre-populated values', async ({ page }) => {
@@ -917,7 +926,7 @@ test.describe('Client Field Settings - Edit Custom Categories', () => {
 
     // Should have both edit and delete buttons
     await expect(page.locator('[data-testid="cat-edit-editable_cat"]')).toBeVisible();
-    await expect(page.locator('[data-testid="cat-remove-editable_cat"]')).toBeVisible();
+    await expect(page.locator('[data-testid="cat-deactivate-editable_cat"]')).toBeVisible();
   });
 
   test('should open edit form and rename category', async ({ page }) => {

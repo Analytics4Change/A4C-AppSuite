@@ -76,4 +76,12 @@ export interface IClientFieldService {
     reason: string,
     correlationId?: string
   ): Promise<RpcResult>;
+
+  /** Count clients with data for a custom field (for deactivation confirmation) */
+  getFieldUsageCount(fieldKey: string): Promise<{ success: boolean; count: number }>;
+
+  /** Count active fields in a category + their names (for deactivation confirmation) */
+  getCategoryFieldCount(
+    categoryId: string
+  ): Promise<{ success: boolean; count: number; fields: string[] }>;
 }
