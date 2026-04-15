@@ -67,8 +67,10 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
       }
     }, [editingFieldId]);
 
-    // Custom fields = non-locked, org-created fields (across all categories)
-    const customFields = fields.filter((f) => !SYSTEM_FIELD_KEYS.has(f.field_key) && f.is_active);
+    // Custom fields = non-locked, org-created fields (across all categories), sorted alphabetically
+    const customFields = fields
+      .filter((f) => !SYSTEM_FIELD_KEYS.has(f.field_key) && f.is_active)
+      .sort((a, b) => a.display_name.localeCompare(b.display_name));
 
     const fieldKey = name
       .toLowerCase()
