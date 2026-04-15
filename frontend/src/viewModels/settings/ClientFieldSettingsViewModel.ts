@@ -370,8 +370,11 @@ export class ClientFieldSettingsViewModel {
       const correlationId = this.getSessionCorrelationId();
       const result = await this.service.createFieldDefinition(params, correlationId);
       if (!result.success) {
+        const friendlyError = result.error?.includes('Field key already exists')
+          ? `"${params.display_name}" already exists. Choose another name.`
+          : (result.error ?? 'Failed to create field');
         runInAction(() => {
-          this.createFieldError = result.error ?? 'Failed to create field';
+          this.createFieldError = friendlyError;
           this.isCreatingField = false;
         });
         return false;
