@@ -148,13 +148,20 @@ export class ClientFieldSettingsViewModel {
     return map;
   }
 
-  /** Tab list: system categories + "Custom Fields" + "Categories" */
+  /** Tab list: system categories (by sort_order) + custom categories (alphabetical) + fixed tabs */
   get tabList(): Array<{ slug: string; name: string }> {
-    const categoryTabs = this.categories
-      .filter((c) => c.is_active)
+    const active = this.categories.filter((c) => c.is_active);
+    const systemTabs = active
+      .filter((c) => c.is_system)
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((c) => ({ slug: c.slug, name: c.name }));
+    const customTabs = active
+      .filter((c) => !c.is_system)
+      .sort((a, b) => a.name.localeCompare(b.name))
       .map((c) => ({ slug: c.slug, name: c.name }));
     return [
-      ...categoryTabs,
+      ...systemTabs,
+      ...customTabs,
       { slug: 'custom_fields', name: 'Custom Fields' },
       { slug: 'categories', name: 'Categories' },
     ];
