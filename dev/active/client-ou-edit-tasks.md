@@ -2,24 +2,23 @@
 
 ## Current Status
 
-**Phase**: Phase 2 — Frontend Types & Service Updates
-**Status**: ✅ IN PROGRESS
-**Last Updated**: 2026-04-22
-**Next Step**: Edit `frontend/src/types/client.types.ts` — add `organization_unit_id` and `organization_unit_name` to `ClientPlacementHistory` (line 343) and `organization_unit_id` to `ChangePlacementParams` (line 631). Then update SupabaseClientService and MockClientService.
+**Phase**: Phase 1 — Database Migration
+**Status**: ⏸️ PENDING
+**Last Updated**: 2026-04-21
+**Next Step**: Create migration via `supabase migration new client_ou_placement_and_edit_support`, then implement 1a (ALTER TABLE), 1b (api.change_client_placement signature), 1c (handler), 1d (api.get_client join).
 
 ---
 
-## Phase 1: Database Migration ✅ COMPLETE
+## Phase 1: Database Migration ⏸️ PENDING
 
-- [x] Create migration file via `supabase migration new client_ou_placement_and_edit_support`
-  - File: `20260422021549_client_ou_placement_and_edit_support.sql`
-- [x] 1a: ALTER TABLE `client_placement_history_projection` ADD COLUMN `organization_unit_id` uuid + index
-- [x] 1b: CREATE OR REPLACE `api.change_client_placement()` — add `p_organization_unit_id uuid DEFAULT NULL`, include in event_data
-- [x] 1c: CREATE OR REPLACE `handle_client_placement_changed()` — extract `organization_unit_id` from event_data, include in INSERT, denormalize to `clients_projection`
-- [x] 1d: CREATE OR REPLACE `api.get_client()` — LEFT JOIN placement history to `organization_units_projection` for `organization_unit_name`
-- [x] Update handler reference file: `infrastructure/supabase/handlers/client/handle_client_placement_changed.sql`
-- [x] Update AsyncAPI contract: `ClientPlacementChangeData` now includes `organization_unit_id`
-- [x] Regenerate TypeScript types from AsyncAPI schemas
+- [ ] Create migration file via `supabase migration new client_ou_placement_and_edit_support`
+- [ ] 1a: ALTER TABLE `client_placement_history_projection` ADD COLUMN `organization_unit_id` uuid + index
+- [ ] 1b: CREATE OR REPLACE `api.change_client_placement()` — add `p_organization_unit_id uuid DEFAULT NULL`, include in event_data
+- [ ] 1c: CREATE OR REPLACE `handle_client_placement_changed()` — extract `organization_unit_id` from event_data, include in INSERT, denormalize to `clients_projection`
+- [ ] 1d: CREATE OR REPLACE `api.get_client()` — LEFT JOIN placement history to `organization_units_projection` for `organization_unit_name`
+- [ ] Update handler reference file: `infrastructure/supabase/handlers/client/handle_client_placement_changed.sql`
+- [ ] Update AsyncAPI contract: `ClientPlacementChangeData` now includes `organization_unit_id`
+- [ ] Regenerate TypeScript types from AsyncAPI schemas
 
 ## Phase 2: Frontend Types & Service Updates ⏸️ PENDING
 
