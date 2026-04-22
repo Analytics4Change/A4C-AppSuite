@@ -43,8 +43,7 @@ BEGIN
         referral_organization = CASE WHEN v_changes ? 'referral_organization' THEN v_changes->>'referral_organization' ELSE referral_organization END,
         referral_date = CASE WHEN v_changes ? 'referral_date' THEN (v_changes->>'referral_date')::date ELSE referral_date END,
         reason_for_referral = CASE WHEN v_changes ? 'reason_for_referral' THEN v_changes->>'reason_for_referral' ELSE reason_for_referral END,
-        -- Admission
-        organization_unit_id = CASE WHEN v_changes ? 'organization_unit_id' THEN (v_changes->>'organization_unit_id')::uuid ELSE organization_unit_id END,
+        -- Admission (C3: organization_unit_id intentionally omitted; mutate via api.change_client_placement)
         admission_date = COALESCE((v_changes->>'admission_date')::date, admission_date),
         admission_type = CASE WHEN v_changes ? 'admission_type' THEN v_changes->>'admission_type' ELSE admission_type END,
         level_of_care = CASE WHEN v_changes ? 'level_of_care' THEN v_changes->>'level_of_care' ELSE level_of_care END,

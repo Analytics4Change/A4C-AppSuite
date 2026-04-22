@@ -16639,6 +16639,13 @@ channels:
                     reason:
                       type: string
                       description: Reason for placement change
+                    organization_unit_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: >-
+                        Organizational unit (facility/site) for this placement;
+                        null allowed for unscoped placements
                 event_metadata:
                   title: EventMetadata
                   type: object
@@ -33981,6 +33988,13 @@ channels:
                     reason:
                       type: string
                       description: Reason for placement change
+                    organization_unit_id:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: >-
+                        Organizational unit (facility/site) for this placement;
+                        null allowed for unscoped placements
                 event_metadata:
                   title: EventMetadata
                   type: object

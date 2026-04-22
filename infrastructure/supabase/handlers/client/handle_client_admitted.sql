@@ -22,7 +22,7 @@ BEGIN
         level_of_care = CASE WHEN p_event.event_data ? 'level_of_care' THEN p_event.event_data->>'level_of_care' ELSE level_of_care END,
         expected_length_of_stay = CASE WHEN p_event.event_data ? 'expected_length_of_stay' THEN (p_event.event_data->>'expected_length_of_stay')::integer ELSE expected_length_of_stay END,
         initial_risk_level = CASE WHEN p_event.event_data ? 'initial_risk_level' THEN p_event.event_data->>'initial_risk_level' ELSE initial_risk_level END,
-        organization_unit_id = CASE WHEN p_event.event_data ? 'organization_unit_id' THEN (p_event.event_data->>'organization_unit_id')::uuid ELSE organization_unit_id END,
+        -- C3: organization_unit_id intentionally NOT mutated here; use api.change_client_placement.
         primary_diagnosis = CASE WHEN p_event.event_data ? 'primary_diagnosis' THEN p_event.event_data->'primary_diagnosis' ELSE primary_diagnosis END,
         updated_at = p_event.created_at,
         updated_by = v_user_id,
