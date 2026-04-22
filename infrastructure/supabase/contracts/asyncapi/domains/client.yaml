@@ -1162,6 +1162,10 @@ components:
         placement_arrangement:
           type: string
           description: Placement type (e.g., residential, foster_care, group_home)
+        organization_unit_id:
+          type: string
+          format: uuid
+          description: Organizational unit (facility/site) for this placement
         start_date:
           type: string
           format: date
