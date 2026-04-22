@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-15
+last_updated: 2026-04-20
 ---
 
 <!-- TL;DR-START -->
@@ -131,15 +131,15 @@ All deactivations are soft-deletes:
 
 ## Consumers
 
-| Page | Pattern | Cascade | Dependency Check |
-|------|---------|---------|-----------------|
-| OrganizationsManagePage | DangerZone | Backend | None |
-| UsersManagePage | DangerZone | None | Role assignments |
-| RolesManagePage | DangerZone | None | User list |
-| SchedulesManagePage | DangerZone | FK CASCADE | User list |
-| OrgUnitsManagePage | DangerZone | ltree handler | Permission-based |
-| CustomFieldsTab | ConfirmDialog | None | Client usage count |
-| CategoriesTab | ConfirmDialog | Events (cross-aggregate) | Field count + names |
+| Page | Pattern | Lifecycle | Cascade | Dependency Check |
+|------|---------|-----------|---------|-----------------|
+| OrganizationsManagePage | DangerZone | Deactivate + Reactivate + Delete | Backend | None |
+| UsersManagePage | DangerZone | Deactivate + Reactivate + Delete | None | Role assignments |
+| RolesManagePage | DangerZone | Deactivate + Reactivate + Delete | None | User list |
+| SchedulesManagePage | DangerZone | Deactivate + Reactivate + Delete | FK CASCADE | User list |
+| OrgUnitsManagePage | DangerZone | Deactivate + Reactivate + Delete | ltree handler | Permission-based |
+| CustomFieldsTab | ConfirmDialog | Deactivate + Reactivate + Delete | None | Client usage count (blocks delete when > 0) |
+| CategoriesTab | ConfirmDialog | Deactivate + Reactivate + Delete | Deactivate cascades via events; reactivate does NOT cascade | Field count + names (blocks delete when > 0, counts active + inactive) |
 
 ## See Also
 

@@ -47,6 +47,12 @@ export interface ConfirmDialogProps {
   details?: string[];
   /** When set, user must type this text to enable the confirm button */
   requireConfirmText?: string;
+  /**
+   * When true, the confirm button is forcibly disabled regardless of other
+   * state. Used for blocked-destructive-action dialogs where only the Cancel
+   * button should be interactive.
+   */
+  confirmDisabled?: boolean;
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -61,6 +67,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   variant = 'default',
   details,
   requireConfirmText,
+  confirmDisabled: confirmDisabledProp = false,
 }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -74,6 +81,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const confirmDisabled =
     isLoading ||
+    confirmDisabledProp ||
     (!!requireConfirmText && confirmInput.toUpperCase() !== requireConfirmText.toUpperCase());
 
   // Focus trap and keyboard navigation (WCAG 2.1 AA requirement)
