@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-03-28
+last_updated: 2026-04-22
 purpose: agent-navigation
 ---
 
@@ -41,6 +41,7 @@ purpose: agent-navigation
 | `assignment` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | schedule_user_assignments_projection.md, organizations_projection.md |
 | `activity` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | activities-reference.md |
 | `automatic-tracing` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
+| `adding-permission` | [permissions-reference.md](architecture/authorization/permissions-reference.md) | role-management.md, rbac-architecture.md, permissions_projection.md |
 | `addresses` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | phones_projection.md |
 | `adr` | [adr-multi-role-effective-permissions.md](architecture/authorization/adr-multi-role-effective-permissions.md) | rbac-architecture.md, scoping-architecture.md |
 | `apm-integration` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
@@ -178,8 +179,9 @@ purpose: agent-navigation
 | `parent-span-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `pattern-selection` | [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | event-handler-pattern.md, SKILL.md |
 | `pre-request-hook` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
-| `permissions` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | permissions_projection.md |
+| `permissions` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | permissions_projection.md, permissions-reference.md, role-management.md |
 | `permission-grants` | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | rbac-architecture.md |
+| `permission-selector` | [role-management.md](frontend/reference/role-management.md) | permissions_projection.md, rbac-architecture.md |
 | `pg-notify` | [event-driven-workflow-triggering.md](architecture/workflows/event-driven-workflow-triggering.md) | triggering-workflows.md |
 | `pg-notify-pattern` | [event-driven-workflow-triggering.md](architecture/workflows/event-driven-workflow-triggering.md) | event-processing-patterns.md |
 | `patient` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | client-data-model.md |
@@ -211,10 +213,12 @@ purpose: agent-navigation
 | `role-permissions` | [role_permissions_projection.md](infrastructure/reference/database/tables/role_permissions_projection.md) | roles_projection.md |
 | `role-templates` | [role_permission_templates.md](infrastructure/reference/database/tables/role_permission_templates.md) | provider-admin-permissions-architecture.md |
 | `role-validity` | [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | rbac-architecture.md |
-| `role-assignment` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | manage-user.md, user_roles_projection.md |
+| `role-assignment` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | manage-user.md, user_roles_projection.md, role-management.md |
+| `role-form` | [role-management.md](frontend/reference/role-management.md) | rbac-architecture.md, permissions-reference.md |
+| `role-management` | [role-management.md](frontend/reference/role-management.md) | rbac-architecture.md, permissions-reference.md, permissions_projection.md |
 | `bulk-assignment` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | user_roles_projection.md |
 | `sync-role-assignments` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | manage-user.md |
-| `roles` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | roles_projection.md |
+| `roles` | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | roles_projection.md, role-management.md, permissions-reference.md |
 | `router` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md |
 | `rxnorm` | [medications.md](infrastructure/reference/database/tables/medications.md) | rxnorm-medication-autocomplete.md |
 | `saga` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | error-handling-and-compensation.md |
@@ -311,6 +315,7 @@ purpose: agent-navigation
 | [TESTING.md](frontend/testing/TESTING.md) | Unit and E2E testing strategies | `testing`, `vitest`, `playwright` | 2100 |
 | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | **[Aspirational]** Precursor question with canonical location/status values for all data collection applets | `data-collection`, `canonical-values`, `precursor-question` | 500 |
 | [ui-patterns.md](frontend/patterns/ui-patterns.md) | Modal architecture, dropdown patterns | `modal`, `ui`, `patterns` | 1800 |
+| [role-management.md](frontend/reference/role-management.md) | Role management frontend reference (MVVM, data-driven permission selector, subset-only delegation) | `role-management`, `role-form`, `permission-selector`, `adding-permission` | 1200 |
 
 ### Infrastructure
 

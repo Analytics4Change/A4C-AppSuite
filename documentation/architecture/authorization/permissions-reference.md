@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-04-22
 ---
 
 <!-- TL;DR-START -->
@@ -192,6 +192,27 @@ To grant permissions to existing provider_admin roles that were created before t
 -- Run sql/99-seeds/011-grant-provider-admin-permissions.sql (grants all 16 permissions)
 ```
 
+## Adding a New Permission (End-to-End)
+
+The `/roles` management UI is **data-driven**: once a new permission exists in `permissions_projection`, it automatically appears as a selectable checkbox in the role form — no frontend enum, union type, or component edit is required. Use this checklist when introducing a new permission.
+
+### Required
+
+1. **Seed the permission** — add a row (emitting `permission.defined`) to `infrastructure/supabase/sql/99-seeds/001-permissions-seed.sql`. The projection is updated automatically by the event router.
+2. **Grant it to a role template** — if the permission should be pre-granted to seeded roles such as `provider_admin`, add a row to the `role_permission_templates` seed (see [Permission Templates](#permission-templates) below).
+3. **Apply migration / reseed** — follow [DEPLOYMENT_INSTRUCTIONS.md](../../infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md).
+
+After steps 1–3 the new permission is live in the `/roles` UI.
+
+### Conditional
+
+4. **Mock mode** — if you develop against `npm run dev:mock` or have tests that use the mock role service, mirror the permission in `MOCK_PERMISSIONS` at `frontend/src/services/roles/MockRoleService.ts:83-116`.
+5. **New applet prefix** — if the permission introduces a brand-new applet (e.g., `billing.*` when no `billing.*` permissions exist yet), add a one-line entry to `APPLET_DISPLAY_NAMES` at `frontend/src/components/roles/PermissionSelector.tsx:88-97` for a friendly group header. Unknown applets still render, with an auto-generated label like `"Billing Management"`.
+6. **JWT/Edge Function reference** — if the permission is consumed by Edge Functions that import from `frontend/src/config/permissions.config.ts`, add it there too (see note under [Frontend Permission Configuration](#frontend-permission-configuration)).
+7. **Frontend permission gate** — if other UI needs to conditionally render on this permission, use `useAuth().hasPermission('applet.action')`. No enum or union type needs updating.
+
+**See also**: [Role Management Frontend Reference](../../frontend/reference/role-management.md) for the UI data flow, [permissions_projection](../../infrastructure/reference/database/tables/permissions_projection.md#1-define-new-permission-via-event) for the event emission example.
+
 ## Permission Templates
 
 Permission assignments for new organizations are managed via the `role_permission_templates` table. This provides a database-driven, platform-owner-configurable approach to permission management.
@@ -248,19 +269,12 @@ WHERE role_name = 'provider_admin' AND permission_name = 'old.permission';
 
 ## Frontend Permission Configuration
 
-Frontend permissions are defined in `frontend/src/config/permissions.config.ts`:
+The `/roles` management UI loads the permission list **dynamically** at runtime via `api.get_permissions()`; it does NOT read any hardcoded list from frontend source. See [Role Management Frontend Reference](../../frontend/reference/role-management.md) for the full data flow.
 
-```typescript
-export const PERMISSIONS: Record<string, Permission> = {
-  // Global Level (10)
-  'organization.create': { scope: 'global', ... },
-  // ...
+Two frontend files reference permissions statically and have narrow, specific purposes:
 
-  // Organization Level (21)
-  'organization.view': { scope: 'organization', ... },
-  // ...
-};
-```
+- **`frontend/src/config/permissions.config.ts`** — reference constants consumed by Edge Functions and JWT validation logic. This file must stay aligned with `permissions_projection`, but editing it alone will NOT surface a new permission in the `/roles` UI. Only edit when a new permission is also consumed by Edge Functions.
+- **`frontend/src/services/roles/MockRoleService.ts`** — hardcoded `MOCK_PERMISSIONS` array used by `npm run dev:mock` and unit tests. Mirror new permissions here for mock-mode development.
 
 ## Database Schema
 
