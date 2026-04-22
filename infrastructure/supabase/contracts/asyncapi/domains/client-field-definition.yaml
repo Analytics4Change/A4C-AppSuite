@@ -19,10 +19,26 @@ components:
     ClientFieldDefinitionDeactivated:
       name: client_field_definition.deactivated
       title: Client Field Definition Deactivated
-      summary: A field definition has been deactivated (hidden from configuration, one-way)
+      summary: A field definition has been deactivated (soft-delete, reversible via reactivation)
       contentType: application/json
       payload:
         $ref: '#/components/schemas/ClientFieldDefinitionDeactivatedEvent'
+
+    ClientFieldDefinitionReactivated:
+      name: client_field_definition.reactivated
+      title: Client Field Definition Reactivated
+      summary: A previously deactivated field definition has been reactivated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientFieldDefinitionReactivatedEvent'
+
+    ClientFieldDefinitionDeleted:
+      name: client_field_definition.deleted
+      title: Client Field Definition Deleted
+      summary: A field definition has been permanently deleted (hard delete, only after deactivation with zero client usage)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientFieldDefinitionDeletedEvent'
 
   schemas:
     # =========================================================================
@@ -244,3 +260,87 @@ components:
         organization_id:
           type: string
           format: uuid
+
+    ClientFieldDefinitionReactivatedEvent:
+      title: ClientFieldDefinitionReactivatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Field definition UUID
+        stream_type:
+          type: string
+          const: client_field_definition
+        event_type:
+          type: string
+          const: client_field_definition.reactivated
+        event_data:
+          $ref: '#/components/schemas/ClientFieldDefinitionReactivatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientFieldDefinitionReactivatedData:
+      title: ClientFieldDefinitionReactivatedData
+      type: object
+      description: Data for field definition reactivation (restores is_active=true)
+      required:
+        - field_id
+        - organization_id
+      properties:
+        field_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+
+    ClientFieldDefinitionDeletedEvent:
+      title: ClientFieldDefinitionDeletedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Field definition UUID (projection row deleted after handler runs)
+        stream_type:
+          type: string
+          const: client_field_definition
+        event_type:
+          type: string
+          const: client_field_definition.deleted
+        event_data:
+          $ref: '#/components/schemas/ClientFieldDefinitionDeletedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientFieldDefinitionDeletedData:
+      title: ClientFieldDefinitionDeletedData
+      type: object
+      description: Data for permanent field definition deletion
+      required:
+        - field_id
+        - organization_id
+        - field_key
+      properties:
+        field_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        field_key:
+          type: string
+          description: Semantic key of the deleted field (preserved in event for audit)

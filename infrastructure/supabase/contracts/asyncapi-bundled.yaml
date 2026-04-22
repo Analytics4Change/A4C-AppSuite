@@ -13764,8 +13764,8 @@ channels:
           - name: client_field_definition.deactivated
             title: Client Field Definition Deactivated
             summary: >-
-              A field definition has been deactivated (hidden from
-              configuration, one-way)
+              A field definition has been deactivated (soft-delete, reversible
+              via reactivation)
             contentType: application/json
             payload:
               title: ClientFieldDefinitionDeactivatedEvent
@@ -13801,6 +13801,218 @@ channels:
                     organization_id:
                       type: string
                       format: uuid
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_definition.reactivated
+            title: Client Field Definition Reactivated
+            summary: A previously deactivated field definition has been reactivated
+            contentType: application/json
+            payload:
+              title: ClientFieldDefinitionReactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field definition UUID
+                stream_type:
+                  type: string
+                  const: client_field_definition
+                event_type:
+                  type: string
+                  const: client_field_definition.reactivated
+                event_data:
+                  title: ClientFieldDefinitionReactivatedData
+                  type: object
+                  description: >-
+                    Data for field definition reactivation (restores
+                    is_active=true)
+                  required:
+                    - field_id
+                    - organization_id
+                  properties:
+                    field_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_definition.deleted
+            title: Client Field Definition Deleted
+            summary: >-
+              A field definition has been permanently deleted (hard delete, only
+              after deactivation with zero client usage)
+            contentType: application/json
+            payload:
+              title: ClientFieldDefinitionDeletedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: >-
+                    Field definition UUID (projection row deleted after handler
+                    runs)
+                stream_type:
+                  type: string
+                  const: client_field_definition
+                event_type:
+                  type: string
+                  const: client_field_definition.deleted
+                event_data:
+                  title: ClientFieldDefinitionDeletedData
+                  type: object
+                  description: Data for permanent field definition deletion
+                  required:
+                    - field_id
+                    - organization_id
+                    - field_key
+                  properties:
+                    field_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    field_key:
+                      type: string
+                      description: >-
+                        Semantic key of the deleted field (preserved in event
+                        for audit)
                 event_metadata:
                   title: EventMetadata
                   type: object
@@ -14094,7 +14306,9 @@ channels:
                       description: Additional context or notes
           - name: client_field_category.deactivated
             title: Client Field Category Deactivated
-            summary: An org-defined field category has been deactivated
+            summary: >-
+              An org-defined field category has been deactivated (soft-delete,
+              reversible via reactivation)
             contentType: application/json
             payload:
               title: ClientFieldCategoryDeactivatedEvent
@@ -14120,6 +14334,214 @@ channels:
                   title: ClientFieldCategoryDeactivatedData
                   type: object
                   description: Data for field category deactivation
+                  required:
+                    - category_id
+                    - organization_id
+                  properties:
+                    category_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_category.reactivated
+            title: Client Field Category Reactivated
+            summary: >-
+              A previously deactivated org-defined field category has been
+              reactivated (does not cascade to children)
+            contentType: application/json
+            payload:
+              title: ClientFieldCategoryReactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field category UUID
+                stream_type:
+                  type: string
+                  const: client_field_category
+                event_type:
+                  type: string
+                  const: client_field_category.reactivated
+                event_data:
+                  title: ClientFieldCategoryReactivatedData
+                  type: object
+                  description: >-
+                    Data for field category reactivation. Does not cascade to
+                    child fields — they remain in their current state.
+                  required:
+                    - category_id
+                    - organization_id
+                  properties:
+                    category_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_category.deleted
+            title: Client Field Category Deleted
+            summary: >-
+              An org-defined field category has been permanently deleted (hard
+              delete, only after deactivation with no remaining child fields)
+            contentType: application/json
+            payload:
+              title: ClientFieldCategoryDeletedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: >-
+                    Field category UUID (projection row deleted after handler
+                    runs)
+                stream_type:
+                  type: string
+                  const: client_field_category
+                event_type:
+                  type: string
+                  const: client_field_category.deleted
+                event_data:
+                  title: ClientFieldCategoryDeletedData
+                  type: object
+                  description: Data for permanent field category deletion
                   required:
                     - category_id
                     - organization_id
@@ -30684,8 +31106,8 @@ channels:
           - name: client_field_definition.deactivated
             title: Client Field Definition Deactivated
             summary: >-
-              A field definition has been deactivated (hidden from
-              configuration, one-way)
+              A field definition has been deactivated (soft-delete, reversible
+              via reactivation)
             contentType: application/json
             payload:
               title: ClientFieldDefinitionDeactivatedEvent
@@ -30721,6 +31143,218 @@ channels:
                     organization_id:
                       type: string
                       format: uuid
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_definition.reactivated
+            title: Client Field Definition Reactivated
+            summary: A previously deactivated field definition has been reactivated
+            contentType: application/json
+            payload:
+              title: ClientFieldDefinitionReactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field definition UUID
+                stream_type:
+                  type: string
+                  const: client_field_definition
+                event_type:
+                  type: string
+                  const: client_field_definition.reactivated
+                event_data:
+                  title: ClientFieldDefinitionReactivatedData
+                  type: object
+                  description: >-
+                    Data for field definition reactivation (restores
+                    is_active=true)
+                  required:
+                    - field_id
+                    - organization_id
+                  properties:
+                    field_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_definition.deleted
+            title: Client Field Definition Deleted
+            summary: >-
+              A field definition has been permanently deleted (hard delete, only
+              after deactivation with zero client usage)
+            contentType: application/json
+            payload:
+              title: ClientFieldDefinitionDeletedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: >-
+                    Field definition UUID (projection row deleted after handler
+                    runs)
+                stream_type:
+                  type: string
+                  const: client_field_definition
+                event_type:
+                  type: string
+                  const: client_field_definition.deleted
+                event_data:
+                  title: ClientFieldDefinitionDeletedData
+                  type: object
+                  description: Data for permanent field definition deletion
+                  required:
+                    - field_id
+                    - organization_id
+                    - field_key
+                  properties:
+                    field_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                    field_key:
+                      type: string
+                      description: >-
+                        Semantic key of the deleted field (preserved in event
+                        for audit)
                 event_metadata:
                   title: EventMetadata
                   type: object
@@ -31014,7 +31648,9 @@ channels:
                       description: Additional context or notes
           - name: client_field_category.deactivated
             title: Client Field Category Deactivated
-            summary: An org-defined field category has been deactivated
+            summary: >-
+              An org-defined field category has been deactivated (soft-delete,
+              reversible via reactivation)
             contentType: application/json
             payload:
               title: ClientFieldCategoryDeactivatedEvent
@@ -31040,6 +31676,214 @@ channels:
                   title: ClientFieldCategoryDeactivatedData
                   type: object
                   description: Data for field category deactivation
+                  required:
+                    - category_id
+                    - organization_id
+                  properties:
+                    category_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_category.reactivated
+            title: Client Field Category Reactivated
+            summary: >-
+              A previously deactivated org-defined field category has been
+              reactivated (does not cascade to children)
+            contentType: application/json
+            payload:
+              title: ClientFieldCategoryReactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Field category UUID
+                stream_type:
+                  type: string
+                  const: client_field_category
+                event_type:
+                  type: string
+                  const: client_field_category.reactivated
+                event_data:
+                  title: ClientFieldCategoryReactivatedData
+                  type: object
+                  description: >-
+                    Data for field category reactivation. Does not cascade to
+                    child fields — they remain in their current state.
+                  required:
+                    - category_id
+                    - organization_id
+                  properties:
+                    category_id:
+                      type: string
+                      format: uuid
+                    organization_id:
+                      type: string
+                      format: uuid
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: client_field_category.deleted
+            title: Client Field Category Deleted
+            summary: >-
+              An org-defined field category has been permanently deleted (hard
+              delete, only after deactivation with no remaining child fields)
+            contentType: application/json
+            payload:
+              title: ClientFieldCategoryDeletedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: >-
+                    Field category UUID (projection row deleted after handler
+                    runs)
+                stream_type:
+                  type: string
+                  const: client_field_category
+                event_type:
+                  type: string
+                  const: client_field_category.deleted
+                event_data:
+                  title: ClientFieldCategoryDeletedData
+                  type: object
+                  description: Data for permanent field category deletion
                   required:
                     - category_id
                     - organization_id

@@ -19,10 +19,26 @@ components:
     ClientFieldCategoryDeactivated:
       name: client_field_category.deactivated
       title: Client Field Category Deactivated
-      summary: An org-defined field category has been deactivated
+      summary: An org-defined field category has been deactivated (soft-delete, reversible via reactivation)
       contentType: application/json
       payload:
         $ref: '#/components/schemas/ClientFieldCategoryDeactivatedEvent'
+
+    ClientFieldCategoryReactivated:
+      name: client_field_category.reactivated
+      title: Client Field Category Reactivated
+      summary: A previously deactivated org-defined field category has been reactivated (does not cascade to children)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientFieldCategoryReactivatedEvent'
+
+    ClientFieldCategoryDeleted:
+      name: client_field_category.deleted
+      title: Client Field Category Deleted
+      summary: An org-defined field category has been permanently deleted (hard delete, only after deactivation with no remaining child fields)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ClientFieldCategoryDeletedEvent'
 
   schemas:
     # =========================================================================
@@ -169,6 +185,86 @@ components:
       title: ClientFieldCategoryDeactivatedData
       type: object
       description: Data for field category deactivation
+      required:
+        - category_id
+        - organization_id
+      properties:
+        category_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+
+    ClientFieldCategoryReactivatedEvent:
+      title: ClientFieldCategoryReactivatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Field category UUID
+        stream_type:
+          type: string
+          const: client_field_category
+        event_type:
+          type: string
+          const: client_field_category.reactivated
+        event_data:
+          $ref: '#/components/schemas/ClientFieldCategoryReactivatedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientFieldCategoryReactivatedData:
+      title: ClientFieldCategoryReactivatedData
+      type: object
+      description: Data for field category reactivation. Does not cascade to child fields — they remain in their current state.
+      required:
+        - category_id
+        - organization_id
+      properties:
+        category_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+
+    ClientFieldCategoryDeletedEvent:
+      title: ClientFieldCategoryDeletedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Field category UUID (projection row deleted after handler runs)
+        stream_type:
+          type: string
+          const: client_field_category
+        event_type:
+          type: string
+          const: client_field_category.deleted
+        event_data:
+          $ref: '#/components/schemas/ClientFieldCategoryDeletedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    ClientFieldCategoryDeletedData:
+      title: ClientFieldCategoryDeletedData
+      type: object
+      description: Data for permanent field category deletion
       required:
         - category_id
         - organization_id

@@ -15,6 +15,12 @@ BEGIN
         WHEN 'client_field_definition.deactivated' THEN
             PERFORM handle_client_field_definition_deactivated(p_event);
 
+        WHEN 'client_field_definition.reactivated' THEN
+            PERFORM handle_client_field_definition_reactivated(p_event);
+
+        WHEN 'client_field_definition.deleted' THEN
+            PERFORM handle_client_field_definition_deleted(p_event);
+
         ELSE
             RAISE EXCEPTION 'Unhandled event type "%" in process_client_field_definition_event', p_event.event_type
                 USING ERRCODE = 'P9001';
