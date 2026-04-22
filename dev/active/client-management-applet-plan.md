@@ -643,6 +643,49 @@ END IF;
 9. `20260408000351_fix_client_api_architecture_review.sql`
 10. `20260408012329_fix_batch_update_jsonb_scalar.sql`
 
+## Plan Updates (2026-04-20) — Custom Field/Category Lifecycle Parity
+
+### Problem
+Custom Fields and Custom Categories support only `deactivate` and filter inactive rows out of the UI entirely. This diverges from every other destructive-action entity in the app (Roles, Organization Units, Users, Schedules — all support full Deactivate → Reactivate → Hard Delete with inactive rows staying visible under a status filter). The implicit "ON CONFLICT re-create with same `field_key`" path (fixed in commit `864f2b4d`) is an undocumented, accidental reactivation mechanism — the UX is still wrong because users can't see, reactivate, or hard-delete deactivated rows.
+
+Root cause: plan.md and context.md never defined reactivate, hard-delete, or inactive-state UI for these two entities.
+
+### Lifecycle Contract (Decisions 98-101)
+- **Deactivate** (existing) → `is_active = false`, row preserved, UI shows "Inactive" badge.
+- **Reactivate** (new) → `is_active = true`. System categories and locked fields excluded.
+- **Hard Delete** (new) → physical `DELETE` of projection row.
+  - Field precondition: `is_active = false` AND `get_field_usage_count = 0`.
+  - Category precondition: `is_active = false` AND zero rows in `client_field_definitions_projection` for that `category_id` (active + inactive). Hard-deleted children are physically gone, so they don't block.
+- **Reactivation does NOT cascade** to child fields. Asymmetric with deactivation (which cascades via individual events per commit `aee11d28`). Rationale: user deactivated children individually via the cascade, so they should be reactivated individually too.
+
+Clean teardown for a user removing a whole custom category: deactivate children → hard-delete children (each subject to the usage gate) → deactivate category → hard-delete category (projection is empty, gate clears).
+
+### Scope
+- **Backend**: 4 new RPCs (reactivate + delete × field + category), 4 new handlers, router updates, event_types seed, extended `list_field_categories` + `get_category_field_count` helpers.
+- **AsyncAPI**: 4 new messages + schemas (`*.reactivated`, `*.deleted` for each entity). Regenerate types.
+- **Service layer**: 4 new methods on `IClientFieldService`, Supabase + Mock implementations.
+- **ViewModel**: status filter state + setters, `visibleCustomFields` / `visibleCustomCategories` computeds, 4 new action methods. `loadData` now loads all rows (UI filters client-side).
+- **UI**: status filter bar (All/Active/Inactive) on each tab, inactive badge, conditional per-row actions. Keep inline `ConfirmDialog` pattern (not DangerZone — pattern doc explicitly chose this for tab-level items).
+- **Dependency enumeration on blocked delete**: field shows usage count, category shows enumerated field names (mirrors Roles "has N users" UX).
+
+Plan file: `.claude/plans/read-dev-active-client-management-applet-mellow-sprout.md`
+
+### Migration
+`20260420160421_field_category_reactivate_delete.sql` (on local disk, not yet deployed; passes `supabase db push --dry-run`).
+
+### Dev-doc Backfill
+Same update also backfills the 2026-04-14 "Recent Fixes" batch (5 commits: `aee11d28`, `9abbe28c`, `998ebe14`, `864f2b4d`, `1d6dcf10`) that never made it into `tasks.md`. Migration count corrected from "13 deployed" to "15 deployed".
+
+### Architecture Review (2026-04-20)
+software-architect-dbc reviewed the full implementation: **0 Major + 7 Minor findings**. Three actionable Minors remediated in-place before deployment:
+- **m3**: Consolidated duplicate preconditions in `api.delete_field_definition` + `api.delete_field_category` (single SELECT with `is_active` instead of two queries).
+- **m2/m6**: `CustomFieldsTab` reactivate dialog now warns when the field's parent category is inactive ("will stay hidden until the category is reactivated"). Warn-don't-block per architect recommendation — keeps the RPC contract simple.
+- **m7**: `CategoriesTab` reactivate dialog now reports *"N child field(s) are still inactive"* and enumerates them via the `details` prop.
+
+Three accepted as-is: m1 (smaller metadata surface — inherited from peer RPCs), m4 (org-scope via JWT-derived variable — safe), m5 (mock `getFieldUsageCount` stub — conscious mock-mode limitation).
+
+Also introduced: `ConfirmDialog.confirmDisabled?: boolean` prop — minimal shared-component extension for blocked-destructive-action dialogs. Keeps the Confirm button visible-but-disabled (clearer UX than hiding it).
+
 ## Next Steps After Completion
 
 1. **Behavioral incidents domain** — Second fact table for analytics correlation

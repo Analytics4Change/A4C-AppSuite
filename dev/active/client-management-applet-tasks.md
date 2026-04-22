@@ -413,15 +413,138 @@ _Key remediations: M1 (B2c removed — already done), M2 (JSONB payload), M3 (p_
   - Also applied live via `execute_sql` before CI/CD deploy for immediate testing
 - [x] B7: Integration testing + documentation (7 table docs, E2E, RLS, AGENT-INDEX) (2026-04-08)
 
+## Phase B8: Custom Field & Category Lifecycle Parity 🔄 IN PROGRESS (2026-04-20)
+
+Goal: bring Custom Fields and Custom Categories to full 3-stage lifecycle parity with Roles / Organization Units / Users / Schedules. Today they only support deactivate (one-way) and have no Inactive-state UI. Target: Deactivate → Reactivate → Hard Delete, with deactivated rows visible under a status filter.
+
+User-confirmed decisions (2026-04-20):
+- Full parity — add reactivate + hard delete to BOTH entity types (Decision 98).
+- Field delete gate: block if `api.get_field_usage_count > 0` (Decision 99).
+- Category delete gate: zero rows in `client_field_definitions_projection` (active + inactive). Hard-deleted fields are physically gone so they don't block the category delete (Decision 100).
+- Reactivation does NOT cascade to children — user reactivates each field individually. Asymmetric with deactivation (which does cascade via events) (Decision 101).
+
+Plan file: `.claude/plans/read-dev-active-client-management-applet-mellow-sprout.md`
+
+### Backend (all done, NOT YET DEPLOYED — on local disk only)
+- [x] Migration `20260420160421_field_category_reactivate_delete.sql` — created via `supabase migration new`, passes `db push --dry-run`
+- [x] 4 new RPCs: `api.reactivate_field_definition`, `api.delete_field_definition`, `api.reactivate_field_category`, `api.delete_field_category` (all with `p_correlation_id`, permission check on `organization.update`, read-back guards)
+- [x] 4 new handlers: `handle_client_field_definition_reactivated`, `handle_client_field_definition_deleted`, `handle_client_field_category_reactivated`, `handle_client_field_category_deleted`
+- [x] Router updates: `process_client_field_definition_event` + `process_client_field_category_event` each get 2 new CASE branches (keep `RAISE EXCEPTION` ELSE)
+- [x] `event_types` seed: 4 new rows (field + category × reactivated + deleted)
+- [x] `api.list_field_categories(p_include_inactive boolean)` — dropped old signature, recreated with optional param
+- [x] `api.get_category_field_count(p_category_id, p_include_inactive)` — extended with optional param for delete-gate query
+- [x] GRANTs updated (authenticated, service_role for list_field_categories)
+- [x] Handler reference files: 4 new `.sql` files created under `handlers/client_field_definition/` and `handlers/client_field_category/`
+- [x] Router reference files updated: `handlers/routers/process_client_field_definition_event.sql`, `.../process_client_field_category_event.sql`
+
+### AsyncAPI + Types (all done)
+- [x] `client-field-definition.yaml`: added `ClientFieldDefinitionReactivated` + `ClientFieldDefinitionDeleted` messages, `*ReactivatedEvent/Data` + `*DeletedEvent/Data` schemas
+- [x] `client-field-category.yaml`: same pattern for category
+- [x] `asyncapi.yaml`: 4 new `$ref` entries added to messages union
+- [x] Regenerated types: **38 enums, 281 interfaces** (was 271). Copied to `frontend/src/types/generated/generated-events.ts`.
+
+### Service Layer (all done)
+- [x] `IClientFieldService`: added `reactivateFieldDefinition`, `deleteFieldDefinition`, `reactivateFieldCategory`, `deleteFieldCategory`. Extended `listFieldCategories(includeInactive?)` and `getCategoryFieldCount(categoryId, includeInactive?)`.
+- [x] `SupabaseClientFieldService`: 4 new RPC calls, wired `p_include_inactive` param through for list + count helpers
+- [x] `MockClientFieldService`: 4 new in-memory methods, usage-count gate mirrored in deleteFieldDefinition mock (matches backend UX for E2E). `listFieldCategories(true)` returns inactive rows.
+- [x] `RpcResult` type: added `usage_count?`, `child_count?`, `child_names?` fields (for blocked-delete dialog enumeration)
+
+### ViewModel (all done)
+- [x] `FieldStatusFilter = 'all' | 'active' | 'inactive'` exported type
+- [x] Observables: `fieldStatusFilter`, `categoryStatusFilter` (default `'active'`)
+- [x] Setters: `setFieldStatusFilter`, `setCategoryStatusFilter`
+- [x] Computeds: `visibleCustomFields` (non-system + status filter + alphabetical), `visibleCustomCategories` (system always included)
+- [x] `fieldsByCategory` now filters `is_active = true` explicitly (avoids leaking deactivated custom fields into system-category tabs since loadData now pulls all rows)
+- [x] `changedFields` skips `!is_active` (can't batch-edit deactivated)
+- [x] `loadData` calls `listFieldDefinitions(true)` + `listFieldCategories(true)` — always loads all rows, UI filters client-side
+- [x] 4 new action methods: `reactivateCustomField`, `deleteCustomField`, `reactivateCategory`, `deleteCategory`. `delete*` methods return a richer result (`{success, error, usageCount | childCount, childNames}`) so callers can enumerate dependencies.
+- [x] New state: `isFieldLifecycleActionInProgress`, `fieldLifecycleError`, `isCategoryLifecycleActionInProgress`, `categoryLifecycleError`, and clear* helpers
+- [x] `getCategoryFieldCount(id, includeInactive)` pass-through
+
+### UI — CustomFieldsTab ✅ COMPLETE
+- [x] Imports updated (`RotateCcw` from lucide-react, `FieldStatusFilter` type)
+- [x] Replaced inline `customFields = fields.filter(...is_active)` with `viewModel.visibleCustomFields`
+- [x] Added `reactivateTarget` + `deleteTarget` local state
+- [x] Status filter bar (All / Active / Inactive) bound to `viewModel.setFieldStatusFilter` with `aria-pressed` and `data-testid="cf-status-filter-{all|active|inactive}"`
+- [x] "Inactive" badge on rows where `!field.is_active` (`data-testid="cf-inactive-badge-{field_key}"`)
+- [x] Conditional row actions: active → Edit + Deactivate (unchanged); inactive → Reactivate (green `RotateCcw`) + Delete (red `Trash2`). Edit hidden on inactive.
+- [x] Reactivate button + success-variant `ConfirmDialog` calling `vm.reactivateCustomField`.
+- [x] Delete button with pre-query `vm.getFieldUsageCount`: count > 0 → blocked dialog with `confirmDisabled={true}`, "Dismiss" cancel label; count = 0 → danger confirm with `requireConfirmText = field.display_name`.
+- [x] `aria-label` on new action buttons: `Reactivate <name>` / `Delete <name>`.
+- [x] `ConfirmDialog` extended with `confirmDisabled?: boolean` prop for blocked-destructive-action dialogs.
+- [x] `fieldLifecycleError` banner surfaced at top of tab (`role="alert"`).
+
+### UI — CategoriesTab ✅ COMPLETE
+- [x] Status filter bar (`data-testid="cat-status-filter-{all|active|inactive}"`) bound to `viewModel.setCategoryStatusFilter`
+- [x] Replaced inline `activeCategories = categories.filter((c) => c.is_active)` with `viewModel.visibleCustomCategories`
+- [x] System categories always visible (never filtered out) — matches pre-existing behavior
+- [x] Inactive badge (`data-testid="cat-inactive-badge-{slug}"`) + conditional Edit/Deactivate vs Reactivate/Delete action buttons
+- [x] Reactivate dialog (`variant="success"`) calling `vm.reactivateCategory` — explanatory copy notes children do NOT auto-reactivate
+- [x] Delete pre-query `vm.getCategoryFieldCount(id, includeInactive=true)` — matches server-side gate exactly. count > 0 → blocked dialog with enumerated field names via `details` prop; count = 0 → danger confirm with `requireConfirmText = category.name`
+- [x] `categoryLifecycleError` banner surfaced at top of tab (`role="alert"`)
+- [x] Uses `result.childNames` from `vm.deleteCategory` to refresh enumeration if the server disagrees with the client pre-check
+
+### E2E Tests ✅ COMPLETE
+- [x] Appended to `frontend/e2e/client-field-settings.spec.ts` (6 new tests, 60 total)
+- [x] `Inactive filter reveals deactivated fields with Inactive badge` — verifies Reactivate/Delete buttons present, Edit hidden
+- [x] `Reactivate flow returns a deactivated field to Active` — success dialog → confirm → disappears from Inactive, re-appears in Active
+- [x] `Delete blocked when field has client usage` — `field_key` containing `weekend` (mock returns usage=3) → dialog confirm button disabled, Dismiss remains enabled
+- [x] `Delete happy path removes field from all filters with typed confirmation` — typed-confirm → removed from Active, Inactive, and All filters
+- [x] `Reactivate flow returns a deactivated category to Active` — inactive badge visible, reactivate → Active filter shows row
+- [x] `Delete happy path removes empty deactivated category with typed confirmation` — typed-confirm flow for categories
+
+### Documentation ✅ COMPLETE
+- [x] Updated `documentation/frontend/patterns/danger-zone-pattern.md` Consumer table: new `Lifecycle` column showing 3-stage verbs for ALL rows, CustomFieldsTab + CategoriesTab rows updated with full lifecycle + accurate cascade/dependency-check detail. `last_updated: 2026-04-20`.
+- [x] Added Decisions 98-101 to `dev/active/client-management-applet-context.md` — full lifecycle, field delete gate (usage count), category delete gate (projection row count, active + inactive), reactivation no-cascade.
+- [x] `dev/active/client-management-applet-plan.md` already has "Plan Updates (2026-04-20) — Custom Field/Category Lifecycle Parity" section (line 646).
+
+### Verification ✅ COMPLETE (2026-04-20)
+- [x] `supabase db push --linked --dry-run` clean
+- [x] `cd frontend && npx tsc --noEmit` clean, `npx eslint` clean on changed files, `npm run build` green (5.71s, 1,783 KB bundle)
+- [x] Playwright full suite: **60/60 passing** (54 pre-existing + 6 new lifecycle tests)
+- [ ] Deploy migration via `git push` → CI/CD pipeline (FINAL STEP — not yet done)
+
+### Architecture Review + Remediation ✅ COMPLETE (2026-04-20)
+
+software-architect-dbc reviewed Phase B8 and flagged **0 Major + 7 Minor findings**. All actionable Minors remediated; 3 accepted as-is per architect's own guidance.
+
+Remediated:
+- **m3** (consolidate dup preconditions): `api.delete_field_definition` + `api.delete_field_category` each collapsed two SELECTs into a single `SELECT ... INTO v_field/v_category` with `is_active` included; dropped the subsequent `IF EXISTS` check. Migration still passes dry-run.
+- **m2/m6** (orphan-category warning on field reactivate): `CustomFieldsTab` reactivate dialog now detects when the field's parent category is inactive and shows *"The parent category 'X' is currently inactive, so this field will stay hidden from the intake form until the category is reactivated too. Proceed anyway?"* Warn-don't-block per architect recommendation. `reactivateTarget` state extended with `parentCategoryInactive` + `parentCategoryName`.
+- **m7** (inactive child count on category reactivate): `CategoriesTab` reactivate dialog now reports *"N child field(s) are still inactive and will stay inactive"* and renders the enumerated list via `details` prop. `reactivateTarget` state extended with `inactiveChildCount` + `inactiveChildNames`. Count sourced from `viewModel.fieldDefinitions` filtered by `category_id && !is_active`.
+
+Accepted (no action needed):
+- **m1** (smaller event-metadata surface): inherited from peer RPCs (schedule-assignment family uses the same minimal set). Future cleanup is an `api.build_event_metadata()` helper, not a B8 concern.
+- **m4** (child-count query via event-data predicate, not JWT session): Safe because `v_org_id` is JWT-derived via `get_current_org_id()`.
+- **m5** (mock `getFieldUsageCount` is a stub): Conscious mock-mode limitation. Add server-side integration test in a follow-up if desired.
+
+### Gotchas Discovered
+- `SYSTEM_FIELD_KEYS` moved to ViewModel: was used inline in CustomFieldsTab, now applied inside `visibleCustomFields` computed. Tab no longer imports it directly.
+- `fieldsByCategory` requires explicit `is_active=true` filter after switching loadData to include inactive rows. Without this, deactivated custom fields assigned to a system category (like Clinical) would leak into that system tab.
+- `changedFields` must skip `!is_active` — otherwise a deactivated row with stale original state generates phantom batch-update diffs.
+- `api.list_field_categories` and `api.get_category_field_count` signatures changed — used `DROP FUNCTION IF EXISTS ...(uuid)` first, then recreated with optional `p_include_inactive` param. New GRANTs are needed on the new signatures.
+- Tab-level Custom Fields/Categories UX **intentionally uses inline `ConfirmDialog`**, NOT the collapsible `DangerZone` component. The danger-zone-pattern doc (line 26-37) defines this split: DangerZone for manage-page entities, inline ConfirmDialog for tab-level list items. Don't change this.
+- The mock service's `getFieldUsageCount` returns 3 when `fieldKey.includes('weekend')` — use this as a hook for E2E tests to trigger the blocked-delete path.
+- `ConfirmDialog` got a new `confirmDisabled?: boolean` prop (shared-component extension, NOT a fork). Use it for blocked-destructive-action dialogs where only the Cancel button should be interactive — keeps the Confirm button visible-but-disabled (communicates "action blocked" better than hiding it). Pairs with `cancelLabel="Dismiss"` for the blocked state.
+- Architect finding m2 resolved via **warn-don't-block**: `api.reactivate_field_definition` does NOT gate on parent category state. The UI surfaces the orphan state instead. This keeps the RPC contract simple and lets admins reactivate in any order.
+
 ## Current Status
 
-**Phase**: Phase 5.2b — Client Intake E2E Tests ⏸️ IN PROGRESS
-**Status**: Backend fully built (26 RPCs, 22 handlers, 7 tables, 23 events). Frontend intake form complete. Co-owner reports registration doesn't work — writing E2E tests to surface failures.
-**Migrations**: 13 deployed (11 original + enum validation_rules fix + field config enhancements).
+**Phase**: Phase B8 — Custom Field/Category Lifecycle Parity 🟢 READY TO DEPLOY
+**Status**: All code + tests + docs + architect remediation complete. 60/60 Playwright tests green. Only step remaining is `git push` to trigger CI/CD deployment of the undeployed migration.
+**Migrations**: 15 deployed + 1 **uncommitted, undeployed** (`20260420160421_field_category_reactivate_delete.sql`) on local disk only. Dry-run passes.
 
-**Last Updated**: 2026-04-13
-**Next Step**: Write E2E tests in `frontend/e2e/client-intake.spec.ts` (append to existing 30 navigation tests). Focus on form fill + submit flow first — this is where the reported failure likely lives.
-**Plan file**: `.claude/plans/eventual-munching-flamingo.md` (E2E test plan).
+**Last Updated**: 2026-04-20 (after architect review + remediation)
+**Next Step (after /clear)**: Final review of staged changes, then `git add` + `git commit` + `git push`. Plan file: `.claude/plans/read-dev-active-client-management-applet-mellow-sprout.md`. Architect remediation is inline in this file under "Architecture Review + Remediation" above.
+
+**Plan file**: `.claude/plans/read-dev-active-client-management-applet-mellow-sprout.md` (approved plan for Phase B8).
+
+### Recent Fixes (2026-04-14):
+- `aee11d28`: Danger-zone confirmation for custom field/category deactivation. New migration `20260415022432_field_deactivation_confirmation.sql`; new pattern doc `documentation/frontend/patterns/danger-zone-pattern.md`; `BaseDangerZoneState` shared type; cascade-via-events (category deactivate emits individual `client_field_definition.deactivated` events under shared `correlation_id`); new RPCs `api.get_field_usage_count`, `api.get_category_field_count`. Architecture review: 3 Major + 4 Minor remediated.
+- `9abbe28c`: Sort custom fields alphabetically by display name (CustomFieldsTab).
+- `998ebe14`: Custom category tabs sorted alphabetically after system categories (ViewModel `tabList`). Also a data patch for Live-for-Life tenant `sort_order=0` row.
+- `864f2b4d`: Read-back guard fix for re-creating a deactivated custom field. `ON CONFLICT (organization_id, field_key)` updates the existing row retaining its original `id`, so the read-back guard must query by `(organization_id, field_key)`, not `id`. Migration `20260415003931_fix_create_field_readback_guard.sql`.
+- `1d6dcf10`: Friendly error message for duplicate custom field name (`"<Display Name>" already exists. Choose another name.`).
 
 ### Recent Fixes (2026-04-09):
 - `283a21f0`: ViewModel preserveChanges + session correlation ID

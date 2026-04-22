@@ -140,6 +140,15 @@
 
 97. **Read-back guards on all client field RPCs** (decided 2026-04-07, architecture review M2): All 4 write RPCs (`create_field_definition`, `update_field_definition`, `create_field_category`, `deactivate_field_category`) now include projection read-back + `processing_error` fetch after event emission. Prevents silent failures where handler errors are swallowed and `{success: true}` is returned. Same pattern as org unit delete fix (Decision from 2026-02-23).
 
+98. **Custom field + category full lifecycle parity** (decided 2026-04-20): Both entities support Deactivate → Reactivate → Hard Delete, matching Roles / Organization Units / Users / Schedules. Root cause of prior UX divergence: plan and context never defined reactivate, delete, or inactive-state UI. Implementation adds 4 new RPCs, 4 handlers, 4 event types, status filter UI, and inactive-row visibility. Container stays as inline `ConfirmDialog` (not the collapsible `DangerZone` panel) — danger-zone-pattern.md explicitly chose this split for tab-level list items vs manage-page entities.
+
+99. **Field hard-delete gate — block on client usage** (decided 2026-04-20): `api.delete_field_definition()` preconditions: `is_active = false` AND `get_field_usage_count(field_key) = 0`. If any client has data for the `field_key` in `clients_projection.custom_fields`, delete is blocked and the usage count returned in the error payload. Users must scrub data or leave the field indefinitely soft-deleted. Mirrors the Roles "must have no users" UX for dependency enumeration.
+
+100. **Category hard-delete gate — zero projection rows** (decided 2026-04-20): `api.delete_field_category()` precondition: `is_active = false` AND zero rows in `client_field_definitions_projection` where `category_id = p_category_id` (active OR inactive). Hard-deleted fields are physically gone from the projection, so they do NOT block the category delete. Clean teardown sequence: deactivate fields → hard-delete fields → deactivate category → hard-delete category. This mirrors how OrgUnits' "must have no children" works — long-deleted children don't block.
+
+101. **Reactivation does NOT cascade to children** (decided 2026-04-20): When a category is reactivated, child fields stay in their current state (each user reactivates individually). Asymmetric with deactivation (which DOES cascade via individual `client_field_definition.deactivated` events under a shared `correlation_id`, established in commit `aee11d28`). Rationale: the user deactivated children individually via the cascade, so they should be reactivated individually too. Mechanically, the reactivate handler only updates the category row; it does not iterate children.
+
+
 68. **Allergy type enum expanded** (decided 2026-03-19): `allergy_type` on each allergy item changed from `medication`/`general` to `medication`/`food`/`environmental`. Standard EMR categorization.
 
 20. **4 clinical contact fields on intake form** (decided 2026-03-04): Separate fields for Assigned Clinician, Therapist, Psychiatrist, and Behavioral Analyst. All share the same reusable `ClinicalContactField` component parameterized by designation. All nullable.
@@ -451,6 +460,38 @@ Full audit of all event types across 12 routers + dispatcher vs 14 AsyncAPI doma
 ### Schema Diagrams (documentation source)
 - `dev/active/client-management-applet-schema-diagrams.md` — Mermaid ER diagram (all 12 new tables + 2 modified + 6 existing), event flow diagram, table inventory, RLS patterns. **Serves as partial source for documentation artifacts** (table reference docs, architecture doc, AGENT-INDEX updates) per `documentation/AGENT-GUIDELINES.md`.
 
+## Mid-Flight Snapshot (2026-04-20) — Phase B8 Lifecycle Parity
+
+Files created (on disk, uncommitted, undeployed):
+- `infrastructure/supabase/supabase/migrations/20260420160421_field_category_reactivate_delete.sql` — migration with 4 new RPCs (reactivate + delete × field + category), 4 new handlers, router updates, event_types seed, extended list + count helpers. Passes `supabase db push --linked --dry-run`.
+- `infrastructure/supabase/handlers/client_field_definition/handle_client_field_definition_reactivated.sql`
+- `infrastructure/supabase/handlers/client_field_definition/handle_client_field_definition_deleted.sql`
+- `infrastructure/supabase/handlers/client_field_category/handle_client_field_category_reactivated.sql`
+- `infrastructure/supabase/handlers/client_field_category/handle_client_field_category_deleted.sql`
+
+Files modified (on disk, uncommitted):
+- `infrastructure/supabase/contracts/asyncapi/domains/client-field-definition.yaml` — added reactivated + deleted messages/schemas
+- `infrastructure/supabase/contracts/asyncapi/domains/client-field-category.yaml` — same
+- `infrastructure/supabase/contracts/asyncapi/asyncapi.yaml` — added 4 new `$ref` entries
+- `infrastructure/supabase/contracts/types/generated-events.ts` — regenerated (281 interfaces)
+- `infrastructure/supabase/contracts/asyncapi-bundled.yaml` — regenerated
+- `infrastructure/supabase/handlers/routers/process_client_field_definition_event.sql` — 2 new CASE branches
+- `infrastructure/supabase/handlers/routers/process_client_field_category_event.sql` — 2 new CASE branches
+- `frontend/src/types/generated/generated-events.ts` — copied from contracts output
+- `frontend/src/types/client-field-settings.types.ts` — `RpcResult` gained `usage_count?`, `child_count?`, `child_names?`
+- `frontend/src/services/client-fields/IClientFieldService.ts` — 4 new methods, extended 2 signatures
+- `frontend/src/services/client-fields/SupabaseClientFieldService.ts` — 4 new RPC wrappers, `p_include_inactive` pass-through
+- `frontend/src/services/client-fields/MockClientFieldService.ts` — 4 new in-memory methods + `includeInactive` support
+- `frontend/src/viewModels/settings/ClientFieldSettingsViewModel.ts` — `FieldStatusFilter` type export, status filter observables, visible* computeds, 4 new action methods, `fieldsByCategory` + `changedFields` skip inactive, `loadData` always loads all rows
+
+Files MID-EDIT (partial — future Claude: start here):
+- `frontend/src/pages/settings/client-fields/CustomFieldsTab.tsx` — imports updated, `reactivateTarget` + `deleteTarget` state scaffolded, `customFields` now sourced from `viewModel.visibleCustomFields`. **Not yet done**: status filter bar UI, Inactive badge, conditional Reactivate / Delete buttons on inactive rows, the three dialog instances (deactivate [existing], reactivate new, delete new with blocked-state handling for usage > 0).
+
+Files NOT YET TOUCHED:
+- `frontend/src/pages/settings/client-fields/CategoriesTab.tsx` — needs same treatment as CustomFieldsTab. Use `viewModel.visibleCustomCategories` and `vm.getCategoryFieldCount(id, true)` (includeInactive=true) to match server gate.
+- `frontend/e2e/client-field-settings.spec.ts` — append reactivate + delete scenarios (see tasks.md Phase B8 for list).
+- `documentation/frontend/patterns/danger-zone-pattern.md` — update Consumer table row.
+
 ## Important Constraints
 
 1. **CQRS compliance**: No direct table writes. All mutations via `api.*` RPC → domain event → handler.
@@ -680,3 +721,17 @@ Regulatory and clinical standards already define value sets for nearly every ana
 
 **Why `client` stream_type instead of `clinical`?**
 `clinical` is too broad — it could encompass behavioral incidents, medication events, treatment plans. `client` is specific to the client entity lifecycle. Each domain entity gets its own stream_type (consistent with existing patterns: `user`, `organization`, `role`, etc.).
+
+## Decisions 98-101 (2026-04-20) — Custom Field / Category Lifecycle Parity
+
+**Decision 98 — Full 3-stage lifecycle for both entity types.**
+Custom Fields and Custom Categories follow the same Deactivate → Reactivate → Hard Delete lifecycle used by Roles, Organization Units, Users, and Schedules. Deactivated rows remain visible under an "Inactive" status filter (tab-level filter bar), not hidden.
+
+**Decision 99 — Field delete gate: client usage count must be zero.**
+Hard-deleting a custom field requires `api.get_field_usage_count(field_key) = 0`. If any client has a value for that `field_key` in `custom_fields`, delete is blocked and the user is told to leave the field deactivated (deactivation preserves historical data; hard-delete would orphan it).
+
+**Decision 100 — Category delete gate: zero rows in `client_field_definitions_projection`.**
+Hard-deleting a custom category requires zero rows (active OR inactive) in `client_field_definitions_projection` for that `category_id`. Hard-deleted fields are physically removed from the projection, so they do NOT block the category delete. Clean teardown sequence: deactivate fields → hard-delete fields → deactivate category → hard-delete category.
+
+**Decision 101 — Reactivation does NOT cascade to children.**
+When a deactivated category is reactivated, its previously-deactivated child fields stay deactivated. Users reactivate each field individually. This is asymmetric with deactivation (which DOES cascade via individual `client_field_definition.deactivated` events under a shared `correlation_id`), and the asymmetry is intentional: reactivating a category is a narrow admin action; indiscriminate re-opening of every historically-deactivated field would be surprising and hard to undo. Users reinstate only the fields they still want.
