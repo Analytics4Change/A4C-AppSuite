@@ -3,7 +3,7 @@
  *
  * Generated from AsyncAPI specification by Modelina
  * Source: infrastructure/supabase/contracts/asyncapi/
- * Generated: 2026-04-20T16:08:20.867Z
+ * Generated: 2026-04-22T05:24:25.097Z
  *
  * To regenerate: cd infrastructure/supabase/contracts && npm run generate:types
  *
@@ -231,7 +231,7 @@ export enum RoleScope {
   UNIT = "unit",
 }
 
-export enum AnonymousSchema_5505 {
+export enum AnonymousSchema_5506 {
   RESERVED_TEXT = "text",
   RESERVED_NUMBER = "number",
   DATE = "date",
@@ -241,7 +241,7 @@ export enum AnonymousSchema_5505 {
   JSONB = "jsonb",
 }
 
-export enum AnonymousSchema_5533 {
+export enum AnonymousSchema_5534 {
   RESERVED_TEXT = "text",
   RESERVED_NUMBER = "number",
   DATE = "date",
@@ -425,12 +425,12 @@ export interface UserAddressUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.updated';
-  'event_data': AnonymousSchema_3317;
+  'event_data': AnonymousSchema_3318;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3317 {
+export interface AnonymousSchema_3318 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -452,12 +452,12 @@ export interface UserAddressRemovedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.removed';
-  'event_data': AnonymousSchema_3349;
+  'event_data': AnonymousSchema_3350;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3349 {
+export interface AnonymousSchema_3350 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -493,12 +493,12 @@ export interface UserPhoneUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.phone.updated';
-  'event_data': AnonymousSchema_3398;
+  'event_data': AnonymousSchema_3399;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3398 {
+export interface AnonymousSchema_3399 {
   'phone_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -2250,7 +2250,7 @@ export interface ClientFieldDefinitionCreatedData {
   'category_id': string;
   'field_key': string;
   'display_name': string;
-  'field_type'?: AnonymousSchema_5505;
+  'field_type'?: AnonymousSchema_5506;
   'is_visible'?: boolean;
   'is_required'?: boolean;
   'validation_rules'?: Map<string, any>;
@@ -2275,7 +2275,7 @@ export interface ClientFieldDefinitionUpdatedData {
   'organization_id': string;
   'display_name'?: string;
   'category_id'?: string;
-  'field_type'?: AnonymousSchema_5533;
+  'field_type'?: AnonymousSchema_5534;
   'is_visible'?: boolean;
   'is_required'?: boolean;
   'validation_rules'?: Map<string, any>;
@@ -2768,6 +2768,7 @@ export interface ClientPlacementChangeData {
   'placement_arrangement': string;
   'start_date': string;
   'reason'?: string;
+  'organization_unit_id'?: string;
   'additionalProperties'?: Map<string, any>;
 }
 
