@@ -10,10 +10,13 @@ import { observer } from 'mobx-react-lite';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Pencil, Loader2, AlertCircle, Check, X } from 'lucide-react';
+import { Plus, Trash2, Pencil, RotateCcw, Loader2, AlertCircle, Check, X } from 'lucide-react';
 import type { FieldDefinition, FieldCategory } from '@/types/client-field-settings.types';
-import { SYSTEM_FIELD_KEYS, FIELD_TYPE_DISPLAY_LABELS } from '@/types/client-field-settings.types';
-import type { ClientFieldSettingsViewModel } from '@/viewModels/settings/ClientFieldSettingsViewModel';
+import { FIELD_TYPE_DISPLAY_LABELS } from '@/types/client-field-settings.types';
+import type {
+  ClientFieldSettingsViewModel,
+  FieldStatusFilter,
+} from '@/viewModels/settings/ClientFieldSettingsViewModel';
 import { EnumValuesInput } from './EnumValuesInput';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
@@ -67,6 +70,26 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
     const [isCheckingUsage, setIsCheckingUsage] = useState(false);
     const [isDeactivating, setIsDeactivating] = useState(false);
 
+    // Reactivation + delete confirmation state
+    const [reactivateTarget, setReactivateTarget] = useState<{
+      id: string;
+      name: string;
+      /**
+       * True when the field's parent category is currently inactive.
+       * Decision 101: reactivation does NOT cascade, so the action still
+       * succeeds — we just warn the admin the field will remain hidden
+       * until the category is also reactivated.
+       */
+      parentCategoryInactive: boolean;
+      parentCategoryName: string | null;
+    } | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<{
+      id: string;
+      name: string;
+      fieldKey: string;
+      usageCount: number;
+    } | null>(null);
+
     const editNameRef = useRef<HTMLInputElement>(null);
 
     const isEnumType = fieldType === 'enum' || fieldType === 'multi_enum';
@@ -78,10 +101,63 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
       }
     }, [editingFieldId]);
 
-    // Custom fields = non-locked, org-created fields (across all categories), sorted alphabetically
-    const customFields = fields
-      .filter((f) => !SYSTEM_FIELD_KEYS.has(f.field_key) && f.is_active)
-      .sort((a, b) => a.display_name.localeCompare(b.display_name));
+    // Custom fields honoring the status filter (All / Active / Inactive).
+    // Sorting + system-field exclusion lives in the ViewModel.
+    const customFields = viewModel.visibleCustomFields;
+    // Eliminate TS unused-param lint for the now-ViewModel-driven source.
+    void fields;
+    const statusFilter = viewModel.fieldStatusFilter;
+
+    const handleStatusFilter = (value: FieldStatusFilter) => viewModel.setFieldStatusFilter(value);
+
+    const handleReactivateClick = (field: FieldDefinition) => {
+      viewModel.clearFieldLifecycleError();
+      const parentCategory = viewModel.categories.find((c) => c.id === field.category_id);
+      setReactivateTarget({
+        id: field.id,
+        name: field.display_name,
+        parentCategoryInactive: parentCategory ? !parentCategory.is_active : false,
+        parentCategoryName: parentCategory?.name ?? null,
+      });
+    };
+
+    const confirmReactivate = async () => {
+      if (!reactivateTarget) return;
+      const ok = await viewModel.reactivateCustomField(
+        reactivateTarget.id,
+        `Reactivated custom field: ${reactivateTarget.name}`,
+        orgId
+      );
+      if (ok) setReactivateTarget(null);
+    };
+
+    const handleDeleteClick = async (field: FieldDefinition) => {
+      viewModel.clearFieldLifecycleError();
+      setIsCheckingUsage(true);
+      const count = await viewModel.getFieldUsageCount(field.field_key);
+      setIsCheckingUsage(false);
+      setDeleteTarget({
+        id: field.id,
+        name: field.display_name,
+        fieldKey: field.field_key,
+        usageCount: count,
+      });
+    };
+
+    const confirmDelete = async () => {
+      if (!deleteTarget || deleteTarget.usageCount > 0) return;
+      const result = await viewModel.deleteCustomField(
+        deleteTarget.id,
+        `Deleted custom field: ${deleteTarget.name}`,
+        orgId
+      );
+      if (result.success) {
+        setDeleteTarget(null);
+      } else if (typeof result.usageCount === 'number' && result.usageCount > 0) {
+        // Server disagreed with client-side pre-check: surface the fresh count.
+        setDeleteTarget({ ...deleteTarget, usageCount: result.usageCount });
+      }
+    };
 
     const fieldKey = name
       .toLowerCase()
@@ -219,6 +295,43 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Status filter bar */}
+            <div
+              className="flex gap-2"
+              role="group"
+              aria-label="Filter custom fields by status"
+              data-testid="cf-status-filter"
+            >
+              {(['all', 'active', 'inactive'] as const).map((value) => (
+                <Button
+                  key={value}
+                  variant={statusFilter === value ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusFilter(value)}
+                  aria-pressed={statusFilter === value}
+                  className={
+                    statusFilter === value
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'hover:bg-gray-100'
+                  }
+                  data-testid={`cf-status-filter-${value}`}
+                >
+                  {value.charAt(0).toUpperCase() + value.slice(1)}
+                </Button>
+              ))}
+            </div>
+
+            {viewModel.fieldLifecycleError && (
+              <div
+                role="alert"
+                className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-sm"
+                data-testid="cf-lifecycle-error"
+              >
+                <AlertCircle size={14} />
+                {viewModel.fieldLifecycleError}
+              </div>
+            )}
+
             {/* Create form */}
             {showForm && (
               <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-white/50">
@@ -352,8 +465,12 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
 
             {/* Custom fields table */}
             {customFields.length === 0 && !showForm ? (
-              <p className="text-sm text-gray-500 py-4">
-                No custom fields defined. Click &quot;Add Custom Field&quot; to create one.
+              <p className="text-sm text-gray-500 py-4" data-testid="cf-empty-state">
+                {statusFilter === 'inactive'
+                  ? 'No deactivated custom fields.'
+                  : statusFilter === 'active'
+                    ? 'No custom fields defined. Click "Add Custom Field" to create one.'
+                    : 'No custom fields exist.'}
               </p>
             ) : (
               <div className="divide-y divide-gray-100">
@@ -459,16 +576,29 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                       key={field.id}
                       className="flex items-center justify-between py-3"
                       data-testid={`custom-field-${field.field_key}`}
+                      data-active={field.is_active ? 'true' : 'false'}
                     >
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">{field.display_name}</span>
+                          <span
+                            className={`text-sm font-medium ${field.is_active ? '' : 'text-gray-500'}`}
+                          >
+                            {field.display_name}
+                          </span>
                           <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
                             {FIELD_TYPE_DISPLAY_LABELS[field.field_type] ?? field.field_type}
                           </span>
-                          {field.is_required && (
+                          {field.is_required && field.is_active && (
                             <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
                               Required
+                            </span>
+                          )}
+                          {!field.is_active && (
+                            <span
+                              className="text-xs text-gray-600 bg-gray-200 px-1.5 py-0.5 rounded"
+                              data-testid={`cf-inactive-badge-${field.field_key}`}
+                            >
+                              Inactive
                             </span>
                           )}
                         </div>
@@ -487,27 +617,58 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                           })()}
                       </div>
                       <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => startEditing(field)}
-                          className="text-gray-500 hover:text-blue-700 hover:bg-blue-50"
-                          aria-label={`Edit ${field.display_name}`}
-                          data-testid={`cf-edit-${field.field_key}`}
-                        >
-                          <Pencil size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeactivateClick(field)}
-                          disabled={isCheckingUsage}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          aria-label={`Deactivate ${field.display_name}`}
-                          data-testid={`cf-deactivate-${field.field_key}`}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
+                        {field.is_active ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEditing(field)}
+                              className="text-gray-500 hover:text-blue-700 hover:bg-blue-50"
+                              aria-label={`Edit ${field.display_name}`}
+                              data-testid={`cf-edit-${field.field_key}`}
+                            >
+                              <Pencil size={14} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeactivateClick(field)}
+                              disabled={isCheckingUsage}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                              aria-label={`Deactivate ${field.display_name}`}
+                              data-testid={`cf-deactivate-${field.field_key}`}
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleReactivateClick(field)}
+                              disabled={viewModel.isFieldLifecycleActionInProgress}
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              aria-label={`Reactivate ${field.display_name}`}
+                              data-testid={`cf-reactivate-${field.field_key}`}
+                            >
+                              <RotateCcw size={14} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteClick(field)}
+                              disabled={
+                                isCheckingUsage || viewModel.isFieldLifecycleActionInProgress
+                              }
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              aria-label={`Delete ${field.display_name}`}
+                              data-testid={`cf-delete-${field.field_key}`}
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   )
@@ -530,6 +691,50 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
               isLoading={isDeactivating}
               onConfirm={confirmDeactivate}
               onCancel={() => setDeactivateTarget(null)}
+            />
+
+            {/* Reactivate confirmation dialog */}
+            <ConfirmDialog
+              isOpen={reactivateTarget !== null}
+              title={`Reactivate "${reactivateTarget?.name}"?`}
+              message={
+                reactivateTarget?.parentCategoryInactive
+                  ? `The parent category "${
+                      reactivateTarget.parentCategoryName ?? ''
+                    }" is currently inactive, so this field will stay hidden from the intake form until the category is reactivated too. Proceed anyway?`
+                  : 'This will return the field to active status. It will re-appear on the intake form under its category.'
+              }
+              confirmLabel="Reactivate"
+              cancelLabel="Cancel"
+              variant="success"
+              isLoading={viewModel.isFieldLifecycleActionInProgress}
+              onConfirm={confirmReactivate}
+              onCancel={() => setReactivateTarget(null)}
+            />
+
+            {/* Hard-delete confirmation dialog */}
+            <ConfirmDialog
+              isOpen={deleteTarget !== null}
+              title={
+                deleteTarget && deleteTarget.usageCount > 0
+                  ? `Cannot delete "${deleteTarget.name}"`
+                  : `Permanently delete "${deleteTarget?.name}"?`
+              }
+              message={
+                deleteTarget && deleteTarget.usageCount > 0
+                  ? `${deleteTarget.usageCount} client(s) have data for this field. Leave it deactivated to preserve the historical data, or clear the data before deleting.`
+                  : 'This permanently removes the field definition. This cannot be undone.'
+              }
+              confirmLabel="Delete permanently"
+              cancelLabel={deleteTarget && deleteTarget.usageCount > 0 ? 'Dismiss' : 'Cancel'}
+              variant="danger"
+              isLoading={viewModel.isFieldLifecycleActionInProgress}
+              confirmDisabled={!!(deleteTarget && deleteTarget.usageCount > 0)}
+              requireConfirmText={
+                deleteTarget && deleteTarget.usageCount === 0 ? deleteTarget.name : undefined
+              }
+              onConfirm={confirmDelete}
+              onCancel={() => setDeleteTarget(null)}
             />
           </CardContent>
         </Card>

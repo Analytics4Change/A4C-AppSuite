@@ -51,8 +51,28 @@ export interface IClientFieldService {
     correlationId?: string
   ): Promise<RpcResult>;
 
+  /** Reactivate a previously deactivated field definition */
+  reactivateFieldDefinition(
+    fieldId: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult>;
+
+  /**
+   * Permanently delete a field definition.
+   * Preconditions (enforced server-side):
+   *   - field is inactive
+   *   - zero clients have data for the field_key in custom_fields
+   * On failure, result.error carries the reason and (for usage) result.usage_count.
+   */
+  deleteFieldDefinition(
+    fieldId: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult>;
+
   /** List all field categories (system + org-defined) */
-  listFieldCategories(): Promise<FieldCategory[]>;
+  listFieldCategories(includeInactive?: boolean): Promise<FieldCategory[]>;
 
   /** Create a new org-defined category */
   createFieldCategory(
@@ -77,11 +97,35 @@ export interface IClientFieldService {
     correlationId?: string
   ): Promise<RpcResult>;
 
-  /** Count clients with data for a custom field (for deactivation confirmation) */
+  /** Reactivate a previously deactivated org-defined category (does not cascade to child fields) */
+  reactivateFieldCategory(
+    categoryId: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult>;
+
+  /**
+   * Permanently delete an org-defined category.
+   * Preconditions (enforced server-side):
+   *   - category is inactive
+   *   - zero rows in client_field_definitions_projection for this category (active or inactive)
+   * On failure, result.error carries the reason and (for children) result.child_count + child_names.
+   */
+  deleteFieldCategory(
+    categoryId: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult>;
+
+  /** Count clients with data for a custom field (for deactivation/delete confirmation) */
   getFieldUsageCount(fieldKey: string): Promise<{ success: boolean; count: number }>;
 
-  /** Count active fields in a category + their names (for deactivation confirmation) */
+  /**
+   * Count fields in a category plus their names.
+   * Pass includeInactive=true to count active + inactive fields (used by delete-category gate).
+   */
   getCategoryFieldCount(
-    categoryId: string
+    categoryId: string,
+    includeInactive?: boolean
   ): Promise<{ success: boolean; count: number; fields: string[] }>;
 }

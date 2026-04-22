@@ -82,6 +82,11 @@ export interface RpcResult {
   field_id?: string;
   category_id?: string;
   error?: string;
+  /** For delete-field blocked cases: clients that still have data */
+  usage_count?: number;
+  /** For delete-category blocked cases: remaining child field count + names */
+  child_count?: number;
+  child_names?: string[];
 }
 
 /** User-friendly display labels for field types */

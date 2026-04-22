@@ -14,12 +14,14 @@ import type {
   CreateFieldDefinitionParams,
   UpdateFieldDefinitionParams,
 } from '@/types/client-field-settings.types';
-import { LOCKED_FIELD_KEYS } from '@/types/client-field-settings.types';
+import { LOCKED_FIELD_KEYS, SYSTEM_FIELD_KEYS } from '@/types/client-field-settings.types';
 import type { IClientFieldService } from '@/services/client-fields/IClientFieldService';
 import { getClientFieldService } from '@/services/client-fields/ClientFieldServiceFactory';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('viewmodel');
+
+export type FieldStatusFilter = 'all' | 'active' | 'inactive';
 
 export class ClientFieldSettingsViewModel {
   fieldDefinitions: FieldDefinition[] = [];
@@ -27,6 +29,10 @@ export class ClientFieldSettingsViewModel {
   categories: FieldCategory[] = [];
 
   activeTab = 'demographics';
+
+  // Status filters for Custom Fields and Categories tabs (mirrors Roles/OrgUnits/etc UX)
+  fieldStatusFilter: FieldStatusFilter = 'active';
+  categoryStatusFilter: FieldStatusFilter = 'active';
 
   isLoading = false;
   isSaving = false;
@@ -44,6 +50,10 @@ export class ClientFieldSettingsViewModel {
   isUpdatingField = false;
   updateFieldError: string | null = null;
 
+  // Field lifecycle (reactivate / delete) state
+  isFieldLifecycleActionInProgress = false;
+  fieldLifecycleError: string | null = null;
+
   // Category form state
   isCreatingCategory = false;
   createCategoryError: string | null = null;
@@ -51,6 +61,10 @@ export class ClientFieldSettingsViewModel {
   // Category edit state
   isUpdatingCategory = false;
   updateCategoryError: string | null = null;
+
+  // Category lifecycle (reactivate / delete) state
+  isCategoryLifecycleActionInProgress = false;
+  categoryLifecycleError: string | null = null;
 
   // Session-scoped correlation ID: ties all CRUD + batch save into one audit trail
   sessionCorrelationId: string | null = null;
@@ -64,6 +78,8 @@ export class ClientFieldSettingsViewModel {
       canSave: computed,
       isReasonValid: computed,
       configurableFieldCount: computed,
+      visibleCustomFields: computed,
+      visibleCustomCategories: computed,
     });
     log.debug('ClientFieldSettingsViewModel initialized');
   }
@@ -91,9 +107,11 @@ export class ClientFieldSettingsViewModel {
 
     try {
       log.debug('Loading field definitions and categories', { orgId, preserveChanges });
+      // Always fetch inactive rows too; the UI filters client-side via status filters
+      // so deactivated custom fields and categories can surface under the Inactive tab.
       const [fields, categories] = await Promise.all([
-        this.service.listFieldDefinitions(),
-        this.service.listFieldCategories(),
+        this.service.listFieldDefinitions(true),
+        this.service.listFieldCategories(true),
       ]);
 
       runInAction(() => {
@@ -137,10 +155,15 @@ export class ClientFieldSettingsViewModel {
     }
   }
 
-  /** Fields grouped by category slug, ordered by category sort_order then field sort_order */
+  /**
+   * Active fields grouped by category slug, ordered by category sort_order then field sort_order.
+   * Excludes deactivated rows — the system category tabs always show only active fields.
+   * Inactive rows surface only in the Custom Fields / Categories tabs via visibleCustomFields.
+   */
   get fieldsByCategory(): Map<string, FieldDefinition[]> {
     const map = new Map<string, FieldDefinition[]>();
     for (const field of this.fieldDefinitions) {
+      if (!field.is_active) continue;
       const group = map.get(field.category_slug) ?? [];
       group.push(field);
       map.set(field.category_slug, group);
@@ -173,6 +196,37 @@ export class ClientFieldSettingsViewModel {
     return fields.filter((f) => !LOCKED_FIELD_KEYS.has(f.field_key)).length;
   }
 
+  /**
+   * Custom (org-created) fields honoring the Custom Fields tab status filter.
+   * Replaces inline `f.is_active` filtering in CustomFieldsTab so deactivated
+   * rows can remain visible for reactivate / delete actions.
+   * Sorted alphabetically by display name (matches existing behavior).
+   */
+  get visibleCustomFields(): FieldDefinition[] {
+    return this.fieldDefinitions
+      .filter((f) => !SYSTEM_FIELD_KEYS.has(f.field_key))
+      .filter((f) => {
+        if (this.fieldStatusFilter === 'all') return true;
+        if (this.fieldStatusFilter === 'active') return f.is_active;
+        return !f.is_active;
+      })
+      .sort((a, b) => a.display_name.localeCompare(b.display_name));
+  }
+
+  /**
+   * Custom (org-created) categories honoring the Categories tab status filter.
+   * System categories are always included (they are always active and cannot
+   * be filtered out), matching the read-only row visibility from before.
+   */
+  get visibleCustomCategories(): FieldCategory[] {
+    return this.categories.filter((c) => {
+      if (c.is_system) return true;
+      if (this.categoryStatusFilter === 'all') return true;
+      if (this.categoryStatusFilter === 'active') return c.is_active;
+      return !c.is_active;
+    });
+  }
+
   get hasChanges(): boolean {
     return this.changedFields.length > 0;
   }
@@ -182,6 +236,8 @@ export class ClientFieldSettingsViewModel {
     for (const field of this.fieldDefinitions) {
       const original = this.originalFieldDefinitions.find((f) => f.id === field.id);
       if (!original) continue;
+      // Inactive fields can't be batch-edited — they must be reactivated first.
+      if (!field.is_active) continue;
       if (LOCKED_FIELD_KEYS.has(field.field_key)) continue;
 
       const change: FieldDefinitionChange = { field_id: field.id };
@@ -246,6 +302,30 @@ export class ClientFieldSettingsViewModel {
   setActiveTab(slug: string): void {
     runInAction(() => {
       this.activeTab = slug;
+    });
+  }
+
+  setFieldStatusFilter(filter: FieldStatusFilter): void {
+    runInAction(() => {
+      this.fieldStatusFilter = filter;
+    });
+  }
+
+  setCategoryStatusFilter(filter: FieldStatusFilter): void {
+    runInAction(() => {
+      this.categoryStatusFilter = filter;
+    });
+  }
+
+  clearFieldLifecycleError(): void {
+    runInAction(() => {
+      this.fieldLifecycleError = null;
+    });
+  }
+
+  clearCategoryLifecycleError(): void {
+    runInAction(() => {
+      this.categoryLifecycleError = null;
     });
   }
 
@@ -414,6 +494,75 @@ export class ClientFieldSettingsViewModel {
     }
   }
 
+  async reactivateCustomField(fieldId: string, reason: string, orgId: string): Promise<boolean> {
+    runInAction(() => {
+      this.isFieldLifecycleActionInProgress = true;
+      this.fieldLifecycleError = null;
+    });
+    try {
+      const correlationId = this.getSessionCorrelationId();
+      const result = await this.service.reactivateFieldDefinition(fieldId, reason, correlationId);
+      if (!result.success) {
+        runInAction(() => {
+          this.fieldLifecycleError = result.error ?? 'Failed to reactivate field';
+          this.isFieldLifecycleActionInProgress = false;
+        });
+        return false;
+      }
+      await this.loadData(orgId, true);
+      runInAction(() => {
+        this.isFieldLifecycleActionInProgress = false;
+      });
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to reactivate field';
+      runInAction(() => {
+        this.fieldLifecycleError = message;
+        this.isFieldLifecycleActionInProgress = false;
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Permanently delete a deactivated custom field.
+   * Returns {success, result} so callers can surface per-error details
+   * (e.g., usage_count) without having to refetch.
+   */
+  async deleteCustomField(
+    fieldId: string,
+    reason: string,
+    orgId: string
+  ): Promise<{ success: boolean; error?: string; usageCount?: number }> {
+    runInAction(() => {
+      this.isFieldLifecycleActionInProgress = true;
+      this.fieldLifecycleError = null;
+    });
+    try {
+      const correlationId = this.getSessionCorrelationId();
+      const result = await this.service.deleteFieldDefinition(fieldId, reason, correlationId);
+      if (!result.success) {
+        runInAction(() => {
+          this.fieldLifecycleError = result.error ?? 'Failed to delete field';
+          this.isFieldLifecycleActionInProgress = false;
+        });
+        return { success: false, error: result.error, usageCount: result.usage_count };
+      }
+      await this.loadData(orgId, true);
+      runInAction(() => {
+        this.isFieldLifecycleActionInProgress = false;
+      });
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete field';
+      runInAction(() => {
+        this.fieldLifecycleError = message;
+        this.isFieldLifecycleActionInProgress = false;
+      });
+      return { success: false, error: message };
+    }
+  }
+
   async updateCustomField(
     fieldId: string,
     params: UpdateFieldDefinitionParams,
@@ -536,6 +685,80 @@ export class ClientFieldSettingsViewModel {
     }
   }
 
+  async reactivateCategory(categoryId: string, reason: string, orgId: string): Promise<boolean> {
+    runInAction(() => {
+      this.isCategoryLifecycleActionInProgress = true;
+      this.categoryLifecycleError = null;
+    });
+    try {
+      const correlationId = this.getSessionCorrelationId();
+      const result = await this.service.reactivateFieldCategory(categoryId, reason, correlationId);
+      if (!result.success) {
+        runInAction(() => {
+          this.categoryLifecycleError = result.error ?? 'Failed to reactivate category';
+          this.isCategoryLifecycleActionInProgress = false;
+        });
+        return false;
+      }
+      await this.loadData(orgId, true);
+      runInAction(() => {
+        this.isCategoryLifecycleActionInProgress = false;
+      });
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to reactivate category';
+      runInAction(() => {
+        this.categoryLifecycleError = message;
+        this.isCategoryLifecycleActionInProgress = false;
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Permanently delete a deactivated, empty custom category.
+   * Returns child_count + child_names on precondition failure so callers can
+   * enumerate the blocking field names inline (matches Roles/OrgUnits UX).
+   */
+  async deleteCategory(
+    categoryId: string,
+    reason: string,
+    orgId: string
+  ): Promise<{ success: boolean; error?: string; childCount?: number; childNames?: string[] }> {
+    runInAction(() => {
+      this.isCategoryLifecycleActionInProgress = true;
+      this.categoryLifecycleError = null;
+    });
+    try {
+      const correlationId = this.getSessionCorrelationId();
+      const result = await this.service.deleteFieldCategory(categoryId, reason, correlationId);
+      if (!result.success) {
+        runInAction(() => {
+          this.categoryLifecycleError = result.error ?? 'Failed to delete category';
+          this.isCategoryLifecycleActionInProgress = false;
+        });
+        return {
+          success: false,
+          error: result.error,
+          childCount: result.child_count,
+          childNames: result.child_names,
+        };
+      }
+      await this.loadData(orgId, true);
+      runInAction(() => {
+        this.isCategoryLifecycleActionInProgress = false;
+      });
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete category';
+      runInAction(() => {
+        this.categoryLifecycleError = message;
+        this.isCategoryLifecycleActionInProgress = false;
+      });
+      return { success: false, error: message };
+    }
+  }
+
   async getFieldUsageCount(fieldKey: string): Promise<number> {
     try {
       const result = await this.service.getFieldUsageCount(fieldKey);
@@ -545,9 +768,12 @@ export class ClientFieldSettingsViewModel {
     }
   }
 
-  async getCategoryFieldCount(categoryId: string): Promise<{ count: number; fields: string[] }> {
+  async getCategoryFieldCount(
+    categoryId: string,
+    includeInactive = false
+  ): Promise<{ count: number; fields: string[] }> {
     try {
-      const result = await this.service.getCategoryFieldCount(categoryId);
+      const result = await this.service.getCategoryFieldCount(categoryId, includeInactive);
       return result.success
         ? { count: result.count, fields: result.fields }
         : { count: 0, fields: [] };

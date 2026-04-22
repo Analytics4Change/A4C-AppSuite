@@ -10,9 +10,22 @@ import { observer } from 'mobx-react-lite';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Pencil, Lock, Loader2, AlertCircle, Check, X } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  Lock,
+  RotateCcw,
+  Loader2,
+  AlertCircle,
+  Check,
+  X,
+} from 'lucide-react';
 import type { FieldCategory } from '@/types/client-field-settings.types';
-import type { ClientFieldSettingsViewModel } from '@/viewModels/settings/ClientFieldSettingsViewModel';
+import type {
+  ClientFieldSettingsViewModel,
+  FieldStatusFilter,
+} from '@/viewModels/settings/ClientFieldSettingsViewModel';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 const glassCardStyle = {
@@ -39,8 +52,35 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
     const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
 
-    const activeCategories = categories.filter((c) => c.is_active);
+    // The ViewModel computed honors the status filter and keeps system categories
+    // always visible (they cannot be filtered out).
+    const visibleCategories = viewModel.visibleCustomCategories;
+    // `categories` prop kept for parent wiring symmetry but no longer used directly.
+    void categories;
+    const statusFilter = viewModel.categoryStatusFilter;
     const canCreate = name.trim().length > 0 && slug.trim().length > 0;
+
+    const handleStatusFilter = (value: FieldStatusFilter) =>
+      viewModel.setCategoryStatusFilter(value);
+
+    // Lifecycle confirmation state
+    const [reactivateTarget, setReactivateTarget] = useState<{
+      id: string;
+      name: string;
+      /**
+       * Decision 101: reactivation does NOT cascade. We still surface how many
+       * child fields remain inactive so the admin can act on them afterward.
+       */
+      inactiveChildCount: number;
+      inactiveChildNames: string[];
+    } | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<{
+      id: string;
+      name: string;
+      childCount: number;
+      childNames: string[];
+    } | null>(null);
+    const [isCheckingDeleteChildren, setIsCheckingDeleteChildren] = useState(false);
 
     const autoSlug = (value: string) => {
       setName(value);
@@ -116,6 +156,63 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
       setDeactivateTarget(null);
     };
 
+    const handleReactivateClick = (cat: FieldCategory) => {
+      viewModel.clearCategoryLifecycleError();
+      const inactiveChildren = viewModel.fieldDefinitions
+        .filter((f) => f.category_id === cat.id && !f.is_active)
+        .map((f) => f.display_name)
+        .sort();
+      setReactivateTarget({
+        id: cat.id,
+        name: cat.name,
+        inactiveChildCount: inactiveChildren.length,
+        inactiveChildNames: inactiveChildren,
+      });
+    };
+
+    const confirmReactivate = async () => {
+      if (!reactivateTarget) return;
+      const ok = await viewModel.reactivateCategory(
+        reactivateTarget.id,
+        `Reactivated category: ${reactivateTarget.name}`,
+        orgId
+      );
+      if (ok) setReactivateTarget(null);
+    };
+
+    const handleDeleteClick = async (cat: FieldCategory) => {
+      viewModel.clearCategoryLifecycleError();
+      setIsCheckingDeleteChildren(true);
+      // includeInactive=true to match the server-side delete gate exactly
+      const result = await viewModel.getCategoryFieldCount(cat.id, true);
+      setIsCheckingDeleteChildren(false);
+      setDeleteTarget({
+        id: cat.id,
+        name: cat.name,
+        childCount: result.count,
+        childNames: result.fields,
+      });
+    };
+
+    const confirmDelete = async () => {
+      if (!deleteTarget || deleteTarget.childCount > 0) return;
+      const result = await viewModel.deleteCategory(
+        deleteTarget.id,
+        `Deleted category: ${deleteTarget.name}`,
+        orgId
+      );
+      if (result.success) {
+        setDeleteTarget(null);
+      } else if (typeof result.childCount === 'number' && result.childCount > 0) {
+        // Server disagrees — show the fresh child list.
+        setDeleteTarget({
+          ...deleteTarget,
+          childCount: result.childCount,
+          childNames: result.childNames ?? [],
+        });
+      }
+    };
+
     return (
       <div
         role="tabpanel"
@@ -145,6 +242,43 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Status filter bar (system categories always shown) */}
+            <div
+              className="flex gap-2"
+              role="group"
+              aria-label="Filter categories by status"
+              data-testid="cat-status-filter"
+            >
+              {(['all', 'active', 'inactive'] as const).map((value) => (
+                <Button
+                  key={value}
+                  variant={statusFilter === value ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusFilter(value)}
+                  aria-pressed={statusFilter === value}
+                  className={
+                    statusFilter === value
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'hover:bg-gray-100'
+                  }
+                  data-testid={`cat-status-filter-${value}`}
+                >
+                  {value.charAt(0).toUpperCase() + value.slice(1)}
+                </Button>
+              ))}
+            </div>
+
+            {viewModel.categoryLifecycleError && (
+              <div
+                role="alert"
+                className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-sm"
+                data-testid="cat-lifecycle-error"
+              >
+                <AlertCircle size={14} />
+                {viewModel.categoryLifecycleError}
+              </div>
+            )}
+
             {/* Create form */}
             {showForm && (
               <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-white/50">
@@ -218,8 +352,15 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
             )}
 
             {/* Categories list */}
+            {visibleCategories.length === 0 && (
+              <p className="text-sm text-gray-500 py-2" data-testid="cat-empty-state">
+                {statusFilter === 'inactive'
+                  ? 'No deactivated custom categories.'
+                  : 'No categories match the current filter.'}
+              </p>
+            )}
             <div className="divide-y divide-gray-100">
-              {activeCategories.map((cat) =>
+              {visibleCategories.map((cat) =>
                 editingCategoryId === cat.id ? (
                   <div
                     key={cat.id}
@@ -277,14 +418,27 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
                     key={cat.id}
                     className="flex items-center justify-between py-3"
                     data-testid={`category-${cat.slug}`}
+                    data-active={cat.is_active ? 'true' : 'false'}
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{cat.name}</span>
+                        <span
+                          className={`text-sm font-medium ${cat.is_active ? '' : 'text-gray-500'}`}
+                        >
+                          {cat.name}
+                        </span>
                         {cat.is_system && (
                           <span className="inline-flex items-center gap-1 text-xs text-gray-400">
                             <Lock size={10} />
                             System
+                          </span>
+                        )}
+                        {!cat.is_active && !cat.is_system && (
+                          <span
+                            className="text-xs text-gray-600 bg-gray-200 px-1.5 py-0.5 rounded"
+                            data-testid={`cat-inactive-badge-${cat.slug}`}
+                          >
+                            Inactive
                           </span>
                         )}
                       </div>
@@ -292,27 +446,59 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
                     </div>
                     {!cat.is_system && (
                       <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => startEditing(cat)}
-                          className="text-gray-500 hover:text-blue-700 hover:bg-blue-50"
-                          aria-label={`Edit ${cat.name}`}
-                          data-testid={`cat-edit-${cat.slug}`}
-                        >
-                          <Pencil size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeactivateClick(cat)}
-                          disabled={isCheckingFields}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          aria-label={`Deactivate ${cat.name}`}
-                          data-testid={`cat-deactivate-${cat.slug}`}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
+                        {cat.is_active ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEditing(cat)}
+                              className="text-gray-500 hover:text-blue-700 hover:bg-blue-50"
+                              aria-label={`Edit ${cat.name}`}
+                              data-testid={`cat-edit-${cat.slug}`}
+                            >
+                              <Pencil size={14} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeactivateClick(cat)}
+                              disabled={isCheckingFields}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                              aria-label={`Deactivate ${cat.name}`}
+                              data-testid={`cat-deactivate-${cat.slug}`}
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleReactivateClick(cat)}
+                              disabled={viewModel.isCategoryLifecycleActionInProgress}
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              aria-label={`Reactivate ${cat.name}`}
+                              data-testid={`cat-reactivate-${cat.slug}`}
+                            >
+                              <RotateCcw size={14} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteClick(cat)}
+                              disabled={
+                                isCheckingDeleteChildren ||
+                                viewModel.isCategoryLifecycleActionInProgress
+                              }
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              aria-label={`Delete ${cat.name}`}
+                              data-testid={`cat-delete-${cat.slug}`}
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -340,6 +526,56 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
               }
               onConfirm={confirmDeactivate}
               onCancel={() => setDeactivateTarget(null)}
+            />
+
+            {/* Reactivate confirmation dialog */}
+            <ConfirmDialog
+              isOpen={reactivateTarget !== null}
+              title={`Reactivate "${reactivateTarget?.name}"?`}
+              message={
+                reactivateTarget && reactivateTarget.inactiveChildCount > 0
+                  ? `This will return the category to active status. ${reactivateTarget.inactiveChildCount} child field(s) are still inactive and will stay inactive — reactivate them individually afterward.`
+                  : 'This will return the category to active status. No inactive child fields to worry about.'
+              }
+              details={
+                reactivateTarget && reactivateTarget.inactiveChildCount > 0
+                  ? reactivateTarget.inactiveChildNames
+                  : undefined
+              }
+              confirmLabel="Reactivate"
+              cancelLabel="Cancel"
+              variant="success"
+              isLoading={viewModel.isCategoryLifecycleActionInProgress}
+              onConfirm={confirmReactivate}
+              onCancel={() => setReactivateTarget(null)}
+            />
+
+            {/* Hard-delete confirmation dialog */}
+            <ConfirmDialog
+              isOpen={deleteTarget !== null}
+              title={
+                deleteTarget && deleteTarget.childCount > 0
+                  ? `Cannot delete "${deleteTarget.name}"`
+                  : `Permanently delete "${deleteTarget?.name}"?`
+              }
+              message={
+                deleteTarget && deleteTarget.childCount > 0
+                  ? `This category still has ${deleteTarget.childCount} field(s) (active or deactivated). Delete those fields first, then retry.`
+                  : 'This permanently removes the category. This cannot be undone.'
+              }
+              details={
+                deleteTarget && deleteTarget.childCount > 0 ? deleteTarget.childNames : undefined
+              }
+              confirmLabel="Delete permanently"
+              cancelLabel={deleteTarget && deleteTarget.childCount > 0 ? 'Dismiss' : 'Cancel'}
+              variant="danger"
+              isLoading={viewModel.isCategoryLifecycleActionInProgress}
+              confirmDisabled={!!(deleteTarget && deleteTarget.childCount > 0)}
+              requireConfirmText={
+                deleteTarget && deleteTarget.childCount === 0 ? deleteTarget.name : undefined
+              }
+              onConfirm={confirmDelete}
+              onCancel={() => setDeleteTarget(null)}
             />
           </CardContent>
         </Card>

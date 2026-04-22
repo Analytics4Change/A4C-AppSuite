@@ -1133,10 +1133,59 @@ export class MockClientFieldService implements IClientFieldService {
     return { success: true, field_id: fieldId };
   }
 
-  async listFieldCategories(): Promise<FieldCategory[]> {
-    log.debug('[Mock] Fetching field categories');
+  async reactivateFieldDefinition(
+    fieldId: string,
+    reason: string,
+    _correlationId?: string
+  ): Promise<RpcResult> {
+    log.debug('[Mock] Reactivating field definition', { fieldId, reason });
     await this.simulateDelay();
 
+    const field = this.fields.find((f) => f.id === fieldId && !f.is_active);
+    if (!field) {
+      return { success: false, error: 'Field definition not found or already active' };
+    }
+
+    field.is_active = true;
+    return { success: true, field_id: fieldId };
+  }
+
+  async deleteFieldDefinition(
+    fieldId: string,
+    reason: string,
+    _correlationId?: string
+  ): Promise<RpcResult> {
+    log.debug('[Mock] Deleting field definition', { fieldId, reason });
+    await this.simulateDelay();
+
+    const idx = this.fields.findIndex((f) => f.id === fieldId);
+    if (idx === -1) {
+      return { success: false, error: 'Field definition not found' };
+    }
+    const field = this.fields[idx];
+    if (field.is_active) {
+      return { success: false, error: 'Field must be deactivated before it can be deleted' };
+    }
+
+    // Mirror the backend usage-count gate so mock mode surfaces the same UX.
+    const usageCount = (await this.getFieldUsageCount(field.field_key)).count;
+    if (usageCount > 0) {
+      return {
+        success: false,
+        error: `Cannot delete -- ${usageCount} client(s) have data for "${field.display_name}". Leave it deactivated instead.`,
+        usage_count: usageCount,
+      };
+    }
+
+    this.fields.splice(idx, 1);
+    return { success: true, field_id: fieldId };
+  }
+
+  async listFieldCategories(includeInactive = false): Promise<FieldCategory[]> {
+    log.debug('[Mock] Fetching field categories', { includeInactive });
+    await this.simulateDelay();
+
+    if (includeInactive) return this.categories.map((c) => ({ ...c }));
     return this.categories.filter((c) => c.is_active).map((c) => ({ ...c }));
   }
 
@@ -1215,6 +1264,65 @@ export class MockClientFieldService implements IClientFieldService {
     return { success: true, category_id: categoryId };
   }
 
+  async reactivateFieldCategory(
+    categoryId: string,
+    reason: string,
+    _correlationId?: string
+  ): Promise<RpcResult> {
+    log.debug('[Mock] Reactivating field category', { categoryId, reason });
+    await this.simulateDelay();
+
+    const category = this.categories.find(
+      (c) => c.id === categoryId && !c.is_active && !c.is_system
+    );
+    if (!category) {
+      return {
+        success: false,
+        error: 'Category not found, is a system category, or already active',
+      };
+    }
+
+    // No cascade: child fields stay in their current state (user reactivates individually)
+    category.is_active = true;
+    return { success: true, category_id: categoryId };
+  }
+
+  async deleteFieldCategory(
+    categoryId: string,
+    reason: string,
+    _correlationId?: string
+  ): Promise<RpcResult> {
+    log.debug('[Mock] Deleting field category', { categoryId, reason });
+    await this.simulateDelay();
+
+    const idx = this.categories.findIndex((c) => c.id === categoryId);
+    if (idx === -1) {
+      return { success: false, error: 'Category not found' };
+    }
+    const category = this.categories[idx];
+    if (category.is_system) {
+      return { success: false, error: 'Category not found or is a system category' };
+    }
+    if (category.is_active) {
+      return { success: false, error: 'Category must be deactivated before it can be deleted' };
+    }
+
+    // Precondition: zero rows for this category in field definitions (active or inactive).
+    const childFields = this.fields.filter((f) => f.category_id === categoryId);
+    if (childFields.length > 0) {
+      const childNames = childFields.map((f) => f.display_name).sort();
+      return {
+        success: false,
+        error: `Cannot delete -- category "${category.name}" still has ${childFields.length} field(s). Delete those fields first.`,
+        child_count: childFields.length,
+        child_names: childNames,
+      };
+    }
+
+    this.categories.splice(idx, 1);
+    return { success: true, category_id: categoryId };
+  }
+
   async getFieldUsageCount(fieldKey: string): Promise<{ success: boolean; count: number }> {
     log.debug('[Mock] Getting field usage count', { fieldKey });
     await this.simulateDelay();
@@ -1224,12 +1332,13 @@ export class MockClientFieldService implements IClientFieldService {
   }
 
   async getCategoryFieldCount(
-    categoryId: string
+    categoryId: string,
+    includeInactive = false
   ): Promise<{ success: boolean; count: number; fields: string[] }> {
-    log.debug('[Mock] Getting category field count', { categoryId });
+    log.debug('[Mock] Getting category field count', { categoryId, includeInactive });
     await this.simulateDelay();
     const fields = this.fields
-      .filter((f) => f.category_id === categoryId && f.is_active)
+      .filter((f) => f.category_id === categoryId && (includeInactive || f.is_active))
       .map((f) => f.display_name);
     return { success: true, count: fields.length, fields };
   }

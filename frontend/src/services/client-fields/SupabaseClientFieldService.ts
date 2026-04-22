@@ -135,10 +135,56 @@ export class SupabaseClientFieldService implements IClientFieldService {
     return result as RpcResult;
   }
 
-  async listFieldCategories(): Promise<FieldCategory[]> {
-    log.debug('Fetching field categories');
+  async reactivateFieldDefinition(
+    fieldId: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult> {
+    log.debug('Reactivating field definition', { fieldId, reason });
 
-    const { data, error } = await supabase.schema('api').rpc('list_field_categories');
+    const { data, error } = await supabase.schema('api').rpc('reactivate_field_definition', {
+      p_field_id: fieldId,
+      p_reason: reason,
+      p_correlation_id: correlationId ?? null,
+    });
+
+    if (error) {
+      log.error('Failed to reactivate field definition', { error });
+      throw new Error(`Failed to reactivate field: ${error.message}`);
+    }
+
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    return result as RpcResult;
+  }
+
+  async deleteFieldDefinition(
+    fieldId: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult> {
+    log.debug('Deleting field definition', { fieldId, reason });
+
+    const { data, error } = await supabase.schema('api').rpc('delete_field_definition', {
+      p_field_id: fieldId,
+      p_reason: reason,
+      p_correlation_id: correlationId ?? null,
+    });
+
+    if (error) {
+      log.error('Failed to delete field definition', { error });
+      throw new Error(`Failed to delete field: ${error.message}`);
+    }
+
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    return result as RpcResult;
+  }
+
+  async listFieldCategories(includeInactive = false): Promise<FieldCategory[]> {
+    log.debug('Fetching field categories', { includeInactive });
+
+    const { data, error } = await supabase.schema('api').rpc('list_field_categories', {
+      p_include_inactive: includeInactive,
+    });
 
     if (error) {
       log.error('Failed to fetch field categories', { error });
@@ -218,6 +264,50 @@ export class SupabaseClientFieldService implements IClientFieldService {
     return result as RpcResult;
   }
 
+  async reactivateFieldCategory(
+    categoryId: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult> {
+    log.debug('Reactivating field category', { categoryId, reason });
+
+    const { data, error } = await supabase.schema('api').rpc('reactivate_field_category', {
+      p_category_id: categoryId,
+      p_reason: reason,
+      p_correlation_id: correlationId ?? null,
+    });
+
+    if (error) {
+      log.error('Failed to reactivate field category', { error });
+      throw new Error(`Failed to reactivate category: ${error.message}`);
+    }
+
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    return result as RpcResult;
+  }
+
+  async deleteFieldCategory(
+    categoryId: string,
+    reason: string,
+    correlationId?: string
+  ): Promise<RpcResult> {
+    log.debug('Deleting field category', { categoryId, reason });
+
+    const { data, error } = await supabase.schema('api').rpc('delete_field_category', {
+      p_category_id: categoryId,
+      p_reason: reason,
+      p_correlation_id: correlationId ?? null,
+    });
+
+    if (error) {
+      log.error('Failed to delete field category', { error });
+      throw new Error(`Failed to delete category: ${error.message}`);
+    }
+
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    return result as RpcResult;
+  }
+
   async getFieldUsageCount(fieldKey: string): Promise<{ success: boolean; count: number }> {
     log.debug('Getting field usage count', { fieldKey });
 
@@ -235,12 +325,14 @@ export class SupabaseClientFieldService implements IClientFieldService {
   }
 
   async getCategoryFieldCount(
-    categoryId: string
+    categoryId: string,
+    includeInactive = false
   ): Promise<{ success: boolean; count: number; fields: string[] }> {
-    log.debug('Getting category field count', { categoryId });
+    log.debug('Getting category field count', { categoryId, includeInactive });
 
     const { data, error } = await supabase.schema('api').rpc('get_category_field_count', {
       p_category_id: categoryId,
+      p_include_inactive: includeInactive,
     });
 
     if (error) {

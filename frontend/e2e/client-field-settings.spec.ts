@@ -1059,3 +1059,195 @@ test.describe('Client Field Settings - Contact Designation Fields', () => {
     }
   });
 });
+
+// ============================================================================
+// Custom Field Lifecycle — Reactivate + Hard Delete (Phase B8)
+// ============================================================================
+
+/** Create + deactivate a custom field, return its key */
+async function createAndDeactivateField(
+  page: Page,
+  displayName: string,
+  expectedKey: string
+): Promise<void> {
+  await page.click('[data-testid="tab-custom_fields"]');
+  await page.click('[data-testid="add-custom-field-btn"]');
+  await page.fill('[data-testid="cf-name-input"]', displayName);
+  await page.selectOption('[data-testid="cf-type-select"]', 'text');
+  const categorySelect = page.locator('[data-testid="cf-category-select"]');
+  const firstOptionValue = await categorySelect.locator('option').nth(1).getAttribute('value');
+  if (firstOptionValue) await categorySelect.selectOption(firstOptionValue);
+  await page.click('[data-testid="cf-save-btn"]');
+  await expect(page.locator('[data-testid="cf-name-input"]')).not.toBeVisible({ timeout: 5000 });
+
+  await page.click(`[data-testid="cf-deactivate-${expectedKey}"]`);
+  await expect(page.locator('[data-testid="confirm-dialog"]')).toBeVisible({ timeout: 5000 });
+  await page.click('[data-testid="confirm-dialog-confirm-btn"]');
+  // Back in Active filter the deactivated row should no longer be shown
+  await expect(page.locator(`[data-testid="custom-field-${expectedKey}"]`)).not.toBeVisible({
+    timeout: 5000,
+  });
+}
+
+test.describe('Client Field Settings - Custom Field Lifecycle', () => {
+  test('Inactive filter reveals deactivated fields with Inactive badge', async ({ page }) => {
+    await navigateToFieldSettings(page);
+    await createAndDeactivateField(
+      page,
+      'Lifecycle Inactive Probe',
+      'custom_lifecycle_inactive_probe'
+    );
+
+    await page.click('[data-testid="cf-status-filter-inactive"]');
+    await expect(
+      page.locator('[data-testid="cf-inactive-badge-custom_lifecycle_inactive_probe"]')
+    ).toBeVisible({ timeout: 5000 });
+    await expect(
+      page.locator('[data-testid="cf-reactivate-custom_lifecycle_inactive_probe"]')
+    ).toBeVisible();
+    await expect(
+      page.locator('[data-testid="cf-delete-custom_lifecycle_inactive_probe"]')
+    ).toBeVisible();
+    // Edit button should NOT be rendered on inactive rows
+    await expect(
+      page.locator('[data-testid="cf-edit-custom_lifecycle_inactive_probe"]')
+    ).toHaveCount(0);
+  });
+
+  test('Reactivate flow returns a deactivated field to Active', async ({ page }) => {
+    await navigateToFieldSettings(page);
+    await createAndDeactivateField(page, 'Reactivate Me', 'custom_reactivate_me');
+
+    await page.click('[data-testid="cf-status-filter-inactive"]');
+    await page.click('[data-testid="cf-reactivate-custom_reactivate_me"]');
+    await expect(page.locator('[data-testid="confirm-dialog"]')).toBeVisible({ timeout: 5000 });
+    await page.click('[data-testid="confirm-dialog-confirm-btn"]');
+
+    // Row should disappear from Inactive filter
+    await expect(page.locator('[data-testid="custom-field-custom_reactivate_me"]')).not.toBeVisible(
+      { timeout: 5000 }
+    );
+
+    // And re-appear in Active filter
+    await page.click('[data-testid="cf-status-filter-active"]');
+    await expect(page.locator('[data-testid="custom-field-custom_reactivate_me"]')).toBeVisible({
+      timeout: 5000,
+    });
+  });
+
+  test('Delete blocked when field has client usage', async ({ page }) => {
+    await navigateToFieldSettings(page);
+    // Mock returns usage_count=3 for keys containing 'weekend'
+    await createAndDeactivateField(page, 'Weekend Visit', 'custom_weekend_visit');
+
+    await page.click('[data-testid="cf-status-filter-inactive"]');
+    await page.click('[data-testid="cf-delete-custom_weekend_visit"]');
+    await expect(page.locator('[data-testid="confirm-dialog"]')).toBeVisible({ timeout: 5000 });
+    // Confirm button should be disabled in the blocked state
+    await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toBeDisabled();
+    // Cancel (now labeled "Dismiss") remains enabled
+    await expect(page.locator('[data-testid="confirm-dialog-cancel-btn"]')).toBeEnabled();
+    await page.click('[data-testid="confirm-dialog-cancel-btn"]');
+  });
+
+  test('Delete happy path removes field from all filters with typed confirmation', async ({
+    page,
+  }) => {
+    await navigateToFieldSettings(page);
+    await createAndDeactivateField(page, 'Disposable Field', 'custom_disposable_field');
+
+    await page.click('[data-testid="cf-status-filter-inactive"]');
+    await page.click('[data-testid="cf-delete-custom_disposable_field"]');
+    await expect(page.locator('[data-testid="confirm-dialog"]')).toBeVisible({ timeout: 5000 });
+
+    // Typed-confirm gate requires the display name
+    await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toBeDisabled();
+    await page.fill('[data-testid="confirm-dialog-confirm-text-input"]', 'Disposable Field');
+    await page.click('[data-testid="confirm-dialog-confirm-btn"]');
+
+    // Removed from Inactive filter
+    await expect(
+      page.locator('[data-testid="custom-field-custom_disposable_field"]')
+    ).not.toBeVisible({ timeout: 5000 });
+    // And absent from Active + All too
+    await page.click('[data-testid="cf-status-filter-active"]');
+    await expect(
+      page.locator('[data-testid="custom-field-custom_disposable_field"]')
+    ).not.toBeVisible();
+    await page.click('[data-testid="cf-status-filter-all"]');
+    await expect(
+      page.locator('[data-testid="custom-field-custom_disposable_field"]')
+    ).not.toBeVisible();
+  });
+});
+
+// ============================================================================
+// Custom Category Lifecycle — Reactivate + Hard Delete (Phase B8)
+// ============================================================================
+
+test.describe('Client Field Settings - Custom Category Lifecycle', () => {
+  test('Reactivate flow returns a deactivated category to Active', async ({ page }) => {
+    await navigateToFieldSettings(page);
+    await page.click('[data-testid="tab-categories"]');
+
+    // Create + deactivate
+    await page.click('[data-testid="add-category-btn"]');
+    await page.fill('[data-testid="cat-name-input"]', 'Reactivate Cat');
+    await page.click('[data-testid="cat-save-btn"]');
+    await expect(page.locator('[data-testid="cat-name-input"]')).not.toBeVisible({ timeout: 5000 });
+
+    await page.click('[data-testid="cat-deactivate-reactivate_cat"]');
+    await expect(page.locator('[data-testid="confirm-dialog"]')).toBeVisible({ timeout: 5000 });
+    await page.click('[data-testid="confirm-dialog-confirm-btn"]');
+    await expect(page.locator('[data-testid="category-reactivate_cat"]')).not.toBeVisible({
+      timeout: 5000,
+    });
+
+    // Inactive filter shows the deactivated category
+    await page.click('[data-testid="cat-status-filter-inactive"]');
+    await expect(page.locator('[data-testid="cat-inactive-badge-reactivate_cat"]')).toBeVisible();
+
+    // Reactivate
+    await page.click('[data-testid="cat-reactivate-reactivate_cat"]');
+    await expect(page.locator('[data-testid="confirm-dialog"]')).toBeVisible({ timeout: 5000 });
+    await page.click('[data-testid="confirm-dialog-confirm-btn"]');
+
+    await page.click('[data-testid="cat-status-filter-active"]');
+    await expect(page.locator('[data-testid="category-reactivate_cat"]')).toBeVisible({
+      timeout: 5000,
+    });
+  });
+
+  test('Delete happy path removes empty deactivated category with typed confirmation', async ({
+    page,
+  }) => {
+    await navigateToFieldSettings(page);
+    await page.click('[data-testid="tab-categories"]');
+
+    await page.click('[data-testid="add-category-btn"]');
+    await page.fill('[data-testid="cat-name-input"]', 'Delete Me Cat');
+    await page.click('[data-testid="cat-save-btn"]');
+    await expect(page.locator('[data-testid="cat-name-input"]')).not.toBeVisible({ timeout: 5000 });
+
+    await page.click('[data-testid="cat-deactivate-delete_me_cat"]');
+    await expect(page.locator('[data-testid="confirm-dialog"]')).toBeVisible({ timeout: 5000 });
+    await page.click('[data-testid="confirm-dialog-confirm-btn"]');
+    await expect(page.locator('[data-testid="category-delete_me_cat"]')).not.toBeVisible({
+      timeout: 5000,
+    });
+
+    await page.click('[data-testid="cat-status-filter-inactive"]');
+    await page.click('[data-testid="cat-delete-delete_me_cat"]');
+    await expect(page.locator('[data-testid="confirm-dialog"]')).toBeVisible({ timeout: 5000 });
+
+    await expect(page.locator('[data-testid="confirm-dialog-confirm-btn"]')).toBeDisabled();
+    await page.fill('[data-testid="confirm-dialog-confirm-text-input"]', 'Delete Me Cat');
+    await page.click('[data-testid="confirm-dialog-confirm-btn"]');
+
+    await expect(page.locator('[data-testid="category-delete_me_cat"]')).not.toBeVisible({
+      timeout: 5000,
+    });
+    await page.click('[data-testid="cat-status-filter-all"]');
+    await expect(page.locator('[data-testid="category-delete_me_cat"]')).not.toBeVisible();
+  });
+});
