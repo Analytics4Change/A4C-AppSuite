@@ -5,6 +5,7 @@
 **Phase**: Phase 0 ✅ + Phase 1 ✅ (applied + reference files synced) → Phase 2 — Frontend Types & Service
 **Status**: 🟢 READY TO CONTINUE
 **Last Updated**: 2026-04-22
+**Branch**: `feat/client-ou-placement` (local-only; commit `cd374c12`). Run `git branch --show-current` to verify before continuing. Do NOT switch to `main`; it tracks `origin/main` and shouldn't carry this work.
 
 **Next Step (concrete)**:
 1. Edit `frontend/src/types/client.types.ts`:
