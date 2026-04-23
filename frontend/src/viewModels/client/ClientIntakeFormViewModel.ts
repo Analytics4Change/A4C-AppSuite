@@ -21,7 +21,7 @@ import type {
   AddressType,
   InsurancePolicyType,
   ContactDesignation,
-  ClientRpcResult,
+  ClientRpcEnvelope,
   PlacementArrangement,
 } from '@/types/client.types';
 import type { OrganizationUnit, OrganizationUnitNode } from '@/types/organization-unit.types';
@@ -618,7 +618,7 @@ export class ClientIntakeFormViewModel {
       const clientId = result.client_id;
 
       // 2. Fire sub-entity + placement RPCs in parallel (partial success acceptable)
-      const subEntityPromises: Promise<ClientRpcResult>[] = [];
+      const subEntityPromises: Promise<ClientRpcEnvelope>[] = [];
 
       // 2a. OU-aware placement history: if both arrangement AND OU are set at
       // intake, emit client.placement.changed so the history row carries OU

@@ -8,7 +8,15 @@
 import type {
   Client,
   ClientListItem,
-  ClientRpcResult,
+  ClientUpdateResult,
+  ClientPhoneResult,
+  ClientEmailResult,
+  ClientAddressResult,
+  ClientInsuranceResult,
+  ClientFundingResult,
+  ClientPlacementResult,
+  ClientAssignmentResult,
+  ClientVoidResult,
   ClientPhone,
   ClientEmail,
   ClientAddress,
@@ -354,7 +362,7 @@ export class MockClientService implements IClientService {
   // Lifecycle
   // -------------------------------------------------------------------------
 
-  async registerClient(params: RegisterClientParams): Promise<ClientRpcResult> {
+  async registerClient(params: RegisterClientParams): Promise<ClientUpdateResult> {
     await delay();
     const d = params.client_data;
 
@@ -463,7 +471,7 @@ export class MockClientService implements IClientService {
     };
   }
 
-  async updateClient(clientId: string, params: UpdateClientParams): Promise<ClientRpcResult> {
+  async updateClient(clientId: string, params: UpdateClientParams): Promise<ClientUpdateResult> {
     await delay();
     const idx = this.clients.findIndex((c) => c.id === clientId);
     if (idx === -1) return { success: false, error: 'Client not found' };
@@ -474,7 +482,7 @@ export class MockClientService implements IClientService {
     return { success: true, client_id: clientId };
   }
 
-  async admitClient(clientId: string, _params?: AdmitClientParams): Promise<ClientRpcResult> {
+  async admitClient(clientId: string, _params?: AdmitClientParams): Promise<ClientUpdateResult> {
     await delay();
     const idx = this.clients.findIndex((c) => c.id === clientId);
     if (idx === -1) return { success: false, error: 'Client not found' };
@@ -485,7 +493,10 @@ export class MockClientService implements IClientService {
     return { success: true, client_id: clientId };
   }
 
-  async dischargeClient(clientId: string, params: DischargeClientParams): Promise<ClientRpcResult> {
+  async dischargeClient(
+    clientId: string,
+    params: DischargeClientParams
+  ): Promise<ClientUpdateResult> {
     await delay();
     const idx = this.clients.findIndex((c) => c.id === clientId);
     if (idx === -1) return { success: false, error: 'Client not found' };
@@ -511,7 +522,7 @@ export class MockClientService implements IClientService {
   // Phone
   // -------------------------------------------------------------------------
 
-  async addClientPhone(clientId: string, params: AddPhoneParams): Promise<ClientRpcResult> {
+  async addClientPhone(clientId: string, params: AddPhoneParams): Promise<ClientPhoneResult> {
     await delay();
     const id = uuid();
     const phone: ClientPhone = {
@@ -534,7 +545,7 @@ export class MockClientService implements IClientService {
     _clientId: string,
     phoneId: string,
     params: UpdatePhoneParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientPhoneResult> {
     await delay();
     this.phones = this.phones.map((p) =>
       p.id === phoneId
@@ -554,19 +565,19 @@ export class MockClientService implements IClientService {
     _clientId: string,
     phoneId: string,
     _reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientVoidResult> {
     await delay();
     this.phones = this.phones.map((p) =>
       p.id === phoneId ? { ...p, is_active: false, updated_at: now() } : p
     );
-    return { success: true, phone_id: phoneId };
+    return { success: true };
   }
 
   // -------------------------------------------------------------------------
   // Email
   // -------------------------------------------------------------------------
 
-  async addClientEmail(clientId: string, params: AddEmailParams): Promise<ClientRpcResult> {
+  async addClientEmail(clientId: string, params: AddEmailParams): Promise<ClientEmailResult> {
     await delay();
     const id = uuid();
     const email: ClientEmail = {
@@ -589,7 +600,7 @@ export class MockClientService implements IClientService {
     _clientId: string,
     emailId: string,
     params: UpdateEmailParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientEmailResult> {
     await delay();
     this.emails = this.emails.map((e) =>
       e.id === emailId
@@ -609,19 +620,19 @@ export class MockClientService implements IClientService {
     _clientId: string,
     emailId: string,
     _reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientVoidResult> {
     await delay();
     this.emails = this.emails.map((e) =>
       e.id === emailId ? { ...e, is_active: false, updated_at: now() } : e
     );
-    return { success: true, email_id: emailId };
+    return { success: true };
   }
 
   // -------------------------------------------------------------------------
   // Address
   // -------------------------------------------------------------------------
 
-  async addClientAddress(clientId: string, params: AddAddressParams): Promise<ClientRpcResult> {
+  async addClientAddress(clientId: string, params: AddAddressParams): Promise<ClientAddressResult> {
     await delay();
     const id = uuid();
     const addr: ClientAddress = {
@@ -649,7 +660,7 @@ export class MockClientService implements IClientService {
     _clientId: string,
     addressId: string,
     params: UpdateAddressParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientAddressResult> {
     await delay();
     this.addresses = this.addresses.map((a) =>
       a.id === addressId
@@ -674,19 +685,22 @@ export class MockClientService implements IClientService {
     _clientId: string,
     addressId: string,
     _reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientVoidResult> {
     await delay();
     this.addresses = this.addresses.map((a) =>
       a.id === addressId ? { ...a, is_active: false, updated_at: now() } : a
     );
-    return { success: true, address_id: addressId };
+    return { success: true };
   }
 
   // -------------------------------------------------------------------------
   // Insurance
   // -------------------------------------------------------------------------
 
-  async addClientInsurance(clientId: string, params: AddInsuranceParams): Promise<ClientRpcResult> {
+  async addClientInsurance(
+    clientId: string,
+    params: AddInsuranceParams
+  ): Promise<ClientInsuranceResult> {
     await delay();
     const id = uuid();
     const policy: ClientInsurancePolicy = {
@@ -714,7 +728,7 @@ export class MockClientService implements IClientService {
     _clientId: string,
     policyId: string,
     params: UpdateInsuranceParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientInsuranceResult> {
     await delay();
     this.insurance = this.insurance.map((i) =>
       i.id === policyId
@@ -738,12 +752,12 @@ export class MockClientService implements IClientService {
     _clientId: string,
     policyId: string,
     _reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientVoidResult> {
     await delay();
     this.insurance = this.insurance.map((i) =>
       i.id === policyId ? { ...i, is_active: false, updated_at: now() } : i
     );
-    return { success: true, policy_id: policyId };
+    return { success: true };
   }
 
   // -------------------------------------------------------------------------
@@ -753,7 +767,7 @@ export class MockClientService implements IClientService {
   async changeClientPlacement(
     clientId: string,
     params: ChangePlacementParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientPlacementResult> {
     await delay();
     // Close previous current placement
     this.placements = this.placements.map((p) =>
@@ -800,7 +814,7 @@ export class MockClientService implements IClientService {
     clientId: string,
     endDate?: string,
     _reasonText?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientPlacementResult> {
     await delay();
     this.placements = this.placements.map((p) =>
       p.client_id === clientId && p.is_current
@@ -815,7 +829,7 @@ export class MockClientService implements IClientService {
     this.clients = this.clients.map((c) =>
       c.id === clientId ? { ...c, placement_arrangement: null, updated_at: now() } : c
     );
-    return { success: true, client_id: clientId };
+    return { success: true };
   }
 
   // -------------------------------------------------------------------------
@@ -825,7 +839,7 @@ export class MockClientService implements IClientService {
   async addClientFundingSource(
     clientId: string,
     params: AddFundingSourceParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientFundingResult> {
     await delay();
     const id = uuid();
     const source: ClientFundingSource = {
@@ -851,7 +865,7 @@ export class MockClientService implements IClientService {
     _clientId: string,
     sourceId: string,
     params: UpdateFundingSourceParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientFundingResult> {
     await delay();
     this.funding = this.funding.map((f) =>
       f.id === sourceId
@@ -874,12 +888,12 @@ export class MockClientService implements IClientService {
     _clientId: string,
     sourceId: string,
     _reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientVoidResult> {
     await delay();
     this.funding = this.funding.map((f) =>
       f.id === sourceId ? { ...f, is_active: false, updated_at: now() } : f
     );
-    return { success: true, funding_source_id: sourceId };
+    return { success: true };
   }
 
   // -------------------------------------------------------------------------
@@ -891,7 +905,7 @@ export class MockClientService implements IClientService {
     contactId: string,
     designation: string,
     _reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientAssignmentResult> {
     await delay();
     const id = uuid();
     const ts = now();
@@ -918,7 +932,7 @@ export class MockClientService implements IClientService {
     contactId: string,
     designation: string,
     _reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientAssignmentResult> {
     await delay();
     this.assignments = this.assignments.map((a) =>
       a.client_id === clientId && a.contact_id === contactId && a.designation === designation
