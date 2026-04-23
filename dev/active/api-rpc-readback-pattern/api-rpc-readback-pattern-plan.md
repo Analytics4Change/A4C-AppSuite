@@ -38,9 +38,13 @@ WHERE n.nspname = 'api'
 ORDER BY p.proname;
 ```
 
-### Inventory Tracking Table — populated 2026-04-23 (revised after PR #29 review)
+### Inventory Tracking Table — populated 2026-04-23 (revised after PR #29 review; refined 2026-04-23 via live `supabase db dump`)
 
-22 distinct `api.update_*` / `api.change_*` RPCs identified via grep across `infrastructure/supabase/supabase/migrations/` using two patterns: the unquoted `api\.(update|change)_` (covers post-baseline migrations) and the quoted-identifier `"api"\."(update|change)_` (covers `20260212010625_baseline_v4.sql`). The first pattern alone missed 3 baseline-only RPCs surfaced by PR #29 review (M1) — `api.update_role`, `api.update_user`, `api.update_user_access_dates` — now included below. DB inspection still deferred to Phase 1 implementation branch (MCP supabase token expired during initial inventory); classifications are based on migration grep + spot-check; refine in Phase 1 by reading each function's live `pg_get_functiondef`.
+22 distinct `api.update_*` / `api.change_*` RPCs identified via grep across `infrastructure/supabase/supabase/migrations/` using two patterns: the unquoted `api\.(update|change)_` (covers post-baseline migrations) and the quoted-identifier `"api"\."(update|change)_` (covers `20260212010625_baseline_v4.sql`). The first pattern alone missed 3 baseline-only RPCs surfaced by PR #29 review (M1) — `api.update_role`, `api.update_user`, `api.update_user_access_dates` — now included below.
+
+**Phase 1 refinement** (2026-04-23, on branch `feat/api-rpc-readback-pattern`): MCP supabase token still unavailable, so refinement performed by `supabase db dump --linked --schema=api` (saved to `/tmp/api_schema_dump.sql`, 442 KB) and inspecting each function body. All 13 prior NEEDS-INSPECTION rows are now definitively classified; the "Possibly-COMPLEX" hints from PR #29 review n1 were resolved (none of the org-* RPCs return joined data — they all read back the single sub-entity row only).
+
+Final tally (post-refinement): **EXCLUDED 4** (do not modify), **DONE 7** (already have post-emit read-back guards), **NEEDS-PATTERN 10** (apply standard `%ROWTYPE` pattern), **COMPLEX-CASE 1** (`update_role` — multiple events + joined permissions). Total 22.
 
 Classification key:
 - **EXCLUDED** — handled elsewhere or no projection row to read back; do not touch
@@ -49,36 +53,37 @@ Classification key:
 - **NEEDS-PATTERN** — confirmed missing read-back; apply standard `%ROWTYPE` pattern
 - **COMPLEX-CASE** — read-back required but the response composes joined data (role+permissions, contact+phone, etc.); standard `%ROWTYPE` pattern won't compose — needs explicit `jsonb_build_object` aggregation. Route through Phase 1b.
 
-| RPC | Latest migration | Classification | Notes |
-|-----|------------------|----------------|-------|
-| `api.update_client` | `20260422052825_client_ou_placement_and_edit_support.sql` | **EXCLUDED** | Proof-of-pattern shipped in client-ou-edit PR 1; do NOT modify |
-| `api.change_client_placement` | `20260423032200_client_transfer_enforcement_and_same_day_placement.sql` | **EXCLUDED** | Read-back broadened in PR #27 review remediation; do NOT modify |
-| `api.update_organization_unit` | `20260221173821_fix_org_unit_create_and_projection_guards.sql` | **DONE** | NOT FOUND guard added Part C of that migration; verify via `pg_get_functiondef` in Phase 1 |
-| `api.update_client_address` | `20260406222857_client_api_functions.sql` | **NEEDS-INSPECTION** | Original definition; spot-check in Phase 1 |
-| `api.update_client_email` | `20260406222857_client_api_functions.sql` | **NEEDS-INSPECTION** | Original definition; spot-check in Phase 1 |
-| `api.update_client_funding_source` | `20260406222857_client_api_functions.sql` | **NEEDS-INSPECTION** | Original definition; spot-check in Phase 1 |
-| `api.update_client_insurance` | `20260406222857_client_api_functions.sql` | **NEEDS-INSPECTION** | Original definition; spot-check in Phase 1 |
-| `api.update_client_phone` | `20260406222857_client_api_functions.sql` | **NEEDS-INSPECTION** | Original definition; spot-check in Phase 1. Note: may have been touched by `20260408000351_fix_client_api_architecture_review.sql` (Major M5 — added read-back guards to "sub-entity add RPCs") |
-| `api.update_field_definition` | `20260408023403_client_field_config_enhancements.sql` | **NEEDS-INSPECTION** | First defined in `20260327212247_client_field_api_functions.sql`, then patched in `20260408023403`; check both for diff during Phase 1 (m3 from PR #29 review) |
-| `api.update_field_category` | `20260408023403_client_field_config_enhancements.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1 |
-| `api.update_organization` | `20260226002002_organization_manage_page_phase1.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1. **Possibly-COMPLEX**: response may join contact/phone projections — confirm response shape and route through Phase 1b if joined (n1 from PR #29 review). |
-| `api.update_organization_address` | `20260226002002_organization_manage_page_phase1.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1. **Possibly-COMPLEX**: sub-entity update; confirm whether response is just the address row or includes the parent organization aggregate. |
-| `api.update_organization_contact` | `20260226002002_organization_manage_page_phase1.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1. **Possibly-COMPLEX**: same caveat as `_address`. |
-| `api.update_organization_phone` | `20260226002002_organization_manage_page_phase1.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1. **Possibly-COMPLEX**: same caveat as `_address`. |
-| `api.update_organization_direct_care_settings` | baseline `20260212010625_baseline_v4.sql` | **NEEDS-INSPECTION** | Defined in baseline; not touched since. Two overloads exist in baseline (3-arg and 4-arg with `p_reason`) — verify which is current on Phase 1 branch. |
-| `api.update_role` | baseline `20260212010625_baseline_v4.sql` | **COMPLEX-CASE** | 4-arg `(p_role_id, p_name, p_description, p_permission_ids uuid[])` returning jsonb. Response composes role + permissions (join). Standard `%ROWTYPE` read-back insufficient; needs explicit `jsonb_build_object` aggregation. Pre-flag for Phase 1b. *(Added 2026-04-23 per PR #29 review M1.)* |
-| `api.update_schedule_template` | `20260217231405_add_event_metadata_to_schedule_rpcs.sql` | **NEEDS-PATTERN** | Confirmed via grep: has pre-emit existence check (`IF NOT FOUND` after `SELECT ... INTO v_template`) but NO post-emit projection read-back guard |
-| `api.update_user` | baseline `20260212010625_baseline_v4.sql` | **NEEDS-INSPECTION** | 4-arg `(p_user_id, p_org_id, p_first_name, p_last_name)` returning jsonb. Used by `frontend/src/services/users/SupabaseUserCommandService.ts`. Spot-check on Phase 1 branch. *(Added 2026-04-23 per PR #29 review M1.)* |
-| `api.update_user_access_dates` | baseline `20260212010625_baseline_v4.sql` | **EXCLUDED** | RETURNS void — no projection row to read back via this RPC's contract. Caller-side success is the absence of an exception; per-event `processing_error` surfacing is still desirable, but does not require the standard read-back pattern. *(Added 2026-04-23 per PR #29 review M1.)* |
-| `api.update_user_notification_preferences` | baseline `20260212010625_baseline_v4.sql` | **NEEDS-INSPECTION** | Defined in baseline; not touched since |
-| `api.update_user_phone` | baseline `20260212010625_baseline_v4.sql` | **NEEDS-INSPECTION** | Defined in baseline; not touched since |
-| `api.update_user_schedule` | DROPPED in `20260217211231_schedule_template_refactor.sql` | **EXCLUDED** | Function dropped during schedule template refactor; replaced by template-based assignment model |
+| RPC | Latest migration | Classification | Read-back projection | Notes |
+|-----|------------------|----------------|---------------------|-------|
+| `api.update_client` | `20260422052825_client_ou_placement_and_edit_support.sql` | **EXCLUDED** | n/a | Proof-of-pattern shipped in client-ou-edit PR 1; do NOT modify |
+| `api.change_client_placement` | `20260423032200_client_transfer_enforcement_and_same_day_placement.sql` | **EXCLUDED** | n/a | Read-back broadened in PR #27 review remediation; do NOT modify |
+| `api.update_user_access_dates` | baseline `20260212010625_baseline_v4.sql` | **EXCLUDED** | n/a | RETURNS void — no projection row to read back. Caller-side success = absence of exception. Could be enhanced in a separate Phase to surface `processing_error`, but not in this feature's scope. |
+| `api.update_user_schedule` | DROPPED in `20260217211231_schedule_template_refactor.sql` | **EXCLUDED** | n/a | Function dropped during schedule template refactor; replaced by template-based assignment model |
+| `api.update_organization_unit` | `20260221173821_fix_org_unit_create_and_projection_guards.sql` | **DONE** | `organization_units_projection` | NOT FOUND guard added Part C of that migration. Confirmed via dump: post-emit `SELECT * INTO v_result` + IF NOT FOUND + processing_error query. ✅ |
+| `api.update_field_definition` | `20260408023403_client_field_config_enhancements.sql` | **DONE** | `client_field_definitions_projection` | First defined in `20260327212247_client_field_api_functions.sql`, then patched in `20260408023403`. Confirmed via dump: has post-emit read-back. ✅ |
+| `api.update_field_category` | `20260408023403_client_field_config_enhancements.sql` | **DONE** | `client_field_categories_projection` | Confirmed via dump: has post-emit read-back. ✅ |
+| `api.update_organization` | `20260226002002_organization_manage_page_phase1.sql` | **DONE** | `organizations_projection` | Confirmed via dump: post-emit `SELECT * INTO v_result FROM organizations_projection WHERE id = p_org_id` + IF NOT FOUND + processing_error query. ✅ |
+| `api.update_organization_address` | `20260226002002_organization_manage_page_phase1.sql` | **DONE** | `addresses_projection` | Confirmed via dump: standard pattern. n1's "Possibly-COMPLEX" hint resolved — response is the single address row only, not a joined aggregate. ✅ |
+| `api.update_organization_contact` | `20260226002002_organization_manage_page_phase1.sql` | **DONE** | `contacts_projection` | Confirmed via dump: standard pattern. n1's "Possibly-COMPLEX" hint resolved — single contact row only. ✅ |
+| `api.update_organization_phone` | `20260226002002_organization_manage_page_phase1.sql` | **DONE** | `phones_projection` | Confirmed via dump: standard pattern. n1's "Possibly-COMPLEX" hint resolved — single phone row only. ✅ |
+| `api.update_client_address` | `20260406222857_client_api_functions.sql` | **NEEDS-PATTERN** | `client_addresses_projection` (confirmed via grep) | Confirmed via dump: emits `client.address.updated` then returns immediately — no post-emit read-back. Apply standard `%ROWTYPE` pattern. |
+| `api.update_client_email` | `20260406222857_client_api_functions.sql` | **NEEDS-PATTERN** | `client_emails_projection` (confirmed via grep) | Confirmed via dump: emits `client.email.updated`, no post-emit read-back. |
+| `api.update_client_funding_source` | `20260406222857_client_api_functions.sql` | **NEEDS-PATTERN** | `client_funding_sources_projection` (confirmed via grep) | Confirmed via dump: emits `client.funding_source.updated`, no post-emit read-back. |
+| `api.update_client_insurance` | `20260406222857_client_api_functions.sql` | **NEEDS-PATTERN** | `client_insurance_policies_projection` (confirmed via grep) | Confirmed via dump: emits `client.insurance.updated`, no post-emit read-back. |
+| `api.update_client_phone` | `20260406222857_client_api_functions.sql` | **NEEDS-PATTERN** | `client_phones_projection` (confirmed via grep) | Confirmed via dump: emits via `api.emit_domain_event(...)`, no post-emit read-back. |
+| `api.update_organization_direct_care_settings` | baseline `20260212010625_baseline_v4.sql` | **NEEDS-PATTERN** | `organizations_projection` | Two overloads in baseline (3-arg without reason and 4-arg with `p_reason`) — confirm via `pg_proc` which is current on apply. Confirmed via dump: emits but no post-emit read-back. |
+| `api.update_schedule_template` | `20260217231405_add_event_metadata_to_schedule_rpcs.sql` | **NEEDS-PATTERN** | `schedule_templates_projection` | Confirmed via dump: pre-emit existence check exists (`SELECT * INTO v_template`) but NO post-emit read-back guard. The pre-emit check is informational; standard pattern still required. |
+| `api.update_user` | baseline `20260212010625_baseline_v4.sql` | **NEEDS-PATTERN** | `users` (base table, not `_projection`) | Confirmed via dump: uses raw `INSERT INTO domain_events (...)` (not `api.emit_domain_event(...)`) + manual stream_version calc + `RETURNING id INTO v_event_id`, then returns. No read-back. **Caveats**: (1) preserve manual stream_version contract; (2) read back from `users` (handler `handle_user_profile_updated` writes to that base table — `users` predates the projection-suffix convention). |
+| `api.update_user_phone` | baseline `20260212010625_baseline_v4.sql` | **NEEDS-PATTERN** | `user_phones` OR `user_org_phone_overrides` | Confirmed via dump: emits `user.phone.updated`. **Caveat**: function reads from one of two tables based on `p_org_id` (NULL → `user_phones`, NOT NULL → `user_org_phone_overrides`). Read-back must mirror the same branching to read from the right table. |
+| `api.update_user_notification_preferences` | baseline `20260212010625_baseline_v4.sql` | **NEEDS-PATTERN** | `user_notification_preferences_projection` (confirmed via grep) | Confirmed via dump: emits `user.notification_preferences.updated` + returns immediately. No post-emit read-back. |
+| `api.update_role` | baseline `20260212010625_baseline_v4.sql` | **COMPLEX-CASE** | `roles_projection` + `role_permissions_projection` | 4-arg `(p_role_id, p_name, p_description, p_permission_ids uuid[])` returning jsonb. Confirmed via dump: emits 1-N events (`role.updated`, `role.permission.granted`, `role.permission.revoked`) and returns just `{success: true}`. Read-back must compose role row + array of permission_ids; needs explicit `jsonb_build_object` + `array_agg`, not `%ROWTYPE`. **Phase 1b case-by-case treatment.** |
 
-**Phase 0 follow-up tasks for Phase 1 implementation branch**:
-1. On the `feat/api-rpc-readback-pattern` branch, run `pg_get_functiondef(oid)` for each NEEDS-INSPECTION row and refine classification.
-2. Verify EXCLUDED-as-dropped (`update_user_schedule`) is genuinely absent from live DB.
-3. Confirm `api.update_organization_unit`'s NOT FOUND guard is the **post-emit** kind (not just a pre-emit existence check) — both kinds use `IF NOT FOUND` so source-code grep can mislead.
-4. Possible additions if grep missed any — re-run the `pg_proc` query against the live DB on Phase 1 branch and reconcile.
+**Phase 0 follow-up tasks — RESOLVED 2026-04-23 on `feat/api-rpc-readback-pattern` branch**:
+1. ✅ `supabase db dump --linked --schema=api --schema=public` saved to `/tmp/api_schema_dump.sql` (442 KB); each NEEDS-INSPECTION row inspected and reclassified.
+2. ✅ `update_user_schedule` confirmed absent from dump (no `CREATE OR REPLACE FUNCTION "api"."update_user_schedule"` block).
+3. ✅ `update_organization_unit` post-emit read-back confirmed via dump body inspection (not just pre-emit existence check).
+4. ✅ `pg_proc` query equivalent run via dump's full function inventory; no missing RPCs surfaced beyond the 22 already catalogued.
+5. ⚠️ **Pending verification on apply**: projection table names in the NEEDS-PATTERN rows (e.g. `client_addresses_projection`) marked "(confirmed via grep)" — confirm exact names from live `information_schema.tables` when writing each `CREATE OR REPLACE FUNCTION`. Most use the standard `<entity>_projection` suffix but the client sub-entity tables may use plural-then-projection (e.g. `client_addresses_projection`).
 
 **Out-of-grep RPCs investigation — RESOLVED 2026-04-23 (PR #29 review M1)**:
 - `api.update_role`, `api.update_user`, `api.update_user_access_dates` — all confirmed defined in baseline `20260212010625_baseline_v4.sql` using quoted-identifier syntax (`"api"."update_*"`). Now promoted into the inventory table above with appropriate classifications.
