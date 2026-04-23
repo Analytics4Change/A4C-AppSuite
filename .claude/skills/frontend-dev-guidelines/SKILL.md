@@ -3,12 +3,15 @@ name: Frontend Development Guidelines
 description: Guard rails for React/MobX reactivity, session management, CQRS queries, and WCAG 2.1 AA accessibility in A4C-AppSuite.
 version: 3.0.0
 category: frontend
-tags: [react, mobx, accessibility, wcag, cqrs, logging, viewmodel]
+tags: [mobx, accessibility, wcag, cqrs, logging, viewmodel]
 ---
 
 # Frontend Guard Rails
 
-Critical rules that prevent bugs in the React/TypeScript frontend. For full guidance, component patterns, and the dropdown decision tree, see `frontend/CLAUDE.md` and search `documentation/AGENT-INDEX.md` with keywords: `react`, `mobx`, `accessibility`, `wcag`, `component`, `dropdown`, `modal`, `forgot-password`, `password-reset`, `logging`, `viewmodel`, `auth`, `session`, `cqrs`.
+Critical rules that prevent bugs in the React/TypeScript frontend. For deeper guidance:
+
+- **Architecture / pattern questions** — search `documentation/AGENT-INDEX.md` with keywords: `mobx`, `viewmodel`, `cqrs`, `events`, `authentication`, `session-management`, `forgot-password`, `password-reset`, `logging`, `accessibility`, `wcag`.
+- **UI component / pattern selection** (dropdowns, modals, checkbox groups) — consult the decision tree in `frontend/CLAUDE.md` and `documentation/frontend/patterns/ui-patterns.md` directly.
 
 ---
 
@@ -52,7 +55,7 @@ async fetchData() {
 
 Supabase manages session state automatically. Manual caching causes **silent failures** — empty data lists with zero results and no errors.
 
-> **Do NOT use `getCurrentSession()` in new code** — it is a legacy cache pattern in `supabase.service.ts`. Do not copy it.
+> **Do NOT introduce manual session caching.** A legacy `getCurrentSession()` cache exists in `supabase.service.ts` but has no active callers. Do not re-introduce this pattern or copy its shape elsewhere.
 
 ```typescript
 // ❌ WRONG — manual cache returns NULL, all queries silently fail
@@ -141,38 +144,43 @@ import { DomainEvent } from '@/types/event-types';
 
 See `frontend/CLAUDE.md` "Generated Event Types" section for regeneration steps.
 
-## 11. CQRS Write Path: Event Emission Only
+## 11. CQRS Write Path: `api.*` RPC via Service, Check Envelope
 
-All mutations go through event emission. **Never write directly to projection tables.**
+All mutations go through `api.*` schema RPCs via service classes. The RPC emits domain events server-side — never write to projection tables directly.
 
-- Every write call must include a `reason` field (minimum 10 characters)
-- Use the `useEvents` hook and `ReasonInput` component for user-facing mutations
-- Batch multiple related entities in a single emission call
+- Every mutation must include a `reason` field (minimum 10 characters). Use the `ReasonInput` component (`frontend/src/components/ui/ReasonInput.tsx`) for user-facing reason capture.
+- RPCs return an envelope `{ success: boolean, data?, errorDetails? }` — always check `result.success` before using `result.data`.
 
 ```typescript
-// ✅ CORRECT
-const { emitEvent } = useEvents();
-await emitEvent('user.deactivated', { userId, reason: 'Account policy violation' });
+// ✅ CORRECT — call api.* RPC via service, check envelope
+const result = await roleService.deactivateRole({ roleId, reason });
+if (!result.success) {
+  showError(result.errorDetails?.message ?? 'Unknown error');
+  return;
+}
+// use result.data
 
-// ❌ WRONG — direct table write bypasses event sourcing
+// ❌ WRONG — direct projection write bypasses event sourcing
 await supabase.from('users_projection').update({ is_active: false }).eq('id', userId);
 ```
 
-See `documentation/frontend/guides/EVENT-DRIVEN-GUIDE.md` for the full write-path pattern.
+See `documentation/frontend/guides/EVENT-DRIVEN-GUIDE.md` for the full write-path pattern and `frontend/CLAUDE.md` (CQRS Query Pattern section) for RPC conventions.
 
 ## 12. JWT Utilities: Import from Shared Location
 
-Do NOT duplicate `decodeJWT()` logic in individual services. There are already 5 copies in the codebase — these are tech debt to be consolidated into `@/utils/jwt.ts`.
+Do NOT duplicate `decodeJWT()` logic in individual services. Always import from the shared utility at `@/utils/jwt.ts`.
 
 ```typescript
-// ✅ CORRECT — import from shared utility (once consolidated)
+// ✅ CORRECT
 import { decodeJWT } from '@/utils/jwt';
 
-// ❌ WRONG — inline decode duplicated per service
+// ❌ WRONG — inline decode
 const claims = JSON.parse(atob(token.split('.')[1]));
 ```
 
-When the shared utility exists, all services must import from it. Do not add a 6th inline copy.
+**Rule**: All JWT decoding MUST import `decodeJWT` from `@/utils/jwt.ts`. Do not introduce inline `atob` / `JSON.parse` decode logic. If you find an inline copy while working nearby, migrate it in the same PR.
+
+**Self-audit**: `grep -rnE "JSON\.parse.*atob" frontend/src` — any hits outside `@/utils/jwt.ts` are tech debt.
 
 ## 13. Logging: `Logger.getLogger()`, Never Bare Console
 
