@@ -1,9 +1,9 @@
 # Client OU Placement & Edit — Context
 
 **Feature**: Client OU Placement Tracking + Full Client Record Editing
-**Branch**: main (not yet branched)
+**Branch**: `feat/client-ou-placement`
 **Started**: 2026-04-21
-**Last Updated**: 2026-04-22 (post-architect-review — all "completed" claims reset; plan expanded to 8 phases)
+**Last Updated**: 2026-04-22 (post-Phase-3 commit `9390eff7` — Phases 0-3 complete; PR 1 needs Phase 6 + 8a + PR 1 tests)
 
 ## Overview
 
@@ -210,6 +210,7 @@ const selectedPath = currentOUId ? getOUPathById(units, currentOUId) : null;
 
 ## Gotchas Discovered This Session (2026-04-22)
 
+### Phases 0-1 (DB + contracts)
 - **`frontend/src/types/generated/` is gitignored** (`frontend/.gitignore:99`). Sync-schemas regenerates the mirror from `infrastructure/supabase/contracts/types/generated-events.ts`. Don't commit files there; they will appear unchanged in `git status` even after a successful sync.
 - **Postgres function overload on DEFAULT param added**: When a function gains a new parameter with DEFAULT — even via `CREATE OR REPLACE` — Postgres creates a NEW overload instead of replacing the old signature. This left a stale 7-arg `api.change_client_placement` callable by name resolution. Fix: `DROP FUNCTION IF EXISTS api.fn(<old-types>)` BEFORE the new `CREATE OR REPLACE`. The migration's 1c block does this explicitly.
 - **`organization_units_projection.display_name` is nullable; `.name` is NOT NULL**. `api.get_client`'s LEFT JOIN uses `COALESCE(ou.display_name, ou.name)` to always produce a string. `api.change_client_placement` similarly COALESCEs in its response.
@@ -218,31 +219,68 @@ const selectedPath = currentOUId ? getOUPathById(units, currentOUId) : null;
 - **Tasks doc originally had wrong table names** (`permissions` + `role_templates`). The actual tables are `permissions_projection`, `role_permission_templates`, `role_permissions_projection`. The migration uses correct names; the task descriptions have been implicitly superseded by the completed SQL.
 - **RPC argument order matters for overload resolution**. Added `p_organization_unit_id` at the END of the arg list so existing callers (which pass positional args) keep working. Frontend callers currently invoke `changeClientPlacement` with named parameters via Supabase's `.rpc()`, so ordering is flexible there.
 
+### Phase 2 (frontend types + services)
+- **`ClientRpcResult.client` was typed as a 4-field subset** (`{id, first_name, last_name, status}`) that no consumer actually reads. Widened to `Partial<Client>` with an inline doc note clarifying that sub-entity arrays (phones/emails/placement_history/...) are NOT populated by a projection read-back — those still require `getClient()`. — Decided 2026-04-22
+- **`api.update_client` read-back returns clients_projection row only** — not the full `Client` aggregate. Consumers that need sub-entities after an update still call `getClient()`. The service-level fallback in `SupabaseClientService.updateClient` does `getClient()` automatically when the RPC response omits `client` (Mock or pre-1g-pre API).
+- **No existing consumers for `SupabaseClientService.updateClient`** at Phase 2 time — grep across `src/**` shows only the interface + Mock. Phase 4 ViewModel will be the first. Means the widened `ClientRpcResult.client` type is safe to land without touching call sites.
+- **Pre-existing test failures baseline** (confirmed via stash-and-rerun on main): 52 fail / 389 pass (40 fail / 10 pass files) — in `SupabaseClientFieldService`, organization ViewModels, `InvitationAcceptanceViewModel`, scripts/logger. Don't attribute these to Phase 2/3 work. Baseline to compare against after Phase 4+ additions.
+
+### Phase 3 (intake OU picker)
+- **`TreeSelectDropdown` has NO `data-testid` prop**. Its props are `id`, `label`, `nodes`, `selectedPath`, `onSelect`, `placeholder`, `disabled`, `error`, `helpText`, `className`. To attach a stable test selector, wrap it in a `<div data-testid="...">` — this avoids modifying a shared component used by the roles page.
+- **`TreeSelectDropdown` is shared with `/roles/*` via `RoleFormFields.tsx`** — two importers total after Phase 3 (`AdmissionSection.tsx` + `RoleFormFields.tsx`). Previously the "Reference Materials" section claimed RoleFormFields was the "only existing consumer" — that's no longer true. Any change to TreeSelectDropdown affects both routes.
+- **Intake loads `status: 'active'` units only** (`ouService.getUnits({ status: 'active' })`) — so the picker inherently cannot surface an inactive OU. The "(inactive)" suffix rendering is only needed in PlacementCard (Phase 6) and edit-mode picker (Phase 5a), where historical OU references may be inactive.
+- **`rootPath` derived from shortest path**: Mirrors `RolesManagePage` pattern — `units.reduce((shortest, u) => u.path.length < shortest.length ? u.path : shortest, units[0].path)`. No JWT scope_path claim read is required; the OU service already scopes results to the user's hierarchy.
+- **Intake does NOT eagerly call `changeClientPlacement`**. Before Phase 3 the intake flow only emitted `client.registered`; the first placement history row was never created at intake. Phase 3 adds the call conditionally (only when arrangement + OU + admission_date are all set) — arrangement-only intakes still do not emit a placement event. This matches C3 (placement history lifecycle owned by `change_client_placement`) without introducing a new auto-write path.
+- **Placement failure is a warning, not a submit failure**. `changeClientPlacement` rides in the same `Promise.allSettled` batch as sub-entity RPCs, so if it fails the client is still registered and the user sees the failure in the `subEntityErrors` warning banner. This keeps intake resilient (client data is the primary artifact) while surfacing the problem.
+
 ## Files Created/Modified This Session
 
 ### New Files
-- (none yet)
+- `infrastructure/supabase/supabase/migrations/20260422052825_client_ou_placement_and_edit_support.sql` — APPLIED to linked project 2026-04-22 (Phase 1, commit `cd374c12`). All 10 verification assertions pass.
+- `frontend/src/utils/organizationUnitPath.ts` — `getOUPathById` + `getOUIdByPath` helpers bridging TreeSelectDropdown's ltree paths to UUID form stored in `clients_projection.organization_unit_id` (Phase 2, commit `d1f69ef1`).
+- `frontend/src/utils/__tests__/organizationUnitPath.test.ts` — 11 Vitest unit tests (round-trip, null/undefined/empty, prefix non-match, empty list) (Phase 2, commit `d1f69ef1`).
 
-### Modified Files (Phase 0 — 2026-04-22)
+### Modified Files (Phase 0 — 2026-04-22, commit `cd374c12`)
 - `infrastructure/supabase/contracts/asyncapi/domains/client.yaml` — added `organization_unit_id` (nullable uuid) to `ClientPlacementChangeData` schema
 - `infrastructure/supabase/contracts/asyncapi-bundled.yaml` — regenerated by `npm run generate:types`
 - `infrastructure/supabase/contracts/types/generated-events.ts` — regenerated by `npm run generate:types` (ClientPlacementChangeData now has `organization_unit_id?: string`)
 - `frontend/src/types/generated/*` — regenerated by `npm run sync-schemas` (mirror of `infrastructure/.../contracts/types/`). **Gitignored** (see `frontend/.gitignore:99`) — rebuilt automatically by `npm run build` and `npm run sync-schemas`. A fresh clone after PR 1 merges will regenerate these from the committed AsyncAPI source. No git-tracked frontend change from Phase 0.
 
-### New Files (Phase 1 — 2026-04-22)
-- `infrastructure/supabase/supabase/migrations/20260422052825_client_ou_placement_and_edit_support.sql` — APPLIED to linked project 2026-04-22. All 10 verification assertions pass.
-
-### Modified Files (Phase 1 post-apply — 2026-04-22)
+### Modified Files (Phase 1 post-apply — 2026-04-22, commit `cd374c12`)
 - `infrastructure/supabase/handlers/client/handle_client_placement_changed.sql` — re-extracted via `pg_get_functiondef`: OU column + FOR UPDATE lock + denormalization
 - `infrastructure/supabase/handlers/client/handle_client_information_updated.sql` — OU CASE branch removed
 - `infrastructure/supabase/handlers/client/handle_client_admitted.sql` — OU CASE branch removed
 
-### Doc Updates (both phases)
-- `dev/active/client-ou-edit-tasks.md` — Phase 0 ✅ / Phase 1 in-progress; each 1a–1j task checked off with the concrete SQL element
-- `dev/active/client-ou-edit-plan.md` — corrected stale 0d note to reflect frontend sync step
-- `dev/active/client-ou-edit-context.md` — (this file)
+### Modified Files (Phase 2 — 2026-04-22, commit `d1f69ef1`)
+- `frontend/src/types/client.types.ts`:
+  - `ClientPlacementHistory` gained `organization_unit_id: string | null` + `organization_unit_name?: string | null`
+  - `ChangePlacementParams` gained `organization_unit_id?: string | null`
+  - `ClientRpcResult.client` widened from the 4-field subset to `Partial<Client>` with a doc comment on sub-entity array caveats
+- `frontend/src/services/clients/SupabaseClientService.ts`:
+  - `changeClientPlacement()` now passes `p_organization_unit_id: params.organization_unit_id ?? null`
+  - `updateClient()` opts in to `response.client` when present; falls back to `await this.getClient(clientId)` when absent (Mock or pre-1g-pre API). This is the 1g-pre proof-of-pattern seed for the parked follow-up feature.
+- `frontend/src/services/clients/MockClientService.ts`:
+  - `changeClientPlacement()` writes `organization_unit_id` to the synthesized placement history row AND denormalizes it onto the client row — mirrors `handle_client_placement_changed` on the DB side.
 
-**Architect review caveat (2026-04-22)**: Prior "completed" claims for the migration, AsyncAPI yaml, and handler reference files were reset because disk inspection showed none had been done. Claims from this session onward reflect verified on-disk state.
+### Modified Files (Phase 3 — 2026-04-22, commit `9390eff7`)
+- `frontend/src/viewModels/client/ClientIntakeFormViewModel.ts`:
+  - 3rd constructor arg: `organizationUnitService: IOrganizationUnitService = getOrganizationUnitService()`
+  - New observables: `organizationUnits`, `organizationUnitsRootPath`, `isLoadingOrganizationUnits`, `organizationUnitsError`
+  - New computeds: `organizationUnitTree` (calls `buildOrganizationUnitTree`), `selectedOrganizationUnitPath` (via `getOUPathById`)
+  - New actions: `loadOrganizationUnits()` (idempotent, non-fatal on error), `setOrganizationUnitByPath(path)` (calls `getOUIdByPath` + `setField`)
+  - `submit()` pushes `changeClientPlacement` into the post-register `Promise.allSettled` batch when `placement_arrangement`, `organization_unit_id`, AND `admission_date` are all set. Shares the session `correlation_id` with the register event.
+- `frontend/src/pages/clients/intake/AdmissionSection.tsx`:
+  - Imports `TreeSelectDropdown`
+  - Renders OU picker wrapped in `<div data-testid="admission-ou-select">` with dynamic placeholder/disabled states + optional help text
+- `frontend/src/pages/clients/ClientIntakePage.tsx`:
+  - Mount effect calls `vm.loadOrganizationUnits()` alongside `vm.loadFieldDefinitions()`
+
+### Doc Updates (all phases)
+- `dev/active/client-ou-edit-tasks.md` — phase checkboxes, current status, concrete next-step block (updated through each phase; committed as part of feat commits `cd374c12`, `d1f69ef1`, `9390eff7`)
+- `dev/active/client-ou-edit-plan.md` — corrected stale 0d note during Phase 0 work; not substantively changed since architect review integration
+- `dev/active/client-ou-edit-context.md` — this file, updated after each phase
+
+**Architect review caveat (2026-04-22)**: Prior "completed" claims for the migration, AsyncAPI yaml, and handler reference files were reset because disk inspection showed none had been done. Claims from Phase 0 onward reflect verified on-disk state.
 
 ## Architect Review (2026-04-22)
 
@@ -254,8 +292,10 @@ Full architecture review completed via `software-architect-dbc` agent. Verdict: 
 
 ## Reference Materials
 
-- `frontend/src/components/roles/RoleFormFields.tsx` — only existing consumer of TreeSelectDropdown
-- `frontend/src/viewModels/settings/ClientFieldSettingsViewModel.ts` — dirty tracking pattern to follow
-- `documentation/infrastructure/patterns/event-handler-pattern.md` — handler creation rules
-- `infrastructure/supabase/handlers/` — reference handler files (update AFTER migration applied)
-- `documentation/architecture/decisions/adr-client-management-schema.md` — establishes placement history as first-class projection
+- `frontend/src/components/roles/RoleFormFields.tsx` — TreeSelectDropdown consumer on `/roles/*`. Stores OU selection as a **path string** (no UUID mapping needed — differs from the intake flow).
+- `frontend/src/pages/clients/intake/AdmissionSection.tsx` — second TreeSelectDropdown consumer (new in Phase 3). Stores OU as a **UUID** in `formData.organization_unit_id` with path↔id mapping via `frontend/src/utils/organizationUnitPath.ts`.
+- `frontend/src/pages/roles/RolesManagePage.tsx` — reference implementation for the "shortest-path reduce" rootPath pattern that `ClientIntakeFormViewModel.loadOrganizationUnits()` mirrors.
+- `frontend/src/viewModels/settings/ClientFieldSettingsViewModel.ts` — dirty tracking pattern to follow for Phase 4 `ClientEditViewModel`.
+- `documentation/infrastructure/patterns/event-handler-pattern.md` — handler creation rules.
+- `infrastructure/supabase/handlers/` — reference handler files (update AFTER migration applied).
+- `documentation/architecture/decisions/adr-client-management-schema.md` — establishes placement history as first-class projection.
