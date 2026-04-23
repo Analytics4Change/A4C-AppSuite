@@ -24,6 +24,8 @@ purpose: agent-navigation
 | Consolidate Day Zero baseline | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | [handlers/README.md](../infrastructure/supabase/handlers/README.md) |
 | Configure authentication | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) |
 | Deploy database changes | [DEPLOYMENT_INSTRUCTIONS.md](infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) |
+| Manual deploy or rollback | [deployment-runbook.md](infrastructure/operations/deployment/deployment-runbook.md) | [disaster-recovery.md](infrastructure/operations/disaster-recovery.md) |
+| Recover from cluster/DB failure | [disaster-recovery.md](infrastructure/operations/disaster-recovery.md) | [deployment-runbook.md](infrastructure/operations/deployment/deployment-runbook.md) |
 | Understand CQRS/events | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | [EVENT-DRIVEN-GUIDE.md](frontend/guides/EVENT-DRIVEN-GUIDE.md) |
 | Test OAuth flow | [OAUTH-TESTING.md](infrastructure/guides/supabase/OAUTH-TESTING.md) | [supabase-auth-overview.md](architecture/authentication/supabase-auth-overview.md) |
 | Add RBAC permissions | [rbac-architecture.md](architecture/authorization/rbac-architecture.md) | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) |
@@ -92,7 +94,8 @@ purpose: agent-navigation
 | `day0-migration` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | handlers/README.md, DEPLOYMENT_INSTRUCTIONS.md |
 | `data-collection` | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | ui-patterns.md, EVENT-DRIVEN-GUIDE.md |
 | `database-hook` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | custom-claims-setup.md |
-| `deployment` | [DEPLOYMENT_INSTRUCTIONS.md](infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) | infrastructure/CLAUDE.md |
+| `deployment` | [DEPLOYMENT_INSTRUCTIONS.md](infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) | deployment-runbook.md, infrastructure/CLAUDE.md |
+| `disaster-recovery` | [disaster-recovery.md](infrastructure/operations/disaster-recovery.md) | deployment-runbook.md |
 | `determinism` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | temporal-overview.md |
 | `development` | [DEVELOPMENT.md](frontend/guides/DEVELOPMENT.md) | frontend/CLAUDE.md |
 | `direct-care-settings` | [organizations_projection.md](infrastructure/reference/database/tables/organizations_projection.md) | user_client_assignments_projection.md |
@@ -105,7 +108,7 @@ purpose: agent-navigation
 | `duration-ms` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `edge-function` | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | DEPLOYMENT_INSTRUCTIONS.md |
 | `edge-function-jwt` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | EDGE_FUNCTION_TESTS.md |
-| `email` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | resend-email-provider.md |
+| `email` | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | resend-key-rotation.md |
 | `entity-service` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | organization-management-architecture.md |
 | `event-archival` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `event-errors` | [event-observability.md](infrastructure/guides/event-observability.md) | event-sourcing-overview.md, triggering-workflows.md |
@@ -141,7 +144,8 @@ purpose: agent-navigation
 | `invitation-oauth` | [oauth-invitation-acceptance.md](architecture/authentication/oauth-invitation-acceptance.md) | invitations_projection.md, frontend-auth-architecture.md |
 | `jwt` | [custom-claims-setup.md](architecture/authentication/custom-claims-setup.md) | frontend-auth-architecture.md, supabase-auth-overview.md |
 | `jwt-claims` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | frontend-auth-architecture.md, infrastructure/CLAUDE.md |
-| `kubernetes` | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | KUBECONFIG_UPDATE_GUIDE.md |
+| `kubernetes` | [deployment-runbook.md](infrastructure/operations/deployment/deployment-runbook.md) | KUBECONFIG_UPDATE_GUIDE.md, infrastructure/CLAUDE.md |
+| `runbook` | [deployment-runbook.md](infrastructure/operations/deployment/deployment-runbook.md) | disaster-recovery.md, infrastructure/CLAUDE.md |
 | `logging` | [logging-standards.md](architecture/logging-standards.md) | frontend/CLAUDE.md, workflows/CLAUDE.md |
 | `ltree` | [scoping-architecture.md](architecture/authorization/scoping-architecture.md) | organization_units_projection.md |
 | `manage-user` | [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | edge-functions-deployment.md, rbac-architecture.md |
@@ -287,7 +291,7 @@ purpose: agent-navigation
 | [CLAUDE.md](../CLAUDE.md) | Repository overview, quick start commands, key links | `monorepo`, `overview`, `quickstart`, `cross-component` | 3600 |
 | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | React/TypeScript development guide with accessibility | `react`, `mobx`, `accessibility` | 5200 |
 | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | Temporal workflow development guide | `temporal`, `activities`, `saga` | 4800 |
-| [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | Infrastructure guide with deployment runbook | `supabase`, `kubernetes`, `deployment` | 6100 |
+| [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) | Infrastructure component guide — points to subdir CLAUDE.md (supabase, k8s) and operations docs | `supabase`, `kubernetes`, `migrations` | 3000 |
 | [README.md](./README.md) | Documentation table of contents | `navigation`, `index` | 2200 |
 
 ### Architecture (Cross-Cutting)
@@ -342,6 +346,8 @@ purpose: agent-navigation
 | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | Split handler architecture: routers, handlers, adding new event types, projection read-back guard | `event-handler`, `handler`, `router`, `process_event`, `split-handlers`, `projection-guard` | 4200 |
 | [observability-operations.md](infrastructure/guides/observability-operations.md) | **[Aspirational]** Production-scale: retention, sampling, APM integration | `retention-policy`, `trace-sampling`, `apm-integration`, `otlp-export`, `event-archival` | 2000 |
 | [table-template.md](infrastructure/reference/database/table-template.md) | Database table documentation template | `template`, `database`, `schema` | 800 |
+| [deployment-runbook.md](infrastructure/operations/deployment/deployment-runbook.md) | Manual deployment + rollback procedures for frontend, workers, Supabase migrations; troubleshooting per pipeline | `runbook`, `deployment`, `rollback`, `kubectl`, `supabase-cli`, `cloudflare-tunnel` | 2400 |
+| [disaster-recovery.md](infrastructure/operations/disaster-recovery.md) | Backup strategy + recovery procedures for cluster failure, database corruption, application rollback | `disaster-recovery`, `backup`, `recovery`, `cluster-failure` | 1000 |
 
 ### Workflows
 
