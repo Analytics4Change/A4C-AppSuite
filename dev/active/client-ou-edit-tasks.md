@@ -2,35 +2,37 @@
 
 ## Current Status
 
-**Phase**: Phase 0 ✅ + Phase 1 ✅ + Phase 2 ✅ → Phase 3 — OU Picker in Intake Form
+**Phase**: Phase 0 ✅ + Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ → Phase 6 — Placement History OU Display (still PR 1)
 **Status**: 🟢 READY TO CONTINUE
 **Last Updated**: 2026-04-22
-**Branch**: `feat/client-ou-placement` (local-only; commit `cd374c12` + uncommitted Phase 2 work). Run `git branch --show-current` to verify before continuing. Do NOT switch to `main`; it tracks `origin/main` and shouldn't carry this work.
+**Branch**: `feat/client-ou-placement` (commit `d1f69ef1` + uncommitted Phase 3 work). Run `git branch --show-current` to verify before continuing. Do NOT switch to `main`; it tracks `origin/main` and shouldn't carry this work.
 
-**Next Step (concrete)** — Phase 3, OU picker at intake:
-1. Open `frontend/src/viewModels/client/ClientIntakeFormViewModel.ts`.
-   - Add an observable `units: OrganizationUnit[]` (empty array default) + loading flag.
-   - On construction / init, load `units` via `ouService.getUnits({ status: 'active' })` (inject via factory — follow existing service-injection pattern; see `RoleFormViewModel` for reference). Expose `rootPath` from JWT scope claim for tree building.
-   - Add a computed `ouTree = buildOrganizationUnitTree(this.units, this.rootPath)` for the dropdown.
-   - Add a computed `selectedOUPath` using `getOUPathById(this.units, this.formData.organization_unit_id as string | null)`.
-   - In `submit()` (~lines 505-631): AFTER `registerClient()` succeeds, if BOTH `formData.placement_arrangement` AND `formData.organization_unit_id` are set, call `changeClientPlacement({ placement_arrangement, start_date: admission_date, organization_unit_id, correlation_id })`.
-2. Open `frontend/src/pages/clients/intake/AdmissionSection.tsx`. Add `<TreeSelectDropdown>` for OU selection:
-   - `id="admission-ou-select"`, `data-testid="admission-ou-select"`
-   - `nodes={vm.ouTree}`, `selectedPath={vm.selectedOUPath}`
-   - `onSelect={(path) => vm.setField('organization_unit_id', getOUIdByPath(vm.units, path))}`
-   - Place it after the existing placement_arrangement field; gate visibility / render behavior on `vm.units.length > 0`.
-3. Confirm the intake form's OU field is OPTIONAL (matches migration — `organization_unit_id uuid DEFAULT NULL`). Permissions: intake gated on `client.create`; no additional `client.transfer` gate at intake.
+**Next Step (concrete)** — Phase 6, show OU name on placement history:
+1. Open `frontend/src/pages/clients/ClientOverviewPage.tsx`. Locate `PlacementCard` (renders rows from `client.placement_history`).
+2. Render `organization_unit_name` when present. Rules:
+   - Present + OU is active → show display name (e.g., "Main Campus — East Wing")
+   - Present + OU deactivated (still returned by api.get_client LEFT JOIN) → append "(inactive)" suffix
+   - Null/undefined → show "—" placeholder
+3. `api.get_client()` already returns `organization_unit_name` from the LEFT JOIN on `organization_units_projection` (Phase 1e, migration `20260422052825`). No backend work required.
+4. `MockClientService.getClient()` should also surface `organization_unit_name` to keep the mock parity — but since the mock has no OU directory, it may return null, and PlacementCard must handle it. Decision: skip mock change unless the placement history card visibly regresses in mock mode; revisit during manual smoke.
 
-**Verification**: `cd frontend && npm run typecheck && npm run lint && npm run test -- --run src/viewModels/client src/pages/clients/intake` and manual smoke test the intake flow in dev mode (mock auth).
+**Verification**: typecheck + lint + targeted tests. Manual smoke: intake with OU → placement history card shows OU name; client with no-OU placement shows "—".
 
-**Files already touched (do not re-edit)**: The AsyncAPI contract, generated types, handler reference files, migration, Phase 2 types/services/utility are all in sync.
+**Bundle note**: PR 1 covers Phases 0, 1, 2, 3, 6, 8a + testing (per plan table). Phase 4/5/8b is PR 2a/2b.
 
-**Phase 2 artifacts** (completed 2026-04-22, uncommitted):
+**Phase 3 artifacts** (completed 2026-04-22, uncommitted):
+- `frontend/src/viewModels/client/ClientIntakeFormViewModel.ts` — 3rd constructor arg `IOrganizationUnitService`; `organizationUnits` / `organizationUnitsRootPath` / loading flags; `organizationUnitTree` + `selectedOrganizationUnitPath` computeds; `loadOrganizationUnits()` + `setOrganizationUnitByPath()` actions. `submit()` now pushes `changeClientPlacement` into the post-register RPC batch when placement + OU + admission_date are all set.
+- `frontend/src/pages/clients/intake/AdmissionSection.tsx` — new `<TreeSelectDropdown>` wrapped in `<div data-testid="admission-ou-select">`, disabled with placeholder hints during loading/empty states, optional help text.
+- `frontend/src/pages/clients/ClientIntakePage.tsx` — mount effect now calls `vm.loadOrganizationUnits()` alongside `vm.loadFieldDefinitions()`.
+- Verification: typecheck ✓, lint ✓, targeted tests ✓ (67). Full suite: 52 fail / 389 pass — same pre-existing baseline as Phase 2 (no new regressions).
+
+**Phase 2 artifacts** (committed in `d1f69ef1`):
 - `frontend/src/types/client.types.ts` — `ClientPlacementHistory.organization_unit_id` + `organization_unit_name?` added; `ChangePlacementParams.organization_unit_id?` added; `ClientRpcResult.client` widened to `Partial<Client>` with doc comment on sub-entity caveat.
 - `frontend/src/services/clients/SupabaseClientService.ts` — `changeClientPlacement()` passes `p_organization_unit_id`; `updateClient()` opts-in to `response.client` with `getClient()` fallback.
 - `frontend/src/services/clients/MockClientService.ts` — `changeClientPlacement()` writes `organization_unit_id` to synthesized placement row and denormalizes to the client.
-- `frontend/src/utils/organizationUnitPath.ts` + `frontend/src/utils/__tests__/organizationUnitPath.test.ts` — `getOUPathById` / `getOUIdByPath` helpers with 11 passing unit tests covering id↔path round-trip, null/empty/prefix edge cases.
-- Verification: typecheck ✓, lint ✓, targeted tests ✓ (67 passed in `src/utils` + `src/viewModels/client`). Pre-existing test failures in organization VMs / `SupabaseClientFieldService` / logger are unrelated and exist on main (confirmed via stash-and-rerun).
+- `frontend/src/utils/organizationUnitPath.ts` + `frontend/src/utils/__tests__/organizationUnitPath.test.ts` — `getOUPathById` / `getOUIdByPath` helpers with 11 passing unit tests.
+
+**Files already touched (do not re-edit)**: AsyncAPI contract, generated types, handler reference files, migration, Phase 2 types/services/utility, Phase 3 intake VM/page/section are all in sync.
 
 **End-of-feature reminder**: Phase 9 (activate parked `api-rpc-readback-pattern` follow-up) is part of this feature's definition of done. Do NOT archive this feature without executing Phase 9.
 
@@ -163,15 +165,19 @@ All work is pending. Integrating architect recommendations:
   - [x] Unit tests for both helpers — 11 passing tests (round-trip, null/undefined/empty, missing id/path, prefix non-match, empty units list)
 - [x] Verification: `cd frontend && npm run typecheck` ✓, `npm run lint` ✓, `npm run test -- --run src/utils src/viewModels/client` ✓ (67 passed). Pre-existing failures in `SupabaseClientFieldService`, organization VMs, scripts logger, etc. are unrelated (confirmed by stash-and-rerun).
 
-## Phase 3: OU Picker in Intake Form ⏸️ PENDING
+## Phase 3: OU Picker in Intake Form ✅ COMPLETE (2026-04-22)
 
-- [ ] Add OU state to `ClientIntakeFormViewModel`: load `units` via `getUnits({status: 'active'})` on mount
-- [ ] Add `TreeSelectDropdown` to `AdmissionSection.tsx` with `data-testid="admission-ou-select"`
-- [ ] Use `buildOrganizationUnitTree(units, rootPath)` for nodes prop
-- [ ] Map `vm.formData.organization_unit_id` → path via `getOUPathById`
-- [ ] `onSelect` callback: map path → id via `getOUIdByPath`, call `vm.setField('organization_unit_id', id)`
-- [ ] In `ClientIntakeFormViewModel.submit()` (line 505-631): after `registerClient()`, if both `placement_arrangement` AND `organization_unit_id` set → call `changeClientPlacement()` with OU
-- [ ] Handle deactivated OU case: show "(inactive)" suffix in display
+- [x] Add OU state to `ClientIntakeFormViewModel`: `organizationUnits`, `organizationUnitsRootPath`, `isLoadingOrganizationUnits`, `organizationUnitsError` + injected `IOrganizationUnitService` (3rd constructor arg, defaults to `getOrganizationUnitService()`)
+- [x] `loadOrganizationUnits()` action — loads active units, computes rootPath (shortest path — mirrors `RolesManagePage` pattern), idempotent (no-op when already loaded/loading); failure non-fatal (picker degrades to empty)
+- [x] Add `TreeSelectDropdown` to `AdmissionSection.tsx` wrapped in `<div data-testid="admission-ou-select">` (TreeSelectDropdown itself has no data-testid prop — wrapper pattern keeps the test selector stable without modifying a shared component)
+- [x] Use `viewModel.organizationUnitTree` computed (calls `buildOrganizationUnitTree(units, rootPath)`) for `nodes` prop; returns `[]` when no units loaded so dropdown renders disabled placeholder cleanly
+- [x] Map `vm.formData.organization_unit_id` → path via `getOUPathById` (computed `selectedOrganizationUnitPath`)
+- [x] `onSelect` callback: `viewModel.setOrganizationUnitByPath(path)` — internally maps path → id via `getOUIdByPath` and calls `setField('organization_unit_id', id)`
+- [x] In `ClientIntakeFormViewModel.submit()`: after `registerClient()`, if `placement_arrangement`, `organization_unit_id`, AND `admission_date` are all set, push `changeClientPlacement({ placement_arrangement, start_date: admission_date, organization_unit_id, correlation_id })` into `subEntityPromises` so the initial placement history row carries OU from the start. Failures surface as a warning in `subEntityErrors`, not a submit failure.
+- [x] Wire `vm.loadOrganizationUnits()` into `ClientIntakePage` mount effect alongside `loadFieldDefinitions()`
+- [x] Verification: `cd frontend && npm run typecheck` ✓, `npm run lint` ✓, `npm run test -- --run src/viewModels/client src/pages/clients src/utils` ✓ (67 pass). Full suite shows same 52-fail pre-existing baseline — no new regressions.
+
+**Deferred to Phase 6 / 5a**: "Handle deactivated OU case: show (inactive) suffix" — the intake picker only loads `status: 'active'` units, so intake inherently cannot surface an inactive OU. The suffix display is needed in PlacementCard (Phase 6) and the edit-mode OU picker (Phase 5a), where historical/deactivated OUs may appear in records.
 
 ## Phase 4: Client Edit ViewModel ⏸️ PENDING
 
