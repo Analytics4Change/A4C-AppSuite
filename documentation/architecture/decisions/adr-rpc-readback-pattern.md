@@ -176,9 +176,12 @@ For caller-driven failures that do use `RAISE EXCEPTION`, existing ERRCODEs are 
   - 1 schedule: `update_schedule_template`
   - 1 role (COMPLEX-CASE composing role + permissions): `update_role`
 - **2026-04-23** — Migration `20260423062426_add_user_profile_updated_handler.sql` adds the missing `handle_user_profile_updated` handler that the read-back surfaced as never-implemented dead code.
-- **2026-04-23** — Migration `20260423065747_api_rpc_readback_v2_event_id_check.sql` upgrades all 19 single-event RPCs from Pattern A v1 (IF NOT FOUND only) to **Pattern A v2** (IF NOT FOUND + race-safe post-emit `WHERE id = v_event_id` check on `processing_error`). Closes the field-level write-through gap documented in the original "Known Limitation" section. `update_role` is intentionally NOT retrofitted — its existing 5-second-window multi-event check is the appropriate COMPLEX-CASE pattern.
+- **2026-04-23** — Migration `20260423065747_api_rpc_readback_v2_event_id_check.sql` upgrades all 19 single-event RPCs from Pattern A v1 (IF NOT FOUND only) to **Pattern A v2** (IF NOT FOUND + race-safe post-emit `WHERE id = v_event_id` check on `processing_error`). Closes the field-level write-through gap documented in the original "Known Limitation" section. `update_role` kept on the COMPLEX-CASE multi-event variant at this point (see next entry for v2 COMPLEX-CASE retrofit).
+- **2026-04-23** — Migration `20260423074238_api_rpc_readback_v2_m1_m2_fix.sql` addresses PR #30 review findings M1 + M2 (architect-reviewed, agent `ad2e78383cd378c9f`):
+  - **M1** — 6 RPCs (`update_client_address`, `_email`, `_funding_source`, `_insurance`, `_phone`, `update_client`) had a race-prone `ORDER BY created_at DESC LIMIT 1` query in their IF NOT FOUND branch despite `v_event_id` being captured in scope. Rewritten to use `WHERE id = v_event_id` consistently in both the IF NOT FOUND and post-emit branches. All 20 Pattern A v2 single-event RPC definitions now use the race-safe PK lookup in both branches.
+  - **M2** — `update_role` (COMPLEX-CASE) switched from wall-clock 5-second-window detection (`created_at > NOW() - INTERVAL '5 seconds'`) to captured-event-id semantics. Each emit (`role.updated`, N × `role.permission.granted`, M × `role.permission.revoked`) appends its UUID to `v_event_ids uuid[]`; the error lookup uses `WHERE id = ANY(v_event_ids) AND processing_error IS NOT NULL`. Race-safe under concurrent role edits; correctly scoped to this RPC's own emits; empty-array no-op case returns `{success: true}` correctly.
 
-Total RPCs now using Pattern A v2: **19** (all single-event RPCs); `update_role` continues to use the COMPLEX-CASE multi-event variant.
+Total RPCs using Pattern A v2: **19 single-event + 1 multi-event (`update_role`)** = 20 definitions across 19 RPCs (one RPC has two overloads). All race-safe on captured event_id.
 
 ## Alternatives considered
 
@@ -189,6 +192,10 @@ The original parked-feature plan proposed this. Rejected because RAISE EXCEPTION
 ### Client-side polling
 
 ViewModels could re-query `domain_events` after every save to check for `processing_error`. Rejected because every new ViewModel would have to re-implement the recheck pattern correctly, and a missed implementation would re-introduce the silent-failure bug. Centralizing at the RPC layer means consumers get a uniform `success` flag.
+
+### Extracting the dual-check into a PL/pgSQL helper
+
+Each Pattern A v2 RPC repeats ~5 lines of boilerplate for the IF NOT FOUND fallback + post-emit `processing_error` check — ~100 lines of duplication across 20 function definitions. PR #30 review (N1) asked whether a helper could eliminate this. Rejected: PL/pgSQL is single-frame — a helper's `RETURN` returns from the helper, not from the caller, so the helper cannot "early-return" the error envelope on the caller's behalf. Possible shapes: (a) helper returns `text` (the `processing_error`), caller still writes the `IF ... THEN RETURN jsonb_build_object(...); END IF;` block — eliminates one `SELECT ... INTO ...` but not the conditional return; (b) a code generator that reads a YAML manifest of RPC metadata and emits the SQL — higher upfront cost than the 20-RPC duplication warrants; (c) accept the duplication as pattern enforcement — each RPC is self-contained and auditable without jumping to a helper definition. Chose (c); if a 21st RPC is added, revisit with (b).
 
 ## Pattern A v1 → v2 (Resolved 2026-04-23)
 
