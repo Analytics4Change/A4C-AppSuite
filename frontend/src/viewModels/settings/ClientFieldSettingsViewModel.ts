@@ -566,7 +566,7 @@ export class ClientFieldSettingsViewModel {
   async updateCustomField(
     fieldId: string,
     params: UpdateFieldDefinitionParams,
-    orgId: string
+    _orgId: string
   ): Promise<boolean> {
     runInAction(() => {
       this.isUpdatingField = true;
@@ -587,8 +587,16 @@ export class ClientFieldSettingsViewModel {
         return false;
       }
 
-      await this.loadData(orgId, true);
+      // Pattern A v2: updateFieldDefinition returns the refreshed field row
+      // (migration 20260423154534). Patch the list in place — no loadData()
+      // round-trip needed.
       runInAction(() => {
+        if (result.field) {
+          const updated = result.field;
+          this.fieldDefinitions = this.fieldDefinitions.map((f) =>
+            f.id === updated.id ? updated : f
+          );
+        }
         this.isUpdatingField = false;
       });
       return true;
@@ -636,7 +644,7 @@ export class ClientFieldSettingsViewModel {
     }
   }
 
-  async updateCategory(categoryId: string, name: string, orgId: string): Promise<boolean> {
+  async updateCategory(categoryId: string, name: string, _orgId: string): Promise<boolean> {
     runInAction(() => {
       this.isUpdatingCategory = true;
       this.updateCategoryError = null;
@@ -658,8 +666,20 @@ export class ClientFieldSettingsViewModel {
         return false;
       }
 
-      await this.loadData(orgId, true);
+      // Pattern A v2: updateFieldCategory returns the refreshed category row
+      // (migration 20260423154534). Patch both lists:
+      //   - this.categories — replace the category entry
+      //   - this.fieldDefinitions — update cached `category_name` for any
+      //     field referencing this category (we renamed it; the cached name
+      //     is now stale).
       runInAction(() => {
+        if (result.category) {
+          const updated = result.category;
+          this.categories = this.categories.map((c) => (c.id === updated.id ? updated : c));
+          this.fieldDefinitions = this.fieldDefinitions.map((f) =>
+            f.category_id === updated.id ? { ...f, category_name: updated.name } : f
+          );
+        }
         this.isUpdatingCategory = false;
       });
       return true;

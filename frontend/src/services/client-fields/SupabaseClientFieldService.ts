@@ -15,7 +15,10 @@ import type {
   BatchUpdateResult,
   CreateFieldDefinitionParams,
   UpdateFieldDefinitionParams,
-  RpcResult,
+  FieldDefinitionResult,
+  FieldCategoryResult,
+  DeleteFieldResult,
+  DeleteCategoryResult,
 } from '@/types/client-field-settings.types';
 import type { IClientFieldService } from './IClientFieldService';
 
@@ -63,7 +66,7 @@ export class SupabaseClientFieldService implements IClientFieldService {
   async createFieldDefinition(
     params: CreateFieldDefinitionParams,
     correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldDefinitionResult> {
     log.debug('Creating field definition', { params });
 
     const { data, error } = await supabase.schema('api').rpc('create_field_definition', {
@@ -85,13 +88,13 @@ export class SupabaseClientFieldService implements IClientFieldService {
     }
 
     const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as RpcResult;
+    return result as FieldDefinitionResult;
   }
 
   async updateFieldDefinition(
     fieldId: string,
     params: UpdateFieldDefinitionParams
-  ): Promise<RpcResult> {
+  ): Promise<FieldDefinitionResult> {
     log.debug('Updating field definition', { fieldId, params });
 
     const { data, error } = await supabase.schema('api').rpc('update_field_definition', {
@@ -110,14 +113,14 @@ export class SupabaseClientFieldService implements IClientFieldService {
     }
 
     const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as RpcResult;
+    return result as FieldDefinitionResult;
   }
 
   async deactivateFieldDefinition(
     fieldId: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldDefinitionResult> {
     log.debug('Deactivating field definition', { fieldId, reason });
 
     const { data, error } = await supabase.schema('api').rpc('deactivate_field_definition', {
@@ -132,14 +135,14 @@ export class SupabaseClientFieldService implements IClientFieldService {
     }
 
     const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as RpcResult;
+    return result as FieldDefinitionResult;
   }
 
   async reactivateFieldDefinition(
     fieldId: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldDefinitionResult> {
     log.debug('Reactivating field definition', { fieldId, reason });
 
     const { data, error } = await supabase.schema('api').rpc('reactivate_field_definition', {
@@ -154,14 +157,14 @@ export class SupabaseClientFieldService implements IClientFieldService {
     }
 
     const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as RpcResult;
+    return result as FieldDefinitionResult;
   }
 
   async deleteFieldDefinition(
     fieldId: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<DeleteFieldResult> {
     log.debug('Deleting field definition', { fieldId, reason });
 
     const { data, error } = await supabase.schema('api').rpc('delete_field_definition', {
@@ -176,7 +179,7 @@ export class SupabaseClientFieldService implements IClientFieldService {
     }
 
     const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as RpcResult;
+    return result as DeleteFieldResult;
   }
 
   async listFieldCategories(includeInactive = false): Promise<FieldCategory[]> {
@@ -199,7 +202,7 @@ export class SupabaseClientFieldService implements IClientFieldService {
     slug: string,
     sortOrder?: number,
     correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldCategoryResult> {
     log.debug('Creating field category', { name, slug, sortOrder });
 
     const { data, error } = await supabase.schema('api').rpc('create_field_category', {
@@ -215,7 +218,7 @@ export class SupabaseClientFieldService implements IClientFieldService {
     }
 
     const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as RpcResult;
+    return result as FieldCategoryResult;
   }
 
   async updateFieldCategory(
@@ -223,7 +226,7 @@ export class SupabaseClientFieldService implements IClientFieldService {
     name: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldCategoryResult> {
     log.debug('Updating field category', { categoryId, name, reason });
 
     const { data, error } = await supabase.schema('api').rpc('update_field_category', {
@@ -239,14 +242,14 @@ export class SupabaseClientFieldService implements IClientFieldService {
     }
 
     const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as RpcResult;
+    return result as FieldCategoryResult;
   }
 
   async deactivateFieldCategory(
     categoryId: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldCategoryResult> {
     log.debug('Deactivating field category', { categoryId, reason });
 
     const { data, error } = await supabase.schema('api').rpc('deactivate_field_category', {
@@ -261,14 +264,14 @@ export class SupabaseClientFieldService implements IClientFieldService {
     }
 
     const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as RpcResult;
+    return result as FieldCategoryResult;
   }
 
   async reactivateFieldCategory(
     categoryId: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldCategoryResult> {
     log.debug('Reactivating field category', { categoryId, reason });
 
     const { data, error } = await supabase.schema('api').rpc('reactivate_field_category', {
@@ -283,14 +286,14 @@ export class SupabaseClientFieldService implements IClientFieldService {
     }
 
     const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as RpcResult;
+    return result as FieldCategoryResult;
   }
 
   async deleteFieldCategory(
     categoryId: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<DeleteCategoryResult> {
     log.debug('Deleting field category', { categoryId, reason });
 
     const { data, error } = await supabase.schema('api').rpc('delete_field_category', {
@@ -305,7 +308,7 @@ export class SupabaseClientFieldService implements IClientFieldService {
     }
 
     const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as RpcResult;
+    return result as DeleteCategoryResult;
   }
 
   async getFieldUsageCount(fieldKey: string): Promise<{ success: boolean; count: number }> {

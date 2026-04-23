@@ -76,15 +76,59 @@ export interface UpdateFieldDefinitionParams {
   correlation_id?: string;
 }
 
-/** RPC result envelope */
-export interface RpcResult {
+/**
+ * Base envelope for client-field-settings RPC responses.
+ *
+ * Contract (Pattern A v2 — see adr-rpc-readback-pattern.md):
+ *   Postcondition: `success` is always present.
+ *   Postcondition: `error` is present iff `success === false`.
+ */
+export interface FieldRpcEnvelope {
   success: boolean;
-  field_id?: string;
-  category_id?: string;
   error?: string;
-  /** For delete-field blocked cases: clients that still have data */
+}
+
+/**
+ * Response for api.create_field_definition / api.update_field_definition /
+ * api.deactivate_field_definition / api.reactivate_field_definition.
+ *
+ * `field` is populated by `update_field_definition` (Pattern A v2 read-back,
+ * list-shape: joined `category_name` / `category_slug`, includes `is_active`).
+ * Other RPCs in this group return just `{success, field_id}`.
+ */
+export interface FieldDefinitionResult extends FieldRpcEnvelope {
+  field_id?: string;
+  field?: FieldDefinition;
+}
+
+/**
+ * Response for api.create_field_category / api.update_field_category /
+ * api.deactivate_field_category / api.reactivate_field_category.
+ *
+ * `category` is populated by `update_field_category` (Pattern A v2 read-back,
+ * list-shape: includes computed `is_system`). Other RPCs in this group return
+ * just `{success, category_id}`.
+ */
+export interface FieldCategoryResult extends FieldRpcEnvelope {
+  category_id?: string;
+  category?: FieldCategory;
+}
+
+/**
+ * Response for api.delete_field_definition. On failure (clients still have
+ * data), `usage_count` carries the blocking count.
+ */
+export interface DeleteFieldResult extends FieldRpcEnvelope {
+  field_id?: string;
   usage_count?: number;
-  /** For delete-category blocked cases: remaining child field count + names */
+}
+
+/**
+ * Response for api.delete_field_category. On failure (child fields remain),
+ * `child_count` + `child_names` carry the blocking details.
+ */
+export interface DeleteCategoryResult extends FieldRpcEnvelope {
+  category_id?: string;
   child_count?: number;
   child_names?: string[];
 }
