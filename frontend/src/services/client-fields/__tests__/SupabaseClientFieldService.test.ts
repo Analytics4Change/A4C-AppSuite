@@ -5,7 +5,8 @@ import type {
   FieldCategory,
   BatchUpdateResult,
   CreateFieldDefinitionParams,
-  RpcResult,
+  FieldDefinitionResult,
+  FieldCategoryResult,
 } from '@/types/client-field-settings.types';
 
 // ── Mock @/lib/supabase ──
@@ -55,7 +56,7 @@ const BATCH_UPDATE_RESULT: BatchUpdateResult = {
   correlation_id: 'corr-abc-123',
 };
 
-const RPC_SUCCESS: RpcResult = { success: true, field_id: 'field-01' };
+const RPC_SUCCESS: FieldDefinitionResult = { success: true, field_id: 'field-01' };
 
 // ── Tests ──
 
@@ -126,8 +127,9 @@ describe('SupabaseClientFieldService', () => {
       const result = await service.batchUpdateFieldDefinitions(changes, reason);
 
       expect(mockRpc).toHaveBeenCalledWith('batch_update_field_definitions', {
-        p_changes: JSON.stringify(changes),
+        p_changes: changes,
         p_reason: reason,
+        p_correlation_id: null,
       });
       expect(result).toEqual(BATCH_UPDATE_RESULT);
     });
@@ -143,14 +145,18 @@ describe('SupabaseClientFieldService', () => {
       expect(result).toEqual(BATCH_UPDATE_RESULT);
     });
 
-    it('stringifies changes array as p_changes', async () => {
+    it('passes changes as array (no double stringification)', async () => {
+      // Regression protection: commit 4849122b removed double JSON
+      // serialization — p_changes must be the array itself, not a stringified
+      // JSON blob. The Supabase JS client serializes JSONB params on transport.
       mockRpc.mockResolvedValueOnce({ data: BATCH_UPDATE_RESULT, error: null });
 
       await service.batchUpdateFieldDefinitions(changes, reason);
 
       const callArgs = mockRpc.mock.calls[0][1];
-      expect(callArgs.p_changes).toBe(JSON.stringify(changes));
-      expect(typeof callArgs.p_changes).toBe('string');
+      expect(callArgs.p_changes).toEqual(changes);
+      expect(Array.isArray(callArgs.p_changes)).toBe(true);
+      expect(typeof callArgs.p_changes).not.toBe('string');
     });
 
     it('throws with descriptive message on error', async () => {
@@ -194,7 +200,8 @@ describe('SupabaseClientFieldService', () => {
         p_is_required: false,
         p_is_dimension: false,
         p_sort_order: 5,
-        p_validation_rules: JSON.stringify({ maxLength: 500 }),
+        p_validation_rules: { maxLength: 500 },
+        p_correlation_id: null,
       });
       expect(result).toEqual(RPC_SUCCESS);
     });
@@ -220,6 +227,7 @@ describe('SupabaseClientFieldService', () => {
         p_is_dimension: false,
         p_sort_order: 0,
         p_validation_rules: null,
+        p_correlation_id: null,
       });
     });
 
@@ -268,7 +276,7 @@ describe('SupabaseClientFieldService', () => {
 
   describe('deactivateFieldDefinition', () => {
     it('returns RpcResult on success', async () => {
-      const rpcResult: RpcResult = { success: true, field_id: 'field-01' };
+      const rpcResult: FieldDefinitionResult = { success: true, field_id: 'field-01' };
       mockRpc.mockResolvedValueOnce({ data: rpcResult, error: null });
 
       const result = await service.deactivateFieldDefinition('field-01', 'No longer needed');
@@ -276,12 +284,13 @@ describe('SupabaseClientFieldService', () => {
       expect(mockRpc).toHaveBeenCalledWith('deactivate_field_definition', {
         p_field_id: 'field-01',
         p_reason: 'No longer needed',
+        p_correlation_id: null,
       });
       expect(result).toEqual(rpcResult);
     });
 
     it('parses JSON string data response', async () => {
-      const rpcResult: RpcResult = { success: true, field_id: 'field-01' };
+      const rpcResult: FieldDefinitionResult = { success: true, field_id: 'field-01' };
       mockRpc.mockResolvedValueOnce({ data: JSON.stringify(rpcResult), error: null });
 
       const result = await service.deactivateFieldDefinition('field-01', 'reason');
@@ -309,7 +318,9 @@ describe('SupabaseClientFieldService', () => {
 
       const result = await service.listFieldCategories();
 
-      expect(mockRpc).toHaveBeenCalledWith('list_field_categories');
+      expect(mockRpc).toHaveBeenCalledWith('list_field_categories', {
+        p_include_inactive: false,
+      });
       expect(result).toEqual([FIELD_CATEGORY]);
     });
 
@@ -337,7 +348,7 @@ describe('SupabaseClientFieldService', () => {
 
   describe('createFieldCategory', () => {
     it('returns RpcResult on success', async () => {
-      const rpcResult: RpcResult = { success: true, category_id: 'cat-new' };
+      const rpcResult: FieldCategoryResult = { success: true, category_id: 'cat-new' };
       mockRpc.mockResolvedValueOnce({ data: rpcResult, error: null });
 
       const result = await service.createFieldCategory('Housing', 'housing', 3);
@@ -346,6 +357,7 @@ describe('SupabaseClientFieldService', () => {
         p_name: 'Housing',
         p_slug: 'housing',
         p_sort_order: 3,
+        p_correlation_id: null,
       });
       expect(result).toEqual(rpcResult);
     });
@@ -359,11 +371,12 @@ describe('SupabaseClientFieldService', () => {
         p_name: 'Housing',
         p_slug: 'housing',
         p_sort_order: 0,
+        p_correlation_id: null,
       });
     });
 
     it('parses JSON string data response', async () => {
-      const rpcResult: RpcResult = { success: true, category_id: 'cat-new' };
+      const rpcResult: FieldCategoryResult = { success: true, category_id: 'cat-new' };
       mockRpc.mockResolvedValueOnce({ data: JSON.stringify(rpcResult), error: null });
 
       const result = await service.createFieldCategory('Housing', 'housing');
@@ -387,7 +400,7 @@ describe('SupabaseClientFieldService', () => {
 
   describe('deactivateFieldCategory', () => {
     it('returns RpcResult on success', async () => {
-      const rpcResult: RpcResult = { success: true, category_id: 'cat-01' };
+      const rpcResult: FieldCategoryResult = { success: true, category_id: 'cat-01' };
       mockRpc.mockResolvedValueOnce({ data: rpcResult, error: null });
 
       const result = await service.deactivateFieldCategory('cat-01', 'Category merged into other');
@@ -395,12 +408,13 @@ describe('SupabaseClientFieldService', () => {
       expect(mockRpc).toHaveBeenCalledWith('deactivate_field_category', {
         p_category_id: 'cat-01',
         p_reason: 'Category merged into other',
+        p_correlation_id: null,
       });
       expect(result).toEqual(rpcResult);
     });
 
     it('parses JSON string data response', async () => {
-      const rpcResult: RpcResult = { success: true, category_id: 'cat-01' };
+      const rpcResult: FieldCategoryResult = { success: true, category_id: 'cat-01' };
       mockRpc.mockResolvedValueOnce({ data: JSON.stringify(rpcResult), error: null });
 
       const result = await service.deactivateFieldCategory('cat-01', 'reason');

@@ -108,6 +108,14 @@ export interface FieldDefinitionResult extends FieldRpcEnvelope {
  * `category` is populated by `update_field_category` (Pattern A v2 read-back,
  * list-shape: includes computed `is_system`). Other RPCs in this group return
  * just `{success, category_id}`.
+ *
+ * **Invariant**: when `category` is populated by `update_field_category`,
+ * `category.is_system` is always `false` — the underlying RPC rejects
+ * attempts to update system categories (pre-emit filter
+ * `WHERE organization_id = v_org_id`, and system categories have
+ * `organization_id = NULL`), so the read-back never returns one. Consumers
+ * can treat `is_system` as a stable `false` for entities populated via this
+ * RPC. (Migration `20260423154534_client_field_rpc_return_entities.sql`.)
  */
 export interface FieldCategoryResult extends FieldRpcEnvelope {
   category_id?: string;

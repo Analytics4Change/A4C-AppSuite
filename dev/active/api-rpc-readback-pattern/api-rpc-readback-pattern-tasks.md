@@ -312,6 +312,54 @@ All findings from PR #30 self-review (architect-reviewed, agent `ad2e78383cd378c
 | **N2** — Test plan checkbox open | nit | Spot-check procedure added to PR #30 body (injected CHECK constraint → envelope verification) | ✅ PR body updated |
 | **N3** — Heredoc bug postmortem | nit | Added to `context.md` Implementation Lessons; travels with dev-docs on archive | ✅ context.md updated |
 
+## PR #31 Review Remediation ✅ IN PROGRESS (2026-04-23)
+
+Context: `lars-tice` self-review on PR #31 (`feat/phase4-client-rpc-result-typing`) — Approve with suggestions, nothing blocking. 10 observations catalogued.
+
+| ID | Item | Type | Resolution | Status |
+|----|------|------|------------|--------|
+| **M1** | `SupabaseRoleService.updateRole` silent `{success: true}` fallback when `response.role` missing — VM can't patch list, UI shows stale data | minor | `log.warn` with rich context (`responseKeys`, `hasPermissionIds`) added at all 3 sites exhibiting the pattern: `SupabaseRoleService.updateRole`, `ClientFieldSettingsViewModel.updateCustomField`, `ClientFieldSettingsViewModel.updateCategory` | ✅ Fixed |
+| **M2** | Correlation ID generation on UPDATE RPCs | minor | **Parked** — new follow-up: audit all `api.update_*`/`change_*` RPCs; replace `COALESCE(p_correlation_id, gen_random_uuid())` with `SELECT correlation_id FROM <projection> WHERE id = p_<id>` lookup; preserves entity-lifecycle query semantics per `infrastructure/CLAUDE.md` business-scoped pattern. See "4a-follow-up-4" below. | ⏸️ Parked |
+| **M3** | 9 pre-existing failures in `SupabaseClientFieldService.test.ts` | verification | **Fixed** — git-log analysis traced to test-expectation drift from 3 prior commits (`4849122b` removed `p_changes` stringification, `5d479918` added `p_correlation_id`, `697068b8` removed `p_validation_rules` stringification). All 9 topical (test-side only); no production change. Restored green baseline: 26/26 passing. | ✅ Fixed |
+| **N1** | `v_existing record` overkill in migration `20260423154534` | nit | **Parked** — migration style cleanup follow-up. See "4a-follow-up-5". | ⏸️ Parked |
+| **N2** | `is_system` always `false` in `update_field_category` read-back (pre-emit filter excludes system categories) | nit | JSDoc `Invariant` section added to `FieldCategoryResult` — documents at consumer boundary; avoids edit-applied-migration hygiene issue | ✅ Fixed |
+| **N3** | `MockRoleService.ts` prettier reformat inflated review surface | process note | No code change; future-PR process note to run prettier in separate commit | ⏸️ No action |
+| **N4** | `IClientFieldService` JSDoc only annotates 2 of 10 methods | nit | Per-method JSDoc added to 6 create/deactivate/reactivate methods (4 field, 2 category — the 2 category deactivate/reactivate already had good enough docs; check count in commit) clarifying which methods populate entity vs return id only | ✅ Fixed |
+| **R1** | `add_client_*` RPCs don't return entities; types admit it as optional | documentation | JSDoc expanded on 5 dual-RPC `Client*Result` types (Phone, Email, Address, Insurance, Funding) explicitly noting `<entity>` is populated by `update_client_*` only | ✅ Fixed |
+| **R2** | Blocker 3 (UsersViewModel) remains deferred | known | Already parked; planning pass pending before implementation | ⏸️ Parked |
+| **R3** | No automated smoke test for Pattern A v2 migrations | future | **Parked** — future CI check. See "4a-follow-up-6". | ⏸️ Parked |
+
+### 4a-follow-up-4: Correlation ID preservation on UPDATE RPCs
+
+**Scope**: Codebase-wide audit of all `api.update_*` / `api.change_*` RPCs (~19 definitions post Phase 1.6). Each currently uses `COALESCE(p_correlation_id, gen_random_uuid())` on UPDATE, minting a new correlation_id when the caller omits one. Per `infrastructure/CLAUDE.md` Correlation ID Pattern: UPDATE should **look up and reuse** the correlation_id stored at CREATE time so queries by `correlation_id` return the entity's full lifecycle.
+
+**Acceptance criteria**:
+- [ ] Audit which projections already store `correlation_id` (varies per entity); identify missing ones requiring schema additions.
+- [ ] For each UPDATE RPC, replace `COALESCE(p_correlation_id, gen_random_uuid())` with `SELECT correlation_id FROM <projection> WHERE id = p_<id>` lookup — fallback only on first-update-ever or no-stored-id case.
+- [ ] ADR note on the pattern (likely extension to `adr-rpc-readback-pattern.md` or a new correlation-id ADR).
+- [ ] Spot-check: update an entity; query `domain_events WHERE correlation_id = <original>` — expect full lifecycle (CREATE + UPDATEs) in chronological order.
+
+**Blocker on scope expansion**: may surface "correlation_id was never stored for domain X" cases requiring backfill plans.
+
+### 4a-follow-up-5: Migration style cleanup — `v_existing record` → `PERFORM 1 ... IF NOT FOUND`
+
+**Scope**: Audit applied migrations for the `DECLARE v_existing record; ... SELECT id INTO v_existing FROM ... IF NOT FOUND THEN ...` pattern. Replace with idiomatic `PERFORM 1 FROM <table> WHERE ... ; IF NOT FOUND THEN ...; END IF;` via `CREATE OR REPLACE FUNCTION`. Zero runtime impact.
+
+**Why defer**: Pure hygiene; not a bug. Editing applied migration files risks local/DB drift. Cleanup must land as a fresh migration.
+
+### 4a-follow-up-6: Pattern A v2 RPC smoke test
+
+**Scope**: New `pg_tap` or RPC integration test file that, for every `api.update_*` / `api.change_*` RPC (19 defs):
+
+- [ ] Inject a forced handler failure via a temporary CHECK constraint on the target projection.
+- [ ] Call the RPC.
+- [ ] Assert envelope shape: `{success: false, error: 'Event processing failed: ...'}`.
+- [ ] Assert `domain_events` row persisted with `processing_error` populated.
+- [ ] Cleanup constraint.
+- [ ] Separately assert `success` path returns expected entity fields per list-shape contract (`field`, `category`, `client`, `phone`, etc.).
+
+Wires into CI alongside existing `plpgsql_check` (which only catches static errors).
+
 ## Verification ⏸️ PARKED
 
 ### PR 1 pre-merge

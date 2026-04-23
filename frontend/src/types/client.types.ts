@@ -714,31 +714,65 @@ export interface ClientUpdateResult extends ClientRpcEnvelope {
   client?: ClientProjectionRow;
 }
 
-/** Response for api.add_client_phone / api.update_client_phone */
+/**
+ * Response for api.add_client_phone / api.update_client_phone.
+ *
+ * **Entity population**: `phone` is populated only by `update_client_phone`
+ * (Pattern A v2 read-back). `add_client_phone` returns `{success, phone_id}`
+ * and callers should not expect `phone` to be set on add responses — use the
+ * returned id to fetch, or rely on the next query for the full row.
+ */
 export interface ClientPhoneResult extends ClientRpcEnvelope {
   phone_id?: string;
   phone?: ClientPhone;
 }
 
-/** Response for api.add_client_email / api.update_client_email */
+/**
+ * Response for api.add_client_email / api.update_client_email.
+ *
+ * **Entity population**: `email` is populated only by `update_client_email`
+ * (Pattern A v2 read-back). `add_client_email` returns `{success, email_id}`
+ * and callers should not expect `email` to be set on add responses.
+ */
 export interface ClientEmailResult extends ClientRpcEnvelope {
   email_id?: string;
   email?: ClientEmail;
 }
 
-/** Response for api.add_client_address / api.update_client_address */
+/**
+ * Response for api.add_client_address / api.update_client_address.
+ *
+ * **Entity population**: `address` is populated only by
+ * `update_client_address` (Pattern A v2 read-back). `add_client_address`
+ * returns `{success, address_id}` and callers should not expect `address`
+ * to be set on add responses.
+ */
 export interface ClientAddressResult extends ClientRpcEnvelope {
   address_id?: string;
   address?: ClientAddress;
 }
 
-/** Response for api.add_client_insurance / api.update_client_insurance */
+/**
+ * Response for api.add_client_insurance / api.update_client_insurance.
+ *
+ * **Entity population**: `policy` is populated only by
+ * `update_client_insurance` (Pattern A v2 read-back).
+ * `add_client_insurance` returns `{success, policy_id}` and callers should
+ * not expect `policy` to be set on add responses.
+ */
 export interface ClientInsuranceResult extends ClientRpcEnvelope {
   policy_id?: string;
   policy?: ClientInsurancePolicy;
 }
 
-/** Response for api.add_client_funding_source / api.update_client_funding_source */
+/**
+ * Response for api.add_client_funding_source / api.update_client_funding_source.
+ *
+ * **Entity population**: `funding_source` is populated only by
+ * `update_client_funding_source` (Pattern A v2 read-back).
+ * `add_client_funding_source` returns `{success, funding_source_id}` and
+ * callers should not expect `funding_source` to be set on add responses.
+ */
 export interface ClientFundingResult extends ClientRpcEnvelope {
   funding_source_id?: string;
   funding_source?: ClientFundingSource;

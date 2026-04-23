@@ -522,6 +522,22 @@ export class SupabaseRoleService implements IRoleService {
       // operation, so we omit it — callers merging into an existing list
       // should preserve their current userCount for this role.
       if (!response.role) {
+        // Silent-fallback observability per logging-standards.md +
+        // event-observability.md anti-silent-failure posture. Under
+        // Pattern A v2 this branch should never fire; if it does, the
+        // backend RPC predates the v2 read-back or a migration is missing.
+        // responseKeys + hasPermissionIds make the regression
+        // self-diagnosable (distinguishes pre-v2 backend from a partial
+        // service-mapper bug from an unknown envelope shape).
+        log.warn(
+          'updateRole success without role read-back — VM will not patch its list. ' +
+            'Backend RPC may be pre-Pattern-A-v2 or on a failed migration.',
+          {
+            roleId: request.id,
+            responseKeys: Object.keys(response),
+            hasPermissionIds: Array.isArray(response.permission_ids),
+          }
+        );
         return { success: true };
       }
       const row = response.role;
