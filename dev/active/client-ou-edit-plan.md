@@ -9,6 +9,7 @@
 
 - **2026-04-21**: Initial 6-phase plan
 - **2026-04-22**: Expanded to 9 phases after `software-architect-dbc` review. Added Phase 0 (AsyncAPI contract-first), Phase 7 (testing), Phase 8 (documentation). Split Phase 5 into 5a/5b. Added architect decisions C3, C4, M1, M4, M8 to DB phase. PR structure revised to 1 / 2a / 2b.
+- **2026-04-23**: Added in-PR-1 remediation block (PR #27 review) — see "PR #27 Review Remediation" section below. Migration `20260423032200` ships the `client.transfer` enforcement + same-day handler fix; frontend ships `ClientProjectionRow` narrowing + intake test split. ADR Decision 2 amended with enforcement subsection; Decision 6 added.
 
 ## Phase Summary
 
@@ -343,6 +344,23 @@ Sub-entity rows use a nested `EditableSection`-like pattern with Add/Remove butt
 - Display `organization_unit_name` when present; show "—" for null
 - Data comes from `api.get_client()` LEFT JOIN (Phase 1e)
 - Handle missing OU gracefully (display placeholder, not "undefined")
+
+---
+
+## PR #27 Review Remediation (in-PR-1, added 2026-04-23)
+
+Code review of PR 1 surfaced 1 Major + 3 Minor findings. All addressed within this PR rather than deferred. Remediation plan/decisions are captured in this file's Plan Revision History entry, the ADR (Decision 2 enforcement subsection + new Decision 6), and the tasks doc's "PR #27 review remediation artifacts" block. Summary:
+
+- **A. Migration `20260423032200_client_transfer_enforcement_and_same_day_placement.sql`**:
+  - `api.change_client_placement` — inferred permission check (`client.create` first placement, else `client.transfer`); old `client.update` check removed
+  - `api.change_client_placement` — read-back broadened to `(client_id, start_date, is_current)` so same-day path resolves cleanly
+  - `handle_client_placement_changed` — same-day in-place branch under existing FOR UPDATE lock; close-then-insert preserved for different-day path
+  - Handler reference file `handlers/client/handle_client_placement_changed.sql` re-extracted
+- **B. Frontend `ClientProjectionRow` type**: defined as `Omit<Client, sub-entities>`; `ClientRpcResult.client` narrowed from `Partial<Client>`
+- **C. Intake test split**: existing OU-skip test renamed to clarify multi-field-guard scope; new test isolates OU-required path
+- **D. ADR + dev-active docs**: Decision 2 amended with enforcement subsection, Decision 6 added (same-day handling), TL;DR/header bumped to "six decisions"
+
+Verification: typecheck ✓, lint ✓, Playwright intake suite 59 passing (was 58, +1), MCP structural assertions all pass against linked project.
 
 ---
 

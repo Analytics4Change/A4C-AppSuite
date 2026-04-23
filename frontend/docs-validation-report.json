@@ -1,5 +1,15 @@
 {
-  "errors": [],
+  "errors": [
+    {
+      "message": "Broken internal link: \"Auth context CLAUDE.md\" -> \"../contexts/CLAUDE.md\" at line 187",
+      "file": "src/services/CLAUDE.md",
+      "severity": "error"
+    },
+    {
+      "message": "Found 1 broken internal links that must be fixed",
+      "severity": "error"
+    }
+  ],
   "warnings": [],
   "info": [
     {
@@ -54,7 +64,23 @@
       "severity": "info"
     },
     {
-      "message": "Link validation completed: 7 internal links checked, all valid",
+      "message": "Internal link found: ../../CLAUDE.md",
+      "file": "src/services/CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../contexts/CLAUDE.md",
+      "file": "src/services/CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../../../documentation/workflows/reference/event-metadata-schema.md",
+      "file": "src/services/CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../../../documentation/architecture/authentication/frontend-auth-architecture.md",
+      "file": "src/services/CLAUDE.md",
       "severity": "info"
     }
   ],
@@ -64,10 +90,10 @@
     "componentsDocumented": 0,
     "apisDocumented": 0
   },
-  "timestamp": "2026-04-23T02:33:18.674Z",
+  "timestamp": "2026-04-23T03:32:29.199Z",
   "summary": {
-    "hasErrors": false,
+    "hasErrors": true,
     "hasWarnings": false,
-    "totalIssues": 0
+    "totalIssues": 2
   }
 }

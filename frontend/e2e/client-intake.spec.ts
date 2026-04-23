@@ -851,9 +851,13 @@ test.describe('Client Registration — Organizational Unit Placement', () => {
     await expect(oldWing).toHaveCount(0);
   });
 
-  test('registering a client without selecting an OU shows no placement history', async ({
+  test('intake without all three required placement fields emits no placement event', async ({
     page,
   }) => {
+    // Exercises the multi-field guard in ClientIntakeFormViewModel.submit():
+    // change_client_placement is only emitted when placement_arrangement,
+    // organization_unit_id, AND admission_date are all set. This test fills
+    // only admission_date, leaving the other two unset — no placement event.
     await navigateToIntakeForm(page);
 
     // Minimal required fields across sections
@@ -864,9 +868,7 @@ test.describe('Client Registration — Organizational Unit Placement', () => {
 
     await page.click('[data-testid="intake-nav-admission"]');
     await page.fill('[data-testid="intake-field-admission_date"]', '2026-04-15');
-    // Note: placement_arrangement left empty — submit() guard requires all three
-    // (placement_arrangement + organization_unit_id + admission_date) to emit
-    // change_client_placement, so nothing is emitted here.
+    // placement_arrangement and OU both left empty.
 
     await page.click('[data-testid="intake-nav-medical"]');
     await page.fill('[data-testid="intake-field-allergies"]', 'NKA');
@@ -879,6 +881,41 @@ test.describe('Client Registration — Organizational Unit Placement', () => {
     // On detail page: placement history section must be hidden since placements=[]
     await page.waitForURL(/\/clients\/[a-f0-9-]+$/, { timeout: 10000 });
     await expect(page.locator('[data-testid="client-overview"]')).toBeVisible();
+    await expect(page.locator('[data-testid="section-placements"]')).not.toBeVisible();
+  });
+
+  test('intake with placement_arrangement + admission_date but no OU emits no placement event', async ({
+    page,
+  }) => {
+    // OU-specific isolation of the multi-field guard. Two of the three required
+    // fields are set; only OU is omitted. Verifies the guard treats OU as
+    // strictly required rather than defaulting it to null and emitting anyway.
+    await navigateToIntakeForm(page);
+
+    await page.fill('[data-testid="intake-field-first_name"]', 'NoOu');
+    await page.fill('[data-testid="intake-field-last_name"]', 'PlacementOnly');
+    await page.fill('[data-testid="intake-field-date_of_birth"]', '2013-06-01');
+    await page.selectOption('[data-testid="intake-field-gender"]', 'female');
+
+    await page.click('[data-testid="intake-nav-admission"]');
+    await page.fill('[data-testid="intake-field-admission_date"]', '2026-04-15');
+    await page.selectOption(
+      '[data-testid="intake-field-placement_arrangement"]',
+      'residential_treatment'
+    );
+    // Deliberately skip the OU picker — verifies the OU-required path in isolation.
+
+    await page.click('[data-testid="intake-nav-medical"]');
+    await page.fill('[data-testid="intake-field-allergies"]', 'NKA');
+    await page.fill('[data-testid="intake-field-medical_conditions"]', 'None');
+
+    await page.click('[data-testid="intake-nav-education"]');
+    await expect(page.locator('[data-testid="intake-submit-button"]')).toBeEnabled();
+    await page.click('[data-testid="intake-submit-button"]');
+
+    await page.waitForURL(/\/clients\/[a-f0-9-]+$/, { timeout: 10000 });
+    await expect(page.locator('[data-testid="client-overview"]')).toBeVisible();
+    // OU is one of the three required intake fields → no placement section rendered.
     await expect(page.locator('[data-testid="section-placements"]')).not.toBeVisible();
   });
 

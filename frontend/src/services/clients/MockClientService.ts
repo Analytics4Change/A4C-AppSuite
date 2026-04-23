@@ -453,15 +453,13 @@ export class MockClientService implements IClientService {
     };
 
     this.clients = [...this.clients, client];
+    // Mock parity: return the full projection row (sub-entity arrays are
+    // structurally tolerated by ClientProjectionRow's Omit<...> shape but
+    // are not part of the contract — consumers must call getClient() for them).
     return {
       success: true,
       client_id: id,
-      client: {
-        id,
-        first_name: client.first_name,
-        last_name: client.last_name,
-        status: client.status,
-      },
+      client,
     };
   }
 
