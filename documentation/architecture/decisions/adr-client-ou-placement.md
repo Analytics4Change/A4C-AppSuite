@@ -79,6 +79,8 @@ END IF;
 
 The DB infers transfer-vs-create from state (presence of an `is_current = true` placement row). A malicious caller cannot bypass by claiming an intake context. Migration `20260423032200_client_transfer_enforcement_and_same_day_placement.sql` ships this enforcement; the prior `client.update` check it replaces was a temporary stand-in identified during PR #27 review. The intake flow (which calls `change_client_placement` *after* `register_client`, when no `is_current` row exists) resolves to `client.create`; the edit flow (Phase 5a, future PR 2a) resolves to `client.transfer`. Decision 2's claim that transfers are gated on `client.transfer` is now load-bearing at the enforcement layer, not just the role-template seed.
 
+`api.change_client_placement` is also one of the proof-of-pattern RPCs that motivated [adr-rpc-readback-pattern.md](./adr-rpc-readback-pattern.md) — both the broadened post-emit read-back from PR #27 review and the inferred-check pre-emit guard above demonstrate the architectural decisions formalized in that ADR (Pattern A return-error envelope for handler failures + caller-driven failures may use either pattern).
+
 ### Decision 3 — Row lock in `handle_client_placement_changed` (C4)
 
 **Decision**: The placement handler acquires a `FOR UPDATE` lock on the existing `is_current = true` placement row before the close-then-insert cycle.

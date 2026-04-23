@@ -1,22 +1,23 @@
 ---
 status: current
-last_updated: 2026-02-19
+last_updated: 2026-04-23
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Split handler architecture where each domain event has a dedicated `handle_<aggregate>_<action>()` function, dispatched via explicit CASE routers for independent validation. Covers the synchronous trigger handler pattern only — for async patterns (pg_notify + Temporal), see [event-processing-patterns.md](./event-processing-patterns.md). Includes event type naming convention (dots for hierarchy, underscores for compound names).
+**Summary**: Split handler architecture where each domain event has a dedicated `handle_<aggregate>_<action>()` function, dispatched via explicit CASE routers for independent validation. Covers the synchronous trigger handler pattern, the projection read-back guard for `api.update_*` RPCs, and the event type naming convention. For async patterns (pg_notify + Temporal), see [event-processing-patterns.md](./event-processing-patterns.md); for the full RPC contract behind the read-back guard, see [adr-rpc-readback-pattern.md](../../architecture/decisions/adr-rpc-readback-pattern.md).
 
 **When to read**:
 - Adding a new domain event type
 - Choosing an event type name
 - Debugging event processing failures
 - Understanding how projections are updated
+- Adding read-back to a new `api.update_*` RPC
 
 **Prerequisites**: Familiarity with CQRS concepts (see [event-sourcing-overview.md](../../architecture/data/event-sourcing-overview.md))
 
-**Key topics**: `handler`, `event-handler`, `router`, `process_event`, `split-handlers`, `event-type-naming`, `naming-convention`
+**Key topics**: `handler`, `event-handler`, `router`, `process_event`, `split-handlers`, `event-type-naming`, `naming-convention`, `rpc-readback`, `projection-guard`
 
 **Estimated read time**: 8 minutes
 <!-- TL;DR-END -->
@@ -519,6 +520,8 @@ handlers/
 
 ## Projection Read-Back Guard
 
+> **See also**: [adr-rpc-readback-pattern.md](../../architecture/decisions/adr-rpc-readback-pattern.md) for the full contract decision (response shape, error-string convention, audit-trail-preservation rationale that makes RAISE EXCEPTION forbidden for handler-driven failures).
+
 When an RPC function emits a domain event and then reads the projection table to build its response, there is a **silent failure risk**: if the event handler fails, `process_domain_event()` catches the exception and records it in `processing_error`, but the RPC continues execution. The subsequent `SELECT INTO` from the projection returns no row, and the RPC returns `{success: true}` with null fields.
 
 ### Required Pattern
@@ -581,16 +584,27 @@ if (response.success && !response.unit?.id) {
 
 ### Affected RPCs
 
-Currently, only the organization unit RPCs follow the emit-then-read-back pattern:
-- `api.create_organization_unit()`
-- `api.update_organization_unit()`
-- `api.deactivate_organization_unit()`
-- `api.reactivate_organization_unit()`
+**All `api.update_*` and `api.change_*` RPCs MUST follow this pattern** as of migration `20260423060052_api_rpc_readback_pattern.sql` (2026-04-23). Generalization formalized in [adr-rpc-readback-pattern.md](../../architecture/decisions/adr-rpc-readback-pattern.md). 18 RPCs currently apply Pattern A (return-error envelope on handler failure):
 
-Other create RPCs (roles, schedules) return hardcoded data or just IDs, so they are not affected.
+| Group | RPCs | Migration |
+|---|---|---|
+| Client (proof-of-pattern) | `update_client`, `change_client_placement` | `20260422052825`, `20260423032200` |
+| Client sub-entity | `update_client_address`, `_email`, `_funding_source`, `_insurance`, `_phone` | `20260423060052` |
+| Organization | `update_organization`, `_address`, `_contact`, `_phone`, `_unit`, `update_organization_direct_care_settings` (3-arg + 4-arg) | `20260226002002`, `20260221173821`, `20260423060052` |
+| Field config | `update_field_definition`, `update_field_category` | `20260408023403` |
+| User | `update_user`, `_phone`, `_notification_preferences` | `20260423060052` |
+| Schedule | `update_schedule_template` | `20260423060052` |
+| Role (COMPLEX-CASE — joined response composes role + permission_ids) | `update_role` | `20260423060052` |
+
+**Exceptions** (do NOT apply this pattern):
+- Creation RPCs (`api.create_*`, `api.register_*`) — projection row didn't exist before the event; standard pattern would always trigger NOT FOUND on first creation. Use existing creation contract (returns the new id).
+- Deletion RPCs — soft-delete + hard-delete have their own concerns (separate read-back guard via `FOUND` check on the SELECT-before-delete; not in this pattern's scope).
+- RPCs that RETURN `void` (e.g. `api.update_user_access_dates`) — no projection row to read back. Per-event `processing_error` surfacing is still desirable but does not require this pattern.
+- RPCs in the workflow service layer (Edge Functions, Temporal activities) — separate orchestration tier; failures surface via workflow saga compensation.
 
 ## Related Documentation
 
+- [adr-rpc-readback-pattern.md](../../architecture/decisions/adr-rpc-readback-pattern.md) - The contract decision behind the Projection Read-Back Guard (response shape, audit-trail-preservation rationale, telemetry convention)
 - [Event Processing Patterns](./event-processing-patterns.md) - Decision guide for choosing sync vs async patterns
 - [Event Sourcing Overview](../../architecture/data/event-sourcing-overview.md) - CQRS architecture
 - [Event Sourcing & CQRS Projections](../../architecture/data/event-sourcing-overview.md) - Projection table design

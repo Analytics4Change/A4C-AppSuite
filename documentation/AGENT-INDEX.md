@@ -47,6 +47,7 @@ purpose: agent-navigation
 | `addresses` | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | phones_projection.md |
 | `adr` | [adr-multi-role-effective-permissions.md](architecture/authorization/adr-multi-role-effective-permissions.md) | rbac-architecture.md, scoping-architecture.md |
 | `apm-integration` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
+| `api-contract` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) | event-handler-pattern.md, frontend/services/CLAUDE.md |
 | `apiRpc` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | supabase.service.ts |
 | `applet-action` | [permissions_projection.md](infrastructure/reference/database/tables/permissions_projection.md) | rbac-architecture.md |
 | `asyncapi` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, event-sourcing-overview.md |
@@ -202,7 +203,8 @@ purpose: agent-navigation
 | `prescriptions` | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | dosage_info.md |
 | `process_event` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md |
 | `projection` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | organizations_projection.md, table-template.md |
-| `projection-guard` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md, infrastructure/CLAUDE.md |
+| `projection-guard` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md, infrastructure/CLAUDE.md, adr-rpc-readback-pattern.md |
+| `processing-error` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) | event-handler-pattern.md, event-observability.md |
 | `provider-admin` | [provider-admin-permissions-architecture.md](architecture/authorization/provider-admin-permissions-architecture.md) | role_permission_templates.md |
 | `provider-admin-redirect` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | organizations_projection.md |
 | `provider-onboarding` | [provider-onboarding-quickstart.md](workflows/guides/provider-onboarding-quickstart.md) | organization-bootstrap-workflow-design.md |
@@ -211,6 +213,7 @@ purpose: agent-navigation
 | `resend` | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | activities-reference.md |
 | `retention-policy` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `retry-policies` | [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | activities-reference.md |
+| `rpc-readback` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) | event-handler-pattern.md, adr-client-ou-placement.md, event-observability.md |
 | `rls` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | table-template.md, SQL_IDEMPOTENCY_AUDIT.md, DAY0-MIGRATION-GUIDE.md |
 | `rls-gap` | [clients.md](infrastructure/reference/database/tables/clients.md) | medications.md |
 | `rls-verification` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | multi-tenancy-architecture.md |
@@ -307,6 +310,7 @@ purpose: agent-navigation
 | [adr-cqrs-dual-write-remediation.md](architecture/decisions/adr-cqrs-dual-write-remediation.md) | ADR: CQRS dual-write audit and remediation | `adr`, `cqrs-compliance`, `dual-write`, `event-type-naming`, `remediation` | 1500 |
 | [adr-client-management-schema.md](architecture/decisions/adr-client-management-schema.md) | ADR: Client management schema — 12 tables, 84 decisions, intake/lifecycle | `adr`, `client-management`, `schema-design`, `intake-form`, `configurable-fields`, `contact-designation`, `placement-history`, `discharge`, `analytics-dimensions`, `enum-reference` | 5000 |
 | [adr-client-ou-placement.md](architecture/decisions/adr-client-ou-placement.md) | ADR: Client OU placement — single-path OU mutation, `client.transfer` permission, row lock, read-time OU state enrichment | `adr`, `client-placement`, `client-transfer`, `organization-unit`, `placement-history`, `row-lock`, `cqrs-read-model` | 1200 |
+| [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) | ADR: All `api.update_*`/`change_*` RPCs use Pattern A (return-error envelope) for handler-driven failures; RAISE EXCEPTION forbidden because it rolls back the audit row | `adr`, `rpc-readback`, `processing-error`, `projection-guard`, `api-contract` | 2400 |
 | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | Organization isolation via RLS and JWT claims | `rls`, `multi-tenant`, `org_id` | 2800 |
 | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | CQRS pattern, domain events, projections | `cqrs`, `events`, `projections` | 2500 |
 | [temporal-overview.md](architecture/workflows/temporal-overview.md) | Workflow orchestration concepts and patterns | `temporal`, `workflow`, `saga` | 3200 |

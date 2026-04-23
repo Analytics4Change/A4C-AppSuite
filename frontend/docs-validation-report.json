@@ -1,8 +1,8 @@
 {
   "errors": [
     {
-      "message": "Broken internal link: \"Auth context CLAUDE.md\" -> \"../contexts/CLAUDE.md\" at line 187",
-      "file": "src/services/CLAUDE.md",
+      "message": "Broken internal link: \"Frontend component reference\" -> \"../../../documentation/frontend/\" at line 214",
+      "file": "src/components/ui/CLAUDE.md",
       "severity": "error"
     },
     {
@@ -82,6 +82,46 @@
       "message": "Internal link found: ../../../documentation/architecture/authentication/frontend-auth-architecture.md",
       "file": "src/services/CLAUDE.md",
       "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../../CLAUDE.md",
+      "file": "src/contexts/CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../services/CLAUDE.md",
+      "file": "src/contexts/CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../../../documentation/architecture/authentication/frontend-auth-architecture.md",
+      "file": "src/contexts/CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../../../documentation/architecture/authentication/supabase-auth-overview.md",
+      "file": "src/contexts/CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../../../documentation/infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md",
+      "file": "src/contexts/CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../../../CLAUDE.md",
+      "file": "src/components/ui/CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ./assignment/",
+      "file": "src/components/ui/CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../../../documentation/frontend/",
+      "file": "src/components/ui/CLAUDE.md",
+      "severity": "info"
     }
   ],
   "stats": {
@@ -90,7 +130,7 @@
     "componentsDocumented": 0,
     "apisDocumented": 0
   },
-  "timestamp": "2026-04-23T03:32:29.199Z",
+  "timestamp": "2026-04-23T06:45:28.235Z",
   "summary": {
     "hasErrors": true,
     "hasWarnings": false,
