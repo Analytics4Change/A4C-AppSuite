@@ -58,13 +58,14 @@ Activated 2026-04-23. Trigger conditions met:
 
 **Fix shipped** in migration `20260423062426_add_user_profile_updated_handler.sql` (applied 2026-04-23): creates `public.handle_user_profile_updated(p_event record)` which UPDATEs `public.users.first_name`/`last_name` via COALESCE for partial-update semantics. Handler reference file added at `infrastructure/supabase/handlers/user/handle_user_profile_updated.sql` per Rule 7b. With the handler in place + the Pattern A read-back from migration `20260423060052`, `api.update_user` is now end-to-end correct: emits event → handler updates row → read-back returns fresh row → `{success: true, user: <updated row>}`.
 
-## Phase 2: Frontend Service Updates ⏸️ PARKED
+## Phase 2: Frontend Service Updates ✅ COMPLETE (2026-04-23)
 
-- [ ] For each in-scope service (organization, roles, users, schedules, etc.):
-  - [ ] Update response type in service interface
-  - [ ] Add backward-compat fallback: `response.row || response.entity || ...`
-  - [ ] Update unit tests
-  - [ ] Update mock service responses
+- [x] **`SupabaseDirectCareSettingsService.ts` — BREAKING change handled**: response shape changed from raw `{enable_*}` jsonb to `{success: true, settings: {enable_*}}` envelope. Updated `updateSettings()` to detect the new envelope (presence of `success` key), branch on `success === false` to throw with `error` message, and read `data.settings.*`. Backward-compat fallback preserved for the legacy raw-jsonb shape (in case the migration hasn't deployed to a particular environment yet) — branches in if `success` key is absent.
+- [x] **`MockDirectCareSettingsService.ts`** — no change needed; mock implements `IDirectCareSettingsService` interface directly (returns `DirectCareSettings`), so the supabase service translates between RPC envelope and interface shape.
+- [x] **`DirectCareSettingsViewModel.test.ts`** — no change needed; tests use the interface contract (which is unchanged). 29/29 passing.
+- [x] **`ClientRpcResult` type** — added optional read-back entity fields (`phone`, `email`, `address`, `policy`, `funding_source`) so consumers can use the new RPC response shape opportunistically without re-fetching. Existing consumers continue to work (they just don't read the new fields).
+- [x] **Other refactored RPC consumers** (`SupabaseClientService.ts` for 5 client sub-entity RPCs, `SupabaseRoleService.ts` for `update_role`, `SupabaseScheduleService.ts` for `update_schedule_template`) — audit confirmed all are non-breaking. Consumers parse the response envelope and check `success`; the new `<entity>` fields are additive and ignored. No behavioral changes required for Phase 2 acceptance — opportunistic refactors to consume the new fields can land in Phase 4 (ViewModel simplification).
+- [x] Verification: `npm run typecheck` ✓, `npm run lint` ✓, `npm run test -- --run src/viewModels/settings/__tests__/DirectCareSettingsViewModel.test.ts` ✓ (29 passed).
 
 ## Phase 3: Documentation ⏸️ PARKED
 
