@@ -196,8 +196,15 @@ export interface RoleOperationResult {
   /** Whether the operation succeeded */
   success: boolean;
 
-  /** The resulting role (if successful, for create operations) */
+  /** The resulting role (if successful) — populated for create and update */
   role?: Role;
+
+  /**
+   * Permission IDs associated with the role after the operation.
+   * Populated by update_role (Pattern A v2 read-back) so consumers can
+   * refresh their permission list in-place without a follow-up fetch.
+   */
+  permission_ids?: string[];
 
   /** Error message (if failed) */
   error?: string;
@@ -307,7 +314,9 @@ export interface ScopedPermissionGroups {
  * @param permissions - Flat array of permissions
  * @returns Object with globalGroups and orgGroups, each containing applet groups
  */
-export function groupPermissionsByScopeAndApplet(permissions: Permission[]): ScopedPermissionGroups {
+export function groupPermissionsByScopeAndApplet(
+  permissions: Permission[]
+): ScopedPermissionGroups {
   // Separate by scope type
   const globalPerms = permissions.filter((p) => p.scopeType === 'global');
   const orgPerms = permissions.filter((p) => p.scopeType !== 'global');
@@ -346,10 +355,7 @@ function toTitleCase(str: string): string {
  * @param userPermissionIds - Set of permission IDs the user possesses
  * @returns True if the user can grant this permission
  */
-export function canGrantPermission(
-  permissionId: string,
-  userPermissionIds: Set<string>
-): boolean {
+export function canGrantPermission(permissionId: string, userPermissionIds: Set<string>): boolean {
   return userPermissionIds.has(permissionId);
 }
 
@@ -377,7 +383,8 @@ export const ROLE_VALIDATION = {
     minLength: 1,
     maxLength: 100,
     pattern: /^[a-zA-Z][a-zA-Z0-9_\-\s]*$/,
-    message: 'Name must start with a letter and contain only letters, numbers, underscores, hyphens, and spaces',
+    message:
+      'Name must start with a letter and contain only letters, numbers, underscores, hyphens, and spaces',
   },
   description: {
     minLength: 10,

@@ -82,10 +82,22 @@ describe('RolesViewModel', () => {
       getPermissions: vi.fn().mockResolvedValue([...mockPermissions]),
       getUserPermissions: vi.fn().mockResolvedValue([...mockUserPermissionIds]),
       createRole: vi.fn().mockResolvedValue({ success: true, role: mockRoles[0] }),
-      updateRole: vi.fn().mockResolvedValue({ success: true }),
+      updateRole: vi.fn().mockResolvedValue({
+        success: true,
+        role: { ...mockRoles[0], name: 'Updated Admin', permissionCount: 0 },
+        permission_ids: [],
+      }),
       deactivateRole: vi.fn().mockResolvedValue({ success: true }),
       reactivateRole: vi.fn().mockResolvedValue({ success: true }),
       deleteRole: vi.fn().mockResolvedValue({ success: true }),
+      // Bulk assignment methods — unused by RolesViewModel tests, stubbed for
+      // IRoleService type completeness.
+      listUsersForBulkAssignment: vi.fn().mockResolvedValue([]),
+      bulkAssignRole: vi.fn().mockResolvedValue({ success: true, assignedCount: 0, errors: [] }),
+      listUsersForRoleManagement: vi.fn().mockResolvedValue([]),
+      syncRoleAssignments: vi
+        .fn()
+        .mockResolvedValue({ success: true, assigned: [], unassigned: [], failed: [] }),
     };
 
     viewModel = new RolesViewModel(mockService);
@@ -366,9 +378,9 @@ describe('RolesViewModel', () => {
 
       it('should be false when loading', async () => {
         // Start a load operation but don't await it
-        mockService.getRoles = vi.fn().mockImplementation(
-          () => new Promise((resolve) => setTimeout(() => resolve([]), 100))
-        );
+        mockService.getRoles = vi
+          .fn()
+          .mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve([]), 100)));
         const loadPromise = viewModel.loadRoles();
         expect(viewModel.canCreate).toBe(false);
         await loadPromise;
@@ -463,7 +475,11 @@ describe('RolesViewModel', () => {
     });
 
     describe('updateRole', () => {
-      it('should update role and reload list', async () => {
+      it('should update role and patch local list from response (Pattern A v2)', async () => {
+        // Seed the VM's list so the patch path has a target
+        await viewModel.loadRoles();
+        vi.mocked(mockService.getRoles).mockClear();
+
         const result = await viewModel.updateRole({
           id: 'role-1',
           name: 'Updated Admin',
@@ -471,7 +487,13 @@ describe('RolesViewModel', () => {
 
         expect(result.success).toBe(true);
         expect(mockService.updateRole).toHaveBeenCalled();
-        expect(mockService.getRoles).toHaveBeenCalled();
+        // No follow-up getRoles() — VM consumes result.role directly
+        expect(mockService.getRoles).not.toHaveBeenCalled();
+        // Local list reflects the update
+        const updated = viewModel.getRoleById('role-1');
+        expect(updated?.name).toBe('Updated Admin');
+        // userCount preserved from previous list entry (not returned by RPC)
+        expect(updated?.userCount).toBe(5);
       });
 
       it('should handle update failure', async () => {
