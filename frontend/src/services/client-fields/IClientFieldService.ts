@@ -21,7 +21,10 @@ import type {
   BatchUpdateResult,
   CreateFieldDefinitionParams,
   UpdateFieldDefinitionParams,
-  RpcResult,
+  FieldDefinitionResult,
+  FieldCategoryResult,
+  DeleteFieldResult,
+  DeleteCategoryResult,
 } from '@/types/client-field-settings.types';
 
 export interface IClientFieldService {
@@ -39,24 +42,31 @@ export interface IClientFieldService {
   createFieldDefinition(
     params: CreateFieldDefinitionParams,
     correlationId?: string
-  ): Promise<RpcResult>;
+  ): Promise<FieldDefinitionResult>;
 
-  /** Update an existing custom field definition */
-  updateFieldDefinition(fieldId: string, params: UpdateFieldDefinitionParams): Promise<RpcResult>;
+  /**
+   * Update an existing custom field definition.
+   * Pattern A v2: returns the refreshed `field` entity in the success envelope
+   * so consumers can patch their list in place without a re-fetch.
+   */
+  updateFieldDefinition(
+    fieldId: string,
+    params: UpdateFieldDefinitionParams
+  ): Promise<FieldDefinitionResult>;
 
   /** Deactivate (soft-delete) a field definition */
   deactivateFieldDefinition(
     fieldId: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult>;
+  ): Promise<FieldDefinitionResult>;
 
   /** Reactivate a previously deactivated field definition */
   reactivateFieldDefinition(
     fieldId: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult>;
+  ): Promise<FieldDefinitionResult>;
 
   /**
    * Permanently delete a field definition.
@@ -69,7 +79,7 @@ export interface IClientFieldService {
     fieldId: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult>;
+  ): Promise<DeleteFieldResult>;
 
   /** List all field categories (system + org-defined) */
   listFieldCategories(includeInactive?: boolean): Promise<FieldCategory[]>;
@@ -80,29 +90,33 @@ export interface IClientFieldService {
     slug: string,
     sortOrder?: number,
     correlationId?: string
-  ): Promise<RpcResult>;
+  ): Promise<FieldCategoryResult>;
 
-  /** Update an org-defined category (name only, slug immutable) */
+  /**
+   * Update an org-defined category (name only, slug immutable).
+   * Pattern A v2: returns the refreshed `category` entity in the success
+   * envelope so consumers can patch their list in place without a re-fetch.
+   */
   updateFieldCategory(
     categoryId: string,
     name: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult>;
+  ): Promise<FieldCategoryResult>;
 
   /** Deactivate (soft-delete) an org-defined category */
   deactivateFieldCategory(
     categoryId: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult>;
+  ): Promise<FieldCategoryResult>;
 
   /** Reactivate a previously deactivated org-defined category (does not cascade to child fields) */
   reactivateFieldCategory(
     categoryId: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult>;
+  ): Promise<FieldCategoryResult>;
 
   /**
    * Permanently delete an org-defined category.
@@ -115,7 +129,7 @@ export interface IClientFieldService {
     categoryId: string,
     reason: string,
     correlationId?: string
-  ): Promise<RpcResult>;
+  ): Promise<DeleteCategoryResult>;
 
   /** Count clients with data for a custom field (for deactivation/delete confirmation) */
   getFieldUsageCount(fieldKey: string): Promise<{ success: boolean; count: number }>;

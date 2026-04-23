@@ -14,7 +14,10 @@ import type {
   BatchUpdateResult,
   CreateFieldDefinitionParams,
   UpdateFieldDefinitionParams,
-  RpcResult,
+  FieldDefinitionResult,
+  FieldCategoryResult,
+  DeleteFieldResult,
+  DeleteCategoryResult,
 } from '@/types/client-field-settings.types';
 import type { IClientFieldService } from './IClientFieldService';
 
@@ -1052,7 +1055,7 @@ export class MockClientFieldService implements IClientFieldService {
   async createFieldDefinition(
     params: CreateFieldDefinitionParams,
     _correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldDefinitionResult> {
     log.debug('[Mock] Creating field definition', { params });
     await this.simulateDelay();
 
@@ -1091,7 +1094,7 @@ export class MockClientFieldService implements IClientFieldService {
   async updateFieldDefinition(
     fieldId: string,
     params: UpdateFieldDefinitionParams
-  ): Promise<RpcResult> {
+  ): Promise<FieldDefinitionResult> {
     log.debug('[Mock] Updating field definition', { fieldId, params });
     await this.simulateDelay();
 
@@ -1113,14 +1116,16 @@ export class MockClientFieldService implements IClientFieldService {
     if (params.validation_rules !== undefined)
       field.validation_rules = params.validation_rules as Record<string, unknown> | null;
 
-    return { success: true, field_id: fieldId };
+    // Pattern A v2 parity with real service: return the refreshed field entity
+    // so callers can patch their list in place without a follow-up fetch.
+    return { success: true, field_id: fieldId, field: { ...field } };
   }
 
   async deactivateFieldDefinition(
     fieldId: string,
     reason: string,
     _correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldDefinitionResult> {
     log.debug('[Mock] Deactivating field definition', { fieldId, reason });
     await this.simulateDelay();
 
@@ -1137,7 +1142,7 @@ export class MockClientFieldService implements IClientFieldService {
     fieldId: string,
     reason: string,
     _correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldDefinitionResult> {
     log.debug('[Mock] Reactivating field definition', { fieldId, reason });
     await this.simulateDelay();
 
@@ -1154,7 +1159,7 @@ export class MockClientFieldService implements IClientFieldService {
     fieldId: string,
     reason: string,
     _correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<DeleteFieldResult> {
     log.debug('[Mock] Deleting field definition', { fieldId, reason });
     await this.simulateDelay();
 
@@ -1194,7 +1199,7 @@ export class MockClientFieldService implements IClientFieldService {
     name: string,
     reason: string,
     _correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldCategoryResult> {
     log.debug('[Mock] Updating field category', { categoryId, name, reason });
     await this.simulateDelay();
 
@@ -1204,7 +1209,9 @@ export class MockClientFieldService implements IClientFieldService {
     }
 
     cat.name = name;
-    return { success: true, category_id: categoryId };
+    // Pattern A v2 parity with real service: return the refreshed category
+    // entity so callers can patch their list in place without a re-fetch.
+    return { success: true, category_id: categoryId, category: { ...cat } };
   }
 
   async createFieldCategory(
@@ -1212,7 +1219,7 @@ export class MockClientFieldService implements IClientFieldService {
     slug: string,
     sortOrder?: number,
     _correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldCategoryResult> {
     log.debug('[Mock] Creating field category', { name, slug });
     await this.simulateDelay();
 
@@ -1239,7 +1246,7 @@ export class MockClientFieldService implements IClientFieldService {
     categoryId: string,
     reason: string,
     _correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldCategoryResult> {
     log.debug('[Mock] Deactivating field category', { categoryId, reason });
     await this.simulateDelay();
 
@@ -1268,7 +1275,7 @@ export class MockClientFieldService implements IClientFieldService {
     categoryId: string,
     reason: string,
     _correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<FieldCategoryResult> {
     log.debug('[Mock] Reactivating field category', { categoryId, reason });
     await this.simulateDelay();
 
@@ -1291,7 +1298,7 @@ export class MockClientFieldService implements IClientFieldService {
     categoryId: string,
     reason: string,
     _correlationId?: string
-  ): Promise<RpcResult> {
+  ): Promise<DeleteCategoryResult> {
     log.debug('[Mock] Deleting field category', { categoryId, reason });
     await this.simulateDelay();
 
