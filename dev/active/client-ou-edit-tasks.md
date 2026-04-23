@@ -4,8 +4,8 @@
 
 **Phase**: Phase 0 ✅ + Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ → Phase 6 — Placement History OU Display (still PR 1)
 **Status**: 🟢 READY TO CONTINUE
-**Last Updated**: 2026-04-22
-**Branch**: `feat/client-ou-placement` (commit `d1f69ef1` + uncommitted Phase 3 work). Run `git branch --show-current` to verify before continuing. Do NOT switch to `main`; it tracks `origin/main` and shouldn't carry this work.
+**Last Updated**: 2026-04-22 (post-Phase-3 commit; dev-docs refreshed before /clear)
+**Branch**: `feat/client-ou-placement` (HEAD = `9390eff7`; working tree clean). Run `git branch --show-current` to verify before continuing. Do NOT switch to `main`; it tracks `origin/main` and shouldn't carry this work.
 
 **Next Step (concrete)** — Phase 6, show OU name on placement history:
 1. Open `frontend/src/pages/clients/ClientOverviewPage.tsx`. Locate `PlacementCard` (renders rows from `client.placement_history`).
@@ -20,7 +20,7 @@
 
 **Bundle note**: PR 1 covers Phases 0, 1, 2, 3, 6, 8a + testing (per plan table). Phase 4/5/8b is PR 2a/2b.
 
-**Phase 3 artifacts** (completed 2026-04-22, uncommitted):
+**Phase 3 artifacts** (committed in `9390eff7`):
 - `frontend/src/viewModels/client/ClientIntakeFormViewModel.ts` — 3rd constructor arg `IOrganizationUnitService`; `organizationUnits` / `organizationUnitsRootPath` / loading flags; `organizationUnitTree` + `selectedOrganizationUnitPath` computeds; `loadOrganizationUnits()` + `setOrganizationUnitByPath()` actions. `submit()` now pushes `changeClientPlacement` into the post-register RPC batch when placement + OU + admission_date are all set.
 - `frontend/src/pages/clients/intake/AdmissionSection.tsx` — new `<TreeSelectDropdown>` wrapped in `<div data-testid="admission-ou-select">`, disabled with placeholder hints during loading/empty states, optional help text.
 - `frontend/src/pages/clients/ClientIntakePage.tsx` — mount effect now calls `vm.loadOrganizationUnits()` alongside `vm.loadFieldDefinitions()`.
