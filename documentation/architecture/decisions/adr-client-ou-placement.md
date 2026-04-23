@@ -6,7 +6,7 @@ last_updated: 2026-04-23
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: ADR documenting the architectural decisions for associating clients with organizational units via placement history. Establishes the placement history row as the single source of truth for OU assignment, defines the `client.transfer` permission, mandates a row lock in the placement handler, and enriches the read model with current OU state without corrupting audit history.
+**Summary**: ADR documenting six architectural decisions for associating clients with organizational units via placement history. Establishes the placement history row as the single source of truth for OU assignment, defines the `client.transfer` permission (enforced via inferred check in `api.change_client_placement`), mandates a row lock in the placement handler, enriches the read model with current OU state without corrupting audit history, and updates same-day placement events in place to honour the `(client_id, start_date)` UNIQUE constraint.
 
 **When to read**:
 - Before modifying the client admission or placement code paths
@@ -24,8 +24,8 @@ last_updated: 2026-04-23
 
 # ADR: Client OU Placement
 
-**Date**: 2026-04-22 (Phase 1 schema + handlers) / 2026-04-23 (Phase 6 read-model enrichment)
-**Status**: Implemented (PR 1 — Phases 0, 1, 2, 3, 6)
+**Date**: 2026-04-22 (Phase 1 schema + handlers) / 2026-04-23 (Phase 6 read-model enrichment + PR #27 review remediation)
+**Status**: Implemented (PR 1 — Phases 0, 1, 2, 3, 6 + Decisions 2-enforcement and 6 added)
 **Deciders**: Lars (architect), Claude (implementation), software-architect-dbc (review)
 
 ## Context
@@ -57,6 +57,27 @@ This ADR consolidates the architectural decisions made across the `client-ou-edi
 - **Backfill**: All active `provider_admin` role assignments received `client.transfer` via an idempotent INSERT into `role_permissions_projection` in migration `20260422052825`.
 
 **Note**: `clinician` role does NOT receive `client.transfer`. If a clinician creates a client via intake and selects an OU at the same time, the OU picker is gated by `client.create` (the intake permission), not `client.transfer`. This is intentional — initial placement at intake is part of client creation, not a transfer.
+
+**Enforcement** (added 2026-04-23 post-PR-#27 review): `api.change_client_placement` now performs an **inferred permission check**:
+
+```sql
+SELECT EXISTS (
+    SELECT 1 FROM client_placement_history_projection
+    WHERE client_id = p_client_id AND is_current = true
+) INTO v_has_existing_placement;
+
+v_required_perm := CASE
+    WHEN v_has_existing_placement THEN 'client.transfer'
+    ELSE 'client.create'
+END;
+
+IF NOT public.has_effective_permission(v_required_perm, v_org_path) THEN
+    RETURN jsonb_build_object('success', false,
+        'error', 'Missing permission: ' || v_required_perm);
+END IF;
+```
+
+The DB infers transfer-vs-create from state (presence of an `is_current = true` placement row). A malicious caller cannot bypass by claiming an intake context. Migration `20260423032200_client_transfer_enforcement_and_same_day_placement.sql` ships this enforcement; the prior `client.update` check it replaces was a temporary stand-in identified during PR #27 review. The intake flow (which calls `change_client_placement` *after* `register_client`, when no `is_current` row exists) resolves to `client.create`; the edit flow (Phase 5a, future PR 2a) resolves to `client.transfer`. Decision 2's claim that transfers are gated on `client.transfer` is now load-bearing at the enforcement layer, not just the role-template seed.
 
 ### Decision 3 — Row lock in `handle_client_placement_changed` (C4)
 
@@ -92,6 +113,19 @@ This ADR consolidates the architectural decisions made across the `client-ou-edi
 **Architect-reviewed** (software-architect-dbc): "Deriving at read time via LEFT JOIN is the only option consistent with CQRS and event-sourced audit semantics." See migration `20260423013804` header for full context.
 
 **Forward-compatibility**: The same three fields will be consumed by the Phase 5a edit-mode OU picker to display the "(inactive)" annotation on a client's current OU when it has been deactivated since assignment. No additional backend work required.
+
+### Decision 6 — Same-day placement corrections update in place (PR #27 review)
+
+**Decision**: `handle_client_placement_changed` branches on `start_date` inside the `FOR UPDATE` lock. If the locked `is_current = true` row's `start_date` matches the incoming event's `start_date`, the handler updates that row in place (correction). Otherwise it follows the existing close-then-insert path. This avoids violating the `UNIQUE (client_id, start_date)` constraint added by migration `20260408000351`.
+
+**Rationale**:
+- **Semantic match**: An admin re-selecting an OU within minutes of intake is correcting a placement, not stacking a new one. Two history rows for the same start date would mislead audit consumers ("the client was in two OUs simultaneously on 2026-04-22").
+- **Avoids processing_error noise**: Without this branch, same-day double-saves would surface as `processing_error` on the second event with a unique-violation message. Operators would see legitimate corrections as failures.
+- **Lock-protected**: The `FOR UPDATE` lock from Decision 3 already serializes concurrent placement events; the same-day branch operates inside that lock, so two same-day events from racing sessions still serialize and both end up updating the same surviving row.
+
+**RPC read-back broadened**: `api.change_client_placement` previously read back the new row by `id = v_placement_id` (the freshly-generated UUID from the RPC). On the same-day path the handler does NOT insert a new row, so that read-back would return null. Migration `20260423032200` broadens the read-back to `WHERE client_id = p_client_id AND start_date = p_start_date AND is_current = true`, which resolves both new-row and same-day-correction paths cleanly.
+
+**Validation**: Migration `20260423032200` verification queries assert the handler body contains the same-day branch and the RPC body contains the broadened read-back.
 
 ## Consequences
 

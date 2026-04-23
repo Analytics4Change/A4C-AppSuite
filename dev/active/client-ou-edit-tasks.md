@@ -2,23 +2,40 @@
 
 ## Current Status
 
-**Phase**: Phase 0 ✅ + Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 6 ✅ + Phase 7 (PR 1 slice) ✅ + Phase 8a ✅ → **PR 1 READY FOR REVIEW**
-**Status**: 🟢 PR 1 COMPLETE — next is PR 2a (Phase 4/5a) or merge + start Phase 9
-**Last Updated**: 2026-04-23 (Phase 7 + 8a commit `e3d7fd8c`)
-**Branch**: `feat/client-ou-placement` (HEAD = `e3d7fd8c`; working tree clean). 5 feature commits on this branch: `d1f69ef1` (types/services), `9390eff7` (intake picker), `cdfcdd91` (Phase 6 placement card), `e3d7fd8c` (Phase 7 E2E + Phase 8a docs) — plus `b52aeaef`, `9245c6cb`, `cd374c12` earlier foundation/docs commits.
+**Phase**: Phase 0 ✅ + Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 6 ✅ + Phase 7 (PR 1 slice) ✅ + Phase 8a ✅ + **PR #27 review remediation ✅** → **PR 1 READY FOR RE-REVIEW**
+**Status**: 🟢 PR 1 COMPLETE (review findings addressed) — next is PR 2a (Phase 4/5a) or merge + start Phase 9
+**Last Updated**: 2026-04-23 (PR #27 review remediation: migration `20260423032200`, `ClientProjectionRow` type narrowing, OU intake test split)
+**Branch**: `feat/client-ou-placement` — 5 prior feature commits + PR #27 remediation commit (in progress). Migrations now: `20260422052825` + `20260423013804` + `20260423032200`.
 
-**Next Step (concrete)** — open PR 1 for review, OR continue onto PR 2a:
-1. **PR 1 review path**: push branch, open PR targeting `main`. PR 1 slice: Phases 0/1/2/3/6/7/8a. Include migration `20260422052825` + `20260423013804` (both applied to linked project).
+**Next Step (concrete)** — open PR 1 for re-review, OR continue onto PR 2a:
+1. **PR 1 re-review path**: push branch, request review on PR #27. Confirm reviewer's three findings are closed: (a) `client.transfer` enforced in DB via inferred check, (b) same-day placement handled in-place, (c) `ClientProjectionRow` narrowing replaces `Partial<Client>`, (d) intake-OU test split + renamed.
 2. **PR 2a path**: proceed to Phase 4 (ClientEditViewModel) + Phase 5a (Client edit UI foundation — Demographics + Admission sections with edit mode). See Phase 4/5a checklists below.
 3. **Post-merge**: Phase 9 activates the parked `api-rpc-readback-pattern` follow-up immediately after PR 1 merges.
 
 **Verification**:
-- `npm run typecheck` ✓, `npm run lint` ✓, `npm run docs:check` ✓ (0 issues)
-- `npm run test -- --run src/utils src/viewModels/client src/pages/clients src/services/clients` ✓ (67 passed)
-- `npx playwright test --config playwright.client-intake.config.ts` ✓ (58 passed, includes 4 new OU tests)
-- SQL verification via MCP: 12/12 assertions pass against linked project
+- `npm run typecheck` ✓, `npm run lint` ✓
+- `npx playwright test --config playwright.client-intake.config.ts` ✓ (59 passed, +1 for OU-skip-path test)
+- SQL verification via MCP: inferred-permission check present, old `client.update` check removed, same-day branch present, broadened read-back present, 0 failed `client.placement.changed` events
+- New migration applied to linked project 2026-04-23
 
 **Bundle note**: PR 1 covers Phases 0, 1, 2, 3, 6, 7 (PR 1 slice), 8a (per plan table). Phase 4/5a/7 (PR 2a slice)/8b is PR 2a/2b. Phase 5b is PR 2b.
+
+**PR #27 review remediation artifacts** (committed 2026-04-23):
+- `infrastructure/supabase/supabase/migrations/20260423032200_client_transfer_enforcement_and_same_day_placement.sql` — addresses two PR #27 findings:
+  - **🔴 Major**: `api.change_client_placement` now performs an inferred permission check (`client.create` when no `is_current=true` placement row exists; `client.transfer` otherwise). Closes ADR Decision 2 enforcement gap. Old `client.update` check removed.
+  - **🟡 Minor**: `handle_client_placement_changed` adds same-day in-place branch under the existing FOR UPDATE lock. Avoids `UNIQUE(client_id, start_date)` violation when an admin corrects an OU pick within minutes. RPC's read-back broadened from `id = v_placement_id` to `(client_id, start_date, is_current)` so it resolves both new-row and same-day-correction paths.
+  - Applied to linked project 2026-04-23. MCP verification confirms inferred-check present, old check removed, same-day branch present, broadened read-back present, 0 failed events.
+- `infrastructure/supabase/handlers/client/handle_client_placement_changed.sql` — refreshed reference file from `pg_get_functiondef` (Rule 7b) to reflect new branching.
+- `frontend/src/types/client.types.ts` — **🟡 Minor**: replaced `client?: Partial<Client>` with `client?: ClientProjectionRow`. New type defined as `Omit<Client, sub-entity-fields>` so it stays in sync with the canonical `Client` interface and consumers get accurate IntelliSense for what's actually populated by a projection read-back.
+- `frontend/src/services/clients/MockClientService.ts` — `registerClient()` now returns the full constructed `client` (which structurally satisfies `ClientProjectionRow`) instead of a hand-curated 4-field stub.
+- `frontend/e2e/client-intake.spec.ts` — **🟡 Minor**: split the misleading "without selecting an OU shows no placement history" test into two:
+  1. Renamed: "intake without all three required placement fields emits no placement event" (preserves the original multi-field-guard coverage).
+  2. New: "intake with placement_arrangement + admission_date but no OU emits no placement event" (isolates the OU-required path). Brings the OU describe-block to 5 tests, total suite to 59 passing.
+- `documentation/architecture/decisions/adr-client-ou-placement.md`:
+  - Decision 2 amended with **Enforcement** subsection documenting the inferred-check + the old `client.update` stand-in being a known temporary state at PR 1 commit time.
+  - New Decision 6 — Same-day placement corrections update in place (with rationale, lock-protection note, and read-back broadening).
+  - TL;DR + header bumped to "six decisions".
+- `dev/active/client-ou-edit-{tasks,context,plan}.md` — this update.
 
 **Phase 7 + 8a artifacts** (committed in `e3d7fd8c`):
 - `frontend/e2e/client-intake.spec.ts` — new `describe` block "Client Registration — Organizational Unit Placement" adds 4 E2E tests covering OU picker mount, inactive-unit filter (Old Wing excluded from intake), no-OU intake → no placement section, and happy path (Main Campus → OU label shown, no "(inactive)" suffix). Full 58-test suite passes in ~1.3m against mock mode.
@@ -268,7 +285,7 @@ All work is pending. Integrating architect recommendations:
 - [ ] OU field: `TreeSelectDropdown` with `data-testid="admission-edit-ou-select"`
 - [ ] Placement arrangement: enum dropdown (same source as intake)
 - [ ] Save flow calls `vm.saveSection('admission')` which handles ordering internally
-- [ ] Gate OU/placement sub-section on `hasPermission('client.transfer')`; demographics sub-fields on `client.update`
+- [ ] Gate OU/placement sub-section on `hasPermission('client.transfer')`; demographics sub-fields on `client.update` — UI-layer only; the backend already enforces this via the inferred check in `api.change_client_placement` (PR #27 remediation, migration `20260423032200`).
 - [ ] Show notice when OU changes: "This will create a placement history record"
 - [ ] After save: placement history auto-refreshes via `loadClient`
 
@@ -336,7 +353,7 @@ All work is pending. Integrating architect recommendations:
   - [ ] Error path: processing_error surfaces in saveErrors
 - [ ] Playwright E2E: `client-edit-demographics.spec.ts`, `client-edit-admission.spec.ts`
   - [ ] Viewer without `client.update`: Edit button hidden
-  - [ ] Admin with `client.update` but not `client.transfer`: Demographics editable, OU read-only
+  - [ ] Admin with `client.update` but not `client.transfer`: Demographics editable, OU read-only (backend RPC also rejects with `Missing permission: client.transfer` per migration `20260423032200`'s inferred check — UI test asserts both gating layers behave correctly)
   - [ ] Full permissions: Demographics + Admission save flows work
   - [ ] Focus management: Edit → first field focused; Cancel → Edit button focused
   - [ ] Discharged client: Edit button hidden

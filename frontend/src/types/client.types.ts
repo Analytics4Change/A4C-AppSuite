@@ -674,6 +674,25 @@ export interface UpdateFundingSourceParams {
 // 6. RPC Result Type
 // =============================================================================
 
+/**
+ * Shape of a single row from `clients_projection`, as returned by RPCs that
+ * perform a projection read-back (e.g. `api.update_client` post-Phase 1g-pre,
+ * `api.change_client_placement`). All top-level columns of the projection
+ * are present; sub-entity arrays (phones, emails, addresses, insurance_policies,
+ * placement_history, funding_sources, contact_assignments) are NOT — those
+ * require `api.get_client` to assemble the full `Client` aggregate.
+ */
+export type ClientProjectionRow = Omit<
+  Client,
+  | 'phones'
+  | 'emails'
+  | 'addresses'
+  | 'insurance_policies'
+  | 'placement_history'
+  | 'funding_sources'
+  | 'contact_assignments'
+>;
+
 export interface ClientRpcResult {
   success: boolean;
   error?: string;
@@ -685,9 +704,5 @@ export interface ClientRpcResult {
   placement_id?: string;
   funding_source_id?: string;
   assignment_id?: string;
-  // Rich projection row returned by read-back-enriched RPCs (e.g. api.update_client
-  // post-Phase 1g-pre). Sub-entity arrays (phones, emails, placement_history, ...)
-  // are NOT populated by a projection read-back — use getClient() for the full
-  // aggregate. Fields present here come directly from clients_projection.
-  client?: Partial<Client>;
+  client?: ClientProjectionRow;
 }
