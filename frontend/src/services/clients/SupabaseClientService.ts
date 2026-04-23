@@ -115,7 +115,17 @@ export class SupabaseClientService implements IClientService {
       return { success: false, error: error.message };
     }
 
-    return parseResponse(data) as ClientRpcResult;
+    const result = parseResponse(data) as ClientRpcResult;
+
+    if (result.success && !result.client) {
+      try {
+        result.client = await this.getClient(clientId);
+      } catch (err) {
+        log.warn('Failed to refetch client after update fallback', { err });
+      }
+    }
+
+    return result;
   }
 
   async admitClient(clientId: string, params?: AdmitClientParams): Promise<ClientRpcResult> {
@@ -397,6 +407,7 @@ export class SupabaseClientService implements IClientService {
       p_start_date: params.start_date,
       p_reason: params.reason ?? 'Placement changed',
       p_correlation_id: params.correlation_id ?? null,
+      p_organization_unit_id: params.organization_unit_id ?? null,
     });
 
     if (error) return { success: false, error: error.message };
