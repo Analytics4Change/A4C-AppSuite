@@ -35,9 +35,7 @@ export class DirectCareSettingsViewModel {
 
   reason = '';
 
-  constructor(
-    private service: IDirectCareSettingsService = getDirectCareSettingsService()
-  ) {
+  constructor(private service: IDirectCareSettingsService = getDirectCareSettingsService()) {
     makeAutoObservable(this);
     log.debug('DirectCareSettingsViewModel initialized');
   }
@@ -104,8 +102,10 @@ export class DirectCareSettingsViewModel {
   get hasChanges(): boolean {
     if (!this.settings || !this.originalSettings) return false;
     return (
-      this.settings.enable_staff_client_mapping !== this.originalSettings.enable_staff_client_mapping ||
-      this.settings.enable_schedule_enforcement !== this.originalSettings.enable_schedule_enforcement
+      this.settings.enable_staff_client_mapping !==
+        this.originalSettings.enable_staff_client_mapping ||
+      this.settings.enable_schedule_enforcement !==
+        this.originalSettings.enable_schedule_enforcement
     );
   }
 
@@ -129,12 +129,16 @@ export class DirectCareSettingsViewModel {
     });
 
     try {
-      const staffMapping = this.settings.enable_staff_client_mapping !== this.originalSettings?.enable_staff_client_mapping
-        ? this.settings.enable_staff_client_mapping
-        : null;
-      const scheduleEnforcement = this.settings.enable_schedule_enforcement !== this.originalSettings?.enable_schedule_enforcement
-        ? this.settings.enable_schedule_enforcement
-        : null;
+      const staffMapping =
+        this.settings.enable_staff_client_mapping !==
+        this.originalSettings?.enable_staff_client_mapping
+          ? this.settings.enable_staff_client_mapping
+          : null;
+      const scheduleEnforcement =
+        this.settings.enable_schedule_enforcement !==
+        this.originalSettings?.enable_schedule_enforcement
+          ? this.settings.enable_schedule_enforcement
+          : null;
 
       log.debug('Saving direct care settings', {
         orgId: this.orgId,
@@ -143,17 +147,19 @@ export class DirectCareSettingsViewModel {
         reason: this.reason,
       });
 
-      await this.service.updateSettings(
+      const updated = await this.service.updateSettings(
         this.orgId,
         staffMapping,
         scheduleEnforcement,
-        this.reason.trim(),
+        this.reason.trim()
       );
 
-      // Reload to confirm server state
-      await this.loadSettings(this.orgId);
-
+      // Pattern A v2: updateSettings returns the post-projection read-back
+      // directly, so consume it instead of issuing a second loadSettings()
+      // round-trip.
       runInAction(() => {
+        this.settings = { ...updated };
+        this.originalSettings = { ...updated };
         this.isSaving = false;
         this.saveSuccess = true;
         this.reason = '';

@@ -197,20 +197,24 @@ describe('DirectCareSettingsViewModel', () => {
       expect(result).toBe(true);
       expect(mockService.updateSettings).toHaveBeenCalledWith(
         'org-123',
-        true,  // staff mapping changed to true
-        null,  // schedule enforcement unchanged
-        'Enabling staff-client mapping for pilot',
+        true, // staff mapping changed to true
+        null, // schedule enforcement unchanged
+        'Enabling staff-client mapping for pilot'
       );
       expect(vm.isSaving).toBe(false);
       expect(vm.saveSuccess).toBe(true);
       expect(vm.reason).toBe('');
     });
 
-    it('reloads after successful save', async () => {
+    it('consumes updateSettings response without a second getSettings round-trip (Pattern A v2)', async () => {
       await vm.saveSettings();
 
-      // getSettings called twice: once on initial load, once after save
-      expect(mockService.getSettings).toHaveBeenCalledTimes(2);
+      // getSettings should be called ONLY on initial load; updateSettings
+      // already returns the post-projection read-back so no refetch is needed.
+      expect(mockService.getSettings).toHaveBeenCalledTimes(1);
+      expect(mockService.updateSettings).toHaveBeenCalledTimes(1);
+      // VM state reflects the update response
+      expect(vm.settings?.enable_staff_client_mapping).toBe(true);
     });
 
     it('handles save error', async () => {
@@ -247,9 +251,9 @@ describe('DirectCareSettingsViewModel', () => {
 
       expect(mockService.updateSettings).toHaveBeenCalledWith(
         'org-123',
-        true,  // staff mapping changed
-        true,  // schedule enforcement changed
-        'Enabling staff-client mapping for pilot',
+        true, // staff mapping changed
+        true, // schedule enforcement changed
+        'Enabling staff-client mapping for pilot'
       );
     });
   });
