@@ -24,8 +24,8 @@ last_updated: 2026-04-23
 
 # ADR: API RPC Read-back Pattern
 
-**Date**: 2026-04-23
-**Status**: Implemented (Phase 1 of `api-rpc-readback-pattern` feature — migration `20260423060052` applied to linked dev project; 11 RPCs refactored)
+**Date**: 2026-04-23 (initial — Pattern A v1) / 2026-04-23 (revision — Pattern A v2 closes the field-level write-through gap)
+**Status**: Implemented (Phase 1+1.6 of `api-rpc-readback-pattern` feature — migrations `20260423060052` (v1) + `20260423065747` (v2) applied to linked dev project; 19 single-event RPCs on v2; `update_role` on COMPLEX-CASE multi-event variant)
 **Deciders**: Lars (architect), software-architect-dbc (review), Claude (implementation)
 
 ## Context
@@ -48,24 +48,32 @@ The first remediation landed in `api.update_client` (PR 1 of the `client-ou-edit
 
 ## Decisions
 
-### Decision 1 — All `api.update_*` and `api.change_*` RPCs MUST perform a post-emit projection read-back
+### Decision 1 — All `api.update_*` and `api.change_*` RPCs MUST perform a post-emit projection read-back (Pattern A v2)
 
-**Decision**: After emitting the domain event, the RPC reads back the corresponding projection row and surfaces a handler failure to the caller. Standard form:
+**Decision**: After emitting the domain event, the RPC reads back the corresponding projection row AND verifies the just-emitted event did not carry a `processing_error`. Standard form (Pattern A v2 — see "Pattern A v1 → v2 (Resolved)" section below for why both checks are required):
 
 ```sql
-PERFORM api.emit_domain_event(...);
+v_event_id := api.emit_domain_event(...);  -- capture event_id (RETURNS uuid already)
 
 SELECT * INTO v_row FROM <projection> WHERE id = <key>;
 
 IF NOT FOUND THEN
+    -- Defense in depth: catches genuinely-missing-row case
     SELECT processing_error INTO v_processing_error
-    FROM domain_events
-    WHERE stream_id = <stream_id> AND event_type = '<event_type>'
-    ORDER BY created_at DESC LIMIT 1;
-
+    FROM domain_events WHERE id = v_event_id;
     RETURN jsonb_build_object(
         'success', false,
         'error', 'Event processing failed: ' || COALESCE(v_processing_error, 'unknown')
+    );
+END IF;
+
+-- v2: race-safe check on the just-emitted event (catches handler-raised on existing row)
+SELECT processing_error INTO v_processing_error
+FROM domain_events WHERE id = v_event_id;
+IF v_processing_error IS NOT NULL THEN
+    RETURN jsonb_build_object(
+        'success', false,
+        'error', 'Event processing failed: ' || v_processing_error
     );
 END IF;
 
@@ -168,8 +176,9 @@ For caller-driven failures that do use `RAISE EXCEPTION`, existing ERRCODEs are 
   - 1 schedule: `update_schedule_template`
   - 1 role (COMPLEX-CASE composing role + permissions): `update_role`
 - **2026-04-23** — Migration `20260423062426_add_user_profile_updated_handler.sql` adds the missing `handle_user_profile_updated` handler that the read-back surfaced as never-implemented dead code.
+- **2026-04-23** — Migration `20260423065747_api_rpc_readback_v2_event_id_check.sql` upgrades all 19 single-event RPCs from Pattern A v1 (IF NOT FOUND only) to **Pattern A v2** (IF NOT FOUND + race-safe post-emit `WHERE id = v_event_id` check on `processing_error`). Closes the field-level write-through gap documented in the original "Known Limitation" section. `update_role` is intentionally NOT retrofitted — its existing 5-second-window multi-event check is the appropriate COMPLEX-CASE pattern.
 
-Total RPCs now using Pattern A: **18** (7 already-DONE pre-2026-04-23 + 11 shipped in `20260423060052`).
+Total RPCs now using Pattern A v2: **19** (all single-event RPCs); `update_role` continues to use the COMPLEX-CASE multi-event variant.
 
 ## Alternatives considered
 
@@ -181,24 +190,37 @@ The original parked-feature plan proposed this. Rejected because RAISE EXCEPTION
 
 ViewModels could re-query `domain_events` after every save to check for `processing_error`. Rejected because every new ViewModel would have to re-implement the recheck pattern correctly, and a missed implementation would re-introduce the silent-failure bug. Centralizing at the RPC layer means consumers get a uniform `success` flag.
 
-## Known limitation
+## Pattern A v1 → v2 (Resolved 2026-04-23)
 
-`IF NOT FOUND` only catches the case where the projection row is COMPLETELY MISSING. For UPDATE-only handlers (most refactored RPCs target rows created by separate `add_*` or `register_*` RPCs), a handler that raises mid-update sets `processing_error` but the row remains visible (just stale). The current implementation matches the existing pre-2026-04-23 DONE-RPC pattern (IF NOT FOUND only) for consistency.
+The original Pattern A (now called v1) used `IF NOT FOUND` alone as the failure-detection signal. **Surfaced gap**: `IF NOT FOUND` only catches the case where the projection row is COMPLETELY MISSING. For UPDATE-only handlers — which is the majority — the projection row pre-exists (created by a separate `add_*` / `register_*` RPC). If the handler raises mid-update (NOT NULL violation, type mismatch, RLS denial, NULL deref, missing handler), the dispatcher trigger persists `processing_error` but the projection row remains visible (just stale or partially-updated). The IF NOT FOUND check does NOT fire. The RPC returns `{success: true, <entity>: <stale row>}` — exactly the silent-failure shape Pattern A was meant to eliminate.
 
-A future enhancement could add an explicit `processing_error` check on the just-emitted event after the IF NOT FOUND check:
+This was concretely demonstrated when implementing `api.update_user`: `handle_user_profile_updated` was referenced in the router CASE since 2026-02-17 but had never been created (separate fix in commit `461b4929`). Every call set `processing_error`, but the `users` row pre-existed from signup. Without the handler fix, the v1 IF NOT FOUND check would have returned `{success: true, user: <unchanged row>}`.
+
+**Software-architect-dbc** follow-up review (2026-04-23, agent ID `a26d286c3c12db3d5`) confirmed the gap and recommended Pattern A v2.
+
+### Pattern A v2 — capture event_id + race-safe post-emit check
+
+Two additions to v1:
+
+1. **Capture the emitted event's UUID** by changing `PERFORM api.emit_domain_event(...)` to `v_event_id := api.emit_domain_event(...)`. `api.emit_domain_event(...) RETURNS uuid` already — no signature change required.
+
+2. **After the existing IF NOT FOUND block, add a race-safe post-emit `processing_error` check on the captured event_id**:
 
 ```sql
+v_event_id := api.emit_domain_event(...);  -- v2: capture instead of PERFORM
+
 SELECT * INTO v_row FROM <projection> WHERE id = <key>;
 IF NOT FOUND THEN
-    -- ... (current behavior)
+    -- v1 IF NOT FOUND branch (defense in depth — catches genuinely-missing-row cases)
+    SELECT processing_error INTO v_processing_error
+    FROM domain_events WHERE id = v_event_id;
+    RETURN jsonb_build_object('success', false,
+        'error', 'Event processing failed: ' || COALESCE(v_processing_error, 'unknown'));
 END IF;
 
--- Future addition: also catch handler-raised on existing row
+-- v2 race-safe check — catches handler-raised-mid-update on existing row
 SELECT processing_error INTO v_processing_error
-FROM domain_events
-WHERE stream_id = <stream_id> AND event_type = '<event_type>'
-ORDER BY created_at DESC LIMIT 1;
-
+FROM domain_events WHERE id = v_event_id;
 IF v_processing_error IS NOT NULL THEN
     RETURN jsonb_build_object('success', false,
         'error', 'Event processing failed: ' || v_processing_error);
@@ -207,7 +229,13 @@ END IF;
 RETURN jsonb_build_object('success', true, ...);
 ```
 
-If pursued, the enhancement should land across ALL 18 refactored RPCs in lockstep to maintain pattern consistency. `api.update_role` already includes a 5-second-window variant of this check for its multi-event partial-success case.
+**Race safety**: `WHERE id = v_event_id` is an indexed PK lookup against the exact row this RPC just emitted. Immune to concurrent emits on the same stream by other sessions. The previous v1 IF NOT FOUND fallback's `ORDER BY created_at DESC LIMIT 1` could find a sibling event's `processing_error` — v2 fixes that.
+
+**Defense in depth**: Both checks coexist. The IF NOT FOUND check catches the rare case where the row is genuinely missing (e.g., RLS-denied projection write that left no row at all). The v2 check catches the common case (handler raised on existing row). Both pass = success.
+
+**`api.update_role`** is intentionally NOT retrofitted to v2 — its existing 5-second-window multi-event check is the appropriate COMPLEX-CASE pattern for its multi-emit semantics (1 role.updated + N role.permission.granted + M role.permission.revoked).
+
+**Migration**: `20260423065747_api_rpc_readback_v2_event_id_check.sql` (applied 2026-04-23) retrofits all 19 single-event RPCs (10 from migration `20260423060052` + 9 pre-existing DONE entries; one of those has 2 overloads = 20 function definitions total) in lockstep.
 
 ## Consequences
 

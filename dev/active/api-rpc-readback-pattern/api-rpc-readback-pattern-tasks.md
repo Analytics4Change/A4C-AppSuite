@@ -58,6 +58,59 @@ Activated 2026-04-23. Trigger conditions met:
 
 **Fix shipped** in migration `20260423062426_add_user_profile_updated_handler.sql` (applied 2026-04-23): creates `public.handle_user_profile_updated(p_event record)` which UPDATEs `public.users.first_name`/`last_name` via COALESCE for partial-update semantics. Handler reference file added at `infrastructure/supabase/handlers/user/handle_user_profile_updated.sql` per Rule 7b. With the handler in place + the Pattern A read-back from migration `20260423060052`, `api.update_user` is now end-to-end correct: emits event → handler updates row → read-back returns fresh row → `{success: true, user: <updated row>}`.
 
+## Phase 1.6: Pattern A v2 — race-safe `processing_error` check via captured event_id ✅ COMPLETE (2026-04-23)
+
+> **Trigger**: Architect (`software-architect-dbc`, agent ID `a26d286c3c12db3d5`) follow-up review on 2026-04-23 confirmed the field-level write-through gap originally documented as a "Known Limitation" in the ADR. Recommended landing the v2 enhancement on this same branch before opening the PR, retrofitting ALL pre-existing DONE RPCs in lockstep for pattern consistency.
+
+**Migration**: `infrastructure/supabase/supabase/migrations/20260423065747_api_rpc_readback_v2_event_id_check.sql` (1820 lines, applied 2026-04-23). Required `supabase migration repair --status reverted` after the initial apply (an heredoc bug truncated 6 RPCs from the file; the repair allowed re-pushing the corrected complete file). Net result: all 20 function definitions retrofitted in one atomic apply.
+
+**v2 changes per RPC** (mechanical):
+1. Add `v_event_id uuid;` to DECLARE.
+2. Capture: `v_event_id := api.emit_domain_event(...)` (was `PERFORM`). `api.emit_domain_event(...) RETURNS uuid` already.
+3. After the existing IF NOT FOUND block: `SELECT processing_error INTO v_processing_error FROM domain_events WHERE id = v_event_id; IF v_processing_error IS NOT NULL THEN RETURN error envelope; END IF;`
+
+**RPCs retrofitted** (20 function definitions across 19 RPCs):
+
+Phase 1 RPCs (10 unique RPCs, 11 defs counting the 2 overloads of `update_organization_direct_care_settings`):
+- [x] `api.update_client_address`
+- [x] `api.update_client_email`
+- [x] `api.update_client_funding_source`
+- [x] `api.update_client_insurance`
+- [x] `api.update_client_phone`
+- [x] `api.update_organization_direct_care_settings` (3-arg overload)
+- [x] `api.update_organization_direct_care_settings` (4-arg overload)
+- [x] `api.update_user`
+- [x] `api.update_user_phone`
+- [x] `api.update_user_notification_preferences`
+- [x] `api.update_schedule_template`
+
+Pre-existing DONE RPCs (9 — predates this branch):
+- [x] `api.update_client` (proof-of-pattern, migration `20260422052825`)
+- [x] `api.change_client_placement` (migration `20260423032200`)
+- [x] `api.update_organization_unit` (migration `20260221173821`)
+- [x] `api.update_organization` (migration `20260226002002`)
+- [x] `api.update_organization_address` (migration `20260226002002`)
+- [x] `api.update_organization_contact` (migration `20260226002002`)
+- [x] `api.update_organization_phone` (migration `20260226002002`)
+- [x] `api.update_field_definition` (migration `20260408023403`)
+- [x] `api.update_field_category` (migration `20260408023403`)
+
+**Intentionally NOT retrofitted**:
+- `api.update_role` — uses COMPLEX-CASE multi-event 5-second-window check appropriate for its multi-emit semantics (1 role.updated + N role.permission.granted + M role.permission.revoked). Its existing pattern stays as-is.
+
+**Verification** (post-apply via re-dump):
+- 20 `WHERE id = v_event_id` post-emit checks present across the 19 RPCs (per-RPC dump-walking confirmed)
+- `update_role` body unchanged (5-second-window check intact, single grep match)
+- All 20 RPCs preserve their existing IF NOT FOUND fallback (defense in depth)
+- `api.emit_domain_event(...) RETURNS uuid` already — no signature change required
+
+**Doc updates** (Phase 1.6c):
+- `documentation/architecture/decisions/adr-rpc-readback-pattern.md`: "Known Limitation" section replaced with "Pattern A v1 → v2 (Resolved 2026-04-23)" — full v2 spec, defense-in-depth rationale, race-safety explanation, intentional-skip note for update_role; Decision 1 updated to show v2 standard form; Rollout history extended with this migration; Date + Status header bumped
+- `infrastructure/supabase/CLAUDE.md`: existing rule "RPC functions that read back ... MUST check for NOT FOUND" upgraded to "MUST use Pattern A v2 (BOTH checks)" with full code template; explicit warning that NEVER RAISE EXCEPTION for handler-driven failures retained
+- `documentation/infrastructure/patterns/event-handler-pattern.md`: "Required Pattern" section renamed to "Required Pattern (Pattern A v2)" with new dual-check code example + defense-in-depth rationale; cross-link to ADR's "Pattern A v1 → v2" section
+
+---
+
 ## Phase 2: Frontend Service Updates ✅ COMPLETE (2026-04-23)
 
 - [x] **`SupabaseDirectCareSettingsService.ts` — BREAKING change handled**: response shape changed from raw `{enable_*}` jsonb to `{success: true, settings: {enable_*}}` envelope. Updated `updateSettings()` to detect the new envelope (presence of `success` key), branch on `success === false` to throw with `error` message, and read `data.settings.*`. Backward-compat fallback preserved for the legacy raw-jsonb shape (in case the migration hasn't deployed to a particular environment yet) — branches in if `success` key is absent.

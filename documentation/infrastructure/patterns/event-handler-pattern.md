@@ -524,39 +524,47 @@ handlers/
 
 When an RPC function emits a domain event and then reads the projection table to build its response, there is a **silent failure risk**: if the event handler fails, `process_domain_event()` catches the exception and records it in `processing_error`, but the RPC continues execution. The subsequent `SELECT INTO` from the projection returns no row, and the RPC returns `{success: true}` with null fields.
 
-### Required Pattern
+### Required Pattern (Pattern A v2)
 
-Every RPC that reads back from a projection after emitting an event **MUST** include a `NOT FOUND` guard:
+Every RPC that reads back from a projection after emitting an event **MUST** include BOTH:
+1. An `IF NOT FOUND` guard on the projection read-back (catches genuinely-missing-row case)
+2. A `processing_error` check on the captured event_id (catches handler-raised-mid-update on existing row — the common UPDATE-only case)
 
 ```sql
--- Emit the event
-PERFORM api.emit_domain_event(...);
+-- Emit the event AND capture its UUID for the v2 race-safe check
+v_event_id := api.emit_domain_event(...);   -- RETURNS uuid (already)
 
 -- Read back the projection
 SELECT * INTO v_result
 FROM my_projection
 WHERE id = v_entity_id;
 
--- Guard: detect handler failure
+-- Guard 1: row missing entirely (rare; e.g. RLS-denied projection write)
 IF NOT FOUND THEN
-  -- Fetch actual processing error for diagnostics
   SELECT processing_error INTO v_processing_error
-  FROM domain_events
-  WHERE stream_id = v_entity_id
-    AND event_type = 'entity.created'
-  ORDER BY sequence_number DESC
-  LIMIT 1;
-
+  FROM domain_events WHERE id = v_event_id;
   RETURN jsonb_build_object(
     'success', false,
-    'error', COALESCE(v_processing_error, 'Projection not found after event processing'),
+    'error', 'Event processing failed: ' || COALESCE(v_processing_error, 'Projection not found after event processing'),
     'errorDetails', jsonb_build_object(
       'code', 'PROCESSING_ERROR',
       'message', 'The event was recorded but the handler failed. Check domain_events for details.'
     )
   );
 END IF;
+
+-- Guard 2 (v2 race-safe check): handler-raised on existing row
+SELECT processing_error INTO v_processing_error
+FROM domain_events WHERE id = v_event_id;
+IF v_processing_error IS NOT NULL THEN
+  RETURN jsonb_build_object(
+    'success', false,
+    'error', 'Event processing failed: ' || v_processing_error
+  );
+END IF;
 ```
+
+**Why both checks**: For UPDATE-only handlers (most refactored RPCs), the projection row pre-exists from a separate `add_*` / `register_*` RPC. A handler that raises mid-update sets `processing_error` but the row remains visible (just stale or partially-updated). Guard 1 alone wouldn't fire — the row exists. Guard 2 catches this. Detailed rationale in [adr-rpc-readback-pattern.md](../../architecture/decisions/adr-rpc-readback-pattern.md) "Pattern A v1 → v2 (Resolved)" section.
 
 ### Why This Matters
 

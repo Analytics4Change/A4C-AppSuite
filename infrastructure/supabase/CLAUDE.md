@@ -226,16 +226,34 @@ handlers/
 > `api.emit_domain_event()`; handlers update projections. Direct writes bypass the
 > audit trail and break event replay.
 
-> **⚠️ RPC functions that read back from projections MUST check for NOT FOUND**
+> **⚠️ RPC functions that read back from projections MUST use Pattern A v2 (BOTH checks)**
 >
 > When an RPC emits a domain event and then reads the projection to build its
-> response, it MUST check `IF NOT FOUND` after the SELECT INTO. If the event handler
-> fails, the exception is caught by `process_domain_event()` (recorded in
-> `processing_error`), but the RPC continues execution. Without a NOT FOUND check,
-> the RPC returns `{success: true}` with null fields — a silent failure.
+> response, it MUST perform TWO checks:
 >
-> On NOT FOUND, fetch the actual `processing_error` from `domain_events` and
-> `RETURN jsonb_build_object('success', false, 'error', 'Event processing failed: ' || COALESCE(v_processing_error, 'unknown'))`.
+> 1. **`IF NOT FOUND` on the projection read-back** — catches the case where the
+>    row is genuinely missing (e.g., RLS-denied projection write that left no row).
+> 2. **`processing_error` check on the captured event_id** — catches the common
+>    case where a handler raised mid-update on an existing (pre-existing) row.
+>    Without this check, an UPDATE-only handler that fails silently leaves the
+>    pre-existing stale row visible, and the RPC returns `{success: true}` with
+>    that stale data — defeating the read-back's purpose.
+>
+> Required form:
+> ```sql
+> v_event_id := api.emit_domain_event(...);  -- capture (RETURNS uuid already)
+> SELECT * INTO v_row FROM <projection> WHERE id = <key>;
+> IF NOT FOUND THEN
+>     SELECT processing_error INTO v_processing_error FROM domain_events WHERE id = v_event_id;
+>     RETURN jsonb_build_object('success', false, 'error', 'Event processing failed: ' || COALESCE(v_processing_error, 'unknown'));
+> END IF;
+> SELECT processing_error INTO v_processing_error FROM domain_events WHERE id = v_event_id;
+> IF v_processing_error IS NOT NULL THEN
+>     RETURN jsonb_build_object('success', false, 'error', 'Event processing failed: ' || v_processing_error);
+> END IF;
+> RETURN jsonb_build_object('success', true, ...);
+> ```
+>
 > **NEVER `RAISE EXCEPTION` here** — that rolls back the audit row that the trigger
 > just persisted with `processing_error`, destroying the diagnostic evidence
 > (admin dashboard at `/admin/events` would see zero failed events;
