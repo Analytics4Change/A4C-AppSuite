@@ -13,16 +13,17 @@ Refactor all `api.update_*` RPCs to perform projection read-back and surface han
 
 ## Phase Summary
 
-| Phase | Description | Effort | PR |
-|-------|------------|--------|----|
-| 0 | Inventory all `api.update_*` RPCs via `pg_proc` query; classify | Small | PR 1 |
-| 1 | Migration: add read-back + processing_error check to each RPC; migration header enumerates the pattern | Medium | PR 1 |
-| 2 | Update frontend service types to include `row` in response | Small | PR 1 |
-| 3 | ADR + documentation | Small | PR 1 |
-| 4 | Update ViewModels to consume returned row (remove redundant `getX()` calls) — optional follow-up | Medium | PR 2 (optional) |
+| Phase | Description | Effort | Branch / PR |
+|-------|------------|--------|-------------|
+| 0 | Inventory all `api.update_*` and `api.change_*` RPCs; classify | Small | `chore/activate-api-rpc-readback-pattern` (PR #29 — this branch) |
+| 1 | Migration: add read-back + processing_error check to each in-scope RPC; migration header enumerates the pattern | Medium | `feat/api-rpc-readback-pattern` (PR 1 of implementation) |
+| 2 | Update frontend service types to include `row` in response | Small | `feat/api-rpc-readback-pattern` (PR 1 of implementation) |
+| 3 | ADR + documentation (sub-phases 3a–3f per `api-rpc-readback-pattern-tasks.md`) | Small | `feat/api-rpc-readback-pattern` (PR 1 of implementation) |
+| 4 | Update ViewModels to consume returned row (remove redundant `getX()` calls) | Medium | Optional follow-up PR (post-PR-1 of implementation) |
 
-**PR 1**: Phases 0–3 (backend + type updates + docs)
-**PR 2 (optional)**: Phase 4 — ViewModel simplification
+**This branch (PR #29)**: Phase 0 only — activation + inventory tracking table.
+**Implementation PR 1** (`feat/api-rpc-readback-pattern`): Phases 1–3.
+**Implementation PR 2 (optional)**: Phase 4 — ViewModel simplification.
 
 ## Phase 0: RPC Inventory
 
@@ -37,15 +38,16 @@ WHERE n.nspname = 'api'
 ORDER BY p.proname;
 ```
 
-### Inventory Tracking Table — populated 2026-04-23
+### Inventory Tracking Table — populated 2026-04-23 (revised after PR #29 review)
 
-19 distinct `api.update_*` / `api.change_*` RPCs identified via grep across `infrastructure/supabase/supabase/migrations/` (DB inspection deferred — MCP supabase token expired during inventory; classifications below are based on migration grep + spot-check; refine in Phase 1 by reading each function's live `pg_get_functiondef`).
+22 distinct `api.update_*` / `api.change_*` RPCs identified via grep across `infrastructure/supabase/supabase/migrations/` using two patterns: the unquoted `api\.(update|change)_` (covers post-baseline migrations) and the quoted-identifier `"api"\."(update|change)_` (covers `20260212010625_baseline_v4.sql`). The first pattern alone missed 3 baseline-only RPCs surfaced by PR #29 review (M1) — `api.update_role`, `api.update_user`, `api.update_user_access_dates` — now included below. DB inspection still deferred to Phase 1 implementation branch (MCP supabase token expired during initial inventory); classifications are based on migration grep + spot-check; refine in Phase 1 by reading each function's live `pg_get_functiondef`.
 
 Classification key:
-- **EXCLUDED** — handled elsewhere; do not touch
+- **EXCLUDED** — handled elsewhere or no projection row to read back; do not touch
 - **DONE** — already has post-emit projection read-back guard (NOT FOUND check after event emission)
 - **NEEDS-INSPECTION** — function exists; current state unknown; verify on Phase 1 implementation branch
-- **NEEDS-PATTERN** — confirmed missing read-back; apply standard pattern
+- **NEEDS-PATTERN** — confirmed missing read-back; apply standard `%ROWTYPE` pattern
+- **COMPLEX-CASE** — read-back required but the response composes joined data (role+permissions, contact+phone, etc.); standard `%ROWTYPE` pattern won't compose — needs explicit `jsonb_build_object` aggregation. Route through Phase 1b.
 
 | RPC | Latest migration | Classification | Notes |
 |-----|------------------|----------------|-------|
@@ -57,14 +59,17 @@ Classification key:
 | `api.update_client_funding_source` | `20260406222857_client_api_functions.sql` | **NEEDS-INSPECTION** | Original definition; spot-check in Phase 1 |
 | `api.update_client_insurance` | `20260406222857_client_api_functions.sql` | **NEEDS-INSPECTION** | Original definition; spot-check in Phase 1 |
 | `api.update_client_phone` | `20260406222857_client_api_functions.sql` | **NEEDS-INSPECTION** | Original definition; spot-check in Phase 1. Note: may have been touched by `20260408000351_fix_client_api_architecture_review.sql` (Major M5 — added read-back guards to "sub-entity add RPCs") |
-| `api.update_field_definition` | `20260408023403_client_field_config_enhancements.sql` | **NEEDS-INSPECTION** | Two-version chain; check latest |
+| `api.update_field_definition` | `20260408023403_client_field_config_enhancements.sql` | **NEEDS-INSPECTION** | First defined in `20260327212247_client_field_api_functions.sql`, then patched in `20260408023403`; check both for diff during Phase 1 (m3 from PR #29 review) |
 | `api.update_field_category` | `20260408023403_client_field_config_enhancements.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1 |
-| `api.update_organization` | `20260226002002_organization_manage_page_phase1.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1 |
-| `api.update_organization_address` | `20260226002002_organization_manage_page_phase1.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1 |
-| `api.update_organization_contact` | `20260226002002_organization_manage_page_phase1.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1 |
-| `api.update_organization_phone` | `20260226002002_organization_manage_page_phase1.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1 |
-| `api.update_organization_direct_care_settings` | baseline `20260212010625_baseline_v4.sql` | **NEEDS-INSPECTION** | Defined in baseline; not touched since |
+| `api.update_organization` | `20260226002002_organization_manage_page_phase1.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1. **Possibly-COMPLEX**: response may join contact/phone projections — confirm response shape and route through Phase 1b if joined (n1 from PR #29 review). |
+| `api.update_organization_address` | `20260226002002_organization_manage_page_phase1.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1. **Possibly-COMPLEX**: sub-entity update; confirm whether response is just the address row or includes the parent organization aggregate. |
+| `api.update_organization_contact` | `20260226002002_organization_manage_page_phase1.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1. **Possibly-COMPLEX**: same caveat as `_address`. |
+| `api.update_organization_phone` | `20260226002002_organization_manage_page_phase1.sql` | **NEEDS-INSPECTION** | Spot-check in Phase 1. **Possibly-COMPLEX**: same caveat as `_address`. |
+| `api.update_organization_direct_care_settings` | baseline `20260212010625_baseline_v4.sql` | **NEEDS-INSPECTION** | Defined in baseline; not touched since. Two overloads exist in baseline (3-arg and 4-arg with `p_reason`) — verify which is current on Phase 1 branch. |
+| `api.update_role` | baseline `20260212010625_baseline_v4.sql` | **COMPLEX-CASE** | 4-arg `(p_role_id, p_name, p_description, p_permission_ids uuid[])` returning jsonb. Response composes role + permissions (join). Standard `%ROWTYPE` read-back insufficient; needs explicit `jsonb_build_object` aggregation. Pre-flag for Phase 1b. *(Added 2026-04-23 per PR #29 review M1.)* |
 | `api.update_schedule_template` | `20260217231405_add_event_metadata_to_schedule_rpcs.sql` | **NEEDS-PATTERN** | Confirmed via grep: has pre-emit existence check (`IF NOT FOUND` after `SELECT ... INTO v_template`) but NO post-emit projection read-back guard |
+| `api.update_user` | baseline `20260212010625_baseline_v4.sql` | **NEEDS-INSPECTION** | 4-arg `(p_user_id, p_org_id, p_first_name, p_last_name)` returning jsonb. Used by `frontend/src/services/users/SupabaseUserCommandService.ts`. Spot-check on Phase 1 branch. *(Added 2026-04-23 per PR #29 review M1.)* |
+| `api.update_user_access_dates` | baseline `20260212010625_baseline_v4.sql` | **EXCLUDED** | RETURNS void — no projection row to read back via this RPC's contract. Caller-side success is the absence of an exception; per-event `processing_error` surfacing is still desirable, but does not require the standard read-back pattern. *(Added 2026-04-23 per PR #29 review M1.)* |
 | `api.update_user_notification_preferences` | baseline `20260212010625_baseline_v4.sql` | **NEEDS-INSPECTION** | Defined in baseline; not touched since |
 | `api.update_user_phone` | baseline `20260212010625_baseline_v4.sql` | **NEEDS-INSPECTION** | Defined in baseline; not touched since |
 | `api.update_user_schedule` | DROPPED in `20260217211231_schedule_template_refactor.sql` | **EXCLUDED** | Function dropped during schedule template refactor; replaced by template-based assignment model |
@@ -75,10 +80,11 @@ Classification key:
 3. Confirm `api.update_organization_unit`'s NOT FOUND guard is the **post-emit** kind (not just a pre-emit existence check) — both kinds use `IF NOT FOUND` so source-code grep can mislead.
 4. Possible additions if grep missed any — re-run the `pg_proc` query against the live DB on Phase 1 branch and reconcile.
 
-**Out-of-grep RPCs to investigate during Phase 1**:
-- The original parked-feature scope mentioned `api.update_role` and `api.update_user_profile` which do NOT appear in the grep. Either: (a) they were never created, (b) they use a different naming verb, or (c) they live in the baseline only. Live DB query will resolve.
+**Out-of-grep RPCs investigation — RESOLVED 2026-04-23 (PR #29 review M1)**:
+- `api.update_role`, `api.update_user`, `api.update_user_access_dates` — all confirmed defined in baseline `20260212010625_baseline_v4.sql` using quoted-identifier syntax (`"api"."update_*"`). Now promoted into the inventory table above with appropriate classifications.
+- `api.update_user_profile` — does NOT exist; closest match is `api.update_user` (which the original parked-feature scope was probably referring to under a different name). No further investigation needed.
 
-For each in-scope RPC after refinement, classify:
+For each in-scope RPC after Phase 1 refinement, classify:
 - Already has read-back → skip
 - Needs read-back pattern applied → queue for Phase 1 standard-pattern
 - Complex (batch / multi-projection) → handle case-by-case

@@ -64,13 +64,14 @@ Activated 2026-04-23. Trigger conditions met:
 - [ ] TL;DR block (between `<!-- TL;DR-START -->` / `<!-- TL;DR-END -->`):
   - [ ] **Summary**: 1–2 sentences max — what the ADR decides
   - [ ] **When to read**: 2–4 SPECIFIC scenarios (e.g. "Adding a new `api.update_*` RPC", "Debugging a `processing_error` reaching the frontend"), NOT generic ("when working with RPCs")
-  - [ ] **Prerequisites**: link `event-handler-pattern.md`, `event-sourcing-overview.md`
+  - [ ] **Prerequisites** (optional per `documentation/AGENT-GUIDELINES.md:94` — "Only if doc assumes prior knowledge"; recommended here): link `event-handler-pattern.md`, `event-sourcing-overview.md`
   - [ ] **Key topics** (3–6 backticked keywords): `adr`, `rpc-readback`, `processing-error`, `projection-guard`, `api-contract` — must match AGENT-INDEX entries (3c)
   - [ ] **Estimated read time** (round to nearest 5 min)
 - [ ] Body sections:
   - [ ] **Context** — silent-failure problem; reference `client-ou-edit` M3 finding + the proof-of-pattern in `api.update_client`
   - [ ] **Decision** — read-back is mandatory for all `api.update_*` and `api.change_*` RPCs (with exceptions list: creation/deletion/workflow-tier)
   - [ ] **Contract** — response shape (`{success, <entity>, ...}`), error codes (P9003 NOT FOUND / P9004 handler failure), HTTP-level mapping
+  - [ ] **Telemetry convention** (added per PR #29 review n2): one short paragraph stating that frontend telemetry MUST distinguish `P9003` from `P9004` by reading the `code` field on the PostgREST error response, NOT by parsing the message text. PostgREST surfaces the PostgreSQL `ERRCODE` as the `code` field in its error JSON body — a stable contract on these codes lets observability dashboards and alerting rules pivot off the code rather than the (changeable) message string. Cite the PostgREST error-response shape as the integration point.
   - [ ] **Rollout history** — link to the migration shipping the change
   - [ ] **Alternatives considered** — Pattern B (client-side polling), why rejected
   - [ ] **Consequences** — projection writes always synchronous (already true via BEFORE INSERT trigger); RPC perf impact (one indexed PK lookup per update; negligible)
