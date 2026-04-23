@@ -82,37 +82,221 @@ function generateId(): string {
  */
 const MOCK_PERMISSIONS: Permission[] = [
   // Organization Management (4 org-scoped)
-  { id: 'perm-org-view', name: 'organization.view', applet: 'organization', action: 'view', displayName: 'View Settings', description: 'View organization settings', scopeType: 'org' },
-  { id: 'perm-org-update', name: 'organization.update', applet: 'organization', action: 'update', displayName: 'Update Settings', description: 'Update organization settings', scopeType: 'org' },
-  { id: 'perm-org-create-ou', name: 'organization.create_ou', applet: 'organization', action: 'create_ou', displayName: 'Create Unit', description: 'Create organization units within hierarchy', scopeType: 'org' },
-  { id: 'perm-org-view-ou', name: 'organization.view_ou', applet: 'organization', action: 'view_ou', displayName: 'View Hierarchy', description: 'View organization unit hierarchy', scopeType: 'org' },
+  {
+    id: 'perm-org-view',
+    name: 'organization.view',
+    applet: 'organization',
+    action: 'view',
+    displayName: 'View Settings',
+    description: 'View organization settings',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-org-update',
+    name: 'organization.update',
+    applet: 'organization',
+    action: 'update',
+    displayName: 'Update Settings',
+    description: 'Update organization settings',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-org-create-ou',
+    name: 'organization.create_ou',
+    applet: 'organization',
+    action: 'create_ou',
+    displayName: 'Create Unit',
+    description: 'Create organization units within hierarchy',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-org-view-ou',
+    name: 'organization.view_ou',
+    applet: 'organization',
+    action: 'view_ou',
+    displayName: 'View Hierarchy',
+    description: 'View organization unit hierarchy',
+    scopeType: 'org',
+  },
 
   // Client Management (4)
-  { id: 'perm-client-create', name: 'client.create', applet: 'client', action: 'create', displayName: 'Create Client', description: 'Add new client records', scopeType: 'org' },
-  { id: 'perm-client-view', name: 'client.view', applet: 'client', action: 'view', displayName: 'View Clients', description: 'View client information', scopeType: 'org' },
-  { id: 'perm-client-update', name: 'client.update', applet: 'client', action: 'update', displayName: 'Update Client', description: 'Modify client information', scopeType: 'org' },
-  { id: 'perm-client-delete', name: 'client.delete', applet: 'client', action: 'delete', displayName: 'Delete Client', description: 'Remove client records', scopeType: 'org' },
+  {
+    id: 'perm-client-create',
+    name: 'client.create',
+    applet: 'client',
+    action: 'create',
+    displayName: 'Create Client',
+    description: 'Add new client records',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-client-view',
+    name: 'client.view',
+    applet: 'client',
+    action: 'view',
+    displayName: 'View Clients',
+    description: 'View client information',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-client-update',
+    name: 'client.update',
+    applet: 'client',
+    action: 'update',
+    displayName: 'Update Client',
+    description: 'Modify client information',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-client-delete',
+    name: 'client.delete',
+    applet: 'client',
+    action: 'delete',
+    displayName: 'Delete Client',
+    description: 'Remove client records',
+    scopeType: 'org',
+  },
 
   // Medication Management (5 - includes administer)
-  { id: 'perm-med-administer', name: 'medication.administer', applet: 'medication', action: 'administer', displayName: 'Administer', description: 'Administer medications', scopeType: 'org' },
-  { id: 'perm-med-create', name: 'medication.create', applet: 'medication', action: 'create', displayName: 'Create', description: 'Add new medication entries', scopeType: 'org' },
-  { id: 'perm-med-view', name: 'medication.view', applet: 'medication', action: 'view', displayName: 'View', description: 'View medication records', scopeType: 'org' },
-  { id: 'perm-med-update', name: 'medication.update', applet: 'medication', action: 'update', displayName: 'Update', description: 'Modify medication entries', scopeType: 'org' },
-  { id: 'perm-med-delete', name: 'medication.delete', applet: 'medication', action: 'delete', displayName: 'Delete', description: 'Remove medication entries', scopeType: 'org' },
+  {
+    id: 'perm-med-administer',
+    name: 'medication.administer',
+    applet: 'medication',
+    action: 'administer',
+    displayName: 'Administer',
+    description: 'Administer medications',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-med-create',
+    name: 'medication.create',
+    applet: 'medication',
+    action: 'create',
+    displayName: 'Create',
+    description: 'Add new medication entries',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-med-view',
+    name: 'medication.view',
+    applet: 'medication',
+    action: 'view',
+    displayName: 'View',
+    description: 'View medication records',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-med-update',
+    name: 'medication.update',
+    applet: 'medication',
+    action: 'update',
+    displayName: 'Update',
+    description: 'Modify medication entries',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-med-delete',
+    name: 'medication.delete',
+    applet: 'medication',
+    action: 'delete',
+    displayName: 'Delete',
+    description: 'Remove medication entries',
+    scopeType: 'org',
+  },
 
   // Role Management (4 - removed role.assign, role.grant)
-  { id: 'perm-role-create', name: 'role.create', applet: 'role', action: 'create', displayName: 'Create Role', description: 'Create custom roles for the organization', scopeType: 'org' },
-  { id: 'perm-role-view', name: 'role.view', applet: 'role', action: 'view', displayName: 'View Roles', description: 'View role definitions and permissions', scopeType: 'org' },
-  { id: 'perm-role-update', name: 'role.update', applet: 'role', action: 'update', displayName: 'Update Role', description: 'Modify role details and permissions', scopeType: 'org' },
-  { id: 'perm-role-delete', name: 'role.delete', applet: 'role', action: 'delete', displayName: 'Delete Role', description: 'Delete roles from the organization', scopeType: 'org' },
+  {
+    id: 'perm-role-create',
+    name: 'role.create',
+    applet: 'role',
+    action: 'create',
+    displayName: 'Create Role',
+    description: 'Create custom roles for the organization',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-role-view',
+    name: 'role.view',
+    applet: 'role',
+    action: 'view',
+    displayName: 'View Roles',
+    description: 'View role definitions and permissions',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-role-update',
+    name: 'role.update',
+    applet: 'role',
+    action: 'update',
+    displayName: 'Update Role',
+    description: 'Modify role details and permissions',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-role-delete',
+    name: 'role.delete',
+    applet: 'role',
+    action: 'delete',
+    displayName: 'Delete Role',
+    description: 'Delete roles from the organization',
+    scopeType: 'org',
+  },
 
   // User Management (6 - includes role_assign/revoke)
-  { id: 'perm-user-create', name: 'user.create', applet: 'user', action: 'create', displayName: 'Create User', description: 'Create new users in the organization', scopeType: 'org' },
-  { id: 'perm-user-view', name: 'user.view', applet: 'user', action: 'view', displayName: 'View Users', description: 'View user profiles and information', scopeType: 'org' },
-  { id: 'perm-user-update', name: 'user.update', applet: 'user', action: 'update', displayName: 'Update User', description: 'Modify user profiles and settings', scopeType: 'org' },
-  { id: 'perm-user-delete', name: 'user.delete', applet: 'user', action: 'delete', displayName: 'Delete User', description: 'Remove users from the organization', scopeType: 'org' },
-  { id: 'perm-user-role-assign', name: 'user.role_assign', applet: 'user', action: 'role_assign', displayName: 'Assign Role', description: 'Assign roles to users', scopeType: 'org' },
-  { id: 'perm-user-role-revoke', name: 'user.role_revoke', applet: 'user', action: 'role_revoke', displayName: 'Revoke Role', description: 'Revoke roles from users', scopeType: 'org' },
+  {
+    id: 'perm-user-create',
+    name: 'user.create',
+    applet: 'user',
+    action: 'create',
+    displayName: 'Create User',
+    description: 'Create new users in the organization',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-user-view',
+    name: 'user.view',
+    applet: 'user',
+    action: 'view',
+    displayName: 'View Users',
+    description: 'View user profiles and information',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-user-update',
+    name: 'user.update',
+    applet: 'user',
+    action: 'update',
+    displayName: 'Update User',
+    description: 'Modify user profiles and settings',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-user-delete',
+    name: 'user.delete',
+    applet: 'user',
+    action: 'delete',
+    displayName: 'Delete User',
+    description: 'Remove users from the organization',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-user-role-assign',
+    name: 'user.role_assign',
+    applet: 'user',
+    action: 'role_assign',
+    displayName: 'Assign Role',
+    description: 'Assign roles to users',
+    scopeType: 'org',
+  },
+  {
+    id: 'perm-user-role-revoke',
+    name: 'user.role_revoke',
+    applet: 'user',
+    action: 'role_revoke',
+    displayName: 'Revoke Role',
+    description: 'Revoke roles from users',
+    scopeType: 'org',
+  },
 ];
 
 /**
@@ -176,20 +360,35 @@ function getInitialMockRoles(): { roles: Role[]; rolePermissions: Map<string, st
 
   const rolePermissions = new Map<string, string[]>([
     ['role-org-admin', MOCK_PERMISSIONS.map((p) => p.id)], // All permissions
-    ['role-clinician', [
-      'perm-client-view', 'perm-client-update',
-      'perm-med-create', 'perm-med-view', 'perm-med-update',
-      'perm-org-view', 'perm-org-view-ou',
-      'perm-user-view',
-    ]],
+    [
+      'role-clinician',
+      [
+        'perm-client-view',
+        'perm-client-update',
+        'perm-med-create',
+        'perm-med-view',
+        'perm-med-update',
+        'perm-org-view',
+        'perm-org-view-ou',
+        'perm-user-view',
+      ],
+    ],
     ['role-med-viewer', ['perm-med-view', 'perm-client-view', 'perm-org-view']],
-    ['role-deprecated', [
-      'perm-org-view', 'perm-org-update',
-      'perm-client-view', 'perm-client-update',
-      'perm-med-view', 'perm-med-update',
-      'perm-user-view', 'perm-user-update',
-      'perm-role-view', 'perm-user-role-assign',
-    ]],
+    [
+      'role-deprecated',
+      [
+        'perm-org-view',
+        'perm-org-update',
+        'perm-client-view',
+        'perm-client-update',
+        'perm-med-view',
+        'perm-med-update',
+        'perm-user-view',
+        'perm-user-update',
+        'perm-role-view',
+        'perm-user-role-assign',
+      ],
+    ],
   ]);
 
   return { roles, rolePermissions };
@@ -219,7 +418,10 @@ export class MockRoleService implements IRoleService {
   /**
    * Load user-role assignments from localStorage
    */
-  private loadUserRoleAssignments(): Map<string, { userId: string; roleId: string; scopePath: string }> {
+  private loadUserRoleAssignments(): Map<
+    string,
+    { userId: string; roleId: string; scopePath: string }
+  > {
     try {
       const json = localStorage.getItem(USER_ROLES_STORAGE_KEY);
       if (json) {
@@ -431,7 +633,10 @@ export class MockRoleService implements IRoleService {
       return {
         success: false,
         error: 'Cannot update inactive role',
-        errorDetails: { code: 'INACTIVE_ROLE', message: 'Reactivate the role before making changes' },
+        errorDetails: {
+          code: 'INACTIVE_ROLE',
+          message: 'Reactivate the role before making changes',
+        },
       };
     }
 
@@ -464,7 +669,15 @@ export class MockRoleService implements IRoleService {
 
     this.saveToStorage();
     log.info('Mock: Updated role', { roleId: role.id, name: role.name });
-    return { success: true };
+
+    // Pattern A v2 parity: return the refreshed role + current permission_ids
+    // so callers can update their local state without a follow-up loadRoles().
+    const permissionIds = this.rolePermissions.get(role.id) ?? [];
+    return {
+      success: true,
+      role: { ...role, permissionCount: permissionIds.length },
+      permission_ids: permissionIds,
+    };
   }
 
   async deactivateRole(roleId: string): Promise<RoleOperationResult> {
@@ -967,7 +1180,10 @@ export class MockRoleService implements IRoleService {
     }
 
     // Update role's userCount
-    role.userCount = Math.max(0, role.userCount + addedSuccessful.length - removedSuccessful.length);
+    role.userCount = Math.max(
+      0,
+      role.userCount + addedSuccessful.length - removedSuccessful.length
+    );
 
     // Save changes
     this.saveUserRoleAssignments();

@@ -122,10 +122,18 @@ interface UserPermissionRow {
 }
 
 /**
- * JSONB response type for mutation operations
+ * JSONB response type for mutation operations.
+ *
+ * `api.create_role` returns camelCase keys via an explicit jsonb_build_object.
+ * `api.update_role` (Pattern A v2) returns the raw `roles_projection` row via
+ * `row_to_json(v_row)` — snake_case, no computed `permission_count`/`user_count`
+ * — plus `permission_ids` from the role_permissions_projection read-back.
+ *
+ * The two response shapes coexist here; consumers pick the one their RPC emits.
  */
 interface MutationResponse {
   success: boolean;
+  /** Populated by api.create_role (camelCase) */
   role?: {
     id: string;
     name: string;
@@ -136,6 +144,33 @@ interface MutationResponse {
     createdAt: string;
     updatedAt: string;
   };
+  error?: string;
+  errorDetails?: {
+    code: string;
+    count?: number;
+    message: string;
+  };
+}
+
+/**
+ * JSONB response type for api.update_role (Pattern A v2 read-back shape).
+ * `role` is the raw roles_projection row (snake_case, no computed columns);
+ * `permission_ids` is the permission set AFTER grant/revoke processing.
+ */
+interface UpdateRoleResponse {
+  success: boolean;
+  role?: {
+    id: string;
+    name: string;
+    description: string;
+    organization_id: string | null;
+    org_hierarchy_scope: string | null;
+    is_active: boolean;
+    deleted_at: string | null;
+    created_at: string;
+    updated_at: string;
+  };
+  permission_ids?: string[];
   error?: string;
   errorDetails?: {
     code: string;
@@ -467,7 +502,7 @@ export class SupabaseRoleService implements IRoleService {
         };
       }
 
-      const response = data as MutationResponse;
+      const response = data as UpdateRoleResponse;
 
       if (!response.success) {
         log.warn('Update role failed', { response });
@@ -479,7 +514,34 @@ export class SupabaseRoleService implements IRoleService {
       }
 
       log.info('Role updated', { roleId: request.id });
-      return { success: true };
+
+      // Pattern A v2: api.update_role returns the refreshed projection row +
+      // permission_ids. Consumers can use these to avoid a follow-up
+      // loadRoles() round-trip. `userCount` is NOT stored on roles_projection
+      // (computed at query time via LEFT JOIN) and isn't affected by this
+      // operation, so we omit it — callers merging into an existing list
+      // should preserve their current userCount for this role.
+      if (!response.role) {
+        return { success: true };
+      }
+      const row = response.role;
+      const permissionIds = response.permission_ids ?? [];
+      return {
+        success: true,
+        role: {
+          id: row.id,
+          name: row.name,
+          description: row.description,
+          organizationId: row.organization_id,
+          orgHierarchyScope: row.org_hierarchy_scope,
+          isActive: row.is_active,
+          createdAt: new Date(row.created_at),
+          updatedAt: new Date(row.updated_at),
+          permissionCount: permissionIds.length,
+          userCount: 0,
+        },
+        permission_ids: permissionIds,
+      };
     } catch (err) {
       log.error('Exception in updateRole', err);
       return {
@@ -666,14 +728,15 @@ export class SupabaseRoleService implements IRoleService {
         throw new Error(`Failed to list users: ${error.message}`);
       }
 
-      const rows = (data as Array<{
-        id: string;
-        email: string;
-        display_name: string;
-        is_active: boolean;
-        current_roles: string[];
-        is_already_assigned: boolean;
-      }>) || [];
+      const rows =
+        (data as Array<{
+          id: string;
+          email: string;
+          display_name: string;
+          is_active: boolean;
+          current_roles: string[];
+          is_already_assigned: boolean;
+        }>) || [];
 
       log.debug(`Fetched ${rows.length} users for bulk assignment`);
 
@@ -779,14 +842,15 @@ export class SupabaseRoleService implements IRoleService {
         throw new Error(`Failed to list users: ${error.message}`);
       }
 
-      const rows = (data as Array<{
-        id: string;
-        email: string;
-        display_name: string;
-        is_active: boolean;
-        current_roles: string[];
-        is_assigned: boolean;
-      }>) || [];
+      const rows =
+        (data as Array<{
+          id: string;
+          email: string;
+          display_name: string;
+          is_active: boolean;
+          current_roles: string[];
+          is_assigned: boolean;
+        }>) || [];
 
       log.debug(`Fetched ${rows.length} users for role management`);
 

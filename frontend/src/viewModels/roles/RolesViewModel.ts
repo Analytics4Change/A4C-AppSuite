@@ -410,10 +410,25 @@ export class RolesViewModel {
       const result = await this.service.updateRole(request);
 
       if (result.success) {
-        // Reload to get fresh data
-        await this.loadRoles();
-
+        // Pattern A v2: updateRole returns the refreshed role + permission_ids
+        // from the projection. Consume them directly and patch the list in
+        // place — no loadRoles() round-trip. `userCount` is NOT returned by
+        // the RPC (not a stored column; computed at query time via LEFT JOIN)
+        // AND is not affected by name/description/permission changes, so we
+        // preserve the existing value from our local list.
         runInAction(() => {
+          if (result.role) {
+            const index = this.rawRoles.findIndex((r) => r.id === result.role!.id);
+            if (index !== -1) {
+              const previousUserCount = this.rawRoles[index].userCount;
+              const updated: Role = { ...result.role, userCount: previousUserCount };
+              this.rawRoles = [
+                ...this.rawRoles.slice(0, index),
+                updated,
+                ...this.rawRoles.slice(index + 1),
+              ];
+            }
+          }
           this.isLoading = false;
         });
         log.info('Updated role', { id: request.id });
