@@ -34,8 +34,51 @@ import type {
   ClientStatus,
 } from '@/types/client.types';
 import type { IClientService } from './IClientService';
+import { getOrganizationUnitService } from '@/services/organization/OrganizationUnitServiceFactory';
 
 const MOCK_ORG_ID = '00000000-0000-0000-0000-000000000001';
+
+/**
+ * Resolve current OU state for a placement row — mirrors the real
+ * api.get_client() LEFT JOIN to organization_units_projection. Fields are
+ * nullable when the OU is not assigned or not found.
+ */
+async function resolvePlacementOuState(
+  placement: ClientPlacementHistory
+): Promise<ClientPlacementHistory> {
+  if (!placement.organization_unit_id) {
+    return {
+      ...placement,
+      organization_unit_name: null,
+      organization_unit_is_active: null,
+      organization_unit_deleted_at: null,
+    };
+  }
+  try {
+    const unit = await getOrganizationUnitService().getUnitById(placement.organization_unit_id);
+    if (!unit) {
+      return {
+        ...placement,
+        organization_unit_name: null,
+        organization_unit_is_active: null,
+        organization_unit_deleted_at: null,
+      };
+    }
+    return {
+      ...placement,
+      organization_unit_name: unit.displayName || unit.name,
+      organization_unit_is_active: unit.isActive,
+      organization_unit_deleted_at: null,
+    };
+  } catch {
+    return {
+      ...placement,
+      organization_unit_name: null,
+      organization_unit_is_active: null,
+      organization_unit_deleted_at: null,
+    };
+  }
+}
 const MOCK_USER_ID = '00000000-0000-0000-0000-000000000099';
 
 function delay(): Promise<void> {
@@ -293,9 +336,11 @@ export class MockClientService implements IClientService {
       insurance_policies: this.insurance
         .filter((i) => i.client_id === clientId && i.is_active)
         .map((i) => ({ ...i })),
-      placement_history: this.placements
-        .filter((p) => p.client_id === clientId)
-        .map((p) => ({ ...p })),
+      placement_history: await Promise.all(
+        this.placements
+          .filter((p) => p.client_id === clientId)
+          .map((p) => resolvePlacementOuState({ ...p }))
+      ),
       funding_sources: this.funding
         .filter((f) => f.client_id === clientId && f.is_active)
         .map((f) => ({ ...f })),

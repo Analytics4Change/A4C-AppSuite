@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-08
+last_updated: 2026-04-23
 ---
 
 <!-- TL;DR-START -->
@@ -30,9 +30,11 @@ CQRS projection table storing the full placement trajectory of a client — wher
 Key characteristics:
 - **Temporal log**: Multiple rows per client, each covering a date range — this is history, not just the current state
 - **One current placement**: A partial UNIQUE index on `(client_id) WHERE is_current = true` enforces that only one row can be the active placement at any time
-- **Denormalization on change**: When a placement changes, the handler also updates `clients_projection.placement_arrangement` to the new value (denormalized for fast querying)
+- **Denormalization on change**: When a placement changes, the handler also updates `clients_projection.placement_arrangement` AND `clients_projection.organization_unit_id` to match the new current row (denormalized for fast querying; canonical source remains this table)
+- **Single-path OU mutation**: `organization_unit_id` is mutable only via `client.placement.changed` — the `handle_client_information_updated` and `handle_client_admitted` handlers previously wrote OU as a side effect; those branches were removed in migration `20260422052825`. See [ADR: Client OU Placement](../../../../architecture/decisions/adr-client-ou-placement.md).
+- **Read-time OU enrichment**: `api.get_client()` LEFT JOINs `organization_units_projection` to surface `organization_unit_name`, `organization_unit_is_active`, `organization_unit_deleted_at` on each placement history item — these fields are derived at read time, never stored on this table (preserves history immutability).
 - **13 SAMHSA placement types**: Standard Medicaid/SAMHSA vocabulary for placement arrangement (Decision 83)
-- **Required permission**: `client.update` for all write operations
+- **Required permission**: `client.update` for info updates; `client.transfer` for OU moves (see [ADR](../../../../architecture/decisions/adr-client-ou-placement.md))
 
 ## Table Schema
 
@@ -49,6 +51,7 @@ Key characteristics:
 | created_at | timestamptz | NO | now() | Record creation timestamp |
 | updated_at | timestamptz | YES | - | Record update timestamp (NULL until first update) |
 | last_event_id | uuid | YES | - | Last domain event that modified this row |
+| organization_unit_id | uuid | YES | - | FK to organization_units_projection — records which OU the client was placed in at this point in history (NULL for unassigned or legacy placements). Nullable; mutated only by `client.placement.changed` events. Added 2026-04-22. |
 
 ### placement_arrangement Values
 
@@ -78,6 +81,7 @@ These 13 values align with SAMHSA and state Medicaid standard placement taxonomy
 | `client_placement_arrangement_check` | CHECK | `placement_arrangement IN ('residential_treatment', 'therapeutic_foster_care', 'group_home', 'foster_care', 'kinship_placement', 'adoptive_placement', 'independent_living', 'home_based', 'detention', 'secure_residential', 'hospital_inpatient', 'shelter', 'other')` |
 | `client_placement_history_projection_client_id_fkey` | FOREIGN KEY | `client_id -> clients_projection(id)` |
 | `client_placement_history_projection_organization_id_fkey` | FOREIGN KEY | `organization_id -> organizations_projection(id)` |
+| `client_placement_history_projection_organization_unit_id_fkey` | FOREIGN KEY | `organization_unit_id -> organization_units_projection(id)` (added 2026-04-22) |
 
 ## Indexes
 
@@ -88,6 +92,7 @@ These 13 values align with SAMHSA and state Medicaid standard placement taxonomy
 | `idx_client_placement_client` | `(client_id)` — full history lookup (no WHERE filter) |
 | `idx_client_placement_org` | `(organization_id)` — org-level history queries |
 | `client_placement_history_projection_client_id_start_date_key` | `UNIQUE (client_id, start_date)` — prevents duplicate placements on same date (m7) |
+| `idx_client_placement_history_ou` | `(organization_unit_id) WHERE is_current = true` — partial index for current-OU membership queries (added 2026-04-22) |
 
 The partial unique index `idx_client_placement_current` enforces the business rule: at most one row per client may have `is_current = true`. The `(client_id, start_date)` UNIQUE constraint (added in migration `20260408000351`) prevents duplicate placement records on the same date. The two non-unique indexes index all rows (not just active) because placement history reporting queries need the full timeline.
 

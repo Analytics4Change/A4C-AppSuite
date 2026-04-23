@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-03-28
+last_updated: 2026-04-23
 ---
 
 <!-- TL;DR-START -->
@@ -42,7 +42,7 @@ Key characteristics:
 |--------|------|----------|---------|-------------|
 | id | uuid | NO | gen_random_uuid() | Primary key |
 | organization_id | uuid | NO | - | FK to organizations_projection |
-| organization_unit_id | uuid | YES | - | FK to organization_units_projection (optional OU scope) |
+| organization_unit_id | uuid | YES | - | FK to organization_units_projection (denormalized from the current `client_placement_history_projection` row; mutable ONLY via `client.placement.changed` events, never via info updates — see [ADR: Client OU Placement](../../../../architecture/decisions/adr-client-ou-placement.md)) |
 | status | text | NO | 'active' | Lifecycle: `active`, `inactive`, `discharged` |
 | data_source | text | NO | 'manual' | How created: `manual`, `api`, `import` |
 | first_name | text | NO | - | Legal first name |
