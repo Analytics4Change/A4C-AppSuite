@@ -704,5 +704,15 @@ export interface ClientRpcResult {
   placement_id?: string;
   funding_source_id?: string;
   assignment_id?: string;
+  // Read-back entity rows. Populated by RPCs that perform a post-emit
+  // projection read-back (Pattern A). Consumers can use these directly to
+  // avoid a follow-up getClient() round-trip when only the touched sub-entity
+  // is needed. Migration `20260423060052_api_rpc_readback_pattern.sql` added
+  // these to the 5 client sub-entity update RPCs.
   client?: ClientProjectionRow;
+  phone?: ClientPhone;
+  email?: ClientEmail;
+  address?: ClientAddress;
+  policy?: ClientInsurancePolicy;
+  funding_source?: ClientFundingSource;
 }

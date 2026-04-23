@@ -52,7 +52,7 @@ export class SupabaseDirectCareSettingsService implements IDirectCareSettingsSer
     orgId: string,
     enableStaffClientMapping: boolean | null,
     enableScheduleEnforcement: boolean | null,
-    reason: string,
+    reason: string
   ): Promise<DirectCareSettings> {
     log.debug('Updating direct care settings', {
       orgId,
@@ -75,13 +75,30 @@ export class SupabaseDirectCareSettingsService implements IDirectCareSettingsSer
       throw new Error(`Failed to update settings: ${error.message}`);
     }
 
-    const settings = typeof data === 'string' ? JSON.parse(data) : data;
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
 
-    log.info('Direct care settings updated', { orgId, settings });
+    // Pattern A envelope (post-migration 20260423060052):
+    //   Success: { success: true, settings: { enable_staff_client_mapping, enable_schedule_enforcement } }
+    //   Failure: { success: false, error: 'Event processing failed: <processing_error>' }
+    // Backward-compat fallback: pre-migration shape was raw { enable_staff_client_mapping, enable_schedule_enforcement }.
+    if (parsed && typeof parsed === 'object' && 'success' in parsed) {
+      if (parsed.success === false) {
+        log.error('Direct care settings update failed', { orgId, error: parsed.error });
+        throw new Error(parsed.error ?? 'Failed to update direct care settings');
+      }
+      const settings = parsed.settings ?? {};
+      log.info('Direct care settings updated', { orgId, settings });
+      return {
+        enable_staff_client_mapping: settings.enable_staff_client_mapping ?? false,
+        enable_schedule_enforcement: settings.enable_schedule_enforcement ?? false,
+      };
+    }
 
+    // Legacy shape (pre-migration): raw settings object at top level
+    log.info('Direct care settings updated (legacy shape)', { orgId, settings: parsed });
     return {
-      enable_staff_client_mapping: settings.enable_staff_client_mapping ?? false,
-      enable_schedule_enforcement: settings.enable_schedule_enforcement ?? false,
+      enable_staff_client_mapping: parsed?.enable_staff_client_mapping ?? false,
+      enable_schedule_enforcement: parsed?.enable_schedule_enforcement ?? false,
     };
   }
 }
