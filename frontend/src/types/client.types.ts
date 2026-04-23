@@ -352,6 +352,8 @@ export interface ClientPlacementHistory {
   created_at: string;
   updated_at: string | null;
   last_event_id: string | null;
+  organization_unit_id: string | null;
+  organization_unit_name?: string | null;
 }
 
 export interface ClientFundingSource {
@@ -633,6 +635,7 @@ export interface ChangePlacementParams {
   start_date: string;
   reason?: string;
   correlation_id?: string;
+  organization_unit_id?: string | null;
 }
 
 export interface AddFundingSourceParams {
@@ -671,10 +674,9 @@ export interface ClientRpcResult {
   placement_id?: string;
   funding_source_id?: string;
   assignment_id?: string;
-  client?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    status: string;
-  };
+  // Rich projection row returned by read-back-enriched RPCs (e.g. api.update_client
+  // post-Phase 1g-pre). Sub-entity arrays (phones, emails, placement_history, ...)
+  // are NOT populated by a projection read-back — use getClient() for the full
+  // aggregate. Fields present here come directly from clients_projection.
+  client?: Partial<Client>;
 }

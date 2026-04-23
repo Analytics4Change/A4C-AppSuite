@@ -719,6 +719,7 @@ export class MockClientService implements IClientService {
         : p
     );
 
+    const ouId = params.organization_unit_id ?? null;
     const id = uuid();
     const placement: ClientPlacementHistory = {
       id,
@@ -732,13 +733,20 @@ export class MockClientService implements IClientService {
       created_at: now(),
       updated_at: null,
       last_event_id: null,
+      organization_unit_id: ouId,
     };
     this.placements = [...this.placements, placement];
 
-    // Denormalize to client
+    // Denormalize to client (mirrors handle_client_placement_changed writing
+    // both placement_arrangement and organization_unit_id to clients_projection)
     this.clients = this.clients.map((c) =>
       c.id === clientId
-        ? { ...c, placement_arrangement: params.placement_arrangement, updated_at: now() }
+        ? {
+            ...c,
+            placement_arrangement: params.placement_arrangement,
+            organization_unit_id: ouId,
+            updated_at: now(),
+          }
         : c
     );
 

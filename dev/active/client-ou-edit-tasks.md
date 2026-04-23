@@ -2,23 +2,35 @@
 
 ## Current Status
 
-**Phase**: Phase 0 ✅ + Phase 1 ✅ (applied + reference files synced) → Phase 2 — Frontend Types & Service
+**Phase**: Phase 0 ✅ + Phase 1 ✅ + Phase 2 ✅ → Phase 3 — OU Picker in Intake Form
 **Status**: 🟢 READY TO CONTINUE
 **Last Updated**: 2026-04-22
-**Branch**: `feat/client-ou-placement` (local-only; commit `cd374c12`). Run `git branch --show-current` to verify before continuing. Do NOT switch to `main`; it tracks `origin/main` and shouldn't carry this work.
+**Branch**: `feat/client-ou-placement` (local-only; commit `cd374c12` + uncommitted Phase 2 work). Run `git branch --show-current` to verify before continuing. Do NOT switch to `main`; it tracks `origin/main` and shouldn't carry this work.
 
-**Next Step (concrete)**:
-1. Edit `frontend/src/types/client.types.ts`:
-   - ~line 343: add `organization_unit_id: string | null` and `organization_unit_name?: string | null` to `ClientPlacementHistory`
-   - ~line 631: add `organization_unit_id?: string | null` to `ChangePlacementParams`
-2. Edit `frontend/src/services/clients/SupabaseClientService.ts` ~line 390–404: include `p_organization_unit_id: params.organization_unit_id ?? null` in the `.rpc('change_client_placement', {...})` call.
-3. Edit `frontend/src/services/clients/MockClientService.ts` ~line 710–746: add `organization_unit_id` to the synthesized mock placement row and to the `_units` lookup if needed so mock consumers can render the OU picker.
-4. Create `frontend/src/utils/organizationUnitPath.ts` exporting `getOUPathById(units, id): string | null` and `getOUIdByPath(units, path): string | null` — mirror the pattern used by `RoleFormFields.tsx`. Add a Vitest unit test alongside.
-5. Also in `SupabaseClientService.updateClient()`: consume `response.client` when present (from the new read-back-enriched `api.update_client`), falling back to `getClient()` if absent (backward-compatible).
+**Next Step (concrete)** — Phase 3, OU picker at intake:
+1. Open `frontend/src/viewModels/client/ClientIntakeFormViewModel.ts`.
+   - Add an observable `units: OrganizationUnit[]` (empty array default) + loading flag.
+   - On construction / init, load `units` via `ouService.getUnits({ status: 'active' })` (inject via factory — follow existing service-injection pattern; see `RoleFormViewModel` for reference). Expose `rootPath` from JWT scope claim for tree building.
+   - Add a computed `ouTree = buildOrganizationUnitTree(this.units, this.rootPath)` for the dropdown.
+   - Add a computed `selectedOUPath` using `getOUPathById(this.units, this.formData.organization_unit_id as string | null)`.
+   - In `submit()` (~lines 505-631): AFTER `registerClient()` succeeds, if BOTH `formData.placement_arrangement` AND `formData.organization_unit_id` are set, call `changeClientPlacement({ placement_arrangement, start_date: admission_date, organization_unit_id, correlation_id })`.
+2. Open `frontend/src/pages/clients/intake/AdmissionSection.tsx`. Add `<TreeSelectDropdown>` for OU selection:
+   - `id="admission-ou-select"`, `data-testid="admission-ou-select"`
+   - `nodes={vm.ouTree}`, `selectedPath={vm.selectedOUPath}`
+   - `onSelect={(path) => vm.setField('organization_unit_id', getOUIdByPath(vm.units, path))}`
+   - Place it after the existing placement_arrangement field; gate visibility / render behavior on `vm.units.length > 0`.
+3. Confirm the intake form's OU field is OPTIONAL (matches migration — `organization_unit_id uuid DEFAULT NULL`). Permissions: intake gated on `client.create`; no additional `client.transfer` gate at intake.
 
-**Verification**: `cd frontend && npm run typecheck && npm run lint && npm run test -- --run` should stay green.
+**Verification**: `cd frontend && npm run typecheck && npm run lint && npm run test -- --run src/viewModels/client src/pages/clients/intake` and manual smoke test the intake flow in dev mode (mock auth).
 
-**Files already touched (do not re-edit)**: The AsyncAPI contract, generated types, and all three handler reference files are already in sync with the live DB. The migration file is committed-adjacent (untracked until you commit this branch's work).
+**Files already touched (do not re-edit)**: The AsyncAPI contract, generated types, handler reference files, migration, Phase 2 types/services/utility are all in sync.
+
+**Phase 2 artifacts** (completed 2026-04-22, uncommitted):
+- `frontend/src/types/client.types.ts` — `ClientPlacementHistory.organization_unit_id` + `organization_unit_name?` added; `ChangePlacementParams.organization_unit_id?` added; `ClientRpcResult.client` widened to `Partial<Client>` with doc comment on sub-entity caveat.
+- `frontend/src/services/clients/SupabaseClientService.ts` — `changeClientPlacement()` passes `p_organization_unit_id`; `updateClient()` opts-in to `response.client` with `getClient()` fallback.
+- `frontend/src/services/clients/MockClientService.ts` — `changeClientPlacement()` writes `organization_unit_id` to synthesized placement row and denormalizes to the client.
+- `frontend/src/utils/organizationUnitPath.ts` + `frontend/src/utils/__tests__/organizationUnitPath.test.ts` — `getOUPathById` / `getOUIdByPath` helpers with 11 passing unit tests covering id↔path round-trip, null/empty/prefix edge cases.
+- Verification: typecheck ✓, lint ✓, targeted tests ✓ (67 passed in `src/utils` + `src/viewModels/client`). Pre-existing test failures in organization VMs / `SupabaseClientFieldService` / logger are unrelated and exist on main (confirmed via stash-and-rerun).
 
 **End-of-feature reminder**: Phase 9 (activate parked `api-rpc-readback-pattern` follow-up) is part of this feature's definition of done. Do NOT archive this feature without executing Phase 9.
 
@@ -137,18 +149,19 @@ All work is pending. Integrating architect recommendations:
   - [x] `infrastructure/supabase/handlers/client/handle_client_admitted.sql` — OU CASE branch removed
 - [x] Router `handlers/routers/process_client_event.sql` verified unchanged — `WHEN 'client.placement.changed' THEN PERFORM handle_client_placement_changed(p_event);` already in place, ELSE raises EXCEPTION. No router update needed.
 
-## Phase 2: Frontend Types & Service Updates ⏸️ PENDING
+## Phase 2: Frontend Types & Service Updates ✅ COMPLETE (2026-04-22)
 
-- [ ] Add `organization_unit_id?: string | null` to `ChangePlacementParams` at `client.types.ts:631`
-- [ ] Add `organization_unit_id: string | null` to `ClientPlacementHistory` at `client.types.ts:343`
-- [ ] Add `organization_unit_name?: string | null` to `ClientPlacementHistory` (display join field)
-- [ ] Update `SupabaseClientService.changeClientPlacement()` at line 394 — pass `p_organization_unit_id`
-- [ ] Update `MockClientService.changeClientPlacement()` at line 723 — add `organization_unit_id` to mock placement
-- [ ] **1g-pre consumer**: Update `SupabaseClientService.updateClient()` to opportunistically use `response.client` (now returned by the enriched `api.update_client`). Keep the `getClient()` refresh as fallback for providers that don't return `client` (Mock, older API deployments). This proves the read-back pattern works end-to-end before generalization in parked follow-up.
-- [ ] NEW: `frontend/src/utils/organizationUnitPath.ts`
-  - [ ] `getOUPathById(units: OrganizationUnit[], id: string | null): string | null`
-  - [ ] `getOUIdByPath(units: OrganizationUnit[], path: string): string | null`
-  - [ ] Unit tests for both helpers
+- [x] Add `organization_unit_id?: string | null` to `ChangePlacementParams` at `client.types.ts:631`
+- [x] Add `organization_unit_id: string | null` to `ClientPlacementHistory` at `client.types.ts:343`
+- [x] Add `organization_unit_name?: string | null` to `ClientPlacementHistory` (display join field)
+- [x] Update `SupabaseClientService.changeClientPlacement()` at line 394 — pass `p_organization_unit_id`
+- [x] Update `MockClientService.changeClientPlacement()` at line 723 — add `organization_unit_id` to mock placement AND denormalize to `clients_projection` row (mirrors `handle_client_placement_changed`)
+- [x] **1g-pre consumer**: Update `SupabaseClientService.updateClient()` to opportunistically use `response.client` (now returned by the enriched `api.update_client`). Keep the `getClient()` refresh as fallback for providers that don't return `client` (Mock, older API deployments). **Also**: widened `ClientRpcResult.client` from the 4-field subset to `Partial<Client>` with an inline doc comment clarifying that sub-entity arrays (phones/emails/placement_history) are NOT populated by a projection read-back — full aggregate still requires `getClient()`.
+- [x] NEW: `frontend/src/utils/organizationUnitPath.ts`
+  - [x] `getOUPathById(units: readonly OrganizationUnit[], id: string | null | undefined): string | null`
+  - [x] `getOUIdByPath(units: readonly OrganizationUnit[], path: string | null | undefined): string | null`
+  - [x] Unit tests for both helpers — 11 passing tests (round-trip, null/undefined/empty, missing id/path, prefix non-match, empty units list)
+- [x] Verification: `cd frontend && npm run typecheck` ✓, `npm run lint` ✓, `npm run test -- --run src/utils src/viewModels/client` ✓ (67 passed). Pre-existing failures in `SupabaseClientFieldService`, organization VMs, scripts logger, etc. are unrelated (confirmed by stash-and-rerun).
 
 ## Phase 3: OU Picker in Intake Form ⏸️ PENDING
 
