@@ -813,3 +813,126 @@ test.describe('Client Registration — Validation', () => {
     await expect(demographicsNav).not.toHaveAttribute('aria-current', 'step');
   });
 });
+
+// ============================================================================
+// Client Registration — Organizational Unit Placement (Phase 6 / PR 1)
+// ============================================================================
+
+test.describe('Client Registration — Organizational Unit Placement', () => {
+  test('OU picker on Admission section is rendered with mock seed OUs', async ({ page }) => {
+    await navigateToIntakeForm(page);
+
+    await page.click('[data-testid="intake-nav-admission"]');
+    await expect(page.locator('[data-testid="intake-section-admission"]')).toBeVisible();
+
+    // Wrapper testid for the OU TreeSelectDropdown
+    const wrapper = page.locator('[data-testid="admission-ou-select"]');
+    await expect(wrapper).toBeVisible();
+
+    // Open the dropdown — combobox role is on the trigger button
+    const trigger = wrapper.getByRole('combobox');
+    await expect(trigger).toBeEnabled();
+    await trigger.click();
+
+    // At least one tree node should be rendered from the mock seed
+    const nodes = page.locator('[data-testid="ou-tree-node"]');
+    expect(await nodes.count()).toBeGreaterThan(0);
+  });
+
+  test('OU picker excludes inactive units (Old Wing filtered out)', async ({ page }) => {
+    await navigateToIntakeForm(page);
+    await page.click('[data-testid="intake-nav-admission"]');
+
+    const wrapper = page.locator('[data-testid="admission-ou-select"]');
+    await wrapper.getByRole('combobox').click();
+
+    // Intake VM loads with { status: 'active' } — Old Wing (isActive=false) must not appear
+    const oldWing = page.locator('[data-testid="ou-tree-node"][data-inactive="true"]');
+    await expect(oldWing).toHaveCount(0);
+  });
+
+  test('registering a client without selecting an OU shows no placement history', async ({
+    page,
+  }) => {
+    await navigateToIntakeForm(page);
+
+    // Minimal required fields across sections
+    await page.fill('[data-testid="intake-field-first_name"]', 'NoOu');
+    await page.fill('[data-testid="intake-field-last_name"]', 'Client');
+    await page.fill('[data-testid="intake-field-date_of_birth"]', '2013-06-01');
+    await page.selectOption('[data-testid="intake-field-gender"]', 'female');
+
+    await page.click('[data-testid="intake-nav-admission"]');
+    await page.fill('[data-testid="intake-field-admission_date"]', '2026-04-15');
+    // Note: placement_arrangement left empty — submit() guard requires all three
+    // (placement_arrangement + organization_unit_id + admission_date) to emit
+    // change_client_placement, so nothing is emitted here.
+
+    await page.click('[data-testid="intake-nav-medical"]');
+    await page.fill('[data-testid="intake-field-allergies"]', 'NKA');
+    await page.fill('[data-testid="intake-field-medical_conditions"]', 'None');
+
+    await page.click('[data-testid="intake-nav-education"]');
+    await expect(page.locator('[data-testid="intake-submit-button"]')).toBeEnabled();
+    await page.click('[data-testid="intake-submit-button"]');
+
+    // On detail page: placement history section must be hidden since placements=[]
+    await page.waitForURL(/\/clients\/[a-f0-9-]+$/, { timeout: 10000 });
+    await expect(page.locator('[data-testid="client-overview"]')).toBeVisible();
+    await expect(page.locator('[data-testid="section-placements"]')).not.toBeVisible();
+  });
+
+  test('registering a client with OU selection shows OU name on placement card', async ({
+    page,
+  }) => {
+    await navigateToIntakeForm(page);
+
+    await page.fill('[data-testid="intake-field-first_name"]', 'WithOu');
+    await page.fill('[data-testid="intake-field-last_name"]', 'Client');
+    await page.fill('[data-testid="intake-field-date_of_birth"]', '2011-02-02');
+    await page.selectOption('[data-testid="intake-field-gender"]', 'male');
+
+    await page.click('[data-testid="intake-nav-admission"]');
+    await page.fill('[data-testid="intake-field-admission_date"]', '2026-04-20');
+    // Placement arrangement is required for change_client_placement to fire
+    await page.selectOption(
+      '[data-testid="intake-field-placement_arrangement"]',
+      'residential_treatment'
+    );
+
+    // Pick an OU — open dropdown, expand the root, then click Main Campus.
+    // Tree starts with all nodes collapsed; direct children require explicit expansion.
+    const wrapper = page.locator('[data-testid="admission-ou-select"]');
+    await wrapper.getByRole('combobox').click();
+    const rootNode = page.locator('[data-testid="ou-tree-node"][data-root="true"]').first();
+    await expect(rootNode).toBeVisible();
+    await rootNode.getByRole('button', { name: /expand/i }).click();
+    const mainCampus = page.locator('[data-testid="ou-tree-node"][data-node-id="ou-main-campus"]');
+    await expect(mainCampus).toBeVisible();
+    await mainCampus.locator('[data-testid="ou-name"]').click();
+
+    // Dropdown closes; trigger should now show the selection
+    await expect(wrapper.getByRole('combobox')).not.toContainText('Select an organizational unit');
+
+    await page.click('[data-testid="intake-nav-medical"]');
+    await page.fill('[data-testid="intake-field-allergies"]', 'NKA');
+    await page.fill('[data-testid="intake-field-medical_conditions"]', 'None');
+
+    await page.click('[data-testid="intake-nav-education"]');
+    await expect(page.locator('[data-testid="intake-submit-button"]')).toBeEnabled();
+    await page.click('[data-testid="intake-submit-button"]');
+
+    await page.waitForURL(/\/clients\/[a-f0-9-]+$/, { timeout: 10000 });
+
+    // Placement section now renders because change_client_placement created a row
+    const placementSection = page.locator('[data-testid="section-placements"]');
+    await expect(placementSection).toBeVisible();
+
+    // OU label row surfaces the resolved name from the mock OU directory
+    const ouLabel = placementSection.locator('[data-testid="placement-ou-label"]').first();
+    await expect(ouLabel).toBeVisible();
+    await expect(ouLabel).toContainText(/Main Campus/i);
+    // Active OU must NOT carry the "(inactive)" suffix
+    await expect(ouLabel).not.toContainText(/\(inactive\)/i);
+  });
+});

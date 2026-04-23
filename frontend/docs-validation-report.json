@@ -39,7 +39,22 @@
       "severity": "info"
     },
     {
-      "message": "Link validation completed: 4 internal links checked, all valid",
+      "message": "Internal link found: ../documentation/AGENT-INDEX.md",
+      "file": "CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../documentation/AGENT-GUIDELINES.md",
+      "file": "CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Internal link found: ../documentation/frontend/",
+      "file": "CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Link validation completed: 7 internal links checked, all valid",
       "severity": "info"
     }
   ],
@@ -49,7 +64,7 @@
     "componentsDocumented": 0,
     "apisDocumented": 0
   },
-  "timestamp": "2025-12-08T21:13:05.248Z",
+  "timestamp": "2026-04-23T02:33:18.674Z",
   "summary": {
     "hasErrors": false,
     "hasWarnings": false,
