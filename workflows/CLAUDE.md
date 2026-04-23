@@ -1,25 +1,25 @@
 ---
 status: current
-last_updated: 2026-02-05
+last_updated: 2026-04-22
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Temporal.io workflow development guide covering determinism requirements, activity patterns, CQRS event sourcing, Saga compensation, and provider configuration.
+**Summary**: Temporal.io workflow component guide — tech stack, provider patterns, saga compensation, configuration, testing, deployment, and Definition of Done. Subdirectory CLAUDE.md files cover workflow determinism and activity idempotency rules.
 
 **When to read**:
-- Implementing or modifying Temporal workflows
-- Creating activities with side effects
-- Debugging non-determinism or replay errors
-- Understanding event emission patterns
-- Configuring DNS/email providers
+- Setting up the workflow worker locally
+- Understanding the saga / provider / configuration patterns
+- Adding a new DNS or email provider
+- Configuring `WORKFLOW_MODE` for a new environment
+- Reviewing the Definition of Done before merge
 
-**Prerequisites**: Basic understanding of Temporal.io concepts, Node.js/TypeScript
+**Prerequisites**: Basic Temporal.io concepts, Node.js/TypeScript
 
-**Key topics**: `temporal`, `workflows`, `activities`, `determinism`, `saga`, `event-sourcing`, `cqrs`, `idempotency`, `compensation`, `cloudflare-dns`, `resend-email`
+**Key topics**: `temporal`, `saga`, `provider-pattern`, `configuration`, `cloudflare-dns`, `resend-email`
 
-**Estimated read time**: 20 minutes (full), 5 minutes (relevant sections)
+**Estimated read time**: 12 minutes (full), 4 minutes (relevant sections)
 <!-- TL;DR-END -->
 
 # CLAUDE.md
@@ -36,7 +36,7 @@ A4C Workflows implements durable, fault-tolerant business process orchestration 
 - **Runtime**: Node.js 20+ with TypeScript
 - **Database**: Supabase PostgreSQL (event store + projections)
 - **DNS Provider**: Cloudflare API
-- **Email Providers**: Resend API (primary), SMTP (fallback) - See [Resend Email Provider Guide](../documentation/workflows/guides/resend-email-provider.md)
+- **Email Providers**: Resend API (primary), SMTP (fallback) — see [Resend Email Provider Guide](../documentation/workflows/guides/resend-email-provider.md)
 - **Testing**: Jest, Temporal test framework
 - **Deployment**: Docker + Kubernetes
 
@@ -56,126 +56,37 @@ npm run query:dev    # Query dev entities
 npm run cleanup:dev  # Delete dev entities
 ```
 
-## Architecture Patterns (Temporal-Specific)
+## Subdirectory CLAUDE.md Files
 
-### Workflow-First Pattern
-**ALL business logic orchestrated through Temporal workflows**, not direct API calls or database updates:
-- Workflows are **deterministic** (same input → same output, always)
-- Workflows contain orchestration logic, not side effects
-- Side effects happen in **activities** (non-deterministic operations)
+For domain-specific rules, see the CLAUDE.md file in the relevant subdirectory:
 
-```typescript
-// ✅ CORRECT: Workflow orchestrates, activities execute
-export async function organizationBootstrapWorkflow(input: OrganizationInput) {
-  const orgId = await activities.createOrganization(input);  // Activity
-  const dnsRecord = await activities.configureDNS(orgId);     // Activity
-  return { orgId, dnsRecord };
-}
+| Path | Covers |
+|------|--------|
+| [`src/workflows/CLAUDE.md`](src/workflows/CLAUDE.md) | Workflow-first pattern, determinism rules (forbidden APIs in workflows), replay testing |
+| [`src/activities/CLAUDE.md`](src/activities/CLAUDE.md) | Three-layer idempotency, event emission with audit context, correlation ID propagation |
 
-// ❌ WRONG: Side effects in workflow (non-deterministic)
-export async function badWorkflow(input: OrganizationInput) {
-  const response = await fetch('https://api.example.com');  // ❌ Non-deterministic!
-  const random = Math.random();                             // ❌ Non-deterministic!
-  const now = new Date();                                   // ❌ Non-deterministic!
-}
-```
+This file (workflows/CLAUDE.md) covers cross-cutting concerns: saga pattern, provider configuration, testing, deployment, DoD.
 
-### CQRS/Event Sourcing Pattern
+## Architecture Patterns (Cross-Cutting)
+
+### CQRS / Event Sourcing
+
 All state changes emit domain events that update read projections:
+
 - **Command**: Activity creates/updates entity
 - **Event**: Activity emits domain event (e.g., `OrganizationCreated`)
 - **Projection**: Database trigger updates read model (e.g., `organizations_projection`)
 
-```typescript
-// Activity emits event after successful operation
-async function createOrganizationActivity(input: OrgInput): Promise<string> {
-  // 1. Create organization via Supabase
-  const { data } = await supabase.from('organizations_projection').insert({...});
-
-  // 2. Emit domain event
-  await emitEvent({
-    event_type: 'organization.created',
-    aggregate_id: data.id,
-    event_data: { name: input.name, ... }
-  });
-
-  return data.id;
-}
-```
-
-### Three-Layer Idempotency
-Workflows and activities MUST be idempotent (safe to retry):
-
-**Layer 1 - Workflow ID**: Unique workflow ID prevents duplicate workflow executions
-```typescript
-// Client triggers workflow with idempotency key
-await client.workflow.start(organizationBootstrapWorkflow, {
-  workflowId: `org-bootstrap-${orgId}`,  // Unique ID prevents duplicates
-  taskQueue: 'bootstrap',
-  args: [input]
-});
-```
-
-**Layer 2 - Activity Check-Then-Act**: Activities check existence before creating
-```typescript
-async function createOrganizationActivity(input: OrgInput): Promise<string> {
-  // Check if already exists
-  const existing = await supabase
-    .from('organizations_projection')
-    .select('id')
-    .eq('slug', input.slug)
-    .maybeSingle();
-
-  if (existing) return existing.id;  // Already created, return existing
-
-  // Create new organization
-  const { data } = await supabase.from('organizations_projection').insert({...});
-  return data.id;
-}
-```
-
-**Layer 3 - Event Deduplication**: Database prevents duplicate event processing
-```typescript
--- Event insertion with unique constraint
-INSERT INTO domain_events (event_id, event_type, aggregate_id, ...)
-VALUES (gen_random_uuid(), 'organization.created', ...)
-ON CONFLICT (aggregate_id, event_type, created_at) DO NOTHING;
-```
+Detail and event-emission rules in [`src/activities/CLAUDE.md`](src/activities/CLAUDE.md).
 
 ### Saga Pattern (Compensation)
-Workflows implement rollback via compensation activities:
 
-```typescript
-export async function organizationBootstrapWorkflow(input: OrgInput) {
-  let dnsRecord: DNSRecord | null = null;
-  let orgId: string | null = null;
-
-  try {
-    // Forward flow
-    orgId = await activities.createOrganization(input);
-    dnsRecord = await activities.configureDNS(orgId);
-    await activities.generateInvitations(orgId);
-    await activities.sendInvitationEmails(orgId);
-    await activities.emitBootstrapCompleted(orgId);  // Trigger handler sets is_active=true
-
-  } catch (error) {
-    // Compensation flow (reverse order)
-    if (dnsRecord) {
-      await activities.removeDNS(dnsRecord);  // Compensate DNS creation
-    }
-    if (orgId) {
-      await activities.emitBootstrapFailed(orgId);  // Handler sets is_active=false
-      await activities.deactivateOrganization(orgId);  // Safety net fallback
-    }
-    throw error;
-  }
-}
-```
+Workflows implement rollback via compensation activities — call them in reverse order on failure. The full pattern with compensation example is in [`src/workflows/CLAUDE.md`](src/workflows/CLAUDE.md).
 
 ### Provider Pattern (Pluggable Dependencies)
+
 DNS and Email providers selected via configuration:
 
-**Factory Pattern**:
 ```typescript
 // src/shared/providers/dns/factory.ts
 export function createDNSProvider(config: Config): IDNSProvider {
@@ -189,273 +100,82 @@ export function createDNSProvider(config: Config): IDNSProvider {
 
 **Mode-Based Selection**:
 ```bash
-# .env configuration
 WORKFLOW_MODE=development  # → LoggingDNS + LoggingEmail (console logs)
 WORKFLOW_MODE=production   # → CloudflareDNS + ResendEmail (real providers)
 WORKFLOW_MODE=mock         # → MockDNS + MockEmail (in-memory, testing)
 ```
 
-## Development Guidelines
-
-### Workflow Determinism Requirements
-
-**Workflows MUST be deterministic** - Temporal replays workflows from history:
-
-**❌ FORBIDDEN in Workflows**:
-- `Math.random()`, `Date.now()`, `new Date()`
-- Network calls: `fetch()`, `axios.get()`
-- Database queries
-- File system operations
-- Non-deterministic timers: `setTimeout()`, `setInterval()`
-
-**✅ ALLOWED in Workflows**:
-- `await activities.*()` - Call activities for side effects
-- `workflow.sleep(duration)` - Deterministic sleep
-- `workflow.condition(predicate)` - Wait for condition
-- `workflow.random()` - Deterministic random (seeded)
-- `workflow.now()` - Deterministic time (from workflow start)
-
-### Activity Implementation Best Practices
-
-**1. Idempotency** (can be retried safely):
-```typescript
-// ✅ Check-then-act pattern
-async function createResource(id: string) {
-  const existing = await db.findById(id);
-  if (existing) return existing;  // Already created
-  return await db.create({ id });
-}
-
-// ❌ Not idempotent (creates duplicate on retry)
-async function badCreate(id: string) {
-  return await db.create({ id });  // Error on retry!
-}
-```
-
-**2. Error Handling** (let Temporal retry):
-```typescript
-// ✅ Throw errors for Temporal to retry
-async function reliableActivity() {
-  try {
-    return await externalAPI.call();
-  } catch (error) {
-    // Log error, then throw for Temporal to retry
-    console.error('Activity failed, will retry:', error);
-    throw error;  // Temporal retries automatically
-  }
-}
-```
-
-**3. Heartbeats** (for long-running activities):
-```typescript
-import { Context } from '@temporalio/activity';
-
-export async function longRunningActivity(items: string[]) {
-  const context = Context.current();
-
-  for (let i = 0; i < items.length; i++) {
-    await processItem(items[i]);
-    context.heartbeat(i);  // Report progress
-  }
-}
-```
-
-### Configuration Management
+## Configuration Management
 
 **Master Control Variable**: `WORKFLOW_MODE`
+
 ```bash
-# Development (console logs, no real resources)
-WORKFLOW_MODE=development
-
-# Testing (in-memory mocks, fast)
-WORKFLOW_MODE=mock
-
-# Production (real DNS, real emails)
-WORKFLOW_MODE=production
+WORKFLOW_MODE=development  # Console logs, no real resources
+WORKFLOW_MODE=mock         # In-memory mocks, fast tests
+WORKFLOW_MODE=production   # Real DNS, real emails
 ```
 
 **Provider Override** (advanced):
 ```bash
-# Use real DNS but log emails
 WORKFLOW_MODE=development
 DNS_PROVIDER=cloudflare
 CLOUDFLARE_API_TOKEN=your-token
 # EMAIL_PROVIDER defaults to logging
 ```
 
-**Configuration Validation**:
+**Validation runs on worker startup**:
 ```typescript
-// Worker validates on startup
 import { validateConfig } from './shared/config/validate-config';
-
 const config = validateConfig(process.env);
 // ❌ Configuration has errors:
 //    • DNS_PROVIDER=cloudflare requires CLOUDFLARE_API_TOKEN
 ```
 
-### Event Emission Pattern
-
-**All activities that modify state MUST emit domain events**:
+### Common Pitfall: No Config Validation
 
 ```typescript
-import { emitEvent } from '../shared/utils/emit-event';
-
-async function createOrganizationActivity(input: OrgInput): Promise<string> {
-  // 1. Perform state change
-  const { data } = await supabase
-    .from('organizations_projection')
-    .insert({ name: input.name, slug: input.slug })
-    .select()
-    .single();
-
-  // 2. Emit domain event with audit context
-  await emitEvent({
-    event_type: 'organization.created',
-    aggregate_type: 'organization',
-    aggregate_id: data.id,
-    event_data: {
-      name: data.name,
-      slug: data.slug,
-      created_by: input.created_by
-    },
-    // RECOMMENDED: Audit context fields (for audit trail)
-    user_id: input.initiated_by_user_id,
-    reason: 'Organization bootstrap workflow'
-  });
-
-  return data.id;
-}
-```
-
-### Audit Context in Events
-
-**The `domain_events` table is the SINGLE SOURCE OF TRUTH for all audit queries.**
-There is no separate audit table - all audit context goes in event metadata.
-
-**All activities that emit events SHOULD include audit context:**
-
-| Field | When to Include | Example |
-|-------|-----------------|---------|
-| `user_id` | Always (who initiated) | UUID of initiating user |
-| `reason` | When action has business context | `"Organization bootstrap workflow"` |
-| `ip_address` | Edge Functions only | From request headers |
-| `user_agent` | Edge Functions only | From request headers |
-| `request_id` | When available from API layer | Correlation with API logs |
-
-**Workflow Input Pattern** - Accept audit context from callers:
-```typescript
-interface OrganizationBootstrapInput {
-  // Business fields
-  name: string;
-  subdomain: string;
-  admin_email: string;
-
-  // Audit context (passed from API caller)
-  initiated_by_user_id?: string;
-  initiated_reason?: string;
-  request_context?: {
-    ip_address?: string;
-    user_agent?: string;
-    request_id?: string;
-  };
-}
-```
-
-**Audit Query Examples:**
-```sql
--- Who changed this organization?
-SELECT event_type, event_metadata->>'user_id' as actor,
-       event_metadata->>'reason' as reason, created_at
-FROM domain_events
-WHERE stream_id = '<org_id>'
-ORDER BY created_at DESC;
-
--- Trace a workflow execution
-SELECT * FROM domain_events
-WHERE event_metadata->>'workflow_id' = '<workflow_id>'
-ORDER BY created_at;
-```
-
-**Event Schema Validation** (AsyncAPI):
-- Event schemas defined in: `infrastructure/supabase/contracts/asyncapi.yaml`
-- Validate event_data matches schema before emitting
-- Use TypeScript types generated from AsyncAPI spec
-
-### Correlation ID Pattern (Business-Scoped)
-
-`correlation_id` ties together the ENTIRE business transaction lifecycle, not just a single request.
-
-**Activity Implementation**:
-- **Never generate** new `correlation_id` in activities
-- **Always use** `params.tracing.correlationId` from workflow input
-- Workflow receives `tracing` from API layer (via `extractTracingFromHeaders`)
-
-**Example - Using Tracing in Activities**:
-```typescript
-import { buildTracingForEvent } from '@shared/utils/emit-event.js';
-
-async function sendInvitationEmailsActivity(params: SendInvitationEmailsParams) {
-  await emitEvent({
-    event_type: 'user.invited',
-    aggregate_id: params.invitationId,
-    event_data: { ... },
-    // Use workflow's tracing context - preserves original correlation_id
-    ...buildTracingForEvent(params.tracing, 'sendInvitationEmails'),
-  });
-}
-```
-
-**API Layer** extracts and passes tracing to workflow:
-```typescript
-// workflows/src/api/routes/workflows.ts
-const tracing = extractTracingFromHeaders(request.headers);
-await client.workflow.start('organizationBootstrapWorkflow', {
-  args: [{ ...params, tracing }]  // Pass tracing to workflow
+// ❌ WRONG: No validation, fails at runtime with cryptic error
+const dnsProvider = new CloudflareDNSProvider({
+  token: process.env.CLOUDFLARE_API_TOKEN  // Undefined → cryptic error
 });
-```
 
-**See**: `documentation/workflows/reference/event-metadata-schema.md#correlation-strategy-business-scoped`
+// ✅ CORRECT: Validate config on startup
+const config = validateConfig(process.env);  // Throws clear error if invalid
+const dnsProvider = createDNSProvider(config);
+```
 
 ## Testing Patterns
 
 ### Unit Tests (Mock Mode)
+
 ```bash
 WORKFLOW_MODE=mock npm test
 ```
 
 ```typescript
-// Use mock providers for fast, isolated tests
 describe('OrganizationBootstrapWorkflow', () => {
   it('should create organization and configure DNS', async () => {
     const env = await TestWorkflowEnvironment.createLocal();
-
     const result = await env.client.workflow.execute(
       organizationBootstrapWorkflow,
       { args: [{ name: 'Test Org', slug: 'test' }] }
     );
-
     expect(result.orgId).toBeDefined();
   });
 });
 ```
 
 ### Workflow Replay Tests
-```typescript
-// Temporal can replay workflows from history
-it('should replay without non-determinism errors', async () => {
-  const history = await getWorkflowHistory('workflow-id');
-  await Worker.runReplayHistory({ history });
-  // Throws if workflow has non-deterministic code
-});
-```
+
+Required for every workflow change — see [`src/workflows/CLAUDE.md`](src/workflows/CLAUDE.md) for the full pattern.
 
 ### Integration Tests (Real Providers)
+
 ```bash
 WORKFLOW_MODE=production npm test -- --testPathPattern=integration
 ```
 
 ```typescript
-// Test with real Cloudflare and Resend
 describe('DNS Integration', () => {
   it('should create real DNS record', async () => {
     const result = await configureDNSActivity({
@@ -463,11 +183,8 @@ describe('DNS Integration', () => {
       recordType: 'CNAME',
       value: 'target.example.com'
     });
-
     expect(result.id).toBeDefined();
-
-    // Cleanup
-    await removeDNSActivity(result);
+    await removeDNSActivity(result);  // Cleanup
   });
 });
 ```
@@ -475,41 +192,28 @@ describe('DNS Integration', () => {
 ## Cross-Component Integration
 
 ### Frontend → Workflows
+
 Frontend triggers workflows via Temporal client:
 
 ```typescript
-// Frontend: Trigger organization bootstrap
 import { client } from '@/lib/temporal';
 
 async function createOrganization(orgData: OrgInput) {
   const handle = await client.workflow.start(organizationBootstrapWorkflow, {
     workflowId: `org-bootstrap-${orgData.slug}`,
     taskQueue: 'bootstrap',
-    args: [orgData]
+    args: [orgData],
   });
-
-  // Poll for status or subscribe to updates
-  const result = await handle.result();
-  return result;
+  return handle.result();
 }
 ```
 
 ### Workflows → Infrastructure (Events)
-Workflows emit events that update database projections:
 
-```typescript
-// Activity emits event
-await emitEvent({
-  event_type: 'organization.created',
-  aggregate_id: orgId,
-  event_data: { name, slug }
-});
-
-// Database trigger processes event (infrastructure/supabase/sql/04-triggers/)
--- Trigger on domain_events table updates organizations_projection
-```
+Activities emit events that update database projections via PostgreSQL triggers (`infrastructure/supabase/sql/04-triggers/`). See [`src/activities/CLAUDE.md`](src/activities/CLAUDE.md) for emission rules.
 
 ### Workflows → Infrastructure (Database)
+
 Activities use Supabase service role for database access:
 
 ```typescript
@@ -519,124 +223,20 @@ const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!  // Bypasses RLS
 );
-
-// Activities can read/write all tables
-const { data } = await supabase.from('organizations_projection').select('*');
-```
-
-## Common Pitfalls (Temporal-Specific)
-
-### 1. Non-Determinism in Workflows
-```typescript
-// ❌ WRONG: Random in workflow
-export async function badWorkflow() {
-  const random = Math.random();  // Different value on replay!
-  if (random > 0.5) { /* ... */ }
-}
-
-// ✅ CORRECT: Use Temporal's deterministic random
-export async function goodWorkflow() {
-  const random = workflow.random();  // Same value on replay
-  if (random > 0.5) { /* ... */ }
-}
-```
-
-### 2. Activity Not Idempotent
-```typescript
-// ❌ WRONG: Creates duplicate on retry
-async function sendEmailActivity(email: string) {
-  await sendEmail(email);  // Sends duplicate if retried
-}
-
-// ✅ CORRECT: Check if already sent
-async function sendEmailActivity(email: string, invitationId: string) {
-  const sent = await db.query('SELECT sent FROM invitations WHERE id = ?', invitationId);
-  if (sent) return;  // Already sent
-
-  await sendEmail(email);
-  await db.update('UPDATE invitations SET sent = true WHERE id = ?', invitationId);
-}
-```
-
-### 3. Missing Event Emission
-```typescript
-// ❌ WRONG: State change without event
-async function createOrgActivity(input: OrgInput) {
-  const { data } = await supabase.from('organizations_projection').insert({...});
-  return data.id;  // No event emitted!
-}
-
-// ✅ CORRECT: Always emit event after state change
-async function createOrgActivity(input: OrgInput) {
-  const { data } = await supabase.from('organizations_projection').insert({...});
-  await emitEvent({ event_type: 'organization.created', ... });  // Event emitted
-  return data.id;
-}
-```
-
-### 4. Configuration Validation Errors
-```typescript
-// ❌ WRONG: No validation, fails at runtime
-const dnsProvider = new CloudflareDNSProvider({
-  token: process.env.CLOUDFLARE_API_TOKEN  // Undefined → cryptic error
-});
-
-// ✅ CORRECT: Validate config on startup
-import { validateConfig } from './shared/config/validate-config';
-
-const config = validateConfig(process.env);  // Throws clear error if invalid
-const dnsProvider = createDNSProvider(config);
-```
-
-### 5. Event Ordering Issues
-```typescript
-// ❌ WRONG: Emit event before state change
-async function badActivity() {
-  await emitEvent({ event_type: 'org.created', ... });  // Event first
-  await supabase.from('orgs').insert({...});             // State second
-  // If state change fails, event already emitted!
-}
-
-// ✅ CORRECT: State change first, then event
-async function goodActivity() {
-  const { data } = await supabase.from('orgs').insert({...});  // State first
-  await emitEvent({ event_type: 'org.created', ... });          // Event second
-  // If event fails, Temporal retries entire activity
-}
 ```
 
 ## MCP Tool Usage
 
-### Supabase MCP (Database Operations)
-Use for database queries during workflow development:
-
-```typescript
-// When implementing activity: Check database schema
-// Claude: Use mcp__supabase__list_tables to see available tables
-// Claude: Use mcp__supabase__execute_sql to test queries
-```
-
-### Context7 MCP (Temporal Documentation)
-Use for Temporal.io best practices:
-
-```typescript
-// When implementing workflow: Get Temporal.io documentation
-// Claude: Use mcp__context7__resolve-library-id with "temporalio"
-// Claude: Use mcp__context7__get-library-docs for workflow patterns
-```
-
-### Exa MCP (Code Examples)
-Use for workflow pattern research:
-
-```typescript
-// When implementing Saga pattern: Find examples
-// Claude: Use mcp__exa__get_code_context_exa with "Temporal Saga pattern"
-```
+- **Supabase MCP**: Use for database queries during workflow development (`mcp__supabase__list_tables`, `mcp__supabase__execute_sql`)
+- **Context7 MCP**: Use for Temporal.io documentation (`mcp__context7__resolve-library-id` with `"temporalio"`)
+- **Exa MCP**: Use for workflow pattern research (`mcp__exa__get_code_context_exa`)
 
 ## Documentation Standards
 
 ### Workflow Documentation Requirements
+
 Each workflow must document:
+
 - **Purpose**: What business process does it orchestrate?
 - **Inputs**: TypeScript interface for workflow arguments
 - **Outputs**: Return type and success criteria
@@ -645,80 +245,25 @@ Each workflow must document:
 - **Events**: Domain events emitted
 - **Retry Policy**: Custom retry configuration (if any)
 
-**Example**:
-```typescript
-/**
- * OrganizationBootstrapWorkflow
- *
- * Purpose: Orchestrates organization onboarding from creation to activation
- *
- * Inputs:
- *   - name: Organization name
- *   - slug: URL-safe organization identifier
- *   - admin_email: Initial admin user email
- *
- * Outputs:
- *   - org_id: Created organization ID
- *   - dns_record_id: Cloudflare DNS record ID
- *
- * Activities (in order):
- *   1. createOrganization - Creates organization record
- *   2. configureDNS - Creates Cloudflare CNAME record
- *   3. verifyDNS - Polls DNS until propagated
- *   4. generateInvitations - Creates invitation records
- *   5. sendInvitationEmails - Sends invitation emails
- *   6. emitBootstrapCompleted - Emits organization.bootstrap.completed event
- *      (trigger handler sets is_active=true on projection)
- *
- * Compensation (Saga):
- *   - If any step fails after DNS creation: removeDNS(dns_record_id)
- *   - If any step fails after org creation: emitBootstrapFailed(org_id)
- *   - Safety net: deactivateOrganization(org_id) kept as fallback
- *
- * Events Emitted:
- *   - organization.created
- *   - organization.dns_configured
- *   - organization.bootstrap.completed (on success)
- *   - organization.bootstrap.failed (on failure)
- */
-```
-
 ### Activity Documentation Requirements
+
 Each activity must document:
+
 - **Purpose**: What side effect does it perform?
 - **Idempotency**: How is check-then-act implemented?
 - **Retry Policy**: Temporal retry configuration
 - **Events**: Domain events emitted (if any)
 - **External Dependencies**: APIs called, providers used
 
-### Event Schema Documentation (AsyncAPI)
-All domain events defined in `infrastructure/supabase/contracts/asyncapi.yaml`:
+### Event Schema Documentation
 
-```yaml
-# AsyncAPI 3.0 spec
-organization.created:
-  payload:
-    type: object
-    properties:
-      organization_id:
-        type: string
-        format: uuid
-      name:
-        type: string
-      slug:
-        type: string
-      created_by:
-        type: string
-        format: uuid
-```
+All domain events defined in `infrastructure/supabase/contracts/asyncapi.yaml`. Frontend imports types from `@/types/events`, never hand-write.
 
 ## Definition of Done (Workflows)
 
-Before marking workflow development complete:
-
 ### Code Quality
-- [ ] Workflow is deterministic (no `Math.random()`, `Date.now()`, `fetch()`)
-- [ ] Activities are idempotent (check-then-act pattern)
+- [ ] Workflow is deterministic (no `Math.random()`, `Date.now()`, `fetch()`) — see [`src/workflows/CLAUDE.md`](src/workflows/CLAUDE.md)
+- [ ] Activities are idempotent (check-then-act pattern) — see [`src/activities/CLAUDE.md`](src/activities/CLAUDE.md)
 - [ ] Error handling delegates to Temporal retry (throw errors, don't swallow)
 - [ ] Configuration validated on worker startup
 - [ ] TypeScript strict mode passes with no errors
@@ -734,7 +279,7 @@ Before marking workflow development complete:
 - [ ] Workflow documented with purpose, inputs, outputs, activities, compensation
 - [ ] Activities documented with idempotency pattern and retry policy
 - [ ] Domain events defined in AsyncAPI spec
-- [ ] Configuration variables added to .env.example
+- [ ] Configuration variables added to `.env.example`
 - [ ] README.md updated if adding new workflow
 
 ### Event-Driven Architecture
@@ -756,29 +301,7 @@ Before marking workflow development complete:
 - [ ] Frontend can trigger workflow
 - [ ] Frontend can query workflow status
 - [ ] Database projections update correctly via events
-- [ ] RLS policies allow service role access (activities use service_role_key)
-
-## Additional Resources
-
-### Architecture & Design
-- **Temporal Architecture Overview**: `documentation/architecture/workflows/temporal-overview.md` - Complete workflow orchestration guide
-- **Organization Onboarding Workflow**: `documentation/architecture/workflows/organization-onboarding-workflow.md` - Workflow design
-- **Workflow Implementation Guide**: `documentation/workflows/architecture/organization-bootstrap-workflow-design.md` - Detailed spec
-- **Error Handling & Compensation**: `documentation/workflows/guides/error-handling-and-compensation.md` - Saga pattern
-- **Activities Reference**: `documentation/workflows/reference/activities-reference.md` - Complete activity catalog
-
-### Event-Driven Architecture
-- **Event-Driven Guide**: `documentation/infrastructure/guides/supabase/docs/EVENT-DRIVEN-ARCHITECTURE.md` - Backend event sourcing spec
-- **Event Sourcing Overview**: `documentation/architecture/data/event-sourcing-overview.md` - CQRS architecture
-- **AsyncAPI Contracts**: `infrastructure/supabase/contracts/asyncapi.yaml` - Event schemas
-
-### Infrastructure & Deployment
-- **Infrastructure CLAUDE.md**: `../infrastructure/CLAUDE.md` - Deployment runbook (see Temporal Workers section)
-- **KUBECONFIG Update Guide**: `documentation/infrastructure/operations/KUBECONFIG_UPDATE_GUIDE.md` - K8s cluster access
-- **Environment Variables**: `documentation/infrastructure/operations/configuration/ENVIRONMENT_VARIABLES.md` - Complete config reference
-
-### External Documentation
-- **Temporal TypeScript SDK**: Use Context7 MCP for `/temporalio/sdk-typescript`
+- [ ] RLS policies allow service role access (activities use `service_role_key`)
 
 ## Quick Reference
 
@@ -791,10 +314,7 @@ kubectl port-forward -n temporal svc/temporal-frontend 7233:7233
 TEMPORAL_ADDRESS=localhost:7233 npm run dev
 ```
 
-**Test Workflow**:
-```bash
-WORKFLOW_MODE=mock npm test
-```
+**Test Workflow**: `WORKFLOW_MODE=mock npm test`
 
 **Deploy Worker**:
 ```bash
@@ -803,13 +323,16 @@ kubectl apply -f infrastructure/k8s/temporal/worker-deployment.yaml
 kubectl rollout status deployment/workflow-worker -n temporal
 ```
 
-**Check Worker Health**:
-```bash
-kubectl logs -n temporal -l app=workflow-worker --tail=100
-```
+**Check Worker Health**: `kubectl logs -n temporal -l app=workflow-worker --tail=100`
 
 ## Documentation Resources
 
-- **[Agent Navigation Index](../documentation/AGENT-INDEX.md)** - Keyword-based doc navigation for AI agents
-- **[Agent Guidelines](../documentation/AGENT-GUIDELINES.md)** - Documentation creation and update rules
-- **[Workflows Documentation](../documentation/workflows/)** - All workflow-specific documentation
+- **[Subdirectory CLAUDE.md files](#subdirectory-claudemd-files)** — Workflow + activity rules
+- **[Temporal Architecture Overview](../documentation/architecture/workflows/temporal-overview.md)** — Complete orchestration design
+- **[Organization Onboarding Workflow](../documentation/architecture/workflows/organization-onboarding-workflow.md)** — Reference workflow
+- **[Activities Reference](../documentation/workflows/reference/activities-reference.md)** — Complete activity catalog
+- **[Event Metadata Schema](../documentation/workflows/reference/event-metadata-schema.md)** — Correlation strategy reference
+- **[Resend Email Provider Guide](../documentation/workflows/guides/resend-email-provider.md)** — Email setup, monitoring, key rotation
+- **[Agent Navigation Index](../documentation/AGENT-INDEX.md)** — Keyword-based doc navigation for AI agents
+- **[Agent Guidelines](../documentation/AGENT-GUIDELINES.md)** — Documentation creation and update rules
+- **[Workflows Documentation](../documentation/workflows/)** — All workflow-specific documentation
