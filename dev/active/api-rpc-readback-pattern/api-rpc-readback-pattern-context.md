@@ -95,3 +95,22 @@ Status quo. Require every client to query after update.
 - `documentation/infrastructure/patterns/event-handler-pattern.md` — handler conventions
 - `software-architect-dbc` review of `client-ou-edit` (M3 finding) — motivating context
 - `dev/active/client-ou-edit-*.md` — the feature that surfaced this pattern
+
+## Implementation Lessons
+
+### N3 — Heredoc truncation bug in Phase 1.6 v2 migration (2026-04-23)
+
+**What happened**: Phase 1.6 shipped migration `20260423065747_api_rpc_readback_v2_event_id_check.sql` as an 1820-line file containing 20 CREATE OR REPLACE FUNCTION definitions. The initial write used a heredoc that truncated silently at ~1100 lines due to an unescaped `$$` sequence inside an inner plpgsql block (heredoc terminator collision). The resulting migration file applied partially — 14 RPCs retrofitted, 6 truncated away. `supabase db push --linked` succeeded because the CREATE OR REPLACE statements that were present compiled cleanly; the missing 6 RPCs were silently absent from the migration.
+
+**How we detected it**: Post-apply `supabase db dump --linked --schema=api` showed only 14 of the 20 expected `WHERE id = v_event_id` post-emit checks. Cross-checking the migration file line count (1820 lines expected, ~1100 actual in the first write) confirmed the truncation.
+
+**Recovery**: `supabase migration repair --linked --status reverted 20260423065747` → rewrote the migration file as 20 separate CREATE OR REPLACE blocks (no nested heredoc) → `supabase db push --linked` re-applied the corrected complete file. Net result: all 20 function definitions retrofitted in one atomic apply after the repair.
+
+**Takeaways for future large migrations**:
+
+1. **Avoid heredoc-within-heredoc**: Either use a tool-driven write (Write tool enforces byte-accurate content) or stick to the `$$ ... $$` dollar-quote pattern for SQL that contains SQL (no nested heredoc delimiters).
+2. **Verify line count after write**: Before `supabase db push`, `wc -l` the migration and cross-check against the expected function count × typical-size. A 1820-line file that writes as 1100 is a red flag.
+3. **Verify via post-apply dump** for migrations touching >5 functions: `supabase db dump --linked --schema=<schema>` then grep for per-function signatures. Don't rely on `supabase db push` exit code alone — it only catches syntax errors, not missing definitions.
+4. **`supabase migration repair --status reverted` is the right recovery** when a migration applied partially — it lets you re-push the corrected file without duplicate-history errors.
+
+**Where this note goes on merge**: This file (`api-rpc-readback-pattern-context.md`) moves to `dev/archived/api-rpc-readback-pattern/` on PR #30 merge per the project's dev-doc lifecycle. The postmortem travels with the feature folder; it is NOT duplicated into the ADR (which is decision-record, not implementation war story) or handler reference files (which are code).

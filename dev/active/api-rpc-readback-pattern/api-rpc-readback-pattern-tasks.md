@@ -200,14 +200,90 @@ Pre-existing DONE RPCs (9 — predates this branch):
 - [ ] **Frontend `npm run docs:check`** — passes (this only validates `frontend/src/**` JSDoc alignment, NOT `documentation/` markdown — but must still be green for the PR)
 - [ ] **Anti-pattern audit**: re-read AGENT-GUIDELINES "Anti-Patterns to Avoid" section; confirm none present in new/updated docs (no overlong Summary, no generic "When to read", no absolute paths, no orphaned doc)
 
-## Phase 4: ViewModel Simplification ⏸️ PARKED (OPTIONAL — may be separate PR)
+## Phase 4: ViewModel Simplification + `ClientRpcResult` Type-Safety Refactor ⏸️ PARKED (separate PR)
+
+> **Architect-reviewed plan** (software-architect-dbc agent `ad2e78383cd378c9f`, 2026-04-23) — produced in response to PR #30 review finding m4. Full report saved to `/tmp/toolu_01H1MrxcYMxxv6F7U9cyWHjS.json`. Recommended **Option C** (separate named types per RPC, shared `ClientRpcEnvelope` base) after weighing Option A (generic `<T>`), Option B (single discriminated union), Option C (one type per RPC).
+
+### 4a: ViewModel redundant-fetch removal (original Phase 4 scope)
 
 For ViewModels that workaround the old pattern by calling `getX()` after every update:
 - [ ] Audit frontend ViewModels for post-update `getX()` calls that exist only as workaround
 - [ ] Remove redundant fetches where safe
-- [ ] Consume `row` from update response directly
+- [ ] Consume the read-back entity (`row`, `client`, `phone`, etc.) from the update response directly
 - [ ] Update tests
 - [ ] Exclude ViewModels that call `getX()` for OTHER reasons (e.g., refreshing joined data)
+
+### 4b: `ClientRpcResult` type-safety refactor (m4 remediation — Option C)
+
+**Why**: PR #30 review m4 flagged that `ClientRpcResult` in `frontend/src/types/client.types.ts:696-718` has 6 optional read-back entity fields (`client?`, `phone?`, `email?`, `address?`, `policy?`, `funding_source?`) + 7 optional `*_id` fields. Consumers must know by convention which RPC populates which field — not type-safe. Reviewer suggested discriminated union / generic; architect recommended **Option C** (separate named types) as the best fit for the project's flat-envelope wire format and existing `IClientService.ts` method-per-entity shape.
+
+**Reasoning** (architect): The live RPC envelope is FLAT (not nested under `data`). Option A requires a service-layer adapter to re-wrap. Option B requires a `kind` discriminator the backend doesn't emit (so it becomes a frontend stamp anyway). Option C maps 1:1 to the wire format and matches the project's "one concrete type per concern" convention (`EffectivePermission`, `JWTPayload` in `_shared/types.ts`). Zero runtime cost; strictest compile-time narrowing.
+
+**Contract spec** (drop into `frontend/src/types/client.types.ts`, replacing the legacy `ClientRpcResult`):
+
+```typescript
+export interface ClientRpcEnvelope {
+  success: boolean;
+  error?: string;  // Pattern A v2: 'Event processing failed: ...' on handler failure
+}
+
+export interface ClientUpdateResult    extends ClientRpcEnvelope { client_id?: string;         client?: ClientProjectionRow }
+export interface ClientPhoneResult     extends ClientRpcEnvelope { phone_id?: string;          phone?: ClientPhone }
+export interface ClientEmailResult     extends ClientRpcEnvelope { email_id?: string;          email?: ClientEmail }
+export interface ClientAddressResult   extends ClientRpcEnvelope { address_id?: string;        address?: ClientAddress }
+export interface ClientInsuranceResult extends ClientRpcEnvelope { policy_id?: string;         policy?: ClientInsurancePolicy }
+export interface ClientFundingResult   extends ClientRpcEnvelope { funding_source_id?: string; funding_source?: ClientFundingSource }
+export interface ClientPlacementResult extends ClientRpcEnvelope { placement_id?: string }
+export interface ClientAssignmentResult extends ClientRpcEnvelope { assignment_id?: string }
+export type     ClientVoidResult       = ClientRpcEnvelope;   // remove_* RPCs
+/** @deprecated Use the specific Client*Result matching your RPC. */
+export interface ClientRpcResult extends ClientRpcEnvelope { /* legacy union-of-all-fields */ }
+```
+
+**Call sites to migrate** (architect-verified via grep):
+
+| File | Usage | Action |
+|------|-------|--------|
+| `frontend/src/types/client.types.ts` | 1 decl | Replace; mark legacy `@deprecated`; add 9 new types |
+| `frontend/src/services/clients/IClientService.ts` | ~24 method sigs | Narrow each `Promise<ClientRpcResult>` to specific result |
+| `frontend/src/services/clients/SupabaseClientService.ts` | ~47 refs | Narrow return types; object literals already compatible via shared base |
+| `frontend/src/services/clients/MockClientService.ts` | ~24 refs | Same narrowing as Supabase service |
+| `frontend/src/viewModels/client/ClientIntakeFormViewModel.ts` | ~2 refs | Narrow call-site variables |
+
+Total ~5 files, ~98 references. Most bodies (`return { success: false, error }`) compile unchanged — the narrowing happens at field-access call sites.
+
+**Definition of Done**:
+- [ ] `ClientRpcEnvelope` base added to `frontend/src/types/client.types.ts`
+- [ ] 9 specific result types added: `ClientUpdateResult`, `ClientPhoneResult`, `ClientEmailResult`, `ClientAddressResult`, `ClientInsuranceResult`, `ClientFundingResult`, `ClientPlacementResult`, `ClientAssignmentResult`, `ClientVoidResult`
+- [ ] Legacy `ClientRpcResult` marked `@deprecated` pointing at the replacements
+- [ ] `IClientService.ts` method signatures narrowed to specific result types
+- [ ] `SupabaseClientService.ts` return types narrowed; PostgREST rpc() calls cast at the boundary
+- [ ] `MockClientService.ts` return types narrowed; mock literals type-check cleanly
+- [ ] `ClientIntakeFormViewModel.ts` (and any other consumer) uses narrowed types
+- [ ] `npm run typecheck` passes
+- [ ] `npm run docs:check` passes (update JSDoc on consumer APIs if needed)
+- [ ] Grep-audit: 0 external references to legacy `ClientRpcResult`
+- [ ] Delete legacy `ClientRpcResult` after audit confirms 0 external refs
+- [ ] Consider parallel refactor for `RpcResult` in `client-field-settings.types.ts` (same anti-pattern, 6 optional fields) — separate task card or same PR; recommend separate
+- [ ] ADR `adr-rpc-readback-pattern.md` gets a "Frontend Envelope Types" section referencing these new types
+- [ ] `data-testid` attributes on any UI surfacing the new read-back data — verify existing IDs remain valid (likely no new ones needed since field names don't change)
+
+**Pre-implementation gate**: The plan above was pre-reviewed by `software-architect-dbc` (agent `ad2e78383cd378c9f`) per PR #30 user instruction. Any substantive deviation (switching to Options A/B, bundling with Phase 4a, expanding to `client-field-settings.types.ts` in the same PR) MUST be re-reviewed by the same architect pattern before execution.
+
+## PR #30 Review Remediation ✅ IN PROGRESS (2026-04-23)
+
+All findings from PR #30 self-review (architect-reviewed, agent `ad2e78383cd378c9f`):
+
+| Finding | Severity | Resolution | Status |
+|---------|----------|------------|--------|
+| **M1** — 6 RPCs use race-prone `ORDER BY created_at DESC LIMIT 1` inside IF NOT FOUND fallback despite `v_event_id` in scope | Major | Migration `20260423074238_api_rpc_readback_v2_m1_m2_fix.sql` rewrites the 6 RPCs with `WHERE id = v_event_id` | ✅ Applied 2026-04-23 |
+| **M2** — `update_role` uses arbitrary 5-second wall-clock window for processing_error detection | Major | Same migration captures each emit's `v_event_id` into `uuid[]`; uses `WHERE id = ANY(v_event_ids)` | ✅ Applied 2026-04-23 |
+| **m3** — `update_user` pre-existing race on manual `MAX(stream_version)+1` calc (not a regression) | minor | **Parked** to `dev/active/update-user-stream-version-race/` follow-up (0 current callers) | ⏸️ Parked |
+| **m4** — `ClientRpcResult` type is increasingly polymorphic | minor | **Phase 4b** plan above (Option C, architect-reviewed) | ⏸️ Parked to Phase 4b |
+| **m5** — Sensitive data in `processing_error` strings returned to callers | minor | **Parked** to `dev/active/rpc-error-pii-sanitization/` (Hybrid Option 6 — strip `PG_EXCEPTION_DETAIL` at trigger + display-layer masking) | ⏸️ Parked |
+| **N1** — Boilerplate duplication across 20 RPC defs | nit | Accepted as-is; ADR Alternatives-Considered note added (plpgsql can't `RETURN` from helpers) | ✅ ADR updated |
+| **N2** — Test plan checkbox open | nit | Spot-check procedure added to PR #30 body (injected CHECK constraint → envelope verification) | ✅ PR body updated |
+| **N3** — Heredoc bug postmortem | nit | Added to `context.md` Implementation Lessons; travels with dev-docs on archive | ✅ context.md updated |
 
 ## Verification ⏸️ PARKED
 
