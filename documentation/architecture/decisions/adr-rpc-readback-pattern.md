@@ -253,8 +253,45 @@ RETURN jsonb_build_object('success', true, ...);
 
 ### Frontend
 - Service-layer envelope contract `{success, error?, <entity>?}` is uniform across 18 RPCs
-- `ClientRpcResult` type extended with optional read-back entity fields (`phone`, `email`, `address`, `policy`, `funding_source`)
 - One BREAKING change in `SupabaseDirectCareSettingsService.updateSettings()` (legacy raw-jsonb shape → envelope shape) — handled with backward-compat fallback in the consumer
+
+### Frontend Envelope Types (Phase 4b — 2026-04-23)
+
+The initial PR shipped a `ClientRpcResult` union-of-all-fields type (6 optional entity fields + 7 optional id fields). PR #30 review (finding m4) flagged this as not type-safe: consumers had to know by convention which RPC populates which field. Phase 4b refactored into **separate named types per RPC**, all extending a shared `ClientRpcEnvelope` base — architect-reviewed (software-architect-dbc agent `ad2e78383cd378c9f`) after comparing Option A (generic `<T>`), Option B (single discriminated union), Option C (separate named types). Option C chosen because it maps 1:1 to the flat wire format with zero service-layer adaptation and matches the project's one-concrete-type-per-concern convention (`EffectivePermission`, `JWTPayload`).
+
+**Contract** (in `frontend/src/types/client.types.ts`):
+
+```typescript
+export interface ClientRpcEnvelope { success: boolean; error?: string }
+
+export interface ClientUpdateResult     extends ClientRpcEnvelope { client_id?: string;         client?: ClientProjectionRow }
+export interface ClientPhoneResult      extends ClientRpcEnvelope { phone_id?: string;          phone?: ClientPhone }
+export interface ClientEmailResult      extends ClientRpcEnvelope { email_id?: string;          email?: ClientEmail }
+export interface ClientAddressResult    extends ClientRpcEnvelope { address_id?: string;        address?: ClientAddress }
+export interface ClientInsuranceResult  extends ClientRpcEnvelope { policy_id?: string;         policy?: ClientInsurancePolicy }
+export interface ClientFundingResult    extends ClientRpcEnvelope { funding_source_id?: string; funding_source?: ClientFundingSource }
+export interface ClientPlacementResult  extends ClientRpcEnvelope { placement_id?: string }
+export interface ClientAssignmentResult extends ClientRpcEnvelope { assignment_id?: string }
+export type      ClientVoidResult       = ClientRpcEnvelope;   // remove_* RPCs
+```
+
+**Method → return type mapping** (enforced in `IClientService.ts`):
+
+| Method | Return type |
+|--------|-------------|
+| `registerClient`, `updateClient`, `admitClient`, `dischargeClient` | `ClientUpdateResult` |
+| `addClientPhone`, `updateClientPhone` | `ClientPhoneResult` |
+| `addClientEmail`, `updateClientEmail` | `ClientEmailResult` |
+| `addClientAddress`, `updateClientAddress` | `ClientAddressResult` |
+| `addClientInsurance`, `updateClientInsurance` | `ClientInsuranceResult` |
+| `addClientFundingSource`, `updateClientFundingSource` | `ClientFundingResult` |
+| `changeClientPlacement`, `endClientPlacement` | `ClientPlacementResult` |
+| `assignClientContact`, `unassignClientContact` | `ClientAssignmentResult` |
+| `removeClient*` (all 5 remove operations) | `ClientVoidResult` |
+
+**Impact**: Consumers accessing e.g. `result.phone_id` on a `ClientEmailResult` get a compile error — the point of the refactor. The legacy `ClientRpcResult` union was deleted after grep confirmed zero external references.
+
+The same pattern should be applied to `RpcResult` in `frontend/src/types/client-field-settings.types.ts` (same anti-pattern with 6 optional fields); tracked as a separate follow-up task.
 
 ### Observability
 - `processing_error` continues to populate on `domain_events` failures (no transaction rollback at RPC layer)

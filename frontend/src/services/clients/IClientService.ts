@@ -8,7 +8,15 @@
 import type {
   Client,
   ClientListItem,
-  ClientRpcResult,
+  ClientUpdateResult,
+  ClientPhoneResult,
+  ClientEmailResult,
+  ClientAddressResult,
+  ClientInsuranceResult,
+  ClientFundingResult,
+  ClientPlacementResult,
+  ClientAssignmentResult,
+  ClientVoidResult,
   RegisterClientParams,
   UpdateClientParams,
   AdmitClientParams,
@@ -32,78 +40,81 @@ export interface IClientService {
   getClient(clientId: string): Promise<Client>;
 
   // Lifecycle
-  registerClient(params: RegisterClientParams): Promise<ClientRpcResult>;
-  updateClient(clientId: string, params: UpdateClientParams): Promise<ClientRpcResult>;
-  admitClient(clientId: string, params?: AdmitClientParams): Promise<ClientRpcResult>;
-  dischargeClient(clientId: string, params: DischargeClientParams): Promise<ClientRpcResult>;
+  registerClient(params: RegisterClientParams): Promise<ClientUpdateResult>;
+  updateClient(clientId: string, params: UpdateClientParams): Promise<ClientUpdateResult>;
+  admitClient(clientId: string, params?: AdmitClientParams): Promise<ClientUpdateResult>;
+  dischargeClient(clientId: string, params: DischargeClientParams): Promise<ClientUpdateResult>;
 
   // Phone
-  addClientPhone(clientId: string, params: AddPhoneParams): Promise<ClientRpcResult>;
+  addClientPhone(clientId: string, params: AddPhoneParams): Promise<ClientPhoneResult>;
   updateClientPhone(
     clientId: string,
     phoneId: string,
     params: UpdatePhoneParams
-  ): Promise<ClientRpcResult>;
-  removeClientPhone(clientId: string, phoneId: string, reason?: string): Promise<ClientRpcResult>;
+  ): Promise<ClientPhoneResult>;
+  removeClientPhone(clientId: string, phoneId: string, reason?: string): Promise<ClientVoidResult>;
 
   // Email
-  addClientEmail(clientId: string, params: AddEmailParams): Promise<ClientRpcResult>;
+  addClientEmail(clientId: string, params: AddEmailParams): Promise<ClientEmailResult>;
   updateClientEmail(
     clientId: string,
     emailId: string,
     params: UpdateEmailParams
-  ): Promise<ClientRpcResult>;
-  removeClientEmail(clientId: string, emailId: string, reason?: string): Promise<ClientRpcResult>;
+  ): Promise<ClientEmailResult>;
+  removeClientEmail(clientId: string, emailId: string, reason?: string): Promise<ClientVoidResult>;
 
   // Address
-  addClientAddress(clientId: string, params: AddAddressParams): Promise<ClientRpcResult>;
+  addClientAddress(clientId: string, params: AddAddressParams): Promise<ClientAddressResult>;
   updateClientAddress(
     clientId: string,
     addressId: string,
     params: UpdateAddressParams
-  ): Promise<ClientRpcResult>;
+  ): Promise<ClientAddressResult>;
   removeClientAddress(
     clientId: string,
     addressId: string,
     reason?: string
-  ): Promise<ClientRpcResult>;
+  ): Promise<ClientVoidResult>;
 
   // Insurance
-  addClientInsurance(clientId: string, params: AddInsuranceParams): Promise<ClientRpcResult>;
+  addClientInsurance(clientId: string, params: AddInsuranceParams): Promise<ClientInsuranceResult>;
   updateClientInsurance(
     clientId: string,
     policyId: string,
     params: UpdateInsuranceParams
-  ): Promise<ClientRpcResult>;
+  ): Promise<ClientInsuranceResult>;
   removeClientInsurance(
     clientId: string,
     policyId: string,
     reason?: string
-  ): Promise<ClientRpcResult>;
+  ): Promise<ClientVoidResult>;
 
   // Placement
-  changeClientPlacement(clientId: string, params: ChangePlacementParams): Promise<ClientRpcResult>;
+  changeClientPlacement(
+    clientId: string,
+    params: ChangePlacementParams
+  ): Promise<ClientPlacementResult>;
   endClientPlacement(
     clientId: string,
     endDate?: string,
     reasonText?: string
-  ): Promise<ClientRpcResult>;
+  ): Promise<ClientPlacementResult>;
 
   // Funding Source
   addClientFundingSource(
     clientId: string,
     params: AddFundingSourceParams
-  ): Promise<ClientRpcResult>;
+  ): Promise<ClientFundingResult>;
   updateClientFundingSource(
     clientId: string,
     sourceId: string,
     params: UpdateFundingSourceParams
-  ): Promise<ClientRpcResult>;
+  ): Promise<ClientFundingResult>;
   removeClientFundingSource(
     clientId: string,
     sourceId: string,
     reason?: string
-  ): Promise<ClientRpcResult>;
+  ): Promise<ClientVoidResult>;
 
   // Contact Assignment
   assignClientContact(
@@ -111,11 +122,11 @@ export interface IClientService {
     contactId: string,
     designation: string,
     reason?: string
-  ): Promise<ClientRpcResult>;
+  ): Promise<ClientAssignmentResult>;
   unassignClientContact(
     clientId: string,
     contactId: string,
     designation: string,
     reason?: string
-  ): Promise<ClientRpcResult>;
+  ): Promise<ClientAssignmentResult>;
 }

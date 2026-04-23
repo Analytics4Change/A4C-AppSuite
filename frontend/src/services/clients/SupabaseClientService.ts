@@ -10,7 +10,15 @@ import { Logger } from '@/utils/logger';
 import type {
   Client,
   ClientListItem,
-  ClientRpcResult,
+  ClientUpdateResult,
+  ClientPhoneResult,
+  ClientEmailResult,
+  ClientAddressResult,
+  ClientInsuranceResult,
+  ClientFundingResult,
+  ClientPlacementResult,
+  ClientAssignmentResult,
+  ClientVoidResult,
   RegisterClientParams,
   UpdateClientParams,
   AdmitClientParams,
@@ -84,7 +92,7 @@ export class SupabaseClientService implements IClientService {
   // Lifecycle
   // ---------------------------------------------------------------------------
 
-  async registerClient(params: RegisterClientParams): Promise<ClientRpcResult> {
+  async registerClient(params: RegisterClientParams): Promise<ClientUpdateResult> {
     log.debug('Registering client');
 
     const { data, error } = await supabase.schema('api').rpc('register_client', {
@@ -98,10 +106,10 @@ export class SupabaseClientService implements IClientService {
       return { success: false, error: error.message };
     }
 
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientUpdateResult;
   }
 
-  async updateClient(clientId: string, params: UpdateClientParams): Promise<ClientRpcResult> {
+  async updateClient(clientId: string, params: UpdateClientParams): Promise<ClientUpdateResult> {
     log.debug('Updating client', { clientId });
 
     const { data, error } = await supabase.schema('api').rpc('update_client', {
@@ -115,7 +123,7 @@ export class SupabaseClientService implements IClientService {
       return { success: false, error: error.message };
     }
 
-    const result = parseResponse(data) as ClientRpcResult;
+    const result = parseResponse(data) as ClientUpdateResult;
 
     if (result.success && !result.client) {
       try {
@@ -128,7 +136,7 @@ export class SupabaseClientService implements IClientService {
     return result;
   }
 
-  async admitClient(clientId: string, params?: AdmitClientParams): Promise<ClientRpcResult> {
+  async admitClient(clientId: string, params?: AdmitClientParams): Promise<ClientUpdateResult> {
     log.debug('Admitting client', { clientId });
 
     const { data, error } = await supabase.schema('api').rpc('admit_client', {
@@ -142,10 +150,10 @@ export class SupabaseClientService implements IClientService {
       return { success: false, error: error.message };
     }
 
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientUpdateResult;
   }
 
-  async dischargeClient(clientId: string, params: DischargeClientParams): Promise<ClientRpcResult> {
+  async dischargeClient(clientId: string, params: DischargeClientParams): Promise<ClientUpdateResult> {
     log.debug('Discharging client', { clientId });
 
     const dischargeData: Record<string, unknown> = {
@@ -167,14 +175,14 @@ export class SupabaseClientService implements IClientService {
       return { success: false, error: error.message };
     }
 
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientUpdateResult;
   }
 
   // ---------------------------------------------------------------------------
   // Phone
   // ---------------------------------------------------------------------------
 
-  async addClientPhone(clientId: string, params: AddPhoneParams): Promise<ClientRpcResult> {
+  async addClientPhone(clientId: string, params: AddPhoneParams): Promise<ClientPhoneResult> {
     const { data, error } = await supabase.schema('api').rpc('add_client_phone', {
       p_client_id: clientId,
       p_phone_number: params.phone_number,
@@ -185,14 +193,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientPhoneResult;
   }
 
   async updateClientPhone(
     clientId: string,
     phoneId: string,
     params: UpdatePhoneParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientPhoneResult> {
     const { data, error } = await supabase.schema('api').rpc('update_client_phone', {
       p_client_id: clientId,
       p_phone_id: phoneId,
@@ -203,14 +211,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientPhoneResult;
   }
 
   async removeClientPhone(
     clientId: string,
     phoneId: string,
     reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientVoidResult> {
     const { data, error } = await supabase.schema('api').rpc('remove_client_phone', {
       p_client_id: clientId,
       p_phone_id: phoneId,
@@ -218,14 +226,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientVoidResult;
   }
 
   // ---------------------------------------------------------------------------
   // Email
   // ---------------------------------------------------------------------------
 
-  async addClientEmail(clientId: string, params: AddEmailParams): Promise<ClientRpcResult> {
+  async addClientEmail(clientId: string, params: AddEmailParams): Promise<ClientEmailResult> {
     const { data, error } = await supabase.schema('api').rpc('add_client_email', {
       p_client_id: clientId,
       p_email: params.email,
@@ -236,14 +244,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientEmailResult;
   }
 
   async updateClientEmail(
     clientId: string,
     emailId: string,
     params: UpdateEmailParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientEmailResult> {
     const { data, error } = await supabase.schema('api').rpc('update_client_email', {
       p_client_id: clientId,
       p_email_id: emailId,
@@ -254,14 +262,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientEmailResult;
   }
 
   async removeClientEmail(
     clientId: string,
     emailId: string,
     reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientVoidResult> {
     const { data, error } = await supabase.schema('api').rpc('remove_client_email', {
       p_client_id: clientId,
       p_email_id: emailId,
@@ -269,14 +277,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientVoidResult;
   }
 
   // ---------------------------------------------------------------------------
   // Address
   // ---------------------------------------------------------------------------
 
-  async addClientAddress(clientId: string, params: AddAddressParams): Promise<ClientRpcResult> {
+  async addClientAddress(clientId: string, params: AddAddressParams): Promise<ClientAddressResult> {
     const { data, error } = await supabase.schema('api').rpc('add_client_address', {
       p_client_id: clientId,
       p_street1: params.street1,
@@ -292,14 +300,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientAddressResult;
   }
 
   async updateClientAddress(
     clientId: string,
     addressId: string,
     params: UpdateAddressParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientAddressResult> {
     const { data, error } = await supabase.schema('api').rpc('update_client_address', {
       p_client_id: clientId,
       p_address_id: addressId,
@@ -315,14 +323,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientAddressResult;
   }
 
   async removeClientAddress(
     clientId: string,
     addressId: string,
     reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientVoidResult> {
     const { data, error } = await supabase.schema('api').rpc('remove_client_address', {
       p_client_id: clientId,
       p_address_id: addressId,
@@ -330,14 +338,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientVoidResult;
   }
 
   // ---------------------------------------------------------------------------
   // Insurance
   // ---------------------------------------------------------------------------
 
-  async addClientInsurance(clientId: string, params: AddInsuranceParams): Promise<ClientRpcResult> {
+  async addClientInsurance(clientId: string, params: AddInsuranceParams): Promise<ClientInsuranceResult> {
     const { data, error } = await supabase.schema('api').rpc('add_client_insurance', {
       p_client_id: clientId,
       p_policy_type: params.policy_type,
@@ -353,14 +361,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientInsuranceResult;
   }
 
   async updateClientInsurance(
     clientId: string,
     policyId: string,
     params: UpdateInsuranceParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientInsuranceResult> {
     const { data, error } = await supabase.schema('api').rpc('update_client_insurance', {
       p_client_id: clientId,
       p_policy_id: policyId,
@@ -375,14 +383,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientInsuranceResult;
   }
 
   async removeClientInsurance(
     clientId: string,
     policyId: string,
     reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientVoidResult> {
     const { data, error } = await supabase.schema('api').rpc('remove_client_insurance', {
       p_client_id: clientId,
       p_policy_id: policyId,
@@ -390,7 +398,7 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientVoidResult;
   }
 
   // ---------------------------------------------------------------------------
@@ -400,7 +408,7 @@ export class SupabaseClientService implements IClientService {
   async changeClientPlacement(
     clientId: string,
     params: ChangePlacementParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientPlacementResult> {
     const { data, error } = await supabase.schema('api').rpc('change_client_placement', {
       p_client_id: clientId,
       p_placement_arrangement: params.placement_arrangement,
@@ -411,14 +419,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientPlacementResult;
   }
 
   async endClientPlacement(
     clientId: string,
     endDate?: string,
     reasonText?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientPlacementResult> {
     const { data, error } = await supabase.schema('api').rpc('end_client_placement', {
       p_client_id: clientId,
       p_end_date: endDate ?? null,
@@ -427,7 +435,7 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientPlacementResult;
   }
 
   // ---------------------------------------------------------------------------
@@ -437,7 +445,7 @@ export class SupabaseClientService implements IClientService {
   async addClientFundingSource(
     clientId: string,
     params: AddFundingSourceParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientFundingResult> {
     const { data, error } = await supabase.schema('api').rpc('add_client_funding_source', {
       p_client_id: clientId,
       p_source_type: params.source_type,
@@ -451,14 +459,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientFundingResult;
   }
 
   async updateClientFundingSource(
     clientId: string,
     sourceId: string,
     params: UpdateFundingSourceParams
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientFundingResult> {
     const { data, error } = await supabase.schema('api').rpc('update_client_funding_source', {
       p_client_id: clientId,
       p_funding_source_id: sourceId,
@@ -472,14 +480,14 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientFundingResult;
   }
 
   async removeClientFundingSource(
     clientId: string,
     sourceId: string,
     reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientVoidResult> {
     const { data, error } = await supabase.schema('api').rpc('remove_client_funding_source', {
       p_client_id: clientId,
       p_funding_source_id: sourceId,
@@ -487,7 +495,7 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientVoidResult;
   }
 
   // ---------------------------------------------------------------------------
@@ -499,7 +507,7 @@ export class SupabaseClientService implements IClientService {
     contactId: string,
     designation: string,
     reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientAssignmentResult> {
     const { data, error } = await supabase.schema('api').rpc('assign_client_contact', {
       p_client_id: clientId,
       p_contact_id: contactId,
@@ -508,7 +516,7 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientAssignmentResult;
   }
 
   async unassignClientContact(
@@ -516,7 +524,7 @@ export class SupabaseClientService implements IClientService {
     contactId: string,
     designation: string,
     reason?: string
-  ): Promise<ClientRpcResult> {
+  ): Promise<ClientAssignmentResult> {
     const { data, error } = await supabase.schema('api').rpc('unassign_client_contact', {
       p_client_id: clientId,
       p_contact_id: contactId,
@@ -525,6 +533,6 @@ export class SupabaseClientService implements IClientService {
     });
 
     if (error) return { success: false, error: error.message };
-    return parseResponse(data) as ClientRpcResult;
+    return parseResponse(data) as ClientAssignmentResult;
   }
 }

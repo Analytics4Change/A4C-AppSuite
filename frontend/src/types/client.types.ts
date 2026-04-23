@@ -693,26 +693,70 @@ export type ClientProjectionRow = Omit<
   | 'contact_assignments'
 >;
 
-export interface ClientRpcResult {
+/**
+ * Base envelope for all client-domain RPC responses.
+ *
+ * Contract (Pattern A v2 — see adr-rpc-readback-pattern.md):
+ *   Postcondition: `success` is always present.
+ *   Postcondition: `error` is present iff `success === false`.
+ *   Invariant: on handler-driven failure, `error` has the prefix
+ *              "Event processing failed: " followed by the `processing_error`
+ *              text from `domain_events`.
+ */
+export interface ClientRpcEnvelope {
   success: boolean;
   error?: string;
+}
+
+/** Response for api.register_client / api.update_client / api.admit_client / api.discharge_client */
+export interface ClientUpdateResult extends ClientRpcEnvelope {
   client_id?: string;
-  phone_id?: string;
-  email_id?: string;
-  address_id?: string;
-  policy_id?: string;
-  placement_id?: string;
-  funding_source_id?: string;
-  assignment_id?: string;
-  // Read-back entity rows. Populated by RPCs that perform a post-emit
-  // projection read-back (Pattern A). Consumers can use these directly to
-  // avoid a follow-up getClient() round-trip when only the touched sub-entity
-  // is needed. Migration `20260423060052_api_rpc_readback_pattern.sql` added
-  // these to the 5 client sub-entity update RPCs.
   client?: ClientProjectionRow;
+}
+
+/** Response for api.add_client_phone / api.update_client_phone */
+export interface ClientPhoneResult extends ClientRpcEnvelope {
+  phone_id?: string;
   phone?: ClientPhone;
+}
+
+/** Response for api.add_client_email / api.update_client_email */
+export interface ClientEmailResult extends ClientRpcEnvelope {
+  email_id?: string;
   email?: ClientEmail;
+}
+
+/** Response for api.add_client_address / api.update_client_address */
+export interface ClientAddressResult extends ClientRpcEnvelope {
+  address_id?: string;
   address?: ClientAddress;
+}
+
+/** Response for api.add_client_insurance / api.update_client_insurance */
+export interface ClientInsuranceResult extends ClientRpcEnvelope {
+  policy_id?: string;
   policy?: ClientInsurancePolicy;
+}
+
+/** Response for api.add_client_funding_source / api.update_client_funding_source */
+export interface ClientFundingResult extends ClientRpcEnvelope {
+  funding_source_id?: string;
   funding_source?: ClientFundingSource;
 }
+
+/** Response for api.change_client_placement / api.end_client_placement */
+export interface ClientPlacementResult extends ClientRpcEnvelope {
+  placement_id?: string;
+}
+
+/** Response for api.assign_client_contact / api.unassign_client_contact */
+export interface ClientAssignmentResult extends ClientRpcEnvelope {
+  assignment_id?: string;
+}
+
+/**
+ * Response for RPCs with no return payload beyond success/error
+ * (e.g., remove_client_phone, remove_client_email, remove_client_address,
+ *  remove_client_insurance, remove_client_funding_source).
+ */
+export type ClientVoidResult = ClientRpcEnvelope;
