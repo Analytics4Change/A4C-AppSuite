@@ -204,14 +204,41 @@ Pre-existing DONE RPCs (9 — predates this branch):
 
 > **Architect-reviewed plan** (software-architect-dbc agent `ad2e78383cd378c9f`, 2026-04-23) — produced in response to PR #30 review finding m4. Full report saved to `/tmp/toolu_01H1MrxcYMxxv6F7U9cyWHjS.json`. Recommended **Option C** (separate named types per RPC, shared `ClientRpcEnvelope` base) after weighing Option A (generic `<T>`), Option B (single discriminated union), Option C (one type per RPC).
 
-### 4a: ViewModel redundant-fetch removal (original Phase 4 scope)
+### 4a: ViewModel redundant-fetch removal (original Phase 4 scope) — 🟡 PARTIAL (2026-04-23)
 
-For ViewModels that workaround the old pattern by calling `getX()` after every update:
-- [ ] Audit frontend ViewModels for post-update `getX()` calls that exist only as workaround
-- [ ] Remove redundant fetches where safe
-- [ ] Consume the read-back entity (`row`, `client`, `phone`, etc.) from the update response directly
-- [ ] Update tests
-- [ ] Exclude ViewModels that call `getX()` for OTHER reasons (e.g., refreshing joined data)
+**Audit complete** (Explore agent, 2026-04-23): 29 ViewModels scanned; 8 sites flagged. Classifications below:
+
+| # | ViewModel | Pattern | Final Classification |
+|---|-----------|---------|----------------------|
+| 1 | `DirectCareSettingsViewModel.ts:146` | `updateSettings()` → `loadSettings()` | **REDUNDANT ✅ Fixed** |
+| 2 | `OrganizationDashboardViewModel.ts:284` | `updateOrganization()` → `loadOrganization()` | **LEGITIMATE (skip)** — service returns `Partial<OrganizationDetailRecord>` which has different field names (`timezone` vs `time_zone`) + types (string vs Date) from VM state `Organization`. Reload performs necessary shape normalization. |
+| 3 | `OrganizationManageFormViewModel.ts:556` | `performEntityOperation()` shared reload | **LEGITIMATE (skip)** — shared helper used by CREATE/UPDATE AND DELETE. DELETE legitimately needs list refresh. Would require splitting helper to optimize just CREATE/UPDATE paths — not worth the churn. |
+| 4 | `RolesViewModel.ts:414` | `updateRole()` → `loadRoles()` | **BLOCKED — service gap** — `SupabaseRoleService.updateRole()` returns `{success: true}` only; does NOT pass through the `role` + `permission_ids` now returned by the `api.update_role` Pattern A v2 envelope. Needs `RoleOperationResult` extension + service propagation first. |
+| 5 | `ClientFieldSettingsViewModel.ts:578` | `updateFieldDefinition()` → `loadData()` | **BLOCKED — service + type gap** — `RpcResult` in `client-field-settings.types.ts` is a flat union-of-optional-fields (same anti-pattern as old `ClientRpcResult`). Needs: (a) refactor `RpcResult` using Phase 4b's pattern (named types per RPC), (b) extend with `field?`/`category?` entity fields, (c) update service to propagate, (d) then VM can consume. |
+| 6 | `ClientFieldSettingsViewModel.ts:647` | `updateFieldCategory()` → `loadData()` | Same as #5 above. |
+| 7 | `UsersViewModel.ts:1407,1561,1717` (3 sites) | sub-entity updates → list reloads | **BLOCKED — service gap** — `SupabaseUserCommandService.updateUserAddress/Phone/NotificationPreferences` don't propagate read-back rows. Service returns `{success, phoneId, eventId}` without the full phone row. |
+
+**Shipped in this work**: #1 only.
+
+**Follow-up work** (separate PRs, in order):
+
+**4a-follow-up-1** — Service result-type refactors. Apply Phase 4b's pattern (named `*Result` types per RPC) to:
+- `RoleOperationResult` in `rbac.types.ts` → `UpdateRoleResult { role?, permission_ids? }` + narrower types per RPC
+- `UserOperationResult` in user types → split into `UserPhoneResult`, `UserAddressResult`, etc.
+- `RpcResult` in `client-field-settings.types.ts` → `FieldDefinitionResult`, `FieldCategoryResult`, etc.
+
+**4a-follow-up-2** — Service propagation. For each refactored service (`SupabaseRoleService`, `SupabaseUserCommandService`, `SupabaseClientFieldService`), read the RPC's read-back entity from `data` and pass it through the narrowed result.
+
+**4a-follow-up-3** — ViewModel simplification. Once services propagate, remove the redundant `loadX()` calls in #4, #5, #6, #7. This is the original "Phase 4a" scope; it was blocked by the upstream service-layer gaps.
+
+**Why this split**: The original Phase 4a scope assumed services ALREADY returned entities. Phase 4b proved that's true at the RPC envelope layer for the client domain, but the service wrappers for role/user/field-settings discard the entity fields before handing back to the ViewModel. Fixing the VM alone is unsafe without service plumbing.
+
+**DoD for this phase** (as completed 2026-04-23):
+- [x] Audit all VMs for post-update fetches
+- [x] Classify each hit as REDUNDANT / LEGITIMATE / BLOCKED
+- [x] Fix the 1 unblocked case (DirectCareSettingsViewModel)
+- [x] Update the test that asserted the obsolete refetch behavior
+- [x] Document blocked cases with specific service-layer gaps for follow-up PRs
 
 ### 4b: `ClientRpcResult` type-safety refactor (m4 remediation — Option C)
 
