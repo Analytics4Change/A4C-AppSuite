@@ -2,10 +2,10 @@
 
 ## Current Status
 
-**Phase**: Phase 0 ✅ + Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 6 ✅ + Phase 7 (PR 1 slice) ✅ + Phase 8a ✅ + **PR #27 review remediation ✅** → **PR 1 READY FOR RE-REVIEW**
-**Status**: 🟢 PR 1 COMPLETE (review findings addressed) — next is PR 2a (Phase 4/5a) or merge + start Phase 9
-**Last Updated**: 2026-04-23 (PR #27 review remediation: migration `20260423032200`, `ClientProjectionRow` type narrowing, OU intake test split)
-**Branch**: `feat/client-ou-placement` — 5 prior feature commits + PR #27 remediation commit (in progress). Migrations now: `20260422052825` + `20260423013804` + `20260423032200`.
+**Phase**: Phase 0 ✅ + Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 6 ✅ + Phase 7 (PR 1 slice) ✅ + Phase 8a ✅ + PR #27 review remediation ✅ + **Phase 9 (activate API RPC read-back follow-up) ✅** → **PR 1 MERGED, PR 2a NEXT**
+**Status**: 🟢 PR 1 MERGED to main as commit `e80de9bd`. Phase 9 follow-up activated on branch `chore/activate-api-rpc-readback-pattern`. Next: PR 2a (Phase 4/5a — ClientEditViewModel + edit foundation).
+**Last Updated**: 2026-04-23 (Phase 9 activation: parked feature `api-rpc-readback-pattern` moved to `dev/active/`, Phase 0 inventory tracking table populated; client-ou-edit feature is NOT archivable until PR 2b lands)
+**Branch history**: `feat/client-ou-placement` (PR 1, merged) → `chore/activate-api-rpc-readback-pattern` (Phase 9 activation, current) → `feat/client-ou-edit-2a` (PR 2a, planned next)
 
 **Next Step (concrete)** — open PR 1 for re-review, OR continue onto PR 2a:
 1. **PR 1 re-review path**: push branch, request review on PR #27. Confirm reviewer's three findings are closed: (a) `client.transfer` enforced in DB via inferred check, (b) same-day placement handled in-place, (c) `ClientProjectionRow` narrowing replaces `Partial<Client>`, (d) intake-OU test split + renamed.
@@ -411,23 +411,23 @@ All work is pending. Integrating architect recommendations:
 - [ ] Discharged client: edit button hidden
 - [ ] `data-testid` present on all new interactive elements (audit via grep)
 
-## Phase 9: Follow-up Handoff — Activate API RPC Read-back Pattern ⏸️ PENDING
+## Phase 9: Follow-up Handoff — Activate API RPC Read-back Pattern ✅ COMPLETE (2026-04-23)
 
-**Trigger**: Immediately after `client-ou-edit` PR 1 merges.
+**Trigger**: Immediately after `client-ou-edit` PR 1 merges. Triggered by PR 1 merge as commit `e80de9bd`.
 
-This is a required phase, not a loose TODO. `client-ou-edit` is not complete until Phase 9 is executed.
+This was a required phase, not a loose TODO. `client-ou-edit` is not complete until Phase 9 is executed. ✅ Now complete.
 
-### 9a: Activate parked feature
-- [ ] Verify `client-ou-edit` PR 1 has merged to main
-- [ ] `git mv dev/parked/api-rpc-readback-pattern/ dev/active/api-rpc-readback-pattern/`
-- [ ] Edit `dev/active/api-rpc-readback-pattern/api-rpc-readback-pattern-tasks.md` — change "Current Status" from PARKED to ACTIVE; update "Last Updated" date; replace "Next Step (on activation)" with concrete Phase 0 next action
-- [ ] Edit `dev/active/api-rpc-readback-pattern/api-rpc-readback-pattern-context.md` — update status from PARKED to ACTIVE; add activation date
-- [ ] Commit the move + status updates: `git commit -m "chore(dev): activate api-rpc-readback-pattern follow-up from client-ou-edit"`
+### 9a: Activate parked feature ✅
+- [x] Verify `client-ou-edit` PR 1 has merged to main — confirmed at commit `e80de9bd`
+- [x] `git mv dev/parked/api-rpc-readback-pattern/ dev/active/api-rpc-readback-pattern/`
+- [x] Edit `dev/active/api-rpc-readback-pattern/api-rpc-readback-pattern-tasks.md` — status PARKED → ACTIVE, Last Updated 2026-04-23, Next Step replaced with concrete Phase 0 follow-ups
+- [x] Edit `dev/active/api-rpc-readback-pattern/api-rpc-readback-pattern-context.md` — status PARKED → ACTIVE, Activated 2026-04-23, references to PR 1 + PR #27 remediation
+- [x] Commit on branch `chore/activate-api-rpc-readback-pattern`
 
-### 9b: Kick off Phase 0 of the activated feature
-- [ ] Run the `pg_proc` inventory query (from parked plan Phase 0)
-- [ ] Populate the Phase 0 tracking table in `api-rpc-readback-pattern-plan.md`
-- [ ] Create branch for that feature's PR 1
+### 9b: Kick off Phase 0 of the activated feature ✅ (inventory) / 🔜 (next branch)
+- [x] Run inventory via grep across migrations (MCP supabase token expired during inventory; live DB query deferred to Phase 1 branch)
+- [x] Populate Phase 0 tracking table in `dev/active/api-rpc-readback-pattern/api-rpc-readback-pattern-plan.md` — 19 RPCs catalogued, classified into EXCLUDED / DONE / NEEDS-INSPECTION / NEEDS-PATTERN
+- [ ] Create branch `feat/api-rpc-readback-pattern` for the implementation PR — to be done AFTER this `chore/activate-api-rpc-readback-pattern` branch lands
 
 ### 9c: Cross-link on `client-ou-edit` archival
 - [ ] When `client-ou-edit` moves from `dev/active/` to `dev/archived/` after PR 2b merge, add a note to its final archive README that the `api-rpc-readback-pattern` follow-up was activated as Phase 9

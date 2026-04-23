@@ -1,9 +1,10 @@
 # API RPC Read-back Pattern — Context
 
 **Feature**: Enforce projection read-back + processing_error surfacing for all `api.update_*` RPCs
-**Status**: PARKED — to be activated immediately after `client-ou-edit` PR 1 merges
+**Status**: 🟢 ACTIVE (Phase 0 in progress)
 **Parked**: 2026-04-22
-**Origin**: Surfaced by `software-architect-dbc` during review of `client-ou-edit` feature (Major finding M3)
+**Activated**: 2026-04-23 (per `client-ou-edit` Phase 9, after PR 1 merged as commit `e80de9bd`)
+**Origin**: Surfaced by `software-architect-dbc` during review of `client-ou-edit` feature (Major finding M3); proof-of-pattern landed in `api.update_client` (migration `20260422052825`) and `api.change_client_placement` (migration `20260423032200`, PR #27 review remediation)
 
 ## Problem Statement
 
