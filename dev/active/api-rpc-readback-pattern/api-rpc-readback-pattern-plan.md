@@ -38,13 +38,13 @@ WHERE n.nspname = 'api'
 ORDER BY p.proname;
 ```
 
-### Inventory Tracking Table — populated 2026-04-23 (revised after PR #29 review; refined 2026-04-23 via live `supabase db dump`)
+### Inventory Tracking Table — populated 2026-04-23 (revised after PR #29 review; refined 2026-04-23 via live `supabase db dump`; NEEDS-PATTERN + COMPLEX-CASE rows shipped DONE in migration `20260423060052` on 2026-04-23)
 
 22 distinct `api.update_*` / `api.change_*` RPCs identified via grep across `infrastructure/supabase/supabase/migrations/` using two patterns: the unquoted `api\.(update|change)_` (covers post-baseline migrations) and the quoted-identifier `"api"\."(update|change)_` (covers `20260212010625_baseline_v4.sql`). The first pattern alone missed 3 baseline-only RPCs surfaced by PR #29 review (M1) — `api.update_role`, `api.update_user`, `api.update_user_access_dates` — now included below.
 
 **Phase 1 refinement** (2026-04-23, on branch `feat/api-rpc-readback-pattern`): MCP supabase token still unavailable, so refinement performed by `supabase db dump --linked --schema=api` (saved to `/tmp/api_schema_dump.sql`, 442 KB) and inspecting each function body. All 13 prior NEEDS-INSPECTION rows are now definitively classified; the "Possibly-COMPLEX" hints from PR #29 review n1 were resolved (none of the org-* RPCs return joined data — they all read back the single sub-entity row only).
 
-Final tally (post-refinement): **EXCLUDED 4** (do not modify), **DONE 7** (already have post-emit read-back guards), **NEEDS-PATTERN 10** (apply standard `%ROWTYPE` pattern), **COMPLEX-CASE 1** (`update_role` — multiple events + joined permissions). Total 22.
+Final tally (post-Phase-1 migration apply 2026-04-23): **EXCLUDED 4** (do not modify), **DONE 18** (7 pre-existing + 11 shipped in migration `20260423060052`). Total 22. The "NEEDS-PATTERN" and "COMPLEX-CASE" classifications below remain in the table for traceability but should be read as historical (all NEEDS-PATTERN rows now have read-back; the 1 COMPLEX-CASE row uses joined-response read-back).
 
 Classification key:
 - **EXCLUDED** — handled elsewhere or no projection row to read back; do not touch
