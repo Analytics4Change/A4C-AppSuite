@@ -153,7 +153,9 @@ purpose: agent-navigation
 | `migration-tracking` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | _migrations_applied.md, DEPLOYMENT_INSTRUCTIONS.md |
 | `modelina` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, infrastructure/CLAUDE.md |
 | `migrations-applied` | [_migrations_applied.md](infrastructure/reference/database/tables/_migrations_applied.md) | DEPLOYMENT_INSTRUCTIONS.md |
-| `mobx` | [viewmodels.md](frontend/architecture/viewmodels.md) | frontend/CLAUDE.md, mobx-optimization.md |
+| `mobx` | [viewmodels.md](frontend/architecture/viewmodels.md) | frontend/CLAUDE.md, mobx-optimization.md, mobx-patterns.md |
+| `mobx-optimization` | [mobx-optimization.md](frontend/performance/mobx-optimization.md) | viewmodels.md, mobx-patterns.md |
+| `mobx-patterns` | [mobx-patterns.md](frontend/patterns/mobx-patterns.md) | viewmodels.md, mobx-optimization.md, viewmodel-testing.md |
 | `naming-convention` | [event-handler-pattern.md](infrastructure/patterns/event-handler-pattern.md) | event-sourcing-overview.md |
 | `multi-role` | [adr-multi-role-effective-permissions.md](architecture/authorization/adr-multi-role-effective-permissions.md) | rbac-architecture.md, scoping-architecture.md |
 | `multi-role-invitation` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | user_roles_projection.md |
@@ -250,7 +252,7 @@ purpose: agent-navigation
 | `supabase-cli` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | DEPLOYMENT_INSTRUCTIONS.md, infrastructure/CLAUDE.md |
 | `temporal` | [temporal-overview.md](architecture/workflows/temporal-overview.md) | workflows/CLAUDE.md, activities-reference.md |
 | `temporal-roles` | [user_roles_projection.md](infrastructure/reference/database/tables/user_roles_projection.md) | rbac-architecture.md |
-| `testing` | [TESTING.md](frontend/testing/TESTING.md) | integration-testing.md |
+| `testing` | [TESTING.md](frontend/testing/TESTING.md) | integration-testing.md, viewmodel-testing.md |
 | `three-layer-idempotency` | [organization-bootstrap-workflow-design.md](workflows/architecture/organization-bootstrap-workflow-design.md) | activities-reference.md |
 | `tracing` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md, logging-standards.md |
 | `trace-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
@@ -262,7 +264,8 @@ purpose: agent-navigation
 | `user-deactivation` | [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | users.md, event-sourcing-overview.md |
 | `user-lifecycle` | [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | users.md, rbac-architecture.md |
 | `var` | [var-partnerships.md](architecture/data/var-partnerships.md) | provider-partners-architecture.md |
-| `viewmodel` | [viewmodels.md](frontend/architecture/viewmodels.md) | viewmodel-testing.md, mobx-patterns.md |
+| `viewmodel` | [viewmodels.md](frontend/architecture/viewmodels.md) | viewmodel-testing.md, mobx-patterns.md, mobx-optimization.md |
+| `viewmodel-testing` | [viewmodel-testing.md](frontend/testing/viewmodel-testing.md) | viewmodels.md, TESTING.md, mobx-patterns.md |
 | `vite` | [DEVELOPMENT.md](frontend/guides/DEVELOPMENT.md) | frontend/CLAUDE.md |
 | `w3c-trace-context` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
 | `wcag` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | TESTING.md |
@@ -316,6 +319,9 @@ purpose: agent-navigation
 | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | **[Aspirational]** Precursor question with canonical location/status values for all data collection applets | `data-collection`, `canonical-values`, `precursor-question` | 500 |
 | [ui-patterns.md](frontend/patterns/ui-patterns.md) | Modal architecture, dropdown patterns | `modal`, `ui`, `patterns` | 1800 |
 | [role-management.md](frontend/reference/role-management.md) | Role management frontend reference (MVVM, data-driven permission selector, subset-only delegation) | `role-management`, `role-form`, `permission-selector`, `adding-permission` | 1200 |
+| [mobx-patterns.md](frontend/patterns/mobx-patterns.md) | Advanced MobX patterns: ViewModel providers, reactions, command pattern, state machines, form handling, testing | `mobx-patterns`, `mobx`, `viewmodel`, `state-machine`, `command-pattern`, `reactions`, `form-handling` | 6500 |
+| [mobx-optimization.md](frontend/performance/mobx-optimization.md) | MobX performance: observable surface area, render optimization, memory management, memoization | `mobx-optimization`, `mobx`, `performance`, `memoization` | 4900 |
+| [viewmodel-testing.md](frontend/testing/viewmodel-testing.md) | Unit and integration testing strategies for MobX ViewModels with Vitest | `viewmodel-testing`, `viewmodel`, `testing`, `vitest` | 3400 |
 
 ### Infrastructure
 
