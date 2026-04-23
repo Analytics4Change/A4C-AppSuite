@@ -67,9 +67,23 @@ Activated 2026-04-23. Trigger conditions met:
 - [x] **Other refactored RPC consumers** (`SupabaseClientService.ts` for 5 client sub-entity RPCs, `SupabaseRoleService.ts` for `update_role`, `SupabaseScheduleService.ts` for `update_schedule_template`) — audit confirmed all are non-breaking. Consumers parse the response envelope and check `success`; the new `<entity>` fields are additive and ignored. No behavioral changes required for Phase 2 acceptance — opportunistic refactors to consume the new fields can land in Phase 4 (ViewModel simplification).
 - [x] Verification: `npm run typecheck` ✓, `npm run lint` ✓, `npm run test -- --run src/viewModels/settings/__tests__/DirectCareSettingsViewModel.test.ts` ✓ (29 passed).
 
-## Phase 3: Documentation ⏸️ PARKED
+## Phase 3: Documentation ✅ COMPLETE (2026-04-23)
 
-> **Compliance source**: `documentation/AGENT-GUIDELINES.md` (full creation rules + quality checklist) and `.claude/skills/documentation-writing/SKILL.md` (guard rails). Every new/updated doc must satisfy frontmatter + TL;DR + cross-link requirements.
+> **Compliance source**: `documentation/AGENT-GUIDELINES.md` (full creation rules + quality checklist) and `.claude/skills/documentation-writing/SKILL.md` (guard rails). Every new/updated doc satisfies frontmatter + TL;DR + cross-link requirements.
+
+**Artifacts**:
+- New ADR `documentation/architecture/decisions/adr-rpc-readback-pattern.md` (~270 lines, 2400-token estimate, key topics: `adr`, `rpc-readback`, `processing-error`, `projection-guard`, `api-contract`)
+- `documentation/infrastructure/patterns/event-handler-pattern.md`: TL;DR Key topics extended (`rpc-readback`, `projection-guard`); `last_updated` bumped to 2026-04-23; "Affected RPCs" list inverted from "only org-unit RPCs" to a full table organized by group with explicit exceptions; cross-link added at the top of "Projection Read-Back Guard" section + in "Related Documentation"
+- `documentation/AGENT-INDEX.md`: 3 new keyword rows (`api-contract`, `processing-error`, `rpc-readback`) + 1 cross-ref update on `projection-guard`; new Document Catalog entry for the ADR
+- `infrastructure/supabase/CLAUDE.md`: existing "RPC functions that read back ... MUST check for NOT FOUND" guard rail extended with explicit "NEVER `RAISE EXCEPTION` here" warning + audit-trail-preservation rationale; forward-link to new ADR added in TL;DR + at the bottom of the relevant rule
+- `documentation/architecture/decisions/adr-client-ou-placement.md` Decision 2 Enforcement subsection: forward-link added to new ADR (proof-of-pattern → general pattern)
+
+**Validation**:
+- All 12 relative links in the new ADR resolve to existing files (manual walk via `grep -oE` + `[ -f $path ]`)
+- Frontmatter renders cleanly (status, last_updated, TL;DR with all required sub-fields per AGENT-GUIDELINES)
+- Bidirectional links wired: ADR ↔ event-handler-pattern.md, ADR ↔ adr-client-ou-placement.md, ADR ↔ infrastructure/supabase/CLAUDE.md
+- AGENT-INDEX keyword entries match TL;DR Key topics on the ADR
+- `npm run docs:check`: pre-existing broken-link in `frontend/src/components/ui/CLAUDE.md` (validator doesn't handle trailing-slash directory links) — NOT caused by Phase 3 work, unchanged from prior state. No new errors introduced.
 
 ### 3a: NEW ADR — `documentation/architecture/decisions/adr-rpc-readback-pattern.md`
 

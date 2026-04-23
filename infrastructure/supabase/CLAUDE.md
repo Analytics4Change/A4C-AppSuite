@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2026-04-22
+last_updated: 2026-04-23
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Rules for `infrastructure/supabase/` — Supabase CLI migration workflow, plpgsql_check validation, event handler architecture (single trigger → router → handler), AsyncAPI type generation, and the projection-read-back guard.
+**Summary**: Rules for `infrastructure/supabase/` — Supabase CLI migration workflow, plpgsql_check validation, event handler architecture (single trigger → router → handler), AsyncAPI type generation, and the projection-read-back guard (Pattern A — return-error envelope; see [adr-rpc-readback-pattern.md](../../documentation/architecture/decisions/adr-rpc-readback-pattern.md)).
 
 **When to read**:
 - Creating or modifying a SQL migration
@@ -234,10 +234,16 @@ handlers/
 > `processing_error`), but the RPC continues execution. Without a NOT FOUND check,
 > the RPC returns `{success: true}` with null fields — a silent failure.
 >
-> Always fetch the actual `processing_error` from `domain_events` to include in
-> the error response for diagnostics.
+> On NOT FOUND, fetch the actual `processing_error` from `domain_events` and
+> `RETURN jsonb_build_object('success', false, 'error', 'Event processing failed: ' || COALESCE(v_processing_error, 'unknown'))`.
+> **NEVER `RAISE EXCEPTION` here** — that rolls back the audit row that the trigger
+> just persisted with `processing_error`, destroying the diagnostic evidence
+> (admin dashboard at `/admin/events` would see zero failed events;
+> `api.retry_failed_event()` would have nothing to retry).
 
-**See**: [event-handler-pattern.md](../../documentation/infrastructure/patterns/event-handler-pattern.md) for the complete implementation guide.
+**See**:
+- [adr-rpc-readback-pattern.md](../../documentation/architecture/decisions/adr-rpc-readback-pattern.md) for the full contract decision (response shape, audit-trail-preservation rationale, telemetry convention, and the inventory of 18 RPCs that follow this pattern).
+- [event-handler-pattern.md](../../documentation/infrastructure/patterns/event-handler-pattern.md) for the complete implementation guide.
 
 ## CQRS Query Rule
 
