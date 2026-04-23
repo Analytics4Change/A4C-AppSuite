@@ -354,6 +354,17 @@ export interface ClientPlacementHistory {
   last_event_id: string | null;
   organization_unit_id: string | null;
   organization_unit_name?: string | null;
+  /**
+   * Current activation state of the placement's OU, derived at read time via
+   * LEFT JOIN to organization_units_projection. Null when no OU is assigned or
+   * the OU row has been removed. See migration 20260423013804.
+   */
+  organization_unit_is_active?: boolean | null;
+  /**
+   * Soft-delete timestamp of the placement's OU (ISO string) if present.
+   * Non-null means the OU has been soft-deleted. See migration 20260423013804.
+   */
+  organization_unit_deleted_at?: string | null;
 }
 
 export interface ClientFundingSource {

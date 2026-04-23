@@ -206,6 +206,15 @@ const InsuranceCard: React.FC<{ policy: ClientInsurancePolicy }> = ({ policy }) 
   </div>
 );
 
+const formatPlacementOuLabel = (placement: ClientPlacementHistory): string => {
+  const name = placement.organization_unit_name;
+  if (name == null || name === '') return '—';
+  const isDeactivated =
+    placement.organization_unit_is_active === false ||
+    placement.organization_unit_deleted_at != null;
+  return isDeactivated ? `${name} (inactive)` : name;
+};
+
 const PlacementCard: React.FC<{ placement: ClientPlacementHistory }> = ({ placement }) => (
   <div
     className={`rounded-lg border p-3 space-y-1 ${placement.is_current ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
@@ -223,6 +232,10 @@ const PlacementCard: React.FC<{ placement: ClientPlacementHistory }> = ({ placem
     </div>
     <p className="text-xs text-gray-500">
       {fmtDate(placement.start_date)} &ndash; {fmtDate(placement.end_date) ?? 'Present'}
+    </p>
+    <p className="text-xs text-gray-500" data-testid="placement-ou-label">
+      <span className="text-gray-400">OU: </span>
+      {formatPlacementOuLabel(placement)}
     </p>
     {placement.reason && <p className="text-xs text-gray-500">{placement.reason}</p>}
   </div>

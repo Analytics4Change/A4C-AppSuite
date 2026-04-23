@@ -2,23 +2,27 @@
 
 ## Current Status
 
-**Phase**: Phase 0 ✅ + Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ → Phase 6 — Placement History OU Display (still PR 1)
+**Phase**: Phase 0 ✅ + Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 6 ✅ → Phase 7 (testing) + Phase 8a (docs) remaining in PR 1
 **Status**: 🟢 READY TO CONTINUE
-**Last Updated**: 2026-04-22 (post-Phase-3 commit; dev-docs refreshed before /clear)
-**Branch**: `feat/client-ou-placement` (HEAD = `9390eff7`; working tree clean). Run `git branch --show-current` to verify before continuing. Do NOT switch to `main`; it tracks `origin/main` and shouldn't carry this work.
+**Last Updated**: 2026-04-23 (post-Phase-6 commit pending)
+**Branch**: `feat/client-ou-placement` (HEAD pending commit; working tree has uncommitted Phase 6 changes). Run `git branch --show-current` to verify before continuing. Do NOT switch to `main`; it tracks `origin/main` and shouldn't carry this work.
 
-**Next Step (concrete)** — Phase 6, show OU name on placement history:
-1. Open `frontend/src/pages/clients/ClientOverviewPage.tsx`. Locate `PlacementCard` (renders rows from `client.placement_history`).
-2. Render `organization_unit_name` when present. Rules:
-   - Present + OU is active → show display name (e.g., "Main Campus — East Wing")
-   - Present + OU deactivated (still returned by api.get_client LEFT JOIN) → append "(inactive)" suffix
-   - Null/undefined → show "—" placeholder
-3. `api.get_client()` already returns `organization_unit_name` from the LEFT JOIN on `organization_units_projection` (Phase 1e, migration `20260422052825`). No backend work required.
-4. `MockClientService.getClient()` should also surface `organization_unit_name` to keep the mock parity — but since the mock has no OU directory, it may return null, and PlacementCard must handle it. Decision: skip mock change unless the placement history card visibly regresses in mock mode; revisit during manual smoke.
+**Next Step (concrete)** — commit Phase 6, then Phase 7 (tests) + Phase 8a (docs):
+1. Commit Phase 6 artifacts (see "Phase 6 artifacts" block below) with a focused message.
+2. Phase 7 (PR 1 slice): add SQL-level verification for the new `api.get_client()` fields, and a Playwright spec that covers (a) intake with OU → placement card shows OU name, (b) client with no-OU placement → placement card shows "—". The `(inactive)` branch has no intake-level trigger yet (intake picker filters by `status: 'active'`); defer its E2E to Phase 5a when OU deactivation becomes reachable through the edit-mode picker, or write a SQL-driven test that inserts a deactivated OU directly.
+3. Phase 8a (PR 1 slice): add ADR `adr-client-ou-placement.md` and update `client_placement_history_projection.md` + AGENT-INDEX entries per the Phase 8 checklist below.
 
-**Verification**: typecheck + lint + targeted tests. Manual smoke: intake with OU → placement history card shows OU name; client with no-OU placement shows "—".
+**Verification**: typecheck ✓, lint ✓, targeted tests ✓ (67 passed: utils + logger + tracing). Full suite pre-existing 52 fail / 389 pass baseline unchanged.
 
 **Bundle note**: PR 1 covers Phases 0, 1, 2, 3, 6, 8a + testing (per plan table). Phase 4/5/8b is PR 2a/2b.
+
+**Phase 6 artifacts** (uncommitted — this session):
+- `infrastructure/supabase/supabase/migrations/20260423013804_client_get_client_ou_state_fields.sql` — CREATE OR REPLACE `api.get_client()` adding `organization_unit_is_active` and `organization_unit_deleted_at` to each placement_history item. Applied to linked project; verified via MCP `pg_get_functiondef` that both keys are present.
+- `frontend/src/types/client.types.ts` — `ClientPlacementHistory` extended with `organization_unit_is_active?: boolean | null` and `organization_unit_deleted_at?: string | null`, both derived at read time from the OU projection (not stored on the history row — preserves event-sourced audit semantics).
+- `frontend/src/pages/clients/ClientOverviewPage.tsx` — new `formatPlacementOuLabel()` helper + `<p data-testid="placement-ou-label">` row inside `PlacementCard`. Rule: `name == null || ''` → "—"; `name && (is_active === false || deleted_at != null)` → `${name} (inactive)`; otherwise → `name`.
+- **Architect review (software-architect-dbc)**: endorsed Option 1 (refined) over alternatives. Key reasoning: denormalizing `organization_unit_is_active` onto `client_placement_history_projection` would conflate history with current state (row would flip on later OU deactivation, violating event-sourced audit semantics); filtering the LEFT JOIN by `is_active` would erase that a client was placed in the now-deactivated OU. Deriving at read time in `api.get_client()` is the only option that preserves history while annotating current state.
+- **Scope correction**: the earlier "No backend work required" note on Phase 6 was wrong — the RPC did not surface `is_active`/`deleted_at`, so the three-state render was unreachable without a migration. Migration `20260423013804` is a pure additive `CREATE OR REPLACE` (idempotent, no new params, no AsyncAPI/event-type changes). Handler reference-file discipline (Rule 7b) does not apply to `api.*` RPCs — confirmed via `infrastructure/supabase/handlers/` directory scope.
+- Verification: `npm run typecheck` ✓, `npm run lint` ✓, `npm run test -- --run src/pages/clients src/types src/viewModels/client src/utils` ✓ (67 passing, same baseline as Phase 3).
 
 **Phase 3 artifacts** (committed in `9390eff7`):
 - `frontend/src/viewModels/client/ClientIntakeFormViewModel.ts` — 3rd constructor arg `IOrganizationUnitService`; `organizationUnits` / `organizationUnitsRootPath` / loading flags; `organizationUnitTree` + `selectedOrganizationUnitPath` computeds; `loadOrganizationUnits()` + `setOrganizationUnitByPath()` actions. `submit()` now pushes `changeClientPlacement` into the post-register RPC batch when placement + OU + admission_date are all set.
@@ -284,12 +288,16 @@ All work is pending. Integrating architect recommendations:
 - [ ] `Promise.allSettled` for batch operations
 - [ ] Reload client after all ops settled
 
-## Phase 6: Placement History OU Display ⏸️ PENDING
+## Phase 6: Placement History OU Display ✅ COMPLETE (2026-04-23)
 
-- [ ] Update `PlacementCard` in `ClientOverviewPage.tsx` to show `organization_unit_name` when present
-- [ ] Show "—" or "Not specified" for null OU
-- [ ] Handle deactivated OU: display name + "(inactive)" suffix
-- [ ] Verify `api.get_client()` returns `organization_unit_name` in placement_history items
+**Architect decision**: Option 1 refined — enrich `api.get_client()` response with OU current-state flags (`is_active`, `deleted_at`) rather than denormalizing onto the history projection or filtering the LEFT JOIN. Preserves audit semantics (history row stays immutable) while annotating current state at read time. See migration `20260423013804` header for full rationale.
+
+- [x] New migration `20260423013804_client_get_client_ou_state_fields.sql` — adds `organization_unit_is_active` + `organization_unit_deleted_at` to each placement_history item in `api.get_client()` response (idempotent CREATE OR REPLACE, no param changes)
+- [x] Migration applied to linked project; verified via MCP `pg_get_functiondef` that both new jsonb keys are present
+- [x] `ClientPlacementHistory` type extended with both optional nullable fields (timestamp as ISO string)
+- [x] `PlacementCard` updated with three-state render: null → "—"; name + deactivated/soft-deleted → "name (inactive)"; otherwise → name. Wrapped in `<p data-testid="placement-ou-label">` for future E2E.
+- [x] `formatPlacementOuLabel()` helper centralizes the rule so Phase 5a edit mode can reuse it
+- [x] Mock unchanged — mock has no OU directory so `organization_unit_name` stays null, and the null-branch naturally renders "—" (no regression)
 
 ## Phase 7: Testing ⏸️ PENDING (Distributed Across PRs)
 
