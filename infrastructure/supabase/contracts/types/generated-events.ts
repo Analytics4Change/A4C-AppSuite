@@ -3,7 +3,6 @@
  *
  * Generated from AsyncAPI specification by Modelina
  * Source: infrastructure/supabase/contracts/asyncapi/
- * Generated: 2026-04-23T04:38:51.272Z
  *
  * To regenerate: cd infrastructure/supabase/contracts && npm run generate:types
  *

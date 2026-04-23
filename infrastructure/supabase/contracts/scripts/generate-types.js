@@ -19,7 +19,6 @@ const HEADER = `/**
  *
  * Generated from AsyncAPI specification by Modelina
  * Source: infrastructure/supabase/contracts/asyncapi/
- * Generated: ${new Date().toISOString()}
  *
  * To regenerate: cd infrastructure/supabase/contracts && npm run generate:types
  *
