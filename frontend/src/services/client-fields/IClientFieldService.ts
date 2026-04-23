@@ -38,7 +38,13 @@ export interface IClientFieldService {
     correlationId?: string
   ): Promise<BatchUpdateResult>;
 
-  /** Create a new custom field definition */
+  /**
+   * Create a new custom field definition.
+   *
+   * **Return shape**: `{success, field_id}` on success; `field` is NOT
+   * populated — consumers that need the hydrated row should call
+   * `listFieldDefinitions()` or wait for a subsequent `updateFieldDefinition`.
+   */
   createFieldDefinition(
     params: CreateFieldDefinitionParams,
     correlationId?: string
@@ -46,7 +52,9 @@ export interface IClientFieldService {
 
   /**
    * Update an existing custom field definition.
-   * Pattern A v2: returns the refreshed `field` entity in the success envelope
+   *
+   * **Pattern A v2**: returns the refreshed `field` entity in the success
+   * envelope (list-shape, includes joined `category_name` / `category_slug`)
    * so consumers can patch their list in place without a re-fetch.
    */
   updateFieldDefinition(
@@ -54,14 +62,24 @@ export interface IClientFieldService {
     params: UpdateFieldDefinitionParams
   ): Promise<FieldDefinitionResult>;
 
-  /** Deactivate (soft-delete) a field definition */
+  /**
+   * Deactivate (soft-delete) a field definition.
+   *
+   * **Return shape**: `{success, field_id}` on success; `field` is NOT
+   * populated.
+   */
   deactivateFieldDefinition(
     fieldId: string,
     reason: string,
     correlationId?: string
   ): Promise<FieldDefinitionResult>;
 
-  /** Reactivate a previously deactivated field definition */
+  /**
+   * Reactivate a previously deactivated field definition.
+   *
+   * **Return shape**: `{success, field_id}` on success; `field` is NOT
+   * populated.
+   */
   reactivateFieldDefinition(
     fieldId: string,
     reason: string,
@@ -84,7 +102,13 @@ export interface IClientFieldService {
   /** List all field categories (system + org-defined) */
   listFieldCategories(includeInactive?: boolean): Promise<FieldCategory[]>;
 
-  /** Create a new org-defined category */
+  /**
+   * Create a new org-defined category.
+   *
+   * **Return shape**: `{success, category_id}` on success; `category` is NOT
+   * populated — consumers that need the hydrated row should call
+   * `listFieldCategories()` or wait for a subsequent `updateFieldCategory`.
+   */
   createFieldCategory(
     name: string,
     slug: string,
@@ -94,8 +118,11 @@ export interface IClientFieldService {
 
   /**
    * Update an org-defined category (name only, slug immutable).
-   * Pattern A v2: returns the refreshed `category` entity in the success
-   * envelope so consumers can patch their list in place without a re-fetch.
+   *
+   * **Pattern A v2**: returns the refreshed `category` entity in the success
+   * envelope (list-shape, includes computed `is_system`) so consumers can
+   * patch their list in place without a re-fetch. See `FieldCategoryResult`
+   * for the `is_system` invariant.
    */
   updateFieldCategory(
     categoryId: string,
@@ -104,14 +131,25 @@ export interface IClientFieldService {
     correlationId?: string
   ): Promise<FieldCategoryResult>;
 
-  /** Deactivate (soft-delete) an org-defined category */
+  /**
+   * Deactivate (soft-delete) an org-defined category.
+   *
+   * **Return shape**: `{success, category_id}` on success; `category` is NOT
+   * populated.
+   */
   deactivateFieldCategory(
     categoryId: string,
     reason: string,
     correlationId?: string
   ): Promise<FieldCategoryResult>;
 
-  /** Reactivate a previously deactivated org-defined category (does not cascade to child fields) */
+  /**
+   * Reactivate a previously deactivated org-defined category (does not
+   * cascade to child fields).
+   *
+   * **Return shape**: `{success, category_id}` on success; `category` is NOT
+   * populated.
+   */
   reactivateFieldCategory(
     categoryId: string,
     reason: string,

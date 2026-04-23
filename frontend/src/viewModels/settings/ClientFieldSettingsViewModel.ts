@@ -590,6 +590,22 @@ export class ClientFieldSettingsViewModel {
       // Pattern A v2: updateFieldDefinition returns the refreshed field row
       // (migration 20260423154534). Patch the list in place — no loadData()
       // round-trip needed.
+      if (!result.field) {
+        // Silent-fallback observability per logging-standards.md +
+        // event-observability.md — a success response without the expected
+        // read-back entity is the same "user saw success but data was broken"
+        // class the observability system targets. Under Pattern A v2 with
+        // migration 20260423154534 deployed, this branch should never fire.
+        log.warn(
+          'updateFieldDefinition success without field read-back — VM will not patch its list. ' +
+            'Migration 20260423154534 may not be deployed to this environment.',
+          {
+            fieldId,
+            responseKeys: Object.keys(result),
+            hasFieldId: typeof result.field_id === 'string',
+          }
+        );
+      }
       runInAction(() => {
         if (result.field) {
           const updated = result.field;
@@ -672,6 +688,18 @@ export class ClientFieldSettingsViewModel {
       //   - this.fieldDefinitions — update cached `category_name` for any
       //     field referencing this category (we renamed it; the cached name
       //     is now stale).
+      if (!result.category) {
+        // Silent-fallback observability — see updateCustomField for rationale.
+        log.warn(
+          'updateFieldCategory success without category read-back — VM will not patch its list. ' +
+            'Migration 20260423154534 may not be deployed to this environment.',
+          {
+            categoryId,
+            responseKeys: Object.keys(result),
+            hasCategoryId: typeof result.category_id === 'string',
+          }
+        );
+      }
       runInAction(() => {
         if (result.category) {
           const updated = result.category;
