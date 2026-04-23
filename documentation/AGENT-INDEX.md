@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-22
+last_updated: 2026-04-23
 purpose: agent-navigation
 ---
 
@@ -213,7 +213,9 @@ purpose: agent-navigation
 | `resend` | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | activities-reference.md |
 | `retention-policy` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
 | `retry-policies` | [error-handling-and-compensation.md](workflows/guides/error-handling-and-compensation.md) | activities-reference.md |
-| `rpc-readback` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) | event-handler-pattern.md, adr-client-ou-placement.md, event-observability.md |
+| `rpc-readback` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) | event-handler-pattern.md, adr-client-ou-placement.md, event-observability.md, rpc-readback-vm-patch.md |
+| `vm-patch` | [rpc-readback-vm-patch.md](frontend/patterns/rpc-readback-vm-patch.md) | adr-rpc-readback-pattern.md, mobx-patterns.md, logging-standards.md |
+| `in-place-update` | [rpc-readback-vm-patch.md](frontend/patterns/rpc-readback-vm-patch.md) | mobx-patterns.md |
 | `rls` | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | table-template.md, SQL_IDEMPOTENCY_AUDIT.md, DAY0-MIGRATION-GUIDE.md |
 | `rls-gap` | [clients.md](infrastructure/reference/database/tables/clients.md) | medications.md |
 | `rls-verification` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | multi-tenancy-architecture.md |
@@ -330,6 +332,7 @@ purpose: agent-navigation
 | [ui-patterns.md](frontend/patterns/ui-patterns.md) | Modal architecture, dropdown patterns | `modal`, `ui`, `patterns` | 1800 |
 | [role-management.md](frontend/reference/role-management.md) | Role management frontend reference (MVVM, data-driven permission selector, subset-only delegation) | `role-management`, `role-form`, `permission-selector`, `adding-permission` | 1200 |
 | [mobx-patterns.md](frontend/patterns/mobx-patterns.md) | Advanced MobX patterns: ViewModel providers, reactions, command pattern, state machines, form handling, testing | `mobx-patterns`, `mobx`, `viewmodel`, `state-machine`, `command-pattern`, `reactions`, `form-handling` | 6500 |
+| [rpc-readback-vm-patch.md](frontend/patterns/rpc-readback-vm-patch.md) | VM in-place patch convention for Pattern A v2 RPC read-back consumers; service propagation, MobX immutable splice, version-gated fallback with log.warn | `pattern-a-v2`, `vm-patch`, `in-place-update`, `refetch`, `fallback`, `rpc-readback` | 1500 |
 | [mobx-optimization.md](frontend/performance/mobx-optimization.md) | MobX performance: observable surface area, render optimization, memory management, memoization | `mobx-optimization`, `mobx`, `performance`, `memoization` | 4900 |
 | [viewmodel-testing.md](frontend/testing/viewmodel-testing.md) | Unit and integration testing strategies for MobX ViewModels with Vitest | `viewmodel-testing`, `viewmodel`, `testing`, `vitest` | 3400 |
 

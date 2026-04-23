@@ -19,7 +19,11 @@ import type {
   InviteUserRequest,
   UpdateUserRequest,
   ModifyRolesRequest,
-  UserOperationResult,
+  InviteUserResult,
+  UpdateUserResult,
+  UserPhoneResult,
+  UpdateNotificationPreferencesResult,
+  UserVoidResult,
   User,
   Invitation,
   AddUserAddressRequest,
@@ -59,9 +63,7 @@ function generateId(): string {
  * Generate a secure-looking token
  */
 function generateToken(): string {
-  return Array.from({ length: 64 }, () =>
-    Math.floor(Math.random() * 16).toString(16)
-  ).join('');
+  return Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 }
 
 /**
@@ -133,7 +135,7 @@ export class MockUserCommandService implements IUserCommandService {
     return null;
   }
 
-  async inviteUser(request: InviteUserRequest): Promise<UserOperationResult> {
+  async inviteUser(request: InviteUserRequest): Promise<InviteUserResult> {
     await this.simulateDelay();
     log.debug('Mock: Inviting user', { email: request.email });
 
@@ -215,7 +217,7 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true, invitation };
   }
 
-  async resendInvitation(invitationId: string): Promise<UserOperationResult> {
+  async resendInvitation(invitationId: string): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Resending invitation', { invitationId });
 
@@ -264,10 +266,13 @@ export class MockUserCommandService implements IUserCommandService {
       email: newInvitation.email,
     });
 
-    return { success: true, invitation: newInvitation };
+    // Aligned with real service contract: resendInvitation returns
+    // UserVoidResult (bare envelope). The Edge Function only returns
+    // {success, error?}; the new invitation is fetched on the next query.
+    return { success: true };
   }
 
-  async revokeInvitation(invitationId: string): Promise<UserOperationResult> {
+  async revokeInvitation(invitationId: string): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Revoking invitation', { invitationId });
 
@@ -297,7 +302,7 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true };
   }
 
-  async deactivateUser(userId: string): Promise<UserOperationResult> {
+  async deactivateUser(userId: string): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Deactivating user', { userId });
 
@@ -327,7 +332,7 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true };
   }
 
-  async reactivateUser(userId: string): Promise<UserOperationResult> {
+  async reactivateUser(userId: string): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Reactivating user', { userId });
 
@@ -357,7 +362,7 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true };
   }
 
-  async deleteUser(userId: string, reason?: string): Promise<UserOperationResult> {
+  async deleteUser(userId: string, reason?: string): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Deleting user', { userId, reason });
 
@@ -385,7 +390,7 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true };
   }
 
-  async updateUser(request: UpdateUserRequest): Promise<UserOperationResult> {
+  async updateUser(request: UpdateUserRequest): Promise<UpdateUserResult> {
     await this.simulateDelay();
     log.debug('Mock: Updating user', { userId: request.userId });
 
@@ -419,10 +424,13 @@ export class MockUserCommandService implements IUserCommandService {
     this.queryService.updateUser(request.userId, updates);
     log.info('Mock: Updated user', { userId: request.userId });
 
-    return { success: true };
+    // Pattern A v2 parity with real service: return the refreshed user row
+    // so VM can patch local state in place.
+    const refreshed = await this.queryService.getUserById(request.userId);
+    return { success: true, user: refreshed.user ?? undefined };
   }
 
-  async modifyRoles(request: ModifyRolesRequest): Promise<UserOperationResult> {
+  async modifyRoles(request: ModifyRolesRequest): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Modifying roles', { userId: request.userId });
 
@@ -440,9 +448,7 @@ export class MockUserCommandService implements IUserCommandService {
     const currentRoleIds = currentRoles.map((r) => r.id);
 
     // Remove roles
-    const updatedRoles = currentRoles.filter(
-      (r) => !request.roleIdsToRemove.includes(r.id)
-    );
+    const updatedRoles = currentRoles.filter((r) => !request.roleIdsToRemove.includes(r.id));
 
     // Add roles (with validation)
     for (const roleId of request.roleIdsToAdd) {
@@ -478,7 +484,7 @@ export class MockUserCommandService implements IUserCommandService {
   async addUserToOrganization(
     userId: string,
     roles: Array<{ roleId: string; roleName: string }>
-  ): Promise<UserOperationResult> {
+  ): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Adding user to organization', { userId, roles });
 
@@ -507,7 +513,7 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true };
   }
 
-  async switchOrganization(organizationId: string): Promise<UserOperationResult> {
+  async switchOrganization(organizationId: string): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Switching organization', { organizationId });
 
@@ -517,7 +523,7 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true };
   }
 
-  async resetPassword(email: string): Promise<UserOperationResult> {
+  async resetPassword(email: string): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Resetting password', { email });
 
@@ -540,7 +546,7 @@ export class MockUserCommandService implements IUserCommandService {
   // Extended Data Collection Command Methods (Phase 0A)
   // ============================================================================
 
-  async addUserAddress(request: AddUserAddressRequest): Promise<UserOperationResult> {
+  async addUserAddress(request: AddUserAddressRequest): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Adding user address', { userId: request.userId, label: request.label });
 
@@ -586,7 +592,7 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true };
   }
 
-  async updateUserAddress(request: UpdateUserAddressRequest): Promise<UserOperationResult> {
+  async updateUserAddress(request: UpdateUserAddressRequest): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Updating user address', { addressId: request.addressId });
 
@@ -620,7 +626,7 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true };
   }
 
-  async removeUserAddress(request: RemoveUserAddressRequest): Promise<UserOperationResult> {
+  async removeUserAddress(request: RemoveUserAddressRequest): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Removing user address', { addressId: request.addressId });
 
@@ -643,7 +649,7 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true };
   }
 
-  async addUserPhone(request: AddUserPhoneRequest): Promise<UserOperationResult> {
+  async addUserPhone(request: AddUserPhoneRequest): Promise<UserPhoneResult> {
     await this.simulateDelay();
     log.debug('Mock: Adding user phone', { userId: request.userId, label: request.label });
 
@@ -677,10 +683,12 @@ export class MockUserCommandService implements IUserCommandService {
     this.queryService.addPhone(phone);
     log.info('Mock: Added user phone', { phoneId: phone.id, userId: request.userId });
 
-    return { success: true };
+    // Pattern A v2 parity with real service (migration 20260423232531):
+    // return the full phone entity so VM can patch list in place.
+    return { success: true, phoneId: phone.id, phone };
   }
 
-  async updateUserPhone(request: UpdateUserPhoneRequest): Promise<UserOperationResult> {
+  async updateUserPhone(request: UpdateUserPhoneRequest): Promise<UserPhoneResult> {
     await this.simulateDelay();
     log.debug('Mock: Updating user phone', { phoneId: request.phoneId });
 
@@ -722,10 +730,12 @@ export class MockUserCommandService implements IUserCommandService {
     this.queryService.updatePhone(request.phoneId, phoneUpdates);
     log.info('Mock: Updated user phone', { phoneId: request.phoneId });
 
-    return { success: true };
+    // Pattern A v2 parity: return refreshed phone so VM can patch in place.
+    const updated = this.queryService.getPhoneById(request.phoneId);
+    return { success: true, phoneId: request.phoneId, phone: updated ?? undefined };
   }
 
-  async removeUserPhone(request: RemoveUserPhoneRequest): Promise<UserOperationResult> {
+  async removeUserPhone(request: RemoveUserPhoneRequest): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Removing user phone', { phoneId: request.phoneId });
 
@@ -748,7 +758,7 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true };
   }
 
-  async updateAccessDates(request: UpdateAccessDatesRequest): Promise<UserOperationResult> {
+  async updateAccessDates(request: UpdateAccessDatesRequest): Promise<UserVoidResult> {
     await this.simulateDelay();
     log.debug('Mock: Updating access dates', { userId: request.userId, orgId: request.orgId });
 
@@ -781,12 +791,18 @@ export class MockUserCommandService implements IUserCommandService {
 
   async updateNotificationPreferences(
     request: UpdateNotificationPreferencesRequest
-  ): Promise<UserOperationResult> {
+  ): Promise<UpdateNotificationPreferencesResult> {
     await this.simulateDelay();
-    log.debug('Mock: Updating notification preferences', { userId: request.userId, orgId: request.orgId });
+    log.debug('Mock: Updating notification preferences', {
+      userId: request.userId,
+      orgId: request.orgId,
+    });
 
     // Validate SMS phone exists if SMS is enabled
-    if (request.notificationPreferences.sms.enabled && request.notificationPreferences.sms.phoneId) {
+    if (
+      request.notificationPreferences.sms.enabled &&
+      request.notificationPreferences.sms.phoneId
+    ) {
       const phone = this.queryService.getPhoneById(request.notificationPreferences.sms.phoneId);
       if (!phone) {
         return {
@@ -817,6 +833,9 @@ export class MockUserCommandService implements IUserCommandService {
       inApp: request.notificationPreferences.inApp,
     });
 
-    return { success: true };
+    // Pattern A v2 via Edge Function parity: echo the updated preferences
+    // so consumer VMs can patch userOrgAccess.notificationPreferences in
+    // place without a refetch.
+    return { success: true, notificationPreferences: request.notificationPreferences };
   }
 }

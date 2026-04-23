@@ -19,7 +19,11 @@ import type {
   InviteUserRequest,
   UpdateUserRequest,
   ModifyRolesRequest,
-  UserOperationResult,
+  InviteUserResult,
+  UpdateUserResult,
+  UserPhoneResult,
+  UpdateNotificationPreferencesResult,
+  UserVoidResult,
   AddUserAddressRequest,
   UpdateUserAddressRequest,
   RemoveUserAddressRequest,
@@ -30,6 +34,8 @@ import type {
   UpdateNotificationPreferencesRequest,
   RoleReference,
   UserOperationErrorCode,
+  PhoneType,
+  NotificationPreferences,
 } from '@/types/user.types';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/user.types';
 import { supabaseService } from '@/services/auth/supabase.service';
@@ -62,7 +68,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * 4. Emits user.invited event
    * 5. Sends invitation email via Resend
    */
-  async inviteUser(request: InviteUserRequest): Promise<UserOperationResult> {
+  async inviteUser(request: InviteUserRequest): Promise<InviteUserResult> {
     // Set up tracing context for this operation
     const tracingContext = await createTracingContext();
     Logger.pushTracingContext(tracingContext);
@@ -165,7 +171,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    *
    * Calls the invite-user Edge Function with resend operation
    */
-  async resendInvitation(invitationId: string): Promise<UserOperationResult> {
+  async resendInvitation(invitationId: string): Promise<UserVoidResult> {
     // Set up tracing context for this operation
     const tracingContext = await createTracingContext();
     Logger.pushTracingContext(tracingContext);
@@ -225,7 +231,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    *
    * Calls the invite-user Edge Function with revoke operation
    */
-  async revokeInvitation(invitationId: string): Promise<UserOperationResult> {
+  async revokeInvitation(invitationId: string): Promise<UserVoidResult> {
     // Set up tracing context for this operation
     const tracingContext = await createTracingContext();
     Logger.pushTracingContext(tracingContext);
@@ -288,7 +294,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * 2. Checks user exists in org
    * 3. Emits user.deactivated event
    */
-  async deactivateUser(userId: string): Promise<UserOperationResult> {
+  async deactivateUser(userId: string): Promise<UserVoidResult> {
     // Set up tracing context for this operation
     const tracingContext = await createTracingContext();
     Logger.pushTracingContext(tracingContext);
@@ -355,7 +361,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * 2. Checks user exists in org
    * 3. Emits user.reactivated event
    */
-  async reactivateUser(userId: string): Promise<UserOperationResult> {
+  async reactivateUser(userId: string): Promise<UserVoidResult> {
     // Set up tracing context for this operation
     const tracingContext = await createTracingContext();
     Logger.pushTracingContext(tracingContext);
@@ -422,7 +428,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * 2. Checks user is deactivated
    * 3. Emits user.deleted event
    */
-  async deleteUser(userId: string, reason?: string): Promise<UserOperationResult> {
+  async deleteUser(userId: string, reason?: string): Promise<UserVoidResult> {
     // Set up tracing context for this operation
     const tracingContext = await createTracingContext();
     Logger.pushTracingContext(tracingContext);
@@ -490,7 +496,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * 2. Emits user.profile.updated event
    * 3. Event processor updates users table
    */
-  async updateUser(request: UpdateUserRequest): Promise<UserOperationResult> {
+  async updateUser(request: UpdateUserRequest): Promise<UpdateUserResult> {
     try {
       log.info('Updating user profile', { userId: request.userId });
 
@@ -520,11 +526,27 @@ export class SupabaseUserCommandService implements IUserCommandService {
         };
       }
 
-      // Call the RPC function via supabaseService helper (handles api schema typing)
+      // Pattern A v2: api.update_user already returns the refreshed user
+      // row (snake_case via row_to_json(v_row)::jsonb). Map to camelCase
+      // `User` so VMs can patch in place. Baseline_v4 handler path:
+      //   emit user.profile.updated → handle_user_profile_updated
+      //   → UPDATE public.users → read-back here.
       const { data, error } = await supabaseService.apiRpc<{
         success: boolean;
         error?: string;
         event_id?: string;
+        user?: {
+          id: string;
+          email: string;
+          first_name: string | null;
+          last_name: string | null;
+          name: string | null;
+          current_organization_id: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+          last_login_at: string | null;
+        };
       }>('update_user', {
         p_user_id: request.userId,
         p_org_id: claims.org_id,
@@ -541,7 +563,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
         };
       }
 
-      // RPC returns {success: boolean, error?: string, event_id?: string}
+      // RPC returns {success, error?, event_id?, user?}
       if (!data?.success) {
         log.warn('User update failed', { error: data?.error });
         return {
@@ -558,7 +580,24 @@ export class SupabaseUserCommandService implements IUserCommandService {
         userId: request.userId,
         eventId: data.event_id,
       });
-      return { success: true };
+
+      // Map snake_case row → camelCase User
+      const user = data.user
+        ? {
+            id: data.user.id,
+            email: data.user.email,
+            firstName: data.user.first_name,
+            lastName: data.user.last_name,
+            name: data.user.name,
+            currentOrganizationId: data.user.current_organization_id,
+            isActive: data.user.is_active,
+            createdAt: new Date(data.user.created_at),
+            updatedAt: new Date(data.user.updated_at),
+            lastLoginAt: data.user.last_login_at ? new Date(data.user.last_login_at) : null,
+          }
+        : undefined;
+
+      return { success: true, user };
     } catch (err) {
       log.error('Error updating user profile', err);
       const message = err instanceof Error ? err.message : 'Failed to update user';
@@ -576,7 +615,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * Calls manage-user Edge Function with modify_roles operation.
    * Emits user.role.assigned for each added role and user.role.revoked for each removed role.
    */
-  async modifyRoles(request: ModifyRolesRequest): Promise<UserOperationResult> {
+  async modifyRoles(request: ModifyRolesRequest): Promise<UserVoidResult> {
     const client = supabaseService.getClient();
     const tracingContext = await createTracingContext();
     const headers = buildHeadersFromContext(tracingContext);
@@ -657,7 +696,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
   async addUserToOrganization(
     _userId: string,
     _roles: Array<{ roleId: string; roleName: string }>
-  ): Promise<UserOperationResult> {
+  ): Promise<UserVoidResult> {
     log.warn('addUserToOrganization not yet implemented for Supabase');
     return {
       success: false,
@@ -674,7 +713,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    *
    * TODO: Implement org context switching
    */
-  async switchOrganization(_organizationId: string): Promise<UserOperationResult> {
+  async switchOrganization(_organizationId: string): Promise<UserVoidResult> {
     log.warn('switchOrganization not yet implemented for Supabase');
     return {
       success: false,
@@ -691,7 +730,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    *
    * Uses Supabase Auth's built-in password reset
    */
-  async resetPassword(email: string): Promise<UserOperationResult> {
+  async resetPassword(email: string): Promise<UserVoidResult> {
     try {
       log.info('Sending password reset', { email });
 
@@ -723,7 +762,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
   // Extended Data Collection Methods - Placeholder Implementations
   // ============================================================================
 
-  async addUserAddress(_request: AddUserAddressRequest): Promise<UserOperationResult> {
+  async addUserAddress(_request: AddUserAddressRequest): Promise<UserVoidResult> {
     log.warn('addUserAddress not yet implemented for Supabase');
     return {
       success: false,
@@ -732,7 +771,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
     };
   }
 
-  async updateUserAddress(_request: UpdateUserAddressRequest): Promise<UserOperationResult> {
+  async updateUserAddress(_request: UpdateUserAddressRequest): Promise<UserVoidResult> {
     log.warn('updateUserAddress not yet implemented for Supabase');
     return {
       success: false,
@@ -741,7 +780,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
     };
   }
 
-  async removeUserAddress(_request: RemoveUserAddressRequest): Promise<UserOperationResult> {
+  async removeUserAddress(_request: RemoveUserAddressRequest): Promise<UserVoidResult> {
     log.warn('removeUserAddress not yet implemented for Supabase');
     return {
       success: false,
@@ -756,7 +795,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * Calls api.add_user_phone RPC which emits user.phone.added event.
    * If orgId is null, creates a global phone. If set, creates org-specific phone.
    */
-  async addUserPhone(request: AddUserPhoneRequest): Promise<UserOperationResult> {
+  async addUserPhone(request: AddUserPhoneRequest): Promise<UserPhoneResult> {
     try {
       log.info('Adding user phone', {
         userId: request.userId,
@@ -764,10 +803,29 @@ export class SupabaseUserCommandService implements IUserCommandService {
         orgId: request.orgId,
       });
 
+      // Pattern A v2 (migration 20260423232531): api.add_user_phone returns
+      // the full phone entity in camelCase (jsonb_build_object with explicit
+      // keys) so no adapter step is needed.
       const { data, error } = await supabaseService.apiRpc<{
         success: boolean;
         phoneId: string;
         eventId: string;
+        phone?: {
+          id: string;
+          userId: string;
+          orgId: string | null;
+          label: string;
+          type: PhoneType;
+          number: string;
+          extension: string | null;
+          countryCode: string;
+          isPrimary: boolean;
+          smsCapable: boolean;
+          isActive: boolean;
+          createdAt: string;
+          updatedAt: string;
+        };
+        error?: string;
       }>('add_user_phone', {
         p_user_id: request.userId,
         p_label: request.label,
@@ -799,12 +857,33 @@ export class SupabaseUserCommandService implements IUserCommandService {
         };
       }
 
+      // Pattern A v2 read-back failure envelope
+      if (data && data.success === false) {
+        return {
+          success: false,
+          error: data.error ?? 'Event processing failed',
+          errorDetails: {
+            code: 'UNKNOWN',
+            message: data.error ?? 'Event processing failed',
+          },
+        };
+      }
+
       log.info('User phone added successfully', {
         userId: request.userId,
         phoneId: data?.phoneId,
       });
 
-      return { success: true, phoneId: data?.phoneId };
+      // Migration returns camelCase already; parse date strings to Date.
+      const phone = data?.phone
+        ? {
+            ...data.phone,
+            createdAt: new Date(data.phone.createdAt),
+            updatedAt: new Date(data.phone.updatedAt),
+          }
+        : undefined;
+
+      return { success: true, phoneId: data?.phoneId, phone };
     } catch (error) {
       log.error('Error in addUserPhone', error);
       return {
@@ -823,17 +902,37 @@ export class SupabaseUserCommandService implements IUserCommandService {
    *
    * Calls api.update_user_phone RPC which emits user.phone.updated event.
    */
-  async updateUserPhone(request: UpdateUserPhoneRequest): Promise<UserOperationResult> {
+  async updateUserPhone(request: UpdateUserPhoneRequest): Promise<UserPhoneResult> {
     try {
       log.info('Updating user phone', {
         phoneId: request.phoneId,
         orgId: request.orgId,
       });
 
-      const { data: _data, error } = await supabaseService.apiRpc<{
+      // Pattern A v2: api.update_user_phone already returns the refreshed
+      // phone row (baseline_v4 L6585, `row_to_json(v_row)::jsonb` — snake_case).
+      // We map it to the camelCase `UserPhone` type before handing to consumers
+      // so VMs can patch their list in place without a shape-normalizer step.
+      const { data, error } = await supabaseService.apiRpc<{
         success: boolean;
         phoneId: string;
         eventId: string;
+        phone?: {
+          id: string;
+          user_id: string;
+          org_id: string | null;
+          label: string;
+          type: PhoneType;
+          number: string;
+          extension: string | null;
+          country_code: string;
+          is_primary: boolean;
+          sms_capable: boolean;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        error?: string;
       }>('update_user_phone', {
         p_phone_id: request.phoneId,
         p_label: request.updates.label ?? null,
@@ -872,9 +971,41 @@ export class SupabaseUserCommandService implements IUserCommandService {
         };
       }
 
+      // Pattern A v2 read-back: handler-driven failure path surfaces the
+      // `processing_error` via a `{success: false}` envelope. Propagate.
+      if (data && data.success === false) {
+        return {
+          success: false,
+          error: data.error ?? 'Event processing failed',
+          errorDetails: {
+            code: 'UNKNOWN',
+            message: data.error ?? 'Event processing failed',
+          },
+        };
+      }
+
       log.info('User phone updated successfully', { phoneId: request.phoneId });
 
-      return { success: true };
+      // Map snake_case row → camelCase UserPhone for consumer VMs.
+      const phone = data?.phone
+        ? {
+            id: data.phone.id,
+            userId: data.phone.user_id,
+            orgId: data.phone.org_id,
+            label: data.phone.label,
+            type: data.phone.type,
+            number: data.phone.number,
+            extension: data.phone.extension,
+            countryCode: data.phone.country_code,
+            isPrimary: data.phone.is_primary,
+            smsCapable: data.phone.sms_capable,
+            isActive: data.phone.is_active,
+            createdAt: new Date(data.phone.created_at),
+            updatedAt: new Date(data.phone.updated_at),
+          }
+        : undefined;
+
+      return { success: true, phoneId: request.phoneId, phone };
     } catch (error) {
       log.error('Error in updateUserPhone', error);
       return {
@@ -893,7 +1024,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    *
    * Calls api.remove_user_phone RPC which emits user.phone.removed event.
    */
-  async removeUserPhone(request: RemoveUserPhoneRequest): Promise<UserOperationResult> {
+  async removeUserPhone(request: RemoveUserPhoneRequest): Promise<UserVoidResult> {
     try {
       log.info('Removing user phone', {
         phoneId: request.phoneId,
@@ -959,7 +1090,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    * Uses api.update_user_access_dates RPC which emits a domain event
    * and updates the user_organizations_projection.
    */
-  async updateAccessDates(request: UpdateAccessDatesRequest): Promise<UserOperationResult> {
+  async updateAccessDates(request: UpdateAccessDatesRequest): Promise<UserVoidResult> {
     try {
       log.info('Updating user access dates', {
         userId: request.userId,
@@ -1036,7 +1167,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
    */
   async updateNotificationPreferences(
     request: UpdateNotificationPreferencesRequest
-  ): Promise<UserOperationResult> {
+  ): Promise<UpdateNotificationPreferencesResult> {
     // Set up tracing context for this operation
     const tracingContext = await createTracingContext();
     Logger.pushTracingContext(tracingContext);
@@ -1103,9 +1234,28 @@ export class SupabaseUserCommandService implements IUserCommandService {
       log.info('Notification preferences updated successfully', {
         userId: request.userId,
         orgId: request.orgId,
+        deployVersion: data.deployVersion,
       });
 
-      return { success: true };
+      // Pattern A v2 via Edge Function (manage-user v10+): echo the
+      // submitted preferences so consumer VMs can patch in place. Transform
+      // back from AsyncAPI snake_case to frontend camelCase.
+      // Absent (older Edge Function version): return undefined so the VM
+      // falls back to loadUserOrgAccess refetch with log.warn.
+      let notificationPreferences: NotificationPreferences | undefined;
+      if (data.notificationPreferences) {
+        const p = data.notificationPreferences;
+        notificationPreferences = {
+          email: p.email,
+          sms: {
+            enabled: p.sms?.enabled ?? false,
+            phoneId: p.sms?.phone_id ?? null,
+          },
+          inApp: p.in_app,
+        };
+      }
+
+      return { success: true, notificationPreferences };
     } catch (error) {
       log.error('Error in updateNotificationPreferences', error);
       return {

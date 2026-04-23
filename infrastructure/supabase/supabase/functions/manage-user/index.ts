@@ -42,7 +42,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v9-access-blocked-guard';
+const DEPLOY_VERSION = 'v10-notification-prefs-readback';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -87,6 +87,21 @@ interface ManageUserResponse {
   userId?: string;
   operation?: Operation;
   error?: string;
+  /**
+   * Deploy version marker — consumers use this for version-gated fallback
+   * detection (see `documentation/frontend/patterns/rpc-readback-vm-patch.md`).
+   * Introduced in v10 alongside the `notificationPreferences` read-back.
+   */
+  deployVersion?: string;
+  /**
+   * For `update_notification_preferences` (v10+): echoes the updated
+   * preferences so consumer VMs can patch `userOrgAccess.notificationPreferences`
+   * in place without a follow-up `loadUserOrgAccess` refetch.
+   *
+   * When absent (pre-v10 Edge Function serving during rollout window),
+   * consumers fall back to the refetch pattern with `log.warn` telemetry.
+   */
+  notificationPreferences?: NotificationPreferences;
 }
 
 /**
@@ -430,11 +445,19 @@ serve(async (req) => {
 
       console.log(`[manage-user v${DEPLOY_VERSION}] Notification preferences updated: event_id=${eventId}`);
 
-      // Success response
+      // v10: echo the submitted prefs so consumer VMs can patch in place.
+      // The handler updated `user_org_access.notification_preferences` from
+      // this same JSONB (synchronous BEFORE INSERT trigger → projection
+      // updated before we reach here), so echoing the request prefs is
+      // equivalent to a read-back. An explicit SELECT would be more
+      // defensive but adds a round-trip; echo is sufficient given the
+      // sync handler contract.
       const response: ManageUserResponse = {
         success: true,
         userId: requestData.userId,
         operation: 'update_notification_preferences',
+        deployVersion: DEPLOY_VERSION,
+        notificationPreferences: prefs,
       };
 
       const completedSpan = endSpan(span, 'ok');

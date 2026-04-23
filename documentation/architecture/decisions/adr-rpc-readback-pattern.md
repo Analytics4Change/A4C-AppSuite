@@ -181,7 +181,24 @@ For caller-driven failures that do use `RAISE EXCEPTION`, existing ERRCODEs are 
   - **M1** — 6 RPCs (`update_client_address`, `_email`, `_funding_source`, `_insurance`, `_phone`, `update_client`) had a race-prone `ORDER BY created_at DESC LIMIT 1` query in their IF NOT FOUND branch despite `v_event_id` being captured in scope. Rewritten to use `WHERE id = v_event_id` consistently in both the IF NOT FOUND and post-emit branches. All 20 Pattern A v2 single-event RPC definitions now use the race-safe PK lookup in both branches.
   - **M2** — `update_role` (COMPLEX-CASE) switched from wall-clock 5-second-window detection (`created_at > NOW() - INTERVAL '5 seconds'`) to captured-event-id semantics. Each emit (`role.updated`, N × `role.permission.granted`, M × `role.permission.revoked`) appends its UUID to `v_event_ids uuid[]`; the error lookup uses `WHERE id = ANY(v_event_ids) AND processing_error IS NOT NULL`. Race-safe under concurrent role edits; correctly scoped to this RPC's own emits; empty-array no-op case returns `{success: true}` correctly.
 
-Total RPCs using Pattern A v2: **19 single-event + 1 multi-event (`update_role`)** = 20 definitions across 19 RPCs (one RPC has two overloads). All race-safe on captured event_id.
+- **2026-04-23** — Migration `20260423232531_add_user_phone_pattern_a_v2_readback.sql` extends `api.add_user_phone` to Pattern A v2 (Blocker 3 PR A, `feat/phase4-user-domain-typing`, architect-reviewed `a9dee2ed181895edb`). The read-back SELECT branches on `p_org_id IS NULL` to read from `user_phones` (global) vs `user_org_phone_overrides` (org-scoped) since the handler writes to two different tables. Returns the full phone entity in camelCase via explicit `jsonb_build_object` (not `row_to_json`) so frontend consumers can patch their observable state in place without a shape-normalizer step — see [rpc-readback-vm-patch.md](../../frontend/patterns/rpc-readback-vm-patch.md). Paired with `manage-user` Edge Function v10 which adds `notificationPreferences` to its `update_notification_preferences` response envelope; version-gated via `deployVersion` field.
+
+Total RPCs using Pattern A v2: **20 single-event + 1 multi-event (`update_role`)** = 21 definitions across 20 RPCs (one RPC has two overloads). Plus 1 Edge Function operation (`manage-user`'s `update_notification_preferences`). All race-safe on captured event_id.
+
+### Frontend envelope types — user domain (Blocker 3, 2026-04-23)
+
+Following the Option C pattern established in Phase 4b (client domain) and Blocker 2 (field settings), the user domain narrows its legacy `UserOperationResult` flat union into per-method named types extending `UserRpcEnvelope`:
+
+| Method | Return type |
+|--------|-------------|
+| `inviteUser` | `InviteUserResult` (populates `invitation`) |
+| `updateUser` | `UpdateUserResult` (populates `user` — Pattern A v2) |
+| `addUserPhone`, `updateUserPhone` | `UserPhoneResult` (populates `phone` — Pattern A v2) |
+| `updateNotificationPreferences` | `UpdateNotificationPreferencesResult` (populates `notificationPreferences` — Edge Function path) |
+| `addUserAddress`, `updateUserAddress`, `removeUserAddress` | `UserVoidResult` (PR B TODO — address backend not yet implemented) |
+| 12 other methods | `UserVoidResult` (base envelope, no entity) |
+
+Full mapping + consumer usage in [rpc-readback-vm-patch.md](../../frontend/patterns/rpc-readback-vm-patch.md).
 
 ## Alternatives considered
 

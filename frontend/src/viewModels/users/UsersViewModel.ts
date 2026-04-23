@@ -46,7 +46,10 @@ import type {
   PaginationOptions,
   RoleReference,
   UserDisplayStatus,
-  UserOperationResult,
+  InviteUserResult,
+  UserPhoneResult,
+  UpdateNotificationPreferencesResult,
+  UserVoidResult,
   InviteUserRequest,
   ModifyRolesRequest,
   UserAddress,
@@ -412,7 +415,11 @@ export class UsersViewModel {
    * Load users and invitations with current filters
    */
   async loadUsers(): Promise<void> {
-    log.debug('Loading users', { filters: this.filters, sort: this.sort, pagination: this.pagination });
+    log.debug('Loading users', {
+      filters: this.filters,
+      sort: this.sort,
+      pagination: this.pagination,
+    });
 
     runInAction(() => {
       this.isLoading = true;
@@ -504,7 +511,8 @@ export class UsersViewModel {
         } else {
           this.selectedUserDetails = null;
           // Use actual error message from service for visibility
-          this.error = result.errorMessage ||
+          this.error =
+            result.errorMessage ||
             'Failed to load user details. The user may not exist or you may not have permission to view them.';
           log.warn('User details load failed', { userId, errorMessage: result.errorMessage });
         }
@@ -688,12 +696,18 @@ export class UsersViewModel {
   /**
    * Set sort options
    */
-  async setSort(sortBy: UserSortOptions['sortBy'], sortOrder?: UserSortOptions['sortOrder']): Promise<void> {
+  async setSort(
+    sortBy: UserSortOptions['sortBy'],
+    sortOrder?: UserSortOptions['sortOrder']
+  ): Promise<void> {
     runInAction(() => {
       // Toggle order if same field, else use provided or default to asc
-      const newOrder = sortBy === this.sort.sortBy && !sortOrder
-        ? (this.sort.sortOrder === 'asc' ? 'desc' : 'asc')
-        : (sortOrder ?? 'asc');
+      const newOrder =
+        sortBy === this.sort.sortBy && !sortOrder
+          ? this.sort.sortOrder === 'asc'
+            ? 'desc'
+            : 'asc'
+          : (sortOrder ?? 'asc');
 
       this.sort = { sortBy, sortOrder: newOrder };
     });
@@ -803,7 +817,7 @@ export class UsersViewModel {
   /**
    * Invite a new user
    */
-  async inviteUser(request: InviteUserRequest): Promise<UserOperationResult> {
+  async inviteUser(request: InviteUserRequest): Promise<InviteUserResult> {
     log.debug('Inviting user', { email: request.email });
 
     runInAction(() => {
@@ -853,7 +867,7 @@ export class UsersViewModel {
   /**
    * Resend an invitation
    */
-  async resendInvitation(invitationId: string): Promise<UserOperationResult> {
+  async resendInvitation(invitationId: string): Promise<UserVoidResult> {
     log.debug('Resending invitation', { invitationId });
 
     runInAction(() => {
@@ -903,7 +917,7 @@ export class UsersViewModel {
   /**
    * Revoke an invitation
    */
-  async revokeInvitation(invitationId: string): Promise<UserOperationResult> {
+  async revokeInvitation(invitationId: string): Promise<UserVoidResult> {
     log.debug('Revoking invitation', { invitationId });
 
     runInAction(() => {
@@ -958,7 +972,7 @@ export class UsersViewModel {
   /**
    * Deactivate a user
    */
-  async deactivateUser(userId: string): Promise<UserOperationResult> {
+  async deactivateUser(userId: string): Promise<UserVoidResult> {
     log.debug('Deactivating user', { userId });
 
     runInAction(() => {
@@ -979,7 +993,10 @@ export class UsersViewModel {
           // Update local state
           const index = this.rawItems.findIndex((i) => i.id === userId);
           if (index !== -1) {
-            const updated = { ...this.rawItems[index], displayStatus: 'deactivated' as UserDisplayStatus };
+            const updated = {
+              ...this.rawItems[index],
+              displayStatus: 'deactivated' as UserDisplayStatus,
+            };
             this.rawItems = [
               ...this.rawItems.slice(0, index),
               updated,
@@ -1014,7 +1031,7 @@ export class UsersViewModel {
   /**
    * Reactivate a user
    */
-  async reactivateUser(userId: string): Promise<UserOperationResult> {
+  async reactivateUser(userId: string): Promise<UserVoidResult> {
     log.debug('Reactivating user', { userId });
 
     runInAction(() => {
@@ -1035,7 +1052,10 @@ export class UsersViewModel {
           // Update local state
           const index = this.rawItems.findIndex((i) => i.id === userId);
           if (index !== -1) {
-            const updated = { ...this.rawItems[index], displayStatus: 'active' as UserDisplayStatus };
+            const updated = {
+              ...this.rawItems[index],
+              displayStatus: 'active' as UserDisplayStatus,
+            };
             this.rawItems = [
               ...this.rawItems.slice(0, index),
               updated,
@@ -1075,7 +1095,7 @@ export class UsersViewModel {
    *
    * Precondition: User must be deactivated before deletion.
    */
-  async deleteUser(userId: string, reason?: string): Promise<UserOperationResult> {
+  async deleteUser(userId: string, reason?: string): Promise<UserVoidResult> {
     log.debug('Deleting user', { userId, reason });
 
     runInAction(() => {
@@ -1130,7 +1150,7 @@ export class UsersViewModel {
   /**
    * Modify roles for a user (add and/or remove)
    */
-  async modifyRoles(request: ModifyRolesRequest): Promise<UserOperationResult> {
+  async modifyRoles(request: ModifyRolesRequest): Promise<UserVoidResult> {
     log.debug('Modifying roles', { userId: request.userId });
 
     runInAction(() => {
@@ -1183,7 +1203,7 @@ export class UsersViewModel {
   async addUserToOrganization(
     userId: string,
     roles: Array<{ roleId: string; roleName: string }>
-  ): Promise<UserOperationResult> {
+  ): Promise<UserVoidResult> {
     log.debug('Adding user to organization', { userId, roles });
 
     runInAction(() => {
@@ -1345,7 +1365,7 @@ export class UsersViewModel {
   /**
    * Add a new address for the selected user
    */
-  async addUserAddress(request: AddUserAddressRequest): Promise<UserOperationResult> {
+  async addUserAddress(request: AddUserAddressRequest): Promise<UserVoidResult> {
     log.debug('Adding user address', { userId: request.userId, label: request.label });
 
     runInAction(() => {
@@ -1395,7 +1415,7 @@ export class UsersViewModel {
   /**
    * Update an existing user address
    */
-  async updateUserAddress(request: UpdateUserAddressRequest): Promise<UserOperationResult> {
+  async updateUserAddress(request: UpdateUserAddressRequest): Promise<UserVoidResult> {
     log.debug('Updating user address', { addressId: request.addressId });
 
     runInAction(() => {
@@ -1445,7 +1465,7 @@ export class UsersViewModel {
   /**
    * Remove (soft delete) a user address
    */
-  async removeUserAddress(request: RemoveUserAddressRequest): Promise<UserOperationResult> {
+  async removeUserAddress(request: RemoveUserAddressRequest): Promise<UserVoidResult> {
     log.debug('Removing user address', { addressId: request.addressId });
 
     runInAction(() => {
@@ -1499,7 +1519,7 @@ export class UsersViewModel {
   /**
    * Add a new phone for the selected user
    */
-  async addUserPhone(request: AddUserPhoneRequest): Promise<UserOperationResult> {
+  async addUserPhone(request: AddUserPhoneRequest): Promise<UserPhoneResult> {
     log.debug('Adding user phone', { userId: request.userId, label: request.label });
 
     runInAction(() => {
@@ -1522,9 +1542,22 @@ export class UsersViewModel {
         }
       });
 
-      // Refresh phones on success
+      // Pattern A v2 (migration 20260423232531): consume returned phone
+      // entity and append to the list. Fallback to loadUserPhones when
+      // missing — emits log.warn per logging-standards.md.
       if (result.success) {
-        await this.loadUserPhones(request.userId);
+        if (result.phone) {
+          runInAction(() => {
+            this.userPhones = [...this.userPhones, result.phone!];
+          });
+        } else {
+          log.warn(
+            'addUserPhone success without phone read-back — falling back to refetch. ' +
+              'Migration 20260423232531 may not be deployed to this environment.',
+            { userId: request.userId, phoneId: result.phoneId }
+          );
+          await this.loadUserPhones(request.userId);
+        }
       }
 
       return result;
@@ -1549,7 +1582,7 @@ export class UsersViewModel {
   /**
    * Update an existing user phone
    */
-  async updateUserPhone(request: UpdateUserPhoneRequest): Promise<UserOperationResult> {
+  async updateUserPhone(request: UpdateUserPhoneRequest): Promise<UserPhoneResult> {
     log.debug('Updating user phone', { phoneId: request.phoneId });
 
     runInAction(() => {
@@ -1572,9 +1605,26 @@ export class UsersViewModel {
         }
       });
 
-      // Refresh phones on success
-      if (result.success && this.selectedItemId) {
-        await this.loadUserPhones(this.selectedItemId);
+      // Pattern A v2: consume the returned phone entity and patch in place.
+      // Fallback to loadUserPhones when the entity field is missing — emits
+      // log.warn for observability per logging-standards.md. See
+      // documentation/frontend/patterns/rpc-readback-vm-patch.md.
+      if (result.success) {
+        if (result.phone) {
+          runInAction(() => {
+            const updated = result.phone!;
+            this.userPhones = this.userPhones.map((p) => (p.id === updated.id ? updated : p));
+          });
+        } else {
+          log.warn(
+            'updateUserPhone success without phone read-back — falling back to refetch. ' +
+              'Backend RPC may be pre-Pattern-A-v2 or on a failed migration.',
+            { phoneId: request.phoneId }
+          );
+          if (this.selectedItemId) {
+            await this.loadUserPhones(this.selectedItemId);
+          }
+        }
       }
 
       return result;
@@ -1599,7 +1649,7 @@ export class UsersViewModel {
   /**
    * Remove (soft delete) a user phone
    */
-  async removeUserPhone(request: RemoveUserPhoneRequest): Promise<UserOperationResult> {
+  async removeUserPhone(request: RemoveUserPhoneRequest): Promise<UserVoidResult> {
     log.debug('Removing user phone', { phoneId: request.phoneId });
 
     runInAction(() => {
@@ -1653,7 +1703,7 @@ export class UsersViewModel {
   /**
    * Update access dates for a user in the current organization
    */
-  async updateAccessDates(request: UpdateAccessDatesRequest): Promise<UserOperationResult> {
+  async updateAccessDates(request: UpdateAccessDatesRequest): Promise<UserVoidResult> {
     log.debug('Updating access dates', { userId: request.userId, orgId: request.orgId });
 
     runInAction(() => {
@@ -1705,8 +1755,11 @@ export class UsersViewModel {
    */
   async updateNotificationPreferences(
     request: UpdateNotificationPreferencesRequest
-  ): Promise<UserOperationResult> {
-    log.debug('Updating notification preferences', { userId: request.userId, orgId: request.orgId });
+  ): Promise<UpdateNotificationPreferencesResult> {
+    log.debug('Updating notification preferences', {
+      userId: request.userId,
+      orgId: request.orgId,
+    });
 
     runInAction(() => {
       this.isSubmitting = true;
@@ -1721,21 +1774,46 @@ export class UsersViewModel {
 
         if (result.success) {
           this.successMessage = 'Notification preferences updated';
-          log.info('Notification preferences updated', { userId: request.userId, orgId: request.orgId });
+          log.info('Notification preferences updated', {
+            userId: request.userId,
+            orgId: request.orgId,
+          });
         } else {
           this.error = result.error ?? 'Failed to update notification preferences';
           log.warn('Failed to update notification preferences', { error: result.error });
         }
       });
 
-      // Refresh org access on success
+      // Pattern A v2 via Edge Function (manage-user v10+, Blocker 3): consume
+      // the returned notificationPreferences and patch `userOrgAccess` in
+      // place. Fallback to loadUserOrgAccess refetch when the field is
+      // missing — emits log.warn for observability (version-gated detection
+      // per Edge-Function vs SQL-RPC plan).
       if (result.success) {
-        await this.loadUserOrgAccess(request.userId, request.orgId);
+        if (result.notificationPreferences && this.userOrgAccess) {
+          const updatedPrefs = result.notificationPreferences;
+          const userOrgAccess = this.userOrgAccess;
+          runInAction(() => {
+            this.userOrgAccess = {
+              ...userOrgAccess,
+              notificationPreferences: updatedPrefs,
+              updatedAt: new Date(),
+            };
+          });
+        } else {
+          log.warn(
+            'updateNotificationPreferences success without notificationPreferences read-back — ' +
+              'falling back to refetch. Edge Function may be older than manage-user v10.',
+            { userId: request.userId, orgId: request.orgId }
+          );
+          await this.loadUserOrgAccess(request.userId, request.orgId);
+        }
       }
 
       return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update notification preferences';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to update notification preferences';
 
       runInAction(() => {
         this.isSubmitting = false;
