@@ -91,6 +91,7 @@ export const ClientIntakePage: React.FC = observer(() => {
 
   useEffect(() => {
     vm.loadFieldDefinitions();
+    vm.loadOrganizationUnits();
   }, [vm]);
 
   // Redirect on success

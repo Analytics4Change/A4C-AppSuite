@@ -2,7 +2,7 @@
  * Admission Section — Step 5 of client intake form.
  *
  * Fields: admission_date, admission_type, level_of_care, expected_length_of_stay,
- * initial_risk_level, placement_arrangement.
+ * initial_risk_level, placement_arrangement, organization_unit (OU picker).
  */
 
 import React from 'react';
@@ -11,6 +11,7 @@ import { IntakeFormField } from './IntakeFormField';
 import { getFieldProps } from './useFieldProps';
 import type { IntakeSectionProps } from './types';
 import { PLACEMENT_ARRANGEMENT_LABELS, INITIAL_RISK_LEVEL_LABELS } from '@/types/client.types';
+import { TreeSelectDropdown } from '@/components/ui/TreeSelectDropdown';
 
 const ADMISSION_TYPE_OPTIONS: ReadonlyArray<readonly [string, string]> = [
   ['planned', 'Planned'],
@@ -69,6 +70,28 @@ export const AdmissionSection: React.FC<IntakeSectionProps> = observer(({ viewMo
           const p = field('placement_arrangement');
           return p ? <IntakeFormField {...p} enumOptions={PLACEMENT_OPTIONS} /> : null;
         })()}
+      </div>
+
+      <div data-testid="admission-ou-select">
+        <TreeSelectDropdown
+          id="admission-ou-select"
+          label="Organizational Unit"
+          nodes={viewModel.organizationUnitTree}
+          selectedPath={viewModel.selectedOrganizationUnitPath}
+          onSelect={(path) => viewModel.setOrganizationUnitByPath(path)}
+          placeholder={
+            viewModel.isLoadingOrganizationUnits
+              ? 'Loading organizational units...'
+              : viewModel.organizationUnitTree.length === 0
+                ? 'No organizational units available'
+                : 'Select an organizational unit...'
+          }
+          disabled={
+            viewModel.isLoadingOrganizationUnits || viewModel.organizationUnitTree.length === 0
+          }
+          error={viewModel.organizationUnitsError ?? undefined}
+          helpText="Optional. Records which facility or site this placement belongs to."
+        />
       </div>
     </div>
   );

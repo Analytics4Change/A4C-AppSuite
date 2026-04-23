@@ -10,8 +10,10 @@
 import { makeAutoObservable, runInAction, computed } from 'mobx';
 import type { IClientService } from '@/services/clients/IClientService';
 import type { IClientFieldService } from '@/services/client-fields/IClientFieldService';
+import type { IOrganizationUnitService } from '@/services/organization/IOrganizationUnitService';
 import { getClientService } from '@/services/clients/ClientServiceFactory';
 import { getClientFieldService } from '@/services/client-fields/ClientFieldServiceFactory';
+import { getOrganizationUnitService } from '@/services/organization/OrganizationUnitServiceFactory';
 import type { FieldDefinition } from '@/types/client-field-settings.types';
 import type {
   PhoneType,
@@ -20,7 +22,11 @@ import type {
   InsurancePolicyType,
   ContactDesignation,
   ClientRpcResult,
+  PlacementArrangement,
 } from '@/types/client.types';
+import type { OrganizationUnit, OrganizationUnitNode } from '@/types/organization-unit.types';
+import { buildOrganizationUnitTree } from '@/types/organization-unit.types';
+import { getOUIdByPath, getOUPathById } from '@/utils/organizationUnitPath';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('viewmodel');
@@ -126,12 +132,19 @@ export class ClientIntakeFormViewModel {
   isLoadingFieldDefinitions = false;
   loadError: string | null = null;
 
+  // Organizational units (for OU picker in Admission section)
+  organizationUnits: OrganizationUnit[] = [];
+  organizationUnitsRootPath = '';
+  isLoadingOrganizationUnits = false;
+  organizationUnitsError: string | null = null;
+
   // Draft
   private draftDirty = false;
 
   constructor(
     private clientService: IClientService = getClientService(),
-    private fieldService: IClientFieldService = getClientFieldService()
+    private fieldService: IClientFieldService = getClientFieldService(),
+    private organizationUnitService: IOrganizationUnitService = getOrganizationUnitService()
   ) {
     makeAutoObservable(this, {
       requiredFieldKeys: computed,
@@ -141,6 +154,8 @@ export class ClientIntakeFormViewModel {
       completionPercentage: computed,
       validationErrors: computed,
       unfilledRequiredFields: computed,
+      organizationUnitTree: computed,
+      selectedOrganizationUnitPath: computed,
     });
   }
 
@@ -254,6 +269,26 @@ export class ClientIntakeFormViewModel {
     return unfilled;
   }
 
+  /**
+   * Tree nodes for the OU picker in the Admission section.
+   * Rebuilt whenever organizationUnits / rootPath change.
+   */
+  get organizationUnitTree(): OrganizationUnitNode[] {
+    if (this.organizationUnits.length === 0) return [];
+    return buildOrganizationUnitTree(this.organizationUnits, this.organizationUnitsRootPath);
+  }
+
+  /**
+   * The selected OU's ltree path, mapped from formData.organization_unit_id.
+   * Returns null when no OU is selected or when the stored id is unknown
+   * (e.g. deactivated unit filtered out of the loaded list).
+   */
+  get selectedOrganizationUnitPath(): string | null {
+    const id = this.formData.organization_unit_id;
+    if (typeof id !== 'string') return null;
+    return getOUPathById(this.organizationUnits, id);
+  }
+
   // -------------------------------------------------------------------------
   // Actions — Field definitions
   // -------------------------------------------------------------------------
@@ -279,6 +314,56 @@ export class ClientIntakeFormViewModel {
         this.isLoadingFieldDefinitions = false;
       });
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Actions — Organizational units
+  // -------------------------------------------------------------------------
+
+  /**
+   * Load active organizational units for the Admission OU picker.
+   * No-op if already loaded or currently loading. On failure the picker
+   * degrades to empty (OU remains unset); failure is non-fatal for intake.
+   */
+  async loadOrganizationUnits(): Promise<void> {
+    if (this.isLoadingOrganizationUnits) return;
+    if (this.organizationUnits.length > 0) return;
+
+    runInAction(() => {
+      this.isLoadingOrganizationUnits = true;
+      this.organizationUnitsError = null;
+    });
+
+    try {
+      const units = await this.organizationUnitService.getUnits({ status: 'active' });
+      const rootPath =
+        units.length > 0
+          ? units.reduce<string>(
+              (shortest, unit) => (unit.path.length < shortest.length ? unit.path : shortest),
+              units[0].path
+            )
+          : '';
+      runInAction(() => {
+        this.organizationUnits = units;
+        this.organizationUnitsRootPath = rootPath;
+        this.isLoadingOrganizationUnits = false;
+      });
+      log.debug('Organizational units loaded for intake OU picker', { count: units.length });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to load organizational units';
+      log.warn('Failed to load organizational units for intake', { error });
+      runInAction(() => {
+        this.organizationUnitsError = message;
+        this.isLoadingOrganizationUnits = false;
+      });
+    }
+  }
+
+  /** Map TreeSelectDropdown's ltree path selection back to an OU id and store it. */
+  setOrganizationUnitByPath(path: string | null): void {
+    const id = getOUIdByPath(this.organizationUnits, path);
+    this.setField('organization_unit_id', id);
   }
 
   // -------------------------------------------------------------------------
@@ -532,8 +617,35 @@ export class ClientIntakeFormViewModel {
 
       const clientId = result.client_id;
 
-      // 2. Fire sub-entity RPCs in parallel (partial success acceptable)
+      // 2. Fire sub-entity + placement RPCs in parallel (partial success acceptable)
       const subEntityPromises: Promise<ClientRpcResult>[] = [];
+
+      // 2a. OU-aware placement history: if both arrangement AND OU are set at
+      // intake, emit client.placement.changed so the history row carries OU
+      // from the start. handle_client_registered already stamps OU onto
+      // clients_projection, so registration alone is sufficient when no
+      // placement arrangement is selected.
+      const placementArrangement = this.formData.placement_arrangement;
+      const organizationUnitId = this.formData.organization_unit_id;
+      const admissionDate = this.formData.admission_date;
+      if (
+        typeof placementArrangement === 'string' &&
+        placementArrangement.length > 0 &&
+        typeof organizationUnitId === 'string' &&
+        organizationUnitId.length > 0 &&
+        typeof admissionDate === 'string' &&
+        admissionDate.length > 0
+      ) {
+        subEntityPromises.push(
+          this.clientService.changeClientPlacement(clientId, {
+            placement_arrangement: placementArrangement as PlacementArrangement,
+            start_date: admissionDate,
+            organization_unit_id: organizationUnitId,
+            reason: 'Initial placement at intake',
+            correlation_id: correlationId,
+          })
+        );
+      }
 
       for (const phone of this.phones) {
         subEntityPromises.push(
