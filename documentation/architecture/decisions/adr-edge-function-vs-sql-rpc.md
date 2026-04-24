@@ -67,7 +67,7 @@ An operation is `load-bearing` (→ Edge Function is appropriate) if it meets **
 - **LB3 — Forwards to workflow orchestration layer.** Requests that dispatch to the Backend API → Temporal must pass JWT + auth headers through a trusted edge. The Edge Function is the canonical boundary.
 - **LB4 — Unauthenticated entry point with bespoke token validation.** Invitation-token acceptance, password-reset links, public webhooks — cases where no JWT is available and a custom token (invitation UUID, magic link hash) must be validated. SQL RPCs can be granted to `anon`, but rate-limiting + correlation-id business-scope lookup + token-hash verification is easier to read in TypeScript.
 - **LB5 — Read orchestration of cross-tier state.** Querying Temporal workflow status, external job queues, or other non-PostgreSQL state that can't be answered by a single `api.*` schema SELECT. Example: `workflow-status` reads `bootstrap_workflows` (a projection) but composes the response against Temporal's workflow lifecycle.
-- **LB6 — Emits to a stream whose caller's JWT cannot be RLS-authorized.** The narrow but real case where events must be emitted before the authoritative user/org exists in `auth.users` / `organizations_projection`. `accept-invitation` is the canonical example: it emits `user.created` + `user.role.assigned` + `user.phone.added` for a user that did not exist when the invitation was created.
+- **LB6 — Emits domain events *before the RLS-authoritative row* for the target stream exists** (the caller's JWT, if any, cannot satisfy RLS policies on the target stream's projection). This separates the emitter-auth question (anonymous vs authenticated) from the target-state question (row exists vs not). `accept-invitation` is the canonical example: it emits `user.created` + `user.role.assigned` + `user.phone.added` for a user that did not exist when the invitation was created. A future operation where an authenticated admin creates resources on behalf of a not-yet-materialized user also qualifies — the emitter has a JWT, but the target row doesn't exist yet.
 
 An operation meeting **zero** of LB1–LB6 is `candidate-for-extraction`: SQL RPC is the correct fit.
 
@@ -90,6 +90,8 @@ Precedent:
 - `manage-user` v11 reads `user_notification_preferences_projection` directly for its Pattern A v2 read-back
 
 Both are legitimate.
+
+**Important — does not override Decision 3**: This permission (Edge Functions may read any table via service-role) does NOT elevate service-role reads to load-bearing. Edge Functions CAN read outside `api.`, but that capability alone does not justify keeping an operation as an Edge Function. See Decision 3.
 
 ### Decision 5 — Pattern A v2 compatibility for load-bearing Edge Function writes
 
@@ -130,6 +132,12 @@ To keep the selection criteria consistent over time, four enforcement layers shi
 
 The grep uses `git diff --diff-filter=A` so existing file modifications are never blocked. Zero retrofit burden.
 
+**CI v1 known limitations**:
+- Enforces only that the ADR filename fragment appears in the file (substring match). A file comment such as `// this does NOT follow adr-edge-function-vs-sql-rpc` would pass the check. The required block's **shape** (JSDoc `ADR:` + `Load-bearing criterion:`) is not validated — only the filename fragment presence.
+- Matches only files named `index.ts` per path regex `^infrastructure/supabase/supabase/functions/[^/]+/index\.ts$`. A new Edge Function using `server.ts` / `main.ts` / split across multiple files would silently pass.
+
+Both tradeoffs favor zero false-positives at the cost of known false-negatives. Acceptable for v1; revisit when either limitation surfaces in practice.
+
 ## Hybrid case walkthrough — `organization-delete`
 
 Some Edge Functions combine permission checks, `api.*` RPC calls, and workflow-layer forwards. `organization-delete` is the canonical example:
@@ -160,7 +168,9 @@ find infrastructure/supabase/supabase/functions -name 'index.ts' -not -path '*/_
 # read the body of each case and answer LB1-LB6.
 ```
 
-Total: 16 operations across 7 functions, 3,390 LOC. **12 load-bearing** + **4 candidate-for-extraction** (one of which — `update_notification_preferences` — is also the sole Pattern A v2 reference implementation per Decision 5).
+Total: 16 operations across 7 functions, 3,390 LOC. **11 load-bearing** + **5 candidate-for-extraction** (one of which — `update_notification_preferences` — is also the sole Pattern A v2 reference implementation per Decision 5).
+
+> **Classification audit note (2026-04-24)**: During PR #33 review, an audit of `manage-user reactivate` revealed no `auth.admin` call on its path (the ban/unban call at `manage-user/index.ts:719` is gated on `operation === 'deactivate'`). Row 9 was therefore moved from `load-bearing` (LB1) to `candidate-for-extraction`. The same audit uncovered a separate data-integrity finding: three user-lifecycle handlers referenced by `process_user_event` (`handle_user_deactivated`, `handle_user_reactivated`, `handle_user_deleted`) are missing from the repo — tracked separately at `dev/active/fix-missing-user-lifecycle-handlers/` (filed after PR #33 merges).
 
 | # | Function | Operation | LB1 | LB2 | LB3 | LB4 | LB5 | LB6 | Classification | Notes |
 |---|----------|-----------|-----|-----|-----|-----|-----|-----|----------------|-------|
@@ -171,13 +181,13 @@ Total: 16 operations across 7 functions, 3,390 LOC. **12 load-bearing** + **4 ca
 | 5 | `invite-user` | `create` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | **load-bearing** | Ensures auth.users + Resend API email |
 | 6 | `invite-user` | `resend` | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | **load-bearing** | Resend API |
 | 7 | `invite-user` | `revoke` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **candidate-for-extraction** | Pure RPC + event emission on existing invitation |
-| 8 | `manage-user` | `deactivate` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | **load-bearing** | LB1 — `auth.admin.updateUserById` ban. **Pattern A v2 retrofit TBD** |
-| 9 | `manage-user` | `reactivate` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | **load-bearing** | LB1 — ban reversal. **Pattern A v2 retrofit TBD** |
-| 10 | `manage-user` | `delete` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **candidate-for-extraction** | Pure RPC + event. **Pattern A v2 retrofit inherited on extraction** |
-| 11 | `manage-user` | `modify_roles` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **candidate-for-extraction** | Pure RPC + 1+N+M events. **Pattern A v2 retrofit TBD** |
+| 8 | `manage-user` | `deactivate` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | **load-bearing** | LB1 — `auth.admin.updateUserById` ban-state sync at `index.ts:721`. **Pattern A v2 retrofit TBD** (blocked on missing `handle_user_deactivated` handler — see `dev/active/fix-missing-user-lifecycle-handlers/`). |
+| 9 | `manage-user` | `reactivate` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **candidate-for-extraction** | Reclassified 2026-04-24 — no `auth.admin` call on this path (ban gated on `operation === 'deactivate'` at `index.ts:719`). Handler `handle_user_reactivated` missing — see `dev/active/fix-missing-user-lifecycle-handlers/`. |
+| 10 | `manage-user` | `delete` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **candidate-for-extraction** | Pure RPC + event; no `auth.admin` call. Handler `handle_user_deleted` missing — see `dev/active/fix-missing-user-lifecycle-handlers/`. |
+| 11 | `manage-user` | `modify_roles` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **candidate-for-extraction** | Pure RPC + 1+N+M events. Existing role-assignment handlers used. |
 | 12 | `manage-user` | `update_notification_preferences` (v11) | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **candidate-for-extraction** | **Pattern A v2 reference implementation**; architect-validated first extraction target |
 | 13 | `organization-bootstrap` | initiate workflow | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | **load-bearing** | Backend API + workflow status response |
-| 14 | `organization-delete` | trigger deletion | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | **load-bearing** | **Hybrid** — see walkthrough above |
+| 14 | `organization-delete` | trigger deletion | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | **load-bearing** | **Hybrid** — see [walkthrough](#hybrid-case-walkthrough--organization-delete) above |
 | 15 | `validate-invitation` | lookup + validate | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | **load-bearing** | LB4 — unauthenticated bespoke token validation |
 | 16 | `workflow-status` | query status | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | **load-bearing** | LB5 — cross-tier state orchestration |
 
@@ -187,7 +197,7 @@ Total: 16 operations across 7 functions, 3,390 LOC. **12 load-bearing** + **4 ca
 |----------|-------------|
 | `accept-invitation` | All 4 ops load-bearing |
 | `invite-user` | **partial-candidate** (2 load-bearing + 1 candidate `revoke`) |
-| `manage-user` | **partial-candidate** (2 load-bearing + 3 candidates) |
+| `manage-user` | **partial-candidate** (1 load-bearing + 4 candidates) |
 | `organization-bootstrap` | Load-bearing whole-function |
 | `organization-delete` | Load-bearing whole-function (hybrid) |
 | `validate-invitation` | Load-bearing whole-function |
@@ -201,8 +211,19 @@ Each row below is a seeded follow-up card under `dev/active/<folder>/`:
 |----------|------|-----------|-------|
 | **High** | `dev/active/manage-user-to-sql-rpc/` | `update_notification_preferences` | Architect-validated first target. Supersedes Blocker-3-followup-7. Scope = this one op only. |
 | Medium | `dev/active/invite-user-revoke-to-sql-rpc/` | `invite-user revoke` | Pure RPC wrapper; no rollout complexity |
-| Medium | `dev/active/manage-user-delete-to-sql-rpc/` | `manage-user delete` | Couples with Pattern A v2 retrofit opportunity |
+| Medium | `dev/active/manage-user-delete-to-sql-rpc/` | `manage-user delete` | Blocked on missing `handle_user_deleted` handler (see separate issue). |
+| Medium | `dev/active/manage-user-reactivate-to-sql-rpc/` | `manage-user reactivate` | Reclassified 2026-04-24. Blocked on missing `handle_user_reactivated` handler (see separate issue). Phase 0 must resolve: is the current semantic (no `auth.admin` call) intentional, or a latent bug requiring an unban on reactivate? |
 | Low | `dev/active/manage-user-modify-roles-to-sql-rpc/` | `manage-user modify_roles` | 1+N+M event emission; revisit after High-priority card ships |
+
+### Load-bearing retrofit backlog
+
+Ops classified `load-bearing` that still carry the pre-v11 emit-and-return-success shape (no Pattern A v2 two-step read-back). These are NOT extraction candidates — they meet load-bearing criteria (LB1–LB6) and must remain as Edge Functions — but their silent-failure shape warrants the v11-style Pattern A v2 retrofit per Decision 5.
+
+| Priority | Op | Retrofit action | Blocker |
+|----------|-----|-----------------|---------|
+| High | `manage-user deactivate` | Add Pattern A v2 two-step read-back (per v11 reference impl for `update_notification_preferences`) + include projection entity in response envelope | Missing `handle_user_deactivated` handler — see `dev/active/fix-missing-user-lifecycle-handlers/` |
+
+When the missing-handlers issue resolves, a retrofit card will be seeded at `dev/active/manage-user-deactivate-pattern-a-v2-retrofit/`.
 
 ### Inventory cadence
 

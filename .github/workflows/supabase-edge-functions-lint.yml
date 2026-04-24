@@ -4,10 +4,16 @@ name: Edge Function ADR Citation Check
 # top-of-file comment. See documentation/architecture/decisions/adr-edge-function-vs-sql-rpc.md
 # Decision 6 (Layer 4) for rationale.
 #
-# Scope: NEW files only (git diff --diff-filter=A). Modifications to existing Edge
-# Function files are NOT blocked — retrofitting the 7 functions that predate this
-# ADR would manufacture churn. New additions must justify load-bearing classification
-# by citing the ADR and naming the LB criterion they meet.
+# Scope: NEW files only (git diff --diff-filter=A --no-renames). Modifications to
+# existing Edge Function files are NOT blocked — retrofitting the 7 functions that
+# predate this ADR would manufacture churn. New additions must justify load-bearing
+# classification by citing the ADR and naming the LB criterion they meet.
+#
+# Known limitations (CI v1): The check is a substring match on the ADR filename
+# fragment. It does NOT validate the full citation block's JSDoc shape, and it only
+# matches files named `index.ts` per the path regex below. A new Edge Function using
+# `server.ts` / `main.ts` / split across multiple files would silently pass. See the
+# "CI v1 known limitations" note in the ADR's Decision 6 / Layer 4 section.
 
 on:
   pull_request:

@@ -24,8 +24,8 @@
 - AsyncAPI contract unchanged (event type / stream_type stay the same)
 
 ### Out of scope
-- Other `manage-user` operations (`deactivate`, `reactivate`, `delete`, `modify_roles`) — separate cards
-- Pattern A v2 retrofit of `manage-user` load-bearing ops (`deactivate`, `reactivate`) — tracked separately
+- Other `manage-user` operations (`deactivate`, `reactivate`, `delete`, `modify_roles`) — separate cards (note: `reactivate` reclassified as `candidate-for-extraction` 2026-04-24; see `dev/active/manage-user-reactivate-to-sql-rpc/`)
+- Pattern A v2 retrofit of `manage-user deactivate` (remaining LB1 op) — tracked separately; blocked on `dev/active/fix-missing-user-lifecycle-handlers/`
 - Renaming `user_notification_preferences_projection` or its schema
 
 ## Why this is the right first extraction
@@ -36,7 +36,7 @@ Per `adr-edge-function-vs-sql-rpc.md` Decision 5, `manage-user update_notificati
 - No snake↔camel transformation at the response boundary — RPC returns the projection row shape directly
 - Consolidates two deploy surfaces (function + migration) into one (migration only)
 
-Frontend consumers already expect the `{success, notificationPreferences}` envelope shape; the migration is compatible at the TypeScript type level.
+Frontend consumers already expect the `{success, notificationPreferences}` envelope shape at the service-boundary level. The open question Phase 0 must resolve (per `plan.md` R2) is whether the RPC returns **camelCase** directly (making the service mapper a no-op, but creating drift between the RPC shape and the AsyncAPI snake_case convention) or **snake_case** (preserving AsyncAPI alignment, requiring the mapper to continue converting). This is the primary design decision for the extraction — not a pre-answered compatibility claim.
 
 ## Rollout considerations
 

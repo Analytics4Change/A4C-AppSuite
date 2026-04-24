@@ -18,9 +18,9 @@ Extract `delete` from `manage-user` Edge Function into a new SQL RPC with Patter
 
 - **O1** — Soft-delete (`users.deleted_at`) vs hard-delete? Per Rule 13 template (SKILL.md), read-back for soft-delete matches `WHERE id = ? AND deleted_at IS NOT NULL`.
 - **O2** — Does user deletion cascade to `user_roles_projection`, `user_org_phone_overrides`, etc.? Confirm handler scope before porting.
-- **O3** — `auth.users` cleanup — does deletion also remove the auth record? If yes, LB1 applies and this becomes a `deactivate`-style flow (load-bearing). If no (soft-delete only), truly `candidate`.
+- **O3** — ~~`auth.users` cleanup — does deletion also remove the auth record?~~ **Verified 2026-04-24 — no `auth.admin` call in delete path** (confirmed by grep of `manage-user/index.ts:668–680` + full-file audit during PR #33 review). Classification stable as `candidate-for-extraction`.
 
-**If O3 reveals auth.users deletion**: reclassify as load-bearing and park this card.
+**Prerequisite**: Handler `handle_user_deleted` is missing from the repo (see `dev/active/fix-missing-user-lifecycle-handlers/`). Extraction into SQL RPC depends on the handler existing — the RPC body will call `api.emit_domain_event('user.deleted', ...)` and expect `handle_user_deleted` to do the projection write.
 
 ## Reference
 
