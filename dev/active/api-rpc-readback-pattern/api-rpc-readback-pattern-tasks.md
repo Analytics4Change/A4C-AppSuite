@@ -360,6 +360,47 @@ Context: `lars-tice` self-review on PR #31 (`feat/phase4-client-rpc-result-typin
 
 Wires into CI alongside existing `plpgsql_check` (which only catches static errors).
 
+## Blocker 3 — User Domain Cleanup ✅ COMPLETE (2026-04-23; PR #32 remediation 2026-04-24 upgrades Edge Function to v11 real Pattern A v2 read-back)
+
+**Branch**: `feat/phase4-user-domain-typing` — Scope F PR A.
+**Architect review**: `software-architect-dbc` agent `a9dee2ed181895edb`.
+
+| Site | Resolution |
+|------|------------|
+| Type anti-pattern (`UserOperationResult` flat union, 5 optional fields × 19 methods) | ✅ Narrowed to `UserRpcEnvelope` + 4 specific result types + `UserVoidResult` |
+| Site 1 (`updateUserAddress` → `loadUserAddresses`) | ⏸️ Deferred to PR B — backend RPCs not yet implemented; Supabase service throws `"not yet implemented"` |
+| Site 2 (`updateUserPhone` → `loadUserPhones`) | ✅ Misclassified in earlier audit — `api.update_user_phone` already returns `phone` entity. Wired type hint, map snake_case→camelCase, VM patches list in place by id with fallback + `log.warn`. Same wire-up for `addUserPhone` after new migration. |
+| Site 3 (`updateNotificationPreferences` → `loadUserOrgAccess`) | ✅ Edge Function route (not SQL RPC). `manage-user` v10 adds `notificationPreferences` + `deployVersion` to response envelope. VM patches `userOrgAccess.notificationPreferences` in place with version-gated fallback. |
+
+**New backend artifacts**:
+- Migration `20260423232531_add_user_phone_pattern_a_v2_readback.sql` — extends `api.add_user_phone` with Pattern A v2 read-back; branches `p_org_id IS NULL` to read from correct projection (`user_phones` vs `user_org_phone_overrides`); returns camelCase `phone` via explicit `jsonb_build_object`.
+- Edge Function `manage-user` v10 — `update_notification_preferences` operation returns `{success, userId, operation, deployVersion, notificationPreferences}`.
+
+**New frontend artifacts**:
+- `UserRpcEnvelope` base + `InviteUserResult`, `UpdateUserResult`, `UserPhoneResult`, `UpdateNotificationPreferencesResult`, `UserVoidResult` in `user.types.ts`
+- Narrowed signatures across `IUserCommandService` + `SupabaseUserCommandService` + `MockUserCommandService` + 5 consumer VMs
+- `log.warn` fallback telemetry at all 3 read-back consumer sites in VM
+- NEW test file `MockUserCommandService.envelope.test.ts` (7/7 tests — envelope-contract coverage)
+- NEW test file `UserRpcContract.test.ts` (11/11 tests — anti-drift structural assertions parsing migration SQL)
+
+**New documentation artifacts**:
+- NEW: `documentation/frontend/patterns/rpc-readback-vm-patch.md` — VM in-place patch pattern at the 3-domain threshold (Roles, ClientFields, Users)
+- Updated: ADR rollout history + frontend envelope types mapping table
+- Updated: AGENT-INDEX keyword + Document Catalog entries
+
+### Blocker 3 — Follow-up tasks
+
+| ID | Title | Status |
+|----|-------|--------|
+| Blocker-3-followup-1 | Primary-phone exclusivity invariant (partial unique index + handler logic) | ⏸️ Parked |
+| Blocker-3-followup-2 | `manage-user` Edge Function fallback removal (acceptance: N days / zero fallback `log.warn` events) | ⏸️ Parked |
+| Blocker-3-followup-3 | Broader RPC-params contract tests (enumerate all `api.*` functions) | ⏸️ Parked |
+| Blocker-3-followup-4 | `frontend/src/viewModels/users/CLAUDE.md` VM-level docs | ⏸️ Parked |
+| Blocker-3-followup-5 | `updateUser` optional in-place patch in consumer VMs | ⏸️ Parked |
+| Blocker-3-followup-6 | Document Edge-Function-vs-SQL-RPC selection as an ADR | ⏸️ Parked |
+| Blocker-3-followup-7 | Evaluate breaking up `manage-user` Edge Function into individual SQL RPCs. **Motivation strengthened by PR #32 review item 1 (silent-failure gap in Edge Function Pattern A v2 consumer — resolved by v11 real read-back) and architect `a060ef3faaa5b630c` finding that a SQL RPC wrapper would be "strictly superior architecturally" (single-transaction PL/pgSQL read-back; no two-client-call round-trip).** Depends on Blocker-3-followup-6 (Edge-Function-vs-SQL-RPC ADR). | ⏸️ Parked (depends on #6) |
+| PR-B | Site 1 address backend implementation (separate planning session) | ⏸️ Parked |
+
 ## Verification ⏸️ PARKED
 
 ### PR 1 pre-merge

@@ -30,7 +30,9 @@ import type {
   InviteUserRequest,
   UpdateUserRequest,
   RoleReference,
-  UserOperationResult,
+  InviteUserResult,
+  UpdateUserResult,
+  UserVoidResult,
   EmailLookupResult,
   NotificationPreferences,
   InvitationPhone,
@@ -892,8 +894,19 @@ export class UserFormViewModel {
    *
    * In create mode: Sends invitation via commandService.inviteUser()
    * In edit mode: Updates user profile via commandService.updateUser()
+   *
+   * Return union intentionally contains UserVoidResult: on edit mode, if
+   * profile update succeeds but subsequent modifyRoles() fails, `result` is
+   * reassigned to the modifyRoles UserVoidResult so consumers see the
+   * role-modification error (see the `result = roleResult` reassignment
+   * around line 969 below). Dropping UserVoidResult here would force a
+   * later consumer to either cast or narrow via success-property access.
+   * PR #32 review item 6 proposed removing this arm as "phantom"; it is
+   * structurally necessary.
    */
-  async submit(commandService: IUserCommandService): Promise<UserOperationResult> {
+  async submit(
+    commandService: IUserCommandService
+  ): Promise<InviteUserResult | UpdateUserResult | UserVoidResult> {
     // Touch all fields to show validation errors
     this.touchAllFields();
 
@@ -932,7 +945,7 @@ export class UserFormViewModel {
     });
 
     try {
-      let result: UserOperationResult;
+      let result: InviteUserResult | UpdateUserResult | UserVoidResult;
 
       if (this.mode === 'create') {
         // Create mode: Send invitation

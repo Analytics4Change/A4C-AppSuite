@@ -474,12 +474,12 @@ export interface Invitation {
  * in the invitation form.
  */
 export type EmailLookupStatus =
-  | 'not_found'        // No matches anywhere - show full form
-  | 'pending'          // Has pending invitation - offer resend
-  | 'expired'          // Invitation expired - offer new invitation
-  | 'active_member'    // Already active in this org - show view link
-  | 'deactivated'      // Deactivated in this org - offer reactivate
-  | 'other_org';       // Exists in system but not this org - offer add
+  | 'not_found' // No matches anywhere - show full form
+  | 'pending' // Has pending invitation - offer resend
+  | 'expired' // Invitation expired - offer new invitation
+  | 'active_member' // Already active in this org - show view link
+  | 'deactivated' // Deactivated in this org - offer reactivate
+  | 'other_org'; // Exists in system but not this org - offer add
 
 /**
  * Full email lookup result with context
@@ -801,7 +801,7 @@ export type UserOperationErrorCode =
   | 'ALREADY_MEMBER'
   | 'ALREADY_ACTIVE'
   | 'ALREADY_INACTIVE'
-  | 'USER_ACTIVE'     // User must be deactivated before deletion
+  | 'USER_ACTIVE' // User must be deactivated before deletion
   | 'INVITATION_EXPIRED'
   | 'INVITATION_REVOKED'
   | 'SUBSET_ONLY_VIOLATION'
@@ -812,33 +812,28 @@ export type UserOperationErrorCode =
   | 'EMAIL_SEND_FAILED'
   | 'FORBIDDEN'
   | 'INVALID_DATES'
-  | 'HTTP_ERROR'      // Edge Function returned non-2xx status
-  | 'RELAY_ERROR'     // Network relay error (Supabase infrastructure)
-  | 'FETCH_ERROR'     // Connection/fetch error
-  | 'AUTH_ERROR'      // Authentication error (no session, missing claims)
-  | 'RPC_ERROR'       // Database RPC function error
-  | 'UPDATE_FAILED'   // Update operation failed
+  | 'HTTP_ERROR' // Edge Function returned non-2xx status
+  | 'RELAY_ERROR' // Network relay error (Supabase infrastructure)
+  | 'FETCH_ERROR' // Connection/fetch error
+  | 'AUTH_ERROR' // Authentication error (no session, missing claims)
+  | 'RPC_ERROR' // Database RPC function error
+  | 'UPDATE_FAILED' // Update operation failed
   | 'MISSING_USER_ID' // Edit mode requires user ID
   | 'UNKNOWN';
 
 /**
- * Result from user operations
+ * Base envelope for all user-domain RPC / Edge Function responses.
+ *
+ * Contract (Pattern A v2 — see adr-rpc-readback-pattern.md):
+ *   Postcondition: `success` is always present.
+ *   Postcondition: `error` is present iff `success === false`.
+ *   Invariant: on handler-driven failure, `error` has the prefix
+ *              "Event processing failed: " followed by the `processing_error`
+ *              text from `domain_events`.
  */
-export interface UserOperationResult {
+export interface UserRpcEnvelope {
   /** Whether the operation succeeded */
   success: boolean;
-
-  /** The resulting user (if applicable) */
-  user?: User;
-
-  /** The resulting invitation (if applicable) */
-  invitation?: Invitation;
-
-  /** The created phone ID (for addUserPhone) */
-  phoneId?: string;
-
-  /** The created address ID (for addUserAddress) */
-  addressId?: string;
 
   /** Error message (if failed) */
   error?: string;
@@ -847,17 +842,75 @@ export interface UserOperationResult {
   errorDetails?: {
     /** Error code for programmatic handling */
     code: UserOperationErrorCode;
-
     /** Human-readable message */
     message: string;
-
     /** Additional context */
     context?: Record<string, unknown>;
-
     /** Correlation ID from Edge Function response for support tickets */
     correlationId?: string;
   };
 }
+
+/** Response for `inviteUser` (populates `invitation` from Edge Function response). */
+export interface InviteUserResult extends UserRpcEnvelope {
+  invitation?: Invitation;
+}
+
+/**
+ * Response for `updateUser`.
+ *
+ * **Pattern A v2**: `api.update_user` already returns the refreshed `user` row
+ * in its success envelope (verified in live schema). Consumers can patch
+ * their local state in place without a follow-up fetch.
+ */
+export interface UpdateUserResult extends UserRpcEnvelope {
+  user?: User;
+}
+
+/**
+ * Response for `addUserPhone` / `updateUserPhone`.
+ *
+ * **Pattern A v2**: `api.update_user_phone` already returns the refreshed
+ * `phone` row. `api.add_user_phone` will return it after the
+ * `add_user_phone_pattern_a_v2_readback` migration. Until then, `phone` may
+ * be undefined on add responses; consumers should fall back to a list refetch
+ * and emit a `log.warn` telemetry signal in that case.
+ */
+export interface UserPhoneResult extends UserRpcEnvelope {
+  phoneId?: string;
+  phone?: UserPhone;
+}
+
+/**
+ * Response for `updateNotificationPreferences`.
+ *
+ * Path: `manage-user` Edge Function, operation `update_notification_preferences`.
+ * The Edge Function returns the updated preferences in its response envelope so
+ * consumer VMs can patch `userOrgAccess.notificationPreferences` in place.
+ *
+ * **Deploy-window compat**: `notificationPreferences` may be undefined during
+ * a rollout window where an older Edge Function version is still serving.
+ * Consumers fall back to a `loadUserOrgAccess` refetch and emit `log.warn`
+ * in that case. See `documentation/frontend/patterns/rpc-readback-vm-patch.md`.
+ */
+export interface UpdateNotificationPreferencesResult extends UserRpcEnvelope {
+  notificationPreferences?: NotificationPreferences;
+}
+
+/**
+ * Response for user-domain operations that return only the envelope:
+ * `resendInvitation`, `revokeInvitation`, `deactivateUser`, `reactivateUser`,
+ * `deleteUser`, `resetPassword`, `addUserToOrganization`, `switchOrganization`,
+ * `modifyRoles`, `updateAccessDates`, `removeUserPhone`, `addUserAddress`,
+ * `updateUserAddress`, `removeUserAddress`.
+ *
+ * **TODO(PR-B)**: Address methods (`addUserAddress`, `updateUserAddress`,
+ * `removeUserAddress`) currently use this type because the backend RPCs are
+ * not yet implemented (placeholder service throws). PR B will introduce a
+ * dedicated `UserAddressResult` with the full contract once the backend
+ * RPCs ship.
+ */
+export type UserVoidResult = UserRpcEnvelope;
 
 // ============================================================================
 // QUERY AND FILTER TYPES
@@ -1049,8 +1102,7 @@ export function validateAccessDates(
   accessStartDate?: string | null,
   accessExpirationDate?: string | null
 ): { accessStartDate?: string; accessExpirationDate?: string } | null {
-  const errors: { accessStartDate?: string; accessExpirationDate?: string } =
-    {};
+  const errors: { accessStartDate?: string; accessExpirationDate?: string } = {};
 
   // Validate date formats if provided
   const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -1060,8 +1112,7 @@ export function validateAccessDates(
   }
 
   if (accessExpirationDate && !datePattern.test(accessExpirationDate)) {
-    errors.accessExpirationDate =
-      'Access expiration date must be in YYYY-MM-DD format';
+    errors.accessExpirationDate = 'Access expiration date must be in YYYY-MM-DD format';
   }
 
   // If both dates provided and valid format, check ordering
@@ -1075,8 +1126,7 @@ export function validateAccessDates(
     const end = new Date(accessExpirationDate);
 
     if (start > end) {
-      errors.accessExpirationDate =
-        'Access expiration date must be after start date';
+      errors.accessExpirationDate = 'Access expiration date must be after start date';
     }
   }
 
@@ -1172,9 +1222,7 @@ export function getDisplayName(item: {
  * @param invitation - Invitation to check
  * @returns Computed display status
  */
-export function computeInvitationDisplayStatus(
-  invitation: Invitation
-): UserDisplayStatus {
+export function computeInvitationDisplayStatus(invitation: Invitation): UserDisplayStatus {
   if (invitation.status === 'accepted') {
     return 'active';
   }

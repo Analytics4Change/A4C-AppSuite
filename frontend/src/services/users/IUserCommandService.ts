@@ -24,7 +24,11 @@ import type {
   InviteUserRequest,
   UpdateUserRequest,
   ModifyRolesRequest,
-  UserOperationResult,
+  InviteUserResult,
+  UpdateUserResult,
+  UserPhoneResult,
+  UpdateNotificationPreferencesResult,
+  UserVoidResult,
   AddUserAddressRequest,
   UpdateUserAddressRequest,
   RemoveUserAddressRequest,
@@ -67,7 +71,7 @@ export interface IUserCommandService {
    *   showError('Cannot assign roles with permissions you do not have');
    * }
    */
-  inviteUser(request: InviteUserRequest): Promise<UserOperationResult>;
+  inviteUser(request: InviteUserRequest): Promise<InviteUserResult>;
 
   /**
    * Resends an existing invitation
@@ -88,7 +92,7 @@ export interface IUserCommandService {
    *   showSuccess('Invitation resent');
    * }
    */
-  resendInvitation(invitationId: string): Promise<UserOperationResult>;
+  resendInvitation(invitationId: string): Promise<UserVoidResult>;
 
   /**
    * Revokes a pending invitation
@@ -107,7 +111,7 @@ export interface IUserCommandService {
    *   showSuccess('Invitation cancelled');
    * }
    */
-  revokeInvitation(invitationId: string): Promise<UserOperationResult>;
+  revokeInvitation(invitationId: string): Promise<UserVoidResult>;
 
   /**
    * Deactivates a user account
@@ -129,7 +133,7 @@ export interface IUserCommandService {
    *   showError('User is already deactivated');
    * }
    */
-  deactivateUser(userId: string): Promise<UserOperationResult>;
+  deactivateUser(userId: string): Promise<UserVoidResult>;
 
   /**
    * Reactivates a deactivated user account
@@ -150,7 +154,7 @@ export interface IUserCommandService {
    *   showError('User is already active');
    * }
    */
-  reactivateUser(userId: string): Promise<UserOperationResult>;
+  reactivateUser(userId: string): Promise<UserVoidResult>;
 
   /**
    * Permanently deletes a deactivated user from the organization
@@ -176,7 +180,7 @@ export interface IUserCommandService {
    *   showError('Cannot delete active user. Deactivate first.');
    * }
    */
-  deleteUser(userId: string, reason?: string): Promise<UserOperationResult>;
+  deleteUser(userId: string, reason?: string): Promise<UserVoidResult>;
 
   /**
    * Updates a user's profile information
@@ -197,7 +201,7 @@ export interface IUserCommandService {
    *   lastName: 'Smith'
    * });
    */
-  updateUser(request: UpdateUserRequest): Promise<UserOperationResult>;
+  updateUser(request: UpdateUserRequest): Promise<UpdateUserResult>;
 
   /**
    * Modifies roles for a user (add and/or remove)
@@ -228,7 +232,7 @@ export interface IUserCommandService {
    *   showError('Cannot assign role outside your organizational scope');
    * }
    */
-  modifyRoles(request: ModifyRolesRequest): Promise<UserOperationResult>;
+  modifyRoles(request: ModifyRolesRequest): Promise<UserVoidResult>;
 
   /**
    * Adds an existing user to the current organization
@@ -253,7 +257,7 @@ export interface IUserCommandService {
   addUserToOrganization(
     userId: string,
     roles: Array<{ roleId: string; roleName: string }>
-  ): Promise<UserOperationResult>;
+  ): Promise<UserVoidResult>;
 
   /**
    * Switches the current user's active organization
@@ -274,7 +278,7 @@ export interface IUserCommandService {
    *   await refreshSession();
    * }
    */
-  switchOrganization(organizationId: string): Promise<UserOperationResult>;
+  switchOrganization(organizationId: string): Promise<UserVoidResult>;
 
   /**
    * Triggers password reset for a user
@@ -291,7 +295,7 @@ export interface IUserCommandService {
    *   showSuccess('Password reset email sent');
    * }
    */
-  resetPassword(email: string): Promise<UserOperationResult>;
+  resetPassword(email: string): Promise<UserVoidResult>;
 
   // ============================================================================
   // Extended Data Collection Methods (Phase 0A)
@@ -335,7 +339,7 @@ export interface IUserCommandService {
    *   zipCode: '60601'
    * });
    */
-  addUserAddress(request: AddUserAddressRequest): Promise<UserOperationResult>;
+  addUserAddress(request: AddUserAddressRequest): Promise<UserVoidResult>;
 
   /**
    * Updates an existing user address
@@ -348,7 +352,7 @@ export interface IUserCommandService {
    * @param request - Address update details
    * @returns Promise resolving to operation result
    */
-  updateUserAddress(request: UpdateUserAddressRequest): Promise<UserOperationResult>;
+  updateUserAddress(request: UpdateUserAddressRequest): Promise<UserVoidResult>;
 
   /**
    * Removes (deactivates) a user address
@@ -361,7 +365,7 @@ export interface IUserCommandService {
    * @param request - Address removal details
    * @returns Promise resolving to operation result
    */
-  removeUserAddress(request: RemoveUserAddressRequest): Promise<UserOperationResult>;
+  removeUserAddress(request: RemoveUserAddressRequest): Promise<UserVoidResult>;
 
   /**
    * Adds a new phone number for a user
@@ -386,7 +390,7 @@ export interface IUserCommandService {
    *   isPrimary: true
    * });
    */
-  addUserPhone(request: AddUserPhoneRequest): Promise<UserOperationResult>;
+  addUserPhone(request: AddUserPhoneRequest): Promise<UserPhoneResult>;
 
   /**
    * Updates an existing user phone
@@ -399,7 +403,7 @@ export interface IUserCommandService {
    * @param request - Phone update details
    * @returns Promise resolving to operation result
    */
-  updateUserPhone(request: UpdateUserPhoneRequest): Promise<UserOperationResult>;
+  updateUserPhone(request: UpdateUserPhoneRequest): Promise<UserPhoneResult>;
 
   /**
    * Removes (deactivates) a user phone
@@ -412,7 +416,7 @@ export interface IUserCommandService {
    * @param request - Phone removal details
    * @returns Promise resolving to operation result
    */
-  removeUserPhone(request: RemoveUserPhoneRequest): Promise<UserOperationResult>;
+  removeUserPhone(request: RemoveUserPhoneRequest): Promise<UserVoidResult>;
 
   /**
    * Updates access dates for a user in an organization
@@ -436,7 +440,7 @@ export interface IUserCommandService {
    *   accessExpirationDate: '2025-09-01'
    * });
    */
-  updateAccessDates(request: UpdateAccessDatesRequest): Promise<UserOperationResult>;
+  updateAccessDates(request: UpdateAccessDatesRequest): Promise<UserVoidResult>;
 
   /**
    * Updates notification preferences for a user in an organization
@@ -463,5 +467,5 @@ export interface IUserCommandService {
    */
   updateNotificationPreferences(
     request: UpdateNotificationPreferencesRequest
-  ): Promise<UserOperationResult>;
+  ): Promise<UpdateNotificationPreferencesResult>;
 }
