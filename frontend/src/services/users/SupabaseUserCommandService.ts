@@ -1173,49 +1173,46 @@ export class SupabaseUserCommandService implements IUserCommandService {
     Logger.pushTracingContext(tracingContext);
 
     try {
-      log.info('Updating user notification preferences', {
-        userId: request.userId,
-        orgId: request.orgId,
-      });
+      log.info('Updating user notification preferences', { userId: request.userId });
 
-      const client = supabaseService.getClient();
-      const headers = buildHeadersFromContext(tracingContext);
-
-      // Transform to AsyncAPI snake_case format for event emission
-      // Frontend uses camelCase internally (TypeScript convention)
-      // but AsyncAPI contract uses snake_case (phone_id, in_app)
+      // Transform request to AsyncAPI snake_case shape for the RPC payload.
+      // RPC emits the domain event with this shape (event_data parity).
       const asyncApiPreferences = {
         email: request.notificationPreferences.email,
         sms: {
           enabled: request.notificationPreferences.sms.enabled,
-          phone_id: request.notificationPreferences.sms.phoneId, // camelCase → snake_case
+          phone_id: request.notificationPreferences.sms.phoneId,
         },
-        in_app: request.notificationPreferences.inApp, // camelCase → snake_case
+        in_app: request.notificationPreferences.inApp,
       };
 
-      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.MANAGE_USER, {
-        body: {
-          operation: 'update_notification_preferences',
-          userId: request.userId,
-          notificationPreferences: asyncApiPreferences,
-          reason: request.reason,
-        },
-        headers,
+      // api.update_user_notification_preferences (Pattern A v2 RPC, extracted
+      // from manage-user Edge Function per adr-edge-function-vs-sql-rpc.md).
+      // org_id sourced from JWT inside the RPC; never passed from the client.
+      const { data, error } = await supabaseService.apiRpc<{
+        success: boolean;
+        error?: string;
+        eventId?: string;
+        notificationPreferences?: {
+          email: boolean;
+          sms: { enabled: boolean; phone_id: string | null };
+          in_app: boolean;
+        };
+      }>('update_user_notification_preferences', {
+        p_user_id: request.userId,
+        p_notification_preferences: asyncApiPreferences,
+        p_reason: request.reason,
       });
 
       if (error) {
-        const errorInfo = await extractEdgeFunctionError(error, 'Update notification preferences');
-        const errorMessage = errorInfo.correlationId
-          ? `${errorInfo.message} (Ref: ${errorInfo.correlationId})`
-          : errorInfo.message;
+        log.error('RPC error in updateNotificationPreferences', { error });
         return {
           success: false,
-          error: errorMessage,
+          error: error.message,
           errorDetails: {
-            code: (errorInfo.code ?? 'UNKNOWN') as UserOperationErrorCode,
-            message: errorInfo.message,
-            context: errorInfo.details ? { details: errorInfo.details } : undefined,
-            correlationId: errorInfo.correlationId,
+            code: 'UNKNOWN',
+            message: error.message,
+            context: { postgresCode: error.code, hint: error.hint },
           },
         };
       }
@@ -1233,15 +1230,12 @@ export class SupabaseUserCommandService implements IUserCommandService {
 
       log.info('Notification preferences updated successfully', {
         userId: request.userId,
-        orgId: request.orgId,
-        deployVersion: data.deployVersion,
+        eventId: data.eventId,
       });
 
-      // Pattern A v2 via Edge Function (manage-user v10+): echo the
-      // submitted preferences so consumer VMs can patch in place. Transform
-      // back from AsyncAPI snake_case to frontend camelCase.
-      // Absent (older Edge Function version): return undefined so the VM
-      // falls back to loadUserOrgAccess refetch with log.warn.
+      // Map RPC's AsyncAPI snake_case response → frontend camelCase
+      // NotificationPreferences shape. Contract: RPC always includes the
+      // notificationPreferences field on success (Pattern A v2 readback).
       let notificationPreferences: NotificationPreferences | undefined;
       if (data.notificationPreferences) {
         const p = data.notificationPreferences;

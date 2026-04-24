@@ -168,7 +168,7 @@ find infrastructure/supabase/supabase/functions -name 'index.ts' -not -path '*/_
 # read the body of each case and answer LB1-LB6.
 ```
 
-Total: 16 operations across 7 functions, 3,390 LOC. **11 load-bearing** + **5 candidate-for-extraction** (one of which — `update_notification_preferences` — is also the sole Pattern A v2 reference implementation per Decision 5).
+Total: 16 operations across 7 functions. **11 load-bearing** + **4 candidate-for-extraction** + **1 extracted** (see row 12; first Edge→RPC extraction shipped 2026-04-24).
 
 > **Classification audit note (2026-04-24)**: During PR #33 review, an audit of `manage-user reactivate` revealed no `auth.admin` call on its path (the ban/unban call at `manage-user/index.ts:719` is gated on `operation === 'deactivate'`). Row 9 was therefore moved from `load-bearing` (LB1) to `candidate-for-extraction`. The same audit uncovered a separate data-integrity finding: three user-lifecycle handlers referenced by `process_user_event` (`handle_user_deactivated`, `handle_user_reactivated`, `handle_user_deleted`) are missing from the repo — tracked separately at `dev/active/fix-missing-user-lifecycle-handlers/` (filed after PR #33 merges).
 
@@ -185,7 +185,7 @@ Total: 16 operations across 7 functions, 3,390 LOC. **11 load-bearing** + **5 ca
 | 9 | `manage-user` | `reactivate` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **candidate-for-extraction** | Reclassified 2026-04-24 — no `auth.admin` call on this path (ban gated on `operation === 'deactivate'` at `index.ts:719`). Handler `handle_user_reactivated` missing — see `dev/active/fix-missing-user-lifecycle-handlers/`. |
 | 10 | `manage-user` | `delete` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **candidate-for-extraction** | Pure RPC + event; no `auth.admin` call. Handler `handle_user_deleted` missing — see `dev/active/fix-missing-user-lifecycle-handlers/`. |
 | 11 | `manage-user` | `modify_roles` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **candidate-for-extraction** | Pure RPC + 1+N+M events. Existing role-assignment handlers used. |
-| 12 | `manage-user` | `update_notification_preferences` (v11) | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **candidate-for-extraction** | **Pattern A v2 reference implementation**; architect-validated first extraction target |
+| 12 | ~~`manage-user`~~ | ~~`update_notification_preferences`~~ | — | — | — | — | — | — | **extracted (2026-04-24)** | Moved to `api.update_user_notification_preferences` SQL RPC. First Edge→RPC extraction; establishes precedent patterns for rows 7, 9, 10, 11. See migration `20260424194102_add_update_user_notification_preferences_rpc.sql`. |
 | 13 | `organization-bootstrap` | initiate workflow | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | **load-bearing** | Backend API + workflow status response |
 | 14 | `organization-delete` | trigger deletion | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | **load-bearing** | **Hybrid** — see [walkthrough](#hybrid-case-walkthrough--organization-delete) above |
 | 15 | `validate-invitation` | lookup + validate | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | **load-bearing** | LB4 — unauthenticated bespoke token validation |
@@ -197,7 +197,7 @@ Total: 16 operations across 7 functions, 3,390 LOC. **11 load-bearing** + **5 ca
 |----------|-------------|
 | `accept-invitation` | All 4 ops load-bearing |
 | `invite-user` | **partial-candidate** (2 load-bearing + 1 candidate `revoke`) |
-| `manage-user` | **partial-candidate** (1 load-bearing + 4 candidates) |
+| `manage-user` | **partial-candidate** (1 load-bearing + 3 candidates; `update_notification_preferences` extracted 2026-04-24) |
 | `organization-bootstrap` | Load-bearing whole-function |
 | `organization-delete` | Load-bearing whole-function (hybrid) |
 | `validate-invitation` | Load-bearing whole-function |
@@ -209,11 +209,11 @@ Each row below is a seeded follow-up card under `dev/active/<folder>/`:
 
 | Priority | Card | Source op | Notes |
 |----------|------|-----------|-------|
-| **High** | `dev/active/manage-user-to-sql-rpc/` | `update_notification_preferences` | Architect-validated first target. Supersedes Blocker-3-followup-7. Scope = this one op only. |
-| Medium | `dev/active/invite-user-revoke-to-sql-rpc/` | `invite-user revoke` | Pure RPC wrapper; no rollout complexity |
-| Medium | `dev/active/manage-user-delete-to-sql-rpc/` | `manage-user delete` | Blocked on missing `handle_user_deleted` handler (see separate issue). |
-| Medium | `dev/active/manage-user-reactivate-to-sql-rpc/` | `manage-user reactivate` | Reclassified 2026-04-24. Blocked on missing `handle_user_reactivated` handler (see separate issue). Phase 0 must resolve: is the current semantic (no `auth.admin` call) intentional, or a latent bug requiring an unban on reactivate? |
-| Low | `dev/active/manage-user-modify-roles-to-sql-rpc/` | `manage-user modify_roles` | 1+N+M event emission; revisit after High-priority card ships |
+| ~~High~~ | ~~`dev/active/manage-user-to-sql-rpc/`~~ | ~~`update_notification_preferences`~~ | **Extracted 2026-04-24** — see Rollout history. Sets precedent patterns for rows below. |
+| Medium | `dev/active/invite-user-revoke-to-sql-rpc/` | `invite-user revoke` | Pure RPC wrapper; no rollout complexity. Per precedent: snake_case wire, `public.has_permission()` port, direct cutover. |
+| Medium | `dev/active/manage-user-delete-to-sql-rpc/` | `manage-user delete` | Unblocked as of PR #35 (handler exists). Per precedent: **scoped permission check via `public.has_effective_permission()`** (target-org ltree), **dual-deploy preferred** due to admin session bundle longevity. |
+| Medium | `dev/active/manage-user-reactivate-to-sql-rpc/` | `manage-user reactivate` | Reclassified 2026-04-24. Unblocked as of PR #35 (handler exists). Same precedent notes as `delete`. Phase 0 must resolve: is the current semantic (no `auth.admin` call) intentional, or a latent bug requiring an unban on reactivate? |
+| Low | `dev/active/manage-user-modify-roles-to-sql-rpc/` | `manage-user modify_roles` | 1+N+M event emission; revisit after simpler cards ship. Per precedent: direct cutover acceptable. |
 
 ### Load-bearing retrofit backlog
 
@@ -232,6 +232,7 @@ Walk the inventory every 6 months or when adding a new Edge Function. Append Rol
 ## Rollout history
 
 - **2026-04-24** — Initial publication (`adr_version: v1`). Establishes criteria LB1–LB6, inventory of 16 operations across 7 functions, four-layer enforcement mechanism (this ADR + `infrastructure/CLAUDE.md` guard rails + `.claude/skills/infrastructure-guidelines/SKILL.md` mirror + CI citation check). Seeds 4 extraction follow-up cards. No operations extracted in this PR.
+- **2026-04-24** — First extraction: `manage-user update_notification_preferences` → `api.update_user_notification_preferences` (migration `20260424194102_add_update_user_notification_preferences_rpc.sql`). Inventory row #12 moves `candidate` → `extracted`. Manage-user Edge Function `DEPLOY_VERSION` bumps to `v12-post-notification-prefs-extraction`. **Established precedents for the 4 remaining candidate extractions**: (a) snake_case at RPC boundary with frontend service keeping its snake→camel mapper; (b) permission port via `public.has_permission()` (presence-only) for unscoped ops, `public.has_effective_permission()` for scoped ops like `delete`/`reactivate`; (c) `public.get_current_user_id()` as the caller-identity idiom (preserves testing override); (d) `org_id` always sourced from JWT via `current_setting('request.jwt.claims', true)::jsonb`, never from body; (e) DbC `COMMENT ON FUNCTION` block with pre/post/invariant/error-envelope is the project template for `api.*` extractions; (f) direct cutover for simple ops, dual-deploy for admin-heavy ops (delete/reactivate).
 
 ## Alternatives considered
 

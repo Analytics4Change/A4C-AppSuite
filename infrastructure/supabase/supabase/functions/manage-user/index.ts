@@ -1,26 +1,26 @@
 /**
  * Manage User Edge Function
  *
- * Handles user lifecycle operations: deactivate, reactivate, delete, role modification,
- * and notification preferences updates.
+ * Handles user lifecycle operations: deactivate, reactivate, delete, and role
+ * modification. The `update_notification_preferences` operation was extracted
+ * to `api.update_user_notification_preferences` SQL RPC — see
+ * adr-edge-function-vs-sql-rpc.md (PR #33) and migration
+ * 20260424194102_add_update_user_notification_preferences_rpc.sql.
  *
  * Operations:
  * - deactivate: Deactivate a user within the organization
  * - reactivate: Reactivate a deactivated user
  * - delete: Permanently delete a deactivated user (soft-delete via deleted_at)
  * - modify_roles: Add and/or remove roles for a user
- * - update_notification_preferences: Update user notification settings (email, SMS, in-app)
  *
  * CQRS-compliant: Emits domain events:
  * - user.deactivated / user.reactivated / user.deleted
  * - user.role.assigned / user.role.revoked
- * - user.notification_preferences.updated
  *
  * Permissions:
  * - user.update: deactivate/reactivate
  * - user.delete: delete
  * - user.role_assign: modify_roles
- * - update_notification_preferences: self OR user.update
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -42,7 +42,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v11-pattern-a-v2-readback';
+const DEPLOY_VERSION = 'v12-post-notification-prefs-extraction';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -50,24 +50,11 @@ const corsHeaders = standardCorsHeaders;
 /**
  * Supported operations
  */
-type Operation = 'deactivate' | 'reactivate' | 'delete' | 'modify_roles' | 'update_notification_preferences';
+type Operation = 'deactivate' | 'reactivate' | 'delete' | 'modify_roles';
 
 /**
  * Request format from frontend
  */
-/**
- * Notification preferences structure
- * Follows AsyncAPI contract snake_case convention
- */
-interface NotificationPreferences {
-  email: boolean;
-  sms: {
-    enabled: boolean;
-    phone_id: string | null;
-  };
-  in_app: boolean;
-}
-
 interface ManageUserRequest {
   operation: Operation;
   userId: string;
@@ -75,8 +62,6 @@ interface ManageUserRequest {
   // For modify_roles operation only
   roleIdsToAdd?: string[];
   roleIdsToRemove?: string[];
-  // For update_notification_preferences operation only
-  notificationPreferences?: NotificationPreferences;
 }
 
 /**
@@ -87,21 +72,6 @@ interface ManageUserResponse {
   userId?: string;
   operation?: Operation;
   error?: string;
-  /**
-   * Deploy version marker — consumers use this for version-gated fallback
-   * detection (see `documentation/frontend/patterns/rpc-readback-vm-patch.md`).
-   * Introduced in v10 alongside the `notificationPreferences` read-back.
-   */
-  deployVersion?: string;
-  /**
-   * For `update_notification_preferences` (v10+): echoes the updated
-   * preferences so consumer VMs can patch `userOrgAccess.notificationPreferences`
-   * in place without a follow-up `loadUserOrgAccess` refetch.
-   *
-   * When absent (pre-v10 Edge Function serving during rollout window),
-   * consumers fall back to the refetch pattern with `log.warn` telemetry.
-   */
-  notificationPreferences?: NotificationPreferences;
 }
 
 /**
@@ -260,18 +230,6 @@ serve(async (req) => {
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-    } else if (preCheckData.operation === 'update_notification_preferences') {
-      // Allow users to update their own notification preferences
-      // Org admins and platform admins can also update any user's preferences
-      const isSelf = preCheckData.userId === user.id;
-      const hasUserUpdate = hasPermission(effectivePermissions, 'user.update');
-      if (!isSelf && !hasUserUpdate) {
-        console.log(`[manage-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} cannot update notification preferences for ${preCheckData.userId}`);
-        return new Response(
-          JSON.stringify({ error: 'Permission denied: Can only update your own notification preferences unless you have user.update permission' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
     } else {
       if (!hasPermission(effectivePermissions, 'user.update')) {
         console.log(`[manage-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} lacks user.update`);
@@ -297,9 +255,9 @@ serve(async (req) => {
       );
     }
 
-    if (!['deactivate', 'reactivate', 'delete', 'modify_roles', 'update_notification_preferences'].includes(requestData.operation)) {
+    if (!['deactivate', 'reactivate', 'delete', 'modify_roles'].includes(requestData.operation)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid operation. Must be "deactivate", "reactivate", "delete", "modify_roles", or "update_notification_preferences"' }),
+        JSON.stringify({ error: 'Invalid operation. Must be "deactivate", "reactivate", "delete", or "modify_roles"' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -319,32 +277,6 @@ serve(async (req) => {
       if (!hasRolesToAdd && !hasRolesToRemove) {
         return new Response(
           JSON.stringify({ error: 'At least one of roleIdsToAdd or roleIdsToRemove must be provided' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    // Validate update_notification_preferences specific fields
-    if (requestData.operation === 'update_notification_preferences') {
-      if (!requestData.notificationPreferences) {
-        return new Response(
-          JSON.stringify({ error: 'notificationPreferences is required for update_notification_preferences operation' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Validate notification preferences structure
-      const prefs = requestData.notificationPreferences;
-      if (typeof prefs.email !== 'boolean' || typeof prefs.in_app !== 'boolean') {
-        return new Response(
-          JSON.stringify({ error: 'notificationPreferences must include boolean email and in_app fields' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if (!prefs.sms || typeof prefs.sms.enabled !== 'boolean') {
-        return new Response(
-          JSON.stringify({ error: 'notificationPreferences.sms must include boolean enabled field' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -412,171 +344,6 @@ serve(async (req) => {
       );
     }
 
-    // ==========================================================================
-    // HANDLE UPDATE_NOTIFICATION_PREFERENCES OPERATION (separate flow)
-    // ==========================================================================
-    if (requestData.operation === 'update_notification_preferences') {
-      const prefs = requestData.notificationPreferences!;
-
-      console.log(`[manage-user v${DEPLOY_VERSION}] Processing update_notification_preferences for user ${requestData.userId}...`);
-
-      // Emit the user.notification_preferences.updated event
-      // Note: orgId comes from JWT claims (SECURITY CRITICAL - not from request body!)
-      const { data: eventId, error: eventError } = await supabaseAdmin
-        .rpc('emit_domain_event', {
-          p_stream_id: requestData.userId,
-          p_stream_type: 'user',
-          p_event_type: 'user.notification_preferences.updated',
-          p_event_data: {
-            user_id: requestData.userId,
-            org_id: orgId, // From JWT claims, NOT request body
-            notification_preferences: prefs,
-          },
-          p_event_metadata: buildEventMetadata(tracingContext, 'user.notification_preferences.updated', req, {
-            user_id: user.id,
-            organization_id: orgId, // Audit compliance per infrastructure/CLAUDE.md Event Metadata Requirements (Q9.3 fix)
-            reason: requestData.reason || 'Updated via User Management',
-          }),
-        });
-
-      if (eventError) {
-        console.error(`[manage-user v${DEPLOY_VERSION}] Failed to emit user.notification_preferences.updated:`, eventError);
-        return handleRpcError(eventError, correlationId, corsHeaders, 'update notification preferences');
-      }
-
-      console.log(`[manage-user v${DEPLOY_VERSION}] Notification preferences emitted: event_id=${eventId}`);
-
-      // Pattern A v2 read-back (ADR: adr-rpc-readback-pattern.md:93 — Edge
-      // Functions as orchestration tier may implement the equivalent check in
-      // TypeScript). Paired files:
-      //   - handler: infrastructure/supabase/handlers/user/handle_user_notification_preferences_updated.sql
-      //   - target projection: user_notification_preferences_projection
-      //     (columns: email_enabled, sms_enabled, sms_phone_id, in_app_enabled)
-      // If you add/remove a field on either side, update both AND refresh the
-      // "Existing implementations" table in
-      // documentation/frontend/patterns/rpc-readback-vm-patch.md.
-
-      // Step 1: check processing_error on the captured event_id (race-safe PK
-      // lookup — the BEFORE INSERT trigger runs inside the INSERT transaction
-      // and commits before emit_domain_event returns, so this round-trip
-      // always sees the final state).
-      const { data: eventRow, error: eventReadError } = await supabaseAdmin
-        .from('domain_events')
-        .select('processing_error')
-        .eq('id', eventId)
-        .single();
-
-      if (eventReadError) {
-        console.error(
-          `[manage-user v${DEPLOY_VERSION}] Failed to read-back event ${eventId} for processing_error check:`,
-          eventReadError
-        );
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'Event processing failed: event row lookup failed after emit',
-            operation: 'update_notification_preferences',
-          } satisfies ManageUserResponse),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if (eventRow?.processing_error) {
-        console.warn(
-          `[manage-user v${DEPLOY_VERSION}] processing_error on event ${eventId}: ${eventRow.processing_error}`
-        );
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: `Event processing failed: ${eventRow.processing_error}`,
-            operation: 'update_notification_preferences',
-          } satisfies ManageUserResponse),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Step 2a: guard against returning data for a soft-deleted user.
-      // The dependent notification_preferences_projection has no FK cascade
-      // on user soft-delete, so a logically-orphaned row could still exist.
-      // This mirrors the api.get_user_notification_preferences orphan filter.
-      const { data: userRow } = await supabaseAdmin
-        .from('users')
-        .select('deleted_at')
-        .eq('id', requestData.userId)
-        .single();
-
-      if (userRow?.deleted_at) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'User is deleted',
-            operation: 'update_notification_preferences',
-          } satisfies ManageUserResponse),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Step 2b: SELECT the projection row to get authoritative state (handler
-      // applies COALESCE defaults; the projection row is the source of truth,
-      // not the request body).
-      const { data: projectionRow, error: readbackError } = await supabaseAdmin
-        .from('user_notification_preferences_projection')
-        .select('email_enabled, sms_enabled, sms_phone_id, in_app_enabled')
-        .eq('user_id', requestData.userId)
-        .eq('organization_id', orgId)
-        .single();
-
-      if (readbackError || !projectionRow) {
-        // Handler UPSERTs (handle_user_notification_preferences_updated.sql
-        // L37-45 — IF NOT FOUND THEN INSERT). A successful emit with
-        // NOT-FOUND on read-back is therefore a handler invariant violation.
-        console.error(
-          `[manage-user v${DEPLOY_VERSION}] READ-BACK NOT-FOUND — handler invariant violated (event ${eventId})`,
-          {
-            userId: requestData.userId,
-            orgId,
-            handlerInvariantViolated: true,
-            readbackError,
-          }
-        );
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'Event processing failed: projection read-back returned no row',
-            operation: 'update_notification_preferences',
-          } satisfies ManageUserResponse),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Step 3: transform DB columns (snake_case + split SMS fields) back to
-      // the AsyncAPI snake_case shape the frontend service already maps to
-      // camelCase `NotificationPreferences`.
-      const refreshedPreferences: NotificationPreferences = {
-        email: projectionRow.email_enabled,
-        sms: {
-          enabled: projectionRow.sms_enabled,
-          phone_id: projectionRow.sms_phone_id,
-        },
-        in_app: projectionRow.in_app_enabled,
-      };
-
-      const response: ManageUserResponse = {
-        success: true,
-        userId: requestData.userId,
-        operation: 'update_notification_preferences',
-        deployVersion: DEPLOY_VERSION,
-        notificationPreferences: refreshedPreferences,
-      };
-
-      const completedSpan = endSpan(span, 'ok');
-      console.log(`[manage-user v${DEPLOY_VERSION}] Completed in ${completedSpan.durationMs}ms, correlation_id=${correlationId}`);
-
-      return new Response(
-        JSON.stringify(response),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     // ==========================================================================
     // HANDLE MODIFY_ROLES OPERATION (separate flow)
