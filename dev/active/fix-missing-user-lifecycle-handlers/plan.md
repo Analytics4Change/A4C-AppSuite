@@ -1,15 +1,15 @@
 # Fix Missing User Lifecycle Handlers — Plan
 
 > **Execution status**: see `tasks.md` (phases 0–5 complete, PR pending).
-> **Scope update (2026-04-24)**: expanded to include 4 api.* RPC orphan filters + 2 Edge Function guards after RED verdict on pre-work orphan-read audit — see `context.md` "Incidental Findings" §2.
+> **Scope update (2026-04-24)**: expanded to include 5 api.* RPC orphan filters + 2 Edge Function guards after RED verdict on pre-work orphan-read audit — see `context.md` "Incidental Findings" §2.
 
 ## Executive Summary
 
-Create the 3 missing handlers (`handle_user_deactivated`, `handle_user_reactivated`, `handle_user_deleted`) that are referenced by `process_user_event`'s CASE branches but have never been defined by any migration. Ship handler reference files. Add orphan-read filters to 4 api.* RPCs + 2 Edge Function paths so that consumer queries exclude rows for soft-deleted users. Unblocks 3 downstream extraction cards.
+Create the 3 missing handlers (`handle_user_deactivated`, `handle_user_reactivated`, `handle_user_deleted`) that are referenced by `process_user_event`'s CASE branches but have never been defined by any migration. Ship handler reference files. Add orphan-read filters to 5 api.* RPCs + 2 Edge Function paths so that consumer queries exclude rows for soft-deleted users. Unblocks 3 downstream extraction cards.
 
 ## Scope
 
-See `context.md`. In scope: 1 migration with 3 handler definitions + 4 api.* function patches + 3 reference files + 2 Edge Function patches. Backfill NOT needed (Phase 0 confirmed zero failed events to retry). Out of scope: any extraction work, router changes, adding `deactivated_at` column to `public.users`, tombstoning dependent projections, `auth.users` unban on reactivate.
+See `context.md`. In scope: 1 migration with 3 handler definitions + 5 api.* function patches + 3 reference files + 2 Edge Function patches. Backfill NOT needed (Phase 0 confirmed zero failed events to retry). Out of scope: any extraction work, router changes, adding `deactivated_at` column to `public.users`, tombstoning dependent projections, `auth.users` unban on reactivate.
 
 ## Phases
 
