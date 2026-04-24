@@ -211,4 +211,4 @@ The highlighting is powered by:
 
 - [Frontend CLAUDE.md](../../../CLAUDE.md) — Tech stack, MobX rules, accessibility standards (parent)
 - [Assignment sub-components](./assignment/) — Shared UI for role/schedule assignment dialogs
-- [Frontend component reference](../../../documentation/frontend/) — Generated component docs
+- [Frontend documentation hub](../../../../documentation/frontend/README.md) — Frontend docs table of contents

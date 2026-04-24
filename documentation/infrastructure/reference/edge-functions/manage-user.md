@@ -1,16 +1,15 @@
 ---
 status: current
-last_updated: 2026-01-20
+last_updated: 2026-04-24
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Edge Function API reference for user lifecycle operations: deactivate, reactivate, delete, role modification, and notification preferences updates. All operations emit domain events for CQRS projection updates.
+**Summary**: Edge Function API reference for user lifecycle operations: deactivate, reactivate, delete, and role modification. All operations emit domain events for CQRS projection updates. Notification preferences updates were extracted to `api.update_user_notification_preferences` SQL RPC (2026-04-24, first Edge→RPC extraction per [adr-edge-function-vs-sql-rpc.md](../../../architecture/decisions/adr-edge-function-vs-sql-rpc.md)).
 
 **When to read**:
 - Implementing user management UI (deactivate/reactivate/delete users)
-- Updating notification preferences via frontend
 - Modifying user roles programmatically
 - Understanding permission requirements for user operations
 - Troubleshooting user management API calls
@@ -19,9 +18,9 @@ last_updated: 2026-01-20
 - [frontend-auth-architecture.md](../../../architecture/authentication/frontend-auth-architecture.md) - JWT custom claims
 - [rbac-architecture.md](../../../architecture/authorization/rbac-architecture.md) - Permission model
 
-**Key topics**: `manage-user`, `edge-function`, `user-lifecycle`, `notification-preferences`, `role-modification`, `user-deactivation`
+**Key topics**: `manage-user`, `edge-function`, `user-lifecycle`, `role-modification`, `user-deactivation`
 
-**Estimated read time**: 10 minutes
+**Estimated read time**: 8 minutes
 <!-- TL;DR-END -->
 
 # manage-user Edge Function
@@ -156,38 +155,21 @@ Add and/or remove roles for a user.
 
 ---
 
-### 5. Update Notification Preferences
+### 5. Update Notification Preferences — *Extracted (2026-04-24)*
 
-Update user's notification settings (email, SMS, in-app).
-
-**Permission Required**: Self OR `user.update`
-- Users can always update their own preferences
-- Org admins can update any user's preferences
-
-**Request**:
-```typescript
-{
-  operation: 'update_notification_preferences',
-  userId: string,
-  notificationPreferences: {
-    email: boolean,
-    sms: {
-      enabled: boolean,
-      phone_id: string | null   // UUID of verified phone for SMS
-    },
-    in_app: boolean
-  },
-  reason?: string
-}
-```
-
-**Event Emitted**: `user.notification_preferences.updated`
-
-**Validation Rules**:
-- `notificationPreferences` object is required
-- `email` and `in_app` must be booleans
-- `sms.enabled` must be a boolean
-- `sms.phone_id` can be null if SMS disabled
+> **Moved to SQL RPC.** This operation was extracted from the `manage-user` Edge
+> Function into `api.update_user_notification_preferences` per
+> [adr-edge-function-vs-sql-rpc.md](../../../architecture/decisions/adr-edge-function-vs-sql-rpc.md).
+> The RPC is the new canonical path; the Edge Function no longer accepts
+> `operation: 'update_notification_preferences'` (removed in `DEPLOY_VERSION`
+> `v12-post-notification-prefs-extraction`).
+>
+> Frontend callers use `SupabaseUserCommandService.updateNotificationPreferences`
+> which now calls `supabase.schema('api').rpc('update_user_notification_preferences', ...)`.
+> The AsyncAPI event contract (`user.notification_preferences.updated`) is
+> unchanged; only the emit path moved.
+>
+> Reference migration: `infrastructure/supabase/supabase/migrations/20260424194102_add_update_user_notification_preferences_rpc.sql`.
 
 ## Response Format
 
@@ -252,30 +234,8 @@ class SupabaseUserCommandService implements IUserCommandService {
     return { success: true, data };
   }
 
-  async updateNotificationPreferences(
-    request: UpdateNotificationPreferencesRequest
-  ): Promise<UpdateNotificationPreferencesResult> {
-    const { data, error } = await supabase.functions.invoke('manage-user', {
-      body: {
-        operation: 'update_notification_preferences',
-        userId: request.userId,
-        notificationPreferences: {
-          email: request.notificationPreferences.email,
-          sms: {
-            enabled: request.notificationPreferences.sms.enabled,
-            phone_id: request.notificationPreferences.sms.phoneId,
-          },
-          in_app: request.notificationPreferences.inApp,
-        },
-        reason: request.reason,
-      },
-    });
-
-    if (error) {
-      return this.extractEdgeFunctionError(error);
-    }
-    return { success: true, data };
-  }
+  // updateNotificationPreferences was extracted to api.update_user_notification_preferences
+  // SQL RPC (2026-04-24). See adr-edge-function-vs-sql-rpc.md for the full rationale.
 }
 ```
 
@@ -286,17 +246,22 @@ import { supabaseService } from '@/lib/supabase';
 
 const client = supabaseService.getClient();
 
+// For user lifecycle ops (deactivate/reactivate/delete/modify_roles):
 const { data, error } = await client.functions.invoke('manage-user', {
-  body: {
-    operation: 'update_notification_preferences',
-    userId: currentUser.id,
-    notificationPreferences: {
+  body: { operation: 'deactivate', userId: targetUserId },
+});
+
+// Notification preferences use the SQL RPC instead:
+const { data, error } = await client
+  .schema('api')
+  .rpc('update_user_notification_preferences', {
+    p_user_id: currentUser.id,
+    p_notification_preferences: {
       email: true,
       sms: { enabled: false, phone_id: null },
       in_app: true,
     },
-  },
-});
+  });
 ```
 
 ## Event Flow

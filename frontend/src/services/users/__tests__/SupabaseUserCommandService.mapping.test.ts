@@ -6,7 +6,7 @@
  *   - `updateUserPhone` (row_to_json → camelCase + Date parsing)
  *   - `addUserPhone` (camelCase passthrough + Date parsing)
  *   - `updateUser` (row_to_json → camelCase + nullable Date)
- *   - `updateNotificationPreferences` (error envelope contract)
+ *   - `updateNotificationPreferences` (Pattern A v2 RPC envelope + snake→camel)
  *
  * Stubs `@/services/auth/supabase.service`'s `apiRpc` via `vi.mock()` with
  * canned responses so we test the mapping in isolation from any real
@@ -315,33 +315,93 @@ describe('SupabaseUserCommandService — snake_case → camelCase mapping', () =
   });
 
   // ---------------------------------------------------------------------------
-  // updateNotificationPreferences — Edge Function v11 error envelope
-  // (architect Q9.1 SHOULD-ADD — contract test for the error path)
+  // updateNotificationPreferences — RPC envelope contract
+  // (api.update_user_notification_preferences, first Edge→RPC extraction)
+  // Tests the Pattern A v2 RPC contract: snake_case response → camelCase type,
+  // error envelope surfacing, and PostgREST permission-denied (42501) handling.
+  // This block also serves as the template for the 4 follow-up extractions.
   // ---------------------------------------------------------------------------
-  describe('updateNotificationPreferences — v11 error envelope contract', () => {
-    it('surfaces v11 error envelope without notificationPreferences', async () => {
-      // Rewire the Edge Function invocation to return the v11 error shape.
-      // The service uses `client.functions.invoke(...)` rather than apiRpc
-      // for this one — inject through getClient's returned invoke stub.
-      const invokeStub = vi.fn().mockResolvedValueOnce({
+  describe('updateNotificationPreferences — RPC envelope contract', () => {
+    it('maps snake_case RPC response to camelCase NotificationPreferences', async () => {
+      mockApiRpc.mockResolvedValueOnce({
+        data: {
+          success: true,
+          eventId: '11111111-2222-3333-4444-555555555555',
+          notificationPreferences: {
+            email: true,
+            sms: { enabled: true, phone_id: 'phone-abc' },
+            in_app: false,
+          },
+        },
+        error: null,
+      });
+
+      const result = await service.updateNotificationPreferences({
+        userId: 'user-1',
+        orgId: 'org-test',
+        notificationPreferences: {
+          email: true,
+          sms: { enabled: true, phoneId: 'phone-abc' },
+          inApp: false,
+        },
+      });
+
+      expect(mockApiRpc).toHaveBeenCalledWith(
+        'update_user_notification_preferences',
+        expect.objectContaining({
+          p_user_id: 'user-1',
+          p_notification_preferences: {
+            email: true,
+            sms: { enabled: true, phone_id: 'phone-abc' },
+            in_app: false,
+          },
+        })
+      );
+      expect(result.success).toBe(true);
+      expect(result.notificationPreferences).toEqual({
+        email: true,
+        sms: { enabled: true, phoneId: 'phone-abc' },
+        inApp: false,
+      });
+    });
+
+    it('preserves null phoneId through the snake→camel mapping', async () => {
+      mockApiRpc.mockResolvedValueOnce({
+        data: {
+          success: true,
+          eventId: '11111111-2222-3333-4444-555555555555',
+          notificationPreferences: {
+            email: false,
+            sms: { enabled: false, phone_id: null },
+            in_app: true,
+          },
+        },
+        error: null,
+      });
+
+      const result = await service.updateNotificationPreferences({
+        userId: 'user-1',
+        orgId: 'org-test',
+        notificationPreferences: {
+          email: false,
+          sms: { enabled: false, phoneId: null },
+          inApp: true,
+        },
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.notificationPreferences?.sms.phoneId).toBeNull();
+      expect(result.notificationPreferences?.inApp).toBe(true);
+    });
+
+    it('surfaces handler-failure envelope without notificationPreferences', async () => {
+      mockApiRpc.mockResolvedValueOnce({
         data: {
           success: false,
           error:
             'Event processing failed: new row for relation "user_notification_preferences_projection" violates check constraint "spot_check"',
-          operation: 'update_notification_preferences',
         },
         error: null,
-      });
-      mockGetClient.mockReturnValueOnce({
-        auth: {
-          getSession: vi.fn().mockResolvedValue({
-            data: {
-              session: { access_token: 'header.eyJvcmdfaWQiOiJvcmctdGVzdCJ9.sig' },
-            },
-          }),
-          resetPasswordForEmail: vi.fn(),
-        },
-        functions: { invoke: invokeStub },
       });
 
       const result = await service.updateNotificationPreferences({
@@ -357,6 +417,39 @@ describe('SupabaseUserCommandService — snake_case → camelCase mapping', () =
       expect(result.success).toBe(false);
       expect(result.notificationPreferences).toBeUndefined();
       expect(result.error).toContain('Event processing failed');
+    });
+
+    it('surfaces PostgREST permission-denied (42501) through the error path', async () => {
+      // Template assertion for the 4 follow-up extractions: the RPC raises
+      // with ERRCODE 42501 (SQLSTATE permission_denied); PostgREST surfaces
+      // it as an error object on the apiRpc result. Service returns
+      // {success: false, error: <message>, errorDetails: {code: 'UNKNOWN'}}.
+      mockApiRpc.mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: '42501',
+          message:
+            'Permission denied: Can only update your own notification preferences unless you have user.update permission',
+          hint: null,
+        },
+      });
+
+      const result = await service.updateNotificationPreferences({
+        userId: 'other-user',
+        orgId: 'org-test',
+        notificationPreferences: {
+          email: true,
+          sms: { enabled: false, phoneId: null },
+          inApp: true,
+        },
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Permission denied');
+      expect(result.errorDetails?.code).toBe('UNKNOWN');
+      expect(result.errorDetails?.context).toEqual(
+        expect.objectContaining({ postgresCode: '42501' })
+      );
     });
   });
 });
