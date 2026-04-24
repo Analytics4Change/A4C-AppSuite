@@ -59,7 +59,7 @@ Activated 2026-04-24. Conditions met:
 - [x] Identified 3 ambiguous cases (`update_notification_preferences`, `validate-invitation`, `organization-bootstrap`/`organization-delete`) with explicit rationale
 - [x] Corrected sub-agent rule-violation: `validate-invitation` and `accept-invitation.query-org-for-redirect` reclassified as load-bearing per LB4
 
-**Totals**: 13 load-bearing, 3 candidate + 1 reference-impl candidate = **4 candidate ops** for Phase 5 seed cards.
+**Totals**: **12 load-bearing** + **4 candidate-for-extraction** (one also serves as Pattern A v2 reference implementation). 4 seed cards land in Phase 5.
 
 ## Phase 1 — Draft ADR ✅ COMPLETE (2026-04-24)
 

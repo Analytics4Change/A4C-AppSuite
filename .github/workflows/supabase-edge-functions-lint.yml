@@ -27,7 +27,10 @@ jobs:
         id: identify
         run: |
           git fetch origin ${{ github.base_ref }} --depth=1
-          NEW_FILES=$(git diff --name-only --diff-filter=A \
+          # --no-renames forces renames/copies to show as delete+add so that
+          # moving a file into the functions tree (e.g. from a prototype dir)
+          # correctly registers as a new Edge Function requiring citation.
+          NEW_FILES=$(git diff --name-only --no-renames --diff-filter=A \
             origin/${{ github.base_ref }}...HEAD \
             | grep -E '^infrastructure/supabase/supabase/functions/[^/]+/index\.ts$' \
             || true)

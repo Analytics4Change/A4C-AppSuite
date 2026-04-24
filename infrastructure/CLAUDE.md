@@ -137,7 +137,7 @@ kubectl get secret workflow-worker-secrets -n temporal -o yaml
 
 > **⚠️ CRITICAL: All frontend queries MUST use `api.` schema RPC functions.**
 
-Projection tables are denormalized read models — never query directly with PostgREST embedding across tables. Detailed rationale + examples in [`supabase/CLAUDE.md`](supabase/CLAUDE.md).
+Projection tables are denormalized read models — never query directly with PostgREST embedding across tables. Detailed rationale + examples in [`supabase/CLAUDE.md`](supabase/CLAUDE.md). **Edge Functions are exempt from this rule** — they are the orchestration tier and may use service-role reads of any table when needed (see next section + ADR Decision 4).
 
 | ✅ Correct | ❌ Wrong |
 |-----------|----------|

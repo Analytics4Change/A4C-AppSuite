@@ -160,7 +160,7 @@ find infrastructure/supabase/supabase/functions -name 'index.ts' -not -path '*/_
 # read the body of each case and answer LB1-LB6.
 ```
 
-Total: 16 operations across 7 functions, 3,390 LOC. **13 load-bearing** + **3 candidate-for-extraction** + **1 reference-impl candidate** (`update_notification_preferences`, used as Pattern A v2 reference in Decision 5).
+Total: 16 operations across 7 functions, 3,390 LOC. **12 load-bearing** + **4 candidate-for-extraction** (one of which — `update_notification_preferences` — is also the sole Pattern A v2 reference implementation per Decision 5).
 
 | # | Function | Operation | LB1 | LB2 | LB3 | LB4 | LB5 | LB6 | Classification | Notes |
 |---|----------|-----------|-----|-----|-----|-----|-----|-----|----------------|-------|

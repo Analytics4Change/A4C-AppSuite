@@ -78,8 +78,8 @@ See `edge-function-vs-sql-rpc-adr-context.md` for full scope. Summary:
 **Totals** (anti-staleness note: this is a point-in-time snapshot. Regenerate via `find infrastructure/supabase/supabase/functions -name 'index.ts' -not -path '*/_shared/*' | xargs wc -l` + per-op inspection):
 
 - **16 total operations** across 7 functions
-- **13 load-bearing**: 4 in `accept-invitation`, 2 in `invite-user`, 2 in `manage-user`, 1 each in `organization-bootstrap`, `organization-delete`, `validate-invitation`, `workflow-status`
-- **3 candidate-for-extraction**: `invite-user revoke`, `manage-user delete`, `manage-user modify_roles`, plus the reference-impl `manage-user update_notification_preferences` (= **4 candidates** including the architect-validated first target)
+- **12 load-bearing**: 4 in `accept-invitation`, 2 in `invite-user`, 2 in `manage-user`, 1 each in `organization-bootstrap`, `organization-delete`, `validate-invitation`, `workflow-status`
+- **4 candidate-for-extraction**: `invite-user revoke`, `manage-user delete`, `manage-user modify_roles`, `manage-user update_notification_preferences` (also sole Pattern A v2 reference implementation per Decision 5 — architect-validated first target)
 
 ### Function-level composition
 
