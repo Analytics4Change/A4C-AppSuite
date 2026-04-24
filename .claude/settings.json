@@ -11,5 +11,11 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(gh --version)",
+      "Bash(uuidgen)"
+    ]
   }
 }
