@@ -20,6 +20,79 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_client_address: {
+        Args: {
+          p_address_type?: string
+          p_city: string
+          p_client_id: string
+          p_correlation_id?: string
+          p_country?: string
+          p_event_metadata?: Json
+          p_is_primary?: boolean
+          p_reason?: string
+          p_state: string
+          p_street1: string
+          p_street2?: string
+          p_zip: string
+        }
+        Returns: Json
+      }
+      add_client_email: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_email: string
+          p_email_type?: string
+          p_event_metadata?: Json
+          p_is_primary?: boolean
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      add_client_funding_source: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_custom_fields?: Json
+          p_end_date?: string
+          p_event_metadata?: Json
+          p_reason?: string
+          p_reference_number?: string
+          p_source_name: string
+          p_source_type: string
+          p_start_date?: string
+        }
+        Returns: Json
+      }
+      add_client_insurance: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_coverage_end_date?: string
+          p_coverage_start_date?: string
+          p_event_metadata?: Json
+          p_group_number?: string
+          p_payer_name: string
+          p_policy_number?: string
+          p_policy_type: string
+          p_reason?: string
+          p_subscriber_name?: string
+          p_subscriber_relation?: string
+        }
+        Returns: Json
+      }
+      add_client_phone: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_event_metadata?: Json
+          p_is_primary?: boolean
+          p_phone_number: string
+          p_phone_type?: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
       add_user_phone: {
         Args: {
           p_country_code?: string
@@ -35,6 +108,27 @@ export type Database = {
         }
         Returns: Json
       }
+      admit_client: {
+        Args: {
+          p_admission_data: Json
+          p_client_id: string
+          p_correlation_id?: string
+          p_event_metadata?: Json
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      assign_client_contact: {
+        Args: {
+          p_client_id: string
+          p_contact_id: string
+          p_correlation_id?: string
+          p_designation: string
+          p_event_metadata?: Json
+          p_reason?: string
+        }
+        Returns: Json
+      }
       assign_client_to_user: {
         Args: {
           p_assigned_until?: string
@@ -43,6 +137,19 @@ export type Database = {
           p_reason?: string
           p_user_id: string
         }
+        Returns: Json
+      }
+      assign_user_to_schedule: {
+        Args: {
+          p_effective_from?: string
+          p_effective_until?: string
+          p_template_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      batch_update_field_definitions: {
+        Args: { p_changes: Json; p_correlation_id?: string; p_reason?: string }
         Returns: Json
       }
       bulk_assign_role: {
@@ -54,6 +161,23 @@ export type Database = {
           p_user_ids: string[]
         }
         Returns: Json
+      }
+      change_client_placement: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_event_metadata?: Json
+          p_organization_unit_id?: string
+          p_placement_arrangement: string
+          p_reason?: string
+          p_reason_text?: string
+          p_start_date?: string
+        }
+        Returns: Json
+      }
+      check_field_definitions_exist: {
+        Args: { p_org_id: string }
+        Returns: boolean
       }
       check_organization_by_name: {
         Args: { p_name: string }
@@ -89,6 +213,44 @@ export type Database = {
           user_id: string
         }[]
       }
+      create_field_category: {
+        Args: {
+          p_correlation_id?: string
+          p_name: string
+          p_slug: string
+          p_sort_order?: number
+        }
+        Returns: Json
+      }
+      create_field_definition: {
+        Args: {
+          p_category_id: string
+          p_configurable_label?: string
+          p_conforming_dimension_mapping?: string
+          p_correlation_id?: string
+          p_display_name: string
+          p_field_key: string
+          p_field_type?: string
+          p_is_dimension?: boolean
+          p_is_required?: boolean
+          p_is_visible?: boolean
+          p_sort_order?: number
+          p_validation_rules?: Json
+        }
+        Returns: Json
+      }
+      create_organization_address: {
+        Args: { p_data: Json; p_org_id: string }
+        Returns: Json
+      }
+      create_organization_contact: {
+        Args: { p_data: Json; p_org_id: string }
+        Returns: Json
+      }
+      create_organization_phone: {
+        Args: { p_data: Json; p_org_id: string }
+        Returns: Json
+      }
       create_organization_unit: {
         Args: {
           p_display_name?: string
@@ -108,43 +270,94 @@ export type Database = {
         }
         Returns: Json
       }
-      create_user_schedule:
-        | {
-            Args: {
-              p_effective_from?: string
-              p_effective_until?: string
-              p_org_unit_id?: string
-              p_reason?: string
-              p_schedule: Json
-              p_user_id: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_effective_from?: string
-              p_effective_until?: string
-              p_org_unit_id?: string
-              p_reason?: string
-              p_schedule: Json
-              p_schedule_name: string
-              p_user_id: string
-            }
-            Returns: Json
-          }
+      create_schedule_template: {
+        Args: {
+          p_name: string
+          p_org_unit_id?: string
+          p_schedule: Json
+          p_user_ids?: string[]
+        }
+        Returns: Json
+      }
+      deactivate_all_field_definitions: {
+        Args: { p_org_id: string }
+        Returns: number
+      }
+      deactivate_field_category: {
+        Args: {
+          p_category_id: string
+          p_correlation_id?: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      deactivate_field_definition: {
+        Args: {
+          p_correlation_id?: string
+          p_field_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      deactivate_organization: {
+        Args: { p_org_id: string; p_reason?: string }
+        Returns: Json
+      }
       deactivate_organization_unit: {
         Args: { p_unit_id: string }
         Returns: Json
       }
       deactivate_role: { Args: { p_role_id: string }; Returns: Json }
-      deactivate_user_schedule: {
-        Args: { p_reason?: string; p_schedule_id: string }
+      deactivate_schedule_template: {
+        Args: { p_reason?: string; p_template_id: string }
+        Returns: Json
+      }
+      delete_field_category: {
+        Args: {
+          p_category_id: string
+          p_correlation_id?: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      delete_field_definition: {
+        Args: {
+          p_correlation_id?: string
+          p_field_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      delete_organization: {
+        Args: { p_org_id: string; p_reason?: string }
+        Returns: Json
+      }
+      delete_organization_address: {
+        Args: { p_address_id: string; p_reason?: string }
+        Returns: Json
+      }
+      delete_organization_contact: {
+        Args: { p_contact_id: string; p_reason?: string }
+        Returns: Json
+      }
+      delete_organization_phone: {
+        Args: { p_phone_id: string; p_reason?: string }
         Returns: Json
       }
       delete_organization_unit: { Args: { p_unit_id: string }; Returns: Json }
       delete_role: { Args: { p_role_id: string }; Returns: Json }
-      delete_user_schedule: {
-        Args: { p_reason?: string; p_schedule_id: string }
+      delete_schedule_template: {
+        Args: { p_reason?: string; p_template_id: string }
+        Returns: Json
+      }
+      discharge_client: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_discharge_data: Json
+          p_event_metadata?: Json
+          p_reason?: string
+        }
         Returns: Json
       }
       dismiss_failed_event: {
@@ -170,6 +383,17 @@ export type Database = {
           p_workflow_type: string
         }
         Returns: string
+      }
+      end_client_placement: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_end_date?: string
+          p_event_metadata?: Json
+          p_reason?: string
+          p_reason_text?: string
+        }
+        Returns: Json
       }
       find_contacts_by_phone: {
         Args: { p_organization_id: string; p_phone_number: string }
@@ -211,8 +435,13 @@ export type Database = {
           error_message: string
           invitations_sent: number
           organization_id: string
+          stages: Json
           status: string
         }[]
+      }
+      get_category_field_count: {
+        Args: { p_category_id: string; p_include_inactive?: boolean }
+        Returns: Json
       }
       get_child_organizations: {
         Args: { p_parent_org_id: string }
@@ -230,6 +459,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_client: { Args: { p_client_id: string }; Returns: Json }
       get_contacts_by_org: {
         Args: { p_org_id: string }
         Returns: {
@@ -344,6 +574,7 @@ export type Database = {
               stream_version: number
             }[]
           }
+      get_field_usage_count: { Args: { p_field_key: string }; Returns: Json }
       get_invitation_by_id: {
         Args: { p_invitation_id: string }
         Returns: {
@@ -427,6 +658,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_organization_details: { Args: { p_org_id: string }; Returns: Json }
       get_organization_direct_care_settings: {
         Args: { p_org_id: string }
         Returns: Json
@@ -493,6 +725,9 @@ export type Database = {
           name: string
           parent_path: string
           path: string
+          provider_admin_email: string
+          provider_admin_name: string
+          provider_admin_phone: string
           slug: string
           timezone: string
           type: string
@@ -517,11 +752,27 @@ export type Database = {
           name: string
           parent_path: string
           path: string
+          provider_admin_email: string
+          provider_admin_name: string
+          provider_admin_phone: string
           slug: string
           timezone: string
           total_count: number
           type: string
           updated_at: string
+        }[]
+      }
+      get_orphaned_deletions: {
+        Args: { p_hours_threshold?: number }
+        Returns: {
+          deleted_at: string
+          deletion_reason: string
+          has_completed_event: boolean
+          has_initiated_event: boolean
+          hours_since_deletion: number
+          id: string
+          name: string
+          slug: string
         }[]
       }
       get_pending_invitations_by_org: {
@@ -624,7 +875,7 @@ export type Database = {
           user_count: number
         }[]
       }
-      get_schedule_by_id: { Args: { p_schedule_id: string }; Returns: Json }
+      get_schedule_template: { Args: { p_template_id: string }; Returns: Json }
       get_trace_timeline: {
         Args: { p_trace_id: string }
         Returns: {
@@ -744,6 +995,57 @@ export type Database = {
         Args: { p_organization_id?: string; p_user_id: string }
         Returns: Json
       }
+      list_clients: {
+        Args: { p_search_term?: string; p_status?: string }
+        Returns: Json
+      }
+      list_field_categories: {
+        Args: { p_include_inactive?: boolean }
+        Returns: {
+          id: string
+          is_active: boolean
+          is_system: boolean
+          name: string
+          organization_id: string
+          slug: string
+          sort_order: number
+        }[]
+      }
+      list_field_definition_templates: {
+        Args: never
+        Returns: {
+          category_slug: string
+          configurable_label: string
+          conforming_dimension_mapping: string
+          display_name: string
+          field_key: string
+          field_type: string
+          is_dimension: boolean
+          is_required: boolean
+          is_visible: boolean
+          sort_order: number
+        }[]
+      }
+      list_field_definitions: {
+        Args: { p_include_inactive?: boolean }
+        Returns: {
+          category_id: string
+          category_name: string
+          category_slug: string
+          configurable_label: string
+          conforming_dimension_mapping: string
+          display_name: string
+          field_key: string
+          field_type: string
+          id: string
+          is_active: boolean
+          is_dimension: boolean
+          is_required: boolean
+          is_visible: boolean
+          sort_order: number
+          validation_rules: Json
+        }[]
+      }
       list_invitations: {
         Args: { p_org_id: string; p_search_term?: string; p_status?: string[] }
         Returns: {
@@ -775,6 +1077,17 @@ export type Database = {
           name: string
           organization_id: string
           user_count: number
+        }[]
+      }
+      list_schedule_templates: {
+        Args: { p_org_id?: string; p_search?: string; p_status?: string }
+        Returns: Json
+      }
+      list_system_field_categories: {
+        Args: never
+        Returns: {
+          id: string
+          slug: string
         }[]
       }
       list_user_client_assignments: {
@@ -811,26 +1124,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      list_user_schedules:
-        | {
-            Args: {
-              p_active_only?: boolean
-              p_org_id?: string
-              p_org_unit_id?: string
-              p_user_id?: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_active_only?: boolean
-              p_org_id?: string
-              p_org_unit_id?: string
-              p_schedule_name?: string
-              p_user_id?: string
-            }
-            Returns: Json
-          }
       list_users: {
         Args: {
           p_org_id: string
@@ -890,13 +1183,106 @@ export type Database = {
           is_assigned: boolean
         }[]
       }
+      list_users_for_schedule_management: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_search_term?: string
+          p_template_id: string
+        }
+        Returns: {
+          current_schedule_id: string
+          current_schedule_name: string
+          display_name: string
+          email: string
+          id: string
+          is_active: boolean
+          is_assigned: boolean
+        }[]
+      }
+      reactivate_field_category: {
+        Args: {
+          p_category_id: string
+          p_correlation_id?: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      reactivate_field_definition: {
+        Args: {
+          p_correlation_id?: string
+          p_field_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      reactivate_organization: { Args: { p_org_id: string }; Returns: Json }
       reactivate_organization_unit: {
         Args: { p_unit_id: string }
         Returns: Json
       }
       reactivate_role: { Args: { p_role_id: string }; Returns: Json }
-      reactivate_user_schedule: {
-        Args: { p_reason?: string; p_schedule_id: string }
+      reactivate_schedule_template: {
+        Args: { p_template_id: string }
+        Returns: Json
+      }
+      register_client: {
+        Args: {
+          p_client_data: Json
+          p_correlation_id?: string
+          p_event_metadata?: Json
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      remove_client_address: {
+        Args: {
+          p_address_id: string
+          p_client_id: string
+          p_correlation_id?: string
+          p_event_metadata?: Json
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      remove_client_email: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_email_id: string
+          p_event_metadata?: Json
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      remove_client_funding_source: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_event_metadata?: Json
+          p_funding_source_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      remove_client_insurance: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_event_metadata?: Json
+          p_policy_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      remove_client_phone: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_event_metadata?: Json
+          p_phone_id: string
+          p_reason?: string
+        }
         Returns: Json
       }
       remove_user_phone: {
@@ -916,10 +1302,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      retry_deletion_workflow: { Args: { p_org_id: string }; Returns: Json }
       retry_failed_event: { Args: { p_event_id: string }; Returns: Json }
       revoke_invitation: {
         Args: { p_invitation_id: string; p_reason?: string }
         Returns: boolean
+      }
+      safety_net_deactivate_organization: {
+        Args: { p_org_id: string }
+        Returns: Json
       }
       soft_delete_organization_addresses: {
         Args: { p_deleted_at?: string; p_org_id: string }
@@ -945,11 +1336,163 @@ export type Database = {
         }
         Returns: Json
       }
+      sync_schedule_assignments: {
+        Args: {
+          p_correlation_id?: string
+          p_reason?: string
+          p_template_id: string
+          p_user_ids_to_add: string[]
+          p_user_ids_to_remove: string[]
+        }
+        Returns: Json
+      }
+      unassign_client_contact: {
+        Args: {
+          p_client_id: string
+          p_contact_id: string
+          p_correlation_id?: string
+          p_designation: string
+          p_event_metadata?: Json
+          p_reason?: string
+        }
+        Returns: Json
+      }
       unassign_client_from_user: {
         Args: { p_client_id: string; p_reason?: string; p_user_id: string }
         Returns: Json
       }
+      unassign_user_from_schedule: {
+        Args: { p_reason?: string; p_template_id: string; p_user_id: string }
+        Returns: Json
+      }
       undismiss_failed_event: { Args: { p_event_id: string }; Returns: Json }
+      update_client: {
+        Args: {
+          p_changes: Json
+          p_client_id: string
+          p_correlation_id?: string
+          p_event_metadata?: Json
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      update_client_address: {
+        Args: {
+          p_address_id: string
+          p_address_type?: string
+          p_city?: string
+          p_client_id: string
+          p_correlation_id?: string
+          p_country?: string
+          p_event_metadata?: Json
+          p_is_primary?: boolean
+          p_reason?: string
+          p_state?: string
+          p_street1?: string
+          p_street2?: string
+          p_zip?: string
+        }
+        Returns: Json
+      }
+      update_client_email: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_email?: string
+          p_email_id: string
+          p_email_type?: string
+          p_event_metadata?: Json
+          p_is_primary?: boolean
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      update_client_funding_source: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_custom_fields?: Json
+          p_end_date?: string
+          p_event_metadata?: Json
+          p_funding_source_id: string
+          p_reason?: string
+          p_reference_number?: string
+          p_source_name?: string
+          p_source_type?: string
+          p_start_date?: string
+        }
+        Returns: Json
+      }
+      update_client_insurance: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_coverage_end_date?: string
+          p_coverage_start_date?: string
+          p_event_metadata?: Json
+          p_group_number?: string
+          p_payer_name?: string
+          p_policy_id: string
+          p_policy_number?: string
+          p_reason?: string
+          p_subscriber_name?: string
+          p_subscriber_relation?: string
+        }
+        Returns: Json
+      }
+      update_client_phone: {
+        Args: {
+          p_client_id: string
+          p_correlation_id?: string
+          p_event_metadata?: Json
+          p_is_primary?: boolean
+          p_phone_id: string
+          p_phone_number?: string
+          p_phone_type?: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      update_field_category: {
+        Args: {
+          p_category_id: string
+          p_correlation_id?: string
+          p_name?: string
+          p_reason?: string
+          p_sort_order?: number
+        }
+        Returns: Json
+      }
+      update_field_definition: {
+        Args: {
+          p_category_id?: string
+          p_configurable_label?: string
+          p_conforming_dimension_mapping?: string
+          p_correlation_id?: string
+          p_display_name?: string
+          p_field_id: string
+          p_field_type?: string
+          p_is_dimension?: boolean
+          p_is_required?: boolean
+          p_is_visible?: boolean
+          p_reason?: string
+          p_sort_order?: number
+          p_validation_rules?: Json
+        }
+        Returns: Json
+      }
+      update_organization: {
+        Args: { p_data: Json; p_org_id: string; p_reason?: string }
+        Returns: Json
+      }
+      update_organization_address: {
+        Args: { p_address_id: string; p_data: Json }
+        Returns: Json
+      }
+      update_organization_contact: {
+        Args: { p_contact_id: string; p_data: Json }
+        Returns: Json
+      }
       update_organization_direct_care_settings:
         | {
             Args: {
@@ -968,6 +1511,10 @@ export type Database = {
             }
             Returns: Json
           }
+      update_organization_phone: {
+        Args: { p_data: Json; p_phone_id: string }
+        Returns: Json
+      }
       update_organization_unit: {
         Args: {
           p_display_name?: string
@@ -983,6 +1530,15 @@ export type Database = {
           p_name?: string
           p_permission_ids?: string[]
           p_role_id: string
+        }
+        Returns: Json
+      }
+      update_schedule_template: {
+        Args: {
+          p_name?: string
+          p_org_unit_id?: string
+          p_schedule?: Json
+          p_template_id: string
         }
         Returns: Json
       }
@@ -1007,7 +1563,6 @@ export type Database = {
       update_user_notification_preferences: {
         Args: {
           p_notification_preferences: Json
-          p_org_id: string
           p_reason?: string
           p_user_id: string
         }
@@ -1028,57 +1583,8 @@ export type Database = {
         }
         Returns: Json
       }
-      update_user_schedule:
-        | {
-            Args: {
-              p_effective_from?: string
-              p_effective_until?: string
-              p_org_unit_id?: string
-              p_reason?: string
-              p_schedule?: Json
-              p_schedule_id: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_effective_from?: string
-              p_effective_until?: string
-              p_org_unit_id?: string
-              p_reason?: string
-              p_schedule?: Json
-              p_schedule_id: string
-              p_schedule_name?: string
-            }
-            Returns: Json
-          }
       validate_role_assignment: {
         Args: { p_role_ids: string[] }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
         Returns: Json
       }
     }
@@ -1186,6 +1692,903 @@ export type Database = {
           },
         ]
       }
+      client_addresses_projection: {
+        Row: {
+          address_type: string
+          city: string
+          client_id: string
+          country: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_primary: boolean
+          last_event_id: string | null
+          organization_id: string
+          state: string
+          street1: string
+          street2: string | null
+          updated_at: string | null
+          zip: string
+        }
+        Insert: {
+          address_type?: string
+          city: string
+          client_id: string
+          country?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          last_event_id?: string | null
+          organization_id: string
+          state: string
+          street1: string
+          street2?: string | null
+          updated_at?: string | null
+          zip: string
+        }
+        Update: {
+          address_type?: string
+          city?: string
+          client_id?: string
+          country?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          last_event_id?: string | null
+          organization_id?: string
+          state?: string
+          street1?: string
+          street2?: string | null
+          updated_at?: string | null
+          zip?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_addresses_projection_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_addresses_projection_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_contact_assignments_projection: {
+        Row: {
+          assigned_at: string
+          client_id: string
+          contact_id: string
+          created_at: string
+          designation: string
+          id: string
+          is_active: boolean
+          last_event_id: string | null
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_at?: string
+          client_id: string
+          contact_id: string
+          created_at?: string
+          designation: string
+          id?: string
+          is_active?: boolean
+          last_event_id?: string | null
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_at?: string
+          client_id?: string
+          contact_id?: string
+          created_at?: string
+          designation?: string
+          id?: string
+          is_active?: boolean
+          last_event_id?: string | null
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_contact_assignments_projection_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_contact_assignments_projection_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_contact_assignments_projection_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_emails_projection: {
+        Row: {
+          client_id: string
+          created_at: string
+          email: string
+          email_type: string
+          id: string
+          is_active: boolean
+          is_primary: boolean
+          last_event_id: string | null
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          email: string
+          email_type?: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          last_event_id?: string | null
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          email?: string
+          email_type?: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          last_event_id?: string | null
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_emails_projection_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_emails_projection_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_field_categories: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          last_event_id: string | null
+          name: string
+          organization_id: string | null
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_event_id?: string | null
+          name: string
+          organization_id?: string | null
+          slug: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_event_id?: string | null
+          name?: string
+          organization_id?: string | null
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_field_categories_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_field_definition_templates: {
+        Row: {
+          category_slug: string
+          configurable_label: string | null
+          conforming_dimension_mapping: string | null
+          created_at: string
+          display_name: string
+          field_key: string
+          field_type: string
+          id: string
+          is_active: boolean
+          is_dimension: boolean
+          is_locked: boolean
+          is_required: boolean
+          is_visible: boolean
+          sort_order: number
+          validation_rules: Json | null
+        }
+        Insert: {
+          category_slug: string
+          configurable_label?: string | null
+          conforming_dimension_mapping?: string | null
+          created_at?: string
+          display_name: string
+          field_key: string
+          field_type?: string
+          id?: string
+          is_active?: boolean
+          is_dimension?: boolean
+          is_locked?: boolean
+          is_required?: boolean
+          is_visible?: boolean
+          sort_order?: number
+          validation_rules?: Json | null
+        }
+        Update: {
+          category_slug?: string
+          configurable_label?: string | null
+          conforming_dimension_mapping?: string | null
+          created_at?: string
+          display_name?: string
+          field_key?: string
+          field_type?: string
+          id?: string
+          is_active?: boolean
+          is_dimension?: boolean
+          is_locked?: boolean
+          is_required?: boolean
+          is_visible?: boolean
+          sort_order?: number
+          validation_rules?: Json | null
+        }
+        Relationships: []
+      }
+      client_field_definitions_projection: {
+        Row: {
+          category_id: string
+          configurable_label: string | null
+          conforming_dimension_mapping: string | null
+          created_at: string
+          display_name: string
+          field_key: string
+          field_type: string
+          id: string
+          is_active: boolean
+          is_dimension: boolean
+          is_required: boolean
+          is_visible: boolean
+          last_event_id: string | null
+          organization_id: string
+          sort_order: number
+          updated_at: string
+          validation_rules: Json | null
+        }
+        Insert: {
+          category_id: string
+          configurable_label?: string | null
+          conforming_dimension_mapping?: string | null
+          created_at?: string
+          display_name: string
+          field_key: string
+          field_type?: string
+          id?: string
+          is_active?: boolean
+          is_dimension?: boolean
+          is_required?: boolean
+          is_visible?: boolean
+          last_event_id?: string | null
+          organization_id: string
+          sort_order?: number
+          updated_at?: string
+          validation_rules?: Json | null
+        }
+        Update: {
+          category_id?: string
+          configurable_label?: string | null
+          conforming_dimension_mapping?: string | null
+          created_at?: string
+          display_name?: string
+          field_key?: string
+          field_type?: string
+          id?: string
+          is_active?: boolean
+          is_dimension?: boolean
+          is_required?: boolean
+          is_visible?: boolean
+          last_event_id?: string | null
+          organization_id?: string
+          sort_order?: number
+          updated_at?: string
+          validation_rules?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_field_definitions_projection_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "client_field_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_field_definitions_projection_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_funding_sources_projection: {
+        Row: {
+          client_id: string
+          created_at: string
+          custom_fields: Json
+          end_date: string | null
+          id: string
+          is_active: boolean
+          last_event_id: string | null
+          organization_id: string
+          reference_number: string | null
+          source_name: string
+          source_type: string
+          start_date: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          custom_fields?: Json
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          last_event_id?: string | null
+          organization_id: string
+          reference_number?: string | null
+          source_name: string
+          source_type: string
+          start_date?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          custom_fields?: Json
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          last_event_id?: string | null
+          organization_id?: string
+          reference_number?: string | null
+          source_name?: string
+          source_type?: string
+          start_date?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_funding_sources_projection_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_funding_sources_projection_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_insurance_policies_projection: {
+        Row: {
+          client_id: string
+          coverage_end_date: string | null
+          coverage_start_date: string | null
+          created_at: string
+          group_number: string | null
+          id: string
+          is_active: boolean
+          last_event_id: string | null
+          organization_id: string
+          payer_name: string
+          policy_number: string | null
+          policy_type: string
+          subscriber_name: string | null
+          subscriber_relation: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          coverage_end_date?: string | null
+          coverage_start_date?: string | null
+          created_at?: string
+          group_number?: string | null
+          id?: string
+          is_active?: boolean
+          last_event_id?: string | null
+          organization_id: string
+          payer_name: string
+          policy_number?: string | null
+          policy_type: string
+          subscriber_name?: string | null
+          subscriber_relation?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          coverage_end_date?: string | null
+          coverage_start_date?: string | null
+          created_at?: string
+          group_number?: string | null
+          id?: string
+          is_active?: boolean
+          last_event_id?: string | null
+          organization_id?: string
+          payer_name?: string
+          policy_number?: string | null
+          policy_type?: string
+          subscriber_name?: string | null
+          subscriber_relation?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_insurance_policies_projection_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_insurance_policies_projection_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_phones_projection: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_primary: boolean
+          last_event_id: string | null
+          organization_id: string
+          phone_number: string
+          phone_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          last_event_id?: string | null
+          organization_id: string
+          phone_number: string
+          phone_type?: string
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          last_event_id?: string | null
+          organization_id?: string
+          phone_number?: string
+          phone_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_phones_projection_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_phones_projection_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_placement_history_projection: {
+        Row: {
+          client_id: string
+          created_at: string
+          end_date: string | null
+          id: string
+          is_current: boolean
+          last_event_id: string | null
+          organization_id: string
+          organization_unit_id: string | null
+          placement_arrangement: string
+          reason: string | null
+          start_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          is_current?: boolean
+          last_event_id?: string | null
+          organization_id: string
+          organization_unit_id?: string | null
+          placement_arrangement: string
+          reason?: string | null
+          start_date: string
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          is_current?: boolean
+          last_event_id?: string | null
+          organization_id?: string
+          organization_unit_id?: string | null
+          placement_arrangement?: string
+          reason?: string | null
+          start_date?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_placement_history_projection_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_placement_history_projection_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_placement_history_projection_organization_unit_id_fkey"
+            columns: ["organization_unit_id"]
+            isOneToOne: false
+            referencedRelation: "organization_units_projection"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_reference_values: {
+        Row: {
+          category: string
+          code: string
+          display_name: string
+          id: string
+          is_active: boolean
+          sort_order: number | null
+        }
+        Insert: {
+          category: string
+          code: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          sort_order?: number | null
+        }
+        Update: {
+          category?: string
+          code?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
+      clients_projection: {
+        Row: {
+          admission_date: string
+          admission_type: string | null
+          allergies: Json
+          citizenship_status: string | null
+          court_case_number: string | null
+          court_ordered_placement: boolean | null
+          created_at: string
+          created_by: string
+          custom_fields: Json
+          data_source: string
+          date_of_birth: string
+          developmental_history: string | null
+          dietary_restrictions: string | null
+          discharge_date: string | null
+          discharge_diagnosis: Json | null
+          discharge_outcome: string | null
+          discharge_placement: string | null
+          discharge_reason: string | null
+          drivers_license: string | null
+          dsm5_diagnoses: Json | null
+          education_status: string | null
+          ethnicity: string | null
+          expected_length_of_stay: number | null
+          external_id: string | null
+          financial_guarantor_type: string | null
+          first_name: string
+          gender: string
+          gender_identity: string | null
+          grade_level: string | null
+          id: string
+          iep_status: boolean | null
+          immunization_status: string | null
+          initial_risk_level: string | null
+          interpreter_needed: boolean | null
+          last_event_id: string | null
+          last_name: string
+          legal_custody_status: string | null
+          legal_status: string | null
+          level_of_care: string | null
+          mandated_reporting_status: boolean | null
+          marital_status: string | null
+          medicaid_id: string | null
+          medical_conditions: Json
+          medicare_id: string | null
+          middle_name: string | null
+          mrn: string | null
+          organization_id: string
+          organization_unit_id: string | null
+          photo_url: string | null
+          placement_arrangement: string | null
+          preferred_name: string | null
+          presenting_problem: string | null
+          previous_treatment_history: string | null
+          primary_diagnosis: Json | null
+          primary_language: string | null
+          pronouns: string | null
+          protective_services_involvement: boolean | null
+          race: string[] | null
+          reason_for_referral: string | null
+          referral_date: string | null
+          referral_organization: string | null
+          referral_source_type: string | null
+          safety_plan_required: boolean | null
+          secondary_diagnoses: Json | null
+          secondary_language: string | null
+          special_medical_needs: string | null
+          state_agency: string | null
+          status: string
+          substance_use_history: string | null
+          suicide_risk_status: string | null
+          trauma_history_indicator: boolean | null
+          updated_at: string
+          updated_by: string
+          violence_risk_status: string | null
+        }
+        Insert: {
+          admission_date: string
+          admission_type?: string | null
+          allergies?: Json
+          citizenship_status?: string | null
+          court_case_number?: string | null
+          court_ordered_placement?: boolean | null
+          created_at?: string
+          created_by: string
+          custom_fields?: Json
+          data_source?: string
+          date_of_birth: string
+          developmental_history?: string | null
+          dietary_restrictions?: string | null
+          discharge_date?: string | null
+          discharge_diagnosis?: Json | null
+          discharge_outcome?: string | null
+          discharge_placement?: string | null
+          discharge_reason?: string | null
+          drivers_license?: string | null
+          dsm5_diagnoses?: Json | null
+          education_status?: string | null
+          ethnicity?: string | null
+          expected_length_of_stay?: number | null
+          external_id?: string | null
+          financial_guarantor_type?: string | null
+          first_name: string
+          gender: string
+          gender_identity?: string | null
+          grade_level?: string | null
+          id?: string
+          iep_status?: boolean | null
+          immunization_status?: string | null
+          initial_risk_level?: string | null
+          interpreter_needed?: boolean | null
+          last_event_id?: string | null
+          last_name: string
+          legal_custody_status?: string | null
+          legal_status?: string | null
+          level_of_care?: string | null
+          mandated_reporting_status?: boolean | null
+          marital_status?: string | null
+          medicaid_id?: string | null
+          medical_conditions?: Json
+          medicare_id?: string | null
+          middle_name?: string | null
+          mrn?: string | null
+          organization_id: string
+          organization_unit_id?: string | null
+          photo_url?: string | null
+          placement_arrangement?: string | null
+          preferred_name?: string | null
+          presenting_problem?: string | null
+          previous_treatment_history?: string | null
+          primary_diagnosis?: Json | null
+          primary_language?: string | null
+          pronouns?: string | null
+          protective_services_involvement?: boolean | null
+          race?: string[] | null
+          reason_for_referral?: string | null
+          referral_date?: string | null
+          referral_organization?: string | null
+          referral_source_type?: string | null
+          safety_plan_required?: boolean | null
+          secondary_diagnoses?: Json | null
+          secondary_language?: string | null
+          special_medical_needs?: string | null
+          state_agency?: string | null
+          status?: string
+          substance_use_history?: string | null
+          suicide_risk_status?: string | null
+          trauma_history_indicator?: boolean | null
+          updated_at?: string
+          updated_by: string
+          violence_risk_status?: string | null
+        }
+        Update: {
+          admission_date?: string
+          admission_type?: string | null
+          allergies?: Json
+          citizenship_status?: string | null
+          court_case_number?: string | null
+          court_ordered_placement?: boolean | null
+          created_at?: string
+          created_by?: string
+          custom_fields?: Json
+          data_source?: string
+          date_of_birth?: string
+          developmental_history?: string | null
+          dietary_restrictions?: string | null
+          discharge_date?: string | null
+          discharge_diagnosis?: Json | null
+          discharge_outcome?: string | null
+          discharge_placement?: string | null
+          discharge_reason?: string | null
+          drivers_license?: string | null
+          dsm5_diagnoses?: Json | null
+          education_status?: string | null
+          ethnicity?: string | null
+          expected_length_of_stay?: number | null
+          external_id?: string | null
+          financial_guarantor_type?: string | null
+          first_name?: string
+          gender?: string
+          gender_identity?: string | null
+          grade_level?: string | null
+          id?: string
+          iep_status?: boolean | null
+          immunization_status?: string | null
+          initial_risk_level?: string | null
+          interpreter_needed?: boolean | null
+          last_event_id?: string | null
+          last_name?: string
+          legal_custody_status?: string | null
+          legal_status?: string | null
+          level_of_care?: string | null
+          mandated_reporting_status?: boolean | null
+          marital_status?: string | null
+          medicaid_id?: string | null
+          medical_conditions?: Json
+          medicare_id?: string | null
+          middle_name?: string | null
+          mrn?: string | null
+          organization_id?: string
+          organization_unit_id?: string | null
+          photo_url?: string | null
+          placement_arrangement?: string | null
+          preferred_name?: string | null
+          presenting_problem?: string | null
+          previous_treatment_history?: string | null
+          primary_diagnosis?: Json | null
+          primary_language?: string | null
+          pronouns?: string | null
+          protective_services_involvement?: boolean | null
+          race?: string[] | null
+          reason_for_referral?: string | null
+          referral_date?: string | null
+          referral_organization?: string | null
+          referral_source_type?: string | null
+          safety_plan_required?: boolean | null
+          secondary_diagnoses?: Json | null
+          secondary_language?: string | null
+          special_medical_needs?: string | null
+          state_agency?: string | null
+          status?: string
+          substance_use_history?: string | null
+          suicide_risk_status?: string | null
+          trauma_history_indicator?: boolean | null
+          updated_at?: string
+          updated_by?: string
+          violence_risk_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_projection_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_projection_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_projection_organization_unit_id_fkey"
+            columns: ["organization_unit_id"]
+            isOneToOne: false
+            referencedRelation: "organization_units_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_projection_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_addresses: {
         Row: {
           address_id: string
@@ -1212,6 +2615,54 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts_projection"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_designations_projection: {
+        Row: {
+          contact_id: string
+          created_at: string
+          designation: string
+          id: string
+          is_active: boolean
+          last_event_id: string | null
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          designation: string
+          id?: string
+          is_active?: boolean
+          last_event_id?: string | null
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          designation?: string
+          id?: string
+          is_active?: boolean
+          last_event_id?: string | null
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_designations_projection_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_designations_projection_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
             referencedColumns: ["id"]
           },
         ]
@@ -2394,6 +3845,124 @@ export type Database = {
           },
         ]
       }
+      schedule_templates_projection: {
+        Row: {
+          assigned_user_count: number
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          last_event_id: string | null
+          org_unit_id: string | null
+          organization_id: string
+          schedule: Json
+          schedule_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_user_count?: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_event_id?: string | null
+          org_unit_id?: string | null
+          organization_id: string
+          schedule: Json
+          schedule_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_user_count?: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_event_id?: string | null
+          org_unit_id?: string | null
+          organization_id?: string
+          schedule?: Json
+          schedule_name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_templates_projection_org_unit_id_fkey"
+            columns: ["org_unit_id"]
+            isOneToOne: false
+            referencedRelation: "organization_units_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_templates_projection_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedule_user_assignments_projection: {
+        Row: {
+          created_at: string | null
+          effective_from: string | null
+          effective_until: string | null
+          id: string
+          is_active: boolean | null
+          last_event_id: string | null
+          organization_id: string
+          schedule_template_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          effective_from?: string | null
+          effective_until?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_event_id?: string | null
+          organization_id: string
+          schedule_template_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          effective_from?: string | null
+          effective_until?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_event_id?: string | null
+          organization_id?: string
+          schedule_template_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_user_assignments_organization_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_user_assignments_template_fkey"
+            columns: ["schedule_template_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_templates_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_user_assignments_user_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_addresses: {
         Row: {
           city: string
@@ -2500,6 +4069,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "user_client_assignments_projection_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_projection"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_client_assignments_projection_organization_id_fkey"
             columns: ["organization_id"]
@@ -2838,76 +4414,6 @@ export type Database = {
           },
         ]
       }
-      user_schedule_policies_projection: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          effective_from: string | null
-          effective_until: string | null
-          id: string
-          is_active: boolean | null
-          last_event_id: string | null
-          org_unit_id: string | null
-          organization_id: string
-          schedule: Json
-          schedule_name: string
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          effective_from?: string | null
-          effective_until?: string | null
-          id?: string
-          is_active?: boolean | null
-          last_event_id?: string | null
-          org_unit_id?: string | null
-          organization_id: string
-          schedule: Json
-          schedule_name: string
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          effective_from?: string | null
-          effective_until?: string | null
-          id?: string
-          is_active?: boolean | null
-          last_event_id?: string | null
-          org_unit_id?: string | null
-          organization_id?: string
-          schedule?: Json
-          schedule_name?: string
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_schedule_policies_projection_org_unit_id_fkey"
-            columns: ["org_unit_id"]
-            isOneToOne: false
-            referencedRelation: "organization_units_projection"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_schedule_policies_projection_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations_projection"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_schedule_policies_projection_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       users: {
         Row: {
           accessible_organizations: string[] | null
@@ -3058,7 +4564,7 @@ export type Database = {
       }
       unprocessed_events: {
         Row: {
-          age: unknown
+          age: string | null
           created_at: string | null
           created_by: string | null
           event_type: string | null
@@ -3178,6 +4684,7 @@ export type Database = {
           error_message: string
           invitations_sent: number
           organization_id: string
+          stages: Json
           status: string
         }[]
       }
@@ -3386,6 +4893,146 @@ export type Database = {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
       }
+      handle_client_address_added: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_address_removed: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_address_updated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_admitted: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_contact_assigned: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_contact_unassigned: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_discharged: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_email_added: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_email_removed: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_email_updated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_field_category_created: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_field_category_deactivated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_field_category_deleted: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_field_category_reactivated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_field_category_updated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_field_definition_created: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_field_definition_deactivated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_field_definition_deleted: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_field_definition_reactivated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_field_definition_updated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_funding_source_added: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_funding_source_removed: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_funding_source_updated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_information_updated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_insurance_added: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_insurance_removed: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_insurance_updated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_phone_added: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_phone_removed: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_phone_updated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_placement_changed: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_placement_ended: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_client_registered: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_contact_designation_created: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_contact_designation_deactivated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
       handle_invitation_resent: {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
@@ -3462,10 +5109,6 @@ export type Database = {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
       }
-      handle_rbac_user_role_assigned: {
-        Args: { p_event: Record<string, unknown> }
-        Returns: undefined
-      }
       handle_role_created: {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
@@ -3491,6 +5134,34 @@ export type Database = {
         Returns: undefined
       }
       handle_role_updated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_schedule_created: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_schedule_deactivated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_schedule_deleted: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_schedule_reactivated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_schedule_updated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_schedule_user_assigned: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_schedule_user_unassigned: {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
       }
@@ -3522,6 +5193,14 @@ export type Database = {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
       }
+      handle_user_deactivated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_user_deleted: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
       handle_user_invited: {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
@@ -3542,31 +5221,19 @@ export type Database = {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
       }
+      handle_user_profile_updated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      handle_user_reactivated: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
       handle_user_role_assigned: {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
       }
       handle_user_role_revoked: {
-        Args: { p_event: Record<string, unknown> }
-        Returns: undefined
-      }
-      handle_user_schedule_created: {
-        Args: { p_event: Record<string, unknown> }
-        Returns: undefined
-      }
-      handle_user_schedule_deactivated: {
-        Args: { p_event: Record<string, unknown> }
-        Returns: undefined
-      }
-      handle_user_schedule_deleted: {
-        Args: { p_event: Record<string, unknown> }
-        Returns: undefined
-      }
-      handle_user_schedule_reactivated: {
-        Args: { p_event: Record<string, unknown> }
-        Returns: undefined
-      }
-      handle_user_schedule_updated: {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
       }
@@ -3612,15 +5279,6 @@ export type Database = {
       }
       is_user_assigned_to_client: {
         Args: { p_client_id: string; p_user_id: string }
-        Returns: boolean
-      }
-      is_user_on_schedule: {
-        Args: {
-          p_check_time?: string
-          p_org_id: string
-          p_org_unit_id?: string
-          p_user_id: string
-        }
         Returns: boolean
       }
       is_var_partner: { Args: never; Returns: boolean }
@@ -3917,6 +5575,18 @@ export type Database = {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
       }
+      process_client_event: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      process_client_field_category_event: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      process_client_field_definition_event: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
       process_contact_event: {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
@@ -3949,16 +5619,12 @@ export type Database = {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
       }
-      process_program_event: {
-        Args: { p_event: Record<string, unknown> }
-        Returns: undefined
-      }
       process_rbac_event: {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
       }
-      process_rbac_events: {
-        Args: { p_event: Database["public"]["Tables"]["domain_events"]["Row"] }
+      process_schedule_event: {
+        Args: { p_event: Record<string, unknown> }
         Returns: undefined
       }
       process_user_event: {
@@ -4028,6 +5694,10 @@ export type Database = {
         }[]
       }
       uuid_generate_v7: { Args: never; Returns: string }
+      validate_client_required_fields: {
+        Args: { p_client_data: Json; p_org_id: string }
+        Returns: string[]
+      }
       validate_cross_tenant_access: {
         Args: {
           p_consultant_org_id: string
@@ -4189,9 +5859,6 @@ export type CompositeTypes<
 
 export const Constants = {
   api: {
-    Enums: {},
-  },
-  graphql_public: {
     Enums: {},
   },
   public: {
