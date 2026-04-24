@@ -562,41 +562,44 @@ export const UsersManagePage: React.FC = observer(() => {
     }
   }, [currentItem, viewModel]);
 
-  // Save notification preferences handler
+  // Save notification preferences handler — routes through the ViewModel so
+  // the Pattern A v2 in-place patch + isSubmitting state stay aligned with
+  // every other write path. Surfaces a Sonner toast for confirmation; the
+  // VM's `error` is cleared on the failure branch so the page's persistent
+  // role="alert" banner doesn't double-announce alongside the toast.
   const handleSaveNotificationPreferences = useCallback(
     async (preferences: NotificationPreferences) => {
       if (!currentItem || currentItem.isInvitation || !organizationId) return;
 
       setIsSavingPrefs(true);
-      setOperationError(null);
       try {
-        const commandService = getUserCommandService();
-        const result = await commandService.updateNotificationPreferences({
+        const result = await viewModel.updateNotificationPreferences({
           userId: currentItem.id,
           orgId: organizationId,
           notificationPreferences: preferences,
         });
 
         if (result.success) {
-          setNotificationPrefs(preferences);
-          log.info('Notification preferences saved', { userId: currentItem.id });
+          setNotificationPrefs(result.notificationPreferences ?? preferences);
           toast.success('Notification preferences updated');
         } else {
-          const message = result.error || 'Failed to save notification preferences';
-          setOperationError(message);
+          // RPC errors prefixed `Event processing failed:` carry handler
+          // internals (e.g. constraint names) — keep the raw form in the
+          // VM's debug log; show the user a friendly fallback.
+          const raw = result.error ?? 'Failed to save notification preferences';
+          const message = raw.startsWith('Event processing failed:')
+            ? 'Could not save notification preferences. Please try again.'
+            : raw;
           toast.error(message);
+          // Clear so the page's role="alert" banner doesn't repeat what the
+          // toast already announced (avoids double aria-live).
+          viewModel.clearError();
         }
-      } catch (error) {
-        log.error('Error saving notification preferences', error);
-        const message =
-          error instanceof Error ? error.message : 'Failed to save notification preferences';
-        setOperationError(message);
-        toast.error(message);
       } finally {
         setIsSavingPrefs(false);
       }
     },
-    [currentItem, organizationId]
+    [currentItem, organizationId, viewModel]
   );
 
   // Get display name for current item
