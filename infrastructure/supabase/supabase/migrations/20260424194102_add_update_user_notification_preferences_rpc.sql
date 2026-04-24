@@ -43,10 +43,11 @@ BEGIN
     -- Permission port: self-update OR user.update permission.
     -- has_permission() already unnests the [{p, s}] claim array correctly
     -- (baseline_v4 lines 9927-9941).
+    -- Hygiene: generic 'Permission denied' message; the specific rule
+    -- (self-or-user.update) is documented in the COMMENT block below and in
+    -- documentation/infrastructure/reference/edge-functions/manage-user.md.
     IF p_user_id <> v_caller_id AND NOT public.has_permission('user.update') THEN
-        RAISE EXCEPTION
-            'Permission denied: Can only update your own notification preferences unless you have user.update permission'
-            USING ERRCODE = '42501';
+        RAISE EXCEPTION 'Permission denied' USING ERRCODE = '42501';
     END IF;
 
     -- Input shape validation (mirrors Edge Function manage-user/index.ts:338-350)
