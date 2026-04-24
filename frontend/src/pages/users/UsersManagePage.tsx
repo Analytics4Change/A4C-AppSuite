@@ -21,6 +21,7 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -579,14 +580,18 @@ export const UsersManagePage: React.FC = observer(() => {
         if (result.success) {
           setNotificationPrefs(preferences);
           log.info('Notification preferences saved', { userId: currentItem.id });
+          toast.success('Notification preferences updated');
         } else {
-          setOperationError(result.error || 'Failed to save notification preferences');
+          const message = result.error || 'Failed to save notification preferences';
+          setOperationError(message);
+          toast.error(message);
         }
       } catch (error) {
         log.error('Error saving notification preferences', error);
-        setOperationError(
-          error instanceof Error ? error.message : 'Failed to save notification preferences'
-        );
+        const message =
+          error instanceof Error ? error.message : 'Failed to save notification preferences';
+        setOperationError(message);
+        toast.error(message);
       } finally {
         setIsSavingPrefs(false);
       }
