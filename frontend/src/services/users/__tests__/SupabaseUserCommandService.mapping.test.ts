@@ -424,12 +424,14 @@ describe('SupabaseUserCommandService — snake_case → camelCase mapping', () =
       // with ERRCODE 42501 (SQLSTATE permission_denied); PostgREST surfaces
       // it as an error object on the apiRpc result. Service returns
       // {success: false, error: <message>, errorDetails: {code: 'UNKNOWN'}}.
+      // The RPC uses the generic 'Permission denied' message per hygiene —
+      // specific rule documentation lives in the migration COMMENT block and
+      // the edge-functions/manage-user.md reference doc.
       mockApiRpc.mockResolvedValueOnce({
         data: null,
         error: {
           code: '42501',
-          message:
-            'Permission denied: Can only update your own notification preferences unless you have user.update permission',
+          message: 'Permission denied',
           hint: null,
         },
       });
