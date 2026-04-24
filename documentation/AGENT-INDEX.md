@@ -107,8 +107,11 @@ purpose: agent-navigation
 | `deletion-workflow` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | activities-reference.md, temporal-overview.md |
 | `dual-write` | [cqrs-dual-write-audit.md](../dev/archived/cqrs-dual-write-audit/cqrs-dual-write-audit-context.md) | event-handler-pattern.md, event-processing-patterns.md |
 | `duration-ms` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
-| `edge-function` | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | DEPLOYMENT_INSTRUCTIONS.md |
+| `edge-function` | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | DEPLOYMENT_INSTRUCTIONS.md, adr-edge-function-vs-sql-rpc.md |
 | `edge-function-jwt` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | EDGE_FUNCTION_TESTS.md |
+| `edge-function-vs-sql-rpc` | [adr-edge-function-vs-sql-rpc.md](architecture/decisions/adr-edge-function-vs-sql-rpc.md) | adr-rpc-readback-pattern.md, event-handler-pattern.md |
+| `sql-rpc` | [adr-edge-function-vs-sql-rpc.md](architecture/decisions/adr-edge-function-vs-sql-rpc.md) | adr-rpc-readback-pattern.md, event-handler-pattern.md |
+| `orchestration-tier` | [adr-edge-function-vs-sql-rpc.md](architecture/decisions/adr-edge-function-vs-sql-rpc.md) | adr-rpc-readback-pattern.md |
 | `email` | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | resend-key-rotation.md |
 | `entity-service` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | organization-management-architecture.md |
 | `event-archival` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
@@ -313,6 +316,7 @@ purpose: agent-navigation
 | [adr-client-management-schema.md](architecture/decisions/adr-client-management-schema.md) | ADR: Client management schema — 12 tables, 84 decisions, intake/lifecycle | `adr`, `client-management`, `schema-design`, `intake-form`, `configurable-fields`, `contact-designation`, `placement-history`, `discharge`, `analytics-dimensions`, `enum-reference` | 5000 |
 | [adr-client-ou-placement.md](architecture/decisions/adr-client-ou-placement.md) | ADR: Client OU placement — single-path OU mutation, `client.transfer` permission, row lock, read-time OU state enrichment | `adr`, `client-placement`, `client-transfer`, `organization-unit`, `placement-history`, `row-lock`, `cqrs-read-model` | 1200 |
 | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) | ADR: All `api.update_*`/`change_*` RPCs use Pattern A (return-error envelope) for handler-driven failures; RAISE EXCEPTION forbidden because it rolls back the audit row | `adr`, `rpc-readback`, `processing-error`, `projection-guard`, `api-contract` | 2400 |
+| [adr-edge-function-vs-sql-rpc.md](architecture/decisions/adr-edge-function-vs-sql-rpc.md) | ADR: SQL RPC is the default for write operations; Edge Functions reserved for 6 load-bearing criteria (LB1–LB6). Includes inventory of all 7 Edge Functions with per-operation classification + extraction backlog. | `adr`, `edge-function`, `sql-rpc`, `orchestration-tier`, `cqrs` | 2800 |
 | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | Organization isolation via RLS and JWT claims | `rls`, `multi-tenant`, `org_id` | 2800 |
 | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | CQRS pattern, domain events, projections | `cqrs`, `events`, `projections` | 2500 |
 | [temporal-overview.md](architecture/workflows/temporal-overview.md) | Workflow orchestration concepts and patterns | `temporal`, `workflow`, `saga` | 3200 |

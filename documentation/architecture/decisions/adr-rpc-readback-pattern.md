@@ -3,6 +3,7 @@ status: current
 last_updated: 2026-04-24
 ---
 
+
 <!-- TL;DR-START -->
 ## TL;DR
 
@@ -327,5 +328,6 @@ The same pattern should be applied to `RpcResult` in `frontend/src/types/client-
 - [event-observability.md](../../infrastructure/guides/event-observability.md) — Failed-event monitoring; `processing_error` query examples; `/admin/events` dashboard reference
 - [event-sourcing-overview.md](../data/event-sourcing-overview.md) — CQRS architecture; why the read-side / write-side split makes the read-back pattern necessary
 - [adr-client-ou-placement.md](./adr-client-ou-placement.md) — Decision 2 Enforcement section is the proof-of-pattern application; this ADR generalizes that decision to all RPCs
+- [adr-edge-function-vs-sql-rpc.md](./adr-edge-function-vs-sql-rpc.md) — When to choose SQL RPC vs Edge Function; Decision 5 of that ADR references the Pattern A v2 contract codified here
 - [infrastructure/supabase/CLAUDE.md](../../../infrastructure/supabase/CLAUDE.md) — "RPC functions that read back from projections MUST check for NOT FOUND" guard rail predates this ADR; cross-referenced in that section
 - [frontend/src/services/CLAUDE.md](../../../frontend/src/services/CLAUDE.md) — Frontend service envelope contract that this ADR's response shape conforms to
