@@ -36,6 +36,7 @@ Single migration: `20260424182345_add_missing_user_lifecycle_handlers_and_orphan
 - [x] Patched `api.get_user_phones` — added early-return empty array for deleted users
 - [x] Patched `api.get_user_notification_preferences` — added early-return "all-disabled" shape
 - [x] Patched `api.list_user_client_assignments` — converted LEFT JOIN to INNER JOIN with deleted_at filter in ON
+- [x] Patched `api.get_schedule_template` — added `deleted_at IS NULL` to the users join in the assigned_users sub-select (added post-review, 5th site surfaced by architectural review)
 - [x] `RAISE EXCEPTION ... USING ERRCODE = 'P0002'` — no PII interpolation; forward-compatible with parked `rpc-error-pii-sanitization` card
 
 ## Phase 3 — Edge Function Patches ✅ COMPLETE
@@ -53,7 +54,7 @@ Single migration: `20260424182345_add_missing_user_lifecycle_handlers_and_orphan
 
 - [x] `supabase db push --linked --dry-run` — confirmed single-migration push
 - [x] `supabase db push --linked` — migration applied to dev
-- [x] Post-apply verification: 3 handlers in `pg_proc`; all 4 api functions show `deleted_at IS NULL` in their bodies
+- [x] Post-apply verification: 3 handlers in `pg_proc`; first 4 api functions show `deleted_at IS NULL` in their bodies (5th patch for `api.get_schedule_template` added post-review, will apply on prod deploy via CI — dev may be briefly out of sync until re-push)
 - [x] Backfill step skipped — Phase 0 confirmed zero failed events to retry
 - [x] Non-deleted user probe: `list_user_client_assignments`, `get_user_phones`, `get_user_notification_preferences` all return normal data
 
