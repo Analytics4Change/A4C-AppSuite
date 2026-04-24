@@ -1158,12 +1158,14 @@ export class SupabaseUserCommandService implements IUserCommandService {
   }
 
   /**
-   * Update user's notification preferences for the organization
+   * Update user's notification preferences for the organization.
    *
-   * Calls the manage-user Edge Function with update_notification_preferences operation.
-   * This provides full tracing context (correlation_id, trace_id, etc.) for observability.
-   *
-   * Phase 6.4: Migrated from RPC to Edge Function pattern for architectural consistency.
+   * Calls `api.update_user_notification_preferences` SQL RPC (Pattern A v2
+   * readback). Extracted from the `manage-user` Edge Function per
+   * `adr-edge-function-vs-sql-rpc.md` — see migration
+   * `20260424194102_add_update_user_notification_preferences_rpc.sql`.
+   * Correlation IDs propagate via the PostgREST session variables set by the
+   * request pipeline.
    */
   async updateNotificationPreferences(
     request: UpdateNotificationPreferencesRequest

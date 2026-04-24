@@ -884,14 +884,14 @@ export interface UserPhoneResult extends UserRpcEnvelope {
 /**
  * Response for `updateNotificationPreferences`.
  *
- * Path: `manage-user` Edge Function, operation `update_notification_preferences`.
- * The Edge Function returns the updated preferences in its response envelope so
- * consumer VMs can patch `userOrgAccess.notificationPreferences` in place.
+ * Path: `api.update_user_notification_preferences` SQL RPC (Pattern A v2
+ * readback). The RPC returns the updated preferences in its response envelope
+ * so consumer VMs can patch `userOrgAccess.notificationPreferences` in place.
  *
- * **Deploy-window compat**: `notificationPreferences` may be undefined during
- * a rollout window where an older Edge Function version is still serving.
- * Consumers fall back to a `loadUserOrgAccess` refetch and emit `log.warn`
- * in that case. See `documentation/frontend/patterns/rpc-readback-vm-patch.md`.
+ * `notificationPreferences` may be undefined when the handler failed after
+ * event emission (`processing_error` surfaces in the error envelope); consumers
+ * fall back to a `loadUserOrgAccess` refetch and emit `log.warn` in that case.
+ * See `documentation/frontend/patterns/rpc-readback-vm-patch.md`.
  */
 export interface UpdateNotificationPreferencesResult extends UserRpcEnvelope {
   notificationPreferences?: NotificationPreferences;
