@@ -1,3 +1,13 @@
+-- ============================================================================
+-- DRIFT GUARD (paired with Edge Function manage-user v11+):
+--   The Edge Function at
+--   `infrastructure/supabase/supabase/functions/manage-user/index.ts`
+--   (operation `update_notification_preferences`, v11 onward) performs a
+--   Pattern A v2 read-back of the column set this handler writes. If you
+--   add/remove/rename a column here, update the Edge Function's SELECT
+--   AND refresh the column list in `rpc-readback-vm-patch.md`.
+--   Column list today: email_enabled, sms_enabled, sms_phone_id, in_app_enabled.
+-- ============================================================================
 CREATE OR REPLACE FUNCTION public.handle_user_notification_preferences_updated(p_event record)
  RETURNS void
  LANGUAGE plpgsql

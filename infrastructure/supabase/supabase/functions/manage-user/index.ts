@@ -42,7 +42,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v10-notification-prefs-readback';
+const DEPLOY_VERSION = 'v11-pattern-a-v2-readback';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -434,6 +434,7 @@ serve(async (req) => {
           },
           p_event_metadata: buildEventMetadata(tracingContext, 'user.notification_preferences.updated', req, {
             user_id: user.id,
+            organization_id: orgId, // Audit compliance per infrastructure/CLAUDE.md Event Metadata Requirements (Q9.3 fix)
             reason: requestData.reason || 'Updated via User Management',
           }),
         });
@@ -443,21 +444,108 @@ serve(async (req) => {
         return handleRpcError(eventError, correlationId, corsHeaders, 'update notification preferences');
       }
 
-      console.log(`[manage-user v${DEPLOY_VERSION}] Notification preferences updated: event_id=${eventId}`);
+      console.log(`[manage-user v${DEPLOY_VERSION}] Notification preferences emitted: event_id=${eventId}`);
 
-      // v10: echo the submitted prefs so consumer VMs can patch in place.
-      // The handler updated `user_org_access.notification_preferences` from
-      // this same JSONB (synchronous BEFORE INSERT trigger → projection
-      // updated before we reach here), so echoing the request prefs is
-      // equivalent to a read-back. An explicit SELECT would be more
-      // defensive but adds a round-trip; echo is sufficient given the
-      // sync handler contract.
+      // Pattern A v2 read-back (ADR: adr-rpc-readback-pattern.md:93 — Edge
+      // Functions as orchestration tier may implement the equivalent check in
+      // TypeScript). Paired files:
+      //   - handler: infrastructure/supabase/handlers/user/handle_user_notification_preferences_updated.sql
+      //   - target projection: user_notification_preferences_projection
+      //     (columns: email_enabled, sms_enabled, sms_phone_id, in_app_enabled)
+      // If you add/remove a field on either side, update both AND refresh the
+      // "Existing implementations" table in
+      // documentation/frontend/patterns/rpc-readback-vm-patch.md.
+
+      // Step 1: check processing_error on the captured event_id (race-safe PK
+      // lookup — the BEFORE INSERT trigger runs inside the INSERT transaction
+      // and commits before emit_domain_event returns, so this round-trip
+      // always sees the final state).
+      const { data: eventRow, error: eventReadError } = await supabaseAdmin
+        .from('domain_events')
+        .select('processing_error')
+        .eq('id', eventId)
+        .single();
+
+      if (eventReadError) {
+        console.error(
+          `[manage-user v${DEPLOY_VERSION}] Failed to read-back event ${eventId} for processing_error check:`,
+          eventReadError
+        );
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Event processing failed: event row lookup failed after emit',
+            operation: 'update_notification_preferences',
+          } satisfies ManageUserResponse),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (eventRow?.processing_error) {
+        console.warn(
+          `[manage-user v${DEPLOY_VERSION}] processing_error on event ${eventId}: ${eventRow.processing_error}`
+        );
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Event processing failed: ${eventRow.processing_error}`,
+            operation: 'update_notification_preferences',
+          } satisfies ManageUserResponse),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Step 2: SELECT the projection row to get authoritative state (handler
+      // applies COALESCE defaults; the projection row is the source of truth,
+      // not the request body).
+      const { data: projectionRow, error: readbackError } = await supabaseAdmin
+        .from('user_notification_preferences_projection')
+        .select('email_enabled, sms_enabled, sms_phone_id, in_app_enabled')
+        .eq('user_id', requestData.userId)
+        .eq('organization_id', orgId)
+        .single();
+
+      if (readbackError || !projectionRow) {
+        // Handler UPSERTs (handle_user_notification_preferences_updated.sql
+        // L37-45 — IF NOT FOUND THEN INSERT). A successful emit with
+        // NOT-FOUND on read-back is therefore a handler invariant violation.
+        console.error(
+          `[manage-user v${DEPLOY_VERSION}] READ-BACK NOT-FOUND — handler invariant violated (event ${eventId})`,
+          {
+            userId: requestData.userId,
+            orgId,
+            handlerInvariantViolated: true,
+            readbackError,
+          }
+        );
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Event processing failed: projection read-back returned no row',
+            operation: 'update_notification_preferences',
+          } satisfies ManageUserResponse),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Step 3: transform DB columns (snake_case + split SMS fields) back to
+      // the AsyncAPI snake_case shape the frontend service already maps to
+      // camelCase `NotificationPreferences`.
+      const refreshedPreferences: NotificationPreferences = {
+        email: projectionRow.email_enabled,
+        sms: {
+          enabled: projectionRow.sms_enabled,
+          phone_id: projectionRow.sms_phone_id,
+        },
+        in_app: projectionRow.in_app_enabled,
+      };
+
       const response: ManageUserResponse = {
         success: true,
         userId: requestData.userId,
         operation: 'update_notification_preferences',
         deployVersion: DEPLOY_VERSION,
-        notificationPreferences: prefs,
+        notificationPreferences: refreshedPreferences,
       };
 
       const completedSpan = endSpan(span, 'ok');
