@@ -21,7 +21,7 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { toast } from 'sonner';
+import { useNotificationPreferencesSave } from '@/hooks/useNotificationPreferencesSave';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -125,7 +125,6 @@ export const UsersManagePage: React.FC = observer(() => {
   );
   const [userPhones, setUserPhones] = useState<UserPhone[]>([]);
   const [isLoadingPrefs, setIsLoadingPrefs] = useState(false);
-  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   // Load users and roles on mount
   useEffect(() => {
@@ -562,42 +561,16 @@ export const UsersManagePage: React.FC = observer(() => {
     }
   }, [currentItem, viewModel]);
 
-  // Save notification preferences handler
-  const handleSaveNotificationPreferences = useCallback(
-    async (preferences: NotificationPreferences) => {
-      if (!currentItem || currentItem.isInvitation || !organizationId) return;
-
-      setIsSavingPrefs(true);
-      setOperationError(null);
-      try {
-        const commandService = getUserCommandService();
-        const result = await commandService.updateNotificationPreferences({
-          userId: currentItem.id,
-          orgId: organizationId,
-          notificationPreferences: preferences,
-        });
-
-        if (result.success) {
-          setNotificationPrefs(preferences);
-          log.info('Notification preferences saved', { userId: currentItem.id });
-          toast.success('Notification preferences updated');
-        } else {
-          const message = result.error || 'Failed to save notification preferences';
-          setOperationError(message);
-          toast.error(message);
-        }
-      } catch (error) {
-        log.error('Error saving notification preferences', error);
-        const message =
-          error instanceof Error ? error.message : 'Failed to save notification preferences';
-        setOperationError(message);
-        toast.error(message);
-      } finally {
-        setIsSavingPrefs(false);
-      }
-    },
-    [currentItem, organizationId]
-  );
+  // Save notification preferences — hook encapsulates service call + Sonner
+  // toast so the production handler is exercisable in unit tests.
+  const notificationPrefsSave = useNotificationPreferencesSave({
+    userId: currentItem && !currentItem.isInvitation ? currentItem.id : null,
+    orgId: organizationId,
+    onError: setOperationError,
+    onSuccess: setNotificationPrefs,
+  });
+  const handleSaveNotificationPreferences = notificationPrefsSave.save;
+  const isSavingPrefs = notificationPrefsSave.isSaving;
 
   // Get display name for current item
   const getDisplayName = (item: UserListItem | null): string => {
