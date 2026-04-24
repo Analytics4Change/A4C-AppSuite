@@ -97,6 +97,23 @@ This card BLOCKS 3 seeded extraction cards (all created in PR #33):
 - Do NOT touch the `process_user_event` router itself — CASE branches already correct; just create the missing handlers
 - Backfill retry must be a follow-up action after the migration applies, NOT part of the migration (retries modify rows that the migration creates handlers for — order matters)
 
+## Incidental Findings (2026-04-24)
+
+Surfaced during pre-work verification; documented here as follow-ups (out of scope for this card):
+
+1. **Three projections lack `ON DELETE` clauses on their `user_id` FK**:
+   - `user_client_assignments_projection`
+   - `user_schedule_policies_projection`
+   - `schedule_user_assignments_projection` (per `20260217211231_schedule_template_refactor.sql` and `20260218173920_schedule_assignment_management.sql`)
+
+   Under current design this doesn't bite: `handle_user_deleted` soft-deletes, never physically deletes, so FK ON DELETE clauses are never exercised. If a future operation hard-deletes a user row, these three tables would violate FK. Worth a separate PR to add `ON DELETE SET NULL` or `CASCADE` consistent with the other user-scoped projections.
+
+2. **Orphan-read exposure fixed alongside this card**: Four `api.*` RPCs (`get_user_addresses`, `get_user_phones`, `get_user_notification_preferences`, `list_user_client_assignments`) and two Edge Function read paths (`manage-user/index.ts:502`, `accept-invitation/index.ts:321`) previously returned dependent-projection data for users without checking `users.deleted_at`. Latent today (no deleted users in prod because the handler didn't exist); would have leaked on first `user.deleted` event. Fixed in the same PR because the leak becomes real the moment `handle_user_deleted` populates `deleted_at`.
+
+3. **Deactivation-read filtering explicitly NOT in scope**: Deactivation is a per-consumer business rule (admin views show deactivated users; notification delivery hides them) unlike deletion which is a universal hide. ViewModels / callers filter on `is_active` where business-appropriate.
+
+4. **Reactivate limitation**: `handle_user_reactivated` restores projection state (`is_active = true`) but does NOT unban `auth.users`. A deactivated user is banned in `auth.users` via `auth.admin.updateUserById` in the Edge Function; un-banning is a separate concern tracked at `manage-user-reactivate-to-sql-rpc/context.md` O1.
+
 ## Reference Materials
 
 - `infrastructure/supabase/handlers/routers/process_user_event.sql` — router CASE dispatching to the missing handlers

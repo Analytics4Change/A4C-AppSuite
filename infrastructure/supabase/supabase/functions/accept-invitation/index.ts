@@ -317,18 +317,38 @@ serve(async (req) => {
 
       // Check if user is new or existing (has roles in ANY organization - "Sally scenario")
       // Sally: user with role in Org A accepts invite to Org B → skip user.created
-      const { data: existingRoles, error: rolesCheckError } = await supabase
-        .from('user_roles_projection')
-        .select('id')
-        .eq('user_id', userId)
-        .limit(1);
+      //
+      // Soft-deleted users are treated as NEW for this check — a deleted user
+      // being re-invited should receive the full user.created flow, since the
+      // prior public.users row is tombstoned and logically orphaned role rows
+      // should not short-circuit the onboarding path.
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('deleted_at')
+        .eq('id', userId)
+        .maybeSingle();
+
+      const isDeleted = !!userRow?.deleted_at;
+
+      let existingRoles: Array<{ id: string }> | null = null;
+      let rolesCheckError: unknown = null;
+
+      if (!isDeleted) {
+        const result = await supabase
+          .from('user_roles_projection')
+          .select('id')
+          .eq('user_id', userId)
+          .limit(1);
+        existingRoles = result.data;
+        rolesCheckError = result.error;
+      }
 
       if (rolesCheckError) {
         console.warn(`[accept-invitation v${DEPLOY_VERSION}] Failed to check existing roles:`, rolesCheckError);
         // Continue - we'll emit user.created to be safe (idempotent via projections)
       }
 
-      const isExistingUser = existingRoles && existingRoles.length > 0;
+      const isExistingUser = !isDeleted && !!existingRoles && existingRoles.length > 0;
 
       // Only emit user.created for NEW users (Sally scenario: skip for existing)
       if (!isExistingUser) {

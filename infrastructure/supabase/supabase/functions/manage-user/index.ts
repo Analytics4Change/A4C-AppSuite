@@ -495,7 +495,28 @@ serve(async (req) => {
         );
       }
 
-      // Step 2: SELECT the projection row to get authoritative state (handler
+      // Step 2a: guard against returning data for a soft-deleted user.
+      // The dependent notification_preferences_projection has no FK cascade
+      // on user soft-delete, so a logically-orphaned row could still exist.
+      // This mirrors the api.get_user_notification_preferences orphan filter.
+      const { data: userRow } = await supabaseAdmin
+        .from('users')
+        .select('deleted_at')
+        .eq('id', requestData.userId)
+        .single();
+
+      if (userRow?.deleted_at) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'User is deleted',
+            operation: 'update_notification_preferences',
+          } satisfies ManageUserResponse),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Step 2b: SELECT the projection row to get authoritative state (handler
       // applies COALESCE defaults; the projection row is the source of truth,
       // not the request body).
       const { data: projectionRow, error: readbackError } = await supabaseAdmin
