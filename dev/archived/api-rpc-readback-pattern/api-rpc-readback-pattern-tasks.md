@@ -2,14 +2,16 @@
 
 ## Current Status
 
-**Phase**: Phase 0 (RPC Inventory) — IN PROGRESS
-**Status**: 🟢 ACTIVE
-**Last Updated**: 2026-04-23 (activated from `dev/parked/` per `client-ou-edit` Phase 9; PR 1 merged as commit `e80de9bd` on 2026-04-23)
-**Activated**: 2026-04-23 (branch `chore/activate-api-rpc-readback-pattern`)
-**Next Step (concrete)**:
-1. Phase 0 inventory tracking table populated in `api-rpc-readback-pattern-plan.md` Phase 0 section (this branch)
-2. Open new branch `feat/api-rpc-readback-pattern` from main after this activation PR merges
-3. Begin Phase 1 (migration: apply read-back pattern to all standard-pattern RPCs)
+**Phase**: Blocker 3 (Scope F PR A) + PR #32 Review Remediation — ✅ MERGED
+**Status**: ✅ MERGED (2026-04-24, squash commit `6b4a2fe5` on main)
+**Last Updated**: 2026-04-24
+**Branch**: `feat/phase4-user-domain-typing` — merged via PR #32 https://github.com/Analytics4Change/A4C-AppSuite/pull/32
+**Post-merge actions** (for future work — dev-docs now archived):
+1. ~~Monitor PR #32 for merge~~ ✅ Merged 2026-04-24T00:33:39Z
+2. ~~Archive `dev/active/api-rpc-readback-pattern/` → `dev/archived/api-rpc-readback-pattern/`~~ ✅ Archived with this commit
+3. **Next**: Open new `dev/active/edge-function-vs-sql-rpc-adr/` planning folder — Blocker-3-followup-6 (ADR on Edge Function vs SQL RPC selection criteria)
+4. **After #3**: Reassess Blocker-3-followup-7 (break up `manage-user` Edge Function into per-operation SQL RPCs) — architect `a060ef3faaa5b630c` confirmed "strictly superior architecturally" but correctly deferred pending #6
+5. **Parked**: PR B (Site 1 address backend implementation) — separate planning session
 
 ---
 
@@ -400,6 +402,41 @@ Wires into CI alongside existing `plpgsql_check` (which only catches static erro
 | Blocker-3-followup-6 | Document Edge-Function-vs-SQL-RPC selection as an ADR | ⏸️ Parked |
 | Blocker-3-followup-7 | Evaluate breaking up `manage-user` Edge Function into individual SQL RPCs. **Motivation strengthened by PR #32 review item 1 (silent-failure gap in Edge Function Pattern A v2 consumer — resolved by v11 real read-back) and architect `a060ef3faaa5b630c` finding that a SQL RPC wrapper would be "strictly superior architecturally" (single-transaction PL/pgSQL read-back; no two-client-call round-trip).** Depends on Blocker-3-followup-6 (Edge-Function-vs-SQL-RPC ADR). | ⏸️ Parked (depends on #6) |
 | PR-B | Site 1 address backend implementation (separate planning session) | ⏸️ Parked |
+
+## PR #32 Review Remediation ✅ COMPLETE (2026-04-24)
+
+Two commits on `feat/phase4-user-domain-typing`:
+- **Commit A `e9a39a21`** — Edge Function `manage-user` v11: real Pattern A v2 read-back + `organization_id` audit metadata
+- **Commit B `ffb00780`** — frontend remediation (items 3–6) + architect MUST-FIX Q4/Q7 + SHOULD-ADD Q5/Q8/Q9.1
+
+**Architect review**: `software-architect-dbc` agent `a060ef3faaa5b630c`. Verdict: LGTM with 2 MUST-FIX + 6 SHOULD-ADD refinements — all integrated into this remediation chain. Architect validated: direct-table read via `supabaseAdmin` (service-role) is appropriate (not a CQRS violation — applies to frontend, not Edge Functions); race-safety of PK-lookup on `domain_events.id = v_event_id` is correct (BEFORE INSERT trigger runs inside INSERT txn → commits before second Edge Function round-trip); item 6 "phantom arm" rebuttal factually correct (verified at `UserFormViewModel.ts:961-969`); SQL RPC wrapper "strictly superior architecturally" but correctly deferred to Blocker-3-followup-7.
+
+| ID | Item | Type | Resolution | Status |
+|----|------|------|------------|--------|
+| **Item 1** | Silent-failure gap in Edge Function Pattern A v2 consumer (v10 echoed submitted prefs — no `processing_error` check, no real read-back) | SHOULD-ADDRESS | Edge Function v11: two-step check — (1) `SELECT processing_error FROM domain_events WHERE id = v_event_id` → error envelope if set, (2) `SELECT ... FROM user_notification_preferences_projection WHERE user_id=? AND organization_id=?` → error envelope if NOT-FOUND (tagged `handlerInvariantViolated: true`). Transforms DB columns back to AsyncAPI snake_case shape. | ✅ Fixed |
+| **Item 2** | Factually-incorrect comment in `manage-user` v10 citing `user_org_access` as target table (handler actually writes `user_notification_preferences_projection`) | SHOULD-ADDRESS | Replaced with real read-back (Item 1 fix) — comment now cites handler file + `adr-rpc-readback-pattern.md:93` + authoritative column list. Paired drift-guard comment added to handler SQL reference file. | ✅ Fixed |
+| **Item 3** | No unit tests for `SupabaseUserCommandService` snake_case→camelCase mapping | SHOULD-ADDRESS | NEW `frontend/src/services/users/__tests__/SupabaseUserCommandService.mapping.test.ts` — 7 tests (`vi.hoisted()` pattern): updateUserPhone (snake→camel, error envelope, malformed date), addUserPhone (camelCase passthrough), updateUser (null + undefined lastLoginAt), updateNotificationPreferences (v11 error envelope contract). 7/7 passing. | ✅ Fixed |
+| **Item 4** | Deprecated `UserOperationResult` should be deleted now per "same PR" intent | NIT | Deleted interface + `@deprecated` JSDoc from `user.types.ts`. Pre-verified zero external consumers via `grep -rn UserOperationResult src/ documentation/`. | ✅ Fixed |
+| **Item 5** | Hardcoded "three domains" count in new pattern doc violates anti-staleness SKILL.md rule 8 | NIT | `rpc-readback-vm-patch.md`: replaced with date-stamped snapshot (2026-04-24) + grep recipe. Now 4 rows (Users split SQL-RPC vs Edge-Function paths). | ✅ Fixed |
+| **Item 6** | `UserFormViewModel.submit` return union's `UserVoidResult` arm claimed phantom by reviewer | NIT | **Reviewer factually incorrect** — arm IS reachable via `result = roleResult` on `modifyRoles` failure (line 969). Kept union + added clarifying comment with line-969 citation (architect Q8 SHOULD-ADD makes rebuttal durable). | ✅ Kept-with-comment |
+| **Q4** | Frontend fallback-detection ambiguity — misclassifying v11 error envelopes as "old Edge Function, refetch"? | MUST-FIX | Existing `!data?.success` short-circuit in `SupabaseUserCommandService.ts:1223` already handles v11 error envelope correctly — never reaches VM `if (result.notificationPreferences)` branch. Added belt-and-suspenders VM contract-violation log for hypothetical `success===true && !notificationPreferences` regression (tagged `contractViolation: true`) with refetch fallback. | ✅ Fixed |
+| **Q7** | Doc obligations — anti-staleness SKILL.md rules 1, 3, 12, 13 | MUST-FIX | ADR `last_updated: 2026-04-24` + Rollout history entry for `manage-user` v11 as **first Edge Function Pattern A v2 adopter**; AGENT-INDEX `last_updated` bumped (user_org_access audit returned clean); `rpc-readback-vm-patch.md` pattern doc updated (date-stamp + grep recipe + 4-row table); `dev/active/api-rpc-readback-pattern-tasks.md` PR-32 section updated; Edge Function docs reference file updated (2 stale `UserOperationResult` refs → `UserVoidResult` / `UpdateNotificationPreferencesResult`). | ✅ Fixed |
+| **Q1** | Cite `adr-rpc-readback-pattern.md:93` in Edge Function comment (Edge Functions as orchestration tier extension) | SHOULD-ADD | Inline comment block above read-back cites handler file path + ADR ref + column list. | ✅ Fixed |
+| **Q3** | Paired drift-guard comment on handler SQL reference file | SHOULD-ADD | Added to `infrastructure/supabase/handlers/user/handle_user_notification_preferences_updated.sql` — cites Edge Function file + v11 version marker + authoritative column list. | ✅ Fixed |
+| **Q5** | Additional mapper tests for `new Date(undefined)` NaN and malformed-date regression | SHOULD-ADD | Tests 5 + 6 in new mapping test suite (undefined → null, malformed → handled). | ✅ Fixed |
+| **Q8** | Clarifying comment on `UserFormViewModel.submit` union with line citation | SHOULD-ADD | Added above `submit()` with explicit line-969 citation making rebuttal durable. | ✅ Fixed |
+| **Q9.1** | Error-envelope contract test for Edge Function response | SHOULD-ADD | Test 7 in new mapping test suite: v11 error envelope shape → asserts error path, no `notificationPreferences`. | ✅ Fixed |
+| **Q9.2** | NOT-FOUND log upgraded to tagged error for admin dashboard filtering | SHOULD-ADD | Edge Function v11 emits `console.error(..., { handlerInvariantViolated: true })` on NOT-FOUND branch. | ✅ Fixed |
+| **Q9.3** | Audit `buildEventMetadata()` for `user_id` AND `organization_id` | SHOULD-ADD | **Latent bug found** — `organization_id` was missing from metadata call. Added opportunistically (pre-existed v11; now audit-compliant per `infrastructure/CLAUDE.md` Event Metadata Requirements). | ✅ Fixed (+ latent bug caught) |
+
+**Pre-commit audit results**:
+- `grep -rn 'UserOperationResult' frontend/src/ documentation/ .claude/skills/ *CLAUDE.md` → returned **empty** after Item 4 fix
+- `grep -rn 'user_org_access' documentation/ | grep -i 'notification'` → returned **empty** (AGENT-INDEX keyword-table audit per Q7 clean)
+- `npm run typecheck` ✓, `npm run lint` ✓, `npm run build` ✓
+- `npm run test -- --run src/services/users/__tests__/` → 25/25 passing across 3 user-domain test files (envelope + contract + mapping)
+- `npm run docs:check` ✓ (only pre-existing unrelated trailing-slash warning)
+
+**PR comment posted**: https://github.com/Analytics4Change/A4C-AppSuite/pull/32#issuecomment-4309558250
 
 ## Verification ⏸️ PARKED
 
