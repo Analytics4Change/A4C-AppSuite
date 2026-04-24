@@ -1,0 +1,23 @@
+-- Migration: drop legacy 4-arg api.update_user_notification_preferences
+--
+-- Discovered during post-apply smoke-check of the preceding migration
+-- (20260424194102_add_update_user_notification_preferences_rpc.sql): the
+-- baseline_v4 + Pattern A v2 retrofit (migration 20260423065747) defined a
+-- 4-arg variant `(p_user_id, p_org_id, p_notification_preferences, p_reason)`
+-- that was NEVER wired up from any caller in `frontend/`, `workflows/`, or
+-- `infrastructure/` (verified via grep; only generated database.types.ts
+-- entries reference it, and those regenerate from pg_proc post-drop).
+--
+-- The 4-arg form has divergent semantics vs. the Edge Function path that
+-- was extracted in the preceding migration:
+--   - `p_org_id` from parameter (multi-tenancy bypass risk) vs JWT-sourced
+--   - platform/org-admin permission model vs self-or-`user.update`
+--   - `{success, event_id, preferences: row_to_json(...)}` response shape
+--     vs `{success, eventId, notificationPreferences: {nested, snake_case}}`
+--
+-- Leaving both forms would create PostgREST overload ambiguity + dead code
+-- carrying a looser security model. Dropped here to leave exactly one
+-- `api.update_user_notification_preferences` matching the Edge Function's
+-- original security boundary.
+
+DROP FUNCTION IF EXISTS api.update_user_notification_preferences(uuid, uuid, jsonb, text);

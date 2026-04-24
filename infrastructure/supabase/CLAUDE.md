@@ -376,6 +376,50 @@ cp types/generated-events.ts ../../../frontend/src/types/generated/
 
 **Full documentation**: `.claude/skills/infrastructure-guidelines/resources/asyncapi-contracts.md`
 
+## Supabase-Generated TS Types
+
+**Source of Truth**: Generated TypeScript types from the Postgres schema are the SINGLE source of truth for RPC signatures, table columns, and enum members consumed from TypeScript.
+
+There are TWO consumer files that MUST stay byte-identical:
+- `frontend/src/types/database.types.ts`
+- `workflows/src/types/database.types.ts`
+
+If only one is updated, the other consumer's typecheck will break (or — worse — silently keep compiling because many call sites use `apiRpc<T>(name, Record<string, unknown>)` which bypasses these types, leaving a lie-by-omission in the type surface).
+
+```bash
+cd infrastructure/supabase
+# Prerequisites: SUPABASE_ACCESS_TOKEN set, supabase link --project-ref <ref> done
+
+# 1. Apply the migration FIRST — regen captures the live schema shape
+supabase db push --linked
+
+# 2. Regenerate BOTH consumer copies
+supabase gen types typescript --linked > ../../frontend/src/types/database.types.ts
+supabase gen types typescript --linked > ../../workflows/src/types/database.types.ts
+
+# 3. Confirm consumers still compile
+cd ../../frontend && npm run typecheck
+cd ../workflows && npm run typecheck
+```
+
+**When to regen** — see `.claude/skills/infrastructure-guidelines/SKILL.md` Rule 15 for the decision table. Summary: yes for any change to RPC signatures, table columns, views, or enums; no for logic-only changes inside already-exposed functions.
+
+**Key rules**:
+- **ALWAYS** regen after a migration that changes the Postgres surface (RPC sig, column, enum, table/view add-or-rename)
+- **NEVER** regen before `supabase db push --linked` succeeds — you'll capture the pre-migration shape
+- **ALWAYS** update both `frontend/` and `workflows/` copies in the same commit
+- **NEVER** hand-edit these files — the header is machine-generated and drift will surface on the next regen
+
+**Baseline-overload audit** (prevents stale-overload auth-model drift): before `CREATE OR REPLACE FUNCTION api.<name>(...)` in a new migration, grep baseline_v4 for existing overloads of that name:
+
+```bash
+grep -n "FUNCTION \"api\"\.\"<name>\"" supabase/migrations/20260212010625_baseline_v4.sql
+```
+
+If a different-arity overload exists, decide explicitly in the migration header: DROP the old (default — tighter auth and single wire-level signature) or coexist (document why). Regen after DROP-based migrations cleans the consumer types for free; coexistence shows as an overload union in the generated file — verify it was intentional before committing.
+
+**Distinct from AsyncAPI type-gen**: the AsyncAPI pipeline (above section) generates event-payload types from `contracts/asyncapi.yaml` into `@/types/generated/generated-events.ts`. That's a different surface (domain events on the wire) and uses a different command. The two pipelines are complementary — run each only when its source changed.
+
 ## Directory Structure
 
 ```

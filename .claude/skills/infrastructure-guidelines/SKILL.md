@@ -338,6 +338,39 @@ CI check `.github/workflows/supabase-edge-functions-lint.yml` enforces ADR citat
 
 **Edge Functions are the orchestration tier**: Rule 4 (frontend → `api.` RPC only) is a browser-facing contract. Edge Functions run server-side with service-role credentials; they may read any table when needed. This is a CQRS-rule exemption, not a violation.
 
+## 15. Regenerate `database.types.ts` When Postgres Surface Changes
+
+TypeScript consumers read Postgres shape from two generated files that MUST stay byte-identical:
+- `frontend/src/types/database.types.ts`
+- `workflows/src/types/database.types.ts`
+
+Regenerate after any migration that changes what `supabase gen types typescript` would emit. Skip for logic-only changes inside already-exposed functions.
+
+| Migration change | Regen? |
+|---|---|
+| Add / drop / rename an `api.*` or `public.*` RPC | **Yes** |
+| Change an RPC's parameter list or return type (incl. dropping an overload) | **Yes** |
+| Add / drop / rename a column on a table the frontend/workflows reads | **Yes** |
+| Add / rename a table, view, or enum in `public` / `api` | **Yes** |
+| Change an enum's member list | **Yes** |
+| Modify a PL/pgSQL handler/router/trigger body (no signature change) | No |
+| Add / modify RLS policies | No |
+| Migration only touches `handle_*` / `process_*_event` internals | No |
+
+**Timing**: regen AFTER `supabase db push --linked` succeeds — never before (would capture pre-migration shape).
+
+```bash
+# Run from infrastructure/supabase/ with SUPABASE_ACCESS_TOKEN set and `supabase link` done
+supabase gen types typescript --linked > ../../frontend/src/types/database.types.ts
+supabase gen types typescript --linked > ../../workflows/src/types/database.types.ts
+```
+
+**Self-check**: if `git diff` shows changes in only one of the two files, stop — you forgot the other copy. Drift between the two breaks the `workflows/` or `frontend/` typecheck as soon as someone consumes a changed signature.
+
+**Overload trap**: if a regen shows two entries for the same function name (an overload union), verify the migration intended to keep both signatures. Stale overloads in baseline consolidations are a known source of auth-model drift — see `infrastructure/supabase/CLAUDE.md` "Supabase-Generated TS Types" for the baseline-overload audit pattern.
+
+**Full procedure** (commands, commit-message style, troubleshooting): `infrastructure/supabase/CLAUDE.md` → "Supabase-Generated TS Types".
+
 ---
 
 ## File Locations
