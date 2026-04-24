@@ -71,6 +71,8 @@ await supabase.from('users').select('..., user_roles_projection!inner(...)')
 
 `api.` schema RPCs enforce tenant isolation via `SECURITY INVOKER` and JWT claim helpers (`get_current_org_id()`, `has_platform_privilege()`) — direct table reads bypass this boundary.
 
+**Choosing between SQL RPC and Edge Function for a write operation**: See Rule 14 below.
+
 ## 5. `domain_events` Is the Sole Audit Trail
 
 There is NO separate audit table. All state changes are domain events. **Never create audit/log tables** — query `domain_events` instead.
@@ -306,6 +308,35 @@ $$;
 ```
 
 **Real incident (2026-02-23)**: `api.delete_organization_unit()` lacked the read-back guard (5th of 5 org-unit RPCs; other 4 had been fixed in `20260221173821`). Frontend silently received `{success: false}` because the handler's column-name mismatch was invisible to the caller. Fix migration: `20260223163610_fix_delete_org_unit_projection_guard.sql`.
+
+## 14. Edge Function vs SQL RPC Selection
+
+**Before creating a new Edge Function, consult [adr-edge-function-vs-sql-rpc.md](../../../documentation/architecture/decisions/adr-edge-function-vs-sql-rpc.md).** SQL RPC is the default for write operations; Edge Function requires meeting one of six load-bearing criteria (LB1–LB6):
+
+- **LB1** — Mints auth tokens or creates `auth.users` rows (Supabase Auth admin API)
+- **LB2** — Calls external APIs (Cloudflare, Resend, Backend API, Temporal)
+- **LB3** — Forwards to workflow orchestration layer
+- **LB4** — Unauthenticated entry point with bespoke token validation
+- **LB5** — Cross-tier read orchestration (Temporal status, external queues)
+- **LB6** — Emits to a stream whose caller's JWT cannot be RLS-authorized (pre-user events)
+
+An operation meeting **zero** of LB1–LB6 is `candidate-for-extraction` → write as SQL RPC.
+
+**Opportunistic-migration nudge**: When touching an Edge Function operation classified `candidate-for-extraction` in the ADR's inventory, prefer extracting that operation to an SQL RPC in the same PR.
+
+```typescript
+// ✅ CORRECT (new Edge Function) — ADR citation in top-of-file comment
+/**
+ * ADR: documentation/architecture/decisions/adr-edge-function-vs-sql-rpc.md
+ * Load-bearing criterion: LB2 (Resend API)
+ */
+```
+
+CI check `.github/workflows/supabase-edge-functions-lint.yml` enforces ADR citation on NEW Edge Function files (`git diff --diff-filter=A`). Does NOT block modifications to existing files.
+
+**Explicit non-criterion**: Service-role reads of non-`api.` tables are NOT load-bearing. A `SECURITY DEFINER` SQL RPC can read any table. Don't keep an op in an Edge Function just because it reads outside the `api.` schema — extract it.
+
+**Edge Functions are the orchestration tier**: Rule 4 (frontend → `api.` RPC only) is a browser-facing contract. Edge Functions run server-side with service-role credentials; they may read any table when needed. This is a CQRS-rule exemption, not a violation.
 
 ---
 

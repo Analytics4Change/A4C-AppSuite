@@ -144,6 +144,14 @@ Projection tables are denormalized read models — never query directly with Pos
 | `api.list_users(p_org_id)` | `.from('users').select(..., user_roles_projection!inner(...))` |
 | `api.get_roles(p_org_id)` | `.from('roles_projection').select(..., permissions!inner(...))` |
 
+### Edge Function vs SQL RPC Selection
+
+> **⚠️ Before creating a new Edge Function, consult [adr-edge-function-vs-sql-rpc.md](../documentation/architecture/decisions/adr-edge-function-vs-sql-rpc.md).** SQL RPC is the default; Edge Function requires meeting one of the load-bearing criteria (LB1–LB6): auth-user minting, external API calls, workflow-layer forwarding, unauthenticated bespoke token validation, cross-tier read orchestration, or pre-user-existence event emission.
+
+> **Opportunistic migration**: When touching an Edge Function operation classified `candidate-for-extraction` in the ADR's inventory, prefer extracting that operation to an SQL RPC in the same PR.
+
+CI check `.github/workflows/supabase-edge-functions-lint.yml` enforces that NEW Edge Function files cite the ADR in a top-of-file comment. Existing-file modifications are unaffected.
+
 ### Event Metadata Requirements
 
 All domain events emitted via `api.emit_domain_event()` must include audit context. Required fields:

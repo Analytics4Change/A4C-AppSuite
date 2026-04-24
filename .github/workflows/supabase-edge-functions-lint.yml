@@ -1,0 +1,64 @@
+name: Edge Function ADR Citation Check
+
+# Enforces that NEW Edge Function files cite adr-edge-function-vs-sql-rpc.md in a
+# top-of-file comment. See documentation/architecture/decisions/adr-edge-function-vs-sql-rpc.md
+# Decision 6 (Layer 4) for rationale.
+#
+# Scope: NEW files only (git diff --diff-filter=A). Modifications to existing Edge
+# Function files are NOT blocked — retrofitting the 7 functions that predate this
+# ADR would manufacture churn. New additions must justify load-bearing classification
+# by citing the ADR and naming the LB criterion they meet.
+
+on:
+  pull_request:
+    paths:
+      - 'infrastructure/supabase/supabase/functions/**'
+
+jobs:
+  check-adr-citation:
+    name: Check new Edge Function files cite the ADR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Identify new Edge Function index.ts files
+        id: identify
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          NEW_FILES=$(git diff --name-only --diff-filter=A \
+            origin/${{ github.base_ref }}...HEAD \
+            | grep -E '^infrastructure/supabase/supabase/functions/[^/]+/index\.ts$' \
+            || true)
+          if [ -z "$NEW_FILES" ]; then
+            echo "No new Edge Function files added in this PR"
+            echo "new_files=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "New Edge Function files detected:"
+          echo "$NEW_FILES"
+          {
+            echo "new_files<<EOF"
+            echo "$NEW_FILES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify each new file cites the ADR
+        if: steps.identify.outputs.new_files != ''
+        run: |
+          FAILED=0
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            if ! grep -q 'adr-edge-function-vs-sql-rpc' "$f"; then
+              echo "::error file=$f,title=Missing ADR citation::New Edge Function must cite adr-edge-function-vs-sql-rpc.md in a top-of-file comment. See documentation/architecture/decisions/adr-edge-function-vs-sql-rpc.md (Decision 6 / Layer 4). Required block:"
+              echo "::error::  /**"
+              echo "::error::   * ADR: documentation/architecture/decisions/adr-edge-function-vs-sql-rpc.md"
+              echo "::error::   * Load-bearing criterion: <which LB this meets, e.g. 'LB2 (Resend API)'>"
+              echo "::error::   */"
+              FAILED=1
+            else
+              echo "OK: $f cites the ADR"
+            fi
+          done <<< "${{ steps.identify.outputs.new_files }}"
+          exit $FAILED
