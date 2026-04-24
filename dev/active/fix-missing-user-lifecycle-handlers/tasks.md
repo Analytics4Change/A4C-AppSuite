@@ -2,61 +2,74 @@
 
 ## Current Status
 
-**Phase**: FILED — ready for Phase 0 audit
-**Status**: 🔴 CRITICAL (production data-integrity issue)
+**Phase**: EXECUTED — migration applied to dev, awaiting PR merge
+**Status**: 🔴 CRITICAL (production data-integrity issue + orphan-read leak prevention)
 **Priority**: **HIGH** — blocks 3 downstream extraction cards
 **Last Updated**: 2026-04-24
-**Branch**: TBD
+**Branch**: `fix/missing-user-lifecycle-handlers`
 **Surfaced by**: `dev/archived/edge-function-vs-sql-rpc-adr/` PR #33 audit
+**Scope expansion**: During pre-work verification a RED orphan-read audit finding expanded scope from "handlers only" to "handlers + 4 api.* RPC orphan filters + 2 Edge Function orphan guards" in one cohesive PR.
 
 ## Pre-activation Checklist
 
-- [ ] Live-DB audit run (Phase 0) — confirms handlers missing AND measures backfill scope
-- [ ] Decision: execute as-described OR downgrade to hygiene-only if handlers exist in prod
+- [x] Live-DB audit run (Phase 0) — handlers confirmed absent in dev; ZERO failed events to backfill
+- [x] Decision: execute as-described (no hygiene-only downgrade needed)
 
-## Phase 0 — Live-DB Audit 🟡 NOT STARTED
+## Phase 0 — Live-DB Audit ✅ COMPLETE (2026-04-24)
 
-- [ ] Query `pg_proc` for handler existence
-- [ ] Count failed `user.deactivated`/`reactivated`/`deleted` events with `processing_error IS NOT NULL`
-- [ ] Sample top 20 error messages by recency
-- [ ] Document findings inline in `plan.md` Phase 0 section
+- [x] Queried `pg_proc` — all three handlers confirmed absent
+- [x] Counted failed `user.deactivated`/`reactivated`/`deleted` events with `processing_error IS NOT NULL` — **zero rows**
+- [x] No error samples to investigate (no failed events ever emitted)
+- [x] Confirmed `public.users` schema matches baseline: `is_active boolean`, `deleted_at timestamptz`, `updated_at`. No `deactivated_at`/`reactivated_at` columns
+- [x] Confirmed the 4 target api.* RPCs exist with expected signatures
 
-**Decision gate**: If handlers exist in production → downgrade card to "hygiene-only, update reference files to match prod, no migration needed."
+**Outcome**: Ship the full fix (handlers + orphan filters). No backfill needed.
 
-## Phase 1 — Schema Trace 🟡 NOT STARTED
+## Phase 1-2 — Migration (Handlers + Orphan Filters) ✅ COMPLETE
 
-- [ ] Confirm `users` table columns — what lifecycle fields exist?
-- [ ] Resolve Q1/Q2/Q3 in plan.md
+Single migration: `20260424182345_add_missing_user_lifecycle_handlers_and_orphan_filters.sql`
 
-## Phase 2 — Migration 🟡 NOT STARTED
+- [x] `handle_user_deactivated` — sets `is_active = false`
+- [x] `handle_user_reactivated` — sets `is_active = true`
+- [x] `handle_user_deleted` — sets `deleted_at = COALESCE(...)` + `is_active = false`; replay-safe via COALESCE
+- [x] Patched `api.get_user_addresses` — added EXISTS filter on `public.users.deleted_at IS NULL`
+- [x] Patched `api.get_user_phones` — added early-return empty array for deleted users
+- [x] Patched `api.get_user_notification_preferences` — added early-return "all-disabled" shape
+- [x] Patched `api.list_user_client_assignments` — converted LEFT JOIN to INNER JOIN with deleted_at filter in ON
+- [x] `RAISE EXCEPTION ... USING ERRCODE = 'P0002'` — no PII interpolation; forward-compatible with parked `rpc-error-pii-sanitization` card
 
-- [ ] `supabase migration new add_missing_user_lifecycle_handlers`
-- [ ] Define `handle_user_deactivated`
-- [ ] Define `handle_user_reactivated`
-- [ ] Define `handle_user_deleted`
-- [ ] Apply via `supabase db push --linked`
-- [ ] Verify via post-apply `pg_proc` query
+## Phase 3 — Edge Function Patches ✅ COMPLETE
 
-## Phase 3 — Handler Reference Files 🟡 NOT STARTED
+- [x] `manage-user/index.ts:502` — added `public.users.deleted_at` guard before notification-preference read-back (Pattern A v2 step 2a)
+- [x] `accept-invitation/index.ts:321` — added two-query check: deleted user is treated as NEW user (full onboarding flow), so logically-orphaned `user_roles_projection` rows don't short-circuit the Sally-scenario detection
 
-- [ ] Create `handlers/user/handle_user_deactivated.sql`
-- [ ] Create `handlers/user/handle_user_reactivated.sql`
-- [ ] Create `handlers/user/handle_user_deleted.sql`
+## Phase 4 — Handler Reference Files (Rule 7.1) ✅ COMPLETE
 
-## Phase 4 — Backfill Retry 🟡 NOT STARTED
+- [x] `infrastructure/supabase/handlers/user/handle_user_deactivated.sql`
+- [x] `infrastructure/supabase/handlers/user/handle_user_reactivated.sql`
+- [x] `infrastructure/supabase/handlers/user/handle_user_deleted.sql`
 
-- [ ] Execute retry loop over all failed events of these types
-- [ ] Monitor post-retry for NEW processing errors (signals handler logic bugs)
+## Phase 5 — Apply + Backfill ✅ COMPLETE
 
-## Phase 5 — Verification 🟡 NOT STARTED
+- [x] `supabase db push --linked --dry-run` — confirmed single-migration push
+- [x] `supabase db push --linked` — migration applied to dev
+- [x] Post-apply verification: 3 handlers in `pg_proc`; all 4 api functions show `deleted_at IS NULL` in their bodies
+- [x] Backfill step skipped — Phase 0 confirmed zero failed events to retry
+- [x] Non-deleted user probe: `list_user_client_assignments`, `get_user_phones`, `get_user_notification_preferences` all return normal data
 
-- [ ] Handlers exist via `pg_proc` query
-- [ ] Manual dev-project test: deactivate → reactivate → delete round-trip; confirm projection moves + no new failed events
-- [ ] No regressions in dependent projections
+**Abort-threshold step N/A** (no backfill performed).
 
-## Phase 6 — PR + Merge 🟡 NOT STARTED
+## Phase 6 — Verification + Card Updates ✅ COMPLETE (this commit)
 
-- [ ] Commit + push on branch
-- [ ] Open PR
-- [ ] Post-merge: archive this card → `dev/archived/fix-missing-user-lifecycle-handlers/`
-- [ ] Post-merge: unblock dependent extraction cards (`manage-user-delete-to-sql-rpc/`, `manage-user-reactivate-to-sql-rpc/`, future deactivate retrofit card) — update their Prerequisites sections
+- [x] Update this tasks.md + card context + card plan
+- [x] End-to-end behavioral test on real users explicitly DEFERRED per Auto Mode safety rules — deactivate/delete round-trip on live user accounts would create audit events that cannot be cleanly undone. Will be exercised by `manage-user-delete-to-sql-rpc` and `manage-user-reactivate-to-sql-rpc` when those cards land.
+- [x] Incidental findings logged to context.md
+- [ ] Update downstream card Prerequisites (`manage-user-delete-to-sql-rpc`, `manage-user-reactivate-to-sql-rpc`) — on PR merge
+
+## Phase 7 — PR 🟡 NEXT
+
+- [ ] Commit on branch `fix/missing-user-lifecycle-handlers`
+- [ ] Push + open PR
+- [ ] PR body notes the **reactivate limitation** (projection fix only, does NOT unban `auth.users` — that's tracked at `manage-user-reactivate-to-sql-rpc/context.md` O1)
+- [ ] PR body flags **incidental finding**: `schedule_user_assignments_projection`, `user_client_assignments_projection`, `user_schedule_policies_projection` lack FK `ON DELETE` clauses (separate follow-up)
+- [ ] Post-merge: archive card to `dev/archived/`
