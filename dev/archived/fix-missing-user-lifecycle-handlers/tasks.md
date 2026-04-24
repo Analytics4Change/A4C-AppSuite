@@ -2,13 +2,14 @@
 
 ## Current Status
 
-**Phase**: EXECUTED — migration applied to dev, awaiting PR merge
-**Status**: 🔴 CRITICAL (production data-integrity issue + orphan-read leak prevention)
-**Priority**: **HIGH** — blocks 3 downstream extraction cards
+**Phase**: ✅ COMPLETE — PR #35 merged to main
+**Status**: CLOSED
+**Priority**: (was HIGH, CRITICAL) — blocks resolved
 **Last Updated**: 2026-04-24
-**Branch**: `fix/missing-user-lifecycle-handlers`
+**Branch**: `fix/missing-user-lifecycle-handlers` (merged)
+**Merge commits**: `b3c1bd4b` (main fix) + `32d196f6` (settings) + `8eae916f` (5th orphan-read site added post-review)
 **Surfaced by**: `dev/archived/edge-function-vs-sql-rpc-adr/` PR #33 audit
-**Scope expansion**: During pre-work verification a RED orphan-read audit finding expanded scope from "handlers only" to "handlers + 4 api.* RPC orphan filters + 2 Edge Function orphan guards" in one cohesive PR.
+**Scope expansion**: During pre-work verification a RED orphan-read audit finding expanded scope from "handlers only" to "handlers + 5 api.* RPC orphan filters + 2 Edge Function orphan guards" in one cohesive PR.
 
 ## Pre-activation Checklist
 
@@ -60,17 +61,19 @@ Single migration: `20260424182345_add_missing_user_lifecycle_handlers_and_orphan
 
 **Abort-threshold step N/A** (no backfill performed).
 
-## Phase 6 — Verification + Card Updates ✅ COMPLETE (this commit)
+## Phase 6 — Verification + Card Updates ✅ COMPLETE
 
 - [x] Update this tasks.md + card context + card plan
 - [x] End-to-end behavioral test on real users explicitly DEFERRED per Auto Mode safety rules — deactivate/delete round-trip on live user accounts would create audit events that cannot be cleanly undone. Will be exercised by `manage-user-delete-to-sql-rpc` and `manage-user-reactivate-to-sql-rpc` when those cards land.
 - [x] Incidental findings logged to context.md
-- [ ] Update downstream card Prerequisites (`manage-user-delete-to-sql-rpc`, `manage-user-reactivate-to-sql-rpc`) — on PR merge
+- [x] Update downstream card Prerequisites — handled via the downstream cards' own status updates now that the handlers exist on main
 
-## Phase 7 — PR 🟡 NEXT
+## Phase 7 — PR ✅ COMPLETE
 
-- [ ] Commit on branch `fix/missing-user-lifecycle-handlers`
-- [ ] Push + open PR
-- [ ] PR body notes the **reactivate limitation** (projection fix only, does NOT unban `auth.users` — that's tracked at `manage-user-reactivate-to-sql-rpc/context.md` O1)
-- [ ] PR body flags **incidental finding**: `schedule_user_assignments_projection`, `user_client_assignments_projection`, `user_schedule_policies_projection` lack FK `ON DELETE` clauses (separate follow-up)
-- [ ] Post-merge: archive card to `dev/archived/`
+- [x] Commit on branch `fix/missing-user-lifecycle-handlers`
+- [x] Push + open PR #35
+- [x] PR body notes the **reactivate limitation** (projection fix only, does NOT unban `auth.users` — that's tracked at `manage-user-reactivate-to-sql-rpc/context.md` O1)
+- [x] PR body flags **incidental finding**: `schedule_user_assignments_projection`, `user_client_assignments_projection`, `user_schedule_policies_projection` lack FK `ON DELETE` clauses (separate follow-up)
+- [x] Post-review: 5th orphan-read site (`api.get_schedule_template`) added via follow-up commit `8eae916f`
+- [x] PR merged to main
+- [x] Post-merge: archive card to `dev/archived/`
