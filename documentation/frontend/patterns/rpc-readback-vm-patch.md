@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-23
+last_updated: 2026-04-24
 ---
 
 <!-- TL;DR-START -->
@@ -167,13 +167,21 @@ Document the refetch as LEGITIMATE with an inline comment citing the reason. Don
 
 ## Existing implementations
 
-Three domains currently use this pattern:
+The table below is a snapshot; it will drift as new domains adopt the pattern. Use this grep to enumerate current consumers (avoids the inventory-count trap per anti-staleness SKILL.md rule 8):
 
-| Domain | RPC | VM | Notes |
-|--------|-----|-----|-------|
+```bash
+# Find current VM in-place patch consumers
+grep -rln 'result\.\(phone\|field\|category\|role\|user\|notificationPreferences\)\b' frontend/src/viewModels/
+```
+
+Known implementations (as of 2026-04-24):
+
+| Domain | RPC / Edge Function | VM | Notes |
+|--------|---------------------|-----|-------|
 | Roles | `api.update_role` | `RolesViewModel.updateRole` | Composes role + permission_ids; COMPLEX-CASE read-back |
 | Client Fields | `api.update_field_definition`, `api.update_field_category` | `ClientFieldSettingsViewModel.updateCustomField`, `.updateCategory` | Reads list-shape with joined category_name/category_slug |
-| Users | `api.update_user_phone`, `api.add_user_phone`, `api.update_user`, `manage-user` Edge Function (notification prefs) | `UsersViewModel.updateUserPhone`, `.addUserPhone`, `.updateNotificationPreferences` | First use through an Edge Function path (notification prefs) |
+| Users (SQL) | `api.update_user_phone`, `api.add_user_phone`, `api.update_user` | `UsersViewModel.updateUserPhone`, `.addUserPhone`; `UserFormViewModel.submit` | Pattern A v2 read-back returns entity via `row_to_json` (update_user_phone, update_user) or explicit `jsonb_build_object` with camelCase (add_user_phone migration `20260423232531`) |
+| Users (Edge Function) | `manage-user` v11 `update_notification_preferences` | `UsersViewModel.updateNotificationPreferences` | **First Edge Function Pattern A v2 adopter**. Two-step read-back: `domain_events WHERE id = eventId` for `processing_error`, then SELECT from `user_notification_preferences_projection`. Deploy-version-gated fallback (`deployVersion: 'v11-pattern-a-v2-readback'`). |
 
 ## Related Documentation
 

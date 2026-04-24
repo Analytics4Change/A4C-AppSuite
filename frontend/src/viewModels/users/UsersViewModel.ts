@@ -1784,11 +1784,13 @@ export class UsersViewModel {
         }
       });
 
-      // Pattern A v2 via Edge Function (manage-user v10+, Blocker 3): consume
-      // the returned notificationPreferences and patch `userOrgAccess` in
-      // place. Fallback to loadUserOrgAccess refetch when the field is
-      // missing — emits log.warn for observability (version-gated detection
-      // per Edge-Function vs SQL-RPC plan).
+      // Pattern A v2 via Edge Function (manage-user v11+ ships a real
+      // read-back — see PR #32 remediation, architect a060ef3faaa5b630c):
+      // consume the returned notificationPreferences and patch `userOrgAccess`
+      // in place. Belt-and-suspenders fallback: on v11, success WITHOUT
+      // notificationPreferences is a contract violation (Edge Function
+      // regression OR pre-v11 envelope still in the rollout window) —
+      // `contractViolation: true` tag makes it filterable in production logs.
       if (result.success) {
         if (result.notificationPreferences && this.userOrgAccess) {
           const updatedPrefs = result.notificationPreferences;
@@ -1802,9 +1804,14 @@ export class UsersViewModel {
           });
         } else {
           log.warn(
-            'updateNotificationPreferences success without notificationPreferences read-back — ' +
-              'falling back to refetch. Edge Function may be older than manage-user v10.',
-            { userId: request.userId, orgId: request.orgId }
+            'updateNotificationPreferences success without notificationPreferences — ' +
+              'v11 envelope MUST include the field on success. Falling back to refetch. ' +
+              'Edge Function may have regressed OR pre-v11 envelope still in rollout.',
+            {
+              userId: request.userId,
+              orgId: request.orgId,
+              contractViolation: true,
+            }
           );
           await this.loadUserOrgAccess(request.userId, request.orgId);
         }

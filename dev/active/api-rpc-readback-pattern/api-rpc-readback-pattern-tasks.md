@@ -360,7 +360,7 @@ Context: `lars-tice` self-review on PR #31 (`feat/phase4-client-rpc-result-typin
 
 Wires into CI alongside existing `plpgsql_check` (which only catches static errors).
 
-## Blocker 3 — User Domain Cleanup ✅ COMPLETE (2026-04-23)
+## Blocker 3 — User Domain Cleanup ✅ COMPLETE (2026-04-23; PR #32 remediation 2026-04-24 upgrades Edge Function to v11 real Pattern A v2 read-back)
 
 **Branch**: `feat/phase4-user-domain-typing` — Scope F PR A.
 **Architect review**: `software-architect-dbc` agent `a9dee2ed181895edb`.
@@ -398,7 +398,7 @@ Wires into CI alongside existing `plpgsql_check` (which only catches static erro
 | Blocker-3-followup-4 | `frontend/src/viewModels/users/CLAUDE.md` VM-level docs | ⏸️ Parked |
 | Blocker-3-followup-5 | `updateUser` optional in-place patch in consumer VMs | ⏸️ Parked |
 | Blocker-3-followup-6 | Document Edge-Function-vs-SQL-RPC selection as an ADR | ⏸️ Parked |
-| Blocker-3-followup-7 | Evaluate breaking up `manage-user` Edge Function into individual SQL RPCs | ⏸️ Parked (depends on #6) |
+| Blocker-3-followup-7 | Evaluate breaking up `manage-user` Edge Function into individual SQL RPCs. **Motivation strengthened by PR #32 review item 1 (silent-failure gap in Edge Function Pattern A v2 consumer — resolved by v11 real read-back) and architect `a060ef3faaa5b630c` finding that a SQL RPC wrapper would be "strictly superior architecturally" (single-transaction PL/pgSQL read-back; no two-client-call round-trip).** Depends on Blocker-3-followup-6 (Edge-Function-vs-SQL-RPC ADR). | ⏸️ Parked (depends on #6) |
 | PR-B | Site 1 address backend implementation (separate planning session) | ⏸️ Parked |
 
 ## Verification ⏸️ PARKED

@@ -912,21 +912,6 @@ export interface UpdateNotificationPreferencesResult extends UserRpcEnvelope {
  */
 export type UserVoidResult = UserRpcEnvelope;
 
-/**
- * @deprecated Use the specific `<Method>Result` type matching your RPC.
- *
- * This union-of-all-fields shape was replaced by 5 narrow result types in
- * Blocker 3 (PR `feat/phase4-user-domain-typing`). Retained during migration
- * so legacy consumers compile; remove once grep confirms zero external refs.
- * Scheduled for deletion in the same PR after consumer audit.
- */
-export interface UserOperationResult extends UserRpcEnvelope {
-  user?: User;
-  invitation?: Invitation;
-  phoneId?: string;
-  addressId?: string;
-}
-
 // ============================================================================
 // QUERY AND FILTER TYPES
 // ============================================================================

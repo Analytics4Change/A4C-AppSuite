@@ -237,7 +237,7 @@ The recommended way to call this Edge Function is through the service abstractio
 
 class SupabaseUserCommandService implements IUserCommandService {
 
-  async deactivateUser(request: DeactivateUserRequest): Promise<UserOperationResult> {
+  async deactivateUser(request: DeactivateUserRequest): Promise<UserVoidResult> {
     const { data, error } = await supabase.functions.invoke('manage-user', {
       body: {
         operation: 'deactivate',
@@ -254,7 +254,7 @@ class SupabaseUserCommandService implements IUserCommandService {
 
   async updateNotificationPreferences(
     request: UpdateNotificationPreferencesRequest
-  ): Promise<UserOperationResult> {
+  ): Promise<UpdateNotificationPreferencesResult> {
     const { data, error } = await supabase.functions.invoke('manage-user', {
       body: {
         operation: 'update_notification_preferences',

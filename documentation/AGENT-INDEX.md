@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-23
+last_updated: 2026-04-24
 purpose: agent-navigation
 ---
 

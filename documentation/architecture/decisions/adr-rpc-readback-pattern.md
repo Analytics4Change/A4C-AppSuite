@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-23
+last_updated: 2026-04-24
 ---
 
 <!-- TL;DR-START -->
@@ -183,7 +183,9 @@ For caller-driven failures that do use `RAISE EXCEPTION`, existing ERRCODEs are 
 
 - **2026-04-23** — Migration `20260423232531_add_user_phone_pattern_a_v2_readback.sql` extends `api.add_user_phone` to Pattern A v2 (Blocker 3 PR A, `feat/phase4-user-domain-typing`, architect-reviewed `a9dee2ed181895edb`). The read-back SELECT branches on `p_org_id IS NULL` to read from `user_phones` (global) vs `user_org_phone_overrides` (org-scoped) since the handler writes to two different tables. Returns the full phone entity in camelCase via explicit `jsonb_build_object` (not `row_to_json`) so frontend consumers can patch their observable state in place without a shape-normalizer step — see [rpc-readback-vm-patch.md](../../frontend/patterns/rpc-readback-vm-patch.md). Paired with `manage-user` Edge Function v10 which adds `notificationPreferences` to its `update_notification_preferences` response envelope; version-gated via `deployVersion` field.
 
-Total RPCs using Pattern A v2: **20 single-event + 1 multi-event (`update_role`)** = 21 definitions across 20 RPCs (one RPC has two overloads). Plus 1 Edge Function operation (`manage-user`'s `update_notification_preferences`). All race-safe on captured event_id.
+- **2026-04-24** — `manage-user` Edge Function upgraded v10 → **v11** (`feat/phase4-user-domain-typing`, PR #32 remediation, architect-reviewed `a060ef3faaa5b630c`). **First Edge Function Pattern A v2 adopter**. v10 echoed submitted preferences as "read-back"; v11 performs a genuine two-step check: (1) SELECT `processing_error FROM domain_events WHERE id = eventId` (race-safe PK lookup — `BEFORE INSERT` trigger commits inside the RPC call, so the subsequent Edge Function round-trip always sees the final state), (2) SELECT the 4-column projection row from `user_notification_preferences_projection` (the handler's target table — prior comment block incorrectly cited `user_org_access`). NOT-FOUND on read-back is now tagged `handlerInvariantViolated: true` in the error log since the handler UPSERTs. Event metadata now also includes `organization_id` (audit-compliance fix). See `rpc-readback-vm-patch.md` for the full Edge Function pattern vs SQL RPC pattern comparison. Consumer VMs preserve their existing `!data?.success` short-circuit for error envelopes AND add a belt-and-suspenders contract-violation log (`contractViolation: true`) for the narrow "success without entity" case.
+
+Total RPCs using Pattern A v2: **20 single-event + 1 multi-event (`update_role`)** = 21 definitions across 20 RPCs (one RPC has two overloads). Plus 1 Edge Function operation (`manage-user`'s `update_notification_preferences`, v11+). All race-safe on captured event_id.
 
 ### Frontend envelope types — user domain (Blocker 3, 2026-04-23)
 
