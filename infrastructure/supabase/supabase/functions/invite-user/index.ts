@@ -76,8 +76,8 @@ interface InvitationPhone {
 /**
  * Supported operations
  *
- * Note: `revoke` was extracted to `api.revoke_invitation` RPC in PR
- * (migration `20260424221149_extract_revoke_invitation_rpc.sql`) per
+ * Note: `revoke` was extracted to `api.revoke_invitation` (migration
+ * `20260424221149_extract_revoke_invitation_rpc.sql`) per
  * adr-edge-function-vs-sql-rpc.md; frontend calls the RPC directly.
  */
 type Operation = 'create' | 'resend';

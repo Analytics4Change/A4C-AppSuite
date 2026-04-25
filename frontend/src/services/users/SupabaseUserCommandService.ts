@@ -255,11 +255,18 @@ export class SupabaseUserCommandService implements IUserCommandService {
 
       if (error) {
         log.error('RPC error in revokeInvitation', { error });
+        if (error.code === '42501') {
+          return {
+            success: false,
+            error: 'Access denied - insufficient permissions',
+            errorDetails: { code: 'FORBIDDEN', message: error.message },
+          };
+        }
         return {
           success: false,
           error: error.message,
           errorDetails: {
-            code: 'UNKNOWN' as UserOperationErrorCode,
+            code: 'UNKNOWN',
             message: error.message,
             context: { postgresCode: error.code, hint: error.hint },
           },
