@@ -2,14 +2,17 @@
 
 ## Current Status
 
-**Phase**: SEEDED — awaiting activation after `edge-function-vs-sql-rpc-adr` PR merges
-**Status**: 🟢 ACTIVE (scaffold only)
+**Phase**: Phase 0 complete (2026-04-24); D1–D5 locked; Phase 1' in progress
+**Status**: 🟢 ACTIVE
 **Priority**: Medium
+**Branch**: `invite-user-revoke-to-sql-rpc`
 
-## Tasks
+## Tasks (tracked via TaskCreate; see `plan.md` for full context)
 
-- [ ] Phase 0 — Inspect v15 revoke case body (5 min)
-- [ ] Phase 1 or 1' — Frontend cutover OR migration (per Phase 0 outcome)
-- [ ] Phase 2 — Remove Edge Function case + bump DEPLOY_VERSION
-- [ ] Phase 3 — Verification + PR
-- [ ] Post-merge — Archive + append ADR Rollout history
+- [x] Phase 0 — Inspect v16 revoke case body + existing RPC + caller audit (2026-04-24)
+- [ ] Phase 1' — Draft migration modifying `api.revoke_invitation` (gates + jsonb envelope + DbC)
+- [ ] Phase 1'/4 — Apply migration + regen TS types in both consumer files; typecheck
+- [ ] Phase 2 — Frontend service cutover (`SupabaseUserCommandService.revokeInvitation`)
+- [ ] Phase 3 — Remove `revoke` case from Edge Function + bump `DEPLOY_VERSION` → v17
+- [ ] Phase 5 — Verify (lint, typecheck, build, manual smoke of revoke flow)
+- [ ] Phase 6 — PR + post-merge archive + ADR Rollout history + memory backlog update
