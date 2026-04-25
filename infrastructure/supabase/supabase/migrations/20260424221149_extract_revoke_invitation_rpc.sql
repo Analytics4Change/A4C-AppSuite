@@ -25,6 +25,10 @@
 --   6. GRANT EXECUTE to `authenticated` (new caller); the prior
 --      `GRANT ALL TO service_role` is intentionally not re-granted (the service-role
 --      caller — the Edge Function `revoke` case — is deleted in this PR).
+--   7. Reuse `invitations_projection.correlation_id` on the emit (lookup-and-reuse
+--      pattern per `infrastructure/CLAUDE.md` § Correlation ID Pattern; precedent:
+--      `accept-invitation/index.ts:180-188`). Schema-level commitment at
+--      baseline_v4:12954 names `revoke` as a reuse site explicitly.
 --
 -- Baseline-overload audit (Rule 15): confirmed single signature, no overloads.
 --   grep -n 'FUNCTION "api"\."revoke_invitation"' 20260212010625_baseline_v4.sql
@@ -47,6 +51,7 @@ DECLARE
     v_org_id uuid := NULLIF(v_claims ->> 'org_id', '')::uuid;
     v_access_blocked boolean := COALESCE((v_claims ->> 'access_blocked')::boolean, false);
     v_exists boolean;
+    v_correlation_id uuid;
     v_event_id uuid;
     v_processing_error text;
 BEGIN
@@ -81,6 +86,12 @@ BEGIN
         );
     END IF;
 
+    -- Lookup-and-reuse pattern (infrastructure/CLAUDE.md § Correlation ID Pattern;
+    -- accept-invitation/index.ts:180-188 precedent). Schema commits to reuse at
+    -- baseline_v4:12954 ("reused for resend/revoke/accept/expire events").
+    SELECT correlation_id INTO v_correlation_id
+      FROM invitations_projection WHERE id = p_invitation_id;
+
     -- Emit domain event; handler (process_invitation_event → handle_invitation_revoked)
     -- flips invitations_projection.status to 'revoked' synchronously in-trigger.
     v_event_id := api.emit_domain_event(
@@ -95,7 +106,8 @@ BEGIN
             'user_id', v_caller_id,
             'organization_id', v_org_id,
             'source', 'api.revoke_invitation',
-            'reason', p_reason
+            'reason', p_reason,
+            'correlation_id', v_correlation_id
         )
     );
 
@@ -169,6 +181,19 @@ Notes:
     infrastructure/CLAUDE.md which scopes those fields to Edge Functions.
   - Improvement over prior Edge-service-role path: `event_metadata->>'user_id'`
     is now populated (was null under service-role), closing a latent audit gap.
+  - Correlation reuse: `event_metadata->>'correlation_id'` is now sourced from
+    `invitations_projection.correlation_id` (lookup-and-reuse pattern),
+    closing a second latent audit gap. Lifecycle queries
+    (`SELECT … FROM domain_events WHERE correlation_id = ?`) will now include
+    `invitation.revoked` events alongside `user.invited`, `invitation.resent`,
+    `invitation.accepted`. Schema commits to this at baseline_v4:12954.
+  - Concurrent revoke calls may produce duplicate `invitation.revoked`
+    events (classic TOCTOU between the EXISTS check and the emit). The
+    handler `handle_invitation_revoked` (baseline_v4:11124-11131) issues
+    an unconditional UPDATE, so duplicates are projection-idempotent
+    (status flips to 'revoked' once; subsequent UPDATEs are no-ops aside
+    from `updated_at`). Both events are intentionally preserved in
+    `domain_events` for forensic visibility into the race.
 
 Reference: adr-edge-function-vs-sql-rpc.md (LB0 extraction, inventory row #7);
            adr-rpc-readback-pattern.md (outcome-only variant rationale).

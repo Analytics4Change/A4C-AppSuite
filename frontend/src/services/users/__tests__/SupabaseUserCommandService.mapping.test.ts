@@ -454,4 +454,73 @@ describe('SupabaseUserCommandService — snake_case → camelCase mapping', () =
       );
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // revokeInvitation — RPC envelope contract
+  // (api.revoke_invitation, second Edge→RPC extraction — PR #39)
+  // Mirrors the updateNotificationPreferences template above with the
+  // outcome-only response variant (no projection entity in the envelope).
+  // Also exercises the 42501 → 'FORBIDDEN' mapping (in-file precedent at
+  // SupabaseUserCommandService.ts:848/955/1052/1115).
+  // ---------------------------------------------------------------------------
+  describe('revokeInvitation — RPC envelope contract', () => {
+    it('returns success when the RPC envelope reports success', async () => {
+      mockApiRpc.mockResolvedValueOnce({
+        data: {
+          success: true,
+          eventId: '11111111-2222-3333-4444-555555555555',
+          invitationId: 'inv-1',
+        },
+        error: null,
+      });
+
+      const result = await service.revokeInvitation('inv-1');
+
+      expect(mockApiRpc).toHaveBeenCalledWith(
+        'revoke_invitation',
+        expect.objectContaining({
+          p_invitation_id: 'inv-1',
+          p_reason: 'Revoked by administrator',
+        })
+      );
+      expect(result.success).toBe(true);
+    });
+
+    it('surfaces handler-failure envelope through result.error', async () => {
+      mockApiRpc.mockResolvedValueOnce({
+        data: {
+          success: false,
+          error: 'Invitation not found or not revocable',
+        },
+        error: null,
+      });
+
+      const result = await service.revokeInvitation('inv-missing');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invitation not found or not revocable');
+    });
+
+    it('maps PostgREST 42501 to FORBIDDEN via the in-file precedent', async () => {
+      // The RPC raises ERRCODE 42501 for caller auth missing, access_blocked,
+      // or permission denied (per the migration's DbC COMMENT). The service
+      // matches the in-file precedent (lines 848/955/1052/1115) and surfaces
+      // {code: 'FORBIDDEN', message: 'Access denied - insufficient permissions'}.
+      mockApiRpc.mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: '42501',
+          message: 'Permission denied',
+          hint: null,
+        },
+      });
+
+      const result = await service.revokeInvitation('inv-1');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Access denied - insufficient permissions');
+      expect(result.errorDetails?.code).toBe('FORBIDDEN');
+      expect(result.errorDetails?.message).toBe('Permission denied');
+    });
+  });
 });
