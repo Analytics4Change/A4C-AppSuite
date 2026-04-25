@@ -33,7 +33,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v16-access-blocked-guard';
+const DEPLOY_VERSION = 'v17-revoke-extracted';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -75,15 +75,19 @@ interface InvitationPhone {
 
 /**
  * Supported operations
+ *
+ * Note: `revoke` was extracted to `api.revoke_invitation` RPC in PR
+ * (migration `20260424221149_extract_revoke_invitation_rpc.sql`) per
+ * adr-edge-function-vs-sql-rpc.md; frontend calls the RPC directly.
  */
-type Operation = 'create' | 'resend' | 'revoke';
+type Operation = 'create' | 'resend';
 
 /**
  * Request format from frontend
  */
 interface InviteUserRequest {
   operation?: Operation;              // Default: 'create'
-  invitationId?: string;              // Required for resend/revoke operations
+  invitationId?: string;              // Required for resend operation
   email?: string;                     // Required for create operation
   firstName?: string;                 // Required for create operation
   lastName?: string;                  // Required for create operation
@@ -531,51 +535,6 @@ serve(async (req) => {
     const operation = requestData.operation || 'create';
 
     console.log(`[invite-user v${DEPLOY_VERSION}] Operation: ${operation}`);
-
-    // ==========================================================================
-    // REVOKE OPERATION
-    // ==========================================================================
-    if (operation === 'revoke') {
-      if (!requestData.invitationId) {
-        return new Response(
-          JSON.stringify({ error: 'Missing invitationId for revoke operation' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      console.log(`[invite-user v${DEPLOY_VERSION}] Revoking invitation ${requestData.invitationId}`);
-
-      // Call existing api.revoke_invitation RPC (validates status=pending, emits event)
-      // Note: RPC uses auth.uid() internally for metadata; service_role has no uid,
-      // but the revocation reason and invitation_id provide sufficient audit trail
-      const { data: revokeResult, error: revokeError } = await supabaseAdmin
-        .rpc('revoke_invitation', {
-          p_invitation_id: requestData.invitationId,
-          p_reason: 'Revoked by administrator',
-        });
-
-      if (revokeError) {
-        console.error(`[invite-user v${DEPLOY_VERSION}] Revoke failed:`, revokeError);
-        return handleRpcError(revokeError, correlationId, corsHeaders, 'revoke invitation');
-      }
-
-      if (revokeResult === false) {
-        return new Response(
-          JSON.stringify({ error: 'Invitation not found or not revocable' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      console.log(`[invite-user v${DEPLOY_VERSION}] Invitation revoked successfully: ${requestData.invitationId}`);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          invitationId: requestData.invitationId,
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     // ==========================================================================
     // RESEND OPERATION

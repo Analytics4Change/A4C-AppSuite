@@ -1306,7 +1306,7 @@ export type Database = {
       retry_failed_event: { Args: { p_event_id: string }; Returns: Json }
       revoke_invitation: {
         Args: { p_invitation_id: string; p_reason?: string }
-        Returns: boolean
+        Returns: Json
       }
       safety_net_deactivate_organization: {
         Args: { p_org_id: string }
@@ -1585,6 +1585,31 @@ export type Database = {
       }
       validate_role_assignment: {
         Args: { p_role_ids: string[] }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
         Returns: Json
       }
     }
@@ -5859,6 +5884,9 @@ export type CompositeTypes<
 
 export const Constants = {
   api: {
+    Enums: {},
+  },
+  graphql_public: {
     Enums: {},
   },
   public: {

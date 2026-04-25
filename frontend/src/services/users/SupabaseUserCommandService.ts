@@ -227,9 +227,13 @@ export class SupabaseUserCommandService implements IUserCommandService {
   }
 
   /**
-   * Revoke a pending invitation
+   * Revoke a pending invitation.
    *
-   * Calls the invite-user Edge Function with revoke operation
+   * Calls `api.revoke_invitation` SQL RPC. Extracted from the `invite-user`
+   * Edge Function per `adr-edge-function-vs-sql-rpc.md` — see migration
+   * `20260424221149_extract_revoke_invitation_rpc.sql`. The RPC sources
+   * `org_id` from the JWT, enforces `user.create` permission and the
+   * access-blocked guard server-side, and emits `invitation.revoked`.
    */
   async revokeInvitation(invitationId: string): Promise<UserVoidResult> {
     // Set up tracing context for this operation
@@ -239,29 +243,25 @@ export class SupabaseUserCommandService implements IUserCommandService {
     try {
       log.info('Revoking invitation', { invitationId });
 
-      const client = supabaseService.getClient();
-      const headers = buildHeadersFromContext(tracingContext);
-      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.INVITE_USER, {
-        body: {
-          operation: 'revoke',
-          invitationId,
-        },
-        headers,
+      const { data, error } = await supabaseService.apiRpc<{
+        success: boolean;
+        error?: string;
+        eventId?: string;
+        invitationId?: string;
+      }>('revoke_invitation', {
+        p_invitation_id: invitationId,
+        p_reason: 'Revoked by administrator',
       });
 
       if (error) {
-        const errorInfo = await extractEdgeFunctionError(error, 'Revoke invitation');
-        const errorMessage = errorInfo.correlationId
-          ? `${errorInfo.message} (Ref: ${errorInfo.correlationId})`
-          : errorInfo.message;
+        log.error('RPC error in revokeInvitation', { error });
         return {
           success: false,
-          error: errorMessage,
+          error: error.message,
           errorDetails: {
-            code: (errorInfo.code ?? 'UNKNOWN') as UserOperationErrorCode,
-            message: errorInfo.message,
-            context: errorInfo.details ? { details: errorInfo.details } : undefined,
-            correlationId: errorInfo.correlationId,
+            code: 'UNKNOWN' as UserOperationErrorCode,
+            message: error.message,
+            context: { postgresCode: error.code, hint: error.hint },
           },
         };
       }
@@ -273,7 +273,10 @@ export class SupabaseUserCommandService implements IUserCommandService {
         };
       }
 
-      log.info('Invitation revoked successfully', { invitationId });
+      log.info('Invitation revoked successfully', {
+        invitationId,
+        eventId: data.eventId,
+      });
       return { success: true };
     } catch (error) {
       log.error('Error in revokeInvitation', error);
