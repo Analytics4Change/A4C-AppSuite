@@ -4910,10 +4910,6 @@ export type Database = {
           number: string
         }[]
       }
-      get_user_target_path: {
-        Args: { p_org_id: string; p_user_id: string }
-        Returns: unknown
-      }
       handle_bootstrap_cancelled: {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
