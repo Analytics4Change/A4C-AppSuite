@@ -431,45 +431,49 @@ export class SupabaseUserCommandService implements IUserCommandService {
   }
 
   /**
-   * Permanently delete a deactivated user from the organization
+   * Soft-delete a user.
    *
-   * Calls the manage-user Edge Function which:
-   * 1. Validates permissions (user.delete)
-   * 2. Checks user is deactivated
-   * 3. Emits user.deleted event
+   * Calls `api.delete_user` SQL RPC. Extracted from the `manage-user`
+   * Edge Function per `adr-edge-function-vs-sql-rpc.md` — see migration
+   * `20260427205333_extract_delete_user_rpc.sql`. The RPC sources `org_id`
+   * from the JWT, enforces scoped `user.delete` permission via
+   * `public.has_effective_permission` (target path resolved by
+   * `public.get_user_target_path`), checks `access_blocked`, and emits
+   * `user.deleted` with Pattern A v2 read-back against `users.deleted_at`.
    */
   async deleteUser(userId: string, reason?: string): Promise<UserVoidResult> {
-    // Set up tracing context for this operation
     const tracingContext = await createTracingContext();
     Logger.pushTracingContext(tracingContext);
 
     try {
       log.info('Deleting user', { userId, reason });
 
-      const client = supabaseService.getClient();
-      const headers = buildHeadersFromContext(tracingContext);
-      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.MANAGE_USER, {
-        body: {
-          operation: 'delete',
-          userId,
-          reason,
-        },
-        headers,
+      const { data, error } = await supabaseService.apiRpc<{
+        success: boolean;
+        error?: string;
+        eventId?: string;
+        userId?: string;
+      }>('delete_user', {
+        p_user_id: userId,
+        p_reason: reason ?? 'Manual delete',
       });
 
       if (error) {
-        const errorInfo = await extractEdgeFunctionError(error, 'Delete user');
-        const errorMessage = errorInfo.correlationId
-          ? `${errorInfo.message} (Ref: ${errorInfo.correlationId})`
-          : errorInfo.message;
+        log.error('RPC error in deleteUser', { error });
+        if (error.code === '42501') {
+          return {
+            success: false,
+            error: 'Access denied - insufficient permissions',
+            errorDetails: { code: 'FORBIDDEN', message: error.message },
+          };
+        }
         return {
           success: false,
-          error: errorMessage,
+          error: error.message,
           errorDetails: {
-            code: (errorInfo.code ?? 'UNKNOWN') as UserOperationErrorCode,
-            message: errorInfo.message,
-            context: errorInfo.details ? { details: errorInfo.details } : undefined,
-            correlationId: errorInfo.correlationId,
+            code: 'UNKNOWN',
+            message: error.message,
+            context: { postgresCode: error.code, hint: error.hint },
           },
         };
       }
@@ -479,13 +483,13 @@ export class SupabaseUserCommandService implements IUserCommandService {
           success: false,
           error: data?.error ?? 'Failed to delete user',
           errorDetails: {
-            code: data?.error?.includes('active') ? 'USER_ACTIVE' : 'UNKNOWN',
+            code: data?.error?.includes('already deleted') ? 'USER_ACTIVE' : 'UNKNOWN',
             message: data?.error ?? 'Unknown error',
           },
         };
       }
 
-      log.info('User deleted successfully', { userId });
+      log.info('User deleted successfully', { userId, eventId: data.eventId });
       return { success: true };
     } catch (error) {
       log.error('Error in deleteUser', error);

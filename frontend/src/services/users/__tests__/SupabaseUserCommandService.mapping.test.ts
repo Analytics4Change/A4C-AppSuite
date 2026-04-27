@@ -523,4 +523,89 @@ describe('SupabaseUserCommandService — snake_case → camelCase mapping', () =
       expect(result.errorDetails?.message).toBe('Permission denied');
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // deleteUser — RPC envelope contract
+  // (api.delete_user, third Edge→RPC extraction — manage-user-delete-rpc + scope retrofit)
+  // Outcome-only response variant (no projection entity in the envelope).
+  // Also exercises the 42501 → 'FORBIDDEN' mapping consistent with revokeInvitation
+  // and the precedent at SupabaseUserCommandService.ts:848/955/1052/1115.
+  // ---------------------------------------------------------------------------
+  describe('deleteUser — RPC envelope contract', () => {
+    it('returns success when the RPC envelope reports success', async () => {
+      mockApiRpc.mockResolvedValueOnce({
+        data: {
+          success: true,
+          eventId: '11111111-2222-3333-4444-555555555555',
+          userId: 'user-1',
+        },
+        error: null,
+      });
+
+      const result = await service.deleteUser('user-1', 'cleanup');
+
+      expect(mockApiRpc).toHaveBeenCalledWith(
+        'delete_user',
+        expect.objectContaining({
+          p_user_id: 'user-1',
+          p_reason: 'cleanup',
+        })
+      );
+      expect(result.success).toBe(true);
+    });
+
+    it('surfaces handler-failure envelope through result.error', async () => {
+      mockApiRpc.mockResolvedValueOnce({
+        data: {
+          success: false,
+          error: 'User is already deleted',
+        },
+        error: null,
+      });
+
+      const result = await service.deleteUser('user-already-gone');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('User is already deleted');
+      expect(result.errorDetails?.code).toBe('USER_ACTIVE');
+    });
+
+    it('maps PostgREST 42501 to FORBIDDEN via the in-file precedent', async () => {
+      // The RPC raises ERRCODE 42501 for caller auth missing, access_blocked,
+      // user not in tenant, or scoped permission denied (per the migration's
+      // DbC COMMENT). The service surfaces {code: 'FORBIDDEN'}.
+      mockApiRpc.mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: '42501',
+          message: 'Permission denied',
+          hint: null,
+        },
+      });
+
+      const result = await service.deleteUser('user-out-of-scope');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Access denied - insufficient permissions');
+      expect(result.errorDetails?.code).toBe('FORBIDDEN');
+      expect(result.errorDetails?.message).toBe('Permission denied');
+    });
+
+    it('defaults p_reason to "Manual delete" when reason is omitted', async () => {
+      mockApiRpc.mockResolvedValueOnce({
+        data: { success: true, eventId: '22222222-3333-4444-5555-666666666666', userId: 'user-2' },
+        error: null,
+      });
+
+      await service.deleteUser('user-2');
+
+      expect(mockApiRpc).toHaveBeenCalledWith(
+        'delete_user',
+        expect.objectContaining({
+          p_user_id: 'user-2',
+          p_reason: 'Manual delete',
+        })
+      );
+    });
+  });
 });
