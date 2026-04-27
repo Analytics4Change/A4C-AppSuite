@@ -161,16 +161,6 @@ Permissions are defined per **applet** (distinct functional modules in the appli
 - `user.role_assign` - Assign roles to users
 - `user.role_revoke` - Revoke roles from users
 
-> **All `user.*` permissions are scoped via `effective_permissions[].s`.** SQL
-> RPCs that gate on these MUST use `public.has_effective_permission(<perm>, <target_user_path>)`,
-> resolving the target path via the canonical helper
-> `public.get_user_target_path(p_user_id uuid, p_org_id uuid) → ltree`.
-> Unscoped `public.has_permission()` permits intra-tenant cross-OU privilege
-> escalation and is a code smell for `user.*` operations. See
-> [adr-edge-function-vs-sql-rpc.md](../decisions/adr-edge-function-vs-sql-rpc.md)
-> Rollout 2026-04-27 for the canonical pattern and the retrofit history of
-> `api.update_user_notification_preferences` and `api.revoke_invitation`.
-
 #### Access Grant Applet (Cross-Tenant) - **IMPLEMENTED ✅**
 
 - `access_grant.create` - Create cross-tenant access grants - **IMPLEMENTED ✅**

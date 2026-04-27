@@ -226,29 +226,40 @@ handlers/
 > `api.emit_domain_event()`; handlers update projections. Direct writes bypass the
 > audit trail and break event replay.
 
-> **⚠️ Unscoped `has_permission()` is a code smell — use `has_effective_permission()`**
+> **⚠️ Choosing between `has_permission()` and `has_effective_permission()`**
 >
-> RPCs that gate writes on resource-scoped permissions (`user.*`, `role.*`,
-> `organization.*`, `organization_unit.*`) MUST use
-> `public.has_effective_permission(<perm>, <target_path>)`, NOT the unscoped
-> `public.has_permission(<perm>)`. The unscoped variant ignores the JWT's
-> per-permission scope (`effective_permissions[].s`) and permits intra-tenant
-> cross-OU privilege escalation.
+> `compute_effective_permissions` (baseline_v4:6932-6985) expands permission
+> implications **with scope inheritance**. Concrete chain: a user explicitly
+> granted `organization.update_ou` at scope `acme.pediatrics` also gets
+> derived `{p: 'organization.view_ou', s: 'acme.pediatrics'}` in their JWT
+> `effective_permissions` claim.
 >
-> For user-targeted operations, resolve `<target_path>` via the canonical helper:
+> Use **`public.has_effective_permission(perm, resource_path)`** when:
+> 1. The resource being acted on has organizational location (an ltree path) —
+>    e.g., OUs (`organization_units_projection.path`), role assignments
+>    (`user_roles_projection.scope_path`), the org itself
+>    (`organizations_projection.path`), AND
+> 2. The permission can be derived via implication at narrow scopes.
+>    Without scope-aware checks, list/visibility queries over-include —
+>    `has_permission('organization.view_ou')` returns TRUE for **every** OU
+>    in the tenant once any update_ou grant fires the implication.
 >
-> ```sql
-> v_target_path := public.get_user_target_path(p_user_id, v_org_id);
-> IF NOT public.has_effective_permission('user.delete', v_target_path) THEN
->   RAISE EXCEPTION 'Permission denied' USING ERRCODE = '42501';
-> END IF;
-> ```
+> Canonical examples: `bulk_assign_role` (baseline_v4:5498) checks against
+> the role's `scope_path`. OU mutators (5940/6023) check against the OU's
+> own path.
 >
-> Unscoped `has_permission()` is acceptable only for genuinely global permissions
-> (e.g., `platform.admin`, `settings.global_view`) — and even those should be
-> reviewed against the JWT claim shape before merging.
+> Use **`public.has_permission(perm)`** when:
+> - The resource has no organizational location finer than tenant
+>   (users-as-identities in A4C's current model — see
+>   `documentation/architecture/decisions/adr-edge-function-vs-sql-rpc.md`
+>   Rollout 2026-04-27 § course correction).
+> - Pair with the existing JWT-org_id tenancy guard
+>   (`v_org_id := NULLIF(v_claims ->> 'org_id', '')::uuid` + a target-tenancy
+>   check that returns the same envelope as not-found across tenants).
 >
-> See: [adr-edge-function-vs-sql-rpc.md](../../documentation/architecture/decisions/adr-edge-function-vs-sql-rpc.md) — Rollout 2026-04-27.
+> **Future trigger**: if user-identity acquires OU-bounded location (see
+> `dev/active/sub-tenant-admin-design/`), user-targeted RPCs should switch
+> to scoped checks at that point — not earlier.
 
 > **⚠️ RPC functions that read back from projections MUST use Pattern A v2 (BOTH checks)**
 >

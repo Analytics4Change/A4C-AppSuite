@@ -149,6 +149,55 @@ $$;
 3. CI lint rule for unscoped `has_permission` in new RPC migrations.
 4. Org-switch JWT atomicity: `switch_organization()` updates `current_organization_id` non-atomically with JWT re-issuance. The two-arg helper closes the read path; emit paths in handlers may still see stale tenant context. The org-switch frontend is currently unimplemented (`SupabaseUserCommandService.ts:726-736` returns error), so this is latent.
 
+## Phase 1.5 Course Correction (2026-04-27)
+
+After M1–M4 were applied, the user-model authority flagged that the entire scoped-permission retrofit rested on a misunderstanding:
+
+1. **Users live at the org level.** No per-user OU-bounded identity exists in A4C's data model.
+2. **`users.current_org_unit_id` is per-shift session state for direct-care staff** (set via `api.switch_org_unit` at clock-in), NOT a user-identity field. It changes per shift; it's NULL for non-direct-care users.
+3. **Available-OUs-at-login is dynamic from `effective_permissions[].s` for `organization.view_ou`** — not a stored projection. Verified by exhaustive `information_schema` scan.
+4. The architect's canonical-scoped-pattern citation (`bulk_assign_role`, OU mutators) passes the **resource's** path; users-as-identities don't have a path to pass.
+
+### Empirical evidence (verified against `tmrjlswbsxmbglmaclxu`)
+
+- All `user.*` permission scopes are at org root (zero OU-level scopes exist).
+- All role assignments at depth 1 (no sub-tenant OU assignments).
+- 0 of 6 users have `current_org_unit_id` populated.
+- The architect's hypothetical "regional supervisor with `user.update` granted at scope `acme.pediatrics`" does not exist in the data model.
+
+### Why scoped checks ARE warranted (preserved insight)
+
+`compute_effective_permissions` propagates implications with **scope inheritance**: a user granted `organization.update_ou` at `live4life.west_valley.cypress` derives `organization.view_ou` at the same scope. Listing OUs the user can see requires `has_effective_permission('organization.view_ou', candidate_path)` to avoid leaking visibility to siblings/ancestors. The architect saw this pattern correctly. The mistake was applying it to user-targeted ops where the target resource has no path — which makes the check vacuous (always returns org root) and installs a misleading mental model.
+
+### Disposition
+
+| Migration | Action |
+|---|---|
+| M1 `20260427203747_add_get_user_target_path_helper.sql` | Reverted via R4 (`20260427220419_drop_get_user_target_path_helper.sql`) |
+| M2 `20260427205333_extract_delete_user_rpc.sql` | Replaced via R1 (`20260427220143_unscope_delete_user.sql`) — kept Pattern A v2, idempotency, access_blocked, added inline JWT-org_id tenancy guard |
+| M3 `20260427205449_scope_update_user_notification_preferences.sql` | Replaced via R2 (`20260427220243_unscope_update_user_notification_preferences.sql`) — restored PR #36 form |
+| M4 `20260427205549_scope_revoke_invitation.sql` | Replaced via R3 (`20260427220331_unscope_revoke_invitation.sql`) — restored PR #39 permission style + KEPT the cross-tenant UUID-leak tenancy guard (independent improvement) |
+
+### Surviving extraction outcomes
+
+The original card goal (extract `manage-user delete` → `api.delete_user`) is delivered. The PR also ships:
+- Cross-tenant UUID-leak fix in `api.revoke_invitation` (independent of scoped-permission concern).
+- Idempotency guard in `api.delete_user`.
+- Pattern A v2 read-back in `api.delete_user`.
+- Edge Function cleanup (`manage-user/index.ts`: `delete` removed from `Operation`, perm switch, state guard, event-type switch, validation array, JSDoc; `DEPLOY_VERSION = 'v13-delete-extracted'`).
+- 4 new envelope-contract tests in `SupabaseUserCommandService.mapping.test.ts`.
+
+### Sub-tenant admin design card (seeded)
+
+The capability target the scoped retrofit was attempting to deliver — delegated sub-tenant administration via OU hierarchy — is real but requires user-model evolution before it becomes implementable. Seeded as `dev/active/sub-tenant-admin-design/`. Status: SEEDED, deferred until business need surfaces.
+
+### Documentation
+
+- `infrastructure/supabase/CLAUDE.md` § Critical Rules: rule replaced with the precise resource-has-path + implication-chain rule (with worked example).
+- `documentation/architecture/decisions/adr-edge-function-vs-sql-rpc.md` Rollout 2026-04-27: rewritten to capture both the surviving extraction and the course correction.
+- `documentation/architecture/authorization/rbac-architecture.md`: scoped paragraph removed (was based on wrong model).
+- Memory (`MEMORY.md`, `edge-function-sql-rpc-backlog.md`): precedents (12)–(17) rolled back; surviving improvements (tenancy guard, idempotency, identity-vs-role distinction, ltree column-qualification gotcha) re-codified.
+
 ## Reference
 
 See `context.md`.

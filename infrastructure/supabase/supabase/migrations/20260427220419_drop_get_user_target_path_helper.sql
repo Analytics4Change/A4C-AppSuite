@@ -1,0 +1,33 @@
+-- =============================================================================
+-- Migration: drop_get_user_target_path_helper
+-- (revert R4 of architectural course correction)
+--
+-- Purpose:
+--   Drop public.get_user_target_path(uuid, uuid). The helper was introduced
+--   in 20260427203747_add_get_user_target_path_helper.sql to support the
+--   scoped-permission retrofit of api.delete_user, api.update_user_notification_preferences,
+--   and api.revoke_invitation. All three callers were reverted to unscoped
+--   permission checks in R1-R3 (migrations 20260427220143, 20260427220243,
+--   20260427220331).
+--
+-- Rationale:
+--   See adr-edge-function-vs-sql-rpc.md Rollout 2026-04-27 § course
+--   correction. The helper modeled "the target user's home OU" for
+--   permission targeting, but A4C users have no organizational location
+--   finer than tenant. The check was vacuous (helper always returned org
+--   root) and installed a misleading mental model.
+--
+-- Future restoration:
+--   If/when A4C's user-model evolves to include OU-bounded user identity
+--   (see dev/active/sub-tenant-admin-design/), a similar helper will
+--   re-emerge — but its semantics, signature, and implementation will be
+--   designed against the new data model rather than ported from this
+--   reverted version.
+--
+-- Verification:
+--   - Pre-condition: no callers remain. Verified by grep of api.* function
+--     bodies after R1-R3 applied.
+--   - DROP IF EXISTS for idempotency.
+-- =============================================================================
+
+DROP FUNCTION IF EXISTS public.get_user_target_path(uuid, uuid);
