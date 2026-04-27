@@ -1,15 +1,5 @@
 {
-  "errors": [
-    {
-      "message": "Broken internal link: \"Frontend component reference\" -> \"../../../documentation/frontend/\" at line 214",
-      "file": "src/components/ui/CLAUDE.md",
-      "severity": "error"
-    },
-    {
-      "message": "Found 1 broken internal links that must be fixed",
-      "severity": "error"
-    }
-  ],
+  "errors": [],
   "warnings": [],
   "info": [
     {
@@ -119,8 +109,12 @@
       "severity": "info"
     },
     {
-      "message": "Internal link found: ../../../documentation/frontend/",
+      "message": "Internal link found: ../../../../documentation/frontend/README.md",
       "file": "src/components/ui/CLAUDE.md",
+      "severity": "info"
+    },
+    {
+      "message": "Link validation completed: 19 internal links checked, all valid",
       "severity": "info"
     }
   ],
@@ -130,10 +124,10 @@
     "componentsDocumented": 0,
     "apisDocumented": 0
   },
-  "timestamp": "2026-04-24T00:28:26.954Z",
+  "timestamp": "2026-04-27T21:06:50.141Z",
   "summary": {
-    "hasErrors": true,
+    "hasErrors": false,
     "hasWarnings": false,
-    "totalIssues": 2
+    "totalIssues": 0
   }
 }

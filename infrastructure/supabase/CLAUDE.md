@@ -226,6 +226,30 @@ handlers/
 > `api.emit_domain_event()`; handlers update projections. Direct writes bypass the
 > audit trail and break event replay.
 
+> **⚠️ Unscoped `has_permission()` is a code smell — use `has_effective_permission()`**
+>
+> RPCs that gate writes on resource-scoped permissions (`user.*`, `role.*`,
+> `organization.*`, `organization_unit.*`) MUST use
+> `public.has_effective_permission(<perm>, <target_path>)`, NOT the unscoped
+> `public.has_permission(<perm>)`. The unscoped variant ignores the JWT's
+> per-permission scope (`effective_permissions[].s`) and permits intra-tenant
+> cross-OU privilege escalation.
+>
+> For user-targeted operations, resolve `<target_path>` via the canonical helper:
+>
+> ```sql
+> v_target_path := public.get_user_target_path(p_user_id, v_org_id);
+> IF NOT public.has_effective_permission('user.delete', v_target_path) THEN
+>   RAISE EXCEPTION 'Permission denied' USING ERRCODE = '42501';
+> END IF;
+> ```
+>
+> Unscoped `has_permission()` is acceptable only for genuinely global permissions
+> (e.g., `platform.admin`, `settings.global_view`) — and even those should be
+> reviewed against the JWT claim shape before merging.
+>
+> See: [adr-edge-function-vs-sql-rpc.md](../../documentation/architecture/decisions/adr-edge-function-vs-sql-rpc.md) — Rollout 2026-04-27.
+
 > **⚠️ RPC functions that read back from projections MUST use Pattern A v2 (BOTH checks)**
 >
 > When an RPC emits a domain event and then reads the projection to build its

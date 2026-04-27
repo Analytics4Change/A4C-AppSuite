@@ -350,6 +350,10 @@ export type Database = {
         Args: { p_reason?: string; p_template_id: string }
         Returns: Json
       }
+      delete_user: {
+        Args: { p_reason?: string; p_user_id: string }
+        Returns: Json
+      }
       discharge_client: {
         Args: {
           p_client_id: string
@@ -4905,6 +4909,10 @@ export type Database = {
           is_override: boolean
           number: string
         }[]
+      }
+      get_user_target_path: {
+        Args: { p_org_id: string; p_user_id: string }
+        Returns: unknown
       }
       handle_bootstrap_cancelled: {
         Args: { p_event: Record<string, unknown> }

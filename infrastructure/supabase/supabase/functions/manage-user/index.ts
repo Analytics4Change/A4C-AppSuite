@@ -1,25 +1,25 @@
 /**
  * Manage User Edge Function
  *
- * Handles user lifecycle operations: deactivate, reactivate, delete, and role
- * modification. The `update_notification_preferences` operation was extracted
- * to `api.update_user_notification_preferences` SQL RPC — see
- * adr-edge-function-vs-sql-rpc.md (PR #33) and migration
- * 20260424194102_add_update_user_notification_preferences_rpc.sql.
+ * Handles user lifecycle operations: deactivate, reactivate, and role
+ * modification. Two operations have been extracted to SQL RPCs per
+ * adr-edge-function-vs-sql-rpc.md:
+ * - `update_notification_preferences` → `api.update_user_notification_preferences`
+ *   (migration 20260424194102_add_update_user_notification_preferences_rpc.sql)
+ * - `delete` → `api.delete_user`
+ *   (migration 20260427205333_extract_delete_user_rpc.sql)
  *
  * Operations:
  * - deactivate: Deactivate a user within the organization
  * - reactivate: Reactivate a deactivated user
- * - delete: Permanently delete a deactivated user (soft-delete via deleted_at)
  * - modify_roles: Add and/or remove roles for a user
  *
  * CQRS-compliant: Emits domain events:
- * - user.deactivated / user.reactivated / user.deleted
+ * - user.deactivated / user.reactivated
  * - user.role.assigned / user.role.revoked
  *
  * Permissions:
  * - user.update: deactivate/reactivate
- * - user.delete: delete
  * - user.role_assign: modify_roles
  */
 
@@ -42,7 +42,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v12-post-notification-prefs-extraction';
+const DEPLOY_VERSION = 'v13-delete-extracted';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -50,7 +50,7 @@ const corsHeaders = standardCorsHeaders;
 /**
  * Supported operations
  */
-type Operation = 'deactivate' | 'reactivate' | 'delete' | 'modify_roles';
+type Operation = 'deactivate' | 'reactivate' | 'modify_roles';
 
 /**
  * Request format from frontend
@@ -214,15 +214,7 @@ serve(async (req) => {
     const bodyText = await req.text();
     const preCheckData = JSON.parse(bodyText) as ManageUserRequest;
 
-    if (preCheckData.operation === 'delete') {
-      if (!hasPermission(effectivePermissions, 'user.delete')) {
-        console.log(`[manage-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} lacks user.delete`);
-        return new Response(
-          JSON.stringify({ error: 'Permission denied: user.delete required' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    } else if (preCheckData.operation === 'modify_roles') {
+    if (preCheckData.operation === 'modify_roles') {
       if (!hasPermission(effectivePermissions, 'user.role_assign')) {
         console.log(`[manage-user v${DEPLOY_VERSION}] Permission denied: user ${user.id} lacks user.role_assign`);
         return new Response(
@@ -255,9 +247,9 @@ serve(async (req) => {
       );
     }
 
-    if (!['deactivate', 'reactivate', 'delete', 'modify_roles'].includes(requestData.operation)) {
+    if (!['deactivate', 'reactivate', 'modify_roles'].includes(requestData.operation)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid operation. Must be "deactivate", "reactivate", "delete", or "modify_roles"' }),
+        JSON.stringify({ error: 'Invalid operation. Must be "deactivate", "reactivate", or "modify_roles"' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -282,11 +274,10 @@ serve(async (req) => {
       }
     }
 
-    // Prevent self-deactivation and self-deletion
-    if ((requestData.operation === 'deactivate' || requestData.operation === 'delete') && requestData.userId === user.id) {
-      const action = requestData.operation === 'delete' ? 'delete' : 'deactivate';
+    // Prevent self-deactivation
+    if (requestData.operation === 'deactivate' && requestData.userId === user.id) {
       return new Response(
-        JSON.stringify({ error: `Cannot ${action} yourself` }),
+        JSON.stringify({ error: 'Cannot deactivate yourself' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -324,14 +315,6 @@ serve(async (req) => {
     if (requestData.operation === 'reactivate' && userDetails.isActive) {
       return new Response(
         JSON.stringify({ error: 'User is already active' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Delete requires user to be deactivated first (soft-delete pattern)
-    if (requestData.operation === 'delete' && userDetails.isActive) {
-      return new Response(
-        JSON.stringify({ error: 'Cannot delete active user. Deactivate first.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -453,10 +436,6 @@ serve(async (req) => {
     let eventType: string;
     let timestampField: string;
     switch (requestData.operation) {
-      case 'delete':
-        eventType = 'user.deleted';
-        timestampField = 'deleted_at';
-        break;
       case 'deactivate':
         eventType = 'user.deactivated';
         timestampField = 'deactivated_at';
