@@ -42,7 +42,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v13-delete-extracted';
+const DEPLOY_VERSION = 'v14-deactivate-ban-fix';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -478,21 +478,46 @@ serve(async (req) => {
     console.log(`[manage-user v${DEPLOY_VERSION}] Event emitted: ${eventId}`);
 
     // ==========================================================================
-    // UPDATE USER ACTIVE STATUS (via Supabase Auth Admin API for global state)
-    // The event processor will handle projection updates
+    // UPDATE SUPABASE AUTH BAN STATE (global login prevention)
+    // The event processor handles projection updates (is_active, deactivated_at,
+    // reactivated_at). Banning at the auth tier is what actually prevents login.
+    //
+    // Supabase Auth contract:
+    //   ban_duration: '876000h' (≈100 years) — effectively permanent until unbanned
+    //   ban_duration: 'none'                  — clears any existing ban
+    //
+    // Historical bug (fixed 2026-04-29 same-day as discovery): the deactivate
+    // branch previously called updateUserById with ban_duration: 'none',
+    // which UNBANS rather than bans. Deactivated users could continue to log
+    // in because Supabase Auth never received a real ban. Surfaced during
+    // smoke testing of manage-user-delete-rpc-and-scope-retrofit. Reactivate
+    // also previously had no auth call — meaning even after this fix, banned
+    // users would stay banned forever without the parallel unban here.
     // ==========================================================================
 
-    // Also update Supabase Auth user banned state for global enforcement
     if (requestData.operation === 'deactivate') {
-      // Ban user in Supabase Auth (prevents login)
       const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(
         requestData.userId,
-        { ban_duration: 'none' } // Use 'none' to indicate unbanned, but we set app_metadata
+        { ban_duration: '876000h' } // Effectively permanent ban; cleared by reactivate.
       );
 
       if (banError) {
-        console.warn(`[manage-user v${DEPLOY_VERSION}] Failed to update auth metadata:`, banError);
-        // Don't fail the request - event was emitted, projection will update
+        console.warn(`[manage-user v${DEPLOY_VERSION}] Failed to ban auth user:`, banError);
+        // Don't fail the request - event was emitted, projection will update.
+        // But surface this as a warning since the auth-tier ban is the actual
+        // login-prevention mechanism; without it the user can still log in.
+      }
+    } else if (requestData.operation === 'reactivate') {
+      const { error: unbanError } = await supabaseAdmin.auth.admin.updateUserById(
+        requestData.userId,
+        { ban_duration: 'none' } // Clear any existing ban (set by prior deactivate).
+      );
+
+      if (unbanError) {
+        console.warn(`[manage-user v${DEPLOY_VERSION}] Failed to unban auth user:`, unbanError);
+        // Don't fail the request - event was emitted, projection will update.
+        // But surface this as a warning since the user will remain unable to
+        // log in until the ban is cleared.
       }
     }
 
