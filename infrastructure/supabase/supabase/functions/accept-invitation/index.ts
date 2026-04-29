@@ -26,7 +26,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v20-phone-emit-index-preservation';
+const DEPLOY_VERSION = 'v21-frontend-index-space-fix';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -67,15 +67,21 @@ export interface CreatedInvitationPhone {
  * created earlier in this invitation-acceptance flow.
  *
  * The frontend invitation form (`UsersManagePage.tsx:847`) generates
- * placeholders of the form `invitation-phone-${index}` because it doesn't
- * yet know the real UUIDs that will be minted at acceptance time. The
- * backend is responsible for substituting the real UUID once phones exist.
+ * placeholders of the form `invitation-phone-${index}` over the UNFILTERED
+ * `formData.phones` array — index N corresponds to the Nth phone in the
+ * same iteration order the backend uses to populate `createdPhoneIds`.
+ * `NotificationPreferencesForm` filters smsCapable phones at render time
+ * but the placeholder index space is the unfiltered array. The backend
+ * substitutes the real UUID at acceptance.
  *
  * Pre-conditions:
  *   - createdPhoneIds is in the same iteration order as the frontend's
- *     phones[] array (stable insertion-order index correspondence). The
- *     accept-invitation handler at the call site iterates phones in array
- *     order and pushes into createdPhoneIds without reordering.
+ *     UNFILTERED phones[] array (stable insertion-order index
+ *     correspondence). Both ends iterate the full phones array — frontend
+ *     when generating `invitation-phone-${index}`, backend when populating
+ *     createdPhoneIds. Pre-filtering at either end (e.g., by smsCapable)
+ *     would shift the index space and silently mis-route SMS — closed in
+ *     v21-frontend-index-space-fix (this commit).
  *   - rawPhoneId is one of: null, undefined, an `invitation-phone-N` string,
  *     or a UUID belonging to this user's createdPhoneIds. Any other input
  *     is normalized to null + warn.
@@ -819,8 +825,12 @@ serve(async (req) => {
           })
         });
 
-      if (phoneError) {
-        console.error(`[accept-invitation v${DEPLOY_VERSION}] Failed to emit user.phone.added for ${phone.label}:`, phoneError);
+      if (phoneError || !phoneEventId) {
+        // Belt-and-suspenders: `phoneError` covers RPC-reported failures;
+        // `!phoneEventId` guards against a (hypothetical) silent RPC
+        // degradation where data and error are both nullish. Either case
+        // means the phone was NOT successfully emitted to domain_events.
+        console.error(`[accept-invitation v${DEPLOY_VERSION}] Failed to emit user.phone.added for ${phone.label}:`, phoneError ?? 'no event_id returned');
         // Non-fatal: continue with other phones, but push a sentinel
         // `{ phoneId: null, phone }` to preserve index correspondence with
         // the frontend's phones[] array. resolveInvitationPhonePlaceholder

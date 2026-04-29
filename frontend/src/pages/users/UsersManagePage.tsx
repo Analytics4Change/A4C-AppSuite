@@ -839,25 +839,30 @@ export const UsersManagePage: React.FC = observer(() => {
                           DEFAULT_NOTIFICATION_PREFERENCES
                         }
                         availablePhones={
-                          // Map InvitationPhone[] to UserPhone[] with temporary IDs
-                          // Backend will map these to real IDs on invitation acceptance
-                          formViewModel.formData.phones
-                            ?.filter((p) => p.smsCapable)
-                            .map((p, index) => ({
-                              id: `invitation-phone-${index}`,
-                              userId: '',
-                              orgId: null,
-                              label: p.label,
-                              type: p.type,
-                              number: p.number,
-                              extension: null,
-                              countryCode: p.countryCode ?? '+1',
-                              isPrimary: p.isPrimary ?? false,
-                              isActive: true,
-                              smsCapable: p.smsCapable ?? false,
-                              createdAt: new Date(),
-                              updatedAt: new Date(),
-                            })) ?? []
+                          // Map InvitationPhone[] to UserPhone[] with temporary IDs.
+                          // Backend will map these to real IDs on invitation acceptance.
+                          //
+                          // IMPORTANT: index space MUST match the backend's iteration over
+                          // invitation.phones (UNFILTERED). NotificationPreferencesForm
+                          // filters internally at render time (smsCapable + isActive).
+                          // Do NOT pre-filter here — see accept-invitation/index.ts:74-78
+                          // for the helper invariant. Pre-filtering shifts the
+                          // `invitation-phone-N` index space and silently mis-routes SMS.
+                          formViewModel.formData.phones?.map((p, index) => ({
+                            id: `invitation-phone-${index}`,
+                            userId: '',
+                            orgId: null,
+                            label: p.label,
+                            type: p.type,
+                            number: p.number,
+                            extension: null,
+                            countryCode: p.countryCode ?? '+1',
+                            isPrimary: p.isPrimary ?? false,
+                            isActive: true,
+                            smsCapable: p.smsCapable ?? false,
+                            createdAt: new Date(),
+                            updatedAt: new Date(),
+                          })) ?? []
                         }
                         onSave={(prefs) => formViewModel.setNotificationPreferences(prefs)}
                         inline

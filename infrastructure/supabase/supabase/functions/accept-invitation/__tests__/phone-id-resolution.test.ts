@@ -128,6 +128,15 @@ Deno.test('placeholder adjacent to sentinel resolves correctly (sentinel preserv
   assertEquals(result0, UUID_A);
 });
 
+Deno.test('F6 boundary: invitation-phone-0 against empty createdPhoneIds returns null', () => {
+  // Boundary check: in-range branch with length-0 array. Verifies the
+  // out-of-range path fires cleanly when there are no slots at all
+  // (e.g., an invitation with notification preferences set but zero phones —
+  // hypothetical, but cheap to guard against future regression).
+  const result = resolveInvitationPhonePlaceholder('invitation-phone-0', [], ctx);
+  assertEquals(result, null);
+});
+
 Deno.test('CR-4 integration: index correspondence preserved through sentinel', () => {
   // Load-bearing assertion of this whole card. Construct createdPhoneIds as
   // the loop would build it after a partial failure (B's emit failed → null

@@ -107,3 +107,59 @@ DEPLOY_VERSION bumped: `v19-phone-id-resolution-hardened` → `v20-phone-emit-in
 | `infrastructure/supabase/supabase/functions/accept-invitation/__tests__/phone-id-resolution.test.ts` | NEW — establishes per-function test pattern |
 | `dev/active/fix-phone-emit-index-preservation/plan.md` | This Phase 0 Findings + Resolution section |
 | `dev/active/fix-phone-emit-index-preservation/tasks.md` | Phase status updated |
+
+---
+
+## F3 closure (architect second-pass review, amended into PR #42)
+
+After PR #42 was opened, a second-pass `software-architect-dbc` review verified
+all 5 pre-merge CRs PASS but identified an **unclosed variant of the same bug
+class — F3, HIGH severity**: a frontend/backend index-space mismatch on the
+`invitation-phone-N` placeholder namespace. A third-pass architect review
+validated F3 empirically and recommended amending PR #42 rather than landing F3
+as a successor card.
+
+### F3 finding
+
+- **Frontend** (`UsersManagePage.tsx:844-847`): `formData.phones?.filter((p) => p.smsCapable).map((p, index) => ({ id: \`invitation-phone-${index}\`, ... }))` — placeholder N is assigned over the **filtered** subset.
+- **Backend** (`accept-invitation/index.ts:794`): `for (const phone of phones)` iterates **unfiltered** `invitation.phones`.
+
+Concrete failure: `phones = [Office(smsCapable=false), Mobile-A, Mobile-B]`,
+inviter selects Mobile-A. Frontend stores `phoneId: "invitation-phone-0"`.
+Backend's `createdPhoneIds[0]` is **Office**. Helper resolves to Office's UUID
+— silent wrong-phone selection, the same compliance failure mode this card was
+filed to close.
+
+**Bonus discovery**: `NotificationPreferencesForm.tsx:91` already filters at
+render. The upstream filter at `UsersManagePage.tsx:845` was therefore
+**redundant** for UI behavior; removing it is purely subtractive.
+
+### Architectural decisions (architect-validated)
+
+| Decision | Choice | Justification |
+|---|---|---|
+| Remediation strategy | **Option A** — drop frontend filter | 1-line subtractive change. Single point of truth for filtering moves into `NotificationPreferencesForm`. No workflow/schema impact. Option B (backend pre-filter) would silently skip non-SMS `user.phone.added` events. Option C (stable identifiers) is over-engineering. |
+| Amend vs successor PR | **AMEND PR #42** | Same bug class. Avoids HIGH-severity defect time on `main`. |
+| F1 (discriminated-union) | DROP | Informational only. |
+| F6 (empty-array boundary test) | KEEP | Trivial; closes docblock-vs-tests gap. |
+| Optional hardening | KEEP | `if (phoneError \|\| !phoneEventId)` belt against silent RPC degradation. |
+| Helper docblock correction | REQUIRED | Pre-fix invariant statement is factually wrong post-F3. |
+
+### Implementation (F3 amend, applied 2026-04-29)
+
+- **`frontend/src/pages/users/UsersManagePage.tsx`**: dropped `?.filter((p) => p.smsCapable)` at line 845. Added invariant comment block referencing the helper docblock.
+- **`accept-invitation/index.ts`**:
+  - Lines 69-72 docblock: clarified placeholder index space is **unfiltered**.
+  - Lines 74-78 preconditions: reinforced unfiltered invariant + reference v21.
+  - Line 822 hardening: `if (phoneError || !phoneEventId)` belt-and-suspenders.
+  - DEPLOY_VERSION: `v20-phone-emit-index-preservation` → `v21-frontend-index-space-fix`.
+- **`accept-invitation/__tests__/phone-id-resolution.test.ts`**: F6 boundary test — `invitation-phone-0` against empty `createdPhoneIds` returns null.
+
+### Verification
+
+- `npm run typecheck` (frontend) → clean.
+- `npm run lint` (frontend) → clean.
+- `deno test --allow-net accept-invitation/__tests__/phone-id-resolution.test.ts` → **11 passed, 0 failed** (10 prior + F6 boundary).
+- `deno test --allow-net _shared/__tests__/` → **54 passed, 0 failed** (no regression).
+- Manual deploy + source-verify v21 on dev.
+- Manual UI smoke: F3 failure scenario (3 phones, Office non-SMS, Mobile-A picked); confirm `sms_phone_id` resolves to Mobile-A's UUID, NOT Office's.
