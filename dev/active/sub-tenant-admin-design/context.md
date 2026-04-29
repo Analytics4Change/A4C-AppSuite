@@ -30,7 +30,7 @@ To deliver the capability, a multi-layer change is required, not just a helper f
 
 Sub-tenant admin becomes architecturally meaningful exactly when **users acquire OU-bounded identity** — i.e., a stable per-identity relationship between a user and the OU(s) they "belong to" for administrative purposes (distinct from direct-care shift-OU and from role-assignment scope).
 
-Until that user-model evolution is on the roadmap, this card stays SEEDED and no work should start.
+Until that user-model evolution is on the roadmap, this card stays SEEDED and no work should start. **Before any future implementation begins, re-read `infrastructure/supabase/CLAUDE.md` § Critical Rules — specifically the "Choosing between `has_permission()` and `has_effective_permission()`" rule and the worked `organization.update_ou → organization.view_ou` example.** That rule was codified after the 2026-04-27 scoped-retrofit attempt was reverted; future work must satisfy both its conditions (resource has organizational location AND permission can be derived via implication at narrow scopes) before introducing scoped checks for user-targeted operations.
 
 ## Origin trail
 
