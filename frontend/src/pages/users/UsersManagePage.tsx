@@ -388,15 +388,20 @@ export const UsersManagePage: React.FC = observer(() => {
       if (result.success) {
         setDialogState({ type: 'none' });
         log.info('User deactivated successfully', { userId: currentItem.id });
+        toast.success('User deactivated');
         await viewModel.loadAll();
         selectAndLoadUser(currentItem.id, false);
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to deactivate user');
+        const message = result.error || 'Failed to deactivate user';
+        setOperationError(message);
+        toast.error(message);
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to deactivate user');
+      const message = error instanceof Error ? error.message : 'Failed to deactivate user';
+      setOperationError(message);
+      toast.error(message);
     }
   }, [currentItem, viewModel, selectAndLoadUser]);
 
@@ -419,15 +424,20 @@ export const UsersManagePage: React.FC = observer(() => {
       if (result.success) {
         setDialogState({ type: 'none' });
         log.info('User reactivated successfully', { userId: currentItem.id });
+        toast.success('User reactivated');
         await viewModel.loadAll();
         selectAndLoadUser(currentItem.id, false);
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to reactivate user');
+        const message = result.error || 'Failed to reactivate user';
+        setOperationError(message);
+        toast.error(message);
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to reactivate user');
+      const message = error instanceof Error ? error.message : 'Failed to reactivate user';
+      setOperationError(message);
+      toast.error(message);
     }
   }, [currentItem, viewModel, selectAndLoadUser]);
 
@@ -548,17 +558,22 @@ export const UsersManagePage: React.FC = observer(() => {
       if (result.success) {
         setDialogState({ type: 'none' });
         log.info('User deleted successfully', { userId: currentItem.id });
+        toast.success('User deleted');
         setPanelMode('empty');
         setFormViewModel(null);
         setCurrentItem(null);
         // List refresh is handled by the viewModel.deleteUser method
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to delete user');
+        const message = result.error || 'Failed to delete user';
+        setOperationError(message);
+        toast.error(message);
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to delete user');
+      const message = error instanceof Error ? error.message : 'Failed to delete user';
+      setOperationError(message);
+      toast.error(message);
     }
   }, [currentItem, viewModel]);
 
