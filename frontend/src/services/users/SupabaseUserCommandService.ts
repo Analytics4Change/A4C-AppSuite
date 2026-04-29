@@ -435,11 +435,21 @@ export class SupabaseUserCommandService implements IUserCommandService {
    *
    * Calls `api.delete_user` SQL RPC. Extracted from the `manage-user`
    * Edge Function per `adr-edge-function-vs-sql-rpc.md` — see migration
-   * `20260427205333_extract_delete_user_rpc.sql`. The RPC sources `org_id`
-   * from the JWT, enforces scoped `user.delete` permission via
-   * `public.has_effective_permission` (target path resolved by
-   * `public.get_user_target_path`), checks `access_blocked`, and emits
-   * `user.deleted` with Pattern A v2 read-back against `users.deleted_at`.
+   * `20260427205333_extract_delete_user_rpc.sql` (initial extraction) and
+   * `20260427220143_unscope_delete_user.sql` (course-correction final
+   * form). The RPC sources `org_id` from the JWT, enforces unscoped
+   * `user.delete` permission via `public.has_permission`, checks
+   * `access_blocked`, applies an inline JWT-org_id tenancy guard that
+   * returns the same envelope as not-found across tenants (no UUID-
+   * existence leak), and emits `user.deleted` with Pattern A v2 read-back
+   * against `users.deleted_at`.
+   *
+   * Permission style is unscoped per the architectural course correction
+   * documented in `adr-edge-function-vs-sql-rpc.md` Rollout 2026-04-27 §
+   * course correction: A4C users have no organizational location finer
+   * than tenant, so scope-aware `has_effective_permission` was vacuous
+   * for user-targeted operations. The dropped helper
+   * `public.get_user_target_path` is no longer part of this code path.
    */
   async deleteUser(userId: string, reason?: string): Promise<UserVoidResult> {
     const tracingContext = await createTracingContext();
