@@ -98,6 +98,32 @@ interface CreatedInvitationPhone {
  *   sms_enabled=false and sms_phone_id=<resolved UUID> — consistent with the
  *   read-back contract of api.update_user_notification_preferences and a
  *   harmless tombstone of the inviter's intent.
+ *
+ * Edge case — phone emit failure shifts index correspondence:
+ *   The phone-loop at the call site treats per-phone emit failures as
+ *   non-fatal (continues with remaining phones, does NOT push to
+ *   createdPhoneIds). If the frontend sends phones [A, B, C] with
+ *   prefs.sms.phoneId = "invitation-phone-2" pointing at C, and B's emit
+ *   fails, then createdPhoneIds becomes [A_uuid, C_uuid]. Resolving
+ *   index 2 falls out of range → null → auto-select fallback fires.
+ *   Worse: if the inviter selected "invitation-phone-1" (B), the helper
+ *   resolves to C_uuid — a SILENT WRONG-PHONE SELECTION with only a
+ *   console.warn surface. The graceful-degradation path is acceptable
+ *   for now (steady-state phone emits rarely fail), but is exactly the
+ *   silent-mis-routed-SMS class this fix exists to close. Tracked in
+ *   `dev/active/fix-phone-emit-index-preservation/` for behavioral fix.
+ *
+ * Edge case — smsCapable mismatch on placeholder path:
+ *   The helper passes through a placeholder-resolved UUID even if the
+ *   underlying phone has smsCapable=false. The auto-select branch at
+ *   the call site explicitly filters smsCapable=true; the placeholder
+ *   path does not. This is intentional — the placeholder represents the
+ *   inviter's stated intent ("send SMS to phone N"), and the helper
+ *   honors it. If the inviter chose a non-SMS-capable phone, the
+ *   resulting projection state (sms_enabled=true, sms_phone_id=<non-sms
+ *   capable phone>) reflects their decision; downstream notification
+ *   delivery (in workflows/) is responsible for skipping or escalating
+ *   based on phone capability.
  */
 function resolveInvitationPhonePlaceholder(
   rawPhoneId: string | null | undefined,
