@@ -28,3 +28,82 @@
 - Unit tests cover the null-slot case for `resolveInvitationPhonePlaceholder`.
 - Manual smoke test (or fault injection) confirms inviter intent is honored when adjacent phones fail to emit.
 - No regression in steady-state path (all phones emit successfully).
+
+---
+
+## Phase 0 Findings & Resolution (2026-04-29)
+
+Phase 0 was elevated to a planning phase (architect-reviewed) because the surface
+of changes touched Edge Function test infrastructure and observability semantics in
+addition to the index-correspondence fix itself. Authoritative plan:
+`/home/lars/.claude/plans/does-phase-0-warrant-humble-whale.md`.
+
+### Q1 — Sentinel approach safety (verified)
+
+`handle_user_phone_added` is a simple INSERT with `ON CONFLICT (id) DO NOTHING`,
+single consumer, no cross-event reasoning. Sentinel pattern (push `{ phoneId: null, phone }`
+on failed emit) is safe — no new events emit; no cross-entity invariants disturbed.
+
+### Q2 — `user.phone.add_failed` event decision (NO)
+
+Empirical precedent in the codebase: only saga-level state machines emit failure
+events; sub-entity flows use `console.error` + correlation_id (Edge Functions) or
+`processing_error` on already-emitted events (handlers). A failed *emit* never
+reaches `domain_events`, so `processing_error` doesn't apply. Adding a new event
+type would expand scope (AsyncAPI registration, three-layer audit, type regen) for
+a problem the sentinel already solves.
+
+### Q3 — Test harness scope (notable surprise)
+
+A Deno test harness DOES exist at `_shared/__tests__/` (54 passing tests) but no
+per-Edge-Function precedent existed. This card establishes the per-function
+pattern at `accept-invitation/__tests__/phone-id-resolution.test.ts`. Partially
+de-scopes the parked card `dev/parked/edge-function-deno-test-harness/` — that
+card now narrows to "documenting the established pattern + maybe CI integration."
+
+### Architect review (software-architect-dbc, 2026-04-29)
+
+Verdict: APPROVE WITH CHANGES — 5 items, all incorporated:
+
+- **CR-1 (must-fix)**: Helper docblock retained, retitled "Index correspondence
+  under partial phone-emit failure (closed)", rewritten as closed-bug-class
+  description with explicit sentinel-mechanism reference.
+- **CR-2 (must-fix)**: Helper sentinel-at-in-range observability gap closed.
+  Added explicit warn at the in-range null path with structured context
+  (rawPhoneId, index, phoneLabel, correlationId, userId, invitationId) — without
+  this, the fix would lose the diagnostic signal at exactly the failure mode it
+  was designed for.
+- **CR-3**: Module structure confirmed — `export` keyword inline on helper +
+  types in `index.ts`; no `_lib/` split (premature for ~60-line helper).
+- **CR-4**: 9th test case "index correspondence preserved through sentinel" —
+  the load-bearing assertion of this whole card. Pre-fix sentinel-skipping
+  would have made `invitation-phone-2` resolve to the wrong UUID by index shift.
+- **CR-5**: Test-harness card scope refinement is a same-day follow-up commit
+  on main, NOT bundled in this PR.
+
+### Resolution
+
+Implementation matches plan. Phase 1+2 (sentinel + auto-select filter) closes
+the index-shift bug class. Phase 4 (per-function test pattern) verifies the fix
+empirically with 9 unique test cases (10 deno test results, all green) covering
+PR #41's 6 cases + 3 new sentinel cases. Phase 3 (failure event emission) was
+explicitly NOT done per Q2 architectural decision. Phase 5 (smoke test with
+fault injection) was explicitly NOT done — tests verify the logic; manual
+end-to-end for the happy path is covered by PR #41's prior smoke test.
+
+DEPLOY_VERSION bumped: `v19-phone-id-resolution-hardened` → `v20-phone-emit-index-preservation`.
+
+### Test results
+
+- `deno test --allow-net accept-invitation/__tests__/phone-id-resolution.test.ts`
+  → 10 passed, 0 failed (9 unique test cases; one runs 3 inner assertions).
+- `deno test --allow-net _shared/__tests__/` → 54 passed, 0 failed (no regression).
+
+### Files changed
+
+| Path | Operation |
+|------|-----------|
+| `infrastructure/supabase/supabase/functions/accept-invitation/index.ts` | Type change + sentinel push + auto-select filter + helper-docblock refresh + DEPLOY_VERSION + `export` for helper/types + CR-2 sentinel-detection warn |
+| `infrastructure/supabase/supabase/functions/accept-invitation/__tests__/phone-id-resolution.test.ts` | NEW — establishes per-function test pattern |
+| `dev/active/fix-phone-emit-index-preservation/plan.md` | This Phase 0 Findings + Resolution section |
+| `dev/active/fix-phone-emit-index-preservation/tasks.md` | Phase status updated |

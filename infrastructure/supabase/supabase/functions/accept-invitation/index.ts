@@ -26,7 +26,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v19-phone-id-resolution-hardened';
+const DEPLOY_VERSION = 'v20-phone-emit-index-preservation';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -35,7 +35,7 @@ const corsHeaders = standardCorsHeaders;
  * Phone shape carried in the invitation envelope. Mirrors the frontend's
  * InvitationPhone type at `frontend/src/pages/users/UsersManagePage.tsx`.
  */
-interface InvitationPhone {
+export interface InvitationPhone {
   label: string;
   type: 'mobile' | 'office' | 'fax' | 'emergency';
   number: string;
@@ -49,9 +49,16 @@ interface InvitationPhone {
  * was created from. The accept-invitation handler builds this array in
  * iteration order from the invitation's `phones[]`; the index correspondence
  * is load-bearing for `resolveInvitationPhonePlaceholder` (do NOT reorder).
+ *
+ * `phoneId` is `string | null` to support sentinel slots: if a per-phone
+ * `user.phone.added` emit fails (non-fatal in this saga), the call site
+ * pushes `{ phoneId: null, phone }` to preserve index correspondence
+ * with the frontend's `phones[]` array. Without this, a failed emit would
+ * silently shift subsequent indexes and route SMS to the wrong phone
+ * (closed in v20-phone-emit-index-preservation, 2026-04-29).
  */
-interface CreatedInvitationPhone {
-  phoneId: string;
+export interface CreatedInvitationPhone {
+  phoneId: string | null;
   phone: InvitationPhone;
 }
 
@@ -99,19 +106,19 @@ interface CreatedInvitationPhone {
  *   read-back contract of api.update_user_notification_preferences and a
  *   harmless tombstone of the inviter's intent.
  *
- * Edge case — phone emit failure shifts index correspondence:
+ * Index correspondence under partial phone-emit failure (closed):
  *   The phone-loop at the call site treats per-phone emit failures as
- *   non-fatal (continues with remaining phones, does NOT push to
- *   createdPhoneIds). If the frontend sends phones [A, B, C] with
- *   prefs.sms.phoneId = "invitation-phone-2" pointing at C, and B's emit
- *   fails, then createdPhoneIds becomes [A_uuid, C_uuid]. Resolving
- *   index 2 falls out of range → null → auto-select fallback fires.
- *   Worse: if the inviter selected "invitation-phone-1" (B), the helper
- *   resolves to C_uuid — a SILENT WRONG-PHONE SELECTION with only a
- *   console.warn surface. The graceful-degradation path is acceptable
- *   for now (steady-state phone emits rarely fail), but is exactly the
- *   silent-mis-routed-SMS class this fix exists to close. Tracked in
- *   `dev/active/fix-phone-emit-index-preservation/` for behavioral fix.
+ *   non-fatal. To preserve index correspondence, the call site pushes a
+ *   sentinel `{ phoneId: null, phone }` into createdPhoneIds for each
+ *   failed emit. This helper observes sentinels via the in-range null
+ *   path: createdPhoneIds[N].phoneId === null falls through to a
+ *   `null + warn` branch identical to out-of-range, and the auto-select
+ *   fallback at the call site filters `phoneId !== null`. Net effect:
+ *   inviter intent is honored when index lands on a successful slot;
+ *   gracefully degrades to auto-select when index lands on a sentinel.
+ *   Prior to v20, a failed emit silently shifted index correspondence
+ *   and could route SMS to the wrong phone. See
+ *   `dev/active/fix-phone-emit-index-preservation/` for the fix history.
  *
  * Edge case — smsCapable mismatch on placeholder path:
  *   The helper passes through a placeholder-resolved UUID even if the
@@ -125,7 +132,7 @@ interface CreatedInvitationPhone {
  *   delivery (in workflows/) is responsible for skipping or escalating
  *   based on phone capability.
  */
-function resolveInvitationPhonePlaceholder(
+export function resolveInvitationPhonePlaceholder(
   rawPhoneId: string | null | undefined,
   createdPhoneIds: CreatedInvitationPhone[],
   context: { correlationId?: string; userId: string; invitationId: string }
@@ -136,7 +143,25 @@ function resolveInvitationPhonePlaceholder(
   if (placeholderMatch) {
     const index = parseInt(placeholderMatch[1], 10);
     if (index >= 0 && index < createdPhoneIds.length) {
-      return createdPhoneIds[index].phoneId;
+      const slot = createdPhoneIds[index];
+      if (slot.phoneId === null) {
+        // Sentinel slot — phone emit failed for this index. Surface as a
+        // distinct warn so the silent-degradation case the card was filed
+        // to close has a diagnostic signal at exactly the failure mode.
+        console.warn(
+          `[accept-invitation v${DEPLOY_VERSION}] Placeholder phoneId resolves to a sentinel slot (phone emit failed for this index); falling back to null`,
+          {
+            rawPhoneId,
+            index,
+            phoneLabel: slot.phone.label,
+            correlationId: context.correlationId,
+            userId: context.userId,
+            invitationId: context.invitationId,
+          }
+        );
+        return null;
+      }
+      return slot.phoneId;
     }
     console.warn(
       `[accept-invitation v${DEPLOY_VERSION}] Placeholder phoneId out of range; falling back to null`,
@@ -796,7 +821,14 @@ serve(async (req) => {
 
       if (phoneError) {
         console.error(`[accept-invitation v${DEPLOY_VERSION}] Failed to emit user.phone.added for ${phone.label}:`, phoneError);
-        // Non-fatal: continue with other phones
+        // Non-fatal: continue with other phones, but push a sentinel
+        // `{ phoneId: null, phone }` to preserve index correspondence with
+        // the frontend's phones[] array. resolveInvitationPhonePlaceholder
+        // observes the null phoneId and degrades gracefully (warn + auto-
+        // select fallback) rather than silently shifting subsequent
+        // indexes — closes the silent-mis-routed-SMS bug class for
+        // partial-failure flows.
+        createdPhoneIds.push({ phoneId: null, phone });
       } else {
         console.log(`[accept-invitation v${DEPLOY_VERSION}] ✓ Phone added: ${phone.label} (${phoneId}) to user ${userId}, event_id=${phoneEventId}`);
         createdPhoneIds.push({ phoneId, phone });
@@ -840,7 +872,7 @@ serve(async (req) => {
     // If SMS is enabled but no phoneId specified (or placeholder normalized to null),
     // use first SMS-capable phone
     if (prefs.sms?.enabled && !prefs.sms?.phoneId) {
-      const smsCapablePhone = createdPhoneIds.find(p => p.phone.smsCapable);
+      const smsCapablePhone = createdPhoneIds.find(p => p.phoneId !== null && p.phone.smsCapable);
       if (smsCapablePhone) {
         prefs.sms.phoneId = smsCapablePhone.phoneId;
         console.log(`[accept-invitation v${DEPLOY_VERSION}] Auto-selected SMS phone: ${smsCapablePhone.phone.label} (${smsCapablePhone.phoneId})`);
