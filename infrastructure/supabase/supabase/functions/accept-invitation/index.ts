@@ -26,10 +26,141 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v17-phase6-phones-prefs';
+const DEPLOY_VERSION = 'v19-phone-id-resolution-hardened';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
+
+/**
+ * Phone shape carried in the invitation envelope. Mirrors the frontend's
+ * InvitationPhone type at `frontend/src/pages/users/UsersManagePage.tsx`.
+ */
+interface InvitationPhone {
+  label: string;
+  type: 'mobile' | 'office' | 'fax' | 'emergency';
+  number: string;
+  countryCode?: string;
+  smsCapable?: boolean;
+  isPrimary?: boolean;
+}
+
+/**
+ * Pairing of a freshly-minted phone UUID with the InvitationPhone payload it
+ * was created from. The accept-invitation handler builds this array in
+ * iteration order from the invitation's `phones[]`; the index correspondence
+ * is load-bearing for `resolveInvitationPhonePlaceholder` (do NOT reorder).
+ */
+interface CreatedInvitationPhone {
+  phoneId: string;
+  phone: InvitationPhone;
+}
+
+/**
+ * Resolve an `invitation-phone-N` placeholder phoneId to the real phone UUID
+ * created earlier in this invitation-acceptance flow.
+ *
+ * The frontend invitation form (`UsersManagePage.tsx:847`) generates
+ * placeholders of the form `invitation-phone-${index}` because it doesn't
+ * yet know the real UUIDs that will be minted at acceptance time. The
+ * backend is responsible for substituting the real UUID once phones exist.
+ *
+ * Pre-conditions:
+ *   - createdPhoneIds is in the same iteration order as the frontend's
+ *     phones[] array (stable insertion-order index correspondence). The
+ *     accept-invitation handler at the call site iterates phones in array
+ *     order and pushes into createdPhoneIds without reordering.
+ *   - rawPhoneId is one of: null, undefined, an `invitation-phone-N` string,
+ *     or a UUID belonging to this user's createdPhoneIds. Any other input
+ *     is normalized to null + warn.
+ *   - context: correlationId/userId/invitationId for joinable structured logs.
+ *
+ * Post-conditions:
+ *   - Returns either null or a string that is byte-identical to one of the
+ *     UUIDs in createdPhoneIds. Never returns a placeholder. Never throws.
+ *   - For input `invitation-phone-N` with N in [0, createdPhoneIds.length),
+ *     output === createdPhoneIds[N].phoneId.
+ *
+ * Cases:
+ *   - null/undefined input → null (no SMS phone selected; auto-select may fire)
+ *   - "invitation-phone-N" with N in range → createdPhoneIds[N].phoneId
+ *   - "invitation-phone-N" with N out of range → null + warn (auto-select may fire)
+ *   - Valid UUID matching an entry in createdPhoneIds → pass through
+ *   - Valid UUID NOT in createdPhoneIds → null + warn (defense in depth: prevents
+ *     a hand-crafted invitation payload from pointing this user's
+ *     sms_phone_id at another user's phone or a fabricated UUID)
+ *   - Other malformed string → null + warn (avoids silent handler ::UUID cast failure)
+ *
+ * Behavior with sms.enabled=false:
+ *   The helper is invoked unconditionally (regardless of prefs.sms.enabled)
+ *   so that any placeholder is always normalized to a clean UUID-or-null
+ *   before reaching the handler's ::UUID cast. If the inviter set SMS off
+ *   but left a placeholder selected, the projection will end up with
+ *   sms_enabled=false and sms_phone_id=<resolved UUID> — consistent with the
+ *   read-back contract of api.update_user_notification_preferences and a
+ *   harmless tombstone of the inviter's intent.
+ */
+function resolveInvitationPhonePlaceholder(
+  rawPhoneId: string | null | undefined,
+  createdPhoneIds: CreatedInvitationPhone[],
+  context: { correlationId?: string; userId: string; invitationId: string }
+): string | null {
+  if (!rawPhoneId) return null;
+
+  const placeholderMatch = rawPhoneId.match(/^invitation-phone-(\d+)$/);
+  if (placeholderMatch) {
+    const index = parseInt(placeholderMatch[1], 10);
+    if (index >= 0 && index < createdPhoneIds.length) {
+      return createdPhoneIds[index].phoneId;
+    }
+    console.warn(
+      `[accept-invitation v${DEPLOY_VERSION}] Placeholder phoneId out of range; falling back to null`,
+      {
+        rawPhoneId,
+        createdPhoneIdsLength: createdPhoneIds.length,
+        correlationId: context.correlationId,
+        userId: context.userId,
+        invitationId: context.invitationId,
+      }
+    );
+    return null;
+  }
+
+  // Validate it looks like a UUID; if not, refuse to pass through to avoid
+  // silent handler ::UUID cast failures (the bug this function exists to prevent).
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidPattern.test(rawPhoneId)) {
+    // Defense in depth: a UUID must correspond to a phone we just created
+    // for this user. Reject anything else — prevents a hand-crafted invitation
+    // payload from setting sms_phone_id to another user's phone or a
+    // fabricated UUID.
+    const isOwnedPhone = createdPhoneIds.some((p) => p.phoneId === rawPhoneId);
+    if (isOwnedPhone) {
+      return rawPhoneId;
+    }
+    console.warn(
+      `[accept-invitation v${DEPLOY_VERSION}] phoneId is a UUID but not in createdPhoneIds; falling back to null`,
+      {
+        rawPhoneId,
+        createdPhoneIdsLength: createdPhoneIds.length,
+        correlationId: context.correlationId,
+        userId: context.userId,
+        invitationId: context.invitationId,
+      }
+    );
+    return null;
+  }
+
+  console.warn(
+    `[accept-invitation v${DEPLOY_VERSION}] phoneId is neither a placeholder nor a UUID; falling back to null`,
+    {
+      rawPhoneId,
+      correlationId: context.correlationId,
+      userId: context.userId,
+      invitationId: context.invitationId,
+    }
+  );
+  return null;
+}
 
 /**
  * Supported OAuth providers (matches frontend OAuthProvider type)
@@ -596,21 +727,18 @@ serve(async (req) => {
     // ==========================================================================
     // PHASE 6: EMIT user.phone.added EVENTS FOR PHONES FROM INVITATION
     // This populates user_phones via process_user_event() trigger
+    //
+    // INVARIANT: createdPhoneIds is built in iteration order from phones[]
+    // and MUST NOT be reordered (e.g., do not sort by is_primary first).
+    // resolveInvitationPhonePlaceholder depends on stable insertion-order
+    // index correspondence with the frontend's phones[] array to map
+    // `invitation-phone-N` placeholders to real UUIDs.
     // ==========================================================================
-    interface InvitationPhone {
-      label: string;
-      type: 'mobile' | 'office' | 'fax' | 'emergency';
-      number: string;
-      countryCode?: string;
-      smsCapable?: boolean;
-      isPrimary?: boolean;
-    }
-
     const phones: InvitationPhone[] = invitation.phones || [];
     console.log(`[accept-invitation v${DEPLOY_VERSION}] Processing ${phones.length} phone(s) from invitation`);
 
-    // Track created phone IDs for potential SMS phone selection
-    const createdPhoneIds: { phoneId: string; phone: InvitationPhone }[] = [];
+    // Track created phone IDs for SMS phone selection + placeholder resolution
+    const createdPhoneIds: CreatedInvitationPhone[] = [];
 
     for (const phone of phones) {
       const phoneId = crypto.randomUUID();
@@ -668,7 +796,23 @@ serve(async (req) => {
       inApp: false,
     };
 
-    // If SMS is enabled but no phoneId specified, use first SMS-capable phone
+    // Resolve any `invitation-phone-N` placeholder phoneId to the real UUID
+    // created above. The frontend generates these placeholders at form-fill time
+    // because it doesn't yet know the real UUIDs; the backend must substitute
+    // them here, before emitting `user.notification_preferences.updated` (the
+    // handler casts phoneId to UUID and would otherwise fail). Out-of-range
+    // placeholders, foreign UUIDs, and malformed strings normalize to null,
+    // which triggers the existing auto-select fallback below.
+    if (prefs.sms) {
+      prefs.sms.phoneId = resolveInvitationPhonePlaceholder(prefs.sms.phoneId, createdPhoneIds, {
+        correlationId,
+        userId,
+        invitationId: invitation.id,
+      });
+    }
+
+    // If SMS is enabled but no phoneId specified (or placeholder normalized to null),
+    // use first SMS-capable phone
     if (prefs.sms?.enabled && !prefs.sms?.phoneId) {
       const smsCapablePhone = createdPhoneIds.find(p => p.phone.smsCapable);
       if (smsCapablePhone) {

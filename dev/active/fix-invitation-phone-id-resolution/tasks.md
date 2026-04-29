@@ -2,20 +2,21 @@
 
 ## Current Status
 
-**Phase**: 0 — locating emission site
-**Status**: 🟢 ACTIVE
+**Phase**: IMPLEMENTATION COMPLETE — awaiting commit + PR + smoke test
+**Status**: 🟢 READY-FOR-PR
 **Priority**: Medium
 
 ## Tasks
 
-- [ ] Phase 0 — Locate emission site for `user.notification_preferences.updated` during invitation acceptance (likely `accept-invitation/index.ts`)
-- [ ] Phase 0 — Read `handle_user_notification_preferences_updated` handler source; confirm the failing `::uuid` cast site
-- [ ] Phase 0 — Grep for any other `invitation-<thing>-N` placeholder patterns that might leak similarly
-- [ ] Phase 1 — Decide: substitute-before-emit vs emit-after-phones
-- [ ] Phase 2 — Implement chosen approach; add unit test for multi-phone case
-- [ ] Phase 3 — Identify affected historical users (`domain_events.processing_error LIKE '%invitation-phone-%'`); decide on backfill vs document
-- [ ] Phase 4 — Verify with fresh invitation acceptance test
-- [ ] Phase 5 — Open PR + verify CI green
+- [x] Phase 0 — Locate emission site (`accept-invitation/index.ts:682-705`); single emission point
+- [x] Phase 0 — Read `handle_user_notification_preferences_updated.sql:29-32`; confirm `::UUID` cast at COALESCE
+- [x] Phase 0 — Grep for placeholders: only `invitation-phone-${index}` exists; no equivalent emails/addresses
+- [x] Phase 1 — Approach A confirmed (substitute-before-emit; B is moot since phones already emit before prefs)
+- [x] Phase 2 — Implemented `resolveInvitationPhonePlaceholder` helper + applied at emission site; DEPLOY_VERSION → v18-phone-id-resolution
+- [x] Phase 3 — Pre-deploy regression query: 2 affected historical events on dev (test1 + test users from PR #40 smoke testing); backfill posture: document
+- [ ] Phase 4 — Manual deploy + functional verify with fresh invitation
+- [ ] Phase 5 — Commit + push + open PR
+- [ ] Post-merge — Archive card to `dev/archived/`
 
 ## Cross-references
 
