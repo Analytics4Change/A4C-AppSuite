@@ -23,6 +23,8 @@ import type {
   UpdateUserResult,
   UserPhoneResult,
   UpdateNotificationPreferencesResult,
+  ModifyUserRolesResult,
+  RoleAssignmentViolation,
   UserVoidResult,
   AddUserAddressRequest,
   UpdateUserAddressRequest,
@@ -243,9 +245,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
     try {
       log.info('Revoking invitation', { invitationId });
 
-      const { data, error } = await supabaseService.apiRpc<{
-        success: boolean;
-        error?: string;
+      const env = await supabaseService.apiRpcEnvelope<{
         eventId?: string;
         invitationId?: string;
       }>('revoke_invitation', {
@@ -253,36 +253,34 @@ export class SupabaseUserCommandService implements IUserCommandService {
         p_reason: 'Revoked by administrator',
       });
 
-      if (error) {
-        log.error('RPC error in revokeInvitation', { error });
-        if (error.code === '42501') {
+      if (!env.success) {
+        if (env.postgrestError?.code === '42501') {
           return {
             success: false,
             error: 'Access denied - insufficient permissions',
-            errorDetails: { code: 'FORBIDDEN', message: error.message },
+            errorDetails: { code: 'FORBIDDEN', message: env.error },
+          };
+        }
+        if (env.postgrestError) {
+          return {
+            success: false,
+            error: env.error,
+            errorDetails: {
+              code: 'UNKNOWN',
+              message: env.error,
+              context: { postgresCode: env.postgrestError.code, hint: env.postgrestError.hint },
+            },
           };
         }
         return {
           success: false,
-          error: error.message,
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
-            context: { postgresCode: error.code, hint: error.hint },
-          },
-        };
-      }
-
-      if (!data?.success) {
-        return {
-          success: false,
-          error: data?.error ?? 'Failed to revoke invitation',
+          error: env.error,
         };
       }
 
       log.info('Invitation revoked successfully', {
         invitationId,
-        eventId: data.eventId,
+        eventId: env.eventId,
       });
       return { success: true };
     } catch (error) {
@@ -458,9 +456,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
     try {
       log.info('Deleting user', { userId, reason });
 
-      const { data, error } = await supabaseService.apiRpc<{
-        success: boolean;
-        error?: string;
+      const env = await supabaseService.apiRpcEnvelope<{
         eventId?: string;
         userId?: string;
       }>('delete_user', {
@@ -468,38 +464,36 @@ export class SupabaseUserCommandService implements IUserCommandService {
         p_reason: reason ?? 'Manual delete',
       });
 
-      if (error) {
-        log.error('RPC error in deleteUser', { error });
-        if (error.code === '42501') {
+      if (!env.success) {
+        if (env.postgrestError?.code === '42501') {
           return {
             success: false,
             error: 'Access denied - insufficient permissions',
-            errorDetails: { code: 'FORBIDDEN', message: error.message },
+            errorDetails: { code: 'FORBIDDEN', message: env.error },
+          };
+        }
+        if (env.postgrestError) {
+          return {
+            success: false,
+            error: env.error,
+            errorDetails: {
+              code: 'UNKNOWN',
+              message: env.error,
+              context: { postgresCode: env.postgrestError.code, hint: env.postgrestError.hint },
+            },
           };
         }
         return {
           success: false,
-          error: error.message,
+          error: env.error,
           errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
-            context: { postgresCode: error.code, hint: error.hint },
+            code: env.error.toLowerCase().includes('already deleted') ? 'USER_ACTIVE' : 'UNKNOWN',
+            message: env.error,
           },
         };
       }
 
-      if (!data?.success) {
-        return {
-          success: false,
-          error: data?.error ?? 'Failed to delete user',
-          errorDetails: {
-            code: data?.error?.includes('already deleted') ? 'USER_ACTIVE' : 'UNKNOWN',
-            message: data?.error ?? 'Unknown error',
-          },
-        };
-      }
-
-      log.info('User deleted successfully', { userId, eventId: data.eventId });
+      log.info('User deleted successfully', { userId, eventId: env.eventId });
       return { success: true };
     } catch (error) {
       log.error('Error in deleteUser', error);
@@ -555,9 +549,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
       // `User` so VMs can patch in place. Baseline_v4 handler path:
       //   emit user.profile.updated → handle_user_profile_updated
       //   → UPDATE public.users → read-back here.
-      const { data, error } = await supabaseService.apiRpc<{
-        success: boolean;
-        error?: string;
+      const env = await supabaseService.apiRpcEnvelope<{
         event_id?: string;
         user?: {
           id: string;
@@ -578,46 +570,41 @@ export class SupabaseUserCommandService implements IUserCommandService {
         p_last_name: request.lastName ?? null,
       });
 
-      if (error) {
-        log.error('RPC error updating user', { error });
+      if (!env.success) {
+        if (env.postgrestError) {
+          log.error('RPC error updating user', { error: env.error });
+          return {
+            success: false,
+            error: env.error,
+            errorDetails: { code: 'RPC_ERROR', message: env.error },
+          };
+        }
+        log.warn('User update failed', { error: env.error });
         return {
           success: false,
-          error: error.message,
-          errorDetails: { code: 'RPC_ERROR', message: error.message },
-        };
-      }
-
-      // RPC returns {success, error?, event_id?, user?}
-      if (!data?.success) {
-        log.warn('User update failed', { error: data?.error });
-        return {
-          success: false,
-          error: data?.error || 'Update failed',
-          errorDetails: {
-            code: 'UPDATE_FAILED',
-            message: data?.error || 'Unknown error',
-          },
+          error: env.error,
+          errorDetails: { code: 'UPDATE_FAILED', message: env.error },
         };
       }
 
       log.info('User profile updated successfully', {
         userId: request.userId,
-        eventId: data.event_id,
+        eventId: env.event_id,
       });
 
       // Map snake_case row → camelCase User
-      const user = data.user
+      const user = env.user
         ? {
-            id: data.user.id,
-            email: data.user.email,
-            firstName: data.user.first_name,
-            lastName: data.user.last_name,
-            name: data.user.name,
-            currentOrganizationId: data.user.current_organization_id,
-            isActive: data.user.is_active,
-            createdAt: new Date(data.user.created_at),
-            updatedAt: new Date(data.user.updated_at),
-            lastLoginAt: data.user.last_login_at ? new Date(data.user.last_login_at) : null,
+            id: env.user.id,
+            email: env.user.email,
+            firstName: env.user.first_name,
+            lastName: env.user.last_name,
+            name: env.user.name,
+            currentOrganizationId: env.user.current_organization_id,
+            isActive: env.user.is_active,
+            createdAt: new Date(env.user.created_at),
+            updatedAt: new Date(env.user.updated_at),
+            lastLoginAt: env.user.last_login_at ? new Date(env.user.last_login_at) : null,
           }
         : undefined;
 
@@ -634,15 +621,17 @@ export class SupabaseUserCommandService implements IUserCommandService {
   }
 
   /**
-   * Modify roles for a user (add and/or remove)
+   * Modify roles for a user (add and/or remove).
    *
-   * Calls manage-user Edge Function with modify_roles operation.
-   * Emits user.role.assigned for each added role and user.role.revoked for each removed role.
+   * Calls `api.modify_user_roles` SQL RPC (extracted from manage-user Edge Function
+   * per `adr-edge-function-vs-sql-rpc.md`). Multi-event Pattern A v2: emits
+   * `user.role.revoked` then `user.role.assigned` events; the RPC validates the
+   * union of adds + removes via `validate_role_assignment` (closes the revoke-side
+   * gap that existed in the legacy Edge Function path).
    */
-  async modifyRoles(request: ModifyRolesRequest): Promise<UserVoidResult> {
-    const client = supabaseService.getClient();
+  async modifyRoles(request: ModifyRolesRequest): Promise<ModifyUserRolesResult> {
     const tracingContext = await createTracingContext();
-    const headers = buildHeadersFromContext(tracingContext);
+    Logger.pushTracingContext(tracingContext);
 
     log.debug('Modifying user roles', {
       userId: request.userId,
@@ -651,54 +640,98 @@ export class SupabaseUserCommandService implements IUserCommandService {
     });
 
     try {
-      const { data, error } = await client.functions.invoke(EDGE_FUNCTIONS.MANAGE_USER, {
-        body: {
-          operation: 'modify_roles',
-          userId: request.userId,
-          roleIdsToAdd: request.roleIdsToAdd,
-          roleIdsToRemove: request.roleIdsToRemove,
-        },
-        headers,
+      const env = await supabaseService.apiRpcEnvelope<{
+        userId?: string;
+        addedRoleEventIds?: string[];
+        removedRoleEventIds?: string[];
+      }>('modify_user_roles', {
+        p_user_id: request.userId,
+        p_role_ids_to_add: request.roleIdsToAdd,
+        p_role_ids_to_remove: request.roleIdsToRemove,
+        p_reason: 'Roles modified via User Management',
       });
 
-      if (error) {
-        const errorInfo = await extractEdgeFunctionError(error, 'Modify roles');
-        const errorMessage = errorInfo.correlationId
-          ? `${errorInfo.message} (Ref: ${errorInfo.correlationId})`
-          : errorInfo.message;
-        return {
-          success: false,
-          error: errorMessage,
-          errorDetails: {
-            code: (errorInfo.code ?? 'UNKNOWN') as UserOperationErrorCode,
-            message: errorInfo.message,
-            context:
-              errorInfo.errorDetails ??
-              (errorInfo.details ? { details: errorInfo.details } : undefined),
-            correlationId: errorInfo.correlationId,
-          },
-        };
-      }
+      if (!env.success) {
+        // PostgrestError-shaped failure (transport / unexpected SQL errors)
+        if (env.postgrestError) {
+          if (env.postgrestError.code === '42501') {
+            return {
+              success: false,
+              error: 'Access denied - insufficient permissions',
+              errorDetails: { code: 'FORBIDDEN', message: env.error },
+            };
+          }
+          return {
+            success: false,
+            error: env.error,
+            errorDetails: {
+              code: 'RPC_ERROR',
+              message: env.error,
+              context: { postgresCode: env.postgrestError.code, hint: env.postgrestError.hint },
+            },
+          };
+        }
 
-      if (!data?.success) {
+        // VALIDATION_FAILED — propagate per-role violations
+        if (env.error === 'VALIDATION_FAILED' && env.violations) {
+          return {
+            success: false,
+            error: env.error,
+            violations: env.violations as RoleAssignmentViolation[],
+            errorDetails: {
+              code: 'VALIDATION_FAILED',
+              message: env.violations[0]?.message ?? 'Role assignment validation failed',
+            },
+          };
+        }
+
+        // PARTIAL_FAILURE — pass through partial state (CR-2 contract)
+        if (env.partial) {
+          return {
+            success: false,
+            error: env.error,
+            partial: true,
+            failureIndex: env.failureIndex,
+            failureSection: env.failureSection,
+            processingError: env.processingError,
+            userId: env.userId,
+            addedRoleEventIds: env.addedRoleEventIds,
+            removedRoleEventIds: env.removedRoleEventIds,
+            errorDetails: {
+              code: 'PARTIAL_FAILURE',
+              message: env.processingError ?? env.error,
+            },
+          };
+        }
+
+        // NOT_FOUND / TARGET_DEACTIVATED / PROCESSING_ERROR / INVALID_INPUT
+        const code = (env.errorDetails?.code as UserOperationErrorCode | undefined) ?? 'UNKNOWN';
         return {
           success: false,
-          error: data?.error ?? 'Failed to modify roles',
+          error: env.error,
+          userId: env.userId,
+          addedRoleEventIds: env.addedRoleEventIds,
+          removedRoleEventIds: env.removedRoleEventIds,
           errorDetails: {
-            code: (data?.errorDetails?.code as UserOperationErrorCode) ?? 'UNKNOWN',
-            message: data?.error ?? 'Unknown error',
-            context: data?.errorDetails,
+            code,
+            message: env.errorDetails?.message ?? env.error,
+            context: env.errorDetails?.context,
           },
         };
       }
 
       log.info('User roles modified successfully', {
         userId: request.userId,
-        rolesAdded: request.roleIdsToAdd.length,
-        rolesRemoved: request.roleIdsToRemove.length,
+        rolesAdded: env.addedRoleEventIds?.length ?? 0,
+        rolesRemoved: env.removedRoleEventIds?.length ?? 0,
       });
 
-      return { success: true };
+      return {
+        success: true,
+        userId: env.userId,
+        addedRoleEventIds: env.addedRoleEventIds,
+        removedRoleEventIds: env.removedRoleEventIds,
+      };
     } catch (err) {
       log.error('Unexpected error modifying user roles', { error: err });
       return {
@@ -709,6 +742,8 @@ export class SupabaseUserCommandService implements IUserCommandService {
           message: err instanceof Error ? err.message : 'Unknown error',
         },
       };
+    } finally {
+      Logger.popTracingContext();
     }
   }
 
@@ -830,8 +865,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
       // Pattern A v2 (migration 20260423232531): api.add_user_phone returns
       // the full phone entity in camelCase (jsonb_build_object with explicit
       // keys) so no adapter step is needed.
-      const { data, error } = await supabaseService.apiRpc<{
-        success: boolean;
+      const env = await supabaseService.apiRpcEnvelope<{
         phoneId: string;
         eventId: string;
         phone?: {
@@ -849,7 +883,6 @@ export class SupabaseUserCommandService implements IUserCommandService {
           createdAt: string;
           updatedAt: string;
         };
-        error?: string;
       }>('add_user_phone', {
         p_user_id: request.userId,
         p_label: request.label,
@@ -863,51 +896,45 @@ export class SupabaseUserCommandService implements IUserCommandService {
         p_reason: request.reason ?? null,
       });
 
-      if (error) {
-        log.error('Failed to add user phone via RPC', error);
-
-        if (error.code === '42501') {
+      if (!env.success) {
+        if (env.postgrestError?.code === '42501') {
           return {
             success: false,
             error: 'Access denied - insufficient permissions',
-            errorDetails: { code: 'FORBIDDEN', message: error.message },
+            errorDetails: { code: 'FORBIDDEN', message: env.error },
           };
         }
-
+        if (env.postgrestError) {
+          log.error('Failed to add user phone via RPC', { error: env.error });
+          return {
+            success: false,
+            error: `Failed to add phone: ${env.error}`,
+            errorDetails: { code: 'UNKNOWN', message: env.error },
+          };
+        }
+        // Pattern A v2 read-back failure envelope
         return {
           success: false,
-          error: `Failed to add phone: ${error.message}`,
-          errorDetails: { code: 'UNKNOWN', message: error.message },
-        };
-      }
-
-      // Pattern A v2 read-back failure envelope
-      if (data && data.success === false) {
-        return {
-          success: false,
-          error: data.error ?? 'Event processing failed',
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: data.error ?? 'Event processing failed',
-          },
+          error: env.error,
+          errorDetails: { code: 'UNKNOWN', message: env.error },
         };
       }
 
       log.info('User phone added successfully', {
         userId: request.userId,
-        phoneId: data?.phoneId,
+        phoneId: env.phoneId,
       });
 
       // Migration returns camelCase already; parse date strings to Date.
-      const phone = data?.phone
+      const phone = env.phone
         ? {
-            ...data.phone,
-            createdAt: new Date(data.phone.createdAt),
-            updatedAt: new Date(data.phone.updatedAt),
+            ...env.phone,
+            createdAt: new Date(env.phone.createdAt),
+            updatedAt: new Date(env.phone.updatedAt),
           }
         : undefined;
 
-      return { success: true, phoneId: data?.phoneId, phone };
+      return { success: true, phoneId: env.phoneId, phone };
     } catch (error) {
       log.error('Error in addUserPhone', error);
       return {
@@ -937,8 +964,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
       // phone row (baseline_v4 L6585, `row_to_json(v_row)::jsonb` — snake_case).
       // We map it to the camelCase `UserPhone` type before handing to consumers
       // so VMs can patch their list in place without a shape-normalizer step.
-      const { data, error } = await supabaseService.apiRpc<{
-        success: boolean;
+      const env = await supabaseService.apiRpcEnvelope<{
         phoneId: string;
         eventId: string;
         phone?: {
@@ -956,7 +982,6 @@ export class SupabaseUserCommandService implements IUserCommandService {
           created_at: string;
           updated_at: string;
         };
-        error?: string;
       }>('update_user_phone', {
         p_phone_id: request.phoneId,
         p_label: request.updates.label ?? null,
@@ -970,62 +995,55 @@ export class SupabaseUserCommandService implements IUserCommandService {
         p_reason: request.reason ?? null,
       });
 
-      if (error) {
-        log.error('Failed to update user phone via RPC', error);
-
-        if (error.code === '42501') {
+      if (!env.success) {
+        if (env.postgrestError?.code === '42501') {
           return {
             success: false,
             error: 'Access denied - insufficient permissions',
-            errorDetails: { code: 'FORBIDDEN', message: error.message },
+            errorDetails: { code: 'FORBIDDEN', message: env.error },
           };
         }
-        if (error.code === 'P0002') {
+        if (env.postgrestError?.code === 'P0002') {
           return {
             success: false,
             error: 'Phone not found',
-            errorDetails: { code: 'NOT_FOUND', message: error.message },
+            errorDetails: { code: 'NOT_FOUND', message: env.error },
           };
         }
-
+        if (env.postgrestError) {
+          log.error('Failed to update user phone via RPC', { error: env.error });
+          return {
+            success: false,
+            error: `Failed to update phone: ${env.error}`,
+            errorDetails: { code: 'UNKNOWN', message: env.error },
+          };
+        }
+        // Pattern A v2 read-back: handler-driven failure
         return {
           success: false,
-          error: `Failed to update phone: ${error.message}`,
-          errorDetails: { code: 'UNKNOWN', message: error.message },
-        };
-      }
-
-      // Pattern A v2 read-back: handler-driven failure path surfaces the
-      // `processing_error` via a `{success: false}` envelope. Propagate.
-      if (data && data.success === false) {
-        return {
-          success: false,
-          error: data.error ?? 'Event processing failed',
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: data.error ?? 'Event processing failed',
-          },
+          error: env.error,
+          errorDetails: { code: 'UNKNOWN', message: env.error },
         };
       }
 
       log.info('User phone updated successfully', { phoneId: request.phoneId });
 
       // Map snake_case row → camelCase UserPhone for consumer VMs.
-      const phone = data?.phone
+      const phone = env.phone
         ? {
-            id: data.phone.id,
-            userId: data.phone.user_id,
-            orgId: data.phone.org_id,
-            label: data.phone.label,
-            type: data.phone.type,
-            number: data.phone.number,
-            extension: data.phone.extension,
-            countryCode: data.phone.country_code,
-            isPrimary: data.phone.is_primary,
-            smsCapable: data.phone.sms_capable,
-            isActive: data.phone.is_active,
-            createdAt: new Date(data.phone.created_at),
-            updatedAt: new Date(data.phone.updated_at),
+            id: env.phone.id,
+            userId: env.phone.user_id,
+            orgId: env.phone.org_id,
+            label: env.phone.label,
+            type: env.phone.type,
+            number: env.phone.number,
+            extension: env.phone.extension,
+            countryCode: env.phone.country_code,
+            isPrimary: env.phone.is_primary,
+            smsCapable: env.phone.sms_capable,
+            isActive: env.phone.is_active,
+            createdAt: new Date(env.phone.created_at),
+            updatedAt: new Date(env.phone.updated_at),
           }
         : undefined;
 
@@ -1056,8 +1074,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
         orgId: request.orgId,
       });
 
-      const { data: _removeData, error } = await supabaseService.apiRpc<{
-        success: boolean;
+      const env = await supabaseService.apiRpcEnvelope<{
         phoneId: string;
         eventId: string;
       }>('remove_user_phone', {
@@ -1067,28 +1084,33 @@ export class SupabaseUserCommandService implements IUserCommandService {
         p_reason: request.reason ?? null,
       });
 
-      if (error) {
-        log.error('Failed to remove user phone via RPC', error);
-
-        if (error.code === '42501') {
+      if (!env.success) {
+        if (env.postgrestError?.code === '42501') {
           return {
             success: false,
             error: 'Access denied - insufficient permissions',
-            errorDetails: { code: 'FORBIDDEN', message: error.message },
+            errorDetails: { code: 'FORBIDDEN', message: env.error },
           };
         }
-        if (error.code === 'P0002') {
+        if (env.postgrestError?.code === 'P0002') {
           return {
             success: false,
             error: 'Phone not found',
-            errorDetails: { code: 'NOT_FOUND', message: error.message },
+            errorDetails: { code: 'NOT_FOUND', message: env.error },
           };
         }
-
+        if (env.postgrestError) {
+          log.error('Failed to remove user phone via RPC', { error: env.error });
+          return {
+            success: false,
+            error: `Failed to remove phone: ${env.error}`,
+            errorDetails: { code: 'UNKNOWN', message: env.error },
+          };
+        }
         return {
           success: false,
-          error: `Failed to remove phone: ${error.message}`,
-          errorDetails: { code: 'UNKNOWN', message: error.message },
+          error: env.error,
+          errorDetails: { code: 'UNKNOWN', message: env.error },
         };
       }
 
@@ -1215,9 +1237,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
       // api.update_user_notification_preferences (Pattern A v2 RPC, extracted
       // from manage-user Edge Function per adr-edge-function-vs-sql-rpc.md).
       // org_id sourced from JWT inside the RPC; never passed from the client.
-      const { data, error } = await supabaseService.apiRpc<{
-        success: boolean;
-        error?: string;
+      const env = await supabaseService.apiRpcEnvelope<{
         eventId?: string;
         notificationPreferences?: {
           email: boolean;
@@ -1230,41 +1250,37 @@ export class SupabaseUserCommandService implements IUserCommandService {
         p_reason: request.reason,
       });
 
-      if (error) {
-        log.error('RPC error in updateNotificationPreferences', { error });
+      if (!env.success) {
+        if (env.postgrestError) {
+          log.error('RPC error in updateNotificationPreferences', { error: env.error });
+          return {
+            success: false,
+            error: env.error,
+            errorDetails: {
+              code: 'UNKNOWN',
+              message: env.error,
+              context: { postgresCode: env.postgrestError.code, hint: env.postgrestError.hint },
+            },
+          };
+        }
         return {
           success: false,
-          error: error.message,
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
-            context: { postgresCode: error.code, hint: error.hint },
-          },
-        };
-      }
-
-      if (!data?.success) {
-        return {
-          success: false,
-          error: data?.error ?? 'Failed to update notification preferences',
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: data?.error ?? 'Unknown error',
-          },
+          error: env.error,
+          errorDetails: { code: 'UNKNOWN', message: env.error },
         };
       }
 
       log.info('Notification preferences updated successfully', {
         userId: request.userId,
-        eventId: data.eventId,
+        eventId: env.eventId,
       });
 
       // Map RPC's AsyncAPI snake_case response → frontend camelCase
       // NotificationPreferences shape. Contract: RPC always includes the
       // notificationPreferences field on success (Pattern A v2 readback).
       let notificationPreferences: NotificationPreferences | undefined;
-      if (data.notificationPreferences) {
-        const p = data.notificationPreferences;
+      if (env.notificationPreferences) {
+        const p = env.notificationPreferences;
         notificationPreferences = {
           email: p.email,
           sms: {

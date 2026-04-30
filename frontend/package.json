@@ -9,6 +9,7 @@
     "build": "npm run sync-schemas && tsc && vite build",
     "preview": "vite preview",
     "sync-schemas": "node scripts/sync-schemas.cjs",
+    "gen:rpc-registry": "node scripts/gen-rpc-registry.cjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "prepare": "husky",

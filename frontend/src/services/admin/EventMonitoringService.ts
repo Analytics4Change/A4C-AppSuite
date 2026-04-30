@@ -53,19 +53,6 @@ interface GetFailedEventsRpcResponse {
   total_count: number;
 }
 
-interface RetryEventRpcResponse {
-  success: boolean;
-  event_id: string;
-  new_error: string | null;
-  retried_at: string;
-}
-
-interface DismissEventRpcResponse {
-  success: boolean;
-  message?: string;
-  error?: string;
-}
-
 interface GetStatsRpcResponse {
   total_events: number;
   failed_events: number;
@@ -251,66 +238,51 @@ export class EventMonitoringService {
     try {
       log.info('Retrying failed event', { eventId });
 
-      const { data, error } = await supabaseService.apiRpc<RetryEventRpcResponse>(
-        'retry_failed_event',
-        {
-          p_event_id: eventId,
-        }
-      );
+      const env = await supabaseService.apiRpcEnvelope<{
+        event_id: string;
+        new_error: string | null;
+        retried_at: string;
+      }>('retry_failed_event', { p_event_id: eventId });
 
-      if (error) {
-        log.error('Failed to retry event', { eventId, error });
-
-        // Handle permission errors
-        if (error.code === '42501' || error.message?.includes('permission denied')) {
+      if (!env.success) {
+        log.error('Failed to retry event', { eventId, error: env.error });
+        if (env.postgrestError?.code === '42501' || env.error?.includes('permission denied')) {
           return {
             success: false,
             error: 'Access denied. Platform administrator access required.',
             errorCode: 'FORBIDDEN',
           };
         }
-
-        // Handle not found
-        if (error.code === 'P0002' || error.message?.includes('not found')) {
+        if (env.postgrestError?.code === 'P0002' || env.error?.includes('not found')) {
           return {
             success: false,
             error: 'Event not found or has no processing error.',
             errorCode: 'NOT_FOUND',
           };
         }
-
         return {
           success: false,
-          error: `Failed to retry event: ${error.message}`,
+          error: `Failed to retry event: ${env.error}`,
           errorCode: 'RPC_ERROR',
         };
       }
 
-      if (!data) {
-        return {
-          success: false,
-          error: 'No response from retry operation',
-          errorCode: 'RPC_ERROR',
-        };
-      }
-
-      // PII mask: data.new_error comes from api.retry_failed_event which returns the raw
+      // PII mask: env.new_error comes from api.retry_failed_event which returns the raw
       // domain_events.processing_error column. Mask before logging or surfacing to UI.
-      const maskedNewError = maskPii(data.new_error);
+      const maskedNewError = maskPii(env.new_error);
 
       log.info('Event retry completed', {
         eventId,
-        success: data.success,
         newError: maskedNewError,
       });
 
       return {
         success: true,
         data: {
-          success: data.success,
-          event_id: data.event_id,
+          success: true,
+          event_id: env.event_id,
           new_error: maskedNewError || null,
-          retried_at: data.retried_at,
+          retried_at: env.retried_at,
         },
       };
     } catch (error) {
@@ -352,53 +324,37 @@ export class EventMonitoringService {
     try {
       log.info('Dismissing failed event', { eventId, reason });
 
-      const { data, error } = await supabaseService.apiRpc<DismissEventRpcResponse>(
-        'dismiss_failed_event',
-        {
-          p_event_id: eventId,
-          p_reason: reason ?? null,
-        }
-      );
+      const env = await supabaseService.apiRpcEnvelope<{
+        message?: string;
+      }>('dismiss_failed_event', {
+        p_event_id: eventId,
+        p_reason: reason ?? null,
+      });
 
-      if (error) {
-        log.error('Failed to dismiss event', { eventId, error });
-
-        // Handle permission errors
-        if (error.code === '42501' || error.message?.includes('permission denied')) {
+      if (!env.success) {
+        log.error('Failed to dismiss event', { eventId, error: env.error });
+        if (env.postgrestError?.code === '42501' || env.error?.includes('permission denied')) {
           return {
             success: false,
             error: 'Access denied. Platform administrator access required.',
             errorCode: 'FORBIDDEN',
           };
         }
-
         return {
           success: false,
-          error: `Failed to dismiss event: ${error.message}`,
+          error: `Failed to dismiss event: ${env.error}`,
           errorCode: 'RPC_ERROR',
         };
       }
 
-      if (!data) {
-        return {
-          success: false,
-          error: 'No response from dismiss operation',
-          errorCode: 'RPC_ERROR',
-        };
-      }
-
-      log.info('Event dismiss completed', {
-        eventId,
-        success: data.success,
-        error: data.error,
-      });
+      log.info('Event dismiss completed', { eventId });
 
       return {
         success: true,
         data: {
-          success: data.success,
-          message: data.message,
-          error: data.error,
+          success: true,
+          message: env.message,
+          error: undefined,
         },
       };
     } catch (error) {
@@ -434,52 +390,34 @@ export class EventMonitoringService {
     try {
       log.info('Undismissing failed event', { eventId });
 
-      const { data, error } = await supabaseService.apiRpc<DismissEventRpcResponse>(
-        'undismiss_failed_event',
-        {
-          p_event_id: eventId,
-        }
-      );
+      const env = await supabaseService.apiRpcEnvelope<{
+        message?: string;
+      }>('undismiss_failed_event', { p_event_id: eventId });
 
-      if (error) {
-        log.error('Failed to undismiss event', { eventId, error });
-
-        // Handle permission errors
-        if (error.code === '42501' || error.message?.includes('permission denied')) {
+      if (!env.success) {
+        log.error('Failed to undismiss event', { eventId, error: env.error });
+        if (env.postgrestError?.code === '42501' || env.error?.includes('permission denied')) {
           return {
             success: false,
             error: 'Access denied. Platform administrator access required.',
             errorCode: 'FORBIDDEN',
           };
         }
-
         return {
           success: false,
-          error: `Failed to undismiss event: ${error.message}`,
+          error: `Failed to undismiss event: ${env.error}`,
           errorCode: 'RPC_ERROR',
         };
       }
 
-      if (!data) {
-        return {
-          success: false,
-          error: 'No response from undismiss operation',
-          errorCode: 'RPC_ERROR',
-        };
-      }
-
-      log.info('Event undismiss completed', {
-        eventId,
-        success: data.success,
-        error: data.error,
-      });
+      log.info('Event undismiss completed', { eventId });
 
       return {
         success: true,
         data: {
-          success: data.success,
-          message: data.message,
-          error: data.error,
+          success: true,
+          message: env.message,
+          error: undefined,
         },
       };
     } catch (error) {

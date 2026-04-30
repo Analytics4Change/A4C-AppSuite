@@ -179,6 +179,36 @@ Affected functions: `accept-invitation`, `invite-user`, `manage-user`, `organiza
 
 **ESLint rule (deferred)**: a `no-restricted-syntax` rule forbidding direct `.schema('api').rpc(` outside `supabase.service.ts` and `envelope.ts` is **planned** but not yet shipped — the repo's `--max-warnings 0` lint policy means the rule cannot ship until existing call sites (~70 across 8 services) are migrated to `apiRpcEnvelope<T>`. Rule + bulk migration land together in a follow-up card.
 
+### Type-level enforcement (M3)
+
+Layered on top of the runtime SDK-boundary masking, the **RPC return-shape registry** catches the wrong-helper-for-shape mistake at compile time, before runtime PII-leak exposure can occur.
+
+**Source of truth**: `COMMENT ON FUNCTION api.<name>(...) IS '<existing description>\n\n@a4c-rpc-shape: envelope|read'`. Every `api.*` RPC carries the tag (backfilled in migration `20260430172625_backfill_rpc_shape_comments.sql`; corrections in `20260430172836_fix_rpc_shape_classifications.sql`).
+
+**Codegen**: `frontend/scripts/gen-rpc-registry.cjs` reads `pg_description.description` for every `api.*` function, parses the tag, and emits `frontend/src/services/api/rpc-registry.generated.ts`:
+
+```typescript
+export type EnvelopeRpcs    = 'create_role' | 'modify_user_roles' | 'update_user' | ...;
+export type ReadRpcs        = 'list_users' | 'get_role_by_id' | ...;
+export type UncategorizedRpcs = never;  // populated when tags missing
+```
+
+**Helper narrowing**: `apiRpc<T>` and `apiRpcEnvelope<T>` constrain the `functionName` parameter to `ReadRpcs` and `EnvelopeRpcs` respectively. Mistakes surface as `error TS2345: Argument of type '"update_user"' is not assignable to parameter of type 'ReadRpcs'` rather than runtime envelope-confusion.
+
+**CI gate**: `.github/workflows/rpc-registry-sync.yml` runs against a locally-seeded Supabase container (deterministic anchor — independent of dev/prod state) and fails when:
+1. The committed `rpc-registry.generated.ts` diverges from the migration state.
+2. `UncategorizedRpcs` resolves to anything other than `never` (missing tag).
+
+**DROP + CREATE re-tag rule**: `COMMENT ON FUNCTION` is keyed to the function OID. `CREATE OR REPLACE` (same signature) preserves the tag; `DROP FUNCTION` + `CREATE FUNCTION` (signature change) does NOT — the new OID has no comment. Any DROP+CREATE migration MUST re-issue the `@a4c-rpc-shape:` `COMMENT ON FUNCTION`. Codified as Rule 17 in `infrastructure-guidelines/SKILL.md` and in the `RPC Shape Registry` section of `infrastructure/supabase/CLAUDE.md`.
+
+**Overload-disagreement check**: the codegen FAILs when two overloads of the same `proname` carry different shape tags, surfacing the conflicting OIDs/argument-lists.
+
+**Choosing the tag**:
+- `envelope` — Pattern A v2 `{success: true|false, error?, ...}` shape (writes plus reads that wrap their result in the envelope).
+- `read` — raw data (table/array/scalar/jsonb without a top-level `success` discriminator).
+
+**Documentation surfaces**: `infrastructure-guidelines/SKILL.md` Rule 17 (shape-comment + DROP+CREATE rule); `frontend-dev-guidelines/SKILL.md` Rule 11 (helper-narrowing); `frontend/src/services/CLAUDE.md` §3 (registry contract + workflow); `infrastructure/supabase/CLAUDE.md` § RPC Shape Registry; `MEMORY.md` Key Patterns.
+
 ## Contract
 
 ### Request → Response shapes

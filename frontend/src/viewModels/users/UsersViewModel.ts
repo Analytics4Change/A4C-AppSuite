@@ -49,6 +49,7 @@ import type {
   InviteUserResult,
   UserPhoneResult,
   UpdateNotificationPreferencesResult,
+  ModifyUserRolesResult,
   UserVoidResult,
   InviteUserRequest,
   ModifyRolesRequest,
@@ -1148,9 +1149,16 @@ export class UsersViewModel {
   // ============================================
 
   /**
-   * Modify roles for a user (add and/or remove)
+   * Modify roles for a user (add and/or remove).
+   *
+   * Surfaces structured failure shapes from `api.modify_user_roles`:
+   *   - VALIDATION_FAILED: per-role violations (first message displayed; full
+   *     list available on `result.violations` for richer UI later).
+   *   - PARTIAL_FAILURE: events emitted before mid-loop failure are reflected
+   *     in `result.added/removedRoleEventIds`; surfaced as a distinct error.
+   *   - NOT_FOUND / TARGET_DEACTIVATED / FORBIDDEN: standard envelope errors.
    */
-  async modifyRoles(request: ModifyRolesRequest): Promise<UserVoidResult> {
+  async modifyRoles(request: ModifyRolesRequest): Promise<ModifyUserRolesResult> {
     log.debug('Modifying roles', { userId: request.userId });
 
     runInAction(() => {
@@ -1167,6 +1175,22 @@ export class UsersViewModel {
         if (result.success) {
           this.successMessage = 'Roles updated';
           log.info('Roles modified', { userId: request.userId });
+        } else if (result.violations && result.violations.length > 0) {
+          // Display first violation message; details exposed on result.violations
+          const summary =
+            result.violations.length === 1
+              ? result.violations[0].message
+              : `${result.violations.length} role assignment violations: ${result.violations[0].message}`;
+          this.error = summary;
+          log.warn('Role assignment violations', { violations: result.violations });
+        } else if (result.partial) {
+          this.error = `Partial failure (${result.failureSection} #${result.failureIndex}): ${result.processingError ?? result.error}`;
+          log.warn('modifyRoles partial failure', {
+            failureSection: result.failureSection,
+            failureIndex: result.failureIndex,
+            addedCount: result.addedRoleEventIds?.length ?? 0,
+            removedCount: result.removedRoleEventIds?.length ?? 0,
+          });
         } else {
           this.error = result.error ?? 'Failed to modify roles';
           log.warn('Failed to modify roles', { error: result.error });

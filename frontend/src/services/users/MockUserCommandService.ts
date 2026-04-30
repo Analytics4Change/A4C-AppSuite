@@ -23,6 +23,7 @@ import type {
   UpdateUserResult,
   UserPhoneResult,
   UpdateNotificationPreferencesResult,
+  ModifyUserRolesResult,
   UserVoidResult,
   User,
   Invitation,
@@ -430,7 +431,7 @@ export class MockUserCommandService implements IUserCommandService {
     return { success: true, user: refreshed.user ?? undefined };
   }
 
-  async modifyRoles(request: ModifyRolesRequest): Promise<UserVoidResult> {
+  async modifyRoles(request: ModifyRolesRequest): Promise<ModifyUserRolesResult> {
     await this.simulateDelay();
     log.debug('Mock: Modifying roles', { userId: request.userId });
 
@@ -460,7 +461,15 @@ export class MockUserCommandService implements IUserCommandService {
       if (!roleToAdd) {
         return {
           success: false,
-          error: 'Cannot assign unknown role',
+          error: 'VALIDATION_FAILED',
+          violations: [
+            {
+              role_id: roleId,
+              role_name: null,
+              error_code: 'ROLE_NOT_FOUND',
+              message: `Role ${roleId} not found`,
+            },
+          ],
           errorDetails: {
             code: 'SUBSET_ONLY_VIOLATION',
             message: `Role ${roleId} not found`,
@@ -478,7 +487,12 @@ export class MockUserCommandService implements IUserCommandService {
       roleCount: updatedRoles.length,
     });
 
-    return { success: true };
+    return {
+      success: true,
+      userId: request.userId,
+      addedRoleEventIds: request.roleIdsToAdd.map((id, i) => `mock-add-event-${i}-${id}`),
+      removedRoleEventIds: request.roleIdsToRemove.map((id, i) => `mock-remove-event-${i}-${id}`),
+    };
   }
 
   async addUserToOrganization(

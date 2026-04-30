@@ -2,6 +2,7 @@ import { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/utils/logger';
 import { unwrapApiEnvelope, maskPostgrestError, type ApiEnvelope } from '@/services/api/envelope';
+import type { EnvelopeRpcs, ReadRpcs } from '@/services/api/rpc-registry.generated';
 
 const log = Logger.getLogger('api');
 
@@ -118,7 +119,7 @@ class SupabaseService {
    * @see dev/active/migrate-services-to-api-rpc-envelope/ — bulk-migration follow-up
    */
   async apiRpc<T>(
-    functionName: string,
+    functionName: ReadRpcs,
     params: Record<string, unknown>
   ): Promise<{ data: T | null; error: PostgrestError | null }> {
     const apiClient = this.client as AnySchemaSupabaseClient;
@@ -159,7 +160,7 @@ class SupabaseService {
    * ```
    */
   async apiRpcEnvelope<T extends Record<string, unknown> = Record<string, never>>(
-    functionName: string,
+    functionName: EnvelopeRpcs,
     params: Record<string, unknown>
   ): Promise<ApiEnvelope<T>> {
     const apiClient = this.client as AnySchemaSupabaseClient;
