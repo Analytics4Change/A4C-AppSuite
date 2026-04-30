@@ -198,4 +198,11 @@ function main() {
   );
 }
 
-main();
+// Export pure internals for unit testing without invoking main() (which
+// shells out to psql). The `if (require.main === module)` guard ensures
+// `require('./gen-rpc-registry.cjs')` from a test file does NOT auto-run.
+module.exports = { classify, emitUnion };
+
+if (require.main === module) {
+  main();
+}

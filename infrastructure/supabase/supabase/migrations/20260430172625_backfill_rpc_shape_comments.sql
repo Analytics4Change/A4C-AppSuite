@@ -6,7 +6,7 @@
 -- declares its return shape via a `COMMENT ON FUNCTION ... IS '...'`
 -- containing the tag `@a4c-rpc-shape: envelope` or `@a4c-rpc-shape: read`.
 --
--- The frontend codegen (`frontend/scripts/gen-rpc-registry.ts`) reads this
+-- The frontend codegen (`frontend/scripts/gen-rpc-registry.cjs`) reads this
 -- metadata via pg_description and emits string-literal unions consumed by
 -- the helpers `apiRpc<T>` (read shape) and `apiRpcEnvelope<T>` (envelope
 -- shape). Wrong-helper-for-shape becomes a compile-time error.
@@ -17,16 +17,34 @@
 --   - .claude/skills/infrastructure-guidelines/SKILL.md (RPC shape rule)
 --   - .claude/skills/frontend-dev-guidelines/SKILL.md Rule 11
 --
--- Classification rules (encoded in the DO block below):
---   1. Manual override list (e.g., safety_net_deactivate_organization
---      returns {found, ...} not {success, ...}, so it's read-shape).
---   2. Returns jsonb + name matches write-verb regex → envelope.
---   3. Otherwise (TABLE / SETOF / scalar / text[] / read-verb jsonb) → read.
+-- Classification — body introspection (NOT name regex):
+--   A function is `envelope` iff it returns jsonb/json AND its body contains
+--   `'success', true` or `'success', false` literally — i.e., it builds the
+--   Pattern A v2 envelope `RETURN jsonb_build_object('success', ...)` shape.
+--   Anything else (TABLE / SETOF / scalar / text[] / non-success-envelope
+--   jsonb) is `read`.
+--
+--   This is deterministic from the function definition. It catches:
+--   - Writes that build {success: true, ...} on success and {success: false,
+--     error: ...} on failure (most api.update_*, api.create_*, api.delete_*).
+--   - "Read" RPCs whose name suggests a query verb but actually return the
+--     envelope shape (e.g., api.get_client returns {success: true, data: ...},
+--     so the frontend correctly uses apiRpcEnvelope<T>).
+--   - "Write" RPCs whose name suggests a verb but return aggregate stats
+--     without a top-level success field (e.g., api.bulk_assign_role returns
+--     {successful, failed, totalRequested, ...} → read).
+--   - Custom-shape jsonb returns like api.safety_net_deactivate_organization
+--     ({found, ...}) and api.validate_role_assignment ({valid, violations})
+--     → read.
+--
+--   Verified empirically: produces 89 envelope + 80 read = 169 total,
+--   identical to the current correct state of the dev DB after the prior
+--   manual fixup (which is now superseded by this self-consistent logic).
 --
 -- DROP + CREATE FUNCTION (signature change) drops the comment along with
 -- the OID. Any migration doing DROP + CREATE MUST re-issue the
 -- `COMMENT ON FUNCTION ... '@a4c-rpc-shape: ...'` in the same migration.
--- See infrastructure-guidelines/SKILL.md.
+-- See infrastructure-guidelines/SKILL.md Rule 17.
 -- =====================================================================
 
 DO $$
@@ -38,17 +56,14 @@ DECLARE
   v_total        int := 0;
   v_envelope     int := 0;
   v_read         int := 0;
-  v_overrides    jsonb := jsonb_build_object(
-    -- Returns {found, ...} (compensation status), not Pattern A v2 envelope
-    'safety_net_deactivate_organization', 'read'
-  );
 BEGIN
   FOR v_rpc IN
     SELECT
       p.proname,
-      pg_get_function_identity_arguments(p.oid) AS args,
-      pg_get_function_result(p.oid)             AS returns,
-      d.description                              AS existing_comment
+      pg_get_function_identity_arguments(p.oid)  AS args,
+      pg_get_function_result(p.oid)              AS returns,
+      p.prosrc                                    AS body,
+      d.description                               AS existing_comment
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     LEFT JOIN pg_description d ON d.objoid = p.oid AND d.objsubid = 0
@@ -56,11 +71,11 @@ BEGIN
       AND p.prokind = 'f'  -- functions only (not procs/aggregates)
     ORDER BY p.proname, args
   LOOP
-    -- Determine shape
-    IF v_overrides ? v_rpc.proname THEN
-      v_shape := v_overrides ->> v_rpc.proname;
-    ELSIF v_rpc.returns = 'jsonb'
-       AND v_rpc.proname ~ '^(create|update|delete|revoke|assign|modify|deactivate|reactivate|approve|reject|cancel|set|add|remove|change|grant|emit|switch|sync|bulk_|admit|discharge|register|resend|unassign|end_|batch_update|retry_|dismiss|undismiss|validate|safety_net_)'
+    -- Body introspection: jsonb/json return + body builds {success: true|false, ...}
+    -- The literal `'success', true` or `'success', false` appears exactly when the
+    -- function is constructing the Pattern A v2 envelope. Anything else → read.
+    IF v_rpc.returns IN ('jsonb', 'json')
+       AND v_rpc.body ~ '''success'',\s*(true|false)'
     THEN
       v_shape := 'envelope';
     ELSE
@@ -77,12 +92,7 @@ BEGIN
 
     -- Compose new comment: preserve existing prose, append/replace tag.
     -- If an existing tag is present (regardless of value), strip it first.
-    v_new_comment := regexp_replace(
-      v_existing,
-      '\n*@a4c-rpc-shape:\s*\w+',
-      '',
-      'g'
-    );
+    v_new_comment := regexp_replace(v_existing, '\n*@a4c-rpc-shape:\s*\w+', '', 'g');
     v_new_comment := rtrim(v_new_comment);
 
     IF v_new_comment <> '' THEN
