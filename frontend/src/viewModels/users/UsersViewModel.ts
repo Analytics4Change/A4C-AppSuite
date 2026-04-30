@@ -50,6 +50,7 @@ import type {
   UserPhoneResult,
   UpdateNotificationPreferencesResult,
   ModifyUserRolesResult,
+  RoleAssignmentViolation,
   UserVoidResult,
   InviteUserRequest,
   ModifyRolesRequest,
@@ -135,6 +136,27 @@ export class UsersViewModel {
 
   /** Success message for feedback */
   successMessage: string | null = null;
+
+  /**
+   * Per-role violations from the last `modifyRoles` call when the RPC
+   * returned `error: 'VALIDATION_FAILED'`. Cleared on `clearError()` and
+   * on the start of every `modifyRoles` call. Null when the last error
+   * was not a role-validation failure.
+   */
+  lastRoleViolations: RoleAssignmentViolation[] | null = null;
+
+  /**
+   * Partial-failure metadata from the last `modifyRoles` call when the
+   * multi-event loop short-circuited mid-batch (CR-2 contract). Null when
+   * the last error was not a partial failure.
+   */
+  lastRolePartialFailure: {
+    failureSection: 'add' | 'remove';
+    failureIndex: number;
+    addedRoleEventIds: string[];
+    removedRoleEventIds: string[];
+    processingError?: string;
+  } | null = null;
 
   // ============================================
   // Observable State - Assignable Roles
@@ -1164,6 +1186,8 @@ export class UsersViewModel {
     runInAction(() => {
       this.isSubmitting = true;
       this.error = null;
+      this.lastRoleViolations = null;
+      this.lastRolePartialFailure = null;
     });
 
     try {
@@ -1176,7 +1200,9 @@ export class UsersViewModel {
           this.successMessage = 'Roles updated';
           log.info('Roles modified', { userId: request.userId });
         } else if (result.violations && result.violations.length > 0) {
-          // Display first violation message; details exposed on result.violations
+          // Capture full violations array on the VM so the UI can render
+          // per-row detail (data-testid="role-modification-violation").
+          this.lastRoleViolations = result.violations;
           const summary =
             result.violations.length === 1
               ? result.violations[0].message
@@ -1184,6 +1210,16 @@ export class UsersViewModel {
           this.error = summary;
           log.warn('Role assignment violations', { violations: result.violations });
         } else if (result.partial) {
+          // Capture structured partial-failure state on the VM so the UI can
+          // render contextual recovery affordances
+          // (data-testid="role-modification-partial-warning").
+          this.lastRolePartialFailure = {
+            failureSection: result.failureSection ?? 'add',
+            failureIndex: result.failureIndex ?? 0,
+            addedRoleEventIds: result.addedRoleEventIds ?? [],
+            removedRoleEventIds: result.removedRoleEventIds ?? [],
+            processingError: result.processingError,
+          };
           this.error = `Partial failure (${result.failureSection} #${result.failureIndex}): ${result.processingError ?? result.error}`;
           log.warn('modifyRoles partial failure', {
             failureSection: result.failureSection,
@@ -1866,11 +1902,13 @@ export class UsersViewModel {
   // ============================================
 
   /**
-   * Clear error state
+   * Clear error state (including structured modify-roles violation/partial state)
    */
   clearError(): void {
     runInAction(() => {
       this.error = null;
+      this.lastRoleViolations = null;
+      this.lastRolePartialFailure = null;
     });
   }
 

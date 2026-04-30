@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DangerZone } from '@/components/ui/DangerZone';
 import { UserList, UserFormFields } from '@/components/users';
+import { UsersErrorBanner } from '@/components/users/UsersErrorBanner';
 import {
   AccessDatesForm,
   NotificationPreferencesForm,
@@ -655,28 +656,16 @@ export const UsersManagePage: React.FC = observer(() => {
         </div>
 
         {/* Error Banner */}
-        {(viewModel.error || operationError) && (
-          <div className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-red-800 font-semibold">Error</h3>
-                <p className="text-red-700 text-sm mt-1">{viewModel.error || operationError}</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  viewModel.clearError();
-                  setOperationError(null);
-                }}
-                className="text-red-600 border-red-300"
-              >
-                Dismiss
-              </Button>
-            </div>
-          </div>
-        )}
+        <UsersErrorBanner
+          error={viewModel.error}
+          operationError={operationError}
+          lastRoleViolations={viewModel.lastRoleViolations}
+          lastRolePartialFailure={viewModel.lastRolePartialFailure}
+          onDismiss={() => {
+            viewModel.clearError();
+            setOperationError(null);
+          }}
+        />
 
         {/* Split View Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -1,21 +1,36 @@
 -- =====================================================================
--- Fix RPC shape classifications missed by the verb-regex heuristic
+-- (Historical) Fix RPC shape classifications — now redundant
 -- =====================================================================
 --
--- The backfill migration (20260430172625) classified by name-prefix regex,
--- which misclassified two groups:
+-- ORIGINAL PURPOSE: the backfill migration (20260430172625) initially used
+-- a name-prefix regex heuristic that misclassified 13 RPCs:
+--   - 4 envelope→read: bulk_assign_role, sync_role_assignments,
+--     sync_schedule_assignments, validate_role_assignment (names suggested
+--     write verbs but bodies return flat aggregate-stats objects, not the
+--     Pattern A v2 envelope).
+--   - 9 read→envelope: get_category_field_count, get_client,
+--     get_failed_events_with_detail, get_field_usage_count,
+--     get_organization_details, get_schedule_template, list_clients,
+--     list_schedule_templates, list_user_client_assignments (names suggest
+--     read verbs but bodies build {success: true|false, ...} envelopes,
+--     typically with a permission-check branch).
 --
--- 1. envelope→read (4 RPCs): name matches a write verb but the success-path
---    return is flat data, NOT a Pattern A v2 envelope. These functions
---    return aggregate batch results without a top-level `success` boolean.
+-- CURRENT STATE: the backfill migration was rewritten to use deterministic
+-- body introspection (`prosrc ~ '''success'',\s*(true|false)'`), which
+-- classifies all 13 of these correctly without any override list. This
+-- migration is therefore an IDEMPOTENT NO-OP on a clean database — its
+-- "skip if already correctly tagged" guard fires for every entry in the
+-- targets dictionary.
 --
--- 2. read→envelope (9 RPCs): name matches a read verb but the function
---    returns the {success: true|false, ...} envelope (typically because
---    it has a permission-check branch returning {success: false, error}).
+-- It remains in the migration history because:
+--   1. Removing it would leave dev's `supabase_migrations.schema_migrations`
+--      with a row that has no corresponding file (operationally annoying).
+--   2. Defense in depth — if a future migration retags any of these 13
+--      back to the wrong shape (intentionally or accidentally), this
+--      migration would correct them on the next deploy.
 --
--- This migration retags both groups idempotently. It DOES NOT alter
--- function bodies — only `COMMENT ON FUNCTION ... IS '...'`. Comment is
--- keyed to OID, so signature-stable retag is safe.
+-- A future Day 0 baseline reset will fold the corrected state back into
+-- the consolidated baseline, retiring this migration entirely.
 -- =====================================================================
 
 DO $$
