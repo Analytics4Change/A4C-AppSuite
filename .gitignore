@@ -82,3 +82,4 @@ infrastructure/supabase/test-results/
 *.tmp
 *.temp
 tmp/
+infrastructure/supabase/supabase/functions/deno.lock
