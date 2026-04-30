@@ -49,14 +49,20 @@ const DB_URL =
   process.env.SUPABASE_DB_URL ||
   'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 
+// NOTE: We use CASE WHEN ... ~ ... instead of regexp_matches inside COALESCE.
+// regexp_matches is a set-returning function and Postgres forbids it inside
+// COALESCE ('set-returning functions are not allowed in COALESCE'). The
+// CASE-WHEN pattern is functionally equivalent for our purposes (we only need
+// to know which tag is present, not capture sub-groups).
 const QUERY = `
   SELECT
     p.proname AS name,
     pg_get_function_identity_arguments(p.oid) AS args,
-    COALESCE(
-      (regexp_matches(d.description, '@a4c-rpc-shape:\\s*(envelope|read)'))[1],
-      ''
-    ) AS shape
+    CASE
+      WHEN d.description ~ '@a4c-rpc-shape:\\s*envelope' THEN 'envelope'
+      WHEN d.description ~ '@a4c-rpc-shape:\\s*read'     THEN 'read'
+      ELSE ''
+    END AS shape
   FROM pg_proc p
   JOIN pg_namespace n ON n.oid = p.pronamespace
   LEFT JOIN pg_description d ON d.objoid = p.oid AND d.objsubid = 0
