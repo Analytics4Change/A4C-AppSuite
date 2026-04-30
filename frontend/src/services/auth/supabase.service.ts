@@ -91,19 +91,19 @@ class SupabaseService {
   /**
    * Execute an RPC call on the 'api' schema (read-shape: arrays, scalars, custom objects).
    *
-   * Centralizes schema selection and provides typed return values. Use this for
-   * `api.*` RPCs whose return shape is NOT the Pattern A v2 envelope. For
-   * envelope-shaped writes (`{success, error?, ...}`), use `apiRpcEnvelope<T>`
-   * instead — it returns a typed `ApiEnvelope<T>` with `error` already masked.
+   * ⚠️ **MUST NOT** be used for RPCs that return the Pattern A v2 envelope
+   *    (`{success: true, ...}` | `{success: false, error: string, ...}`).
+   *    Call `apiRpcEnvelope<T>` for those. `apiRpc` does NOT mask `data.error` —
+   *    masking caller-owned `T` would silently break the typed contract.
    *
-   * Failure-path masking: PostgrestError fields (`message`, `details`, `hint`) are
+   * Failure-path masking: PostgrestError fields (`message`, `details`, `hint`) ARE
    * masked at the SDK boundary so callers cannot accidentally surface raw PHI in
    * log lines or UI. The returned object preserves the PostgrestError shape; only
    * its string fields are replaced.
    *
    * @param functionName - Name of the RPC function (e.g., 'get_user_org_access')
    * @param params - Parameters to pass to the function
-   * @returns Promise with typed data or masked error
+   * @returns Promise with typed data or masked PostgrestError
    *
    * @example
    * ```typescript
@@ -112,6 +112,10 @@ class SupabaseService {
    *   { p_user_id: userId }
    * );
    * ```
+   *
+   * @see apiRpcEnvelope — for envelope-shaped writes (Pattern A v2)
+   * @see frontend/src/services/api/envelope.ts — unwrapApiEnvelope helper
+   * @see dev/active/migrate-services-to-api-rpc-envelope/ — bulk-migration follow-up
    */
   async apiRpc<T>(
     functionName: string,

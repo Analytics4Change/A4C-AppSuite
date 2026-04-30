@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-29
+last_updated: 2026-04-30
 ---
 
 
@@ -150,7 +150,9 @@ HTTP status: always 200 OK. The PostgREST response shape is `{success, ...}`; co
 
 **Software-architect-dbc** drafted the recommended ViewModel convention: `if (response.error?.startsWith('Event processing failed: ')) { /* surface as processingError, offer audit-log link */ } else { /* generic error */ }`.
 
-**Post-mask amend (2026-04-29)**: After PII masking lands (migration `20260430002824` and frontend SDK boundary), `result.error` text is **structurally redacted**. The literal prefix `"Event processing failed: "` is preserved (the masker never touches it), so the prefix-parse pattern continues to work. However, the suffix is degraded: `Key (col)=(value)` becomes `Key (col)=(<redacted>)`, UUIDs become `<uuid>`, emails become `<email>`. ViewModels MUST NOT extract identifiers from the masked suffix; use the captured `event_id` returned in the success envelope (or refetch by stream_id) for any audit-log linking affordance. Confirmed prefix-only consumer today: `frontend/src/pages/users/UsersManagePage.tsx:601-607`.
+**Post-mask amend (2026-04-29)**: After PII masking lands (migration `20260430002824` and frontend SDK boundary), `result.error` text is **structurally redacted**. The literal prefix `"Event processing failed: "` is preserved (the masker never touches it), so the prefix-parse pattern continues to work. However, the suffix is degraded: `Key (col)=(value)` becomes `Key (col)=(<redacted>)`, UUIDs become `<uuid>`, emails become `<email>`. ViewModels MUST NOT extract identifiers from the masked suffix; use the captured `event_id` returned in the success envelope (or refetch by stream_id) for any audit-log linking affordance.
+
+**Verified 2026-04-30** (PR #43 architect review LOW-2 follow-up): repo-wide grep confirms only **one** consumer parses `.error` by prefix — `frontend/src/pages/users/UsersManagePage.tsx:605` calls `.startsWith('Event processing failed:')` to swap a friendly fallback message for the raw RPC text. **Zero** consumers extract identifiers from the error suffix (no `.match` / `.split` / `.indexOf` patterns on `.error` strings). One ViewModel — `frontend/src/viewModels/settings/ClientFieldSettingsViewModel.ts:460` — uses `.error?.includes('Field key already exists')` for a substring-detect on a stable phrase emitted by a Rule-16-compliant handler `RAISE EXCEPTION`; the masker leaves that phrase untouched (no `Key (...)=(...)` pattern, no UUID, no email) so the consumer remains safe. Future ViewModels that want to branch on a specific failure mode SHOULD prefer the captured `event_id` + an audit-log lookup over text parsing.
 
 ## PII handling (2026-04-29)
 
