@@ -578,6 +578,10 @@ export type Database = {
               stream_version: number
             }[]
           }
+      get_failed_events_with_detail: {
+        Args: { p_limit?: number; p_offset?: number }
+        Returns: Json
+      }
       get_field_usage_count: { Args: { p_field_key: string }; Returns: Json }
       get_invitation_by_id: {
         Args: { p_invitation_id: string }
@@ -2947,6 +2951,7 @@ export type Database = {
           parent_span_id: string | null
           processed_at: string | null
           processing_error: string | null
+          processing_error_detail: string | null
           retry_count: number | null
           sequence_number: number
           session_id: string | null
@@ -2969,6 +2974,7 @@ export type Database = {
           parent_span_id?: string | null
           processed_at?: string | null
           processing_error?: string | null
+          processing_error_detail?: string | null
           retry_count?: number | null
           sequence_number?: number
           session_id?: string | null
@@ -2991,6 +2997,7 @@ export type Database = {
           parent_span_id?: string | null
           processed_at?: string | null
           processing_error?: string | null
+          processing_error_detail?: string | null
           retry_count?: number | null
           sequence_number?: number
           session_id?: string | null

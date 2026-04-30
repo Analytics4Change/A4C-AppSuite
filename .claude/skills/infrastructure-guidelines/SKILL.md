@@ -373,6 +373,30 @@ supabase gen types typescript --linked > ../../workflows/src/types/database.type
 
 ---
 
+## 16. Handler `RAISE EXCEPTION` Strings Must Not Interpolate Identifiers
+
+Handler/RPC `RAISE EXCEPTION` text is captured by the BEFORE INSERT dispatcher trigger and persisted into `domain_events.processing_error` (visible to platform admins via `api.get_failed_events`). Any user/client identifier interpolated via `%` (UUIDs, emails, names, phone numbers, ltree paths that include facility names) leaks into that audit-visible string — even after the persistence-layer trigger fix that drops `PG_EXCEPTION_DETAIL`. Use `USING ERRCODE = '<opaque>'` and a generic message instead; the caller already knows what they asked for, and the ERRCODE distinguishes the case for branching.
+
+```sql
+-- ✅ Correct
+IF v_role_name IS NULL THEN
+  RAISE EXCEPTION 'Role not found' USING ERRCODE = 'P0002';
+END IF;
+
+-- ❌ Wrong — leaks UUID into processing_error
+IF v_role_name IS NULL THEN
+  RAISE EXCEPTION 'Role not found: %', p_role_id USING ERRCODE = 'P0002';
+END IF;
+```
+
+**What counts as an identifier**: anything that names or addresses a tenant-scoped entity. UUIDs, emails, phone numbers, person names, ltree paths containing OU names. **What does not**: fixed enum values (`stream_type`, `event_type`, status strings) and `SQLERRM`/`SQLSTATE` (already opaque). When in doubt, prefer ERRCODE.
+
+**Audit pattern** when adding or modifying a handler/RPC: grep the file for `RAISE EXCEPTION '[^']*%[^']*'` and review each `%` placeholder's argument. Five baseline_v4 violations were remediated in migration `20260430002824_strip_processing_error_detail_with_admin_rpc.sql`; new violations land in this same shape and should be caught at PR review.
+
+**See**: `documentation/architecture/decisions/adr-rpc-readback-pattern.md` (PII handling section); migration `20260430002824` for the worked examples.
+
+---
+
 ## File Locations
 
 | What | Where |

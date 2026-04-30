@@ -23,7 +23,7 @@ last_updated: 2026-04-22
 
 # Frontend Services Guidelines
 
-This file governs code under `frontend/src/services/`. Three rules — all backed by past production incidents.
+This file governs code under `frontend/src/services/`. Four rules — all backed by past production incidents.
 
 ## 1. Service Session Management
 
@@ -145,7 +145,59 @@ const { data } = await client
 - `SupabaseOrganizationUnitService` → `api.get_organization_units()`
 - `SupabaseScheduleService` → `api.list_schedule_templates()`
 
-## 3. Correlation ID Pattern (Business-Scoped)
+## 3. RPC Helpers — `apiRpc` vs `apiRpcEnvelope`
+
+> **⚠️ HIPAA-relevant: PII masking happens at the SDK boundary.**
+> All `api.*` RPCs SHOULD route through `supabaseService.apiRpc(...)` or `supabaseService.apiRpcEnvelope<T>(...)` so error fields are masked exactly once before any consumer reads them.
+
+Two helpers, picked by **return shape**:
+
+### `apiRpcEnvelope<T>` — write/envelope-shaped RPCs (Pattern A v2)
+
+Use for any RPC that returns the `{success, error?, ...flat fields}` envelope (every `api.update_*`, `api.create_*`, `api.delete_*`, `api.change_*`, etc. — see [`adr-rpc-readback-pattern.md`](../../../documentation/architecture/decisions/adr-rpc-readback-pattern.md)).
+
+```typescript
+import { supabaseService } from '@/services/auth/supabase.service';
+
+const env = await supabaseService.apiRpcEnvelope<{ user: User; event_id: string }>(
+  'update_user',
+  { p_user_id: id, p_email: email },
+);
+if (!env.success) {
+  return { success: false, error: env.error };  // env.error is already masked
+}
+return { success: true, user: env.user };  // intersection-type contract: env.user is typed
+```
+
+The helper's return type is `ApiEnvelope<T> = ApiEnvelopeSuccess<T> | ApiEnvelopeFailure`, an intersection-type discriminated union (`{success: true} & T`). Existing flat-shape callers (`{success: true, role?: Role}`, etc.) work unchanged because the success-path spreads `data` fields onto the envelope.
+
+### `apiRpc<T>` — read-shape RPCs (arrays, scalars, custom objects)
+
+Use for RPCs whose `data` is NOT a `{success, error, ...}` envelope — typically `get_*`, `list_*`, `find_*`. The helper masks the wrapper-level `PostgrestError` (`.message`, `.details`, `.hint`) so PostgREST 4xx responses don't leak PHI either.
+
+```typescript
+const { data, error } = await supabaseService.apiRpc<UserOrgAccess[]>(
+  'list_user_org_access',
+  { p_user_id: userId },
+);
+if (error) {
+  // error.message / error.details / error.hint are already masked
+  return [];
+}
+return data ?? [];
+```
+
+### Why both helpers (don't mutate envelope `data` from `apiRpc`)
+
+`apiRpc<T>` only masks the wrapper error (`PostgrestError`), NOT the `data` payload. Mutating `data.error` inside a generic `apiRpc<T>` would silently change the caller's typed `T` — a contract break. `apiRpcEnvelope<T>` exists specifically to mask the envelope's `data.error` field via `unwrapApiEnvelope<T>` and return a typed `ApiEnvelope<T>`.
+
+### Direct `.schema('api').rpc(...)` (legacy)
+
+Some services still call `supabase.schema('api').rpc(...)` directly. These bypass masking and are slated for migration to `apiRpcEnvelope<T>` in a follow-up card. New code MUST use one of the two helpers above; an ESLint rule will land alongside the bulk migration to enforce this.
+
+**See**: `documentation/architecture/decisions/adr-rpc-readback-pattern.md` (PII handling section); `frontend/src/services/api/envelope.ts` (helper implementation); `frontend/src/utils/maskPii.ts` (masker).
+
+## 4. Correlation ID Pattern (Business-Scoped)
 
 `correlation_id` ties together the ENTIRE business transaction lifecycle, not just a single request.
 

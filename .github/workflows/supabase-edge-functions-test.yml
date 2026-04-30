@@ -1,0 +1,41 @@
+name: Edge Function Deno Tests
+
+# Runs Deno unit tests for Edge Functions.
+#
+# Establishes the per-Edge-Function test pattern from PR #42 as a CI gate. Tests live
+# under either `_shared/__tests__/` (shared utilities) or `<function>/__tests__/`
+# (per-function helpers). All test files matching `__tests__/**/*.test.ts` under
+# `infrastructure/supabase/supabase/functions/` are picked up.
+#
+# Network access is allowed (--allow-net) because some tests mock `fetch` via global
+# patching, which Deno requires net permission to instantiate. No real network calls
+# should occur in tests; if one does, that's a test-quality bug.
+
+on:
+  pull_request:
+    paths:
+      - 'infrastructure/supabase/supabase/functions/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'infrastructure/supabase/supabase/functions/**'
+
+jobs:
+  deno-test:
+    name: Run Deno unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Run all Deno tests under functions/
+        working-directory: infrastructure/supabase/supabase/functions
+        run: |
+          # Allow network because some tests mock fetch (Deno requires the permission to
+          # patch the global). No actual network calls should occur in tests.
+          deno test --allow-net --allow-env --reporter=pretty

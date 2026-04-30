@@ -31,6 +31,7 @@ import {
   type TracingContext,
 } from '../_shared/tracing-context.ts';
 import { buildEventMetadata } from '../_shared/emit-event.ts';
+import { maskPii } from '../_shared/maskPii.ts';
 
 // Deployment version tracking
 const DEPLOY_VERSION = 'v17-revoke-extracted';
@@ -262,7 +263,7 @@ async function emitExpirationEvent(
 /**
  * Send invitation email via Resend API
  */
-async function sendInvitationEmail(
+export async function sendInvitationEmail(
   resendApiKey: string,
   params: {
     email: string;
@@ -366,7 +367,8 @@ If you didn't expect this invitation, you can safely ignore this email.
       const errorData = await response.json();
       return {
         success: false,
-        error: `Resend API error: ${response.status} - ${errorData.message || 'Unknown error'}`,
+        // PII mask: Resend errorData.message can echo recipient email back.
+        error: `Resend API error: ${response.status} - ${maskPii(errorData.message) || 'Unknown error'}`,
       };
     }
 
@@ -378,7 +380,8 @@ If you didn't expect this invitation, you can safely ignore this email.
   } catch (error) {
     return {
       success: false,
-      error: `Failed to send email: ${error.message}`,
+      // PII mask: error.message may carry email server response detail with email addresses.
+      error: `Failed to send email: ${maskPii(error.message)}`,
     };
   }
 }

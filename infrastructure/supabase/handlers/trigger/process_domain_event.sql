@@ -46,12 +46,17 @@ BEGIN
 
         NEW.processed_at = clock_timestamp();
         NEW.processing_error = NULL;
+        NEW.processing_error_detail = NULL;
 
     EXCEPTION
         WHEN OTHERS THEN
             GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT, v_error_detail = PG_EXCEPTION_DETAIL;
+            -- RAISE WARNING preserves operator-debug visibility in PG logs.
             RAISE WARNING 'Event processing error for event %: % - %', NEW.id, v_error_msg, COALESCE(v_error_detail, '');
-            NEW.processing_error = v_error_msg || ' - ' || COALESCE(v_error_detail, '');
+            -- Persisted columns: MESSAGE_TEXT visible to platform.admin via api.get_failed_events;
+            -- PG_EXCEPTION_DETAIL gated behind platform.view_event_details via api.get_failed_events_with_detail.
+            NEW.processing_error = v_error_msg;
+            NEW.processing_error_detail = v_error_detail;
     END;
 
     RETURN NEW;

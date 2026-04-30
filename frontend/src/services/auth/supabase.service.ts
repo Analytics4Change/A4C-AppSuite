@@ -1,6 +1,7 @@
 import { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/utils/logger';
+import { unwrapApiEnvelope, maskPostgrestError, type ApiEnvelope } from '@/services/api/envelope';
 
 const log = Logger.getLogger('api');
 
@@ -88,14 +89,21 @@ class SupabaseService {
   }
 
   /**
-   * Execute an RPC call on the 'api' schema.
+   * Execute an RPC call on the 'api' schema (read-shape: arrays, scalars, custom objects).
    *
-   * Centralizes schema selection and provides typed return values.
-   * Use this for all RPC functions defined in the 'api' schema.
+   * Centralizes schema selection and provides typed return values. Use this for
+   * `api.*` RPCs whose return shape is NOT the Pattern A v2 envelope. For
+   * envelope-shaped writes (`{success, error?, ...}`), use `apiRpcEnvelope<T>`
+   * instead — it returns a typed `ApiEnvelope<T>` with `error` already masked.
+   *
+   * Failure-path masking: PostgrestError fields (`message`, `details`, `hint`) are
+   * masked at the SDK boundary so callers cannot accidentally surface raw PHI in
+   * log lines or UI. The returned object preserves the PostgrestError shape; only
+   * its string fields are replaced.
    *
    * @param functionName - Name of the RPC function (e.g., 'get_user_org_access')
    * @param params - Parameters to pass to the function
-   * @returns Promise with typed data or error
+   * @returns Promise with typed data or masked error
    *
    * @example
    * ```typescript
@@ -110,7 +118,49 @@ class SupabaseService {
     params: Record<string, unknown>
   ): Promise<{ data: T | null; error: PostgrestError | null }> {
     const apiClient = this.client as AnySchemaSupabaseClient;
-    return apiClient.schema('api').rpc(functionName, params);
+    const result = await apiClient.schema('api').rpc(functionName, params);
+    if (result.error) {
+      const masked = maskPostgrestError(result.error);
+      return {
+        data: result.data as T | null,
+        error: { ...result.error, ...masked } as PostgrestError,
+      };
+    }
+    return result as { data: T | null; error: PostgrestError | null };
+  }
+
+  /**
+   * Execute a Pattern A v2 RPC and unwrap the envelope into a typed `ApiEnvelope<T>`.
+   *
+   * This is the ONLY sanctioned way to read `error` off an `api.*` RPC envelope.
+   * `unwrapApiEnvelope` applies `maskPii` exactly once at the SDK boundary so any
+   * downstream consumer (services, ViewModels, log emissions) can never accidentally
+   * surface raw PHI from `processing_error` or `PG_EXCEPTION_DETAIL`.
+   *
+   * Success-path shape is `{success: true} & T` — flat intersection — preserving the
+   * existing return-shape convention used by services in this repo.
+   *
+   * @param functionName - Name of the envelope-shaped RPC (e.g., 'update_user', 'create_role')
+   * @param params - Parameters to pass to the function
+   * @returns Promise with discriminated `ApiEnvelope<T>`
+   *
+   * @example
+   * ```typescript
+   * const env = await supabaseService.apiRpcEnvelope<{ user: User; event_id: string }>(
+   *   'update_user',
+   *   { p_user_id: id, p_email: email }
+   * );
+   * if (!env.success) return { success: false, error: env.error };
+   * return { success: true, user: env.user };  // flat intersection: env.user is typed
+   * ```
+   */
+  async apiRpcEnvelope<T extends Record<string, unknown> = Record<string, never>>(
+    functionName: string,
+    params: Record<string, unknown>
+  ): Promise<ApiEnvelope<T>> {
+    const apiClient = this.client as AnySchemaSupabaseClient;
+    const result = await apiClient.schema('api').rpc(functionName, params);
+    return unwrapApiEnvelope<T>(result);
   }
 }
 
