@@ -1208,6 +1208,15 @@ export type Database = {
           is_assigned: boolean
         }[]
       }
+      modify_user_roles: {
+        Args: {
+          p_reason?: string
+          p_role_ids_to_add?: string[]
+          p_role_ids_to_remove?: string[]
+          p_user_id: string
+        }
+        Returns: Json
+      }
       reactivate_field_category: {
         Args: {
           p_category_id: string

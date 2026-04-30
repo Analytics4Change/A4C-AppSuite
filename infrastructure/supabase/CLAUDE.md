@@ -455,6 +455,37 @@ If a different-arity overload exists, decide explicitly in the migration header:
 
 **Distinct from AsyncAPI type-gen**: the AsyncAPI pipeline (above section) generates event-payload types from `contracts/asyncapi.yaml` into `@/types/generated/generated-events.ts`. That's a different surface (domain events on the wire) and uses a different command. The two pipelines are complementary — run each only when its source changed.
 
+## RPC Shape Registry (M3)
+
+Every `api.*` RPC declares its return shape via `COMMENT ON FUNCTION ... '@a4c-rpc-shape: envelope|read'`. The frontend codegen at `frontend/scripts/gen-rpc-registry.cjs` reads `pg_description.description` and emits string-literal unions consumed by typed helpers (`apiRpc<T>` / `apiRpcEnvelope<T>`) — wrong-helper-for-shape becomes a compile error.
+
+Every new `api.*` RPC migration MUST include a `COMMENT ON FUNCTION` carrying the shape tag. Choosing:
+- `envelope` — Pattern A v2 `{success: true|false, error?, ...}` shape (writes).
+- `read` — raw data (table/array/scalar/jsonb without a top-level `success` discriminator) (reads).
+
+```sql
+CREATE OR REPLACE FUNCTION api.update_user(...) RETURNS jsonb ... ;
+
+COMMENT ON FUNCTION api.update_user(uuid, text, text) IS
+$comment$Update user profile (first_name, last_name) via domain event
+
+@a4c-rpc-shape: envelope$comment$;
+```
+
+> **⚠️ DROP + CREATE re-tag rule**
+>
+> `COMMENT ON FUNCTION` is keyed to the function OID. `CREATE OR REPLACE FUNCTION` (same signature) preserves the comment; `DROP FUNCTION` + `CREATE FUNCTION` (signature change) does NOT — the new OID has no comment. Any DROP+CREATE migration MUST re-issue `COMMENT ON FUNCTION ... '@a4c-rpc-shape: ...'` in the same migration.
+
+CI workflow `.github/workflows/rpc-registry-sync.yml` spins up a local Supabase container, applies migrations, runs `npm run gen:rpc-registry`, and fails if (a) the registry diverges from the migration state or (b) any RPC lacks a shape tag. Run the codegen locally after applying a migration that adds, drops, or retags an `api.*` function:
+
+```bash
+cd frontend
+npm run gen:rpc-registry  # uses local container at 127.0.0.1:54322
+git diff src/services/api/rpc-registry.generated.ts
+```
+
+**See**: `documentation/architecture/decisions/adr-rpc-readback-pattern.md` §"Type-level enforcement (M3)"; `infrastructure-guidelines/SKILL.md` Rule 17; `frontend/src/services/CLAUDE.md` §3.
+
 ## Directory Structure
 
 ```

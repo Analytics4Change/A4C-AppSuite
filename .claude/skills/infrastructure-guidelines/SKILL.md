@@ -397,6 +397,33 @@ END IF;
 
 ---
 
+## 17. Every `api.*` RPC Must Carry an `@a4c-rpc-shape` Comment
+
+The frontend type registry at `frontend/src/services/api/rpc-registry.generated.ts` is generated from `pg_description.description` on `api.*` functions. The codegen parses each comment for `@a4c-rpc-shape: envelope|read` and emits string-literal unions consumed by `apiRpc<T>` (read shape) and `apiRpcEnvelope<T>` (envelope shape) — wrong-helper-for-shape becomes a compile-time error.
+
+**Rule**: every new `CREATE FUNCTION api.*` MUST include a `COMMENT ON FUNCTION` statement carrying the shape tag. Existing prose is preserved by appending a blank line + the tag.
+
+```sql
+CREATE OR REPLACE FUNCTION api.update_user(...) RETURNS jsonb ... ;
+
+COMMENT ON FUNCTION api.update_user(uuid, text, text) IS
+$comment$Update user profile (first_name, last_name) via domain event
+
+@a4c-rpc-shape: envelope$comment$;
+```
+
+**Choosing the tag**:
+- `envelope` — the RPC returns Pattern A v2 `{success: true|false, error?, ...}` shape. Caller uses `apiRpcEnvelope<T>`.
+- `read` — the RPC returns raw data (table/array/scalar/jsonb without a top-level `success` discriminator). Caller uses `apiRpc<T>`.
+
+**DROP + CREATE re-tag rule**: `COMMENT ON FUNCTION` is keyed to the function OID. `CREATE OR REPLACE FUNCTION` (same signature) preserves it; `DROP FUNCTION` + `CREATE FUNCTION` (signature change) does NOT — the new OID has no comment. Any DROP+CREATE migration MUST re-issue the `COMMENT ON FUNCTION ... '@a4c-rpc-shape: ...'` in the same migration.
+
+**CI gate**: `.github/workflows/rpc-registry-sync.yml` spins up a local Supabase container, applies migrations, runs `npm run gen:rpc-registry`, and fails if (a) the committed `rpc-registry.generated.ts` diverges from the generated output or (b) `UncategorizedRpcs` resolves to anything other than `never`.
+
+**See**: `documentation/architecture/decisions/adr-rpc-readback-pattern.md` §"Type-level enforcement (M3)"; `frontend/src/services/CLAUDE.md` §3.
+
+---
+
 ## File Locations
 
 | What | Where |

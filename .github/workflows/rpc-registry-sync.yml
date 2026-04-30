@@ -1,0 +1,90 @@
+name: RPC Shape Registry Sync
+
+# Asserts that frontend/src/services/api/rpc-registry.generated.ts is in sync
+# with the database state produced by applying the migration directory to a
+# clean local Supabase container. Two failure modes:
+#
+#   1. UncategorizedRpcs is non-empty — a migration added/changed an api.* RPC
+#      without the `@a4c-rpc-shape:` tag in `COMMENT ON FUNCTION`.
+#   2. The committed registry file diverges from the generated output —
+#      a migration changed the api.* surface but the developer didn't run
+#      `npm run gen:rpc-registry`.
+#
+# Both fail closed and tell the developer what to do. The generator script
+# at frontend/scripts/gen-rpc-registry.cjs is idempotent.
+#
+# CI anchor: a fresh `supabase start` container seeded from the migrations
+# directory. Deterministic by design (does NOT consult a remote/dev DB).
+# See architect review NT-4 for the rationale.
+
+on:
+  pull_request:
+    paths:
+      - 'infrastructure/supabase/supabase/migrations/**'
+      - 'frontend/src/services/api/rpc-registry.generated.ts'
+      - 'frontend/scripts/gen-rpc-registry.cjs'
+      - '.github/workflows/rpc-registry-sync.yml'
+
+jobs:
+  registry-sync:
+    name: Verify rpc-registry.generated.ts matches migration state
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase container
+        working-directory: infrastructure/supabase
+        run: |
+          supabase start
+          # Wait for the container to be fully ready (status reports DB URL)
+          supabase status
+
+      - name: Apply migrations to local container
+        working-directory: infrastructure/supabase
+        run: supabase db reset --local
+
+      - name: Regenerate registry against local container
+        working-directory: frontend
+        env:
+          # Local container default connection string (no auth-management overhead)
+          SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: |
+          npm ci --no-audit --no-fund
+          npm run gen:rpc-registry
+
+      - name: Assert no diff in registry file
+        run: |
+          if ! git diff --exit-code frontend/src/services/api/rpc-registry.generated.ts; then
+            echo "::error::rpc-registry.generated.ts is out of sync with the migration state."
+            echo "::error::Run \`npm run gen:rpc-registry\` locally and commit the result."
+            echo "::error::See documentation/architecture/decisions/adr-rpc-readback-pattern.md §'Type-level enforcement (M3)'."
+            exit 1
+          fi
+          echo "OK: rpc-registry.generated.ts matches migration state"
+
+      - name: Assert no untagged RPCs (UncategorizedRpcs === never)
+        run: |
+          if ! grep -qE '^export type UncategorizedRpcs = never;\s*$' \
+              frontend/src/services/api/rpc-registry.generated.ts; then
+            echo "::error::UncategorizedRpcs is not 'never'. One or more api.* RPCs are missing"
+            echo "::error::their @a4c-rpc-shape: envelope|read tag in COMMENT ON FUNCTION."
+            echo "::error::Add the tag to your migration. See infrastructure-guidelines/SKILL.md."
+            grep -A2 'export type UncategorizedRpcs' frontend/src/services/api/rpc-registry.generated.ts || true
+            exit 1
+          fi
+          echo "OK: zero untagged api.* RPCs"
+
+      - name: Tear down container
+        if: always()
+        working-directory: infrastructure/supabase
+        run: supabase stop --no-backup || true

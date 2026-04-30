@@ -806,6 +806,13 @@ export type UserOperationErrorCode =
   | 'INVITATION_REVOKED'
   | 'SUBSET_ONLY_VIOLATION'
   | 'SCOPE_VIOLATION'
+  | 'SCOPE_HIERARCHY_VIOLATION'
+  | 'VALIDATION_FAILED'
+  | 'PARTIAL_FAILURE'
+  | 'PROCESSING_ERROR'
+  | 'TARGET_DEACTIVATED'
+  | 'INVALID_INPUT'
+  | 'ROLE_NOT_FOUND'
   | 'NO_ORG_CONTEXT'
   | 'VALIDATION_ERROR'
   | 'PERMISSION_DENIED'
@@ -898,10 +905,65 @@ export interface UpdateNotificationPreferencesResult extends UserRpcEnvelope {
 }
 
 /**
+ * Per-role validation violation surfaced by `api.validate_role_assignment`,
+ * propagated through `api.modify_user_roles` for `error === 'VALIDATION_FAILED'`.
+ *
+ * `error_code` values:
+ *   - `SUBSET_ONLY_VIOLATION`: actor lacks one or more permissions the role grants.
+ *   - `SCOPE_HIERARCHY_VIOLATION`: role's `org_hierarchy_scope` is outside the
+ *     actor's `user.role_assign` containment (template-scope rule).
+ *   - `ROLE_NOT_FOUND`: role_id does not exist or is inactive.
+ */
+export interface RoleAssignmentViolation {
+  role_id: string;
+  role_name: string | null;
+  error_code: 'SUBSET_ONLY_VIOLATION' | 'SCOPE_HIERARCHY_VIOLATION' | 'ROLE_NOT_FOUND';
+  message: string;
+}
+
+/**
+ * Response for `modifyRoles` (`api.modify_user_roles` RPC).
+ *
+ * Multi-event COMPLEX-CASE Pattern A v2 contract:
+ *   Success path: `success: true` plus `addedRoleEventIds[]` / `removedRoleEventIds[]`.
+ *   Validation failure: `success: false`, `error: 'VALIDATION_FAILED'`,
+ *     `violations: RoleAssignmentViolation[]`.
+ *   Partial failure: `success: false`, `partial: true`, `error: 'PARTIAL_FAILURE'`,
+ *     plus the event IDs emitted before the failure and `failureIndex` /
+ *     `failureSection` to support diagnostic / retry. The RPC is idempotent
+ *     when re-run with the same input arrays.
+ */
+export interface ModifyUserRolesResult extends UserRpcEnvelope {
+  /** UUID of the user whose roles were modified (echoed by the RPC). */
+  userId?: string;
+
+  /** event_ids of `user.role.assigned` events emitted (in p_role_ids_to_add order). */
+  addedRoleEventIds?: string[];
+
+  /** event_ids of `user.role.revoked` events emitted (in p_role_ids_to_remove order). */
+  removedRoleEventIds?: string[];
+
+  /** Per-role validation violations (present iff `error === 'VALIDATION_FAILED'`). */
+  violations?: RoleAssignmentViolation[];
+
+  /** True iff the multi-event loop short-circuited mid-batch. */
+  partial?: boolean;
+
+  /** Index into the failed section's input array at which the loop short-circuited. */
+  failureIndex?: number;
+
+  /** Which loop short-circuited: `'add'` or `'remove'`. */
+  failureSection?: 'add' | 'remove';
+
+  /** Aggregated `processing_error` from the captured event_ids on read-back failure. */
+  processingError?: string;
+}
+
+/**
  * Response for user-domain operations that return only the envelope:
  * `resendInvitation`, `revokeInvitation`, `deactivateUser`, `reactivateUser`,
  * `deleteUser`, `resetPassword`, `addUserToOrganization`, `switchOrganization`,
- * `modifyRoles`, `updateAccessDates`, `removeUserPhone`, `addUserAddress`,
+ * `updateAccessDates`, `removeUserPhone`, `addUserAddress`,
  * `updateUserAddress`, `removeUserAddress`.
  *
  * **TODO(PR-B)**: Address methods (`addUserAddress`, `updateUserAddress`,

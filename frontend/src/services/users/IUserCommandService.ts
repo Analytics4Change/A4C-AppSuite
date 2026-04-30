@@ -28,6 +28,7 @@ import type {
   UpdateUserResult,
   UserPhoneResult,
   UpdateNotificationPreferencesResult,
+  ModifyUserRolesResult,
   UserVoidResult,
   AddUserAddressRequest,
   UpdateUserAddressRequest,
@@ -232,7 +233,7 @@ export interface IUserCommandService {
    *   showError('Cannot assign role outside your organizational scope');
    * }
    */
-  modifyRoles(request: ModifyRolesRequest): Promise<UserVoidResult>;
+  modifyRoles(request: ModifyRolesRequest): Promise<ModifyUserRolesResult>;
 
   /**
    * Adds an existing user to the current organization

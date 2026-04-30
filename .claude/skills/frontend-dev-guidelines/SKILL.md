@@ -164,7 +164,27 @@ if (!result.success) {
 await supabase.from('users_projection').update({ is_active: false }).eq('id', userId);
 ```
 
-See `documentation/frontend/guides/EVENT-DRIVEN-GUIDE.md` for the full write-path pattern and `frontend/CLAUDE.md` (CQRS Query Pattern section) for RPC conventions.
+### Helper choice is type-narrowed by the RPC shape registry (M3)
+
+`apiRpc<T>` and `apiRpcEnvelope<T>` constrain their `functionName` parameter to `ReadRpcs` / `EnvelopeRpcs` string-literal unions emitted by `frontend/scripts/gen-rpc-registry.cjs`. The unions are derived from the `@a4c-rpc-shape: envelope|read` tag in each `api.*` function's `COMMENT ON FUNCTION`.
+
+Wrong-helper-for-shape is a **compile error**, not a runtime PII-leak risk:
+
+```typescript
+// ✅ correct — update_user is envelope-shape
+const env = await supabaseService.apiRpcEnvelope<{ user: User }>(
+  'update_user', { p_user_id: id, p_email: email },
+);
+
+// ❌ TS2345 — 'update_user' is not assignable to ReadRpcs
+const { data } = await supabaseService.apiRpc<{ success: boolean; user: User }>(
+  'update_user', { ... }
+);
+```
+
+When a migration adds, drops, or retags an `api.*` RPC: run `npm run gen:rpc-registry` and commit the regenerated `frontend/src/services/api/rpc-registry.generated.ts`. CI workflow `.github/workflows/rpc-registry-sync.yml` blocks merge when the registry diverges from migration state.
+
+See `documentation/frontend/guides/EVENT-DRIVEN-GUIDE.md` for the full write-path pattern, `frontend/CLAUDE.md` (CQRS Query Pattern section) for RPC conventions, and `frontend/src/services/CLAUDE.md` §3 for the registry contract.
 
 ## 12. JWT Utilities: Import from Shared Location
 

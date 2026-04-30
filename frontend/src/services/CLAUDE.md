@@ -195,7 +195,19 @@ return data ?? [];
 
 Some services still call `supabase.schema('api').rpc(...)` directly. These bypass masking and are slated for migration to `apiRpcEnvelope<T>` in a follow-up card. New code MUST use one of the two helpers above; an ESLint rule will land alongside the bulk migration to enforce this.
 
-**See**: `documentation/architecture/decisions/adr-rpc-readback-pattern.md` (PII handling section); `frontend/src/services/api/envelope.ts` (helper implementation); `frontend/src/utils/maskPii.ts` (masker).
+### Type-narrowed helper signatures (M3 registry)
+
+`apiRpc<T>` and `apiRpcEnvelope<T>` constrain `functionName` to the string-literal unions `ReadRpcs` / `EnvelopeRpcs` exported by `@/services/api/rpc-registry.generated.ts`. The unions are emitted by `frontend/scripts/gen-rpc-registry.cjs` from each `api.*` function's `COMMENT ON FUNCTION ... '@a4c-rpc-shape: envelope|read'` tag. Wrong-helper-for-shape is a **TypeScript compile error**, not a runtime PII-leak risk.
+
+**Workflow when adding a new RPC**:
+1. The migration adds `COMMENT ON FUNCTION api.<name>(...) IS '...\n\n@a4c-rpc-shape: envelope';` (or `read`).
+2. Apply via `supabase db push --linked`.
+3. Run `npm run gen:rpc-registry` to regenerate `rpc-registry.generated.ts`.
+4. Commit both files. CI workflow `rpc-registry-sync.yml` blocks merge when out of sync.
+
+If a future migration does `DROP FUNCTION` + `CREATE FUNCTION` (signature change), the `COMMENT ON FUNCTION` is lost — the migration MUST re-issue it. See `infrastructure-guidelines/SKILL.md` Rule 17.
+
+**See**: `documentation/architecture/decisions/adr-rpc-readback-pattern.md` (PII handling section + §"Type-level enforcement (M3)"); `frontend/src/services/api/envelope.ts` (helper implementation); `frontend/src/services/api/rpc-registry.generated.ts` (registry); `frontend/scripts/gen-rpc-registry.cjs` (codegen); `frontend/src/utils/maskPii.ts` (masker).
 
 ## 4. Correlation ID Pattern (Business-Scoped)
 
