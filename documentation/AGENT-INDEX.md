@@ -112,6 +112,15 @@ purpose: agent-navigation
 | `edge-function-vs-sql-rpc` | [adr-edge-function-vs-sql-rpc.md](architecture/decisions/adr-edge-function-vs-sql-rpc.md) | adr-rpc-readback-pattern.md, event-handler-pattern.md |
 | `sql-rpc` | [adr-edge-function-vs-sql-rpc.md](architecture/decisions/adr-edge-function-vs-sql-rpc.md) | adr-rpc-readback-pattern.md, event-handler-pattern.md |
 | `orchestration-tier` | [adr-edge-function-vs-sql-rpc.md](architecture/decisions/adr-edge-function-vs-sql-rpc.md) | adr-rpc-readback-pattern.md |
+| `rpc-shape` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) §"Type-level enforcement (M3)" | infrastructure-guidelines/SKILL.md Rule 17, frontend-dev-guidelines/SKILL.md Rule 11, frontend/services/CLAUDE.md §3 |
+| `rpc-shape-registry` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) §"Type-level enforcement (M3)" | frontend/scripts/gen-rpc-registry.cjs, frontend/src/services/api/rpc-registry.generated.ts, .github/workflows/rpc-registry-sync.yml |
+| `a4c-rpc-shape` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) §"Type-level enforcement (M3)" | infrastructure-guidelines/SKILL.md Rule 17, infrastructure/supabase/CLAUDE.md § RPC Shape Registry |
+| `envelope-rpcs` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) §"Type-level enforcement (M3)" | frontend/src/services/api/rpc-registry.generated.ts, frontend/src/services/auth/supabase.service.ts |
+| `read-rpcs` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) §"Type-level enforcement (M3)" | frontend/src/services/api/rpc-registry.generated.ts, frontend/src/services/auth/supabase.service.ts |
+| `helper-narrowing` | [frontend-dev-guidelines/SKILL.md Rule 11](../.claude/skills/frontend-dev-guidelines/SKILL.md) | adr-rpc-readback-pattern.md §"Type-level enforcement (M3)", frontend/services/CLAUDE.md §3 |
+| `multi-event-pattern-a-v2` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) | infrastructure/supabase/CLAUDE.md, event-handler-pattern.md |
+| `partial-failure-contract` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) | frontend/services/CLAUDE.md §3, infrastructure/supabase/CLAUDE.md |
+| `modify-user-roles` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) | adr-edge-function-vs-sql-rpc.md, infrastructure/supabase/supabase/migrations/20260430172139_add_modify_user_roles_rpc.sql |
 | `email` | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | resend-key-rotation.md |
 | `entity-service` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | organization-management-architecture.md |
 | `event-archival` | [observability-operations.md](infrastructure/guides/observability-operations.md) | event-observability.md |
