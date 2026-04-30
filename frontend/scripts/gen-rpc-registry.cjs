@@ -84,10 +84,17 @@ function success(msg) {
   console.log(`✅ ${msg}`);
 }
 
+// Distinctive multi-char field separator: survives all shell-quoting layers
+// (some shells like dash drop bashisms like $'\t', leaving psql with the
+// literal two-char string `\t` instead of an actual tab character — which
+// bricks line.split('\t') on the JS side). Using a string that no proname
+// or argument list will contain avoids all of that.
+const FIELD_SEP = '<<<A4C_FIELD>>>';
+
 function runQuery() {
   // -A unaligned, -t tuples only, -F separator, -X no psqlrc, -v ON_ERROR_STOP
   const cmd =
-    `psql "${DB_URL}" -A -t -F'\\t' -X -v ON_ERROR_STOP=1 -c "${QUERY.replace(/\n/g, ' ')}"`;
+    `psql "${DB_URL}" -A -t -F'${FIELD_SEP}' -X -v ON_ERROR_STOP=1 -c "${QUERY.replace(/\n/g, ' ')}"`;
   let output;
   try {
     output = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -99,7 +106,7 @@ function runQuery() {
     .split('\n')
     .filter((l) => l.length > 0)
     .map((line) => {
-      const [name, args, shape] = line.split('\t');
+      const [name, args, shape] = line.split(FIELD_SEP);
       return { name, args: args || '', shape: shape || '' };
     });
 }
