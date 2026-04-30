@@ -27,6 +27,8 @@
  * @see documentation/infrastructure/guides/event-observability.md
  */
 
+import { maskPii } from './maskPii.ts';
+
 /**
  * Standard error response structure for all Edge Functions.
  * Compatible with frontend's extractEdgeFunctionError() pattern.
@@ -179,10 +181,11 @@ export function handleRpcError(
 
   return createErrorResponse(
     {
-      error: userMessage,
+      error: maskPii(userMessage),
       code,
       status,
-      details: rpcError.message,
+      // PII mask: rpcError.message can carry PG_EXCEPTION_DETAIL row data.
+      details: maskPii(rpcError.message),
       correlationId,
     },
     corsHeaders
@@ -283,7 +286,9 @@ export function createInternalError(
       code: ErrorCodes.INTERNAL_ERROR,
       status: 500,
       correlationId,
-      details,
+      // PII mask: details often originates from caught error.message which can carry
+      // PG_EXCEPTION_DETAIL or other identifiers.
+      details: details ? maskPii(details) : undefined,
     },
     corsHeaders
   );

@@ -120,9 +120,16 @@ export default [
       'prefer-const': 'warn',
       'no-var': 'error',
       'no-undef': 'error', // This should be handled by globals now
+
+      // FUTURE (deferred to bulk-service-migration follow-up): a no-restricted-syntax rule
+      // forbidding direct .schema('api').rpc(...) outside src/services/auth/supabase.service.ts
+      // and src/services/api/envelope.ts. Lands together with the codemod that migrates the
+      // 8 legacy services to apiRpcEnvelope<T>. Repo-wide --max-warnings 0 means the rule
+      // can't ship until existing call sites are migrated. See ADR PII handling section and
+      // the dev/active follow-up card.
     },
   },
-  
+
   // Apply to Node.js files (scripts, config, tests)
   {
     files: ['scripts/**/*.{js,ts,cjs}', '*.config.{js,ts}', 'vitest.config.*', 'playwright.config.*'],

@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-24
+last_updated: 2026-04-29
 ---
 
 
@@ -149,6 +149,33 @@ HTTP status: always 200 OK. The PostgREST response shape is `{success, ...}`; co
 **Why not the PostgREST `code` field**: The original n2 telemetry note from PR #29 review proposed using PostgreSQL `ERRCODE` (e.g. P9003 / P9004) surfaced via PostgREST's response `code` field. That would only work under Pattern B (`RAISE EXCEPTION ... USING ERRCODE = ...`), which Decision 2 forbids for handler-driven failures. Under Pattern A, PostgREST always returns 200 OK with `{success, error}`, so there is no `code` field to read.
 
 **Software-architect-dbc** drafted the recommended ViewModel convention: `if (response.error?.startsWith('Event processing failed: ')) { /* surface as processingError, offer audit-log link */ } else { /* generic error */ }`.
+
+**Post-mask amend (2026-04-29)**: After PII masking lands (migration `20260430002824` and frontend SDK boundary), `result.error` text is **structurally redacted**. The literal prefix `"Event processing failed: "` is preserved (the masker never touches it), so the prefix-parse pattern continues to work. However, the suffix is degraded: `Key (col)=(value)` becomes `Key (col)=(<redacted>)`, UUIDs become `<uuid>`, emails become `<email>`. ViewModels MUST NOT extract identifiers from the masked suffix; use the captured `event_id` returned in the success envelope (or refetch by stream_id) for any audit-log linking affordance. Confirmed prefix-only consumer today: `frontend/src/pages/users/UsersManagePage.tsx:601-607`.
+
+## PII handling (2026-04-29)
+
+`processing_error` carries operator-debug detail that historically included `PG_EXCEPTION_DETAIL` row data. In a multi-tenant medication-management platform this is HIPAA exposure: `Key (email)=(other-user@acme.com)`, `Key (phone)=(+15551234567)`, `Key (last_name, first_name)=(Smith, John)`, and `Failing row contains (uuid, email, John, Smith, 1985-06-12, ...)` are all canonical PG output shapes that leak cross-tenant PHI to any authenticated caller.
+
+**Three-layer model**:
+
+1. **Persistence layer** — `process_domain_event()` trigger now writes `processing_error = MESSAGE_TEXT` only; raw `PG_EXCEPTION_DETAIL` is preserved in NEW column `processing_error_detail` accessible only via a permission-gated RPC (`api.get_failed_events_with_detail()` gated on `platform.view_event_details`). Forensic parity with pre-migration behavior preserved; no operator-debug regression. `RAISE WARNING` in PG logs unchanged.
+
+2. **SDK boundary (frontend)** — `frontend/src/services/api/envelope.ts` provides `unwrapApiEnvelope<T>(rpcResult): ApiEnvelope<T>` as the only sanctioned way to read `error` off an `api.*` envelope. Helper applies `frontend/src/utils/maskPii.ts` exactly once. `supabaseService.apiRpcEnvelope<T>()` is the typed entry point. `apiRpc<T>` is also augmented to mask `PostgrestError.{message, details, hint}` for read-shape RPCs.
+
+3. **Source-side prevention** — handler/RPC `RAISE EXCEPTION` strings MUST NOT interpolate user/client identifiers. Use `USING ERRCODE = '<opaque>'` + a generic message instead. Codified as Rule 16 in `.claude/skills/infrastructure-guidelines/SKILL.md`. Five baseline_v4 violations were remediated in migration `20260430002824` (functions: `api.bulk_assign_role`, `api.sync_role_assignments`, `public.retry_failed_bootstrap`, `public.switch_organization`, `public.validate_role_scope_path_active`).
+
+**Workflow consumers**: `workflows/src/shared/utils/event-queries.ts:204,292-293` reads `processing_error` for failed-workflow rollups. Audit verdict: server-internal aggregation; never echoed to a frontend client. **No remediation needed**. Workflows that need forensic detail SELECT directly from `domain_events.processing_error_detail` — service role bypasses RLS and bypasses the RPC permission gate.
+
+**Edge Function audit (8 functions)**: All Edge Functions that surface PG/RPC error text route through one of three chokepoints:
+- `_shared/error-response.ts` `handleRpcError()` — masked at L185 (`details: maskPii(rpcError.message)`).
+- `_shared/error-response.ts` `createInternalError()` — masked at L286 (`details: details ? maskPii(details) : undefined`).
+- `invite-user/index.ts:382` (`sendInvitationEmail` catch path) — local helper, masked inline.
+- `invite-user/index.ts:369` (Resend non-OK response path) — masked inline.
+Affected functions: `accept-invitation`, `invite-user`, `manage-user`, `organization-bootstrap`, `organization-delete`, `validate-invitation`, `workflow-status`. Per-function Deno tests verify masking; CI runs them via `.github/workflows/supabase-edge-functions-test.yml`.
+
+**Client-side telemetry audit (frontend)**: `frontend/src/utils/logger.ts` `remote` output target is dead/stub code (TODO comment, no fetch implementation). No Sentry/Datadog/external SaaS shipper is currently configured. `LogOverlay.tsx` intercepts `console.error` for in-development overlay only — receives masked text under the new SDK boundary. Mask in **all environments** (no dev-only escape hatch). Re-audit when a SaaS shipper is introduced.
+
+**ESLint rule (deferred)**: a `no-restricted-syntax` rule forbidding direct `.schema('api').rpc(` outside `supabase.service.ts` and `envelope.ts` is **planned** but not yet shipped — the repo's `--max-warnings 0` lint policy means the rule cannot ship until existing call sites (~70 across 8 services) are migrated to `apiRpcEnvelope<T>`. Rule + bulk migration land together in a follow-up card.
 
 ## Contract
 

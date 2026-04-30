@@ -29,6 +29,7 @@ import type {
 } from '@/types/event-monitoring.types';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
+import { maskPii } from '@/utils/maskPii';
 
 const log = Logger.getLogger('api');
 
@@ -191,7 +192,12 @@ export class EventMonitoringService {
         event_type: row.event_type,
         event_data: row.event_data,
         event_metadata: row.event_metadata as FailedEvent['event_metadata'],
-        processing_error: row.processing_error,
+        // PII mask: row.processing_error is MESSAGE_TEXT only post-migration, but the field
+        // historically carried PG_EXCEPTION_DETAIL row data. Mask defensively for the admin
+        // dashboard so /admin/events sees the same sanitized text every other consumer sees.
+        // Forensic detail (raw PG_EXCEPTION_DETAIL) is available only via
+        // api.get_failed_events_with_detail() gated on platform.view_event_details.
+        processing_error: maskPii(row.processing_error),
         created_at: row.created_at,
         processed_at: row.processed_at,
         dismissed_at: row.dismissed_at,
@@ -288,10 +294,14 @@ export class EventMonitoringService {
         };
       }
 
+      // PII mask: data.new_error comes from api.retry_failed_event which returns the raw
+      // domain_events.processing_error column. Mask before logging or surfacing to UI.
+      const maskedNewError = maskPii(data.new_error);
+
       log.info('Event retry completed', {
         eventId,
         success: data.success,
-        newError: data.new_error,
+        newError: maskedNewError,
       });
 
       return {
@@ -299,7 +309,7 @@ export class EventMonitoringService {
         data: {
           success: data.success,
           event_id: data.event_id,
-          new_error: data.new_error,
+          new_error: maskedNewError || null,
           retried_at: data.retried_at,
         },
       };
