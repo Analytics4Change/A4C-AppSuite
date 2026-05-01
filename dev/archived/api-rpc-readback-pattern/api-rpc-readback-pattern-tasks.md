@@ -395,7 +395,7 @@ Wires into CI alongside existing `plpgsql_check` (which only catches static erro
 | ID | Title | Status |
 |----|-------|--------|
 | Blocker-3-followup-1 | Primary-phone exclusivity invariant (partial unique index + handler logic) | ⏸️ Parked |
-| Blocker-3-followup-2 | `manage-user` Edge Function fallback removal (acceptance: N days / zero fallback `log.warn` events) | ⏸️ Parked |
+| Blocker-3-followup-2 | `manage-user` Edge Function fallback removal (acceptance: N days / zero fallback `log.warn` events) | 🔍 In Verification (pending query results) — [verification packet](../../../dev/active/api-rpc-readback-pattern/blocker-3-followup-2-verification-2026-05-01.md) · [draft PR #45](https://github.com/Analytics4Change/A4C-AppSuite/pull/45) |
 | Blocker-3-followup-3 | Broader RPC-params contract tests (enumerate all `api.*` functions) | ⏸️ Parked |
 | Blocker-3-followup-4 | `frontend/src/viewModels/users/CLAUDE.md` VM-level docs | ⏸️ Parked |
 | Blocker-3-followup-5 | `updateUser` optional in-place patch in consumer VMs | ⏸️ Parked |
