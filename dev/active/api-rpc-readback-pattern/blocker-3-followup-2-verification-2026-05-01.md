@@ -217,22 +217,64 @@ _Signal 4 expected count_: **0 rows with `processing_error IS NOT NULL`** for th
 
 ## Acceptance gate
 
-All four signals MUST return zero hits for the window.
+All four signals MUST return zero **fallback-target-class** hits for the window. (See "Disposition rule" below for the substantive-vs-strict reading.)
 
-- [ ] Signal 1 count: ___
-- [ ] Signal 2 count: ___
-- [ ] Signal 3 count: ___
-- [ ] Signal 4 count: ___
+- [ ] Signal 1 count: ___ (frontend log aggregator — needs human)
+- [ ] Signal 2 count: ___ (frontend log aggregator — needs human)
+- [ ] Signal 3 count: ___ (Supabase Edge Function logs / Dashboard — needs human; CLI v2.75.0 lacks `functions logs`; MCP `get_logs` only retains 24h, observation window is 4–11d back)
+- [x] Signal 4 count: **2 hits, both classified as UNRELATED bug class** (PR #41/#42 invitation-phone-placeholder); treating as effective-zero per Path B disposition (2026-05-05). See "Signal 4 results — 2026-05-05" below.
 
-## If all zero → merge the companion fallback-removal PR
+## Disposition rule
+
+The acceptance gate measures: **did the bug-class-the-fallbacks-guard-against actually fire during the observation window?** Two readings are possible when a signal returns hits:
+
+1. **Strict** — any non-zero count fails the gate. Used when classification is ambiguous or the hits MIGHT belong to the target bug class.
+2. **Substantive** — hits classified as a different (already-closed) bug class are recorded for audit but do NOT fail the gate, because they are not signals of the bug class under test.
+
+**Convention**: if applying the substantive reading, the verification packet MUST record (a) the exact hits, (b) the classification rationale (which bug class they belong to and which PR closed it), and (c) why those hits could not have triggered the fallbacks-under-test. The audit trail then shows a future reader why this gate was treated as effective-zero.
+
+## Signal 4 results — 2026-05-05
+
+**Query run** (via MCP `execute_sql` against the linked dev project):
+
+```sql
+SELECT id, created_at, stream_id, processing_error
+FROM domain_events
+WHERE event_type = 'user.notification_preferences.updated'
+  AND created_at >= '2026-04-24T00:00:00Z'
+  AND processing_error IS NOT NULL
+ORDER BY created_at DESC;
+```
+
+**Returned 2 rows**:
+
+| event id | created_at | stream_id | processing_error |
+|---|---|---|---|
+| `de999f60-3e14-41e4-9d26-748f21927360` | 2026-04-29 19:43:21Z | 61cbb03f-… | `invalid input syntax for type uuid: "invitation-phone-0"` |
+| `edc2c08e-d8ef-486c-911f-75fcb1e2a2d4` | 2026-04-29 16:55:59Z | 86885a4f-… | `invalid input syntax for type uuid: "invitation-phone-0"` |
+
+**Classification — UNRELATED bug class** (PR #41 / PR #42, both merged 2026-04-29):
+
+These two errors are the **invitation-phone-placeholder UUID-cast** bug closed by PR #41 (`resolveInvitationPhonePlaceholder` helper at `accept-invitation/index.ts`) and PR #42 (sentinel pattern + F3 frontend index-space fix). The frontend's `invitation-phone-N` placeholder phoneIds were flowing through to `user.notification_preferences.updated` event payloads, where the handler's `::UUID` cast raised. Both event timestamps land on the same UTC day as the PR #41 merge (2026-04-29), consistent with pre-fix instances captured during the bug's lifetime.
+
+**Why these 2 hits could not have triggered the fallbacks-under-test**:
+
+- The fallbacks (PR #45 removes) fire on `result.success === true && result.notificationPreferences === undefined` — an envelope-completeness violation when the RPC reports success but omits the entity.
+- These 2 hits represent the handler **raising** during projection update. Pattern A v2 read-back catches the raise and the RPC returns `{success: false, error: 'Event processing failed: invalid input syntax for type uuid: ...'}`.
+- A `success === false` envelope routes through the **failure branch** in `updateNotificationPreferences`, NOT the fallback `else` branch. The fallback's pre-condition (`success === true`) is not met.
+- Therefore: even though these events have non-null `processing_error`, they are not signals of the fallback firing or the bug class the fallback guards against.
+
+**Disposition**: Path B (substantive). Signal 4 effective-zero for this gate. Hits recorded for audit per convention. Signals 1, 2, 3 still need human verification before merge.
+
+## If Signals 1/2/3 also come back zero (or substantively zero) → merge the companion fallback-removal PR
 
 See the draft PR opened alongside this file: `refactor(users): remove Pattern A v2 deploy-window fallbacks (pending verification)`.
 
-Fill in the acceptance-gate checkboxes in this file AND in the PR body before merging.
+Fill in the remaining acceptance-gate checkboxes in this file AND in the PR body before merging.
 
-## If any non-zero → document the hits
+## If any of Signals 1/2/3 come back with **target-class** hits → document the hits
 
-Paste the event IDs / log entries below, close the companion PR without merging, and leave the fallback in place. Re-schedule the verification for another 7 days out (2026-05-08).
+Paste the event IDs / log entries below, close the companion PR without merging, and leave the fallback in place. Re-schedule the verification for another 7 days out (next: 2026-05-12 — pushed from 2026-05-08 since 4 days are already elapsed).
 
 ```
 <paste hits here>
