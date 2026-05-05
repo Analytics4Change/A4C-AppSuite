@@ -492,11 +492,21 @@ export const OrganizationsManagePage: React.FC = observer(() => {
       log.info('Organization deleted', { orgId: formVM.orgId });
       setPanelMode('empty');
       setFormVM(null);
+      // Clear stale URL params so the URL→state effect doesn't re-select
+      // the just-deleted organization and surface a stale "could not load" error.
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('orgId');
+          return next;
+        },
+        { replace: true }
+      );
     } else {
       setDialogState({ type: 'none' });
       setOperationError(result.error || 'Failed to delete organization');
     }
-  }, [formVM, listVM]);
+  }, [formVM, listVM, setSearchParams]);
 
   const handleDeactivateFirst = useCallback(() => {
     setDialogState({ type: 'deactivate', isLoading: false });

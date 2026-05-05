@@ -85,7 +85,7 @@ type DialogState =
  */
 export const UsersManagePage: React.FC = observer(() => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { session } = useAuth();
   const organizationId = session?.claims?.org_id ?? '';
 
@@ -563,7 +563,18 @@ export const UsersManagePage: React.FC = observer(() => {
         setPanelMode('empty');
         setFormViewModel(null);
         setCurrentItem(null);
-        // List refresh is handled by the viewModel.deleteUser method
+        // List refresh is handled by the viewModel.deleteUser method.
+        // Clear stale URL params so the URL→state effect doesn't re-select
+        // the just-deleted entity and surface a "could not be loaded" error.
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('userId');
+            next.delete('invitationId');
+            return next;
+          },
+          { replace: true }
+        );
       } else {
         setDialogState({ type: 'none' });
         const message = result.error || 'Failed to delete user';
@@ -576,7 +587,7 @@ export const UsersManagePage: React.FC = observer(() => {
       setOperationError(message);
       toast.error(message);
     }
-  }, [currentItem, viewModel]);
+  }, [currentItem, viewModel, setSearchParams]);
 
   // Save notification preferences handler — routes through the ViewModel so
   // the Pattern A v2 in-place patch + isSubmitting state stay aligned with
