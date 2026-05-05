@@ -459,6 +459,18 @@ export const RolesManagePage: React.FC = observer(() => {
         setPanelMode('empty');
         setFormViewModel(null);
         setCurrentRole(null);
+        // Clear the `roleId` URL param so the URL→state effect at the top of
+        // this component doesn't re-fire on the just-deleted roleId, hit
+        // `getRoleById` returning null, and surface a stale "Role could not
+        // be loaded" error to the user. (Reproduced manually 2026-05-05.)
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('roleId');
+            return next;
+          },
+          { replace: true }
+        );
       } else {
         setDialogState({ type: 'none' });
         setOperationError(result.error || 'Failed to delete role');
@@ -467,7 +479,7 @@ export const RolesManagePage: React.FC = observer(() => {
       setDialogState({ type: 'none' });
       setOperationError(error instanceof Error ? error.message : 'Failed to delete role');
     }
-  }, [currentRole, viewModel]);
+  }, [currentRole, viewModel, setSearchParams]);
 
   // Handle "deactivate first" flow from active warning dialog
   const handleDeactivateFirst = useCallback(() => {

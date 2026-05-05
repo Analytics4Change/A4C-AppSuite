@@ -339,6 +339,16 @@ export const SchedulesManagePage: React.FC = observer(() => {
         setPanelMode('empty');
         setFormViewModel(null);
         setCurrentTemplate(null);
+        // Clear stale URL params so the URL→state effect doesn't re-select
+        // the just-deleted template and surface a stale "could not load" error.
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('templateId');
+            return next;
+          },
+          { replace: true }
+        );
       } else if (result.errorDetails?.code === 'HAS_USERS') {
         // Show dialog listing assigned user names
         setDialogState({ type: 'none' });
@@ -356,7 +366,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
       setDialogState({ type: 'none' });
       setOperationError(error instanceof Error ? error.message : 'Failed to delete template');
     }
-  }, [currentTemplate, viewModel]);
+  }, [currentTemplate, viewModel, setSearchParams]);
 
   const handleDeactivateFirst = useCallback(() => {
     setDialogState({ type: 'deactivate', isLoading: false });
