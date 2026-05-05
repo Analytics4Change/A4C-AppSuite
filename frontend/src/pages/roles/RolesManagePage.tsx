@@ -459,10 +459,8 @@ export const RolesManagePage: React.FC = observer(() => {
         setPanelMode('empty');
         setFormViewModel(null);
         setCurrentRole(null);
-        // Clear the `roleId` URL param so the URL→state effect at the top of
-        // this component doesn't re-fire on the just-deleted roleId, hit
-        // `getRoleById` returning null, and surface a stale "Role could not
-        // be loaded" error to the user. (Reproduced manually 2026-05-05.)
+        // Clear stale URL params so the URL→state effect doesn't re-select
+        // the just-deleted entity and surface a stale "could not load" error.
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev);
