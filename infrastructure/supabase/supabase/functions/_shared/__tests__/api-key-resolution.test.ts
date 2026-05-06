@@ -48,6 +48,15 @@ Deno.test('resolveAnonKey: falls back to env when header is empty string', () =>
   assertEquals(resolveAnonKey(req, env), 'env-fallback');
 });
 
+Deno.test('resolveAnonKey: header lookup is case-insensitive (guards against future regression)', () => {
+  // The Fetch Headers API is case-insensitive by spec; this test fails if
+  // anyone replaces `req.headers.get(...)` with a case-sensitive lookup
+  // (e.g. an object/Map by raw key).
+  const req = reqWithHeaders({ ApiKey: 'sb_publishable_MIXED_CASE_HEADER' });
+  const env = buildEnv({ SUPABASE_ANON_KEY: 'env-fallback-should-not-be-used' });
+  assertEquals(resolveAnonKey(req, env), 'sb_publishable_MIXED_CASE_HEADER');
+});
+
 // ----- resolveServiceRoleKey ----------------------------------------------
 
 Deno.test('resolveServiceRoleKey: prefers APP_SECRET_KEY when set', () => {

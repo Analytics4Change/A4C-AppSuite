@@ -27,6 +27,18 @@ supabase secrets set APP_SECRET_KEY=sb_secret_YOUR_KEY --project-ref <project-re
 ```
 Then redeploy Edge Functions (push to main, or `gh workflow run edge-functions-deploy.yml`).
 
+> **⚠️ Operational Sequence Hazard — self-DOS via missing `APP_SECRET_KEY`**
+>
+> If you flip "Disable legacy API keys" in the Supabase Dashboard **before** `APP_SECRET_KEY` is set in Edge Function secrets, every admin Edge Function (`accept-invitation`, `invite-user`, `manage-user`, `validate-invitation`, `workflow-status`) will return "Legacy API keys are disabled" at the API gateway. Effective service outage on the invitation + user-management surface.
+>
+> **Pre-flight check before disabling legacy:**
+> 1. `supabase secrets list --project-ref <ref>` — confirm `APP_SECRET_KEY` is present.
+> 2. Trigger a redeploy AFTER the secret was set: `gh workflow run edge-functions-deploy.yml` (Edge Functions read env at invocation time but the auto-inject fixes for prefix-reserved vars require a redeploy to take effect — set the secret first, redeploy second).
+> 3. Smoke a non-destructive admin call (e.g. `validate-invitation` with a stub token).
+> 4. Only then flip the toggle.
+>
+> **Recovery if you got the order wrong**: re-enable legacy keys in the Dashboard (instant), set `APP_SECRET_KEY`, redeploy, smoke, then re-disable. No data loss; ~5 minutes of admin-call outage.
+
 ### Backend API Configuration (Optional)
 
 | Variable | Description | Example | Default | Required |
