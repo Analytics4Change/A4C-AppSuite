@@ -70,6 +70,19 @@
 --      UI degrades gracefully on raw ltree paths. View permissions
 --      should be granted explicitly.
 --
+--   7. Forward-looking note for sub-tenant-admin work
+--      (`dev/active/sub-tenant-admin-design/`): when role assignments
+--      eventually live at narrower scopes (e.g., a "South Valley
+--      Admin" assigned at `testorg.south_valley` instead of tenant
+--      root), `compute_effective_permissions`'s `we.scope_path`
+--      inheritance (baseline_v4:6970) propagates the narrower scope to
+--      the derived permissions added here. So a holder of
+--      `role.create` at `testorg.south_valley` will get
+--      `organization.view_ou` at `testorg.south_valley` (NOT tenant
+--      root). The new edges automatically benefit from this property —
+--      no change required to this migration when sub-tenant admin
+--      semantics arrive.
+--
 -- See:
 --   - documentation/architecture/decisions/adr-rpc-readback-pattern.md (no new RPC; not applicable)
 --   - infrastructure/supabase/CLAUDE.md § Critical Rules (CQRS distinction:
@@ -128,3 +141,35 @@ SELECT p1.id, p2.id
 FROM permissions_projection p1, permissions_projection p2
 WHERE p1.name = 'user.role_revoke' AND p2.name = 'user.view'
 ON CONFLICT DO NOTHING;
+
+-- =====================================================================
+-- Postcondition assertion (per architect review P2-A, 2026-05-06)
+-- =====================================================================
+-- The per-edge `INSERT ... SELECT FROM permissions_projection WHERE
+-- name = '<literal>'` pattern silently produces zero rows if a
+-- permission is ever renamed without updating this migration. The
+-- pattern is also used 4× in `sql/99-seeds/003-permission-implications-seed.sql`
+-- with the same latent risk. Make the postcondition explicit:
+DO $$
+DECLARE
+  v_actual integer;
+BEGIN
+  SELECT COUNT(*) INTO v_actual
+  FROM permission_implications pi
+  JOIN permissions_projection p1 ON p1.id = pi.permission_id
+  JOIN permissions_projection p2 ON p2.id = pi.implies_permission_id
+  WHERE (p1.name, p2.name) IN (
+    ('role.create',      'organization.view_ou'),
+    ('role.update',      'organization.view_ou'),
+    ('role.delete',      'organization.view_ou'),
+    ('user.role_assign', 'organization.view_ou'),
+    ('user.role_revoke', 'organization.view_ou'),
+    ('user.role_revoke', 'user.view')
+  );
+  IF v_actual <> 6 THEN
+    RAISE EXCEPTION
+      'Postcondition violated: expected 6 implication rows, found %. '
+      'Likely cause: a source or target permission name was renamed '
+      'without updating this migration.', v_actual;
+  END IF;
+END $$;
