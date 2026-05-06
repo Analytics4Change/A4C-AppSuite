@@ -9,8 +9,23 @@ These environment variables must be configured in Supabase Dashboard → Project
 | Variable | Description | Example | Required |
 |----------|-------------|---------|----------|
 | `SUPABASE_URL` | Supabase project URL | `https://yourproject.supabase.co` | Yes (auto-set) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key for admin operations | `eyJhbGc...` | Yes (auto-set) |
-| `SUPABASE_ANON_KEY` | Anonymous key for client operations | `eyJhbGc...` | Yes (auto-set) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (LEGACY auto-injected; see APP_SECRET_KEY note below) | `eyJhbGc...` or `sb_secret_...` | No (fallback only) |
+| `SUPABASE_ANON_KEY` | Anonymous key (LEGACY auto-injected; per-call resolution prefers request `apikey` header) | `eyJhbGc...` or `sb_publishable_...` | Yes (auto-set, fallback only) |
+| `APP_SECRET_KEY` | **Preferred** secret key for admin operations — set explicitly to bypass the auto-inject bug ([supabase/supabase#37648](https://github.com/supabase/supabase/issues/37648)) | `sb_secret_...` | Yes (admin functions, set explicitly) |
+
+**Why `APP_SECRET_KEY`?**
+
+When migrating from legacy JWT keys to the new `sb_publishable_*`/`sb_secret_*` system, the auto-injected `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_ANON_KEY` Edge Function env vars retain the legacy JWT values even after legacy keys are disabled at the project level. Calls using those values fail at the API gateway with "Legacy API keys are disabled".
+
+**Workarounds applied in `_shared/api-key-resolution.ts`**:
+- **Anon key**: pulled from the inbound request's `apikey:` header (frontend always sends the current publishable key). The env var is fallback only.
+- **Service role / secret key**: read from the custom-named `APP_SECRET_KEY` env var (the `SUPABASE_` prefix is reserved by the platform and can't be overridden via `supabase secrets set`). The auto-injected `SUPABASE_SERVICE_ROLE_KEY` is fallback only.
+
+**Setting `APP_SECRET_KEY`**:
+```bash
+supabase secrets set APP_SECRET_KEY=sb_secret_YOUR_KEY --project-ref <project-ref>
+```
+Then redeploy Edge Functions (push to main, or `gh workflow run edge-functions-deploy.yml`).
 
 ### Backend API Configuration (Optional)
 
@@ -53,10 +68,13 @@ supabase secrets set RESEND_API_KEY=re_YOUR_API_KEY --project-ref <project-ref>
 4. Verify the following variables are set:
 
 ```bash
-# Supabase (auto-configured by Supabase)
+# Supabase (auto-configured by Supabase — fallback only after migration to new API keys)
 SUPABASE_URL=<auto-set-by-supabase>
 SUPABASE_SERVICE_ROLE_KEY=<auto-set-by-supabase>
 SUPABASE_ANON_KEY=<auto-set-by-supabase>
+
+# Custom-named secret key (PREFERRED for admin ops; bypasses auto-inject bug)
+APP_SECRET_KEY=sb_secret_YOUR_KEY
 
 # Backend API (optional - uses default if not set)
 # BACKEND_API_URL=https://api-a4c.firstovertheline.com

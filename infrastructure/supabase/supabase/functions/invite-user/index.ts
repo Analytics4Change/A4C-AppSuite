@@ -16,6 +16,7 @@ import {
   validateEmailFunctionEnv,
   validateAdminFunctionEnv,
 } from '../_shared/env-schema.ts';
+import { resolveAnonKey, resolveServiceRoleKey } from '../_shared/api-key-resolution.ts';
 import { AnySchemaSupabaseClient, JWTPayload, hasPermission } from '../_shared/types.ts';
 import {
   handleRpcError,
@@ -471,7 +472,7 @@ serve(async (req) => {
     }
 
     // Create Supabase client with user's JWT for auth validation
-    const supabaseUser = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    const supabaseUser = createClient(env.SUPABASE_URL, resolveAnonKey(req, env), {
       global: { headers: { Authorization: authHeader } },
     });
 
@@ -520,8 +521,8 @@ serve(async (req) => {
     // ADMIN CLIENT SETUP (needed for both resend and create operations)
     // ==========================================================================
     // Use service role for database operations
-    // Note: SUPABASE_SERVICE_ROLE_KEY is guaranteed by Stage 2 validation above
-    const supabaseAdmin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY!, {
+    // Note: APP_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY is guaranteed by Stage 2 validation above
+    const supabaseAdmin = createClient(env.SUPABASE_URL, resolveServiceRoleKey(env)!, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -709,7 +710,7 @@ serve(async (req) => {
 
       // Create a Supabase client with the user's JWT to validate as them
       // This uses their permissions/scopes to check what they can assign
-      const supabaseUserApi = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+      const supabaseUserApi = createClient(env.SUPABASE_URL, resolveAnonKey(req, env), {
         global: { headers: { Authorization: authHeader } },
         db: { schema: 'api' },
       });

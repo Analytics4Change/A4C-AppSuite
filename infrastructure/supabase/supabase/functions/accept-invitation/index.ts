@@ -10,6 +10,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+import { resolveServiceRoleKey } from '../_shared/api-key-resolution.ts';
 import {
   handleRpcError,
   createValidationError,
@@ -302,15 +303,16 @@ serve(async (req) => {
     return createEnvErrorResponse('accept-invitation', DEPLOY_VERSION, error.message, corsHeaders);
   }
 
-  // This function requires service role key (not auto-set by Supabase)
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
-    return createEnvErrorResponse('accept-invitation', DEPLOY_VERSION, 'SUPABASE_SERVICE_ROLE_KEY is required', corsHeaders);
+  // This function requires service role / secret key (APP_SECRET_KEY preferred;
+  // see _shared/api-key-resolution.ts for the auto-inject workaround rationale)
+  if (!env.APP_SECRET_KEY && !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return createEnvErrorResponse('accept-invitation', DEPLOY_VERSION, 'APP_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY is required', corsHeaders);
   }
 
   try {
     // Initialize Supabase client with service role
     // Use 'api' schema since that's what's exposed through PostgREST
-    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    const supabase = createClient(env.SUPABASE_URL, resolveServiceRoleKey(env)!, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
