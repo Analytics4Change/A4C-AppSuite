@@ -20,6 +20,42 @@ Verified empirical state (2026-04-27, against `tmrjlswbsxmbglmaclxu`):
 - All role assignments at depth 1 (no sub-tenant OU assignments exist).
 - 0 of 6 users have `current_org_unit_id` populated.
 
+## Phase 0 Discovery — narrower alternative vs. full sub-tenant admin
+
+> **Decide before §1.** Sub-tenant admin (this card's full scope) is potentially over-scoped for the immediate need. There is a narrower alternative that solves role-management gating without any user-model evolution.
+
+### Two architectural alternatives
+
+1. **Sub-tenant admin (this card's full scope)** — assign roles like "South Valley Admin" at scope `testorg-20260329.south_valley`, not at tenant root. Reuses `effective_permissions[].s` ltree containment via `has_effective_permission(perm, target_path)`. **Requires user-identity to acquire OU-bounded location** (per "Trigger" above). Heavy: user-model evolution, multi-role aggregation, identity-vs-shift-OU distinction, helper redesign, RPC retrofit across `delete_user` / `deactivate_user` / `update_user_profile` etc.
+
+2. **Role-scope containment check** — distinct from actor's `effective_permissions[].s` paths: `actor's role's org_hierarchy_scope @> target role's org_hierarchy_scope`. Reads as "South Valley Admin can only manage role assignments whose scope is at-or-below `south_valley`." **No user-model change required.** The check sits at the role-management RPC layer (`modify_user_roles`, `assign_role`, `revoke_role`). Targets a `user_roles_projection` row — which already has `scope_path` — not a user identity.
+
+### Which alternative is actually needed?
+
+Matrix the two against the operation taxonomy in §3 below:
+
+| Operation class | Examples | Option 2 sufficient? | Why |
+|---|---|---|---|
+| **Role-scoped** | `modify_user_roles`, `assign_role`, `revoke_role`, `bulk_assign_role` | ✅ Yes | Target has scope (`user_roles_projection.scope_path`); the canonical pattern is already implemented in `baseline_v4 bulk_assign_role`. Actor's role scope @> target row's scope is the natural check. |
+| **Identity-scoped** | `delete_user`, `deactivate_user`, `update_user_profile`, `update_notification_preferences` | ❌ No | Target has no scope today; needs user-identity OU evolution (Option 1). Option 2 cannot answer "is this user under my administrative authority?" because user identity has no path. |
+
+### Phase 0 finding
+
+**Option 2 is the smaller hammer for role-management gating; Option 1 (this card's full scope) is the broader capability for identity-scoped delegation.** They are not substitutes — they apply to different operation classes.
+
+- If the immediate business driver is **role-management only** (e.g., "South Valley Admin shouldn't be able to assign roles outside south_valley"): ship Option 2 as a focused implementation card and defer this one.
+- If the driver **also includes identity-scoped delegation** (e.g., "South Valley Admin should be able to delete users at south_valley"): this card's full design space applies, and Option 2 is one tactical sub-component of it.
+
+### Discovery action
+
+Phase 0 must:
+1. Enumerate the operations that today need a scope-gating boundary the platform doesn't enforce.
+2. Classify each as **role-scoped** or **identity-scoped** per the table above.
+3. **If only role-scoped operations surface**: write a separate small implementation card for Option 2 (target the role-management RPCs only) and keep this card SEEDED.
+4. **If identity-scoped operations also surface**: this card's full design space applies; proceed to §1.
+
+The 2026-05-06 surfacing case (PR #49 — South Valley Admin clicking into 42501 on `api.list_users_for_role_management`) is purely role-management-adjacent (a list-users-for-role-assignment query). It does NOT, by itself, require sub-tenant admin. It requires either (a) the existing tenancy guard already in place, or (b) Option 2 if we want to constrain South Valley Admin's role-management reach further.
+
 ## Design space
 
 ### 1. Data-model changes
