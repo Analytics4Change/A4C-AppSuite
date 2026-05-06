@@ -10,6 +10,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+import { resolveServiceRoleKey } from '../_shared/api-key-resolution.ts';
 import { JWTPayload } from '../_shared/types.ts';
 import {
   handleRpcError,
@@ -71,16 +72,17 @@ serve(async (req) => {
     return createEnvErrorResponse('workflow-status', DEPLOY_VERSION, error.message, corsHeaders);
   }
 
-  // This function requires service role key (not auto-set by Supabase)
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
-    return createEnvErrorResponse('workflow-status', DEPLOY_VERSION, 'SUPABASE_SERVICE_ROLE_KEY is required', corsHeaders);
+  // This function requires service role / secret key (APP_SECRET_KEY preferred;
+  // see _shared/api-key-resolution.ts for the auto-inject workaround rationale)
+  if (!env.APP_SECRET_KEY && !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return createEnvErrorResponse('workflow-status', DEPLOY_VERSION, 'APP_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY is required', corsHeaders);
   }
 
   console.log(`[workflow-status ${DEPLOY_VERSION}] ✓ Environment variables validated`);
 
   try {
     // Initialize Supabase client with service role
-    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = createClient(env.SUPABASE_URL, resolveServiceRoleKey(env)!);
 
     // Verify authorization (JWT token)
     const authHeader = req.headers.get('Authorization');

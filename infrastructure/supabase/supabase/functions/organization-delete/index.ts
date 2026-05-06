@@ -15,6 +15,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+import { resolveAnonKey } from '../_shared/api-key-resolution.ts';
 import { JWTPayload, hasPermission } from '../_shared/types.ts';
 import {
   createInternalError,
@@ -59,7 +60,10 @@ serve(async (req) => {
     return createEnvErrorResponse('organization-delete', DEPLOY_VERSION, error.message, corsHeaders);
   }
 
-  const { SUPABASE_URL: supabaseUrl, SUPABASE_ANON_KEY: supabaseAnonKey, BACKEND_API_URL: backendApiUrl } = env;
+  const { SUPABASE_URL: supabaseUrl, BACKEND_API_URL: backendApiUrl } = env;
+  // Anon key resolved from request header (preferred) or env fallback;
+  // see _shared/api-key-resolution.ts for the auto-inject workaround rationale.
+  const supabaseAnonKey = resolveAnonKey(req, env);
   console.log(`[organization-delete ${DEPLOY_VERSION}] ✓ Environment validated, Backend API: ${backendApiUrl}`);
 
   try {

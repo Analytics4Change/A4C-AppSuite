@@ -25,6 +25,15 @@ export const edgeFunctionEnvSchema = z.object({
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
 
+  // === Custom-named replacement for SUPABASE_SERVICE_ROLE_KEY ===
+  // The `SUPABASE_` prefix is reserved by the platform and the auto-injected
+  // SUPABASE_SERVICE_ROLE_KEY may carry a stale legacy JWT value even after
+  // disabling legacy keys (https://github.com/supabase/supabase/issues/37648).
+  // Set explicitly via: `supabase secrets set APP_SECRET_KEY=sb_secret_...`
+  // Resolved at call sites via `resolveServiceRoleKey()` from
+  // `_shared/api-key-resolution.ts` (prefers this over the auto-injected var).
+  APP_SECRET_KEY: z.string().min(1).optional(),
+
   // === Domain Configuration ===
   // PLATFORM_BASE_DOMAIN is the single source of truth for all domain configuration.
   // Other domain-related values are derived from this:
@@ -88,6 +97,7 @@ export function validateEdgeFunctionEnv(functionName: string): EdgeFunctionEnv {
     SUPABASE_URL: Deno.env.get('SUPABASE_URL'),
     SUPABASE_ANON_KEY: Deno.env.get('SUPABASE_ANON_KEY'),
     SUPABASE_SERVICE_ROLE_KEY: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+    APP_SECRET_KEY: Deno.env.get('APP_SECRET_KEY'),
     PLATFORM_BASE_DOMAIN: Deno.env.get('PLATFORM_BASE_DOMAIN'),
     BACKEND_API_URL: Deno.env.get('BACKEND_API_URL'),
     FRONTEND_URL: Deno.env.get('FRONTEND_URL'),
@@ -209,8 +219,11 @@ export function validateEmailFunctionEnv(
 }
 
 /**
- * Validate environment for admin functions (require service role key).
- * Stage 2 check: Requires SUPABASE_SERVICE_ROLE_KEY.
+ * Validate environment for admin functions (require service role / secret key).
+ * Stage 2 check: Requires either `APP_SECRET_KEY` (preferred) or the
+ * auto-injected `SUPABASE_SERVICE_ROLE_KEY` (fallback). The actual call sites
+ * resolve precedence via `resolveServiceRoleKey()` in
+ * `_shared/api-key-resolution.ts`.
  *
  * @param env - Validated environment from Stage 1
  * @param functionName - Name of the function for error messages
@@ -231,10 +244,13 @@ export function validateAdminFunctionEnv(
 ): ValidationResult {
   const errors: string[] = [];
 
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!env.APP_SECRET_KEY && !env.SUPABASE_SERVICE_ROLE_KEY) {
     errors.push(
-      `SUPABASE_SERVICE_ROLE_KEY is required for ${functionName}. ` +
-      'This should be auto-injected by Supabase.'
+      `Service role / secret key is required for ${functionName}. ` +
+      'Set APP_SECRET_KEY explicitly via `supabase secrets set ' +
+      'APP_SECRET_KEY=sb_secret_...` (preferred — bypasses the auto-inject ' +
+      'bug for SUPABASE_-prefixed vars). Or rely on the auto-injected ' +
+      'SUPABASE_SERVICE_ROLE_KEY for local dev.'
     );
   }
 

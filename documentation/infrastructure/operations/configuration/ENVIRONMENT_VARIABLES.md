@@ -239,28 +239,42 @@ export function validateConfiguration(): ConfigValidationResult {
 
 ### Edge Functions Validation
 
-Edge functions validate at the start of each request handler:
+Edge functions validate at the start of each request handler. The shared
+`_shared/env-schema.ts` module provides Stage 1 (Zod-typed) validation and
+Stage 2 helpers that admin functions call to gate on the service-role / secret
+key. The actual signatures are the source of truth — see
+`infrastructure/supabase/supabase/functions/_shared/env-schema.ts`.
 
 ```typescript
-// infrastructure/supabase/supabase/functions/organization-bootstrap/index.ts
-import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+// Pattern: Stage 1 (typed env) + Stage 2 (admin gate)
+import {
+  validateEdgeFunctionEnv,
+  validateAdminFunctionEnv,
+  createEnvErrorResponse,
+} from '../_shared/env-schema.ts';
 
 serve(async (req) => {
-  // Validate environment - fail fast
+  // Stage 1: Zod validation — fail fast on missing/typed env
   let env;
   try {
-    env = validateEdgeFunctionEnv('organization-bootstrap');
+    env = validateEdgeFunctionEnv('your-function');
   } catch (error) {
-    return createEnvErrorResponse('organization-bootstrap', DEPLOY_VERSION, error.message, corsHeaders);
+    return createEnvErrorResponse('your-function', DEPLOY_VERSION, error.message, corsHeaders);
   }
 
-  // Additional check for service role key
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
-    return createEnvErrorResponse('organization-bootstrap', DEPLOY_VERSION,
-      'SUPABASE_SERVICE_ROLE_KEY is required', corsHeaders);
+  // Stage 2: Admin functions only — accepts APP_SECRET_KEY OR SUPABASE_SERVICE_ROLE_KEY
+  // (see "APP_SECRET_KEY" below for the workaround rationale)
+  const adminCheck = validateAdminFunctionEnv(env, 'your-function');
+  if (!adminCheck.valid) {
+    return createEnvErrorResponse('your-function', DEPLOY_VERSION,
+      adminCheck.errors.join('; '), corsHeaders);
   }
 
-  // Now safe to use env.SUPABASE_URL, env.BACKEND_API_URL, etc.
+  // Now safe to use the typed env. For createClient calls, use the resolvers
+  // in `_shared/api-key-resolution.ts` to bypass the SUPABASE_*-prefix
+  // auto-inject bug:
+  //   const supabaseUser  = createClient(env.SUPABASE_URL, resolveAnonKey(req, env), …);
+  //   const supabaseAdmin = createClient(env.SUPABASE_URL, resolveServiceRoleKey(env)!, …);
 });
 ```
 
@@ -1167,11 +1181,41 @@ These are automatically provided by the Supabase platform:
 
 **Purpose**: Service role API key for privileged operations
 **Auto-Injected**: Yes (by Supabase platform)
-**Required**: Depends on function
+**Required**: Fallback only — admin functions prefer `APP_SECRET_KEY` (see below)
 
 **Behavior Influence**: Enables bypassing RLS for administrative operations
 
 **Security Note**: Only use for trusted backend operations, never expose to clients
+
+> **⚠️ Auto-inject bug** ([supabase/supabase#37648](https://github.com/supabase/supabase/issues/37648)): after migrating to the new `sb_publishable_*`/`sb_secret_*` API key system AND disabling legacy keys at the project level, this auto-injected env var continues to return the legacy JWT value. Calls using it then fail at the API gateway with "Legacy API keys are disabled". Admin Edge Functions therefore prefer the explicit `APP_SECRET_KEY` env var (below). Local `supabase start` dev is unaffected — falls back to the auto-injected var.
+
+#### `APP_SECRET_KEY`
+
+**Purpose**: Service role / secret API key for admin Edge Functions — explicit replacement for the auto-injected `SUPABASE_SERVICE_ROLE_KEY` that bypasses the auto-inject bug
+**Example**: `sb_secret_xxxxxxxxxxxxxxxxxxxxxxxx`
+**Required**: Yes for admin functions in production after legacy keys are disabled (otherwise fallback to `SUPABASE_SERVICE_ROLE_KEY` is acceptable, e.g. for local `supabase start` dev)
+
+**Behavior Influence**: When set, all admin Edge Functions use this value via `resolveServiceRoleKey(env)` in `_shared/api-key-resolution.ts`. Falls back to `SUPABASE_SERVICE_ROLE_KEY` if unset.
+
+**Why a custom name?** The `SUPABASE_` prefix is reserved by the Supabase platform — `supabase secrets set SUPABASE_FOO=...` is rejected. We use a non-prefixed name so the value isn't subject to the platform's auto-inject behavior.
+
+**Setting via CLI**:
+```bash
+supabase secrets set APP_SECRET_KEY=sb_secret_YOUR_KEY --project-ref <project-ref>
+# Then redeploy Edge Functions to pick up the change:
+gh workflow run edge-functions-deploy.yml
+```
+
+**Rotation**:
+1. Roll the corresponding secret key in Supabase Dashboard → Project Settings → API → Secret keys.
+2. `supabase secrets set APP_SECRET_KEY=<new-value> --project-ref <ref>`
+3. Redeploy Edge Functions: `gh workflow run edge-functions-deploy.yml` (waits for next push otherwise).
+4. Smoke test (`validate-invitation`, `workflow-status`, etc.).
+
+**Files**:
+- `infrastructure/supabase/supabase/functions/_shared/api-key-resolution.ts` — `resolveServiceRoleKey()` helper
+- `infrastructure/supabase/supabase/functions/_shared/env-schema.ts` — Zod schema entry; `validateAdminFunctionEnv()` accepts either name
+- All admin Edge Functions (`accept-invitation`, `invite-user`, `manage-user`, `validate-invitation`, `workflow-status`)
 
 ---
 
@@ -1273,7 +1317,10 @@ export const edgeFunctionEnvSchema = z.object({
   // Auto-injected by Supabase platform
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(1),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(), // Fallback only after migration to sb_secret_*
+
+  // Custom-named replacement for SUPABASE_SERVICE_ROLE_KEY (bypass auto-inject bug)
+  APP_SECRET_KEY: z.string().min(1).optional(),
 
   // Custom variables (set via Dashboard or CLI)
   PLATFORM_BASE_DOMAIN: z.string().default('firstovertheline.com'),

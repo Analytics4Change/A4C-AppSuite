@@ -24,6 +24,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
+import { resolveAnonKey, resolveServiceRoleKey } from '../_shared/api-key-resolution.ts';
 import { AnySchemaSupabaseClient, JWTPayload, hasPermission } from '../_shared/types.ts';
 import {
   handleRpcError,
@@ -128,9 +129,10 @@ serve(async (req) => {
     return createEnvErrorResponse('manage-user', DEPLOY_VERSION, error.message, corsHeaders);
   }
 
-  // Require service role key
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
-    return createEnvErrorResponse('manage-user', DEPLOY_VERSION, 'SUPABASE_SERVICE_ROLE_KEY is required', corsHeaders);
+  // Require service role / secret key (APP_SECRET_KEY preferred over the
+  // auto-injected SUPABASE_SERVICE_ROLE_KEY; see _shared/api-key-resolution.ts)
+  if (!env.APP_SECRET_KEY && !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return createEnvErrorResponse('manage-user', DEPLOY_VERSION, 'APP_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY is required', corsHeaders);
   }
 
   try {
@@ -170,7 +172,7 @@ serve(async (req) => {
     }
 
     // Create Supabase client with user's JWT for auth validation
-    const supabaseUser = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    const supabaseUser = createClient(env.SUPABASE_URL, resolveAnonKey(req, env), {
       global: { headers: { Authorization: authHeader } },
     });
 
@@ -257,7 +259,7 @@ serve(async (req) => {
     // ==========================================================================
     // VALIDATE USER EXISTS IN ORG
     // ==========================================================================
-    const supabaseAdmin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    const supabaseAdmin = createClient(env.SUPABASE_URL, resolveServiceRoleKey(env)!, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
