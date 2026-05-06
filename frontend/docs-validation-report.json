@@ -54,6 +54,11 @@
       "severity": "info"
     },
     {
+      "message": "Internal link found: ../../../documentation/architecture/decisions/adr-rpc-readback-pattern.md",
+      "file": "src/services/CLAUDE.md",
+      "severity": "info"
+    },
+    {
       "message": "Internal link found: ../../CLAUDE.md",
       "file": "src/services/CLAUDE.md",
       "severity": "info"
@@ -114,7 +119,7 @@
       "severity": "info"
     },
     {
-      "message": "Link validation completed: 19 internal links checked, all valid",
+      "message": "Link validation completed: 20 internal links checked, all valid",
       "severity": "info"
     }
   ],
@@ -124,7 +129,7 @@
     "componentsDocumented": 0,
     "apisDocumented": 0
   },
-  "timestamp": "2026-04-29T17:24:52.581Z",
+  "timestamp": "2026-05-06T02:57:10.397Z",
   "summary": {
     "hasErrors": false,
     "hasWarnings": false,

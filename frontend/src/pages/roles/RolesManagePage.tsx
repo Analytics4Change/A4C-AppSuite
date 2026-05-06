@@ -54,6 +54,7 @@ import {
 import { Logger } from '@/utils/logger';
 import { cn } from '@/components/ui/utils';
 import { isCanonicalRole } from '@/config/roles.config';
+import { useAuth } from '@/contexts/AuthContext';
 
 const log = Logger.getLogger('component');
 
@@ -78,6 +79,24 @@ type DialogState =
 export const RolesManagePage: React.FC = observer(() => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { hasPermission } = useAuth();
+
+  // Permission gate for "Manage User Assignments" button. The backend
+  // RPC `api.list_users_for_role_management` raises 42501 if the caller
+  // lacks `user.role_assign`; hide the affordance instead of letting the
+  // user click into an error. Mirrors SettingsPage permission-gating
+  // pattern (conditional render, not disable+tooltip — disable+tooltip
+  // is reserved for state-based gates like inactive role).
+  const [canManageUserAssignments, setCanManageUserAssignments] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    hasPermission('user.role_assign').then((result) => {
+      if (!cancelled) setCanManageUserAssignments(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasPermission]);
 
   // Read initial params from URL
   const initialStatus = searchParams.get('status') as 'all' | 'active' | 'inactive' | null;
@@ -781,21 +800,24 @@ export const RolesManagePage: React.FC = observer(() => {
                         Edit Role
                       </CardTitle>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleRoleAssignClick}
-                          disabled={formViewModel.isSubmitting || !currentRole.isActive}
-                          className="text-blue-600 border-blue-300 hover:bg-blue-50"
-                          title={
-                            !currentRole.isActive
-                              ? 'Activate role to manage users'
-                              : 'Add or remove user assignments for this role'
-                          }
-                        >
-                          <Users className="w-4 h-4 mr-1" />
-                          Manage User Assignments
-                        </Button>
+                        {canManageUserAssignments && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRoleAssignClick}
+                            disabled={formViewModel.isSubmitting || !currentRole.isActive}
+                            className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                            title={
+                              !currentRole.isActive
+                                ? 'Activate role to manage users'
+                                : 'Add or remove user assignments for this role'
+                            }
+                            data-testid="manage-user-assignments-button"
+                          >
+                            <Users className="w-4 h-4 mr-1" />
+                            Manage User Assignments
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
