@@ -98,9 +98,6 @@ infrastructure/
 │   └── temporal/                # Temporal.io cluster
 │       ├── values.yaml          # Helm configuration
 │       └── worker-deployment.yaml  # Worker pods
-├── terraform/                   # Infrastructure as Code (future)
-│   ├── environments/            # Environment-specific configs
-│   └── modules/                 # Reusable modules
 └── CLAUDE.md                    # Developer guidance
 ```
 
@@ -150,31 +147,11 @@ VITE_SUPABASE_ANON_KEY=your-prod-anon-key
 
 ---
 
-## Migration from Zitadel to Supabase Auth
+## Migration from Zitadel to Supabase Auth (Historical)
 
-**Status**: Frontend complete, backend in progress
+**Status**: Complete. Zitadel was deprecated October 2025; the platform now runs on Supabase Auth end-to-end. The `zitadel_*` mapping tables and column suffixes were removed in `baseline_v4.sql` (2026-02-12).
 
-### Completed (2025-10-27)
-✅ Frontend authentication architecture
-✅ Three-mode system (mock/integration/production)
-✅ Provider interface pattern
-✅ JWT claims structure defined
-✅ Mock development environment
-✅ Integration testing environment
-✅ Documentation complete
-
-### In Progress
-🚧 Database hook for JWT custom claims
-🚧 RLS policy migration to use JWT claims
-🚧 Temporal workflows for organization bootstrap
-🚧 User invitation system
-
-### Deprecated/Archived
-❌ Zitadel Terraform modules → Archived
-❌ Zitadel service integration → Removed from frontend
-❌ collect-zitadel-data.sh → Historical reference only
-
-**Note**: Some database tables retain "zitadel_" prefixes for backwards compatibility but are not actively used for authentication. These will be migrated in a future phase.
+The Terraform IaC plan that originally accompanied this migration was abandoned in favor of the Supabase CLI (for migrations) and direct kubectl/Helm (for cluster resources). The original migration plan and the Zitadel-era inventory have been moved to `documentation/archived/2026-05-deprecated-tooling/`.
 
 ---
 
@@ -345,11 +322,11 @@ temporal workflow show -w <workflow-id>
 - [ ] Test SAML flows in development
 - [ ] Document enterprise onboarding process
 
-### Phase 4: Migration Cleanup
-- [ ] Remove deprecated Zitadel mapping tables
-- [ ] Archive Zitadel Terraform modules
-- [ ] Update all documentation
-- [ ] Remove zitadel_ prefixes from tables
+### Phase 4: Migration Cleanup (Complete)
+- [x] Removed Zitadel mapping tables (baseline_v4, 2026-02-12)
+- [x] Archived Terraform modules (2026-05-06)
+- [x] Updated documentation (2026-05-06)
+- [x] Removed `zitadel_` column prefixes (baseline_v4)
 
 ---
 
@@ -363,6 +340,6 @@ For questions or issues:
 
 ---
 
-**Document Version**: 2.0
-**Last Updated**: 2025-10-27
-**Migration Status**: Frontend Complete, Backend In Progress
+**Document Version**: 2.1
+**Last Updated**: 2026-05-06
+**Migration Status**: Complete (Zitadel deprecated 2025-10; Terraform IaC plan abandoned; baseline_v4 dropped Zitadel mapping tables)

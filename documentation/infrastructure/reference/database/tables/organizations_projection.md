@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-03-06
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -42,7 +42,6 @@ The table supports multi-level organizational hierarchies with parent-child rela
 | name | text | NO | - | Organization legal/official name |
 | display_name | text | YES | - | User-friendly display name |
 | slug | text | NO | - | URL-friendly identifier for routing (unique) |
-| zitadel_org_id | text | YES | - | Legacy Zitadel Organization ID (NULL for sub-organizations) |
 | type | text | NO | - | Organization type (platform_owner, provider, provider_partner) |
 | path | ltree | NO | - | Hierarchical path (e.g., root.org_acme_healthcare.north_campus) |
 | parent_path | ltree | YES | - | Parent organization ltree path (NULL for root organizations) |
@@ -101,14 +100,6 @@ The table supports multi-level organizational hierarchies with parent-child rela
   - `provider_partner`: VARs, family organizations, courts, partners
 - **Constraints**: CHECK constraint enforces enumeration
 - **Impact**: Affects available features and permissions
-
-#### zitadel_org_id
-- **Type**: `text`
-- **Purpose**: Legacy mapping to deprecated Zitadel organizations
-- **Status**: DEPRECATED (Zitadel migrated to Supabase Auth in October 2025)
-- **Value**: NULL for sub-organizations created after migration
-- **Constraints**: UNIQUE where not NULL
-- **Future**: Will be removed in future schema cleanup
 
 #### is_active
 - **Type**: `boolean`
@@ -236,16 +227,6 @@ CREATE INDEX idx_organizations_type ON organizations_projection(type);
 - **Usage**: `WHERE type = 'provider'`
 - **Performance**: Enables platform-wide provider queries
 
-#### idx_organizations_zitadel_org
-```sql
-CREATE INDEX idx_organizations_zitadel_org ON organizations_projection(zitadel_org_id)
-  WHERE zitadel_org_id IS NOT NULL;
-```
-- **Purpose**: Legacy Zitadel ID lookups during migration period
-- **Status**: DEPRECATED - will be removed
-- **Usage**: Zitadel sync operations (no longer active)
-- **Performance**: Partial index ignores NULL values
-
 #### idx_organizations_active
 ```sql
 CREATE INDEX idx_organizations_active ON organizations_projection(is_active)
@@ -332,7 +313,6 @@ SELECT * FROM organizations_projection;  -- Only assigned org
 ```sql
 UNIQUE (slug)
 UNIQUE (path)
-UNIQUE (zitadel_org_id)  -- Only where NOT NULL
 ```
 
 **slug uniqueness**:

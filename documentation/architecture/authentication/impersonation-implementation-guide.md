@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -815,17 +815,17 @@ export class EventEmitter {
 ### Organizational Context
 
 **CRITICAL ARCHITECTURAL PRINCIPLE:**
-All Provider organizations exist at the **root level** in Zitadel (flat structure). VAR (Value-Added Reseller) Partner organizations also exist at root level. VAR partnerships are tracked as **business metadata** in the `var_partnerships_projection` table, NOT as hierarchical ownership.
+All Provider organizations exist at the **tenant root** (flat structure across tenants). VAR (Value-Added Reseller) Partner organizations also exist at the tenant root. VAR partnerships are tracked as **business metadata** in the `var_partnerships_projection` table, NOT as hierarchical ownership.
 
 **Hierarchy Model Reference:**
 ```
-Zitadel Instance
+Tenants (organizations_projection, top-level)
 │
-├── Analytics4Change (A4C Internal Org) - Root level
-├── VAR Partner XYZ (VAR Org) - Root level (NOT parent of Providers)
-├── Provider A (Provider Org) - Root level
-├── Provider B (Provider Org) - Root level
-└── Provider C (Provider Org) - Root level
+├── Analytics4Change (A4C Internal Org) - Tenant root
+├── VAR Partner XYZ (VAR Org) - Tenant root (NOT parent of Providers)
+├── Provider A (Provider Org) - Tenant root
+├── Provider B (Provider Org) - Tenant root
+└── Provider C (Provider Org) - Tenant root
 
 VAR Relationships (Metadata):
 - var_partnerships_projection: VAR Partner XYZ ↔ Provider A (active)

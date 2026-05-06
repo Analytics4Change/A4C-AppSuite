@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-06
 converted_from: .plans/multi-tenancy/multi-tenancy-organization.html
 migration_note: "Converted from HTML and updated from Zitadel to Supabase Auth architecture"
 original_version: 1.0
@@ -69,8 +69,8 @@ Design Document
 ### 1.1 Project Overview
 
 Analytics4Change (A4C) is implementing a multi-tenant B2B SaaS platform
-with enterprise-grade identity and access management powered by Zitadel
-Cloud.
+with enterprise-grade identity and access management powered by Supabase
+Auth.
 
 ### 1.2 Key Architectural Decisions
 
@@ -199,9 +199,9 @@ are logged for audit.
 
 
 
-### 3.3 Role Structure (Hybrid Approach)
+### 3.3 Role Structure
 
-#### Zitadel Roles (Defined in A4C Portal Project)
+#### Tenant-Scoped Roles
 
 - `provider_admin` - Full tenant management
 - `manager` - Limited management capabilities
@@ -216,9 +216,7 @@ are logged for audit.
 
 
 
-**Why Hybrid?** Application roles enable cross-tenant operations for
-internal staff and support complex business logic that Zitadel's RBAC
-cannot handle alone.
+**Implementation note:** All roles are stored in `roles_projection` and assigned via `user_role_assignments_projection`. Permissions flow into the JWT via the `effective_permissions` custom claim (see `rbac-architecture.md`).
 
 
 
@@ -251,10 +249,10 @@ cannot handle alone.
     ON example_data FOR SELECT
     USING (
       organization_id IN (
-        SELECT id FROM organizations
+        SELECT id FROM organizations_projection
         WHERE path <@ (
-          SELECT path FROM organizations
-          WHERE zitadel_org_id = auth.jwt() ->> 'urn:zitadel:iam:org:id'
+          SELECT path FROM organizations_projection
+          WHERE id = (auth.jwt() ->> 'org_id')::uuid
         )
       )
     );
@@ -460,7 +458,6 @@ root.org_youth_detention_services.main_facility.behavioral_health_wing.treatment
       name TEXT NOT NULL,
       display_name TEXT,
       slug TEXT UNIQUE NOT NULL,
-      zitadel_org_id TEXT UNIQUE, -- NULL for sub-organizations
       type TEXT NOT NULL CHECK (type IN (
         'platform_owner',    -- A4C internal organization (impersonation capability)
         'provider',          -- Healthcare organizations serving clients (data owners)
@@ -562,7 +559,7 @@ Confirmed
     - Provision subdomain (DNS)
     - Create database record
     - Create Provider Admin role
-    - Create admin user in Zitadel
+    - Create admin user in Supabase Auth
     - Grant project access
     - Generate invitation token
     - Send invitation email
@@ -722,16 +719,14 @@ as "Coming Soon - Enterprise Feature"
 
 ### 12.2 Step-by-Step Setup
 
-#### Step 1: Zitadel Configuration
+#### Step 1: Supabase Auth Configuration
 
-1.  Create Supabase Auth instance
-2.  Create service user
-3.  Grant IAM_OWNER role
-4.  Generate service user credentials
-5.  Create A4C Portal project
-6.  Create application with OIDC
-7.  Create project roles (provider_admin, manager, member, viewer)
-8.  Configure instance-level social login (Google, Facebook, Apple)
+1.  Create Supabase project
+2.  Configure social providers (Google, GitHub, Apple, etc.)
+3.  Deploy custom JWT claims hook (sets `org_id`, `user_role`, `effective_permissions`)
+4.  Seed `roles_projection` with platform roles (provider_admin, manager, member, viewer)
+5.  Configure email templates (invitation, password reset)
+6.  Enable Enterprise SSO (SAML 2.0) per-organization as needed
 
 #### Step 2: Supabase Configuration
 
@@ -912,8 +907,6 @@ as "Coming Soon - Enterprise Feature"
 
 ### 14.2 Reference Links
 
-- **Zitadel Documentation:** <a href="https://zitadel.com/docs"
-  target="_blank">https://zitadel.com/docs (DEPRECATED - migrated to Supabase Auth October 2025)
 - **Supabase Documentation:** <a href="https://supabase.com/docs"
   target="_blank">https://supabase.com/docs
 - **PostgreSQL ltree:**

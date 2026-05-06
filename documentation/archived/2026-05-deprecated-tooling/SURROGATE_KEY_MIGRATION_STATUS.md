@@ -1,7 +1,10 @@
 ---
-status: current
+status: archived
 last_updated: 2025-12-30
+archived_on: 2026-05-06
 ---
+
+> **Archived 2026-05-06** — Tracks completion of the 2025 Zitadel TEXT-ID → UUID surrogate-key migration. The migration is complete; the Zitadel mapping tables it operated on (`zitadel_user_mapping`, `zitadel_organization_mapping`) were removed in baseline_v4 (2026-02-12). Preserved as historical record of how the surrogate-key flip was sequenced. **No successor** — current schema lives in `infrastructure/supabase/supabase/migrations/20260212010625_baseline_v4.sql`.
 
 <!-- TL;DR-START -->
 ## TL;DR

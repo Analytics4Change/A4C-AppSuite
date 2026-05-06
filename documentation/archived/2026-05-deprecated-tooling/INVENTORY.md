@@ -1,7 +1,10 @@
 ---
-status: current
+status: archived
 last_updated: 2025-01-13
+archived_on: 2026-05-06
 ---
+
+> **Archived 2026-05-06** — Inventory was created to support the Terraform IaC migration plan (also archived). Documents Zitadel + manually-configured infrastructure as it stood in early 2025. Both Zitadel and the IaC plan were abandoned. **No successor** — current Supabase resources are managed via Supabase CLI; cluster resources via Kubernetes manifests in `infrastructure/k8s/`.
 
 # Infrastructure Inventory
 

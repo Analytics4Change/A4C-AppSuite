@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-01-02
+last_updated: 2026-05-06
 ---
 
 # Environment Variables Reference
@@ -94,7 +94,7 @@ The A4C-AppSuite uses environment variables to configure application behavior ac
 
 - **Frontend** (`frontend/`): React application with Vite
 - **Temporal Workflows** (`workflows/`): Durable workflow orchestration
-- **Infrastructure** (`infrastructure/`): Terraform and Kubernetes configurations
+- **Infrastructure** (`infrastructure/`): Supabase CLI migrations and Kubernetes configurations
 
 ### Configuration File Locations
 
@@ -1076,28 +1076,30 @@ FRONTEND_URL=https://app.analytics4change.com
 
 ## Infrastructure Configuration
 
-### Terraform Provider Variables
+### Supabase CLI Variables
 
-#### `TF_VAR_supabase_access_token`
+#### `SUPABASE_ACCESS_TOKEN`
 
-**Purpose**: Supabase API token for Terraform provider
-**Required**: Yes (if managing Supabase with Terraform)
+**Purpose**: Supabase API token for the Supabase CLI (used for `supabase link`, `supabase db push`, etc.)
+**Required**: Yes (for any CLI-driven migration or deploy)
 
-**Behavior Influence**: Enables Terraform to create/modify Supabase resources
+**Behavior Influence**: Authenticates the CLI against the Supabase management API.
 
 **Files**:
-- `infrastructure/terraform/` (future IaC)
+- `infrastructure/supabase/`
 
-#### `TF_VAR_supabase_project_ref`
+#### `SUPABASE_PROJECT_REF`
 
 **Purpose**: Supabase project reference identifier
 **Example**: `cuvxypuwvbchsngjzdqo`
-**Required**: Yes (if managing Supabase with Terraform)
+**Required**: Yes (for CLI-driven migration or deploy)
 
-**Behavior Influence**: Specifies which Supabase project to manage
+**Behavior Influence**: Specifies which Supabase project the CLI targets.
 
 **Files**:
-- `infrastructure/terraform/`
+- `infrastructure/supabase/`
+
+> **Note**: Terraform was previously considered for IaC but was never adopted in production. Supabase migrations are managed exclusively via the Supabase CLI; Kubernetes resources are managed via `kubectl`/Helm.
 
 ---
 

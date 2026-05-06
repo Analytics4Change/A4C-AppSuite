@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -85,10 +85,10 @@ This document specifies the user interface and user experience for Super Admin i
 **Purpose:** Display impersonation details and controls
 
 **Organizational Context:**
-- Displays target user's organization (root-level Provider or VAR Partner org)
+- Displays target user's organization (tenant-root Provider or VAR Partner org)
 - For Provider internal hierarchy, optionally shows user's scoped unit path
-- All Providers exist at root level in Zitadel (flat structure)
-- VAR Partner orgs also at root level (NOT hierarchical parent of Providers)
+- All Providers exist at the tenant root (flat structure across tenants)
+- VAR Partner orgs also at the tenant root (NOT hierarchical parent of Providers)
 
 **Layout:**
 ```

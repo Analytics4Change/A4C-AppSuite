@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-07
+last_updated: 2026-05-06
 source: .plans/consolidated/agent-observations.md
 migration_note: "Extracted CQRS/Event Sourcing content from consolidated planning doc. Zitadel references updated to Supabase Auth."
 ---

@@ -1,7 +1,10 @@
 ---
-status: current
+status: archived
 last_updated: 2025-01-13
+archived_on: 2026-05-06
 ---
+
+> **Archived 2026-05-06** — Inventory was created to support the Terraform IaC migration plan (also archived). The Supabase resources listed here may have been renamed, restructured, or replaced by event-driven projections in baseline_v4. **⚠️ Contains plaintext API keys that have since been (or must be) rotated** — the same keys were tracked in the 2026-05 git-crypt key leak rotation list. Current Supabase resources are managed via Supabase CLI; see `infrastructure/supabase/CLAUDE.md`.
 
 # Supabase Infrastructure Inventory
 

@@ -1,6 +1,6 @@
 ---
 status: aspirational
-last_updated: 2025-12-30
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -373,10 +373,10 @@ interface HealthStatus {
 **Trigger**: Provider Partner user (VAR consultant, court official, case worker, family member) attempts to access Provider data while offline
 
 **Organizational Context:**
-- All Provider organizations exist at root level in Zitadel (flat structure)
-- Provider Partner organizations also exist at root level (NOT hierarchical parent of Providers)
+- All Provider organizations exist at the tenant root (flat structure across tenants)
+- Provider Partner organizations also exist at the tenant root (NOT hierarchical parent of Providers)
 - Provider partner relationships tracked in type-specific projection tables (event-sourced metadata)
-- Cross-tenant access via `cross_tenant_access_grants_projection` (NOT Zitadel hierarchy) - **IMPLEMENTED ✅**
+- Cross-tenant access via `cross_tenant_access_grants_projection` (explicit grants, NOT organizational hierarchy) - **IMPLEMENTED ✅**
 
 **Behavior**:
 1. Access MUST be blocked if audit event cannot be written synchronously

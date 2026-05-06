@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -554,28 +554,28 @@ interface ImpersonationJustification {
 ### Organizational Hierarchy Context
 
 **CRITICAL ARCHITECTURAL PRINCIPLE:**
-All Provider organizations exist at the **root level** in Zitadel (flat structure). VAR (Value-Added Reseller) relationships with Providers are tracked as **business metadata** in the `var_partnerships_projection` table, NOT as hierarchical ownership in Zitadel.
+All Provider organizations exist at the **tenant root** (flat structure across tenants). VAR (Value-Added Reseller) relationships with Providers are tracked as **business metadata** in the `var_partnerships_projection` table, NOT as hierarchical ownership.
 
 **Hierarchy Model Reference:**
 ```
-Zitadel Instance: analytics4change-zdswvg.us1.zitadel.cloud
+Tenants (organizations_projection, top-level)
 │
-├── Analytics4Change (Zitadel Org) - Internal A4C Organization
+├── Analytics4Change (Internal A4C Organization)
 │   └── Super Admin (role) - Can impersonate any user across all orgs
 │
-├── VAR Partner XYZ (Zitadel Org) - Value Added Reseller/Partner
+├── VAR Partner XYZ (Value Added Reseller/Partner)
 │   ├── Administrator (role)
 │   └── Access: Via cross_tenant_access_grants (NOT hierarchical ownership)
 │       └── Partnership metadata in var_partnerships_projection table
 │
-├── Provider A (Zitadel Org) - Healthcare Provider Organization
+├── Provider A (Healthcare Provider Organization)
 │   ├── Administrator (role)
 │   └── Provider-defined internal hierarchy (flexible structure)
 │       └── Example: facility → wing → pod
 │       └── Example: home_1, home_2, home_3 (flat)
 │       └── Example: campus → residential_unit → clinic
 │
-└── Provider B (Zitadel Org) - Direct Customer (No VAR)
+└── Provider B (Direct Customer, No VAR)
     └── Provider-defined internal hierarchy
 ```
 
@@ -599,7 +599,7 @@ For complete hierarchy model details, see:
 **Use Case:** Super Admin needs to verify VAR Partner dashboard shows correct data
 
 **Implementation:**
-- Impersonate VAR user in VAR Partner org (root-level Zitadel org)
+- Impersonate VAR user in VAR Partner org (tenant-root org)
 - View scoped dashboards (only Providers with active partnerships)
 - Verify cross-tenant access grants functioning correctly
 - Test VAR access to Provider data via metadata-based grants
@@ -620,7 +620,7 @@ interface VARAccess {
   // Partnership tracked in projection table (event-sourced)
   partnerships: VARPartnership[];  // From var_partnerships_projection
 
-  // Access via grants (NOT Zitadel hierarchy)
+  // Access via grants (NOT organizational hierarchy)
   grants: CrossTenantGrant[];  // From cross_tenant_access_grants_projection
 
   // Provider orgs remain at root level

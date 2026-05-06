@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -54,7 +54,7 @@ This document specifies the architecture for provider partner organizations in t
    - **Duration**: 10-40 minutes (includes DNS propagation)
    - **Event-Driven**: All steps emit domain events
 
-2. **Authentication**: Supabase Auth (not Zitadel)
+2. **Authentication**: Supabase Auth
    - Partner users authenticate via Supabase Auth (social login, password, or SAML SSO)
    - JWT tokens include custom claims: `org_id`, `user_role`, `permissions`
    - Cross-tenant access enforced via RLS policies
@@ -64,11 +64,11 @@ This document specifies the architecture for provider partner organizations in t
    - RLS policies check JWT `org_id` + `cross_tenant_access_grants_projection`
    - Automatic revocation when relationship expires
 
-**Key Changes from Previous Architecture**:
-- **Organizations**: Database records (not Zitadel organizations)
-- **User Management**: Temporal workflows + Supabase Auth (not Zitadel Management API)
+**Key Changes from Previous Architecture** (Zitadel deprecated October 2025):
+- **Organizations**: Database records (previously Zitadel organizations)
+- **User Management**: Temporal workflows + Supabase Auth (previously Zitadel Management API)
 - **Subdomains**: Provisioned via Temporal + Cloudflare API (automated)
-- **Invitations**: Secure tokens via Temporal workflows (not Zitadel invitations)
+- **Invitations**: Secure tokens via Temporal workflows (previously Zitadel invitations)
 
 **See Also**:
 - **Temporal Workflows**: `.plans/temporal-integration/organization-onboarding-workflow.md`

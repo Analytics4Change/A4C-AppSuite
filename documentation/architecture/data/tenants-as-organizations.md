@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -25,7 +25,7 @@ last_updated: 2025-12-30
 
 **Status**: ✅ Updated for Supabase Auth + Temporal.io integration
 **Last Updated**: 2025-10-27
-**Migration**: Zitadel → Supabase Auth (frontend complete, workflows pending)
+**Migration**: Zitadel → Supabase Auth (complete; deprecated October 2025)
 
 ## Document Overview
 This document captures the complete architectural decisions and implementation plan for the Provider Management feature and multi-tenancy support in the A4C platform.

@@ -1,21 +1,23 @@
 # A4C AppSuite
 
-Analytics4Change monorepo containing frontend and infrastructure components.
+Analytics4Change monorepo containing the frontend, workflow workers, and infrastructure components.
 
 ## Repository Structure
 
 ```
 A4C-AppSuite/
 ├── frontend/          # React/TypeScript frontend application
-└── infrastructure/    # Terraform infrastructure as code
+├── workflows/         # Temporal.io workflow workers
+└── infrastructure/    # Supabase migrations + Kubernetes manifests
 ```
 
 ## Overview
 
 This monorepo consolidates the Analytics4Change (A4C) platform:
 
-- **Frontend**: React-based medication management application
-- **Infrastructure**: Terraform configurations for Zitadel (auth) and Supabase (database)
+- **Frontend**: React-based medication management application (`frontend/`)
+- **Workflows**: Temporal.io workers for long-running orchestration — DNS provisioning, organization onboarding, invitation lifecycle (`workflows/`)
+- **Infrastructure**: Supabase database/auth (managed via the Supabase CLI) and Kubernetes manifests for the Temporal cluster + workers (`infrastructure/`)
 
 ## Getting Started
 
@@ -29,12 +31,23 @@ npm run dev
 
 See `frontend/CLAUDE.md` for detailed frontend development guidance.
 
+### Workflows
+
+```bash
+cd workflows
+npm install
+TEMPORAL_ADDRESS=localhost:7233 npm run dev
+```
+
+See `workflows/CLAUDE.md` for worker setup and provider configuration.
+
 ### Infrastructure
 
 ```bash
-cd infrastructure/terraform/environments/dev
-terraform init
-terraform plan
+cd infrastructure/supabase
+supabase link --project-ref "<your-project-ref>"
+supabase db push --linked --dry-run   # preview pending migrations
+supabase db push --linked             # apply
 ```
 
 See `infrastructure/CLAUDE.md` for detailed infrastructure guidance.
