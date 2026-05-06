@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-04
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -36,7 +36,7 @@ A4C AppSuite implements a **permission-based Role-Based Access Control (RBAC)** 
 
 ### Integration with Supabase Auth
 
-**IMPORTANT**: This RBAC system is integrated with **Supabase Auth** (not Zitadel). Key integration points:
+**IMPORTANT**: This RBAC system is integrated with **Supabase Auth** (Zitadel was deprecated October 2025). Key integration points:
 
 1. **JWT Custom Claims (v4)**: User permissions are added to JWT tokens via `custom_access_token_hook`
    - `effective_permissions`: Array of scoped permissions (e.g., `[{"p": "medication.create", "s": "acme"}, {"p": "client.view", "s": "acme.pediatrics"}]`)
@@ -356,7 +356,7 @@ interface RoleCreatedEvent {
   event_data: {
     name: string;  // e.g., 'provider_admin'
     description: string;
-    zitadel_org_id?: string;  // NULL for super_admin (all orgs)
+    organization_id?: string;  // NULL for super_admin (all orgs)
     org_hierarchy_scope?: string;  // ltree path or wildcard
   };
   event_metadata: {
@@ -579,20 +579,20 @@ COMMENT ON COLUMN permissions_projection.scope_type IS
 ```sql
 CREATE TABLE roles_projection (
   id UUID PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
   description TEXT NOT NULL,
-  zitadel_org_id TEXT,  -- NULL for super_admin (all orgs)
+  organization_id UUID,  -- NULL for super_admin (all orgs)
   org_hierarchy_scope LTREE,  -- NULL for super_admin, ltree path for org-scoped roles
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
   CHECK (
-    (name = 'super_admin' AND zitadel_org_id IS NULL AND org_hierarchy_scope IS NULL)
+    (name = 'super_admin' AND organization_id IS NULL AND org_hierarchy_scope IS NULL)
     OR
-    (name != 'super_admin' AND zitadel_org_id IS NOT NULL AND org_hierarchy_scope IS NOT NULL)
+    (name != 'super_admin' AND organization_id IS NOT NULL AND org_hierarchy_scope IS NOT NULL)
   )
 );
 
-CREATE INDEX idx_roles_zitadel_org ON roles_projection(zitadel_org_id);
+CREATE INDEX idx_roles_organization_id ON roles_projection(organization_id);
 ```
 
 ### Role Permissions Projection
@@ -1091,15 +1091,18 @@ ORDER BY de.created_at DESC;
 - Integration tests for permission checks
 - E2E tests for role assignment flows
 
-### Phase 2: Zitadel Synchronization
+### Phase 2: JWT Custom Claims (Supabase Auth)
 
-**Goal**: Bidirectional sync between Zitadel and PostgreSQL projections
+**Goal**: Surface permissions to RLS via JWT custom claims
+
+**Status**: ✅ Implemented (claims_version v4) — see `documentation/infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md`
 
 **Deliverables**:
-1. **Webhook Integration**: Zitadel role assignment webhooks
-2. **JWT Parsing**: Extract permissions from Zitadel tokens
-3. **Sync Edge Function**: Handle Zitadel → PostgreSQL sync
-4. **Conflict Resolution**: Handle out-of-sync scenarios
+1. **Custom Access Token Hook**: `auth.custom_access_token_hook` populates `effective_permissions`, `org_id`, `org_type`
+2. **Computed Permissions**: `compute_effective_permissions()` expands implications with scope inheritance
+3. **RLS Helpers**: `has_permission()` and `has_effective_permission()` available to all policies
+
+> **Historical note**: A previous design contemplated bidirectional sync with Zitadel; that approach was abandoned when Zitadel was deprecated in October 2025.
 
 ### Phase 3: Advanced Roles
 

@@ -1,7 +1,10 @@
 ---
-status: current
+status: archived
 last_updated: 2025-01-13
+archived_on: 2026-05-06
 ---
+
+> **Archived 2026-05-06** — Plan never executed. The proposed Terraform-based IaC migration was abandoned in favor of Supabase CLI for migrations and direct kubectl for Kubernetes. Zitadel was deprecated October 2025 (replaced by Supabase Auth), eliminating the original driver of this plan. Preserved here as a historical record of the abandoned approach. **No successor document** — current infrastructure management is captured in `infrastructure/CLAUDE.md`, `infrastructure/supabase/CLAUDE.md`, and `infrastructure/k8s/CLAUDE.md`.
 
 # Infrastructure Migration Plan
 

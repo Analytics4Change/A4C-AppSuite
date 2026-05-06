@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -480,7 +480,7 @@ GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
 ### 📋 Planned
 1. **Enterprise SSO**: SAML 2.0 configuration (3-6 month timeline, see `enterprise-sso-guide.md`)
 2. **Organization Management**: Temporal workflow for org provisioning (see `.plans/temporal-integration/`)
-3. **User Invitation System**: Replace Zitadel invitation flow with custom implementation
+3. **User Invitation System**: Custom Temporal-driven invitation flow (replaces the deprecated Zitadel invitation API)
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-02
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -79,7 +79,6 @@ React/TypeScript medication management application
   - [Deployment Guide](./frontend/guides/DEPLOYMENT.md) - CI/CD and production deployment
   - [Event-Driven Guide](./frontend/guides/EVENT-DRIVEN-GUIDE.md) - CQRS patterns in React
   - [Design Patterns Migration](./frontend/guides/DESIGN_PATTERNS_MIGRATION_GUIDE.md) - Component architecture patterns
-  - [Auth Setup](./frontend/guides/AUTH_SETUP.md) - Authentication configuration
   - [Git-Crypt Setup](./frontend/guides/GIT_CRYPT_SETUP.md) - Repository encryption
   - [RxNorm Medication Autocomplete](./frontend/guides/rxnorm-medication-autocomplete.md) - Drug search implementation
   - [Medication Search Implementation](./frontend/guides/medication-search-implementation.md) - Search architecture
@@ -110,7 +109,7 @@ Temporal.io workflow orchestration for long-running business processes
 - **[Operations](./workflows/operations/)** - Deployment, monitoring, troubleshooting
 
 ### [Infrastructure Documentation](./infrastructure/)
-Terraform IaC, Kubernetes deployments, Supabase resources
+Supabase (managed via Supabase CLI) and Kubernetes deployments
 
 - **[Getting Started](./infrastructure/getting-started/)** - Infrastructure setup and prerequisites
 - **[Architecture](./infrastructure/architecture/)** - Infrastructure design and topology

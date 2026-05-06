@@ -1,7 +1,12 @@
 ---
-status: current
+status: archived
 last_updated: 2025-01-13
+archived_on: 2026-05-06
 ---
+
+> **Archived 2026-05-06** — Inventory was created to support the Terraform IaC migration plan (also archived). The Supabase resources listed here may have been renamed, restructured, or replaced by event-driven projections in baseline_v4. **The plaintext `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` values that were originally captured here have been redacted in-place (defense-in-depth) and are tracked on the 2026-05 credential rotation list.** Current Supabase resources are managed via Supabase CLI; see `infrastructure/supabase/CLAUDE.md`.
+>
+> **Redacted on 2026-05-06**: 4 sites total (API Keys block lines 24/27, Terraform variable defaults at ~1026/1033, env-var template at ~1751/1752) — JWT values all replaced with `<redacted-pending-rotation-2026-05-06>` placeholders.
 
 # Supabase Infrastructure Inventory
 
@@ -17,11 +22,11 @@ This document provides a comprehensive inventory of all Supabase resources requi
 
 ### API Keys
 ```env
-# Public/Anon Key (Frontend use)
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcmpsc3dic3htYmdsbWFjbHh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5MzgzNzQsImV4cCI6MjA3NDUxNDM3NH0.o_cS3L7X6h1UKnNgPEeV9PLSB-bTtExzTK1amXXjxOY
+# Public/Anon Key (Frontend use) — REDACTED 2026-05-06; see banner above
+SUPABASE_ANON_KEY=<redacted-pending-rotation-2026-05-06>
 
-# Service Role Key (Backend/Admin use)
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcmpsc3dic3htYmdsbWFjbHh1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1ODkzODM3NCwiZXhwIjoyMDc0NTE0Mzc0fQ.st2PYTcdOYR_PjcIElRnvjV_-N7CBu7_x0Q3k_150aA
+# Service Role Key (Backend/Admin use) — REDACTED 2026-05-06; see banner above
+SUPABASE_SERVICE_ROLE_KEY=<redacted-pending-rotation-2026-05-06>
 ```
 
 ## Database Schema
@@ -1018,14 +1023,14 @@ variable "supabase_access_token" {
 variable "supabase_anon_key" {
   description = "Supabase anonymous/public key"
   type        = string
-  default     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcmpsc3dic3htYmdsbWFjbHh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5MzgzNzQsImV4cCI6MjA3NDUxNDM3NH0.o_cS3L7X6h1UKnNgPEeV9PLSB-bTtExzTK1amXXjxOY"
+  default     = "<redacted-pending-rotation-2026-05-06>"
 }
 
 variable "supabase_service_role_key" {
   description = "Supabase service role key"
   type        = string
   sensitive   = true
-  default     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcmpsc3dic3htYmdsbWFjbHh1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1ODkzODM3NCwiZXhwIjoyMDc0NTE0Mzc0fQ.st2PYTcdOYR_PjcIElRnvjV_-N7CBu7_x0Q3k_150aA"
+  default     = "<redacted-pending-rotation-2026-05-06>"
 }
 
 variable "environment" {
@@ -1743,8 +1748,8 @@ ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
 ```env
 # Supabase Configuration
 SUPABASE_URL=https://tmrjlswbsxmbglmaclxu.supabase.com
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_ANON_KEY=<redacted-pending-rotation-2026-05-06>
+SUPABASE_SERVICE_ROLE_KEY=<redacted-pending-rotation-2026-05-06>
 SUPABASE_PROJECT_REF=tmrjlswbsxmbglmaclxu
 
 # Terraform Configuration

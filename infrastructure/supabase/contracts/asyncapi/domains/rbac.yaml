@@ -172,10 +172,6 @@ components:
           examples:
             - Platform-wide administrator with all permissions
             - Organization administrator with org-scoped permissions
-        zitadel_org_id:
-          type: string
-          nullable: true
-          description: Zitadel organization ID (NULL for super_admin)
         org_hierarchy_scope:
           type: string
           nullable: true

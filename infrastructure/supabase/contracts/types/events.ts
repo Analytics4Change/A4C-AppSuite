@@ -211,7 +211,6 @@ export interface OrganizationCreationData {
   name: string;
   display_name?: string;
   slug: string;
-  zitadel_org_id?: string;
   type: OrganizationType;
   path: string;
   parent_path?: string;
@@ -400,28 +399,11 @@ export interface OrganizationBootstrapInitiatedEvent extends DomainEvent<Organiz
   event_type: 'organization.bootstrap.initiated';
 }
 
-export interface OrganizationZitadelCreationData {
-  bootstrap_id: string;
-  zitadel_org_id: string;
-  zitadel_user_id: string;
-  admin_email: string;
-  organization_name: string;
-  organization_type: 'provider' | 'provider_partner';
-  slug: string;
-  invitation_sent?: boolean;
-}
-
-export interface OrganizationZitadelCreatedEvent extends DomainEvent<OrganizationZitadelCreationData> {
-  stream_type: 'organization';
-  event_type: 'organization.zitadel.created';
-}
-
 export interface OrganizationBootstrapCompletionData {
   bootstrap_id: string;
   organization_id: string;
   admin_role_assigned: 'provider_admin' | 'partner_admin';
   permissions_granted: number;
-  zitadel_org_id: string;
   ltree_path: string;
 }
 
@@ -432,9 +414,8 @@ export interface OrganizationBootstrapCompletedEvent extends DomainEvent<Organiz
 
 export interface OrganizationBootstrapFailureData {
   bootstrap_id: string;
-  failure_stage: 'zitadel_org_creation' | 'zitadel_user_creation' | 'organization_creation' | 'role_assignment' | 'permission_grants';
+  failure_stage: 'organization_creation' | 'role_assignment' | 'permission_grants';
   error_message: string;
-  zitadel_org_id?: string;
   partial_cleanup_required?: boolean;
 }
 
@@ -539,11 +520,6 @@ export interface AccessGrantReactivatedEvent extends DomainEvent<AccessGrantReac
 // User Domain Events (Placeholder - extend as needed)
 // ============================================================================
 
-export interface UserSyncedFromZitadelEvent extends DomainEvent {
-  stream_type: 'user';
-  event_type: 'user.synced_from_zitadel';
-}
-
 export interface UserOrganizationSwitchedEvent extends DomainEvent {
   stream_type: 'user';
   event_type: 'user.organization_switched';
@@ -569,7 +545,6 @@ export type AllDomainEvents =
   | OrganizationDeactivatedEvent
   | OrganizationDeletedEvent
   | OrganizationBootstrapInitiatedEvent
-  | OrganizationZitadelCreatedEvent
   | OrganizationBootstrapCompletedEvent
   | OrganizationBootstrapFailedEvent
   | OrganizationBootstrapCancelledEvent
@@ -578,5 +553,4 @@ export type AllDomainEvents =
   | AccessGrantExpiredEvent
   | AccessGrantSuspendedEvent
   | AccessGrantReactivatedEvent
-  | UserSyncedFromZitadelEvent
   | UserOrganizationSwitchedEvent;

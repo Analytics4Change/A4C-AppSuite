@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -44,7 +44,7 @@ last_updated: 2025-12-30
 
 ## Overview
 
-This guide walks through configuring Supabase Auth to replace Zitadel as the authentication provider for the A4C Platform. The configuration includes:
+This guide walks through configuring Supabase Auth as the authentication provider for the A4C Platform (Zitadel was deprecated in October 2025). The configuration includes:
 
 - Social login providers (Google, GitHub, etc.)
 - Custom JWT claims for RBAC and multi-tenancy

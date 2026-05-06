@@ -1,11 +1,11 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2026-05-06
 ---
 
 # Infrastructure Documentation
 
-Documentation for the A4C-AppSuite infrastructure, including Terraform IaC, Kubernetes deployments, and Supabase resources.
+Documentation for the A4C-AppSuite infrastructure: Supabase (database, auth, edge functions) managed via Supabase CLI, and Kubernetes deployments managed via kubectl + Helm.
 
 ## Directory Structure
 

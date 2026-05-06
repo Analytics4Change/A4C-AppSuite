@@ -2,26 +2,6 @@
 *-git-crypt.key
 *.key.backup
 
-# Terraform local files
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfstate.backup
-# Note: .terraform.lock.hcl should be committed to ensure consistent provider versions
-terraform.tfstate.d/
-crash.log
-crash.*.log
-
-# Override files as they are usually used for local overrides
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
-
-# CLI configuration files
-.terraformrc
-terraform.rc
-
 # Local environment files (unencrypted versions during development)
 .env.local.decrypted
 *.decrypted
@@ -76,9 +56,6 @@ DO-NOT-COMMIT-*
 
 # Tool directories
 .serena/
-
-# Zitadel inventory data (contains tokens)
-zitadel-inventory-data-*/
 
 # AsyncAPI generated files
 supabase/contracts/asyncapi-bundled.yaml

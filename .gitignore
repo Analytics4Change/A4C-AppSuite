@@ -63,12 +63,6 @@ build/
 coverage/
 infrastructure/supabase/test-results/
 
-# Terraform
-*.tfstate
-*.tfstate.*
-.terraform/
-.terraform.lock.hcl
-
 # Kubernetes secrets (never commit actual secrets!)
 **/secrets.yaml
 **/*-secrets.yaml

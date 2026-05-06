@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -176,10 +176,10 @@ interface ImpersonationStartedEvent {
 ### Example: VAR Partner User Impersonation
 
 **Organizational Context:**
-- All Provider organizations exist at root level in Zitadel (flat structure)
-- VAR Partner organizations also exist at root level (NOT hierarchical parent of Providers)
+- All Provider organizations exist at the tenant root (flat structure across tenants)
+- VAR Partner organizations also exist at the tenant root (NOT hierarchical parent of Providers)
 - VAR partnerships tracked in `var_partnerships_projection` table (event-sourced metadata)
-- VAR access to Provider data via `cross_tenant_access_grants_projection` (NOT Zitadel hierarchy)
+- VAR access to Provider data via `cross_tenant_access_grants_projection` (explicit grants, NOT organizational hierarchy)
 
 **Use Case:** Super Admin verifying VAR Partner dashboard shows correct Provider data
 

@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -99,8 +99,8 @@ CREATE TABLE IF NOT EXISTS organizations_projection (
 All index creation files use `IF NOT EXISTS`:
 
 ```sql
-CREATE INDEX IF NOT EXISTS idx_organizations_zitadel_org_id
-  ON organizations_projection(zitadel_org_id);
+CREATE INDEX IF NOT EXISTS idx_organizations_org_type
+  ON organizations_projection(org_type);
 ```
 
 **Status:** ✅ No changes needed

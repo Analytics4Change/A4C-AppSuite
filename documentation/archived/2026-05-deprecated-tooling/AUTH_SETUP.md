@@ -1,7 +1,10 @@
 ---
-status: current
+status: archived
 last_updated: 2025-12-30
+archived_on: 2026-05-06
 ---
+
+> **Archived 2026-05-06** — This guide configured the Zitadel + Supabase authentication stack. Zitadel was deprecated in October 2025; the platform now uses Supabase Auth exclusively. **Replaced by**: [SUPABASE-AUTH-SETUP.md](../../infrastructure/guides/supabase/SUPABASE-AUTH-SETUP.md) for setup, [supabase-auth-overview.md](../../architecture/authentication/supabase-auth-overview.md) for architecture, [frontend-auth-architecture.md](../../architecture/authentication/frontend-auth-architecture.md) for frontend integration.
 
 <!-- TL;DR-START -->
 ## TL;DR

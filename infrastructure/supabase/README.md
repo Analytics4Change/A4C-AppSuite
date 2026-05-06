@@ -109,8 +109,8 @@ await supabase.from('domain_events').insert({
 
 ### Core Tables (Projected from events)
 
-3. **organizations** - Multi-tenant organizations (synced with Zitadel)
-4. **users** - Shadow table for Zitadel users (for RLS and auditing)
+3. **organizations** - Multi-tenant organizations
+4. **users** - Identity table for authenticated users (used by RLS and auditing)
 5. **clients** - Patient/client records
 6. **medications** - Medication catalog with drug information
 7. **medication_history** - Prescription and administration history
@@ -183,5 +183,5 @@ If deployment fails:
 The A4C-Frontend application expects:
 - All tables to exist with correct schema
 - RLS policies to be in place
-- Zitadel user synchronization to populate users table
+- Supabase Auth populating the `users` projection (via the `auth.users` → JWT custom-claims hook)
 - Organization context to be set for multi-tenancy

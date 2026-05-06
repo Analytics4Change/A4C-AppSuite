@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -202,7 +202,7 @@ END $$;
 ```
 ERROR: Lars Tice user mapping not found
 ```
-**Analysis**: Requires pre-existing Zitadel user mapping
+**Analysis**: Requires a pre-existing user mapping (originally a Zitadel-era assumption; the seed was retired with the Zitadel deprecation in October 2025)
 
 **Fix**: Move to separate `99-seeds/development/` folder or wrap in existence check
 

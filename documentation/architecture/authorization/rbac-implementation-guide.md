@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-06
 ---
 
 <!-- TL;DR-START -->
@@ -93,7 +93,7 @@ SELECT * FROM roles_projection;
 -- Expected: super_admin, provider_admin
 
 -- Verify super_admin has global scope
-SELECT name, zitadel_org_id, org_hierarchy_scope
+SELECT name, organization_id, org_hierarchy_scope
 FROM roles_projection
 WHERE name = 'super_admin';
 -- Expected: NULL values for org scoping
