@@ -14,7 +14,14 @@
  * See .plans/supabase-auth-integration/frontend-auth-architecture.md
  */
 
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import React, {
+  createContext,
+  useState,
+  useContext,
+  ReactNode,
+  useEffect,
+  useCallback,
+} from 'react';
 import { IAuthProvider } from '@/services/auth/IAuthProvider';
 import { getAuthProvider, logAuthConfig } from '@/services/auth/AuthProviderFactory';
 import { getDeploymentConfig } from '@/config/deployment.config';
@@ -367,13 +374,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   };
 
   /**
-   * Check if user has a specific permission
-   * Optionally scope-aware when targetPath is provided (JWT v3)
+   * Check if user has a specific permission.
+   * Optionally scope-aware when targetPath is provided (JWT v3+).
+   *
+   * Wrapped in useCallback so consumers' useEffect deps stay stable
+   * across AuthProvider re-renders (this function is the dep of the
+   * `usePermissionGate` hook's effect).
    */
-  const hasPermission = async (permission: string, targetPath?: string): Promise<boolean> => {
-    const result = await authProvider.hasPermission(permission, targetPath);
-    return result.hasPermission;
-  };
+  const hasPermission = useCallback(
+    async (permission: string, targetPath?: string): Promise<boolean> => {
+      const result = await authProvider.hasPermission(permission, targetPath);
+      return result.hasPermission;
+    },
+    [authProvider]
+  );
 
   /**
    * Switch user's active organization
