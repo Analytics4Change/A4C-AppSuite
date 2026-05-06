@@ -230,7 +230,7 @@ export enum RoleScope {
   UNIT = "unit",
 }
 
-export enum AnonymousSchema_5506 {
+export enum AnonymousSchema_5504 {
   RESERVED_TEXT = "text",
   RESERVED_NUMBER = "number",
   DATE = "date",
@@ -240,7 +240,7 @@ export enum AnonymousSchema_5506 {
   JSONB = "jsonb",
 }
 
-export enum AnonymousSchema_5534 {
+export enum AnonymousSchema_5532 {
   RESERVED_TEXT = "text",
   RESERVED_NUMBER = "number",
   DATE = "date",
@@ -424,12 +424,12 @@ export interface UserAddressUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.updated';
-  'event_data': AnonymousSchema_3318;
+  'event_data': AnonymousSchema_3317;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3318 {
+export interface AnonymousSchema_3317 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -451,12 +451,12 @@ export interface UserAddressRemovedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.removed';
-  'event_data': AnonymousSchema_3350;
+  'event_data': AnonymousSchema_3349;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3350 {
+export interface AnonymousSchema_3349 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -492,12 +492,12 @@ export interface UserPhoneUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.phone.updated';
-  'event_data': AnonymousSchema_3399;
+  'event_data': AnonymousSchema_3398;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3399 {
+export interface AnonymousSchema_3398 {
   'phone_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -2065,7 +2065,6 @@ export interface RoleCreatedEvent {
 export interface RoleCreatedData {
   'name': string;
   'description': string;
-  'zitadel_org_id'?: string;
   'org_hierarchy_scope'?: string;
   'display_name'?: string;
   'organization_id'?: string;
@@ -2249,7 +2248,7 @@ export interface ClientFieldDefinitionCreatedData {
   'category_id': string;
   'field_key': string;
   'display_name': string;
-  'field_type'?: AnonymousSchema_5506;
+  'field_type'?: AnonymousSchema_5504;
   'is_visible'?: boolean;
   'is_required'?: boolean;
   'validation_rules'?: Map<string, any>;
@@ -2274,7 +2273,7 @@ export interface ClientFieldDefinitionUpdatedData {
   'organization_id': string;
   'display_name'?: string;
   'category_id'?: string;
-  'field_type'?: AnonymousSchema_5534;
+  'field_type'?: AnonymousSchema_5532;
   'is_visible'?: boolean;
   'is_required'?: boolean;
   'validation_rules'?: Map<string, any>;

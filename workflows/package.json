@@ -20,6 +20,7 @@
     "test:config": "ts-node -r tsconfig-paths/register src/scripts/test-config.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
+    "sync-schemas": "node scripts/sync-schemas.cjs",
     "cleanup:dev": "ts-node -r tsconfig-paths/register src/scripts/cleanup-dev.ts",
     "cleanup:org": "ts-node -r tsconfig-paths/register src/scripts/cleanup-org.ts",
     "query:dev": "ts-node -r tsconfig-paths/register src/scripts/query-dev.ts",
