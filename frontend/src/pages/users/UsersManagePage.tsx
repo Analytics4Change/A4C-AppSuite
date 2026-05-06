@@ -38,6 +38,7 @@ import { UserFormViewModel } from '@/viewModels/users/UserFormViewModel';
 import { getUserQueryService, getUserCommandService } from '@/services/users';
 import { getRoleService } from '@/services/roles';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissionGate } from '@/hooks/usePermissionGate';
 import type {
   UserListItem,
   UserDisplayStatus,
@@ -88,6 +89,13 @@ export const UsersManagePage: React.FC = observer(() => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { session } = useAuth();
   const organizationId = session?.claims?.org_id ?? '';
+
+  // Permission gates per the hide-vs-disable convention codified in
+  // frontend/CLAUDE.md. Route-entry gate is `user.create`; mutation
+  // permissions (user.update, user.delete) are NOT implied and must be
+  // checked explicitly before rendering the corresponding affordance.
+  const canUpdateUser = usePermissionGate('user.update');
+  const canDeleteUser = usePermissionGate('user.delete');
 
   // List ViewModel - manages user list state
   const [viewModel] = useState(
@@ -926,21 +934,24 @@ export const UsersManagePage: React.FC = observer(() => {
                           This user is deactivated. The form is read-only until reactivated.
                         </p>
                       </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={handleReactivateClick}
-                        disabled={
-                          formViewModel.isSubmitting ||
-                          (dialogState.type === 'reactivate' && dialogState.isLoading)
-                        }
-                        className="bg-green-600 hover:bg-green-700 text-white flex-shrink-0"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        {dialogState.type === 'reactivate' && dialogState.isLoading
-                          ? 'Reactivating...'
-                          : 'Reactivate'}
-                      </Button>
+                      {canUpdateUser && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleReactivateClick}
+                          disabled={
+                            formViewModel.isSubmitting ||
+                            (dialogState.type === 'reactivate' && dialogState.isLoading)
+                          }
+                          className="bg-green-600 hover:bg-green-700 text-white flex-shrink-0"
+                          data-testid="user-reactivate-banner-button"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          {dialogState.type === 'reactivate' && dialogState.isLoading
+                            ? 'Reactivating...'
+                            : 'Reactivate'}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1101,23 +1112,26 @@ export const UsersManagePage: React.FC = observer(() => {
                       />
 
                       {/* Form Actions */}
-                      {!currentItem.isInvitation && currentItem.displayStatus === 'active' && (
-                        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                          <div>
-                            {formViewModel.isDirty && (
-                              <span className="text-sm text-amber-600">Unsaved changes</span>
-                            )}
+                      {!currentItem.isInvitation &&
+                        currentItem.displayStatus === 'active' &&
+                        canUpdateUser && (
+                          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                            <div>
+                              {formViewModel.isDirty && (
+                                <span className="text-sm text-amber-600">Unsaved changes</span>
+                              )}
+                            </div>
+                            <Button
+                              type="submit"
+                              disabled={!formViewModel.canSubmit}
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                              data-testid="user-save-changes-button"
+                            >
+                              <Save className="w-4 h-4 mr-1" />
+                              {formViewModel.isSubmitting ? 'Saving...' : 'Save Changes'}
+                            </Button>
                           </div>
-                          <Button
-                            type="submit"
-                            disabled={!formViewModel.canSubmit}
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
-                          >
-                            <Save className="w-4 h-4 mr-1" />
-                            {formViewModel.isSubmitting ? 'Saving...' : 'Save Changes'}
-                          </Button>
-                        </div>
-                      )}
+                        )}
                     </form>
                   </CardContent>
                 </Card>
@@ -1133,25 +1147,27 @@ export const UsersManagePage: React.FC = observer(() => {
                 )}
 
                 {/* Notification Preferences Section (for active users only) */}
-                {!currentItem.isInvitation && currentItem.displayStatus === 'active' && (
-                  <Card className="shadow-lg">
-                    <CardContent className="p-6">
-                      {isLoadingPrefs ? (
-                        <div className="flex items-center justify-center py-8 text-gray-500">
-                          <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-                          Loading notification preferences...
-                        </div>
-                      ) : (
-                        <NotificationPreferencesForm
-                          preferences={notificationPrefs}
-                          availablePhones={userPhones}
-                          onSave={handleSaveNotificationPreferences}
-                          isSaving={isSavingPrefs}
-                        />
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
+                {!currentItem.isInvitation &&
+                  currentItem.displayStatus === 'active' &&
+                  canUpdateUser && (
+                    <Card className="shadow-lg" data-testid="user-notification-prefs-card">
+                      <CardContent className="p-6">
+                        {isLoadingPrefs ? (
+                          <div className="flex items-center justify-center py-8 text-gray-500">
+                            <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+                            Loading notification preferences...
+                          </div>
+                        ) : (
+                          <NotificationPreferencesForm
+                            preferences={notificationPrefs}
+                            availablePhones={userPhones}
+                            onSave={handleSaveNotificationPreferences}
+                            isSaving={isSavingPrefs}
+                          />
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
 
                 {/* Danger Zone (for active and deactivated users) */}
                 {!currentItem.isInvitation &&
@@ -1161,15 +1177,15 @@ export const UsersManagePage: React.FC = observer(() => {
                       entityType="User"
                       isActive={currentItem.displayStatus === 'active'}
                       isSubmitting={formViewModel?.isSubmitting}
-                      canDeactivate={currentItem.displayStatus === 'active'}
+                      canDeactivate={canUpdateUser && currentItem.displayStatus === 'active'}
                       onDeactivate={handleDeactivateClick}
                       isDeactivating={dialogState.type === 'deactivate' && dialogState.isLoading}
                       deactivateDescription="Deactivating will prevent the user from accessing the application. They can be reactivated later."
-                      canReactivate={currentItem.displayStatus === 'deactivated'}
+                      canReactivate={canUpdateUser && currentItem.displayStatus === 'deactivated'}
                       onReactivate={handleReactivateClick}
                       isReactivating={dialogState.type === 'reactivate' && dialogState.isLoading}
                       reactivateDescription="Reactivating will restore the user's access to the application."
-                      canDelete={true}
+                      canDelete={canDeleteUser}
                       onDelete={handleDeleteClick}
                       isDeleting={dialogState.type === 'delete' && dialogState.isLoading}
                       deleteDescription="Permanently remove this user from the organization."

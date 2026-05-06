@@ -54,7 +54,7 @@ import {
 import { Logger } from '@/utils/logger';
 import { cn } from '@/components/ui/utils';
 import { isCanonicalRole } from '@/config/roles.config';
-import { useAuth } from '@/contexts/AuthContext';
+import { usePermissionGate } from '@/hooks/usePermissionGate';
 
 const log = Logger.getLogger('component');
 
@@ -79,24 +79,12 @@ type DialogState =
 export const RolesManagePage: React.FC = observer(() => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { hasPermission } = useAuth();
 
   // Permission gate for "Manage User Assignments" button. The backend
   // RPC `api.list_users_for_role_management` raises 42501 if the caller
-  // lacks `user.role_assign`; hide the affordance instead of letting the
-  // user click into an error. Mirrors SettingsPage permission-gating
-  // pattern (conditional render, not disable+tooltip — disable+tooltip
-  // is reserved for state-based gates like inactive role).
-  const [canManageUserAssignments, setCanManageUserAssignments] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    hasPermission('user.role_assign').then((result) => {
-      if (!cancelled) setCanManageUserAssignments(result);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [hasPermission]);
+  // lacks `user.role_assign`; hide the affordance per the
+  // permission-gated-hide convention codified in frontend/CLAUDE.md.
+  const canManageUserAssignments = usePermissionGate('user.role_assign');
 
   // Read initial params from URL
   const initialStatus = searchParams.get('status') as 'all' | 'active' | 'inactive' | null;

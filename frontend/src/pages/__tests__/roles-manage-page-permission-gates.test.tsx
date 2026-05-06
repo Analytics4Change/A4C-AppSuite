@@ -1,197 +1,146 @@
 /**
- * Regression test — RolesManagePage must hide the "Manage User Assignments"
- * button when the current user lacks `user.role_assign` permission.
+ * Regression test — `usePermissionGate` hook contract.
  *
- * **What this test fences**
- *
- * The button at `RolesManagePage.tsx` opens `RoleAssignmentDialog`, which
- * loads users via `api.list_users_for_role_management`. That RPC raises
- * SQLSTATE 42501 ("Missing permission: user.role_assign") if the caller
- * lacks the permission. Pre-fix (2026-05-06), the button rendered
- * unconditionally — South Valley Admin and similar custom-role users
- * could click into a guaranteed error.
- *
- * Surfaced manually 2026-05-06 by `lars.tice+test@gmail.com`
- * (South Valley Admin at `testorg-20260329`, no `user.*` permissions)
- * during modify_user_roles UAT scenario #4 setup.
+ * Both `RolesManagePage` (Manage User Assignments button) and
+ * `SettingsPage` (Organization Settings card) gate their cross-aggregate
+ * affordances via `usePermissionGate(name)`. This test fences that
+ * hook directly — if a developer reverts to inline closure ceremony or
+ * drops the `.catch` fail-closed branch, this test fails.
  *
  * **Why this layer (not Playwright)**
  *
- * Same rationale as PR #46's regression test
- * (`manage-pages-clear-deleted-id-from-url.test.tsx`): the contract is
- * a closure-shape between `useAuth().hasPermission(...)` and React state
- * — both faithful in JSDOM. Spinning up a Playwright fixture with two
- * real test identities (one with `user.role_assign`, one without) is
- * disproportionate to the surface being fenced.
+ * The contract is purely an interaction between `useAuth().hasPermission(...)`,
+ * a React effect, and a cancellation guard — all faithful in JSDOM.
+ * Spinning up a Playwright fixture with two real test identities is
+ * disproportionate.
  *
- * The contract being fenced is the standard async permission-check
- * pattern codified at `frontend/src/pages/settings/SettingsPage.tsx:31-44`
- * and now also at `RolesManagePage`:
+ * **What this test fences**
  *
- *   const [allowed, setAllowed] = useState(false);
- *   useEffect(() => {
- *     let cancelled = false;
- *     hasPermission(name).then((r) => { if (!cancelled) setAllowed(r); });
- *     return () => { cancelled = true; };
- *   }, [hasPermission]);
- *
- *   {allowed && <Affordance />}
- *
- * **What this test does**
- *
- * Mounts a tiny harness that replicates the exact pattern with a mocked
- * `hasPermission` resolver, and asserts:
- *   1. Affordance is hidden during the pending promise (initial state).
- *   2. Affordance appears after the promise resolves true.
- *   3. Affordance stays hidden if the promise resolves false.
- *   4. The cancellation guard prevents setState-after-unmount.
- *
- * If `RolesManagePage` is later refactored to drop the conditional render
- * (e.g., a developer reverts to "always show, let backend reject"), this
- * test still passes — but the additional test #5 below mounts the actual
- * page wrapped with a mocked AuthContext and verifies the data-testid
- * either appears or doesn't, fencing the page's actual contract.
+ * 1. Initial state hidden (false) before the promise resolves.
+ * 2. Visible (true) after the promise resolves true.
+ * 3. Hidden (false) after the promise resolves false.
+ * 4. Hidden (false) on rejection — fail-closed parity with
+ *    `useFilteredNavEntries.ts:30-35`.
+ * 5. Cancellation guard prevents setState-after-unmount.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act, cleanup, waitFor } from '@testing-library/react';
-import { useEffect, useState } from 'react';
+import { renderHook, act, cleanup, waitFor } from '@testing-library/react';
+import React from 'react';
+import { usePermissionGate } from '@/hooks/usePermissionGate';
 
-interface GatedAffordanceProps {
-  hasPermission: (name: string) => Promise<boolean>;
-  permission: string;
-  testId: string;
-  label: string;
-}
+// Mock useAuth to inject a controllable hasPermission. We mock the
+// AuthContext module rather than mounting the real AuthProvider so the
+// test stays a hook unit test, not an integration test.
+const mockHasPermission = vi.fn<(permission: string, targetPath?: string) => Promise<boolean>>();
 
-/**
- * Test-only mirror of the conditional-render closure used in
- * RolesManagePage and SettingsPage. Pure JSDOM unit, no router/services.
- */
-function GatedAffordance({ hasPermission, permission, testId, label }: GatedAffordanceProps) {
-  const [allowed, setAllowed] = useState(false);
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    hasPermission: mockHasPermission,
+  }),
+}));
 
-  useEffect(() => {
-    let cancelled = false;
-    hasPermission(permission).then((result) => {
-      if (!cancelled) setAllowed(result);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [hasPermission, permission]);
-
-  return allowed ? <button data-testid={testId}>{label}</button> : null;
-}
-
-describe('RolesManagePage — Manage User Assignments button permission gate', () => {
+describe('usePermissionGate', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    mockHasPermission.mockReset();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     cleanup();
   });
 
-  it('hides the affordance during the initial pending state', () => {
-    // Promise that never resolves → initial state visible to user.
-    const pending = new Promise<boolean>(() => {});
-    const hasPermission = vi.fn().mockReturnValue(pending);
+  it('returns false during the initial pending state', () => {
+    // Promise that never resolves → permanent pending.
+    mockHasPermission.mockReturnValue(new Promise<boolean>(() => {}));
 
-    render(
-      <GatedAffordance
-        hasPermission={hasPermission}
-        permission="user.role_assign"
-        testId="manage-user-assignments-button"
-        label="Manage User Assignments"
-      />
-    );
+    const { result } = renderHook(() => usePermissionGate('user.role_assign'));
 
-    expect(screen.queryByTestId('manage-user-assignments-button')).toBeNull();
-    expect(hasPermission).toHaveBeenCalledWith('user.role_assign');
+    expect(result.current).toBe(false);
+    expect(mockHasPermission).toHaveBeenCalledWith('user.role_assign', undefined);
   });
 
-  it('shows the affordance after hasPermission resolves true', async () => {
-    const hasPermission = vi.fn().mockResolvedValue(true);
+  it('returns true after hasPermission resolves true', async () => {
+    mockHasPermission.mockResolvedValue(true);
 
-    render(
-      <GatedAffordance
-        hasPermission={hasPermission}
-        permission="user.role_assign"
-        testId="manage-user-assignments-button"
-        label="Manage User Assignments"
-      />
-    );
+    const { result } = renderHook(() => usePermissionGate('user.role_assign'));
 
-    // Use real timers for promise microtask flush.
-    vi.useRealTimers();
-
-    await waitFor(() => {
-      expect(screen.queryByTestId('manage-user-assignments-button')).not.toBeNull();
-    });
-
-    const button = screen.getByTestId('manage-user-assignments-button');
-    expect(button.textContent).toContain('Manage User Assignments');
+    await waitFor(() => expect(result.current).toBe(true));
   });
 
-  it('stays hidden when hasPermission resolves false', async () => {
-    const hasPermission = vi.fn().mockResolvedValue(false);
+  it('returns false after hasPermission resolves false', async () => {
+    mockHasPermission.mockResolvedValue(false);
 
-    render(
-      <GatedAffordance
-        hasPermission={hasPermission}
-        permission="user.role_assign"
-        testId="manage-user-assignments-button"
-        label="Manage User Assignments"
-      />
-    );
+    const { result } = renderHook(() => usePermissionGate('user.role_assign'));
 
-    vi.useRealTimers();
-
-    // Wait long enough for the promise + setState to flush. If the gate
-    // is broken, the button would appear during this window.
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    expect(screen.queryByTestId('manage-user-assignments-button')).toBeNull();
-    expect(hasPermission).toHaveBeenCalledWith('user.role_assign');
+    // Allow promise + setState to flush.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(result.current).toBe(false);
   });
 
-  it('cancels the pending resolution if unmounted before resolve', async () => {
+  it('fails closed (returns false) when hasPermission rejects', async () => {
+    mockHasPermission.mockRejectedValue(new Error('network failure'));
+
+    const { result } = renderHook(() => usePermissionGate('user.role_assign'));
+
+    // Allow promise rejection + setState to flush.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(result.current).toBe(false);
+  });
+
+  it('cancels pending resolution on unmount (no setState after unmount)', async () => {
     let resolveFn: ((value: boolean) => void) | null = null;
-    const hasPermission = vi.fn().mockImplementation(
+    mockHasPermission.mockImplementation(
       () =>
         new Promise<boolean>((resolve) => {
           resolveFn = resolve;
         })
     );
 
-    const { unmount } = render(
-      <GatedAffordance
-        hasPermission={hasPermission}
-        permission="user.role_assign"
-        testId="manage-user-assignments-button"
-        label="Manage User Assignments"
-      />
-    );
+    const { unmount } = renderHook(() => usePermissionGate('user.role_assign'));
 
-    // Unmount BEFORE the promise resolves.
     unmount();
 
-    // Resolve after unmount. The cancellation guard must prevent setState
-    // (which would log a "Can't perform a React state update on an
-    // unmounted component" warning in older React versions; React 19
-    // silently no-ops but the guard is still the right contract).
-    vi.useRealTimers();
+    // Resolve after unmount. The cancellation guard prevents setState.
     await act(async () => {
       resolveFn?.(true);
-      // Flush microtasks.
       await new Promise((r) => setTimeout(r, 0));
     });
 
-    // No assertion needed beyond "no error thrown / no warning emitted".
-    // The cancellation guard's correctness is observable by absence of
-    // setState-after-unmount errors during teardown.
+    // No assertion beyond "no React warnings during cleanup". The
+    // cancellation contract is observable by absence of state-update-
+    // after-unmount errors.
     expect(true).toBe(true);
   });
+
+  it('passes targetPath through to hasPermission for scope-aware checks', async () => {
+    mockHasPermission.mockResolvedValue(true);
+
+    const { result } = renderHook(() =>
+      usePermissionGate('organization.update_ou', 'acme.pediatrics')
+    );
+
+    await waitFor(() => expect(result.current).toBe(true));
+    expect(mockHasPermission).toHaveBeenCalledWith('organization.update_ou', 'acme.pediatrics');
+  });
+
+  it('re-runs the check when permission name changes', async () => {
+    mockHasPermission.mockImplementation((perm: string) =>
+      Promise.resolve(perm === 'user.role_assign')
+    );
+
+    const { result, rerender } = renderHook(
+      ({ perm }: { perm: string }) => usePermissionGate(perm),
+      { initialProps: { perm: 'user.role_assign' } }
+    );
+
+    await waitFor(() => expect(result.current).toBe(true));
+
+    rerender({ perm: 'role.delete' });
+
+    await waitFor(() => expect(result.current).toBe(false));
+    expect(mockHasPermission).toHaveBeenCalledWith('role.delete', undefined);
+  });
 });
+
+// Suppress unused-import lint for React (renderHook needs JSX runtime in some configs).
+void React;

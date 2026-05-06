@@ -12,6 +12,7 @@ import { observer } from 'mobx-react-lite';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building, ClipboardList, ChevronRight, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissionGate } from '@/hooks/usePermissionGate';
 
 const glassCardStyle = {
   background: 'rgba(255, 255, 255, 0.7)',
@@ -23,24 +24,12 @@ const glassCardStyle = {
 
 export const SettingsPage: React.FC = observer(() => {
   const navigate = useNavigate();
-  const { session, hasPermission } = useAuth();
+  const { session } = useAuth();
 
   const orgType = session?.claims.org_type;
   const isProvider = orgType === 'provider';
 
-  const [canUpdateOrg, setCanUpdateOrg] = React.useState(false);
-  React.useEffect(() => {
-    let cancelled = false;
-    hasPermission('organization.update').then((result) => {
-      if (!cancelled) {
-        setCanUpdateOrg(result);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [hasPermission]);
-
+  const canUpdateOrg = usePermissionGate('organization.update');
   const showOrgSettings = isProvider && canUpdateOrg;
 
   return (

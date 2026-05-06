@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
 import { cn } from '@/components/ui/utils';
+import { usePermissionGate } from '@/hooks/usePermissionGate';
 
 const log = Logger.getLogger('component');
 
@@ -61,6 +62,11 @@ type DialogState =
 export const SchedulesManagePage: React.FC = observer(() => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Cross-aggregate gate: "Manage User Assignments" calls
+  // api.sync_schedule_assignments which requires user.assign — a
+  // user.* permission not implied by the page-entry user.schedule_manage.
+  const canAssignUsers = usePermissionGate('user.assign');
 
   const initialStatus = searchParams.get('status') as 'all' | 'active' | 'inactive' | null;
   const initialTemplateId = searchParams.get('templateId');
@@ -632,17 +638,20 @@ export const SchedulesManagePage: React.FC = observer(() => {
                         Edit Template
                       </CardTitle>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleManageAssignClick}
-                          disabled={formViewModel.isSubmitting}
-                          className="text-blue-600 border-blue-300 hover:bg-blue-50"
-                          title="Add or remove user assignments for this template"
-                        >
-                          <Users className="w-4 h-4 mr-1" />
-                          Manage User Assignments
-                        </Button>
+                        {canAssignUsers && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleManageAssignClick}
+                            disabled={formViewModel.isSubmitting}
+                            className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                            title="Add or remove user assignments for this template"
+                            data-testid="schedule-manage-user-assignments-button"
+                          >
+                            <Users className="w-4 h-4 mr-1" />
+                            Manage User Assignments
+                          </Button>
+                        )}
                         <span
                           className={cn(
                             'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',

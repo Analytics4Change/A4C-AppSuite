@@ -92,6 +92,38 @@ src/
 └── test/            # Test setup and utilities
 ```
 
+## Permission Gating Convention
+
+> **⚠️ CRITICAL: Permission-gated affordances HIDE; state-gated affordances DISABLE.**
+
+Two distinct categories of conditional UI affordances. Use the right one:
+
+| Category | Pattern | Example |
+|---|---|---|
+| **Permission-gated** | Conditional render — `{allowed && <Button/>}` | Hide "Manage User Assignments" if caller lacks `user.role_assign` |
+| **State-gated** | Disable + tooltip — `<Button disabled={...} title={...}/>` | Disable "Save Changes" while form is submitting |
+
+A permission gate that uses disable+tooltip leaks the existence and label of an affordance the user cannot use — wrong UX, weak defense-in-depth, inconsistent with the codebase. Use the `usePermissionGate` hook:
+
+```tsx
+import { usePermissionGate } from '@/hooks/usePermissionGate';
+
+const canAssignUsers = usePermissionGate('user.role_assign');
+// scope-aware variant:
+const canEditOu = usePermissionGate('organization.update_ou', ouPath);
+
+return canAssignUsers ? <ManageUserAssignmentsButton /> : null;
+```
+
+The hook handles the async ceremony (state, effect, cancellation guard, fail-closed `.catch`) so call sites stay declarative. Backend gates are the load-bearing security boundary; the frontend gate is defense-in-depth + UX.
+
+**When auditing a manage page**, check every action button:
+1. Trace the button → handler → service → RPC.
+2. Read the RPC's first executable permission gate (`get_permission_scope` / `RAISE EXCEPTION 'Missing permission: ...'`).
+3. If the route-entry permission does NOT imply the button's required permission, gate the button explicitly. Cross-aggregate buttons (e.g., a Roles page button calling a `user.*` RPC) ALWAYS need explicit gates.
+
+Self-audit pattern: `grep -rnE 'usePermissionGate|hasPermission\(' frontend/src/pages/` should match every cross-aggregate or cross-permission-class button. Inline closure ceremony (`useState(false) + useEffect + hasPermission(...)`) is a smell — migrate to `usePermissionGate`.
+
 ## Accessibility & WCAG Compliance
 
 ### WCAG 2.1 Level AA Requirements
