@@ -9,6 +9,11 @@
 ## Tasks
 
 - [x] Card seeded with context, design-space plan, references — 2026-04-27
+- [ ] **Phase 0 Discovery — narrower alternative vs. full sub-tenant admin** (added 2026-05-06; gates all subsequent work)
+  - Enumerate operations needing a scope-gating boundary the platform doesn't enforce today.
+  - Classify each as role-scoped (target has `scope_path`) vs identity-scoped (target is user identity).
+  - If only role-scoped: spin off a focused implementation card for Option 2 (`actor's role scope @> target role scope`) and keep this card SEEDED.
+  - If identity-scoped operations also surface: this card's full design space applies. See `plan.md` § Phase 0 Discovery.
 - [ ] **Business-need trigger** — surface sub-tenant admin requirement from a customer / partner / compliance driver
 - [ ] **Design exploration** — answer Open Questions in `plan.md` (multi-OU membership semantics, identity-vs-shift-OU distinction, role-aggregation rule, placement-eligibility filter relationship)
 - [ ] **Architectural review** — `software-architect-dbc` once design is settled; pre-empt the same misreading that triggered the 2026-04-27 course correction
