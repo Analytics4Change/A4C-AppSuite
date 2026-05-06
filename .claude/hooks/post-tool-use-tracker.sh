@@ -51,7 +51,7 @@ detect_repo() {
         temporal)
             echo "temporal"
             ;;
-        # Infrastructure: Terraform, Supabase, K8s
+        # Infrastructure: Supabase, K8s
         infrastructure)
             echo "infrastructure"
             ;;
@@ -92,7 +92,7 @@ get_build_command() {
         fi
     fi
 
-    # Infrastructure: No build command (Terraform/SQL)
+    # Infrastructure: No build command (SQL migrations + K8s manifests)
     if [[ "$repo" == "infrastructure" ]]; then
         echo ""
         return

@@ -97,10 +97,8 @@ SELECT
   u.email,
   u.name,
   u.is_active,
-  zum.zitadel_user_id,
   u.created_at
 FROM users u
-LEFT JOIN zitadel_user_mapping zum ON zum.internal_user_id = u.id
 ORDER BY u.created_at;
 
 
@@ -126,37 +124,7 @@ ORDER BY ur.assigned_at;
 
 
 -- ============================================================================
--- 7. Verify Zitadel Mappings
--- ============================================================================
-
-SELECT 'Zitadel Organization Mappings' as section, COUNT(*) as count
-FROM zitadel_organization_mapping;
--- Expected: 1 (A4C → 339658157368404786)
-
-SELECT
-  org_name,
-  zitadel_org_id,
-  internal_org_id,
-  created_at
-FROM zitadel_organization_mapping
-ORDER BY created_at;
-
-
-SELECT 'Zitadel User Mappings' as section, COUNT(*) as count
-FROM zitadel_user_mapping;
--- Expected: 1 (Lars → 339658157368929074)
-
-SELECT
-  user_email,
-  zitadel_user_id,
-  internal_user_id,
-  created_at
-FROM zitadel_user_mapping
-ORDER BY created_at;
-
-
--- ============================================================================
--- 8. Verify Event Store
+-- 7. Verify Event Store
 -- ============================================================================
 
 SELECT 'Domain Events' as section, COUNT(*) as total_events
@@ -170,48 +138,6 @@ SELECT
 FROM domain_events
 GROUP BY stream_type, event_type
 ORDER BY stream_type, event_type;
-
-
--- ============================================================================
--- 9. Test Permission Check for Lars
--- ============================================================================
-
--- Get Lars's internal UUID
-SELECT get_internal_user_id('339658157368929074') as lars_internal_uuid;
-
--- Test Lars has organization.create_root permission
-SELECT user_has_permission(
-  get_internal_user_id('339658157368929074'),
-  'organization.create_root',
-  NULL,  -- global scope
-  NULL   -- no scope path
-) as lars_has_org_create_root;
--- Expected: true
-
--- Check all permissions Lars has
-SELECT
-  p.applet || '.' || p.action as permission_name,
-  p.requires_mfa
-FROM user_permissions(get_internal_user_id('339658157368929074'), NULL) up
-JOIN permissions_projection p ON p.id = up.permission_id
-ORDER BY p.applet, p.action;
--- Expected: All 22 permissions
-
-
--- ============================================================================
--- 10. Test Authorization Functions
--- ============================================================================
-
--- Test is_super_admin for Lars
-SELECT is_super_admin(get_internal_user_id('339658157368929074')) as lars_is_super_admin;
--- Expected: true
-
--- Test is_org_admin for Lars in A4C organization
-SELECT is_org_admin(
-  get_internal_user_id('339658157368929074'),
-  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID
-) as lars_is_org_admin_in_a4c;
--- Expected: false (Lars is super_admin, not org_admin)
 
 
 -- ============================================================================
