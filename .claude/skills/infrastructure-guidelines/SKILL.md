@@ -424,6 +424,27 @@ $comment$Update user profile (first_name, last_name) via domain event
 
 ---
 
+## 18. Never Track Secret-Bearing Files; Tighten Gitignore on Discovery
+
+`git-crypt` was removed in PR #53 (2026-05-07). With it gone, `.gitignore` is the only line of defense against accidentally committing a `.env.local`, an env backup, or a stray crypt key. Any file matching one of these patterns MUST NOT be staged or committed:
+
+- `.env`, `.env.local`, `.env.*.local`, `.env.production`, `.env.staging`
+- `.env.local.backup-*` (timestamped pre-rotation backups)
+- `*.env.local.backup*` (any env backup with a tail suffix)
+- `*-git-crypt.key` (legacy git-crypt keys — repo no longer uses git-crypt, but keys may be regenerated on accident)
+
+**Rule**: if you find a tracked file matching any of these patterns, do all three:
+
+1. `git rm --cached <file>` and commit the untracking.
+2. Verify the relevant `.gitignore` (root, `frontend/`, `workflows/`) covers the pattern; add it if missing.
+3. **Rotate the underlying credential** — `git rm --cached` removes the file from the worktree pointer but the value remains in history and any clone made before the untracking. Treat the value as compromised.
+
+**Why three gitignore files**: root, frontend, and workflows each have their own `.gitignore`. Patterns added at the root do NOT propagate down — gitignore is per-directory. Mirror the secret patterns in all three.
+
+**See**: PR #53 close-out remediation (2026-05-07); root `.gitignore`, `frontend/.gitignore`, `workflows/.gitignore`.
+
+---
+
 ## File Locations
 
 | What | Where |

@@ -43,6 +43,9 @@ infrastructure/supabase/backup_*.sql
 .env
 .env.local
 .env.*.local
+.env.local.backup-*
+*.env.local.backup*
+*-git-crypt.key
 
 # Logs
 logs

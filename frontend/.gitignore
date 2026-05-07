@@ -32,6 +32,9 @@ test-validation/
 .env.test.local
 .env.production
 .env.staging
+.env.local.backup-*
+*.env.local.backup*
+*-git-crypt.key
 
 # IDE files
 .vscode/settings.json
