@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2026-04-22
+last_updated: 2026-05-07
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Monorepo root guide for A4C-AppSuite — navigation hub pointing to component CLAUDE.md files (frontend, workflows, infrastructure) and the AI agent documentation index. Covers quick-start commands, cross-component workflow pattern, and git-crypt setup.
+**Summary**: Monorepo root guide for A4C-AppSuite — navigation hub pointing to component CLAUDE.md files (frontend, workflows, infrastructure) and the AI agent documentation index. Covers quick-start commands and cross-component workflow pattern.
 
 **When to read**:
 - First time working in this repo
@@ -170,14 +170,6 @@ See [Resend Email Provider Guide](documentation/workflows/guides/resend-email-pr
 ```bash
 export SUPABASE_ACCESS_TOKEN="..."
 export SUPABASE_PROJECT_REF="..."
-```
-
-## Git-Crypt
-
-This repository uses git-crypt for encrypting sensitive files:
-
-```bash
-git-crypt unlock /path/to/A4C-AppSuite-git-crypt.key
 ```
 
 ## GitHub Actions

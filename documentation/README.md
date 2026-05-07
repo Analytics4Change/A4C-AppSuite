@@ -37,7 +37,6 @@ Use the TL;DR section at the top of each document to quickly assess relevance be
 ### For New Developers
 - **[Frontend Development Setup](./frontend/guides/DEVELOPMENT.md)** - Local environment, dev server, hot reload
 - **[Frontend Installation Guide](./frontend/getting-started/installation.md)** - Dependencies, prerequisites, first run
-- **[Git-Crypt Setup](./frontend/guides/GIT_CRYPT_SETUP.md)** - Decrypt sensitive files after clone
 - **[Supabase Auth Setup](./infrastructure/guides/supabase/SUPABASE-AUTH-SETUP.md)** - OAuth configuration, JWT claims
 
 ### Frequently Accessed Documentation
@@ -79,7 +78,6 @@ React/TypeScript medication management application
   - [Deployment Guide](./frontend/guides/DEPLOYMENT.md) - CI/CD and production deployment
   - [Event-Driven Guide](./frontend/guides/EVENT-DRIVEN-GUIDE.md) - CQRS patterns in React
   - [Design Patterns Migration](./frontend/guides/DESIGN_PATTERNS_MIGRATION_GUIDE.md) - Component architecture patterns
-  - [Git-Crypt Setup](./frontend/guides/GIT_CRYPT_SETUP.md) - Repository encryption
   - [RxNorm Medication Autocomplete](./frontend/guides/rxnorm-medication-autocomplete.md) - Drug search implementation
   - [Medication Search Implementation](./frontend/guides/medication-search-implementation.md) - Search architecture
 - **[Reference](./frontend/reference/)** - Quick lookup documentation

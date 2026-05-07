@@ -38,7 +38,7 @@ This document covers backup strategy and recovery procedures for catastrophic fa
 ### Kubernetes
 
 - Critical deployments tracked in git (`infrastructure/k8s/*.yaml`)
-- Secrets stored in encrypted git-crypt
+- Secrets stored as Kubernetes Secrets (gitignored locally; managed via `kubectl` + GitHub Actions secrets)
 - ConfigMaps in version control
 
 ### Temporal
@@ -80,10 +80,9 @@ For per-component rollback commands, see [Deployment Runbook](deployment/deploym
 
 ### Secrets Management
 
-- Never commit secrets to git
+- Never commit secrets to git (push protection enabled at the repo level — GitHub blocks recognizable patterns at commit time)
 - Rotate GitHub secrets regularly (see [Resend Key Rotation](resend-key-rotation.md) for the email provider rotation procedure)
 - Use GitHub environment protection for production
-- Encrypt sensitive files with git-crypt
 
 ### Access Control
 

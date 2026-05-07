@@ -41,7 +41,6 @@ supabase/
 
 1. Access to Supabase Dashboard SQL Editor
 2. Supabase project credentials (URL, anon key, service role key)
-3. Git-crypt key for decrypting sensitive files
 
 ### Manual Deployment (via SQL Editor)
 
@@ -135,7 +134,7 @@ await supabase.from('domain_events').insert({
 2. Test locally if you have a local Supabase instance
 3. Deploy to development project first
 4. Verify changes in Supabase Dashboard
-5. Commit changes to git (files are encrypted via git-crypt)
+5. Commit changes to git
 
 ## Adding New Objects
 

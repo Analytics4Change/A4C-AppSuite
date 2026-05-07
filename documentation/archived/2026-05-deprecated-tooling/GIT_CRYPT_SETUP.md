@@ -1,7 +1,10 @@
 ---
-status: current
+status: archived
 last_updated: 2025-12-30
+archived_on: 2026-05-07
 ---
+
+> **Archived 2026-05-07** — git-crypt was removed from the repository entirely. As of the 2026-05 credential-leak audit, git-crypt encrypted zero files (the leaked key in history is "the key to nothing") and the machinery served no purpose. **Replaced by**: nothing — secrets live in `.env.local` (gitignored), Kubernetes Secrets, GitHub Actions secrets, and Supabase project secrets. Push protection is enabled at the repo level to block recognizable secret patterns at commit time. Preserved here for historical context on the encrypted-files-in-repo approach.
 
 <!-- TL;DR-START -->
 ## TL;DR
