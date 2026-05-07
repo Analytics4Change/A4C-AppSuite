@@ -315,7 +315,7 @@ The kubeconfig file contains:
 
 **Never commit kubeconfig to git or share publicly.** Always:
 - Store in GitHub Secrets (encrypted at rest)
-- Use git-crypt for local encrypted storage if needed
+- Keep local kubeconfig outside the repo (e.g., `~/.kube/config`); the repo's `.gitignore` already excludes it as defense-in-depth
 - Rotate credentials if exposed
 - Use RBAC to limit permissions (create dedicated GitHub Actions user with limited permissions)
 

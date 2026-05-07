@@ -70,7 +70,6 @@ infrastructure/supabase/test-results/
 !**/*-secrets.yaml.example
 
 # Git-crypt
-.git-crypt/
 
 # Temporary files
 *.tmp

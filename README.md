@@ -101,14 +101,6 @@ psql -h db.<project-ref>.supabase.co -U postgres -d postgres \
 - **SQL Idempotency**: [documentation/infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md](documentation/infrastructure/guides/supabase/SQL_IDEMPOTENCY_AUDIT.md)
 - **Connectivity Test**: [infrastructure/test-k8s-connectivity.sh](infrastructure/test-k8s-connectivity.sh)
 
-## Git-Crypt
-
-This repository uses git-crypt to encrypt sensitive files. After cloning:
-
-```bash
-git-crypt unlock /path/to/A4C-*.key
-```
-
 ## Migration Notice
 
 This repository was created by merging:

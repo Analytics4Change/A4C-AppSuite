@@ -1436,9 +1436,10 @@ supabase functions deploy organization-bootstrap
    - GitHub Secrets: Require admin access
    - Kubernetes Secrets: Use RBAC to limit access
 
-2. **Use git-crypt for sensitive files**
-   - Repository uses git-crypt for encryption
-   - Unlock: `git-crypt unlock /path/to/A4C-AppSuite-git-crypt.key`
+2. **Keep secrets out of the repo**
+   - Local `.env.local` files are gitignored
+   - GitHub push protection is enabled — recognizable secret patterns are rejected at commit time
+   - Cluster runtime values live only in Kubernetes Secrets and Supabase project secrets
 
 3. **Audit access logs**
    - Monitor who accesses secrets
