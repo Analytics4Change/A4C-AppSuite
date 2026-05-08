@@ -42,12 +42,29 @@ jobs:
         with:
           version: latest
 
+      # `supabase start` auto-applies any migrations in supabase/migrations/
+      # on first init (confirmed by failing log on the prior CI run). Move the
+      # directory aside before start so the container boots with no migrations,
+      # then restore for the phased manual apply below. Without this, the May
+      # 6 postcondition migration runs before our seed step has a chance.
+      - name: Move migrations aside (prevent supabase start auto-apply)
+        working-directory: infrastructure/supabase
+        run: |
+          mv supabase/migrations supabase/migrations.staged
+          mkdir supabase/migrations  # supabase CLI requires the directory to exist
+
       - name: Start local Supabase container
         working-directory: infrastructure/supabase
         run: |
           supabase start
           # Wait for the container to be fully ready (status reports DB URL)
           supabase status
+
+      - name: Restore migrations directory
+        working-directory: infrastructure/supabase
+        run: |
+          rmdir supabase/migrations
+          mv supabase/migrations.staged supabase/migrations
 
       - name: Install psql client
         run: |
