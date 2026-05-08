@@ -43,15 +43,25 @@ jobs:
           version: latest
 
       # `supabase start` auto-applies any migrations in supabase/migrations/
-      # on first init (confirmed by failing log on the prior CI run). Move the
-      # directory aside before start so the container boots with no migrations,
-      # then restore for the phased manual apply below. Without this, the May
-      # 6 postcondition migration runs before our seed step has a chance.
-      - name: Move migrations aside (prevent supabase start auto-apply)
+      # on first init AND requires the `api` schema to exist for PostgREST
+      # health checks to pass. Strategy: keep ONLY baseline_v4 in the dir
+      # during supabase start (it creates the `api` schema and the foundational
+      # structures), stage the rest aside. After start succeeds, restore the
+      # rest and apply via the phased manual flow below. Without this, either:
+      #   (a) all migrations apply and the May 6 postcondition fails, or
+      #   (b) no migrations apply and PostgREST health check times out (503).
+      - name: Stage post-baseline migrations aside
         working-directory: infrastructure/supabase
         run: |
-          mv supabase/migrations supabase/migrations.staged
-          mkdir supabase/migrations  # supabase CLI requires the directory to exist
+          mkdir supabase/migrations.staged
+          # Move every migration EXCEPT baseline_v4 to the staged dir
+          for f in supabase/migrations/*.sql; do
+            base=$(basename "$f")
+            if [[ "$base" != "20260212010625_baseline_v4.sql" ]]; then
+              mv "$f" supabase/migrations.staged/
+            fi
+          done
+          ls supabase/migrations/
 
       - name: Start local Supabase container
         working-directory: infrastructure/supabase
@@ -60,11 +70,11 @@ jobs:
           # Wait for the container to be fully ready (status reports DB URL)
           supabase status
 
-      - name: Restore migrations directory
+      - name: Restore staged migrations
         working-directory: infrastructure/supabase
         run: |
-          rmdir supabase/migrations
-          mv supabase/migrations.staged supabase/migrations
+          mv supabase/migrations.staged/*.sql supabase/migrations/
+          rmdir supabase/migrations.staged
 
       - name: Install psql client
         run: |
@@ -98,15 +108,23 @@ jobs:
         run: |
           PSQL_CMD="psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -v ON_ERROR_STOP=1"
 
-          # Boundary timestamp: apply migrations through and INCLUDING this one
-          # before seeding. The postcondition migration 20260506190626 must run
-          # AFTER the seed.
+          # Baseline (20260212010625_baseline_v4.sql) is ALREADY APPLIED by
+          # `supabase start` above (we kept it in the migrations dir so PostgREST
+          # health checks pass). Phase 1 applies post-baseline migrations through
+          # and INCLUDING the boundary timestamp; the postcondition migration
+          # 20260506190626 runs in Phase 3 after the permissions seed.
+          BASELINE_TS="20260212010625"
           BOUNDARY_TS="20260506012315"
 
-          echo "::group::Phase 1 - Migrations through and including ${BOUNDARY_TS}"
+          echo "::group::Phase 1 - Post-baseline migrations through and including ${BOUNDARY_TS}"
           for f in $(ls supabase/migrations/*.sql | sort); do
             base=$(basename "$f")
             ts=${base%%_*}
+            # Skip baseline (already applied by supabase start)
+            if [[ "$ts" == "$BASELINE_TS" ]]; then
+              echo "Skipping $base (already applied by supabase start)"
+              continue
+            fi
             if [[ "$ts" > "$BOUNDARY_TS" ]]; then
               echo "Stopping at $base (will apply after seed)"
               break
