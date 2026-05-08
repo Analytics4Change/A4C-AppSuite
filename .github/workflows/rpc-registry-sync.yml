@@ -49,9 +49,83 @@ jobs:
           # Wait for the container to be fully ready (status reports DB URL)
           supabase status
 
-      - name: Apply migrations to local container
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      # Migrations applied in three phases with a permissions seed step in
+      # between. Rationale:
+      #
+      # 20260506190626_add_role_management_view_ou_implications.sql ends with a
+      # DO $$ ... ASSERT $$ postcondition that requires 6 implication rows to
+      # exist, which depends on permissions_projection being populated. On
+      # dev/prod, permissions were populated via the post-baseline seed file
+      # `infrastructure/supabase/sql/99-seeds/001-permissions-seed.sql` (it
+      # emits permission.defined events that the trigger projects into the
+      # projection). On a fresh CI container, that seed never runs (the CLI's
+      # supabase/seed.sql doesn't exist; the 99-seeds/*.sql files aren't
+      # auto-applied).
+      #
+      # The prior `supabase db reset --local` step blindly ran every migration
+      # in lexical order and failed at 20260506190626 with
+      # "Postcondition violated: expected 6 implication rows, found 0".
+      #
+      # Replacement: drive migrations manually via psql, applying baseline +
+      # early migrations first, seeding permissions, then applying remaining
+      # migrations.
+      - name: Apply migrations and seed permissions in phased order
         working-directory: infrastructure/supabase
-        run: supabase db reset --local
+        env:
+          PGPASSWORD: postgres
+        run: |
+          PSQL_CMD="psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -v ON_ERROR_STOP=1"
+
+          # Boundary timestamp: apply migrations through and INCLUDING this one
+          # before seeding. The postcondition migration 20260506190626 must run
+          # AFTER the seed.
+          BOUNDARY_TS="20260506012315"
+
+          echo "::group::Phase 1 - Migrations through and including ${BOUNDARY_TS}"
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            base=$(basename "$f")
+            ts=${base%%_*}
+            if [[ "$ts" > "$BOUNDARY_TS" ]]; then
+              echo "Stopping at $base (will apply after seed)"
+              break
+            fi
+            echo "Applying $base"
+            ${PSQL_CMD} -f "$f"
+          done
+          echo "::endgroup::"
+
+          echo "::group::Phase 2 - Seed permissions (mirrors dev/prod post-baseline state)"
+          ${PSQL_CMD} -f sql/99-seeds/001-permissions-seed.sql
+          echo "::endgroup::"
+
+          echo "::group::Phase 3 - Apply remaining migrations after ${BOUNDARY_TS}"
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            base=$(basename "$f")
+            ts=${base%%_*}
+            if [[ "$ts" > "$BOUNDARY_TS" ]]; then
+              echo "Applying $base"
+              ${PSQL_CMD} -f "$f"
+            fi
+          done
+          echo "::endgroup::"
+
+          echo "::group::Phase 4 - Record applied migrations in supabase_migrations.schema_migrations"
+          # supabase db reset normally writes each migration's version into
+          # supabase_migrations.schema_migrations after applying it. We applied
+          # via psql, so we record them manually for consistency. The registry
+          # generator doesn't actually consult this table, but keeping it
+          # consistent prevents confusion in any subsequent step that might.
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            base=$(basename "$f")
+            ts=${base%%_*}
+            ${PSQL_CMD} -c "INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ('${ts}', '${base%.sql}') ON CONFLICT DO NOTHING;" 2>/dev/null || true
+          done
+          echo "::endgroup::"
 
       - name: Regenerate registry against local container
         working-directory: frontend
