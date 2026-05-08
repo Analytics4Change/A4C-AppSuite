@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck - Schema mismatch with generated types (status/subdomain columns changed)
 /**
  * Query Development Entities
@@ -41,10 +42,18 @@ interface Invitation {
   email: string;
   organization_id: string;
   status: string;
-  role: string;
+  roles: Array<{ role_id: string | null; role_name: string | null }>;
   tags: string[];
   created_at: string;
   expires_at: string;
+}
+
+function formatRoles(roles: Invitation['roles']): string {
+  if (!roles || roles.length === 0) return '(no roles)';
+  return roles
+    .map(r => r.role_name)
+    .filter((n): n is string => Boolean(n))
+    .join(';');
 }
 
 interface QueryResult {
@@ -192,7 +201,7 @@ function formatAsTable(result: QueryResult, tag: string): void {
       console.log(
         email.padEnd(35) +
         (isExpired ? inv.status + ' (EXPIRED)' : inv.status).padEnd(15) +
-        inv.role.padEnd(20) +
+        formatRoles(inv.roles).padEnd(20) +
         expiresStr
       );
 
@@ -253,7 +262,7 @@ function formatAsCSV(result: QueryResult): void {
 
   console.log('');
   console.log('# Invitations');
-  console.log('invitation_id,email,organization_id,status,role,created_at,expires_at,tags');
+  console.log('invitation_id,email,organization_id,status,roles,created_at,expires_at,tags');
 
   result.invitations.forEach(inv => {
     console.log([
@@ -261,7 +270,7 @@ function formatAsCSV(result: QueryResult): void {
       inv.email,
       inv.organization_id,
       inv.status,
-      inv.role,
+      `"${formatRoles(inv.roles)}"`,
       inv.created_at,
       inv.expires_at,
       `"${inv.tags.join(';')}"`
@@ -321,7 +330,7 @@ async function main() {
 
 // Run if executed directly
 if (require.main === module) {
-  main();
+  void main();
 }
 
 export { query, queryDevelopmentEntities };

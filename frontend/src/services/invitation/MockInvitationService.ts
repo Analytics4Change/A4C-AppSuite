@@ -20,7 +20,7 @@ import type { IInvitationService } from './IInvitationService';
 import type {
   InvitationDetails,
   UserCredentials,
-  AcceptInvitationResult
+  AcceptInvitationResult,
 } from '@/types/organization.types';
 
 /**
@@ -28,7 +28,7 @@ import type {
  */
 const STORAGE_KEYS = {
   INVITATIONS: 'mock_invitations',
-  ACCEPTED: 'mock_accepted_invitations'
+  ACCEPTED: 'mock_accepted_invitations',
 } as const;
 
 /**
@@ -38,7 +38,7 @@ interface MockInvitationData {
   token: string;
   orgName: string;
   orgId: string;
-  role: string;
+  roles: Array<{ role_id: string | null; role_name: string | null }>;
   inviterName: string;
   expiresAt: Date;
   email?: string;
@@ -82,10 +82,10 @@ export class MockInvitationService implements IInvitationService {
 
     return {
       orgName: invitation.orgName,
-      role: invitation.role,
+      roles: invitation.roles,
       inviterName: invitation.inviterName,
       expiresAt: new Date(invitation.expiresAt),
-      email: invitation.email
+      email: invitation.email,
     };
   }
 
@@ -122,13 +122,13 @@ export class MockInvitationService implements IInvitationService {
     // Mark invitation as accepted
     this.markInvitationAccepted(token);
 
-    // Determine redirect URL based on role
-    const redirectUrl = this.getRedirectUrlForRole(invitation.role);
+    // Determine redirect URL based on the first role (if any)
+    const redirectUrl = this.getRedirectUrlForRole(invitation.roles?.[0]?.role_name ?? null);
 
     return {
       userId,
       orgId: invitationData.orgId,
-      redirectUrl
+      redirectUrl,
     };
   }
 
@@ -162,10 +162,10 @@ export class MockInvitationService implements IInvitationService {
         token,
         orgName: 'Demo Organization',
         orgId: `org-${Date.now()}`,
-        role: 'provider_admin',
+        roles: [{ role_id: null, role_name: 'provider_admin' }],
         inviterName: 'System Administrator',
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        email: `user-${Date.now()}@example.com`
+        email: `user-${Date.now()}@example.com`,
       };
 
       invitations.set(token, invitation);
@@ -222,24 +222,23 @@ export class MockInvitationService implements IInvitationService {
   private markInvitationAccepted(token: string): void {
     const accepted = this.getAcceptedInvitations();
     accepted.add(token);
-    localStorage.setItem(
-      STORAGE_KEYS.ACCEPTED,
-      JSON.stringify(Array.from(accepted))
-    );
+    localStorage.setItem(STORAGE_KEYS.ACCEPTED, JSON.stringify(Array.from(accepted)));
   }
 
   /**
-   * Get redirect URL based on user role
+   * Get redirect URL based on the user's first role name (or null if none).
    */
-  private getRedirectUrlForRole(role: string): string {
+  private getRedirectUrlForRole(roleName: string | null): string {
+    if (!roleName) return '/dashboard';
+
     const roleRedirects: Record<string, string> = {
       provider_admin: '/organizations/dashboard',
       organization_member: '/clients',
       clinician: '/clients',
-      viewer: '/dashboard'
+      viewer: '/dashboard',
     };
 
-    return roleRedirects[role] || '/dashboard';
+    return roleRedirects[roleName] || '/dashboard';
   }
 
   /**

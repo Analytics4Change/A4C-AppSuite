@@ -27,7 +27,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v21-frontend-index-space-fix';
+const DEPLOY_VERSION = 'v22-roles-array';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -707,16 +707,15 @@ serve(async (req) => {
     // This populates user_roles_projection via process_user_event() trigger
     // ==========================================================================
 
-    // Get roles from new format (roles array) or legacy format (single role string)
+    // Roles to assign on acceptance. The legacy singular `role` fallback was
+    // removed 2026-05-08 along with the deprecated invitations_projection.role
+    // column (migration 20260508170054). Empty array is a legitimate state
+    // ("permissions assigned later" — the invite-user contract supports this).
     interface RoleRef {
       role_id: string | null;
       role_name: string;
     }
-    const roles: RoleRef[] = invitation.roles?.length > 0
-      ? invitation.roles
-      : invitation.role
-        ? [{ role_id: null, role_name: invitation.role }]
-        : [];
+    const roles: RoleRef[] = Array.isArray(invitation.roles) ? invitation.roles : [];
 
     console.log(`[accept-invitation v${DEPLOY_VERSION}] Processing ${roles.length} role(s) from invitation`);
 
@@ -925,7 +924,11 @@ serve(async (req) => {
       console.log(`[accept-invitation v${DEPLOY_VERSION}] ✓ Notification preferences set for user ${userId}, event_id=${prefsEventId}`);
     }
 
-    // Emit invitation.accepted event per AsyncAPI contract
+    // Emit invitation.accepted event per AsyncAPI contract.
+    // Note: the deprecated singular `role` field is intentionally NOT emitted -
+    // the AsyncAPI contract for InvitationAcceptedData only specifies the fields
+    // below (no `role` and no `roles`). Removed 2026-05-08 alongside the
+    // invitations_projection.role column drop.
     const { data: _acceptedEventId, error: acceptedEventError } = await supabase
       .rpc('emit_domain_event', {
         p_stream_id: invitation.id,
@@ -936,7 +939,6 @@ serve(async (req) => {
           org_id: invitation.organization_id,
           user_id: userId,
           email: invitation.email,
-          role: invitation.role,
           accepted_at: new Date().toISOString(),
         },
         p_event_metadata: buildEventMetadata(tracingContext, 'invitation.accepted', req, {

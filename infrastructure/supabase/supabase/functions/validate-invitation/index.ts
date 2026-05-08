@@ -22,10 +22,15 @@ import {
 import { extractTracingContext } from '../_shared/tracing-context.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v10-tracing';
+const DEPLOY_VERSION = 'v11-roles-array';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
+
+interface InvitationRoleRef {
+  role_id: string | null;
+  role_name: string | null;
+}
 
 interface InvitationValidation {
   valid: boolean;
@@ -33,7 +38,9 @@ interface InvitationValidation {
   email: string;
   orgName: string;  // Frontend expects orgName, not organizationName
   organizationId: string;
-  role: string;  // Frontend expects role
+  // `roles` mirrors the JSONB array on invitations_projection.roles.
+  // Empty array is a legitimate state ("permissions assigned later").
+  roles: InvitationRoleRef[];
   expiresAt: string;
   expired: boolean;
   alreadyAccepted: boolean;
@@ -133,14 +140,16 @@ serve(async (req) => {
     const alreadyAccepted = invitation.accepted_at !== null;
 
     // Build validation response
-    // Frontend expects: orgName, role (not organizationName)
+    // Frontend expects: orgName, roles[] (the JSONB array from invitations_projection.roles).
+    // The deprecated singular `role` column was dropped 2026-05-08
+    // (migration 20260508170054_drop_invitations_deprecated_role_column).
     const response: InvitationValidation = {
       valid: !expired && !alreadyAccepted,
       token,
       email: invitation.email,
       orgName,
       organizationId: invitation.organization_id,
-      role: invitation.role,
+      roles: Array.isArray(invitation.roles) ? invitation.roles : [],
       expiresAt: invitation.expires_at,
       expired,
       alreadyAccepted,

@@ -26,11 +26,7 @@ import { makeAutoObservable, runInAction } from 'mobx';
 import type { IInvitationService } from '@/services/invitation/IInvitationService';
 import { InvitationServiceFactory } from '@/services/invitation/InvitationServiceFactory';
 import type { IAuthProvider } from '@/services/auth/IAuthProvider';
-import type {
-  InvitationDetails,
-  UserCredentials,
-  AcceptInvitationResult
-} from '@/types';
+import type { InvitationDetails, UserCredentials, AcceptInvitationResult } from '@/types';
 import type { OAuthProvider, InvitationAuthContext } from '@/types/auth.types';
 import { getAuthContextStorage } from '@/services/storage';
 import { detectPlatform, getCallbackUrl } from '@/utils/platform';
@@ -82,9 +78,7 @@ export class InvitationAcceptanceViewModel {
    *
    * @param invitationService - Invitation operations (defaults to factory-created instance)
    */
-  constructor(
-    private invitationService: IInvitationService = InvitationServiceFactory.create()
-  ) {
+  constructor(private invitationService: IInvitationService = InvitationServiceFactory.create()) {
     makeAutoObservable(this);
     log.debug('InvitationAcceptanceViewModel initialized');
   }
@@ -119,16 +113,13 @@ export class InvitationAcceptanceViewModel {
 
         log.info('Invitation token validated', {
           orgName: details.orgName,
-          role: details.role
+          roleCount: details.roles.length,
         });
       });
 
       return true;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Failed to validate invitation';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to validate invitation';
 
       runInAction(() => {
         this.isValidatingToken = false;
@@ -243,7 +234,7 @@ export class InvitationAcceptanceViewModel {
 
     return this.acceptInvitation({
       email: this.email,
-      password: this.password
+      password: this.password,
     });
   }
 
@@ -285,7 +276,7 @@ export class InvitationAcceptanceViewModel {
       flow: 'invitation_acceptance',
       authMethod: { type: 'oauth', provider },
       platform,
-      createdAt: Date.now(),  // For TTL validation
+      createdAt: Date.now(), // For TTL validation
     };
 
     try {
@@ -338,13 +329,10 @@ export class InvitationAcceptanceViewModel {
     try {
       log.info('Accepting invitation', {
         authMethod: this.authMethodSelection,
-        email: credentials.email
+        email: credentials.email,
       });
 
-      const result = await this.invitationService.acceptInvitation(
-        this.token,
-        credentials
-      );
+      const result = await this.invitationService.acceptInvitation(this.token, credentials);
 
       runInAction(() => {
         this.acceptanceResult = result;
@@ -353,13 +341,12 @@ export class InvitationAcceptanceViewModel {
 
       log.info('Invitation accepted successfully', {
         userId: result.userId,
-        orgId: result.orgId
+        orgId: result.orgId,
       });
 
       return result;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to accept invitation';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to accept invitation';
 
       runInAction(() => {
         this.isAccepting = false;
@@ -412,11 +399,7 @@ export class InvitationAcceptanceViewModel {
    * Computed: Can submit
    */
   get canSubmit(): boolean {
-    return (
-      this.isTokenValid &&
-      !this.isAccepting &&
-      this.email.trim().length > 0
-    );
+    return this.isTokenValid && !this.isAccepting && this.email.trim().length > 0;
   }
 
   /**

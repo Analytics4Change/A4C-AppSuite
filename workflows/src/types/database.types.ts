@@ -627,7 +627,6 @@ export type Database = {
           organization_id: string
           organization_name: string
           phones: Json
-          role: string
           roles: Json
           status: string
           token: string
@@ -3225,7 +3224,6 @@ export type Database = {
           notification_preferences: Json
           organization_id: string
           phones: Json | null
-          role: string | null
           roles: Json | null
           status: string
           tags: string[] | null
@@ -3248,7 +3246,6 @@ export type Database = {
           notification_preferences?: Json
           organization_id: string
           phones?: Json | null
-          role?: string | null
           roles?: Json | null
           status?: string
           tags?: string[] | null
@@ -3271,7 +3268,6 @@ export type Database = {
           notification_preferences?: Json
           organization_id?: string
           phones?: Json | null
-          role?: string | null
           roles?: Json | null
           status?: string
           tags?: string[] | null
