@@ -7,7 +7,7 @@
  */
 
 import { supabaseService } from '@/services/auth/supabase.service';
-import type { ApiEnvelope } from '@/services/api/envelope';
+import { throwIfPostgrestError } from '@/services/api/envelope';
 import { Logger } from '@/utils/logger';
 import type {
   FieldDefinition,
@@ -24,23 +24,6 @@ import type {
 import type { IClientFieldService } from './IClientFieldService';
 
 const log = Logger.getLogger('api');
-
-/**
- * Preserves the pre-migration throw-on-PostgREST-error contract.
- *
- * The pre-PR-B service threw `new Error('Failed to <verb>: <message>')` whenever
- * the raw `.rpc()` call returned a non-null `error` (PostgREST 4xx/5xx). After
- * routing through `apiRpcEnvelope<T>`, those failures surface as
- * `{success: false, postgrestError: {...}, error: '<masked>'}`. Envelope-driven
- * (handler-returned) failures still flow through as `{success: false, ...}` and
- * the caller pattern-matches on `result.success`.
- */
-function throwIfPostgrestError(env: ApiEnvelope<Record<string, unknown>>, verb: string): void {
-  if (!env.success && env.postgrestError) {
-    log.error(`Failed to ${verb}`, { error: env.error });
-    throw new Error(`Failed to ${verb}: ${env.error}`);
-  }
-}
 
 export class SupabaseClientFieldService implements IClientFieldService {
   async listFieldDefinitions(includeInactive = false): Promise<FieldDefinition[]> {

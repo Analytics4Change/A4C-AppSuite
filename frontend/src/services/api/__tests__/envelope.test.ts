@@ -10,7 +10,8 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { PostgrestSingleResponse } from '@supabase/supabase-js';
-import { unwrapApiEnvelope } from '../envelope';
+import type { ApiEnvelope } from '../envelope';
+import { unwrapApiEnvelope, throwIfPostgrestError } from '../envelope';
 
 // Stub maskPii to be identity so tests assert on shape, not masking behavior.
 vi.mock('@/utils/maskPii', () => ({
@@ -101,5 +102,50 @@ describe('unwrapApiEnvelope', () => {
       expect(result.postgrestError?.code).toBe('42501');
       expect(result.error).toBe('permission denied');
     });
+  });
+});
+
+describe('throwIfPostgrestError', () => {
+  it('throws "Failed to <verb>: <error>" on PostgREST-shape failure', () => {
+    const env: ApiEnvelope<Record<string, unknown>> = {
+      success: false,
+      error: 'permission denied',
+      postgrestError: { code: '42501', message: 'permission denied', details: '', hint: '' },
+    };
+
+    expect(() => throwIfPostgrestError(env, 'create field')).toThrow(
+      'Failed to create field: permission denied'
+    );
+  });
+
+  it('does NOT throw on handler-driven envelope failure (no postgrestError)', () => {
+    const env: ApiEnvelope<Record<string, unknown>> = {
+      success: false,
+      error: 'Field key already exists',
+      errorDetails: { code: 'DUPLICATE_KEY', message: 'm' },
+    };
+
+    expect(() => throwIfPostgrestError(env, 'create field')).not.toThrow();
+  });
+
+  it('does NOT throw on success envelope', () => {
+    const env: ApiEnvelope<{ field_id: string }> = {
+      success: true,
+      field_id: 'f1',
+    };
+
+    expect(() => throwIfPostgrestError(env, 'create field')).not.toThrow();
+  });
+
+  it('passes through the verb verbatim in the thrown message', () => {
+    const env: ApiEnvelope<Record<string, unknown>> = {
+      success: false,
+      error: 'boom',
+      postgrestError: { code: '500', message: 'boom', details: '', hint: '' },
+    };
+
+    expect(() => throwIfPostgrestError(env, 'deactivate category')).toThrow(
+      'Failed to deactivate category: boom'
+    );
   });
 });

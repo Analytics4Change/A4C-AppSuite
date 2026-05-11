@@ -88,6 +88,34 @@ export type ApiEnvelope<T extends Record<string, unknown> = Record<string, never
   | ApiEnvelopeFailure;
 
 /**
+ * Preserve the pre-migration throw-on-PostgREST-error contract used by services
+ * that historically threw `new Error('Failed to <verb>: <message>')` whenever
+ * the raw `.rpc()` call returned a non-null PostgREST `error` (401, 42501, 5xx).
+ *
+ * After routing through `apiRpcEnvelope<T>`, those failures surface as
+ * `{success: false, postgrestError: {...}, error: '<masked>'}`. Use this helper
+ * immediately after the `await` to short-circuit on PostgREST-shape failures
+ * while letting handler-driven envelope failures flow through as a typed
+ * `{success: false, ...}` return (callers pattern-match on `result.success`).
+ *
+ * Promoted from `SupabaseClientFieldService` to the SDK boundary (PR #57
+ * architect review P2) so PR-C's bulk wave can adopt the same contract without
+ * inline-helper drift across services.
+ *
+ * @throws Error with `Failed to ${verb}: ${env.error}` if `env.postgrestError`
+ *   is set on a failure envelope. Does nothing if `env.success` is `true` or if
+ *   the failure has no `postgrestError`.
+ */
+export function throwIfPostgrestError(
+  env: ApiEnvelope<Record<string, unknown>>,
+  verb: string
+): void {
+  if (!env.success && env.postgrestError) {
+    throw new Error(`Failed to ${verb}: ${env.error}`);
+  }
+}
+
+/**
  * Mask all PII-bearing string fields on a PostgrestError.
  * Returns a NEW object (does not mutate the input).
  */
