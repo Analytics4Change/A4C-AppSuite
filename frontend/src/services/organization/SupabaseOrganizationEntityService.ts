@@ -5,8 +5,9 @@
  * Each method calls a dedicated RPC for contact/address/phone CRUD.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
+import type { EnvelopeRpcs } from '@/services/api/rpc-registry.generated';
 import type {
   OrganizationEntityResult,
   ContactData,
@@ -16,6 +17,18 @@ import type {
 import type { IOrganizationEntityService } from './IOrganizationEntityService';
 
 const log = Logger.getLogger('api');
+
+/**
+ * Envelope shape returned by every `api.{create,update,delete}_organization_{contact,address,phone}` RPC.
+ *
+ * `apiRpcEnvelope<T>` spreads success-path fields onto `{success: true}` (intersection-type contract).
+ * On failure, returns `{success: false, error: string, ...}` with `error` already masked.
+ */
+type OrganizationEntityRpcSuccess = {
+  contact?: unknown;
+  address?: unknown;
+  phone?: unknown;
+};
 
 export class SupabaseOrganizationEntityService implements IOrganizationEntityService {
   // ---------------------------------------------------------------------------
@@ -94,31 +107,31 @@ export class SupabaseOrganizationEntityService implements IOrganizationEntitySer
   // Shared RPC caller
   // ---------------------------------------------------------------------------
 
+  // rpcName is narrowed to EnvelopeRpcs — calling with a name not in the registry
+  // is a TypeScript compile error at the caller.
   private async callEntityRpc(
-    rpcName: string,
+    rpcName: EnvelopeRpcs,
     params: Record<string, unknown>
   ): Promise<OrganizationEntityResult> {
     try {
       log.debug(`Calling ${rpcName}`, params);
 
-      const { data: result, error } = await supabase.schema('api').rpc(rpcName, params);
+      const env = await supabaseService.apiRpcEnvelope<OrganizationEntityRpcSuccess>(
+        rpcName,
+        params
+      );
 
-      if (error) {
-        log.error(`Failed to call ${rpcName}`, { error, params });
-        return { success: false, error: error.message };
+      if (!env.success) {
+        log.warn(`${rpcName} returned failure`, { error: env.error });
+        return { success: false, error: env.error };
       }
 
-      if (!result?.success) {
-        log.warn(`${rpcName} returned failure`, { result });
-        return { success: false, error: result?.error ?? 'Operation failed' };
-      }
-
-      log.info(`${rpcName} succeeded`, { result });
+      log.info(`${rpcName} succeeded`);
       return {
         success: true,
-        contact: result.contact,
-        address: result.address,
-        phone: result.phone,
+        contact: env.contact as OrganizationEntityResult['contact'],
+        address: env.address as OrganizationEntityResult['address'],
+        phone: env.phone as OrganizationEntityResult['phone'],
       };
     } catch (error) {
       log.error(`Error in ${rpcName}`, { error, params });

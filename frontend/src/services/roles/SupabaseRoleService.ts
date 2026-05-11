@@ -25,7 +25,8 @@
  * @see documentation/architecture/authorization/rbac-architecture.md
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabaseService } from '@/services/auth/supabase.service';
+import type { EnvelopeErrorDetails } from '@/services/api/envelope';
 import { Logger } from '@/utils/logger';
 import type { IRoleService } from './IRoleService';
 import type {
@@ -121,64 +122,6 @@ interface UserPermissionRow {
   permission_id: string;
 }
 
-/**
- * JSONB response type for mutation operations.
- *
- * `api.create_role` returns camelCase keys via an explicit jsonb_build_object.
- * `api.update_role` (Pattern A v2) returns the raw `roles_projection` row via
- * `row_to_json(v_row)` — snake_case, no computed `permission_count`/`user_count`
- * — plus `permission_ids` from the role_permissions_projection read-back.
- *
- * The two response shapes coexist here; consumers pick the one their RPC emits.
- */
-interface MutationResponse {
-  success: boolean;
-  /** Populated by api.create_role (camelCase) */
-  role?: {
-    id: string;
-    name: string;
-    description: string;
-    organizationId: string | null;
-    orgHierarchyScope: string | null;
-    isActive: boolean;
-    createdAt: string;
-    updatedAt: string;
-  };
-  error?: string;
-  errorDetails?: {
-    code: string;
-    count?: number;
-    message: string;
-  };
-}
-
-/**
- * JSONB response type for api.update_role (Pattern A v2 read-back shape).
- * `role` is the raw roles_projection row (snake_case, no computed columns);
- * `permission_ids` is the permission set AFTER grant/revoke processing.
- */
-interface UpdateRoleResponse {
-  success: boolean;
-  role?: {
-    id: string;
-    name: string;
-    description: string;
-    organization_id: string | null;
-    org_hierarchy_scope: string | null;
-    is_active: boolean;
-    deleted_at: string | null;
-    created_at: string;
-    updated_at: string;
-  };
-  permission_ids?: string[];
-  error?: string;
-  errorDetails?: {
-    code: string;
-    count?: number;
-    message: string;
-  };
-}
-
 export class SupabaseRoleService implements IRoleService {
   constructor() {
     log.info('SupabaseRoleService initialized');
@@ -249,7 +192,7 @@ export class SupabaseRoleService implements IRoleService {
    * Maps error details from RPC response to operation result format
    */
   private mapErrorDetails(
-    errorDetails?: MutationResponse['errorDetails']
+    errorDetails?: EnvelopeErrorDetails
   ): RoleOperationResult['errorDetails'] {
     if (!errorDetails) return undefined;
 
@@ -281,7 +224,7 @@ export class SupabaseRoleService implements IRoleService {
     log.debug('getRoles called', { filters });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('get_roles', {
+      const { data, error } = await supabaseService.apiRpc<RoleRow[]>('get_roles', {
         p_status: filters?.status || 'all',
         p_search_term: filters?.searchTerm || null,
       });
@@ -291,7 +234,7 @@ export class SupabaseRoleService implements IRoleService {
         throw new Error(`Failed to fetch roles: ${error.message}`);
       }
 
-      const rows = (data as RoleRow[]) || [];
+      const rows = data || [];
       log.debug(`Fetched ${rows.length} roles`);
 
       return rows.map((row) => this.mapRowToRole(row));
@@ -308,16 +251,17 @@ export class SupabaseRoleService implements IRoleService {
     log.debug('getRoleById called', { roleId });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('get_role_by_id', {
-        p_role_id: roleId,
-      });
+      const { data, error } = await supabaseService.apiRpc<RoleWithPermissionsRow[]>(
+        'get_role_by_id',
+        { p_role_id: roleId }
+      );
 
       if (error) {
         log.error('Error fetching role by ID', error);
         throw new Error(`Failed to fetch role: ${error.message}`);
       }
 
-      const rows = (data as RoleWithPermissionsRow[]) || [];
+      const rows = data || [];
 
       if (rows.length === 0) {
         log.debug('Role not found', { roleId });
@@ -338,14 +282,14 @@ export class SupabaseRoleService implements IRoleService {
     log.debug('getPermissions called');
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('get_permissions');
+      const { data, error } = await supabaseService.apiRpc<PermissionRow[]>('get_permissions', {});
 
       if (error) {
         log.error('Error fetching permissions', error);
         throw new Error(`Failed to fetch permissions: ${error.message}`);
       }
 
-      const rows = (data as PermissionRow[]) || [];
+      const rows = data || [];
       log.debug(`Fetched ${rows.length} permissions`);
 
       return rows.map((row) => this.mapRowToPermission(row));
@@ -362,14 +306,17 @@ export class SupabaseRoleService implements IRoleService {
     log.debug('getUserPermissions called');
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('get_user_permissions');
+      const { data, error } = await supabaseService.apiRpc<UserPermissionRow[]>(
+        'get_user_permissions',
+        {}
+      );
 
       if (error) {
         log.error('Error fetching user permissions', error);
         throw new Error(`Failed to fetch user permissions: ${error.message}`);
       }
 
-      const rows = (data as UserPermissionRow[]) || [];
+      const rows = data || [];
       log.debug(`Fetched ${rows.length} user permission IDs`);
 
       return rows.map((row) => row.permission_id);
@@ -399,7 +346,18 @@ export class SupabaseRoleService implements IRoleService {
     try {
       log.debug(`[DIAG:createRole:RPC_CALL] requestId=${requestId}`);
 
-      const { data, error } = await supabase.schema('api').rpc('create_role', {
+      const env = await supabaseService.apiRpcEnvelope<{
+        role?: {
+          id: string;
+          name: string;
+          description: string;
+          organizationId: string | null;
+          orgHierarchyScope: string | null;
+          isActive: boolean;
+          createdAt: string;
+          updatedAt: string;
+        };
+      }>('create_role', {
         p_name: request.name,
         p_description: request.description,
         p_org_hierarchy_scope: request.orgHierarchyScope || null,
@@ -409,54 +367,60 @@ export class SupabaseRoleService implements IRoleService {
 
       const elapsed = Date.now() - startTime;
 
-      if (error) {
+      // Distinguish PostgREST-level failure (401, 42501, ...) from handler-
+      // returned envelope failure. Preserves the pre-migration DIAG_RPC_ERROR
+      // signal that's lost if we collapse both into one log line.
+      if (!env.success && env.postgrestError) {
         log.error(`[DIAG:createRole:RPC_ERROR] requestId=${requestId} elapsed=${elapsed}ms`, {
-          error: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
+          error: env.error,
+          code: env.postgrestError.code,
+          details: env.postgrestError.details,
+          hint: env.postgrestError.hint,
         });
         return {
           success: false,
-          error: error.message,
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
-          },
+          error: env.error,
+          errorDetails: { code: 'UNKNOWN', message: env.error },
         };
       }
 
-      const response = data as MutationResponse;
-
+      // Pre-branch observation log — fires for every non-PostgREST response
+      // (success and envelope-failure). Restores the pre-migration
+      // DIAG_RPC_RESPONSE signal.
       log.info(`[DIAG:createRole:RPC_RESPONSE] requestId=${requestId} elapsed=${elapsed}ms`, {
-        success: response.success,
-        roleId: response.role?.id,
-        error: response.error,
-        errorDetails: response.errorDetails,
+        success: env.success,
+        roleId: env.success ? env.role?.id : undefined,
+        error: env.success ? undefined : env.error,
+        errorDetails: env.success ? undefined : env.errorDetails,
       });
 
-      if (!response.success) {
-        log.warn(`[DIAG:createRole:EXIT:FAILED] requestId=${requestId}`, { response });
+      if (!env.success) {
+        log.warn(`[DIAG:createRole:EXIT:FAILED] requestId=${requestId} elapsed=${elapsed}ms`, {
+          error: env.error,
+          errorDetails: env.errorDetails,
+        });
         return {
           success: false,
-          error: response.error,
-          errorDetails: this.mapErrorDetails(response.errorDetails),
+          error: env.error,
+          errorDetails: this.mapErrorDetails(env.errorDetails),
         };
       }
 
-      log.info(`[DIAG:createRole:EXIT:SUCCESS] requestId=${requestId} roleId=${response.role?.id}`);
+      log.info(`[DIAG:createRole:EXIT:SUCCESS] requestId=${requestId} elapsed=${elapsed}ms`, {
+        roleId: env.role?.id,
+      });
       return {
         success: true,
-        role: response.role
+        role: env.role
           ? {
-              id: response.role.id,
-              name: response.role.name,
-              description: response.role.description,
-              organizationId: response.role.organizationId,
-              orgHierarchyScope: response.role.orgHierarchyScope,
-              isActive: response.role.isActive,
-              createdAt: new Date(response.role.createdAt),
-              updatedAt: new Date(response.role.updatedAt),
+              id: env.role.id,
+              name: env.role.name,
+              description: env.role.description,
+              organizationId: env.role.organizationId,
+              orgHierarchyScope: env.role.orgHierarchyScope,
+              isActive: env.role.isActive,
+              createdAt: new Date(env.role.createdAt),
+              updatedAt: new Date(env.role.updatedAt),
               permissionCount: request.permissionIds.length,
               userCount: 0,
             }
@@ -483,33 +447,32 @@ export class SupabaseRoleService implements IRoleService {
     log.debug('updateRole called', { request });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('update_role', {
+      const env = await supabaseService.apiRpcEnvelope<{
+        role?: {
+          id: string;
+          name: string;
+          description: string;
+          organization_id: string | null;
+          org_hierarchy_scope: string | null;
+          is_active: boolean;
+          deleted_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        permission_ids?: string[];
+      }>('update_role', {
         p_role_id: request.id,
         p_name: request.name || null,
         p_description: request.description || null,
         p_permission_ids: request.permissionIds || null,
       });
 
-      if (error) {
-        log.error('Error updating role', error);
+      if (!env.success) {
+        log.warn('Update role failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
-          error: error.message,
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
-          },
-        };
-      }
-
-      const response = data as UpdateRoleResponse;
-
-      if (!response.success) {
-        log.warn('Update role failed', { response });
-        return {
-          success: false,
-          error: response.error,
-          errorDetails: this.mapErrorDetails(response.errorDetails),
+          error: env.error,
+          errorDetails: this.mapErrorDetails(env.errorDetails),
         };
       }
 
@@ -521,27 +484,23 @@ export class SupabaseRoleService implements IRoleService {
       // (computed at query time via LEFT JOIN) and isn't affected by this
       // operation, so we omit it — callers merging into an existing list
       // should preserve their current userCount for this role.
-      if (!response.role) {
+      if (!env.role) {
         // Silent-fallback observability per logging-standards.md +
         // event-observability.md anti-silent-failure posture. Under
         // Pattern A v2 this branch should never fire; if it does, the
         // backend RPC predates the v2 read-back or a migration is missing.
-        // responseKeys + hasPermissionIds make the regression
-        // self-diagnosable (distinguishes pre-v2 backend from a partial
-        // service-mapper bug from an unknown envelope shape).
         log.warn(
           'updateRole success without role read-back — VM will not patch its list. ' +
             'Backend RPC may be pre-Pattern-A-v2 or on a failed migration.',
           {
             roleId: request.id,
-            responseKeys: Object.keys(response),
-            hasPermissionIds: Array.isArray(response.permission_ids),
+            hasPermissionIds: Array.isArray(env.permission_ids),
           }
         );
         return { success: true };
       }
-      const row = response.role;
-      const permissionIds = response.permission_ids ?? [];
+      const row = env.role;
+      const permissionIds = env.permission_ids ?? [];
       return {
         success: true,
         role: {
@@ -578,30 +537,14 @@ export class SupabaseRoleService implements IRoleService {
     log.debug('deactivateRole called', { roleId });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('deactivate_role', {
-        p_role_id: roleId,
-      });
+      const env = await supabaseService.apiRpcEnvelope('deactivate_role', { p_role_id: roleId });
 
-      if (error) {
-        log.error('Error deactivating role', error);
+      if (!env.success) {
+        log.warn('Deactivate role failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
-          error: error.message,
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
-          },
-        };
-      }
-
-      const response = data as MutationResponse;
-
-      if (!response.success) {
-        log.warn('Deactivate role failed', { response });
-        return {
-          success: false,
-          error: response.error,
-          errorDetails: this.mapErrorDetails(response.errorDetails),
+          error: env.error,
+          errorDetails: this.mapErrorDetails(env.errorDetails),
         };
       }
 
@@ -627,30 +570,14 @@ export class SupabaseRoleService implements IRoleService {
     log.debug('reactivateRole called', { roleId });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('reactivate_role', {
-        p_role_id: roleId,
-      });
+      const env = await supabaseService.apiRpcEnvelope('reactivate_role', { p_role_id: roleId });
 
-      if (error) {
-        log.error('Error reactivating role', error);
+      if (!env.success) {
+        log.warn('Reactivate role failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
-          error: error.message,
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
-          },
-        };
-      }
-
-      const response = data as MutationResponse;
-
-      if (!response.success) {
-        log.warn('Reactivate role failed', { response });
-        return {
-          success: false,
-          error: response.error,
-          errorDetails: this.mapErrorDetails(response.errorDetails),
+          error: env.error,
+          errorDetails: this.mapErrorDetails(env.errorDetails),
         };
       }
 
@@ -676,30 +603,14 @@ export class SupabaseRoleService implements IRoleService {
     log.debug('deleteRole called', { roleId });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('delete_role', {
-        p_role_id: roleId,
-      });
+      const env = await supabaseService.apiRpcEnvelope('delete_role', { p_role_id: roleId });
 
-      if (error) {
-        log.error('Error deleting role', error);
+      if (!env.success) {
+        log.warn('Delete role failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
-          error: error.message,
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
-          },
-        };
-      }
-
-      const response = data as MutationResponse;
-
-      if (!response.success) {
-        log.warn('Delete role failed', { response });
-        return {
-          success: false,
-          error: response.error,
-          errorDetails: this.mapErrorDetails(response.errorDetails),
+          error: env.error,
+          errorDetails: this.mapErrorDetails(env.errorDetails),
         };
       }
 
@@ -731,7 +642,16 @@ export class SupabaseRoleService implements IRoleService {
     log.debug('listUsersForBulkAssignment called', { params });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('list_users_for_bulk_assignment', {
+      const { data, error } = await supabaseService.apiRpc<
+        Array<{
+          id: string;
+          email: string;
+          display_name: string;
+          is_active: boolean;
+          current_roles: string[];
+          is_already_assigned: boolean;
+        }>
+      >('list_users_for_bulk_assignment', {
         p_role_id: params.roleId,
         p_scope_path: params.scopePath,
         p_search_term: params.searchTerm || null,
@@ -744,15 +664,7 @@ export class SupabaseRoleService implements IRoleService {
         throw new Error(`Failed to list users: ${error.message}`);
       }
 
-      const rows =
-        (data as Array<{
-          id: string;
-          email: string;
-          display_name: string;
-          is_active: boolean;
-          current_roles: string[];
-          is_already_assigned: boolean;
-        }>) || [];
+      const rows = data || [];
 
       log.debug(`Fetched ${rows.length} users for bulk assignment`);
 
@@ -784,7 +696,14 @@ export class SupabaseRoleService implements IRoleService {
     });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('bulk_assign_role', {
+      const { data, error } = await supabaseService.apiRpc<{
+        successful: string[];
+        failed: Array<{ userId: string; reason: string; sqlstate?: string }>;
+        totalRequested: number;
+        totalSucceeded: number;
+        totalFailed: number;
+        correlationId: string;
+      }>('bulk_assign_role', {
         p_role_id: params.roleId,
         p_user_ids: params.userIds,
         p_scope_path: params.scopePath,
@@ -800,28 +719,23 @@ export class SupabaseRoleService implements IRoleService {
         throw new Error(`Bulk assignment failed (Ref: ${correlationId}): ${error.message}`);
       }
 
-      const response = data as {
-        successful: string[];
-        failed: Array<{ userId: string; reason: string; sqlstate?: string }>;
-        totalRequested: number;
-        totalSucceeded: number;
-        totalFailed: number;
-        correlationId: string;
-      };
+      if (!data) {
+        throw new Error(`Bulk assignment failed (Ref: ${correlationId}): no response data`);
+      }
 
       log.info('Bulk assignment completed', {
-        totalSucceeded: response.totalSucceeded,
-        totalFailed: response.totalFailed,
-        correlationId: response.correlationId,
+        totalSucceeded: data.totalSucceeded,
+        totalFailed: data.totalFailed,
+        correlationId: data.correlationId,
       });
 
       return {
-        successful: response.successful || [],
-        failed: response.failed || [],
-        totalRequested: response.totalRequested || params.userIds.length,
-        totalSucceeded: response.totalSucceeded || 0,
-        totalFailed: response.totalFailed || 0,
-        correlationId: response.correlationId || correlationId,
+        successful: data.successful || [],
+        failed: data.failed || [],
+        totalRequested: data.totalRequested || params.userIds.length,
+        totalSucceeded: data.totalSucceeded || 0,
+        totalFailed: data.totalFailed || 0,
+        correlationId: data.correlationId || correlationId,
       };
     } catch (err) {
       log.error('Exception in bulkAssignRole', {
@@ -845,7 +759,16 @@ export class SupabaseRoleService implements IRoleService {
     log.debug('listUsersForRoleManagement called', { params });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('list_users_for_role_management', {
+      const { data, error } = await supabaseService.apiRpc<
+        Array<{
+          id: string;
+          email: string;
+          display_name: string;
+          is_active: boolean;
+          current_roles: string[];
+          is_assigned: boolean;
+        }>
+      >('list_users_for_role_management', {
         p_role_id: params.roleId,
         p_scope_path: params.scopePath,
         p_search_term: params.searchTerm || null,
@@ -858,15 +781,7 @@ export class SupabaseRoleService implements IRoleService {
         throw new Error(`Failed to list users: ${error.message}`);
       }
 
-      const rows =
-        (data as Array<{
-          id: string;
-          email: string;
-          display_name: string;
-          is_active: boolean;
-          current_roles: string[];
-          is_assigned: boolean;
-        }>) || [];
+      const rows = data || [];
 
       log.debug(`Fetched ${rows.length} users for role management`);
 
@@ -899,7 +814,17 @@ export class SupabaseRoleService implements IRoleService {
     });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('sync_role_assignments', {
+      const { data, error } = await supabaseService.apiRpc<{
+        added: {
+          successful: string[];
+          failed: Array<{ userId: string; reason: string; sqlstate?: string }>;
+        };
+        removed: {
+          successful: string[];
+          failed: Array<{ userId: string; reason: string; sqlstate?: string }>;
+        };
+        correlationId: string;
+      }>('sync_role_assignments', {
         p_role_id: params.roleId,
         p_user_ids_to_add: params.userIdsToAdd,
         p_user_ids_to_remove: params.userIdsToRemove,
@@ -916,36 +841,28 @@ export class SupabaseRoleService implements IRoleService {
         throw new Error(`Sync assignment failed (Ref: ${correlationId}): ${error.message}`);
       }
 
-      const response = data as {
-        added: {
-          successful: string[];
-          failed: Array<{ userId: string; reason: string; sqlstate?: string }>;
-        };
-        removed: {
-          successful: string[];
-          failed: Array<{ userId: string; reason: string; sqlstate?: string }>;
-        };
-        correlationId: string;
-      };
+      if (!data) {
+        throw new Error(`Sync assignment failed (Ref: ${correlationId}): no response data`);
+      }
 
       log.info('Sync assignments completed', {
-        addedSuccessful: response.added.successful.length,
-        addedFailed: response.added.failed.length,
-        removedSuccessful: response.removed.successful.length,
-        removedFailed: response.removed.failed.length,
-        correlationId: response.correlationId,
+        addedSuccessful: data.added.successful.length,
+        addedFailed: data.added.failed.length,
+        removedSuccessful: data.removed.successful.length,
+        removedFailed: data.removed.failed.length,
+        correlationId: data.correlationId,
       });
 
       return {
         added: {
-          successful: response.added.successful || [],
-          failed: response.added.failed || [],
+          successful: data.added.successful || [],
+          failed: data.added.failed || [],
         },
         removed: {
-          successful: response.removed.successful || [],
-          failed: response.removed.failed || [],
+          successful: data.removed.successful || [],
+          failed: data.removed.failed || [],
         },
-        correlationId: response.correlationId || correlationId,
+        correlationId: data.correlationId || correlationId,
       };
     } catch (err) {
       log.error('Exception in syncRoleAssignments', {
