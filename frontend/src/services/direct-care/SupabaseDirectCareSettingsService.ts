@@ -8,7 +8,7 @@
  * @see api.update_organization_direct_care_settings()
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
 import type { DirectCareSettings } from '@/types/direct-care-settings.types';
 import type { IDirectCareSettingsService } from './IDirectCareSettingsService';
@@ -24,11 +24,10 @@ export class SupabaseDirectCareSettingsService implements IDirectCareSettingsSer
   async getSettings(orgId: string): Promise<DirectCareSettings> {
     log.debug('Fetching direct care settings', { orgId });
 
-    const { data, error } = await supabase
-      .schema('api')
-      .rpc('get_organization_direct_care_settings', {
-        p_org_id: orgId,
-      });
+    const { data, error } = await supabaseService.apiRpc<DirectCareSettings | null>(
+      'get_organization_direct_care_settings',
+      { p_org_id: orgId }
+    );
 
     if (error) {
       log.error('Failed to fetch direct care settings', { error, orgId });
@@ -40,14 +39,27 @@ export class SupabaseDirectCareSettingsService implements IDirectCareSettingsSer
       return { ...DEFAULT_SETTINGS };
     }
 
-    const settings = typeof data === 'string' ? JSON.parse(data) : data;
-
     return {
-      enable_staff_client_mapping: settings.enable_staff_client_mapping ?? false,
-      enable_schedule_enforcement: settings.enable_schedule_enforcement ?? false,
+      enable_staff_client_mapping: data.enable_staff_client_mapping ?? false,
+      enable_schedule_enforcement: data.enable_schedule_enforcement ?? false,
     };
   }
 
+  /**
+   * Migrated to envelope-only consumption (PR-B 2026-05-11).
+   *
+   * Legacy/v2 dual-shape parse removed per architect targeted-review:
+   *  - Migration `20260423060052` deployed the envelope shape ~3 weeks ago.
+   *  - PR #44's M3 RPC-shape registry tags `update_organization_direct_care_settings`
+   *    as `EnvelopeRpcs` (frontend/src/services/api/rpc-registry.generated.ts:95).
+   *    Wrong shape from the RPC is now a TypeScript compile error.
+   *  - All callers of this method went through dev rollout post-migration.
+   *
+   * If the v1 raw shape ever surfaces again, `unwrapApiEnvelope` will treat it
+   * as success (no `success: false`) and spread it onto the envelope; the
+   * `env.settings` read below would be undefined and we'd fall back to defaults.
+   * That's a soft failure rather than the previous explicit dual-parse.
+   */
   async updateSettings(
     orgId: string,
     enableStaffClientMapping: boolean | null,
@@ -61,44 +73,26 @@ export class SupabaseDirectCareSettingsService implements IDirectCareSettingsSer
       reason,
     });
 
-    const { data, error } = await supabase
-      .schema('api')
-      .rpc('update_organization_direct_care_settings', {
+    const env = await supabaseService.apiRpcEnvelope<{ settings?: Partial<DirectCareSettings> }>(
+      'update_organization_direct_care_settings',
+      {
         p_org_id: orgId,
         p_enable_staff_client_mapping: enableStaffClientMapping,
         p_enable_schedule_enforcement: enableScheduleEnforcement,
         p_reason: reason,
-      });
-
-    if (error) {
-      log.error('Failed to update direct care settings', { error, orgId });
-      throw new Error(`Failed to update settings: ${error.message}`);
-    }
-
-    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-
-    // Pattern A envelope (post-migration 20260423060052):
-    //   Success: { success: true, settings: { enable_staff_client_mapping, enable_schedule_enforcement } }
-    //   Failure: { success: false, error: 'Event processing failed: <processing_error>' }
-    // Backward-compat fallback: pre-migration shape was raw { enable_staff_client_mapping, enable_schedule_enforcement }.
-    if (parsed && typeof parsed === 'object' && 'success' in parsed) {
-      if (parsed.success === false) {
-        log.error('Direct care settings update failed', { orgId, error: parsed.error });
-        throw new Error(parsed.error ?? 'Failed to update direct care settings');
       }
-      const settings = parsed.settings ?? {};
-      log.info('Direct care settings updated', { orgId, settings });
-      return {
-        enable_staff_client_mapping: settings.enable_staff_client_mapping ?? false,
-        enable_schedule_enforcement: settings.enable_schedule_enforcement ?? false,
-      };
+    );
+
+    if (!env.success) {
+      log.error('Direct care settings update failed', { orgId, error: env.error });
+      throw new Error(env.error ?? 'Failed to update direct care settings');
     }
 
-    // Legacy shape (pre-migration): raw settings object at top level
-    log.info('Direct care settings updated (legacy shape)', { orgId, settings: parsed });
+    const settings = env.settings ?? {};
+    log.info('Direct care settings updated', { orgId, settings });
     return {
-      enable_staff_client_mapping: parsed?.enable_staff_client_mapping ?? false,
-      enable_schedule_enforcement: parsed?.enable_schedule_enforcement ?? false,
+      enable_staff_client_mapping: settings.enable_staff_client_mapping ?? false,
+      enable_schedule_enforcement: settings.enable_schedule_enforcement ?? false,
     };
   }
 }

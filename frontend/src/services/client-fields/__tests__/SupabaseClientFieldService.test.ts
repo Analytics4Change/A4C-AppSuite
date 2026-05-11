@@ -1,5 +1,20 @@
+/**
+ * SupabaseClientFieldService — helper-mock test pattern (Q2 refactor)
+ *
+ * Pre-refactor: this file mocked `@/lib/supabase` chain directly (`schema().rpc()`).
+ * Post-refactor (PR-B Q2): mocks `supabaseService.apiRpc` / `apiRpcEnvelope` to
+ * match the canonical pattern established in PR #56 (PR-A) by
+ * `SupabaseUserCommandService.mapping.test.ts` and the PR-A pilot test files.
+ *
+ * Behavioral changes covered:
+ *  - Envelope writes return `ApiEnvelope<T>` directly (no `{data, error}` wrapper)
+ *  - PostgREST-level failures throw via `throwIfPostgrestError` (pre-migration
+ *    contract preserved); envelope-driven failures still flow through as the
+ *    typed result with `success: false`
+ *  - JSON-string-data tests are obsoleted — the SDK boundary now parses envelopes
+ */
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SupabaseClientFieldService } from '../SupabaseClientFieldService';
 import type {
   FieldDefinition,
   FieldCategory,
@@ -9,15 +24,20 @@ import type {
   FieldCategoryResult,
 } from '@/types/client-field-settings.types';
 
-// ── Mock @/lib/supabase ──
+// Hoisted spies — see SupabaseUserCommandService.mapping.test.ts for the pattern.
+const { mockApiRpc, mockApiRpcEnvelope } = vi.hoisted(() => ({
+  mockApiRpc: vi.fn(),
+  mockApiRpcEnvelope: vi.fn(),
+}));
 
-const mockRpc = vi.fn();
-
-vi.mock('@/lib/supabase', () => ({
-  supabase: {
-    schema: () => ({ rpc: mockRpc }),
+vi.mock('@/services/auth/supabase.service', () => ({
+  supabaseService: {
+    apiRpc: mockApiRpc,
+    apiRpcEnvelope: mockApiRpcEnvelope,
   },
 }));
+
+import { SupabaseClientFieldService } from '../SupabaseClientFieldService';
 
 // ── Test fixtures ──
 
@@ -58,50 +78,60 @@ const BATCH_UPDATE_RESULT: BatchUpdateResult = {
 
 const RPC_SUCCESS: FieldDefinitionResult = { success: true, field_id: 'field-01' };
 
+/** PostgREST-level failure envelope (e.g., 401, 42501). */
+function postgrestFailure(message: string) {
+  return {
+    success: false as const,
+    error: message,
+    postgrestError: { code: '500', message, details: '', hint: '' },
+  };
+}
+
 // ── Tests ──
 
 describe('SupabaseClientFieldService', () => {
   let service: SupabaseClientFieldService;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockApiRpc.mockReset();
+    mockApiRpcEnvelope.mockReset();
     service = new SupabaseClientFieldService();
   });
 
-  // ── listFieldDefinitions ──
+  // ── listFieldDefinitions ── (read shape via apiRpc)
 
   describe('listFieldDefinitions', () => {
     it('returns field definitions on success (default: includeInactive=false)', async () => {
-      mockRpc.mockResolvedValueOnce({ data: [FIELD_DEFINITION], error: null });
+      mockApiRpc.mockResolvedValueOnce({ data: [FIELD_DEFINITION], error: null });
 
       const result = await service.listFieldDefinitions();
 
-      expect(mockRpc).toHaveBeenCalledWith('list_field_definitions', {
+      expect(mockApiRpc).toHaveBeenCalledWith('list_field_definitions', {
         p_include_inactive: false,
       });
       expect(result).toEqual([FIELD_DEFINITION]);
     });
 
     it('passes p_include_inactive: true when requested', async () => {
-      mockRpc.mockResolvedValueOnce({ data: [FIELD_DEFINITION], error: null });
+      mockApiRpc.mockResolvedValueOnce({ data: [FIELD_DEFINITION], error: null });
 
       await service.listFieldDefinitions(true);
 
-      expect(mockRpc).toHaveBeenCalledWith('list_field_definitions', {
+      expect(mockApiRpc).toHaveBeenCalledWith('list_field_definitions', {
         p_include_inactive: true,
       });
     });
 
     it('returns empty array when data is null', async () => {
-      mockRpc.mockResolvedValueOnce({ data: null, error: null });
+      mockApiRpc.mockResolvedValueOnce({ data: null, error: null });
 
       const result = await service.listFieldDefinitions();
 
       expect(result).toEqual([]);
     });
 
-    it('throws with descriptive message on error', async () => {
-      mockRpc.mockResolvedValueOnce({
+    it('throws with descriptive message on apiRpc error', async () => {
+      mockApiRpc.mockResolvedValueOnce({
         data: null,
         error: { message: 'permission denied for schema api' },
       });
@@ -112,7 +142,7 @@ describe('SupabaseClientFieldService', () => {
     });
   });
 
-  // ── batchUpdateFieldDefinitions ──
+  // ── batchUpdateFieldDefinitions ── (envelope shape via apiRpcEnvelope)
 
   describe('batchUpdateFieldDefinitions', () => {
     const changes = [
@@ -121,12 +151,12 @@ describe('SupabaseClientFieldService', () => {
     ];
     const reason = 'Updating visibility for audit compliance';
 
-    it('returns BatchUpdateResult on success with object data', async () => {
-      mockRpc.mockResolvedValueOnce({ data: BATCH_UPDATE_RESULT, error: null });
+    it('returns BatchUpdateResult on success', async () => {
+      mockApiRpcEnvelope.mockResolvedValueOnce(BATCH_UPDATE_RESULT);
 
       const result = await service.batchUpdateFieldDefinitions(changes, reason);
 
-      expect(mockRpc).toHaveBeenCalledWith('batch_update_field_definitions', {
+      expect(mockApiRpcEnvelope).toHaveBeenCalledWith('batch_update_field_definitions', {
         p_changes: changes,
         p_reason: reason,
         p_correlation_id: null,
@@ -134,36 +164,21 @@ describe('SupabaseClientFieldService', () => {
       expect(result).toEqual(BATCH_UPDATE_RESULT);
     });
 
-    it('parses JSON string data response', async () => {
-      mockRpc.mockResolvedValueOnce({
-        data: JSON.stringify(BATCH_UPDATE_RESULT),
-        error: null,
-      });
-
-      const result = await service.batchUpdateFieldDefinitions(changes, reason);
-
-      expect(result).toEqual(BATCH_UPDATE_RESULT);
-    });
-
     it('passes changes as array (no double stringification)', async () => {
-      // Regression protection: commit 4849122b removed double JSON
-      // serialization — p_changes must be the array itself, not a stringified
-      // JSON blob. The Supabase JS client serializes JSONB params on transport.
-      mockRpc.mockResolvedValueOnce({ data: BATCH_UPDATE_RESULT, error: null });
+      mockApiRpcEnvelope.mockResolvedValueOnce(BATCH_UPDATE_RESULT);
 
       await service.batchUpdateFieldDefinitions(changes, reason);
 
-      const callArgs = mockRpc.mock.calls[0][1];
+      const callArgs = mockApiRpcEnvelope.mock.calls[0][1] as { p_changes: unknown };
       expect(callArgs.p_changes).toEqual(changes);
       expect(Array.isArray(callArgs.p_changes)).toBe(true);
       expect(typeof callArgs.p_changes).not.toBe('string');
     });
 
-    it('throws with descriptive message on error', async () => {
-      mockRpc.mockResolvedValueOnce({
-        data: null,
-        error: { message: 'batch update failed: field not found' },
-      });
+    it('throws with descriptive message on PostgREST error', async () => {
+      mockApiRpcEnvelope.mockResolvedValueOnce(
+        postgrestFailure('batch update failed: field not found')
+      );
 
       await expect(service.batchUpdateFieldDefinitions(changes, reason)).rejects.toThrow(
         'Failed to batch update: batch update failed: field not found'
@@ -171,11 +186,11 @@ describe('SupabaseClientFieldService', () => {
     });
   });
 
-  // ── createFieldDefinition ──
+  // ── createFieldDefinition ── (envelope shape)
 
   describe('createFieldDefinition', () => {
     it('returns RpcResult on success with all params provided', async () => {
-      mockRpc.mockResolvedValueOnce({ data: RPC_SUCCESS, error: null });
+      mockApiRpcEnvelope.mockResolvedValueOnce(RPC_SUCCESS);
 
       const params: CreateFieldDefinitionParams = {
         field_key: 'custom_notes',
@@ -191,7 +206,7 @@ describe('SupabaseClientFieldService', () => {
 
       const result = await service.createFieldDefinition(params);
 
-      expect(mockRpc).toHaveBeenCalledWith('create_field_definition', {
+      expect(mockApiRpcEnvelope).toHaveBeenCalledWith('create_field_definition', {
         p_field_key: 'custom_notes',
         p_display_name: 'Custom Notes',
         p_category_id: 'cat-01',
@@ -207,7 +222,7 @@ describe('SupabaseClientFieldService', () => {
     });
 
     it('applies defaults when optional params are omitted', async () => {
-      mockRpc.mockResolvedValueOnce({ data: RPC_SUCCESS, error: null });
+      mockApiRpcEnvelope.mockResolvedValueOnce(RPC_SUCCESS);
 
       const params: CreateFieldDefinitionParams = {
         field_key: 'custom_field',
@@ -217,7 +232,7 @@ describe('SupabaseClientFieldService', () => {
 
       await service.createFieldDefinition(params);
 
-      expect(mockRpc).toHaveBeenCalledWith('create_field_definition', {
+      expect(mockApiRpcEnvelope).toHaveBeenCalledWith('create_field_definition', {
         p_field_key: 'custom_field',
         p_display_name: 'Custom Field',
         p_category_id: 'cat-01',
@@ -232,7 +247,7 @@ describe('SupabaseClientFieldService', () => {
     });
 
     it('sets p_validation_rules to null when not provided', async () => {
-      mockRpc.mockResolvedValueOnce({ data: RPC_SUCCESS, error: null });
+      mockApiRpcEnvelope.mockResolvedValueOnce(RPC_SUCCESS);
 
       await service.createFieldDefinition({
         field_key: 'f',
@@ -240,27 +255,12 @@ describe('SupabaseClientFieldService', () => {
         category_id: 'cat-01',
       });
 
-      const callArgs = mockRpc.mock.calls[0][1];
+      const callArgs = mockApiRpcEnvelope.mock.calls[0][1] as { p_validation_rules: unknown };
       expect(callArgs.p_validation_rules).toBeNull();
     });
 
-    it('parses JSON string data response', async () => {
-      mockRpc.mockResolvedValueOnce({ data: JSON.stringify(RPC_SUCCESS), error: null });
-
-      const result = await service.createFieldDefinition({
-        field_key: 'f',
-        display_name: 'F',
-        category_id: 'cat-01',
-      });
-
-      expect(result).toEqual(RPC_SUCCESS);
-    });
-
-    it('throws with descriptive message on error', async () => {
-      mockRpc.mockResolvedValueOnce({
-        data: null,
-        error: { message: 'duplicate field key' },
-      });
+    it('throws with descriptive message on PostgREST error', async () => {
+      mockApiRpcEnvelope.mockResolvedValueOnce(postgrestFailure('duplicate field key'));
 
       await expect(
         service.createFieldDefinition({
@@ -270,6 +270,25 @@ describe('SupabaseClientFieldService', () => {
         })
       ).rejects.toThrow('Failed to create field: duplicate field key');
     });
+
+    it('returns envelope-failure shape without throwing on handler-driven failure', async () => {
+      // Pre-migration: handler-returned `{success: false}` was passed through as the typed
+      // result. Post-migration: same behavior — envelope failures (no postgrestError) do
+      // NOT throw; the caller pattern-matches on `result.success`.
+      mockApiRpcEnvelope.mockResolvedValueOnce({
+        success: false,
+        error: 'Field key conflict',
+        errorDetails: { code: 'DUPLICATE', message: 'm' },
+      });
+
+      const result = await service.createFieldDefinition({
+        field_key: 'first_name',
+        display_name: 'First Name',
+        category_id: 'cat-01',
+      });
+
+      expect(result.success).toBe(false);
+    });
   });
 
   // ── deactivateFieldDefinition ──
@@ -277,11 +296,11 @@ describe('SupabaseClientFieldService', () => {
   describe('deactivateFieldDefinition', () => {
     it('returns RpcResult on success', async () => {
       const rpcResult: FieldDefinitionResult = { success: true, field_id: 'field-01' };
-      mockRpc.mockResolvedValueOnce({ data: rpcResult, error: null });
+      mockApiRpcEnvelope.mockResolvedValueOnce(rpcResult);
 
       const result = await service.deactivateFieldDefinition('field-01', 'No longer needed');
 
-      expect(mockRpc).toHaveBeenCalledWith('deactivate_field_definition', {
+      expect(mockApiRpcEnvelope).toHaveBeenCalledWith('deactivate_field_definition', {
         p_field_id: 'field-01',
         p_reason: 'No longer needed',
         p_correlation_id: null,
@@ -289,20 +308,10 @@ describe('SupabaseClientFieldService', () => {
       expect(result).toEqual(rpcResult);
     });
 
-    it('parses JSON string data response', async () => {
-      const rpcResult: FieldDefinitionResult = { success: true, field_id: 'field-01' };
-      mockRpc.mockResolvedValueOnce({ data: JSON.stringify(rpcResult), error: null });
-
-      const result = await service.deactivateFieldDefinition('field-01', 'reason');
-
-      expect(result).toEqual(rpcResult);
-    });
-
-    it('throws with descriptive message on error', async () => {
-      mockRpc.mockResolvedValueOnce({
-        data: null,
-        error: { message: 'field is locked and cannot be deactivated' },
-      });
+    it('throws with descriptive message on PostgREST error', async () => {
+      mockApiRpcEnvelope.mockResolvedValueOnce(
+        postgrestFailure('field is locked and cannot be deactivated')
+      );
 
       await expect(service.deactivateFieldDefinition('field-01', 'reason')).rejects.toThrow(
         'Failed to deactivate field: field is locked and cannot be deactivated'
@@ -314,26 +323,26 @@ describe('SupabaseClientFieldService', () => {
 
   describe('listFieldCategories', () => {
     it('returns field categories on success', async () => {
-      mockRpc.mockResolvedValueOnce({ data: [FIELD_CATEGORY], error: null });
+      mockApiRpc.mockResolvedValueOnce({ data: [FIELD_CATEGORY], error: null });
 
       const result = await service.listFieldCategories();
 
-      expect(mockRpc).toHaveBeenCalledWith('list_field_categories', {
+      expect(mockApiRpc).toHaveBeenCalledWith('list_field_categories', {
         p_include_inactive: false,
       });
       expect(result).toEqual([FIELD_CATEGORY]);
     });
 
     it('returns empty array when data is null', async () => {
-      mockRpc.mockResolvedValueOnce({ data: null, error: null });
+      mockApiRpc.mockResolvedValueOnce({ data: null, error: null });
 
       const result = await service.listFieldCategories();
 
       expect(result).toEqual([]);
     });
 
-    it('throws with descriptive message on error', async () => {
-      mockRpc.mockResolvedValueOnce({
+    it('throws with descriptive message on apiRpc error', async () => {
+      mockApiRpc.mockResolvedValueOnce({
         data: null,
         error: { message: 'relation does not exist' },
       });
@@ -349,11 +358,11 @@ describe('SupabaseClientFieldService', () => {
   describe('createFieldCategory', () => {
     it('returns RpcResult on success', async () => {
       const rpcResult: FieldCategoryResult = { success: true, category_id: 'cat-new' };
-      mockRpc.mockResolvedValueOnce({ data: rpcResult, error: null });
+      mockApiRpcEnvelope.mockResolvedValueOnce(rpcResult);
 
       const result = await service.createFieldCategory('Housing', 'housing', 3);
 
-      expect(mockRpc).toHaveBeenCalledWith('create_field_category', {
+      expect(mockApiRpcEnvelope).toHaveBeenCalledWith('create_field_category', {
         p_name: 'Housing',
         p_slug: 'housing',
         p_sort_order: 3,
@@ -363,11 +372,11 @@ describe('SupabaseClientFieldService', () => {
     });
 
     it('defaults sortOrder to 0 when not provided', async () => {
-      mockRpc.mockResolvedValueOnce({ data: { success: true }, error: null });
+      mockApiRpcEnvelope.mockResolvedValueOnce({ success: true });
 
       await service.createFieldCategory('Housing', 'housing');
 
-      expect(mockRpc).toHaveBeenCalledWith('create_field_category', {
+      expect(mockApiRpcEnvelope).toHaveBeenCalledWith('create_field_category', {
         p_name: 'Housing',
         p_slug: 'housing',
         p_sort_order: 0,
@@ -375,20 +384,8 @@ describe('SupabaseClientFieldService', () => {
       });
     });
 
-    it('parses JSON string data response', async () => {
-      const rpcResult: FieldCategoryResult = { success: true, category_id: 'cat-new' };
-      mockRpc.mockResolvedValueOnce({ data: JSON.stringify(rpcResult), error: null });
-
-      const result = await service.createFieldCategory('Housing', 'housing');
-
-      expect(result).toEqual(rpcResult);
-    });
-
-    it('throws with descriptive message on error', async () => {
-      mockRpc.mockResolvedValueOnce({
-        data: null,
-        error: { message: 'slug already exists' },
-      });
+    it('throws with descriptive message on PostgREST error', async () => {
+      mockApiRpcEnvelope.mockResolvedValueOnce(postgrestFailure('slug already exists'));
 
       await expect(service.createFieldCategory('Demographics', 'demographics')).rejects.toThrow(
         'Failed to create category: slug already exists'
@@ -401,11 +398,11 @@ describe('SupabaseClientFieldService', () => {
   describe('deactivateFieldCategory', () => {
     it('returns RpcResult on success', async () => {
       const rpcResult: FieldCategoryResult = { success: true, category_id: 'cat-01' };
-      mockRpc.mockResolvedValueOnce({ data: rpcResult, error: null });
+      mockApiRpcEnvelope.mockResolvedValueOnce(rpcResult);
 
       const result = await service.deactivateFieldCategory('cat-01', 'Category merged into other');
 
-      expect(mockRpc).toHaveBeenCalledWith('deactivate_field_category', {
+      expect(mockApiRpcEnvelope).toHaveBeenCalledWith('deactivate_field_category', {
         p_category_id: 'cat-01',
         p_reason: 'Category merged into other',
         p_correlation_id: null,
@@ -413,24 +410,36 @@ describe('SupabaseClientFieldService', () => {
       expect(result).toEqual(rpcResult);
     });
 
-    it('parses JSON string data response', async () => {
-      const rpcResult: FieldCategoryResult = { success: true, category_id: 'cat-01' };
-      mockRpc.mockResolvedValueOnce({ data: JSON.stringify(rpcResult), error: null });
-
-      const result = await service.deactivateFieldCategory('cat-01', 'reason');
-
-      expect(result).toEqual(rpcResult);
-    });
-
-    it('throws with descriptive message on error', async () => {
-      mockRpc.mockResolvedValueOnce({
-        data: null,
-        error: { message: 'system categories cannot be deactivated' },
-      });
+    it('throws with descriptive message on PostgREST error', async () => {
+      mockApiRpcEnvelope.mockResolvedValueOnce(
+        postgrestFailure('system categories cannot be deactivated')
+      );
 
       await expect(service.deactivateFieldCategory('cat-01', 'reason')).rejects.toThrow(
         'Failed to deactivate category: system categories cannot be deactivated'
       );
+    });
+  });
+
+  // ── getFieldUsageCount ── (envelope shape but returns {success, count} contract)
+
+  describe('getFieldUsageCount', () => {
+    it('returns success + count on envelope success', async () => {
+      mockApiRpcEnvelope.mockResolvedValueOnce({ success: true, count: 7 });
+
+      const result = await service.getFieldUsageCount('first_name');
+
+      expect(result).toEqual({ success: true, count: 7 });
+    });
+
+    it('returns {success: false, count: 0} on envelope failure (does NOT throw)', async () => {
+      // Unlike other envelope methods, get_field_usage_count returns a soft-failure
+      // contract for use in UI dialogs (count widgets cannot disrupt the page).
+      mockApiRpcEnvelope.mockResolvedValueOnce(postgrestFailure('relation missing'));
+
+      const result = await service.getFieldUsageCount('first_name');
+
+      expect(result).toEqual({ success: false, count: 0 });
     });
   });
 });

@@ -9,7 +9,7 @@
  * @see api.list_user_client_assignments()
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
 import type { UserClientAssignment } from '@/types/client-assignment.types';
 import type { IAssignmentService } from './IAssignmentService';
@@ -25,27 +25,24 @@ export class SupabaseAssignmentService implements IAssignmentService {
   }): Promise<UserClientAssignment[]> {
     log.debug('Listing assignments', params);
 
-    const { data, error } = await supabase
-      .schema('api')
-      .rpc('list_user_client_assignments', {
+    // Registry-classified envelope (Pattern A v2 read envelope variant):
+    // returns `{success: true, data: UserClientAssignment[]}` on success.
+    const env = await supabaseService.apiRpcEnvelope<{ data?: UserClientAssignment[] }>(
+      'list_user_client_assignments',
+      {
         p_org_id: params.orgId ?? null,
         p_user_id: params.userId ?? null,
         p_client_id: params.clientId ?? null,
         p_active_only: params.activeOnly ?? true,
-      });
+      }
+    );
 
-    if (error) {
-      log.error('Failed to list assignments', { error });
-      throw new Error(`Failed to list assignments: ${error.message}`);
+    if (!env.success) {
+      log.error('Failed to list assignments', { error: env.error });
+      throw new Error(env.error ?? 'Failed to list assignments');
     }
 
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-
-    if (!result?.success) {
-      throw new Error(result?.error ?? 'Failed to list assignments');
-    }
-
-    return result.data ?? [];
+    return env.data ?? [];
   }
 
   async assignClient(params: {
@@ -57,29 +54,24 @@ export class SupabaseAssignmentService implements IAssignmentService {
   }): Promise<{ assignmentId: string }> {
     log.debug('Assigning client', { userId: params.userId, clientId: params.clientId });
 
-    const { data, error } = await supabase
-      .schema('api')
-      .rpc('assign_client_to_user', {
+    const env = await supabaseService.apiRpcEnvelope<{ assignment_id?: string }>(
+      'assign_client_to_user',
+      {
         p_user_id: params.userId,
         p_client_id: params.clientId,
         p_assigned_until: params.assignedUntil ?? null,
         p_notes: params.notes ?? null,
         p_reason: params.reason ?? null,
-      });
+      }
+    );
 
-    if (error) {
-      log.error('Failed to assign client', { error });
-      throw new Error(`Failed to assign client: ${error.message}`);
+    if (!env.success) {
+      log.error('Failed to assign client', { error: env.error });
+      throw new Error(env.error ?? 'Failed to assign client');
     }
 
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-
-    if (!result?.success) {
-      throw new Error(result?.error ?? 'Failed to assign client');
-    }
-
-    log.info('Client assigned', { assignmentId: result.assignment_id });
-    return { assignmentId: result.assignment_id };
+    log.info('Client assigned', { assignmentId: env.assignment_id });
+    return { assignmentId: env.assignment_id as string };
   }
 
   async unassignClient(params: {
@@ -89,23 +81,15 @@ export class SupabaseAssignmentService implements IAssignmentService {
   }): Promise<void> {
     log.debug('Unassigning client', { userId: params.userId, clientId: params.clientId });
 
-    const { data, error } = await supabase
-      .schema('api')
-      .rpc('unassign_client_from_user', {
-        p_user_id: params.userId,
-        p_client_id: params.clientId,
-        p_reason: params.reason ?? null,
-      });
+    const env = await supabaseService.apiRpcEnvelope('unassign_client_from_user', {
+      p_user_id: params.userId,
+      p_client_id: params.clientId,
+      p_reason: params.reason ?? null,
+    });
 
-    if (error) {
-      log.error('Failed to unassign client', { error });
-      throw new Error(`Failed to unassign client: ${error.message}`);
-    }
-
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-
-    if (!result?.success) {
-      throw new Error(result?.error ?? 'Failed to unassign client');
+    if (!env.success) {
+      log.error('Failed to unassign client', { error: env.error });
+      throw new Error(env.error ?? 'Failed to unassign client');
     }
 
     log.info('Client unassigned', { userId: params.userId, clientId: params.clientId });

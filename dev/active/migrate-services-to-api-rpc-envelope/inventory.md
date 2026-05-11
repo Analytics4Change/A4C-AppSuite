@@ -2,7 +2,7 @@
 
 **Generated**: 2026-05-11 during PR-A planning
 **Source of truth**: `frontend/src/services/api/rpc-registry.generated.ts` (M3 enforcement — `EnvelopeRpcs` and `ReadRpcs` string-literal unions emitted from `COMMENT ON FUNCTION api.<name> IS '... @a4c-rpc-shape: envelope|read'` tags)
-**Total**: 85 production sites across 11 service files (65 envelope + 20 read; 2 SDK helper definitions and 5 doc-example matches in `services/CLAUDE.md` excluded)
+**Total**: 89 production sites across 11 service files (67 envelope + 22 read; 2 SDK helper definitions and 5 doc-example matches in `services/CLAUDE.md` excluded). _Revised during PR-B implementation 2026-05-11: original count of 85 missed 4 multi-line-chain sites in `OrgUnit.getDescendants` (1 read) and an extra read in `ClientFields.listFieldDefinitions` (1 read), plus the `OrgCommand`/`OrgUnit` Q6 throw guards revealed 2 additional envelope-success-path classifications that affected per-service splits in ClientFields (now 13+2=15 not 13+1=14)._
 
 ---
 
