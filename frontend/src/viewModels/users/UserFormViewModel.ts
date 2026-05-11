@@ -32,12 +32,13 @@ import type {
   RoleReference,
   InviteUserResult,
   UpdateUserResult,
-  UserVoidResult,
+  ModifyUserRolesResult,
   EmailLookupResult,
   NotificationPreferences,
   InvitationPhone,
   UserListItem,
 } from '@/types/user.types';
+import type { UsersViewModel } from './UsersViewModel';
 import {
   validateEmail,
   validateFirstName,
@@ -893,20 +894,24 @@ export class UserFormViewModel {
    * Submit the form
    *
    * In create mode: Sends invitation via commandService.inviteUser()
-   * In edit mode: Updates user profile via commandService.updateUser()
+   * In edit mode: Updates user profile via commandService.updateUser(), then
+   * (if profile update succeeded and roles changed) delegates role modification
+   * to `usersViewModel.modifyRoles(...)` — the page-level handler that owns
+   * `lastRoleViolations` / `lastRolePartialFailure` state for the rich
+   * `UsersErrorBanner` rendering. Going through the page VM (instead of calling
+   * `commandService.modifyRoles` directly) is the single source of truth for
+   * role-modification error surfacing: violation/partial detail flows to the
+   * page banner, the form's `submissionError` is suppressed when the banner
+   * owns it.
    *
-   * Return union intentionally contains UserVoidResult: on edit mode, if
-   * profile update succeeds but subsequent modifyRoles() fails, `result` is
-   * reassigned to the modifyRoles UserVoidResult so consumers see the
-   * role-modification error (see the `result = roleResult` reassignment
-   * around line 969 below). Dropping UserVoidResult here would force a
-   * later consumer to either cast or narrow via success-property access.
-   * PR #32 review item 6 proposed removing this arm as "phantom"; it is
-   * structurally necessary.
+   * Return union: on edit mode with role changes, `result` is reassigned to
+   * the modifyRoles result when role modification fails, so callers see the
+   * role error (rich `violations` / `partial` fields on `ModifyUserRolesResult`).
    */
   async submit(
-    commandService: IUserCommandService
-  ): Promise<InviteUserResult | UpdateUserResult | UserVoidResult> {
+    commandService: IUserCommandService,
+    usersViewModel: UsersViewModel
+  ): Promise<InviteUserResult | UpdateUserResult | ModifyUserRolesResult> {
     // Touch all fields to show validation errors
     this.touchAllFields();
 
@@ -945,7 +950,7 @@ export class UserFormViewModel {
     });
 
     try {
-      let result: InviteUserResult | UpdateUserResult | UserVoidResult;
+      let result: InviteUserResult | UpdateUserResult | ModifyUserRolesResult;
 
       if (this.mode === 'create') {
         // Create mode: Send invitation
@@ -962,33 +967,35 @@ export class UserFormViewModel {
         log.debug('Updating user profile', { userId: updateRequest.userId });
         result = await commandService.updateUser(updateRequest);
 
-        // Handle role changes (if profile update succeeded and roles changed)
+        // Handle role changes (if profile update succeeded and roles changed).
+        // Delegate to the page VM's modifyRoles handler — it captures
+        // `lastRoleViolations` and `lastRolePartialFailure` on itself so the
+        // page-level UsersErrorBanner can render the rich violation list
+        // (`data-testid="role-modification-violation"`) or partial-failure
+        // recovery banner (`data-testid="role-modification-partial-warning"`).
+        // The page VM also logs structured warnings for both failure modes.
         if (result.success && this.hasRoleChanges) {
           log.debug('Processing role changes', {
             userId: this.editingUserId,
             rolesToAdd: this.rolesToAdd,
             rolesToRemove: this.rolesToRemove,
           });
-          const roleResult = await commandService.modifyRoles({
+          const roleResult = await usersViewModel.modifyRoles({
             userId: this.editingUserId!,
             roleIdsToAdd: this.rolesToAdd,
             roleIdsToRemove: this.rolesToRemove,
           });
 
           if (!roleResult.success) {
-            // Role modification failed - return role error instead
+            // Role modification failed — return role error so caller can react.
+            // The page VM has already populated `lastRoleViolations` /
+            // `lastRolePartialFailure` for the banner; the failure branch below
+            // suppresses the form's inline submissionError to avoid duplicate
+            // error surfaces.
             result = roleResult;
-            log.warn('Role modification failed', {
-              userId: this.editingUserId,
-              error: roleResult.error,
-            });
-          } else {
-            log.info('Role modification successful', {
-              userId: this.editingUserId,
-              added: this.rolesToAdd.length,
-              removed: this.rolesToRemove.length,
-            });
           }
+          // Success path: page VM has already set `successMessage = 'Roles
+          // updated'`; no additional log here (the page VM logs internally).
         }
       }
 
@@ -1002,22 +1009,40 @@ export class UserFormViewModel {
             log.info('User profile updated successfully', { userId: this.editingUserId });
           }
         } else {
-          this.submissionError = result.error ?? 'An error occurred';
-          // Extract detailed error info for display
-          // The context contains the full errorDetails from the Edge Function
-          const ctx = result.errorDetails?.context as Record<string, unknown> | undefined;
-          if (ctx) {
-            this.submissionErrorDetails = {
-              code: result.errorDetails?.code ?? (ctx.code as string),
-              details: this.formatViolationDetails(ctx),
-            };
-          } else {
+          // If the page VM has captured structured role-modification state
+          // (violations or partial-failure), that surface owns the error
+          // display. Suppress the form's inline submissionError to avoid
+          // rendering the same error twice (architect Finding #2).
+          const handledByPageBanner =
+            usersViewModel.lastRoleViolations !== null ||
+            usersViewModel.lastRolePartialFailure !== null;
+
+          if (handledByPageBanner) {
+            this.submissionError = null;
             this.submissionErrorDetails = null;
+          } else {
+            // Non-role failures (profile-update error, network error, etc.)
+            // still surface inline in the form. Prefer the rich
+            // `errorDetails.message` over the bare `error` code string.
+            this.submissionError =
+              result.errorDetails?.message ?? result.error ?? 'An error occurred';
+            // Extract detailed error info for display.
+            // The context contains the full errorDetails from the Edge Function.
+            const ctx = result.errorDetails?.context as Record<string, unknown> | undefined;
+            if (ctx) {
+              this.submissionErrorDetails = {
+                code: result.errorDetails?.code ?? (ctx.code as string),
+                details: this.formatViolationDetails(ctx),
+              };
+            } else {
+              this.submissionErrorDetails = null;
+            }
           }
           log.warn('Form submission failed', {
             mode: this.mode,
             error: result.error,
             errorDetails: result.errorDetails,
+            handledByPageBanner,
           });
         }
       });
