@@ -26,6 +26,7 @@
  */
 
 import { supabaseService } from '@/services/auth/supabase.service';
+import type { EnvelopeErrorDetails } from '@/services/api/envelope';
 import { Logger } from '@/utils/logger';
 import type { IRoleService } from './IRoleService';
 import type {
@@ -121,17 +122,6 @@ interface UserPermissionRow {
   permission_id: string;
 }
 
-/**
- * Errors returned by `api.*` envelope RPCs in this service. Used only as the
- * input type for `mapErrorDetails` (the envelope helper's `errorDetails` shape
- * is structurally compatible with this).
- */
-interface RoleRpcErrorDetails {
-  code: string;
-  count?: number;
-  message: string;
-}
-
 export class SupabaseRoleService implements IRoleService {
   constructor() {
     log.info('SupabaseRoleService initialized');
@@ -201,7 +191,9 @@ export class SupabaseRoleService implements IRoleService {
   /**
    * Maps error details from RPC response to operation result format
    */
-  private mapErrorDetails(errorDetails?: RoleRpcErrorDetails): RoleOperationResult['errorDetails'] {
+  private mapErrorDetails(
+    errorDetails?: EnvelopeErrorDetails
+  ): RoleOperationResult['errorDetails'] {
     if (!errorDetails) return undefined;
 
     type ErrorCode = NonNullable<RoleOperationResult['errorDetails']>['code'];
@@ -374,6 +366,33 @@ export class SupabaseRoleService implements IRoleService {
       });
 
       const elapsed = Date.now() - startTime;
+
+      // Distinguish PostgREST-level failure (401, 42501, ...) from handler-
+      // returned envelope failure. Preserves the pre-migration DIAG_RPC_ERROR
+      // signal that's lost if we collapse both into one log line.
+      if (!env.success && env.postgrestError) {
+        log.error(`[DIAG:createRole:RPC_ERROR] requestId=${requestId} elapsed=${elapsed}ms`, {
+          error: env.error,
+          code: env.postgrestError.code,
+          details: env.postgrestError.details,
+          hint: env.postgrestError.hint,
+        });
+        return {
+          success: false,
+          error: env.error,
+          errorDetails: { code: 'UNKNOWN', message: env.error },
+        };
+      }
+
+      // Pre-branch observation log — fires for every non-PostgREST response
+      // (success and envelope-failure). Restores the pre-migration
+      // DIAG_RPC_RESPONSE signal.
+      log.info(`[DIAG:createRole:RPC_RESPONSE] requestId=${requestId} elapsed=${elapsed}ms`, {
+        success: env.success,
+        roleId: env.success ? env.role?.id : undefined,
+        error: env.success ? undefined : env.error,
+        errorDetails: env.success ? undefined : env.errorDetails,
+      });
 
       if (!env.success) {
         log.warn(`[DIAG:createRole:EXIT:FAILED] requestId=${requestId} elapsed=${elapsed}ms`, {
