@@ -949,6 +949,16 @@ export class UserFormViewModel {
       this.submissionError = null;
     });
 
+    // Snapshot the page VM's structured role-error state before submit. The
+    // suppression check below compares by reference: a fresh role failure on
+    // THIS submit makes `modifyRoles` assign a new array/object (see
+    // UsersViewModel lines 1205 and 1216), so reference equality only holds
+    // when this submit did NOT touch those fields. Without this snapshot,
+    // sticky state from a PRIOR submit would falsely trigger suppression of
+    // a fresh non-role failure on the current submit.
+    const initialRoleViolations = usersViewModel.lastRoleViolations;
+    const initialRolePartialFailure = usersViewModel.lastRolePartialFailure;
+
     try {
       let result: InviteUserResult | UpdateUserResult | ModifyUserRolesResult;
 
@@ -1013,9 +1023,17 @@ export class UserFormViewModel {
           // (violations or partial-failure), that surface owns the error
           // display. Suppress the form's inline submissionError to avoid
           // rendering the same error twice (architect Finding #2).
+          //
+          // Compare against the pre-submit snapshot by reference so that
+          // sticky state from a prior submit (e.g., a previous role-violation
+          // that the user has not dismissed) cannot falsely suppress a fresh
+          // non-role failure on this submit. `modifyRoles` always assigns a
+          // new array/object when it populates these fields, so reference
+          // inequality is a sound provenance check for "this submit caused
+          // the population."
           const handledByPageBanner =
-            usersViewModel.lastRoleViolations !== null ||
-            usersViewModel.lastRolePartialFailure !== null;
+            usersViewModel.lastRoleViolations !== initialRoleViolations ||
+            usersViewModel.lastRolePartialFailure !== initialRolePartialFailure;
 
           if (handledByPageBanner) {
             this.submissionError = null;
