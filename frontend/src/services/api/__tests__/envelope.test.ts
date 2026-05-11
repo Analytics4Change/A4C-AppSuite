@@ -8,13 +8,29 @@
  * re-strip the field unintentionally.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { PostgrestSingleResponse } from '@supabase/supabase-js';
-import { unwrapApiEnvelope } from '../envelope';
+import type { ApiEnvelope } from '../envelope';
+import { unwrapApiEnvelope, throwIfPostgrestError } from '../envelope';
 
 // Stub maskPii to be identity so tests assert on shape, not masking behavior.
 vi.mock('@/utils/maskPii', () => ({
   maskPii: (s: string) => s,
+}));
+
+// Stub Logger so tests can assert on the service-boundary error-emission contract
+// (architect-approved 2026-05-11). `mockLogError` is the only handle we need —
+// the helper only ever calls `log.error`.
+const { mockLogError } = vi.hoisted(() => ({ mockLogError: vi.fn() }));
+vi.mock('@/utils/logger', () => ({
+  Logger: {
+    getLogger: () => ({
+      error: mockLogError,
+      warn: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+    }),
+  },
 }));
 
 function rpcOk<T>(data: T): PostgrestSingleResponse<unknown> {
@@ -100,6 +116,139 @@ describe('unwrapApiEnvelope', () => {
       if (result.success) return;
       expect(result.postgrestError?.code).toBe('42501');
       expect(result.error).toBe('permission denied');
+    });
+  });
+});
+
+describe('throwIfPostgrestError', () => {
+  beforeEach(() => {
+    mockLogError.mockReset();
+  });
+
+  it('throws "Failed to <verb>: <error>" on PostgREST-shape failure', () => {
+    const env: ApiEnvelope<Record<string, unknown>> = {
+      success: false,
+      error: 'permission denied',
+      postgrestError: { code: '42501', message: 'permission denied', details: '', hint: '' },
+    };
+
+    expect(() => throwIfPostgrestError(env, 'create field')).toThrow(
+      'Failed to create field: permission denied'
+    );
+  });
+
+  it('does NOT throw on handler-driven envelope failure (no postgrestError)', () => {
+    const env: ApiEnvelope<Record<string, unknown>> = {
+      success: false,
+      error: 'Field key already exists',
+      errorDetails: { code: 'DUPLICATE_KEY', message: 'm' },
+    };
+
+    expect(() => throwIfPostgrestError(env, 'create field')).not.toThrow();
+  });
+
+  it('does NOT throw on success envelope', () => {
+    const env: ApiEnvelope<{ field_id: string }> = {
+      success: true,
+      field_id: 'f1',
+    };
+
+    expect(() => throwIfPostgrestError(env, 'create field')).not.toThrow();
+  });
+
+  it('passes through the verb verbatim in the thrown message', () => {
+    const env: ApiEnvelope<Record<string, unknown>> = {
+      success: false,
+      error: 'boom',
+      postgrestError: { code: '500', message: 'boom', details: '', hint: '' },
+    };
+
+    expect(() => throwIfPostgrestError(env, 'deactivate category')).toThrow(
+      'Failed to deactivate category: boom'
+    );
+  });
+
+  describe('log emission contract (architect-approved 2026-05-11)', () => {
+    it('calls log.error exactly once on PostgREST-shape failure', () => {
+      const env: ApiEnvelope<Record<string, unknown>> = {
+        success: false,
+        error: 'permission denied',
+        postgrestError: { code: '42501', message: 'permission denied', details: '', hint: '' },
+      };
+
+      expect(() => throwIfPostgrestError(env, 'create field')).toThrow();
+
+      expect(mockLogError).toHaveBeenCalledTimes(1);
+      expect(mockLogError).toHaveBeenCalledWith('Failed to create field', {
+        error: 'permission denied',
+      });
+    });
+
+    it('does NOT call log.error on handler-driven envelope failure', () => {
+      const env: ApiEnvelope<Record<string, unknown>> = {
+        success: false,
+        error: 'Field key already exists',
+        errorDetails: { code: 'DUPLICATE_KEY', message: 'm' },
+      };
+
+      expect(() => throwIfPostgrestError(env, 'create field')).not.toThrow();
+      expect(mockLogError).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call log.error on success envelope', () => {
+      const env: ApiEnvelope<{ field_id: string }> = {
+        success: true,
+        field_id: 'f1',
+      };
+
+      expect(() => throwIfPostgrestError(env, 'create field')).not.toThrow();
+      expect(mockLogError).not.toHaveBeenCalled();
+    });
+
+    it('log.error count exactly tracks PostgREST-failure count across a mixed batch', () => {
+      // Three PostgREST failures interleaved with two success and one
+      // handler-driven failure; expect log.error to fire exactly 3×.
+      const pgFail = (): ApiEnvelope<Record<string, unknown>> => ({
+        success: false,
+        error: 'permission denied',
+        postgrestError: { code: '42501', message: 'permission denied', details: '', hint: '' },
+      });
+      const handlerFail: ApiEnvelope<Record<string, unknown>> = {
+        success: false,
+        error: 'business rule',
+        errorDetails: { code: 'X', message: 'm' },
+      };
+      const successEnv: ApiEnvelope<Record<string, unknown>> = { success: true };
+
+      try {
+        throwIfPostgrestError(pgFail(), 'a');
+      } catch {
+        /* expected */
+      }
+      throwIfPostgrestError(successEnv, 'b');
+      try {
+        throwIfPostgrestError(pgFail(), 'c');
+      } catch {
+        /* expected */
+      }
+      throwIfPostgrestError(handlerFail, 'd');
+      try {
+        throwIfPostgrestError(pgFail(), 'e');
+      } catch {
+        /* expected */
+      }
+      throwIfPostgrestError(successEnv, 'f');
+
+      expect(mockLogError).toHaveBeenCalledTimes(3);
+      expect(mockLogError).toHaveBeenNthCalledWith(1, 'Failed to a', {
+        error: 'permission denied',
+      });
+      expect(mockLogError).toHaveBeenNthCalledWith(2, 'Failed to c', {
+        error: 'permission denied',
+      });
+      expect(mockLogError).toHaveBeenNthCalledWith(3, 'Failed to e', {
+        error: 'permission denied',
+      });
     });
   });
 });

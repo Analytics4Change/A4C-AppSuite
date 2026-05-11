@@ -6,7 +6,8 @@
  * All write methods accept optional correlationId for audit trail grouping.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabaseService } from '@/services/auth/supabase.service';
+import { throwIfPostgrestError } from '@/services/api/envelope';
 import { Logger } from '@/utils/logger';
 import type {
   FieldDefinition,
@@ -28,16 +29,17 @@ export class SupabaseClientFieldService implements IClientFieldService {
   async listFieldDefinitions(includeInactive = false): Promise<FieldDefinition[]> {
     log.debug('Fetching field definitions', { includeInactive });
 
-    const { data, error } = await supabase
-      .schema('api')
-      .rpc('list_field_definitions', { p_include_inactive: includeInactive });
+    const { data, error } = await supabaseService.apiRpc<FieldDefinition[]>(
+      'list_field_definitions',
+      { p_include_inactive: includeInactive }
+    );
 
     if (error) {
       log.error('Failed to fetch field definitions', { error });
       throw new Error(`Failed to fetch field definitions: ${error.message}`);
     }
 
-    return (data ?? []) as FieldDefinition[];
+    return data ?? [];
   }
 
   async batchUpdateFieldDefinitions(
@@ -47,20 +49,18 @@ export class SupabaseClientFieldService implements IClientFieldService {
   ): Promise<BatchUpdateResult> {
     log.debug('Batch updating field definitions', { changeCount: changes.length, reason });
 
-    const { data, error } = await supabase.schema('api').rpc('batch_update_field_definitions', {
-      p_changes: changes,
-      p_reason: reason,
-      p_correlation_id: correlationId ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<BatchUpdateResult, 'success'>>(
+      'batch_update_field_definitions',
+      {
+        p_changes: changes,
+        p_reason: reason,
+        p_correlation_id: correlationId ?? null,
+      }
+    );
 
-    if (error) {
-      log.error('Failed to batch update field definitions', { error });
-      throw new Error(`Failed to batch update: ${error.message}`);
-    }
-
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-    log.info('Batch update complete', { result });
-    return result as BatchUpdateResult;
+    throwIfPostgrestError(env, 'batch update');
+    log.info('Batch update complete', { success: env.success });
+    return env as BatchUpdateResult;
   }
 
   async createFieldDefinition(
@@ -69,26 +69,24 @@ export class SupabaseClientFieldService implements IClientFieldService {
   ): Promise<FieldDefinitionResult> {
     log.debug('Creating field definition', { params });
 
-    const { data, error } = await supabase.schema('api').rpc('create_field_definition', {
-      p_field_key: params.field_key,
-      p_display_name: params.display_name,
-      p_category_id: params.category_id,
-      p_field_type: params.field_type ?? 'text',
-      p_is_visible: params.is_visible ?? true,
-      p_is_required: params.is_required ?? false,
-      p_is_dimension: params.is_dimension ?? false,
-      p_sort_order: params.sort_order ?? 0,
-      p_validation_rules: params.validation_rules ?? null,
-      p_correlation_id: correlationId ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<FieldDefinitionResult, 'success'>>(
+      'create_field_definition',
+      {
+        p_field_key: params.field_key,
+        p_display_name: params.display_name,
+        p_category_id: params.category_id,
+        p_field_type: params.field_type ?? 'text',
+        p_is_visible: params.is_visible ?? true,
+        p_is_required: params.is_required ?? false,
+        p_is_dimension: params.is_dimension ?? false,
+        p_sort_order: params.sort_order ?? 0,
+        p_validation_rules: params.validation_rules ?? null,
+        p_correlation_id: correlationId ?? null,
+      }
+    );
 
-    if (error) {
-      log.error('Failed to create field definition', { error });
-      throw new Error(`Failed to create field: ${error.message}`);
-    }
-
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as FieldDefinitionResult;
+    throwIfPostgrestError(env, 'create field');
+    return env as FieldDefinitionResult;
   }
 
   async updateFieldDefinition(
@@ -97,23 +95,21 @@ export class SupabaseClientFieldService implements IClientFieldService {
   ): Promise<FieldDefinitionResult> {
     log.debug('Updating field definition', { fieldId, params });
 
-    const { data, error } = await supabase.schema('api').rpc('update_field_definition', {
-      p_field_id: fieldId,
-      p_display_name: params.display_name ?? null,
-      p_category_id: params.category_id ?? null,
-      p_is_required: params.is_required ?? null,
-      p_validation_rules: params.validation_rules ?? null,
-      p_reason: params.reason ?? 'Field definition updated',
-      p_correlation_id: params.correlation_id ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<FieldDefinitionResult, 'success'>>(
+      'update_field_definition',
+      {
+        p_field_id: fieldId,
+        p_display_name: params.display_name ?? null,
+        p_category_id: params.category_id ?? null,
+        p_is_required: params.is_required ?? null,
+        p_validation_rules: params.validation_rules ?? null,
+        p_reason: params.reason ?? 'Field definition updated',
+        p_correlation_id: params.correlation_id ?? null,
+      }
+    );
 
-    if (error) {
-      log.error('Failed to update field definition', { error });
-      throw new Error(`Failed to update field: ${error.message}`);
-    }
-
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as FieldDefinitionResult;
+    throwIfPostgrestError(env, 'update field');
+    return env as FieldDefinitionResult;
   }
 
   async deactivateFieldDefinition(
@@ -123,19 +119,17 @@ export class SupabaseClientFieldService implements IClientFieldService {
   ): Promise<FieldDefinitionResult> {
     log.debug('Deactivating field definition', { fieldId, reason });
 
-    const { data, error } = await supabase.schema('api').rpc('deactivate_field_definition', {
-      p_field_id: fieldId,
-      p_reason: reason,
-      p_correlation_id: correlationId ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<FieldDefinitionResult, 'success'>>(
+      'deactivate_field_definition',
+      {
+        p_field_id: fieldId,
+        p_reason: reason,
+        p_correlation_id: correlationId ?? null,
+      }
+    );
 
-    if (error) {
-      log.error('Failed to deactivate field definition', { error });
-      throw new Error(`Failed to deactivate field: ${error.message}`);
-    }
-
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as FieldDefinitionResult;
+    throwIfPostgrestError(env, 'deactivate field');
+    return env as FieldDefinitionResult;
   }
 
   async reactivateFieldDefinition(
@@ -145,19 +139,17 @@ export class SupabaseClientFieldService implements IClientFieldService {
   ): Promise<FieldDefinitionResult> {
     log.debug('Reactivating field definition', { fieldId, reason });
 
-    const { data, error } = await supabase.schema('api').rpc('reactivate_field_definition', {
-      p_field_id: fieldId,
-      p_reason: reason,
-      p_correlation_id: correlationId ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<FieldDefinitionResult, 'success'>>(
+      'reactivate_field_definition',
+      {
+        p_field_id: fieldId,
+        p_reason: reason,
+        p_correlation_id: correlationId ?? null,
+      }
+    );
 
-    if (error) {
-      log.error('Failed to reactivate field definition', { error });
-      throw new Error(`Failed to reactivate field: ${error.message}`);
-    }
-
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as FieldDefinitionResult;
+    throwIfPostgrestError(env, 'reactivate field');
+    return env as FieldDefinitionResult;
   }
 
   async deleteFieldDefinition(
@@ -167,25 +159,23 @@ export class SupabaseClientFieldService implements IClientFieldService {
   ): Promise<DeleteFieldResult> {
     log.debug('Deleting field definition', { fieldId, reason });
 
-    const { data, error } = await supabase.schema('api').rpc('delete_field_definition', {
-      p_field_id: fieldId,
-      p_reason: reason,
-      p_correlation_id: correlationId ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<DeleteFieldResult, 'success'>>(
+      'delete_field_definition',
+      {
+        p_field_id: fieldId,
+        p_reason: reason,
+        p_correlation_id: correlationId ?? null,
+      }
+    );
 
-    if (error) {
-      log.error('Failed to delete field definition', { error });
-      throw new Error(`Failed to delete field: ${error.message}`);
-    }
-
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as DeleteFieldResult;
+    throwIfPostgrestError(env, 'delete field');
+    return env as DeleteFieldResult;
   }
 
   async listFieldCategories(includeInactive = false): Promise<FieldCategory[]> {
     log.debug('Fetching field categories', { includeInactive });
 
-    const { data, error } = await supabase.schema('api').rpc('list_field_categories', {
+    const { data, error } = await supabaseService.apiRpc<FieldCategory[]>('list_field_categories', {
       p_include_inactive: includeInactive,
     });
 
@@ -194,7 +184,7 @@ export class SupabaseClientFieldService implements IClientFieldService {
       throw new Error(`Failed to fetch categories: ${error.message}`);
     }
 
-    return (data ?? []) as FieldCategory[];
+    return data ?? [];
   }
 
   async createFieldCategory(
@@ -205,20 +195,18 @@ export class SupabaseClientFieldService implements IClientFieldService {
   ): Promise<FieldCategoryResult> {
     log.debug('Creating field category', { name, slug, sortOrder });
 
-    const { data, error } = await supabase.schema('api').rpc('create_field_category', {
-      p_name: name,
-      p_slug: slug,
-      p_sort_order: sortOrder ?? 0,
-      p_correlation_id: correlationId ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<FieldCategoryResult, 'success'>>(
+      'create_field_category',
+      {
+        p_name: name,
+        p_slug: slug,
+        p_sort_order: sortOrder ?? 0,
+        p_correlation_id: correlationId ?? null,
+      }
+    );
 
-    if (error) {
-      log.error('Failed to create field category', { error });
-      throw new Error(`Failed to create category: ${error.message}`);
-    }
-
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as FieldCategoryResult;
+    throwIfPostgrestError(env, 'create category');
+    return env as FieldCategoryResult;
   }
 
   async updateFieldCategory(
@@ -229,20 +217,18 @@ export class SupabaseClientFieldService implements IClientFieldService {
   ): Promise<FieldCategoryResult> {
     log.debug('Updating field category', { categoryId, name, reason });
 
-    const { data, error } = await supabase.schema('api').rpc('update_field_category', {
-      p_category_id: categoryId,
-      p_name: name,
-      p_reason: reason,
-      p_correlation_id: correlationId ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<FieldCategoryResult, 'success'>>(
+      'update_field_category',
+      {
+        p_category_id: categoryId,
+        p_name: name,
+        p_reason: reason,
+        p_correlation_id: correlationId ?? null,
+      }
+    );
 
-    if (error) {
-      log.error('Failed to update field category', { error });
-      throw new Error(`Failed to update category: ${error.message}`);
-    }
-
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as FieldCategoryResult;
+    throwIfPostgrestError(env, 'update category');
+    return env as FieldCategoryResult;
   }
 
   async deactivateFieldCategory(
@@ -252,19 +238,17 @@ export class SupabaseClientFieldService implements IClientFieldService {
   ): Promise<FieldCategoryResult> {
     log.debug('Deactivating field category', { categoryId, reason });
 
-    const { data, error } = await supabase.schema('api').rpc('deactivate_field_category', {
-      p_category_id: categoryId,
-      p_reason: reason,
-      p_correlation_id: correlationId ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<FieldCategoryResult, 'success'>>(
+      'deactivate_field_category',
+      {
+        p_category_id: categoryId,
+        p_reason: reason,
+        p_correlation_id: correlationId ?? null,
+      }
+    );
 
-    if (error) {
-      log.error('Failed to deactivate field category', { error });
-      throw new Error(`Failed to deactivate category: ${error.message}`);
-    }
-
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as FieldCategoryResult;
+    throwIfPostgrestError(env, 'deactivate category');
+    return env as FieldCategoryResult;
   }
 
   async reactivateFieldCategory(
@@ -274,19 +258,17 @@ export class SupabaseClientFieldService implements IClientFieldService {
   ): Promise<FieldCategoryResult> {
     log.debug('Reactivating field category', { categoryId, reason });
 
-    const { data, error } = await supabase.schema('api').rpc('reactivate_field_category', {
-      p_category_id: categoryId,
-      p_reason: reason,
-      p_correlation_id: correlationId ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<FieldCategoryResult, 'success'>>(
+      'reactivate_field_category',
+      {
+        p_category_id: categoryId,
+        p_reason: reason,
+        p_correlation_id: correlationId ?? null,
+      }
+    );
 
-    if (error) {
-      log.error('Failed to reactivate field category', { error });
-      throw new Error(`Failed to reactivate category: ${error.message}`);
-    }
-
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as FieldCategoryResult;
+    throwIfPostgrestError(env, 'reactivate category');
+    return env as FieldCategoryResult;
   }
 
   async deleteFieldCategory(
@@ -296,35 +278,32 @@ export class SupabaseClientFieldService implements IClientFieldService {
   ): Promise<DeleteCategoryResult> {
     log.debug('Deleting field category', { categoryId, reason });
 
-    const { data, error } = await supabase.schema('api').rpc('delete_field_category', {
-      p_category_id: categoryId,
-      p_reason: reason,
-      p_correlation_id: correlationId ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<DeleteCategoryResult, 'success'>>(
+      'delete_field_category',
+      {
+        p_category_id: categoryId,
+        p_reason: reason,
+        p_correlation_id: correlationId ?? null,
+      }
+    );
 
-    if (error) {
-      log.error('Failed to delete field category', { error });
-      throw new Error(`Failed to delete category: ${error.message}`);
-    }
-
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return result as DeleteCategoryResult;
+    throwIfPostgrestError(env, 'delete category');
+    return env as DeleteCategoryResult;
   }
 
   async getFieldUsageCount(fieldKey: string): Promise<{ success: boolean; count: number }> {
     log.debug('Getting field usage count', { fieldKey });
 
-    const { data, error } = await supabase.schema('api').rpc('get_field_usage_count', {
+    const env = await supabaseService.apiRpcEnvelope<{ count?: number }>('get_field_usage_count', {
       p_field_key: fieldKey,
     });
 
-    if (error) {
-      log.error('Failed to get field usage count', { error });
+    if (!env.success) {
+      log.error('Failed to get field usage count', { error: env.error });
       return { success: false, count: 0 };
     }
 
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return { success: true, count: result?.count ?? 0 };
+    return { success: true, count: env.count ?? 0 };
   }
 
   async getCategoryFieldCount(
@@ -333,17 +312,19 @@ export class SupabaseClientFieldService implements IClientFieldService {
   ): Promise<{ success: boolean; count: number; fields: string[] }> {
     log.debug('Getting category field count', { categoryId, includeInactive });
 
-    const { data, error } = await supabase.schema('api').rpc('get_category_field_count', {
-      p_category_id: categoryId,
-      p_include_inactive: includeInactive,
-    });
+    const env = await supabaseService.apiRpcEnvelope<{ count?: number; fields?: string[] }>(
+      'get_category_field_count',
+      {
+        p_category_id: categoryId,
+        p_include_inactive: includeInactive,
+      }
+    );
 
-    if (error) {
-      log.error('Failed to get category field count', { error });
+    if (!env.success) {
+      log.error('Failed to get category field count', { error: env.error });
       return { success: false, count: 0, fields: [] };
     }
 
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
-    return { success: true, count: result?.count ?? 0, fields: result?.fields ?? [] };
+    return { success: true, count: env.count ?? 0, fields: env.fields ?? [] };
   }
 }

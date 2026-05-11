@@ -23,7 +23,8 @@
  * @see documentation/architecture/data/multi-tenancy-architecture.md
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabaseService } from '@/services/auth/supabase.service';
+import type { EnvelopeErrorDetails } from '@/services/api/envelope';
 import { Logger } from '@/utils/logger';
 import type { IOrganizationUnitService } from './IOrganizationUnitService';
 import type {
@@ -37,8 +38,7 @@ import type {
 const log = Logger.getLogger('supabase-ou-service');
 
 /**
- * Database row type for organization unit RPC results
- * MUST match: infrastructure/supabase/sql/03-functions/api/005-organization-unit-crud.sql
+ * Database row type for organization unit RPC results (read-shape).
  */
 interface OrganizationUnitRow {
   id: string;
@@ -56,31 +56,22 @@ interface OrganizationUnitRow {
 }
 
 /**
- * JSONB response type for mutation operations
+ * Success-path unit shape from envelope-shape mutation RPCs (camelCase per
+ * jsonb_build_object in the RPC body).
  */
-interface MutationResponse {
-  success: boolean;
-  unit?: {
-    id: string;
-    name: string;
-    displayName: string;
-    path: string;
-    parentPath: string | null;
-    parentId: string | null;
-    timeZone: string;
-    isActive: boolean;
-    childCount: number;
-    isRootOrganization: boolean;
-    createdAt: string;
-    updatedAt: string;
-  };
-  deletedUnit?: MutationResponse['unit']; // backward-compat: old RPC key before migration fix
-  error?: string;
-  errorDetails?: {
-    code: string;
-    count?: number;
-    message: string;
-  };
+interface UnitRpcShape {
+  id: string;
+  name: string;
+  displayName: string;
+  path: string;
+  parentPath: string | null;
+  parentId: string | null;
+  timeZone: string;
+  isActive: boolean;
+  childCount: number;
+  isRootOrganization: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export class SupabaseOrganizationUnitService implements IOrganizationUnitService {
@@ -111,7 +102,7 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
   /**
    * Converts mutation response unit to OrganizationUnit type
    */
-  private mapResponseToUnit(unit: MutationResponse['unit']): OrganizationUnit {
+  private mapResponseToUnit(unit: UnitRpcShape | undefined): OrganizationUnit {
     if (!unit) {
       throw new Error('Unit data missing from response');
     }
@@ -135,7 +126,7 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
    * Maps error details from RPC response to operation result format
    */
   private mapErrorDetails(
-    errorDetails?: MutationResponse['errorDetails']
+    errorDetails?: EnvelopeErrorDetails
   ): OrganizationUnitOperationResult['errorDetails'] {
     if (!errorDetails) return undefined;
 
@@ -187,17 +178,20 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
     log.debug('getUnits called', { filters });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('get_organization_units', {
-        p_status: filters?.status || 'all',
-        p_search_term: filters?.searchTerm || null,
-      });
+      const { data, error } = await supabaseService.apiRpc<OrganizationUnitRow[]>(
+        'get_organization_units',
+        {
+          p_status: filters?.status || 'all',
+          p_search_term: filters?.searchTerm || null,
+        }
+      );
 
       if (error) {
         log.error('Error fetching organization units', error);
         throw new Error(`Failed to fetch organization units: ${error.message}`);
       }
 
-      const rows = (data as OrganizationUnitRow[]) || [];
+      const rows = data || [];
       log.debug(`Fetched ${rows.length} organization units`);
 
       return rows.map((row) => this.mapRowToUnit(row));
@@ -214,16 +208,17 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
     log.debug('getUnitById called', { unitId });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('get_organization_unit_by_id', {
-        p_unit_id: unitId,
-      });
+      const { data, error } = await supabaseService.apiRpc<OrganizationUnitRow[]>(
+        'get_organization_unit_by_id',
+        { p_unit_id: unitId }
+      );
 
       if (error) {
         log.error('Error fetching organization unit by ID', error);
         throw new Error(`Failed to fetch organization unit: ${error.message}`);
       }
 
-      const rows = (data as OrganizationUnitRow[]) || [];
+      const rows = data || [];
 
       if (rows.length === 0) {
         log.debug('Organization unit not found', { unitId });
@@ -244,18 +239,17 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
     log.debug('getDescendants called', { unitId });
 
     try {
-      const { data, error } = await supabase
-        .schema('api')
-        .rpc('get_organization_unit_descendants', {
-          p_unit_id: unitId,
-        });
+      const { data, error } = await supabaseService.apiRpc<OrganizationUnitRow[]>(
+        'get_organization_unit_descendants',
+        { p_unit_id: unitId }
+      );
 
       if (error) {
         log.error('Error fetching unit descendants', error);
         throw new Error(`Failed to fetch descendants: ${error.message}`);
       }
 
-      const rows = (data as OrganizationUnitRow[]) || [];
+      const rows = data || [];
       log.debug(`Fetched ${rows.length} descendants`);
 
       return rows.map((row) => this.mapRowToUnit(row));
@@ -274,42 +268,31 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
     log.debug('createUnit called', { request });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('create_organization_unit', {
-        p_parent_id: request.parentId,
-        p_name: request.name,
-        p_display_name: request.displayName,
-        p_timezone: request.timeZone || null,
-      });
+      const env = await supabaseService.apiRpcEnvelope<{ unit?: UnitRpcShape }>(
+        'create_organization_unit',
+        {
+          p_parent_id: request.parentId,
+          p_name: request.name,
+          p_display_name: request.displayName,
+          p_timezone: request.timeZone || null,
+        }
+      );
 
-      if (error) {
-        log.error('Error creating organization unit', error);
+      if (!env.success) {
+        log.warn('Create unit failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
-          error: error.message,
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
-          },
-        };
-      }
-
-      const response = data as MutationResponse;
-
-      if (!response.success) {
-        log.warn('Create unit failed', { response });
-        return {
-          success: false,
-          error: response.error,
-          errorDetails: this.mapErrorDetails(response.errorDetails),
+          error: env.error,
+          errorDetails: this.mapErrorDetails(env.errorDetails),
         };
       }
 
       // Defense-in-depth: if handler failed, RPC may return success with empty unit
-      if (!response.unit?.id) {
-        log.error('Create returned success but no unit data', { response });
+      if (!env.unit?.id) {
+        log.error('Create returned success but no unit data');
         return {
           success: false,
-          error: response.error || 'Organization unit creation failed — no data returned',
+          error: 'Organization unit creation failed — no data returned',
           errorDetails: {
             code: 'UNKNOWN',
             message: 'Server returned success but no unit data',
@@ -317,10 +300,10 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
         };
       }
 
-      log.info('Organization unit created', { unitId: response.unit.id });
+      log.info('Organization unit created', { unitId: env.unit.id });
       return {
         success: true,
-        unit: this.mapResponseToUnit(response.unit),
+        unit: this.mapResponseToUnit(env.unit),
       };
     } catch (err) {
       log.error('Exception in createUnit', err);
@@ -347,42 +330,31 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
     log.debug('updateUnit called', { request });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('update_organization_unit', {
-        p_unit_id: request.id,
-        p_name: request.name || null,
-        p_display_name: request.displayName || null,
-        p_timezone: request.timeZone || null,
-      });
+      const env = await supabaseService.apiRpcEnvelope<{ unit?: UnitRpcShape }>(
+        'update_organization_unit',
+        {
+          p_unit_id: request.id,
+          p_name: request.name || null,
+          p_display_name: request.displayName || null,
+          p_timezone: request.timeZone || null,
+        }
+      );
 
-      if (error) {
-        log.error('Error updating organization unit', error);
+      if (!env.success) {
+        log.warn('Update unit failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
-          error: error.message,
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
-          },
-        };
-      }
-
-      const response = data as MutationResponse;
-
-      if (!response.success) {
-        log.warn('Update unit failed', { response });
-        return {
-          success: false,
-          error: response.error,
-          errorDetails: this.mapErrorDetails(response.errorDetails),
+          error: env.error,
+          errorDetails: this.mapErrorDetails(env.errorDetails),
         };
       }
 
       // Defense-in-depth: if handler failed, RPC may return success with empty unit
-      if (!response.unit?.id) {
-        log.error('Update returned success but no unit data', { response });
+      if (!env.unit?.id) {
+        log.error('Update returned success but no unit data');
         return {
           success: false,
-          error: response.error || 'Organization unit update failed — no data returned',
+          error: 'Organization unit update failed — no data returned',
           errorDetails: {
             code: 'UNKNOWN',
             message: 'Server returned success but no unit data',
@@ -393,7 +365,7 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
       log.info('Organization unit updated', { unitId: request.id });
       return {
         success: true,
-        unit: this.mapResponseToUnit(response.unit),
+        unit: this.mapResponseToUnit(env.unit),
       };
     } catch (err) {
       log.error('Exception in updateUnit', err);
@@ -418,39 +390,26 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
     log.debug('deactivateUnit called', { unitId });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('deactivate_organization_unit', {
-        p_unit_id: unitId,
-      });
+      const env = await supabaseService.apiRpcEnvelope<{ unit?: UnitRpcShape }>(
+        'deactivate_organization_unit',
+        { p_unit_id: unitId }
+      );
 
-      if (error) {
-        log.error('Error deactivating organization unit', error);
+      if (!env.success) {
+        log.warn('Deactivate unit failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
-          error: error.message,
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
-          },
-        };
-      }
-
-      const response = data as MutationResponse;
-
-      if (!response.success) {
-        log.warn('Deactivate unit failed', { response });
-        return {
-          success: false,
-          error: response.error,
-          errorDetails: this.mapErrorDetails(response.errorDetails),
+          error: env.error,
+          errorDetails: this.mapErrorDetails(env.errorDetails),
         };
       }
 
       // Defense-in-depth: if handler failed, RPC may return success with empty unit
-      if (!response.unit?.id) {
-        log.error('Deactivate returned success but no unit data', { response });
+      if (!env.unit?.id) {
+        log.error('Deactivate returned success but no unit data');
         return {
           success: false,
-          error: response.error || 'Organization unit deactivation failed — no data returned',
+          error: 'Organization unit deactivation failed — no data returned',
           errorDetails: {
             code: 'UNKNOWN',
             message: 'Server returned success but no unit data',
@@ -461,7 +420,7 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
       log.info('Organization unit deactivated', { unitId });
       return {
         success: true,
-        unit: this.mapResponseToUnit(response.unit),
+        unit: this.mapResponseToUnit(env.unit),
       };
     } catch (err) {
       log.error('Exception in deactivateUnit', err);
@@ -485,39 +444,26 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
     log.debug('reactivateUnit called', { unitId });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('reactivate_organization_unit', {
-        p_unit_id: unitId,
-      });
+      const env = await supabaseService.apiRpcEnvelope<{ unit?: UnitRpcShape }>(
+        'reactivate_organization_unit',
+        { p_unit_id: unitId }
+      );
 
-      if (error) {
-        log.error('Error reactivating organization unit', error);
+      if (!env.success) {
+        log.warn('Reactivate unit failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
-          error: error.message,
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
-          },
-        };
-      }
-
-      const response = data as MutationResponse;
-
-      if (!response.success) {
-        log.warn('Reactivate unit failed', { response });
-        return {
-          success: false,
-          error: response.error,
-          errorDetails: this.mapErrorDetails(response.errorDetails),
+          error: env.error,
+          errorDetails: this.mapErrorDetails(env.errorDetails),
         };
       }
 
       // Defense-in-depth: if handler failed, RPC may return success with empty unit
-      if (!response.unit?.id) {
-        log.error('Reactivate returned success but no unit data', { response });
+      if (!env.unit?.id) {
+        log.error('Reactivate returned success but no unit data');
         return {
           success: false,
-          error: response.error || 'Organization unit reactivation failed — no data returned',
+          error: 'Organization unit reactivation failed — no data returned',
           errorDetails: {
             code: 'UNKNOWN',
             message: 'Server returned success but no unit data',
@@ -528,7 +474,7 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
       log.info('Organization unit reactivated', { unitId });
       return {
         success: true,
-        unit: this.mapResponseToUnit(response.unit),
+        unit: this.mapResponseToUnit(env.unit),
       };
     } catch (err) {
       log.error('Exception in reactivateUnit', err);
@@ -553,41 +499,29 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
     log.debug('deleteUnit called', { unitId });
 
     try {
-      const { data, error } = await supabase.schema('api').rpc('delete_organization_unit', {
-        p_unit_id: unitId,
-      });
+      // Backward-compat: old RPC returned 'deletedUnit', new RPC returns 'unit'.
+      // Both shapes are typed on the envelope so the dual-read below stays type-safe.
+      const env = await supabaseService.apiRpcEnvelope<{
+        unit?: UnitRpcShape;
+        deletedUnit?: UnitRpcShape;
+      }>('delete_organization_unit', { p_unit_id: unitId });
 
-      if (error) {
-        log.error('Error deleting organization unit', error);
+      if (!env.success) {
+        log.warn('Delete unit failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
-          error: error.message,
-          errorDetails: {
-            code: 'UNKNOWN',
-            message: error.message,
-          },
-        };
-      }
-
-      const response = data as MutationResponse;
-
-      if (!response.success) {
-        log.warn('Delete unit failed', { response });
-        return {
-          success: false,
-          error: response.error,
-          errorDetails: this.mapErrorDetails(response.errorDetails),
+          error: env.error,
+          errorDetails: this.mapErrorDetails(env.errorDetails),
         };
       }
 
       // Defense-in-depth: if handler failed, RPC may return success with empty unit
-      // Backward-compat: old RPC returned 'deletedUnit', new RPC returns 'unit'
-      const unitData = response.unit || response.deletedUnit;
+      const unitData = env.unit || env.deletedUnit;
       if (!unitData?.id) {
-        log.error('Delete returned success but no unit data', { response });
+        log.error('Delete returned success but no unit data');
         return {
           success: false,
-          error: response.error || 'Organization unit deletion failed — no data returned',
+          error: 'Organization unit deletion failed — no data returned',
           errorDetails: {
             code: 'UNKNOWN',
             message: 'Server returned success but no unit data',

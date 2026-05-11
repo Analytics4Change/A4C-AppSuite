@@ -2,7 +2,7 @@
 
 **Generated**: 2026-05-11 during PR-A planning
 **Source of truth**: `frontend/src/services/api/rpc-registry.generated.ts` (M3 enforcement — `EnvelopeRpcs` and `ReadRpcs` string-literal unions emitted from `COMMENT ON FUNCTION api.<name> IS '... @a4c-rpc-shape: envelope|read'` tags)
-**Total**: 85 production sites across 11 service files (65 envelope + 20 read; 2 SDK helper definitions and 5 doc-example matches in `services/CLAUDE.md` excluded)
+**Total**: 87 production sites across 11 service files (65 envelope + 22 read; 2 SDK helper definitions and 5 doc-example matches in `services/CLAUDE.md` excluded). _Revised during PR-B implementation 2026-05-11: original count of 85 missed 2 multi-line-chain sites — `OrgUnit.getDescendants` (1 read) and `ClientFields.listFieldDefinitions` (1 read) — both surfaced when migrating the affected services. The aggregate row and the affected per-service tables (OrgUnit, ClientFields) below reflect the corrected counts._
 
 ---
 
@@ -38,17 +38,18 @@ Note: uses `{data: result, error}` destructure variant.
 
 The 9 public methods (`createContact`, `updateContact`, `deleteContact`, `createAddress`, `updateAddress`, `deleteAddress`, `createPhone`, `updatePhone`, `deletePhone`) all dispatch to `callEntityRpc` with static literal RPC names. All 9 literals are members of `EnvelopeRpcs`, so re-typing `rpcName: EnvelopeRpcs` keeps the polymorphism while routing through `apiRpcEnvelope`.
 
-#### `SupabaseOrganizationUnitService.ts` (5 envelope + 2 read)
+#### `SupabaseOrganizationUnitService.ts` (5 envelope + 3 read)
 
 | Line | Method | RPC | Shape |
 |---|---|---|---|
-| 190 | `getUnits`        | `get_organization_units`         | read |
-| 217 | `getUnitById`     | `get_organization_unit_by_id`    | read |
-| 277 | `createUnit`      | `create_organization_unit`       | env |
-| 350 | `updateUnit`      | `update_organization_unit`       | env |
-| 421 | `deactivateUnit`  | `deactivate_organization_unit`   | env |
-| 488 | `reactivateUnit`  | `reactivate_organization_unit`   | env |
-| 556 | `deleteUnit`      | `delete_organization_unit`       | env |
+| 190 | `getUnits`        | `get_organization_units`              | read |
+| 217 | `getUnitById`     | `get_organization_unit_by_id`         | read |
+| 247 | `getDescendants`  | `get_organization_unit_descendants`   | read |
+| 277 | `createUnit`      | `create_organization_unit`            | env |
+| 350 | `updateUnit`      | `update_organization_unit`            | env |
+| 421 | `deactivateUnit`  | `deactivate_organization_unit`        | env |
+| 488 | `reactivateUnit`  | `reactivate_organization_unit`        | env |
+| 556 | `deleteUnit`      | `delete_organization_unit`            | env |
 
 #### `getOrganizationSubdomainInfo.ts` (1 read, special)
 
@@ -58,10 +59,11 @@ The 9 public methods (`createContact`, `updateContact`, `deleteContact`, `create
 
 ### client-fields/
 
-#### `SupabaseClientFieldService.ts` (13 envelope + 1 read)
+#### `SupabaseClientFieldService.ts` (13 envelope + 2 read)
 
 | Line | Method | RPC | Shape |
 |---|---|---|---|
+| 28  | `listFieldDefinitions`        | `list_field_definitions`         | read |
 | 50  | `batchUpdateFieldDefinitions` | `batch_update_field_definitions` | env |
 | 72  | `createFieldDefinition`       | `create_field_definition`       | env |
 | 100 | `updateFieldDefinition`       | `update_field_definition`       | env |
@@ -170,15 +172,15 @@ All 25 sites are writes routed through local `parseResponse(data)` helper which 
 | OrgQuery | 0 | 4 | 4 |
 | OrgCommand | 4 | 0 | 4 |
 | OrgEntity | 1 | 0 | 1 |
-| OrgUnit | 5 | 2 | 7 |
+| OrgUnit | 5 | 3 | 8 |
 | OrgSubdomain | 0 | 1 | 1 |
-| ClientFields | 13 | 1 | 14 |
+| ClientFields | 13 | 2 | 15 |
 | Roles | 5 | 8 | 13 |
 | Schedule | 9 | 2 | 11 |
 | Clients | 25 | 0 | 25 |
 | DirectCare | 1 | 1 | 2 |
 | Assignment | 2 | 1 | 3 |
-| **TOTAL** | **65** | **20** | **85** |
+| **TOTAL** | **65** | **22** | **87** |
 
 ---
 
@@ -198,6 +200,7 @@ These services already consume `supabaseService.apiRpc` / `apiRpcEnvelope`:
 - **PR-A pilots (14 sites)**: OrgEntity (1 env) + Roles (5 env + 8 read = 13)
 - **PR-B bulk (41 sites)**: OrgCommand (4) + OrgUnit (5+2) + ClientFields (13+1) + Schedule (9+2) + DirectCare (1+1) + Assignment (2+1)
 - **PR-C closeout (30 sites + rule)**: Clients (25) + OrgQuery (4) + OrgSubdomain (1 — refactor in place) + activate ESLint rule
+  - **Pre-PR-C inventory refresh methodology** (architect review F3, PR #57): the original Phase 0 single-line regex `\.schema\(['\"]api['\"]\)\.rpc` missed 4 multi-line chained-form sites across PR-A/B. Before opening PR-C, re-run the inventory with a multi-line-aware approach over all PR-C target files: `grep -Pzo "(?s)\.schema\(['\"]api['\"]\).*?\.rpc\(" frontend/src/services/clients/ frontend/src/services/organization/SupabaseOrganizationQueryService.ts frontend/src/services/organization/getOrganizationSubdomainInfo.ts` — or equivalent multi-line regex (`[\s\S]` rather than `.*`). `SupabaseClientService.ts` is the highest-risk target at 25 sites and may itself contain multi-line forms not visible to the single-line grep.
 
 ## Open question resolutions
 
