@@ -3,19 +3,20 @@
  *
  * Production implementation using api.* schema RPC functions.
  * Follows CQRS pattern: all queries via api schema RPCs.
+ *
+ * Envelope-shape RPCs route through `supabaseService.apiRpcEnvelope<T>` where
+ * `T = Omit<ResultType, 'success'>` so the success-path intersection produces
+ * a value structurally compatible with the named result type. The 4 lifecycle
+ * methods (register/update/admit/discharge) emit `log.error` on PostgREST 4xx/5xx
+ * via `logIfPostgrestError` to preserve the pre-migration observability contract.
  */
 
 import { supabaseService } from '@/services/auth/supabase.service';
-import { throwIfPostgrestError } from '@/services/api/envelope';
+import { throwIfPostgrestError, logIfPostgrestError } from '@/services/api/envelope';
 import { Logger } from '@/utils/logger';
 import type {
   Client,
   ClientListItem,
-  ClientPhone,
-  ClientEmail,
-  ClientAddress,
-  ClientInsurancePolicy,
-  ClientFundingSource,
   ClientProjectionRow,
   ClientUpdateResult,
   ClientPhoneResult,
@@ -78,47 +79,53 @@ export class SupabaseClientService implements IClientService {
   }
 
   // ---------------------------------------------------------------------------
-  // Lifecycle (return on failure)
+  // Lifecycle (return on failure; logIfPostgrestError preserves the pre-
+  // migration log.error emission for PostgREST 4xx/5xx — F1 closure)
   // ---------------------------------------------------------------------------
 
   async registerClient(params: RegisterClientParams): Promise<ClientUpdateResult> {
     log.debug('Registering client');
 
-    const env = await supabaseService.apiRpcEnvelope<{
-      client_id?: string;
-      client?: ClientProjectionRow;
-    }>('register_client', {
-      p_client_data: JSON.stringify(params.client_data),
-      p_reason: params.reason ?? 'Client registered',
-      p_correlation_id: params.correlation_id ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientUpdateResult, 'success'>>(
+      'register_client',
+      {
+        p_client_data: JSON.stringify(params.client_data),
+        p_reason: params.reason ?? 'Client registered',
+        p_correlation_id: params.correlation_id ?? null,
+      }
+    );
 
-    if (!env.success) return { success: false, error: env.error };
-    return { success: true, client_id: env.client_id, client: env.client };
+    if (!env.success) {
+      logIfPostgrestError(env, 'register client');
+      return { success: false, error: env.error };
+    }
+    return env as ClientUpdateResult;
   }
 
   async updateClient(clientId: string, params: UpdateClientParams): Promise<ClientUpdateResult> {
     log.debug('Updating client', { clientId });
 
-    const env = await supabaseService.apiRpcEnvelope<{
-      client_id?: string;
-      client?: ClientProjectionRow;
-    }>('update_client', {
-      p_client_id: clientId,
-      p_changes: JSON.stringify(params.changes),
-      p_reason: params.reason ?? 'Client information updated',
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientUpdateResult, 'success'>>(
+      'update_client',
+      {
+        p_client_id: clientId,
+        p_changes: JSON.stringify(params.changes),
+        p_reason: params.reason ?? 'Client information updated',
+      }
+    );
 
-    if (!env.success) return { success: false, error: env.error };
+    if (!env.success) {
+      logIfPostgrestError(env, 'update client');
+      return { success: false, error: env.error };
+    }
 
     // Fallback: if RPC returned success without the projection row, refetch via getClient
-    // to keep the consumer's optimistic-update path populated.
+    // to keep the consumer's optimistic-update path populated. Preserves pre-migration
+    // behavior verbatim — `getClient` returns the read-model `Client` type, cast through
+    // `unknown` because `ClientUpdateResult.client` is typed against `ClientProjectionRow`.
     let client = env.client;
     if (!client) {
       try {
-        // getClient returns the read-model `Client` type; assign through unknown
-        // because ClientUpdateResult.client is typed against ClientProjectionRow.
-        // Preserves pre-migration behavior verbatim.
         client = (await this.getClient(clientId)) as unknown as ClientProjectionRow;
       } catch (err) {
         log.warn('Failed to refetch client after update fallback', { err });
@@ -131,17 +138,20 @@ export class SupabaseClientService implements IClientService {
   async admitClient(clientId: string, params?: AdmitClientParams): Promise<ClientUpdateResult> {
     log.debug('Admitting client', { clientId });
 
-    const env = await supabaseService.apiRpcEnvelope<{
-      client_id?: string;
-      client?: ClientProjectionRow;
-    }>('admit_client', {
-      p_client_id: clientId,
-      p_admission_data: JSON.stringify(params?.admission_data ?? {}),
-      p_reason: params?.reason ?? 'Client admitted',
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientUpdateResult, 'success'>>(
+      'admit_client',
+      {
+        p_client_id: clientId,
+        p_admission_data: JSON.stringify(params?.admission_data ?? {}),
+        p_reason: params?.reason ?? 'Client admitted',
+      }
+    );
 
-    if (!env.success) return { success: false, error: env.error };
-    return { success: true, client_id: env.client_id, client: env.client };
+    if (!env.success) {
+      logIfPostgrestError(env, 'admit client');
+      return { success: false, error: env.error };
+    }
+    return env as ClientUpdateResult;
   }
 
   async dischargeClient(
@@ -158,17 +168,20 @@ export class SupabaseClientService implements IClientService {
     if (params.discharge_diagnosis) dischargeData.discharge_diagnosis = params.discharge_diagnosis;
     if (params.discharge_placement) dischargeData.discharge_placement = params.discharge_placement;
 
-    const env = await supabaseService.apiRpcEnvelope<{
-      client_id?: string;
-      client?: ClientProjectionRow;
-    }>('discharge_client', {
-      p_client_id: clientId,
-      p_discharge_data: JSON.stringify(dischargeData),
-      p_reason: params.reason ?? 'Client discharged',
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientUpdateResult, 'success'>>(
+      'discharge_client',
+      {
+        p_client_id: clientId,
+        p_discharge_data: JSON.stringify(dischargeData),
+        p_reason: params.reason ?? 'Client discharged',
+      }
+    );
 
-    if (!env.success) return { success: false, error: env.error };
-    return { success: true, client_id: env.client_id, client: env.client };
+    if (!env.success) {
+      logIfPostgrestError(env, 'discharge client');
+      return { success: false, error: env.error };
+    }
+    return env as ClientUpdateResult;
   }
 
   // ---------------------------------------------------------------------------
@@ -176,7 +189,7 @@ export class SupabaseClientService implements IClientService {
   // ---------------------------------------------------------------------------
 
   async addClientPhone(clientId: string, params: AddPhoneParams): Promise<ClientPhoneResult> {
-    const env = await supabaseService.apiRpcEnvelope<{ phone_id?: string; phone?: ClientPhone }>(
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientPhoneResult, 'success'>>(
       'add_client_phone',
       {
         p_client_id: clientId,
@@ -189,7 +202,7 @@ export class SupabaseClientService implements IClientService {
     );
 
     if (!env.success) return { success: false, error: env.error };
-    return { success: true, phone_id: env.phone_id, phone: env.phone };
+    return env as ClientPhoneResult;
   }
 
   async updateClientPhone(
@@ -197,7 +210,7 @@ export class SupabaseClientService implements IClientService {
     phoneId: string,
     params: UpdatePhoneParams
   ): Promise<ClientPhoneResult> {
-    const env = await supabaseService.apiRpcEnvelope<{ phone_id?: string; phone?: ClientPhone }>(
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientPhoneResult, 'success'>>(
       'update_client_phone',
       {
         p_client_id: clientId,
@@ -210,7 +223,7 @@ export class SupabaseClientService implements IClientService {
     );
 
     if (!env.success) return { success: false, error: env.error };
-    return { success: true, phone_id: env.phone_id, phone: env.phone };
+    return env as ClientPhoneResult;
   }
 
   async removeClientPhone(
@@ -233,7 +246,7 @@ export class SupabaseClientService implements IClientService {
   // ---------------------------------------------------------------------------
 
   async addClientEmail(clientId: string, params: AddEmailParams): Promise<ClientEmailResult> {
-    const env = await supabaseService.apiRpcEnvelope<{ email_id?: string; email?: ClientEmail }>(
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientEmailResult, 'success'>>(
       'add_client_email',
       {
         p_client_id: clientId,
@@ -246,7 +259,7 @@ export class SupabaseClientService implements IClientService {
     );
 
     if (!env.success) return { success: false, error: env.error };
-    return { success: true, email_id: env.email_id, email: env.email };
+    return env as ClientEmailResult;
   }
 
   async updateClientEmail(
@@ -254,7 +267,7 @@ export class SupabaseClientService implements IClientService {
     emailId: string,
     params: UpdateEmailParams
   ): Promise<ClientEmailResult> {
-    const env = await supabaseService.apiRpcEnvelope<{ email_id?: string; email?: ClientEmail }>(
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientEmailResult, 'success'>>(
       'update_client_email',
       {
         p_client_id: clientId,
@@ -267,7 +280,7 @@ export class SupabaseClientService implements IClientService {
     );
 
     if (!env.success) return { success: false, error: env.error };
-    return { success: true, email_id: env.email_id, email: env.email };
+    return env as ClientEmailResult;
   }
 
   async removeClientEmail(
@@ -290,25 +303,25 @@ export class SupabaseClientService implements IClientService {
   // ---------------------------------------------------------------------------
 
   async addClientAddress(clientId: string, params: AddAddressParams): Promise<ClientAddressResult> {
-    const env = await supabaseService.apiRpcEnvelope<{
-      address_id?: string;
-      address?: ClientAddress;
-    }>('add_client_address', {
-      p_client_id: clientId,
-      p_street1: params.street1,
-      p_city: params.city,
-      p_state: params.state,
-      p_zip: params.zip,
-      p_address_type: params.address_type ?? 'home',
-      p_street2: params.street2 ?? null,
-      p_country: params.country ?? 'US',
-      p_is_primary: params.is_primary ?? false,
-      p_reason: params.reason ?? 'Address added',
-      p_correlation_id: params.correlation_id ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientAddressResult, 'success'>>(
+      'add_client_address',
+      {
+        p_client_id: clientId,
+        p_street1: params.street1,
+        p_city: params.city,
+        p_state: params.state,
+        p_zip: params.zip,
+        p_address_type: params.address_type ?? 'home',
+        p_street2: params.street2 ?? null,
+        p_country: params.country ?? 'US',
+        p_is_primary: params.is_primary ?? false,
+        p_reason: params.reason ?? 'Address added',
+        p_correlation_id: params.correlation_id ?? null,
+      }
+    );
 
     if (!env.success) return { success: false, error: env.error };
-    return { success: true, address_id: env.address_id, address: env.address };
+    return env as ClientAddressResult;
   }
 
   async updateClientAddress(
@@ -316,25 +329,25 @@ export class SupabaseClientService implements IClientService {
     addressId: string,
     params: UpdateAddressParams
   ): Promise<ClientAddressResult> {
-    const env = await supabaseService.apiRpcEnvelope<{
-      address_id?: string;
-      address?: ClientAddress;
-    }>('update_client_address', {
-      p_client_id: clientId,
-      p_address_id: addressId,
-      p_address_type: params.address_type ?? null,
-      p_street1: params.street1 ?? null,
-      p_street2: params.street2 ?? null,
-      p_city: params.city ?? null,
-      p_state: params.state ?? null,
-      p_zip: params.zip ?? null,
-      p_country: params.country ?? null,
-      p_is_primary: params.is_primary ?? null,
-      p_reason: params.reason ?? 'Address updated',
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientAddressResult, 'success'>>(
+      'update_client_address',
+      {
+        p_client_id: clientId,
+        p_address_id: addressId,
+        p_address_type: params.address_type ?? null,
+        p_street1: params.street1 ?? null,
+        p_street2: params.street2 ?? null,
+        p_city: params.city ?? null,
+        p_state: params.state ?? null,
+        p_zip: params.zip ?? null,
+        p_country: params.country ?? null,
+        p_is_primary: params.is_primary ?? null,
+        p_reason: params.reason ?? 'Address updated',
+      }
+    );
 
     if (!env.success) return { success: false, error: env.error };
-    return { success: true, address_id: env.address_id, address: env.address };
+    return env as ClientAddressResult;
   }
 
   async removeClientAddress(
@@ -360,25 +373,25 @@ export class SupabaseClientService implements IClientService {
     clientId: string,
     params: AddInsuranceParams
   ): Promise<ClientInsuranceResult> {
-    const env = await supabaseService.apiRpcEnvelope<{
-      policy_id?: string;
-      policy?: ClientInsurancePolicy;
-    }>('add_client_insurance', {
-      p_client_id: clientId,
-      p_policy_type: params.policy_type,
-      p_payer_name: params.payer_name,
-      p_policy_number: params.policy_number ?? null,
-      p_group_number: params.group_number ?? null,
-      p_subscriber_name: params.subscriber_name ?? null,
-      p_subscriber_relation: params.subscriber_relation ?? null,
-      p_coverage_start_date: params.coverage_start_date ?? null,
-      p_coverage_end_date: params.coverage_end_date ?? null,
-      p_reason: params.reason ?? 'Insurance added',
-      p_correlation_id: params.correlation_id ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientInsuranceResult, 'success'>>(
+      'add_client_insurance',
+      {
+        p_client_id: clientId,
+        p_policy_type: params.policy_type,
+        p_payer_name: params.payer_name,
+        p_policy_number: params.policy_number ?? null,
+        p_group_number: params.group_number ?? null,
+        p_subscriber_name: params.subscriber_name ?? null,
+        p_subscriber_relation: params.subscriber_relation ?? null,
+        p_coverage_start_date: params.coverage_start_date ?? null,
+        p_coverage_end_date: params.coverage_end_date ?? null,
+        p_reason: params.reason ?? 'Insurance added',
+        p_correlation_id: params.correlation_id ?? null,
+      }
+    );
 
     if (!env.success) return { success: false, error: env.error };
-    return { success: true, policy_id: env.policy_id, policy: env.policy };
+    return env as ClientInsuranceResult;
   }
 
   async updateClientInsurance(
@@ -386,24 +399,24 @@ export class SupabaseClientService implements IClientService {
     policyId: string,
     params: UpdateInsuranceParams
   ): Promise<ClientInsuranceResult> {
-    const env = await supabaseService.apiRpcEnvelope<{
-      policy_id?: string;
-      policy?: ClientInsurancePolicy;
-    }>('update_client_insurance', {
-      p_client_id: clientId,
-      p_policy_id: policyId,
-      p_payer_name: params.payer_name ?? null,
-      p_policy_number: params.policy_number ?? null,
-      p_group_number: params.group_number ?? null,
-      p_subscriber_name: params.subscriber_name ?? null,
-      p_subscriber_relation: params.subscriber_relation ?? null,
-      p_coverage_start_date: params.coverage_start_date ?? null,
-      p_coverage_end_date: params.coverage_end_date ?? null,
-      p_reason: params.reason ?? 'Insurance updated',
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientInsuranceResult, 'success'>>(
+      'update_client_insurance',
+      {
+        p_client_id: clientId,
+        p_policy_id: policyId,
+        p_payer_name: params.payer_name ?? null,
+        p_policy_number: params.policy_number ?? null,
+        p_group_number: params.group_number ?? null,
+        p_subscriber_name: params.subscriber_name ?? null,
+        p_subscriber_relation: params.subscriber_relation ?? null,
+        p_coverage_start_date: params.coverage_start_date ?? null,
+        p_coverage_end_date: params.coverage_end_date ?? null,
+        p_reason: params.reason ?? 'Insurance updated',
+      }
+    );
 
     if (!env.success) return { success: false, error: env.error };
-    return { success: true, policy_id: env.policy_id, policy: env.policy };
+    return env as ClientInsuranceResult;
   }
 
   async removeClientInsurance(
@@ -429,7 +442,7 @@ export class SupabaseClientService implements IClientService {
     clientId: string,
     params: ChangePlacementParams
   ): Promise<ClientPlacementResult> {
-    const env = await supabaseService.apiRpcEnvelope<{ placement_id?: string }>(
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientPlacementResult, 'success'>>(
       'change_client_placement',
       {
         p_client_id: clientId,
@@ -442,7 +455,7 @@ export class SupabaseClientService implements IClientService {
     );
 
     if (!env.success) return { success: false, error: env.error };
-    return { success: true, placement_id: env.placement_id };
+    return env as ClientPlacementResult;
   }
 
   async endClientPlacement(
@@ -450,7 +463,7 @@ export class SupabaseClientService implements IClientService {
     endDate?: string,
     reasonText?: string
   ): Promise<ClientPlacementResult> {
-    const env = await supabaseService.apiRpcEnvelope<{ placement_id?: string }>(
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientPlacementResult, 'success'>>(
       'end_client_placement',
       {
         p_client_id: clientId,
@@ -461,7 +474,7 @@ export class SupabaseClientService implements IClientService {
     );
 
     if (!env.success) return { success: false, error: env.error };
-    return { success: true, placement_id: env.placement_id };
+    return env as ClientPlacementResult;
   }
 
   // ---------------------------------------------------------------------------
@@ -472,27 +485,23 @@ export class SupabaseClientService implements IClientService {
     clientId: string,
     params: AddFundingSourceParams
   ): Promise<ClientFundingResult> {
-    const env = await supabaseService.apiRpcEnvelope<{
-      funding_source_id?: string;
-      funding_source?: ClientFundingSource;
-    }>('add_client_funding_source', {
-      p_client_id: clientId,
-      p_source_type: params.source_type,
-      p_source_name: params.source_name,
-      p_reference_number: params.reference_number ?? null,
-      p_start_date: params.start_date ?? null,
-      p_end_date: params.end_date ?? null,
-      p_custom_fields: JSON.stringify(params.custom_fields ?? {}),
-      p_reason: params.reason ?? 'Funding source added',
-      p_correlation_id: params.correlation_id ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientFundingResult, 'success'>>(
+      'add_client_funding_source',
+      {
+        p_client_id: clientId,
+        p_source_type: params.source_type,
+        p_source_name: params.source_name,
+        p_reference_number: params.reference_number ?? null,
+        p_start_date: params.start_date ?? null,
+        p_end_date: params.end_date ?? null,
+        p_custom_fields: JSON.stringify(params.custom_fields ?? {}),
+        p_reason: params.reason ?? 'Funding source added',
+        p_correlation_id: params.correlation_id ?? null,
+      }
+    );
 
     if (!env.success) return { success: false, error: env.error };
-    return {
-      success: true,
-      funding_source_id: env.funding_source_id,
-      funding_source: env.funding_source,
-    };
+    return env as ClientFundingResult;
   }
 
   async updateClientFundingSource(
@@ -500,27 +509,23 @@ export class SupabaseClientService implements IClientService {
     sourceId: string,
     params: UpdateFundingSourceParams
   ): Promise<ClientFundingResult> {
-    const env = await supabaseService.apiRpcEnvelope<{
-      funding_source_id?: string;
-      funding_source?: ClientFundingSource;
-    }>('update_client_funding_source', {
-      p_client_id: clientId,
-      p_funding_source_id: sourceId,
-      p_source_type: params.source_type ?? null,
-      p_source_name: params.source_name ?? null,
-      p_reference_number: params.reference_number ?? null,
-      p_start_date: params.start_date ?? null,
-      p_end_date: params.end_date ?? null,
-      p_custom_fields: params.custom_fields ? JSON.stringify(params.custom_fields) : null,
-      p_reason: params.reason ?? 'Funding source updated',
-    });
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientFundingResult, 'success'>>(
+      'update_client_funding_source',
+      {
+        p_client_id: clientId,
+        p_funding_source_id: sourceId,
+        p_source_type: params.source_type ?? null,
+        p_source_name: params.source_name ?? null,
+        p_reference_number: params.reference_number ?? null,
+        p_start_date: params.start_date ?? null,
+        p_end_date: params.end_date ?? null,
+        p_custom_fields: params.custom_fields ? JSON.stringify(params.custom_fields) : null,
+        p_reason: params.reason ?? 'Funding source updated',
+      }
+    );
 
     if (!env.success) return { success: false, error: env.error };
-    return {
-      success: true,
-      funding_source_id: env.funding_source_id,
-      funding_source: env.funding_source,
-    };
+    return env as ClientFundingResult;
   }
 
   async removeClientFundingSource(
@@ -548,7 +553,7 @@ export class SupabaseClientService implements IClientService {
     designation: string,
     reason?: string
   ): Promise<ClientAssignmentResult> {
-    const env = await supabaseService.apiRpcEnvelope<{ assignment_id?: string }>(
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientAssignmentResult, 'success'>>(
       'assign_client_contact',
       {
         p_client_id: clientId,
@@ -559,7 +564,7 @@ export class SupabaseClientService implements IClientService {
     );
 
     if (!env.success) return { success: false, error: env.error };
-    return { success: true, assignment_id: env.assignment_id };
+    return env as ClientAssignmentResult;
   }
 
   async unassignClientContact(
@@ -568,7 +573,7 @@ export class SupabaseClientService implements IClientService {
     designation: string,
     reason?: string
   ): Promise<ClientAssignmentResult> {
-    const env = await supabaseService.apiRpcEnvelope<{ assignment_id?: string }>(
+    const env = await supabaseService.apiRpcEnvelope<Omit<ClientAssignmentResult, 'success'>>(
       'unassign_client_contact',
       {
         p_client_id: clientId,
@@ -579,6 +584,6 @@ export class SupabaseClientService implements IClientService {
     );
 
     if (!env.success) return { success: false, error: env.error };
-    return { success: true, assignment_id: env.assignment_id };
+    return env as ClientAssignmentResult;
   }
 }

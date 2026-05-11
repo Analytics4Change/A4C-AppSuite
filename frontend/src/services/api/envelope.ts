@@ -126,6 +126,27 @@ export function throwIfPostgrestError(
 }
 
 /**
+ * Return-contract companion to `throwIfPostgrestError`. Emits the same
+ * service-boundary `log.error('Failed to <verb>', { error })` on PostgREST
+ * 4xx/5xx failures but does NOT throw — for services whose pre-migration
+ * contract was to log + return `{success: false, error}` (e.g. the lifecycle
+ * methods on `SupabaseClientService`: register, update, admit, discharge).
+ *
+ * Use this immediately before `return { success: false, error: env.error }`
+ * when the calling service is on the return-contract path. Does nothing on
+ * success envelopes or handler-driven envelope failures.
+ *
+ * Promoted to the SDK boundary per PR #58 architect review F1 — closes the
+ * observability regression where 4 lifecycle methods lost their PostgREST-
+ * error log emission post-migration.
+ */
+export function logIfPostgrestError(env: ApiEnvelope<Record<string, unknown>>, verb: string): void {
+  if (!env.success && env.postgrestError) {
+    log.error(`Failed to ${verb}`, { error: env.error });
+  }
+}
+
+/**
  * Mask all PII-bearing string fields on a PostgrestError.
  * Returns a NEW object (does not mutate the input).
  */

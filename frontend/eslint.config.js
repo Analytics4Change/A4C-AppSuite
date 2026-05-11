@@ -148,11 +148,14 @@ export default [
     },
   },
 
-  // SDK boundary — these are the two files that legitimately call .schema('api').rpc(...).
-  // The helpers exposed here are the only sanctioned way for the rest of the codebase
-  // to invoke api.* RPCs (no-restricted-syntax above forbids the pattern elsewhere).
+  // SDK boundary — this is the only file that legitimately calls .schema('api').rpc(...).
+  // The helpers exposed here (apiRpc, apiRpcEnvelope) are the only sanctioned way for
+  // the rest of the codebase to invoke api.* RPCs; no-restricted-syntax above forbids
+  // the pattern everywhere else. `envelope.ts` was previously listed defensively but
+  // operates only on PostgrestSingleResponse objects (does not call .schema().rpc()
+  // itself), so it doesn't trigger the rule — F5 PR #58 review removed the dead entry.
   {
-    files: ['src/services/auth/supabase.service.ts', 'src/services/api/envelope.ts'],
+    files: ['src/services/auth/supabase.service.ts'],
     rules: {
       'no-restricted-syntax': 'off',
     },

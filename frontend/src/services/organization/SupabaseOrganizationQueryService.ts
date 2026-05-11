@@ -242,9 +242,19 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
         return null;
       }
 
-      log.info('Fetched organization details', { orgId, name: env.organization?.name });
+      // Runtime guard for the envelope-contract invariant: api.get_organization_details
+      // returns `organization` on every success (verified against the RPC body). The
+      // inline generic types `organization?` as optional only because the M3 codegen
+      // emits `Partial`-like shapes for envelope success-path fields. If this guard
+      // ever fires, the RPC contract has drifted — fail closed.
+      if (!env.organization) {
+        log.warn('Organization details envelope missing organization field', { orgId });
+        return null;
+      }
+
+      log.info('Fetched organization details', { orgId, name: env.organization.name });
       return {
-        organization: env.organization as OrganizationDetails['organization'],
+        organization: env.organization,
         contacts: env.contacts ?? [],
         addresses: env.addresses ?? [],
         phones: env.phones ?? [],
