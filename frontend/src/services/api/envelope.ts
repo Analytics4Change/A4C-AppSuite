@@ -1,5 +1,8 @@
 import type { PostgrestError, PostgrestSingleResponse } from '@supabase/supabase-js';
 import { maskPii } from '@/utils/maskPii';
+import { Logger } from '@/utils/logger';
+
+const log = Logger.getLogger('api');
 
 /**
  * Typed boundary for `api.*` RPC envelopes (Pattern A v2).
@@ -111,6 +114,13 @@ export function throwIfPostgrestError(
   verb: string
 ): void {
   if (!env.success && env.postgrestError) {
+    // Service-boundary observability for PostgREST 4xx/5xx (auth, RLS, schema).
+    // Restored from the pre-promotion in-helper log on
+    // SupabaseClientFieldService — at the SDK boundary so all current and
+    // future callers (PR-C `SupabaseClientService` + any later migrations)
+    // get the signal automatically without per-caller boilerplate.
+    // Architect-approved 2026-05-11 (PR #57 re-review consultation).
+    log.error(`Failed to ${verb}`, { error: env.error });
     throw new Error(`Failed to ${verb}: ${env.error}`);
   }
 }
