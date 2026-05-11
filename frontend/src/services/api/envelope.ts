@@ -30,6 +30,13 @@ export interface EnvelopeErrorDetails {
   message: string;
   context?: Record<string, unknown>;
   correlationId?: string;
+  /**
+   * Optional count emitted by RPCs that return blocking-dependency errors
+   * (e.g. `delete_role` with `HAS_USERS` returns `count: 5` so the UI can
+   * say "Cannot delete: 5 users assigned"). Consumed by OrganizationUnits
+   * manage page (cannot-delete dialog) and Role service error mapper.
+   */
+  count?: number;
 }
 
 /**
@@ -143,6 +150,7 @@ export function unwrapApiEnvelope<T extends Record<string, unknown> = Record<str
         message: maskPii(data.errorDetails.message),
         context: data.errorDetails.context,
         correlationId: data.errorDetails.correlationId,
+        count: data.errorDetails.count,
       };
     }
     if (data.violations !== undefined) {
