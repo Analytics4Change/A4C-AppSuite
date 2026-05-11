@@ -343,7 +343,11 @@ export const UsersManagePage: React.FC = observer(() => {
       if (!formViewModel) return;
 
       const commandService = getUserCommandService();
-      const result = await formViewModel.submit(commandService);
+      // Pass the page VM as the second arg so that role-modification failures
+      // (violations / partial) populate `viewModel.lastRoleViolations` and
+      // `viewModel.lastRolePartialFailure` for the rich UsersErrorBanner.
+      // See UserFormViewModel.submit's JSDoc for the funnel-through rationale.
+      const result = await formViewModel.submit(commandService, viewModel);
 
       if (result.success) {
         log.info('Form submitted successfully', { mode: panelMode });
