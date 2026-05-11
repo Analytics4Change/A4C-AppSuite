@@ -27,7 +27,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v21-frontend-index-space-fix';
+const DEPLOY_VERSION = 'v23-asyncapi-roles-emit';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -707,33 +707,62 @@ serve(async (req) => {
     // This populates user_roles_projection via process_user_event() trigger
     // ==========================================================================
 
-    // Get roles from new format (roles array) or legacy format (single role string)
+    // Roles to assign on acceptance. The legacy singular `role` fallback was
+    // removed 2026-05-08 along with the deprecated invitations_projection.role
+    // column (migration 20260508170054). Empty array is a legitimate state
+    // ("permissions assigned later" — the invite-user contract supports this).
+    //
+    // RoleRef.role_name is intentionally `string | null` to align with the upstream
+    // type surface (InvitationDetails.roles[].role_name, validate-invitation's
+    // InvitationRoleRef, MockInvitationData). Both fields nullable means a
+    // malformed entry can carry no identifying info; we guard for that explicitly
+    // below.
     interface RoleRef {
       role_id: string | null;
-      role_name: string;
+      role_name: string | null;
     }
-    const roles: RoleRef[] = invitation.roles?.length > 0
-      ? invitation.roles
-      : invitation.role
-        ? [{ role_id: null, role_name: invitation.role }]
-        : [];
+    const roles: RoleRef[] = Array.isArray(invitation.roles) ? invitation.roles : [];
 
     console.log(`[accept-invitation v${DEPLOY_VERSION}] Processing ${roles.length} role(s) from invitation`);
+
+    // Track resolved roles for the AsyncAPI-required `roles` field on the
+    // invitation.accepted emit below. Each entry MUST have a non-null role_id
+    // (RoleAssignment schema requires it). `role_name` is optional in the schema
+    // and is OMITTED rather than emitted as null when missing - the schema's
+    // `role_name: type: string` does not declare nullable, so absent-when-null
+    // is the correct conformance shape.
+    const resolvedRoles: Array<{ role_id: string; role_name?: string }> = [];
 
     for (const role of roles) {
       const roleName = role.role_name;
       let roleId = role.role_id;
 
+      // Malformed entry: no identifying info. Fail noisily rather than passing
+      // NULL to api.get_role_by_name (which would silently return zero rows and
+      // surface as a confusing role_lookup_failed for "null"). Aligns the actual
+      // failure mode with what an operator can act on.
+      if (!roleId && !roleName) {
+        console.error(`[accept-invitation v${DEPLOY_VERSION}] Malformed role entry on invitation ${invitation.id}: both role_id and role_name are null`);
+        return new Response(
+          JSON.stringify({
+            error: 'malformed_role_entry',
+            message: 'Invitation contains a role entry with no role_id and no role_name. Contact administrator.',
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // CRITICAL: role_id is NOT NULL in user_roles_projection
       // Must resolve role_id if not provided
       if (!roleId) {
+        // roleName is non-null here (the malformed-entry guard above ensures it).
         console.log(`[accept-invitation v${DEPLOY_VERSION}] Looking up role_id for role_name: ${roleName}, org: ${invitation.organization_id}`);
 
         // Use RPC function in api schema (follows CQRS pattern)
         const { data: roleResults, error: lookupError } = await supabase
           .rpc('get_role_by_name', {
             p_org_id: invitation.organization_id,
-            p_role_name: roleName
+            p_role_name: roleName as string,
           });
 
         const roleData = roleResults?.[0];
@@ -753,6 +782,17 @@ serve(async (req) => {
         roleId = roleData.id;
         console.log(`[accept-invitation v${DEPLOY_VERSION}] Resolved role "${roleName}" to id: ${roleId}`);
       }
+
+      // Track for the invitation.accepted event_data emit below.
+      // roleId is non-null here (either pre-supplied or just resolved above).
+      // role_name is omitted when null per the AsyncAPI RoleAssignment schema.
+      const resolvedEntry: { role_id: string; role_name?: string } = {
+        role_id: roleId as string,
+      };
+      if (roleName !== null) {
+        resolvedEntry.role_name = roleName;
+      }
+      resolvedRoles.push(resolvedEntry);
 
       // Emit user.role.assigned event
       const { data: roleEventId, error: roleError } = await supabase
@@ -925,7 +965,13 @@ serve(async (req) => {
       console.log(`[accept-invitation v${DEPLOY_VERSION}] ✓ Notification preferences set for user ${userId}, event_id=${prefsEventId}`);
     }
 
-    // Emit invitation.accepted event per AsyncAPI contract
+    // Emit invitation.accepted event per AsyncAPI contract.
+    // Required fields per infrastructure/supabase/contracts/asyncapi/domains/invitation.yaml
+    // InvitationAcceptedData: invitation_id, org_id, user_id, email, roles, accepted_at.
+    // The `roles` snapshot uses RESOLVED role_ids (the AsyncAPI RoleAssignment schema
+    // requires a non-null role_id; we resolve any null IDs above via api.get_role_by_name).
+    // The deprecated singular `role` field is no longer emitted - not in the schema.
+    // Updated 2026-05-08 alongside the invitations_projection.role column drop.
     const { data: _acceptedEventId, error: acceptedEventError } = await supabase
       .rpc('emit_domain_event', {
         p_stream_id: invitation.id,
@@ -936,7 +982,7 @@ serve(async (req) => {
           org_id: invitation.organization_id,
           user_id: userId,
           email: invitation.email,
-          role: invitation.role,
+          roles: resolvedRoles,
           accepted_at: new Date().toISOString(),
         },
         p_event_metadata: buildEventMetadata(tracingContext, 'invitation.accepted', req, {

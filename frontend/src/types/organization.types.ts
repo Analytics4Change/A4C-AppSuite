@@ -266,11 +266,18 @@ export interface DraftSummary {
 }
 
 /**
- * Invitation details returned from token validation
+ * Invitation details returned from token validation.
+ *
+ * `roles` mirrors the JSONB array on `invitations_projection.roles`. Each
+ * entry can have `role_name: null` for invitations created without a role
+ * (the "permissions assigned later" path supported by `invite-user`). An
+ * empty array means no role was specified at invitation time. The deprecated
+ * singular `role` column was dropped 2026-05-08 (migration
+ * 20260508170054_drop_invitations_deprecated_role_column).
  */
 export interface InvitationDetails {
   orgName: string;
-  role: string;
+  roles: Array<{ role_id: string | null; role_name: string | null }>;
   inviterName: string;
   expiresAt: Date;
   email?: string; // Pre-fill email if available

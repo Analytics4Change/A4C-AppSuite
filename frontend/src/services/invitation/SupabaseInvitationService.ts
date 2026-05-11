@@ -80,18 +80,18 @@ export class SupabaseInvitationService implements IInvitationService {
         throw new Error(errorWithRef);
       }
 
-      if (!data?.orgName || !data?.role) {
+      if (!data?.orgName || !Array.isArray(data?.roles)) {
         throw new Error('Invalid invitation response');
       }
 
       log.info('Invitation validated', {
         orgName: data.orgName,
-        role: data.role,
+        roleCount: data.roles.length,
       });
 
       return {
         orgName: data.orgName,
-        role: data.role,
+        roles: data.roles,
         inviterName: data.inviterName,
         expiresAt: new Date(data.expiresAt),
         email: data.email,

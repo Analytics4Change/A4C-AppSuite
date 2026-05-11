@@ -21,16 +21,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   InvitationAcceptanceViewModel,
-  type AuthMethodSelection
+  type AuthMethodSelection,
 } from '@/viewModels/organization/InvitationAcceptanceViewModel';
 import { getAuthProvider } from '@/services/auth/AuthProviderFactory';
-import {
-  Building,
-  Mail,
-  AlertCircle,
-  CheckCircle,
-  Loader2
-} from 'lucide-react';
+import { Building, Mail, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('component');
@@ -105,7 +99,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
 
     if (result?.redirectUrl) {
       log.info('Invitation accepted, redirecting', {
-        redirectUrl: result.redirectUrl
+        redirectUrl: result.redirectUrl,
       });
       handleRedirect(result.redirectUrl);
     }
@@ -140,13 +134,11 @@ export const AcceptInvitationPage: React.FC = observer(() => {
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           border: '1px solid rgba(255, 255, 255, 0.3)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
         }}
       >
         <CardHeader>
-          <CardTitle className="text-2xl text-center">
-            Accept Organization Invitation
-          </CardTitle>
+          <CardTitle className="text-2xl text-center">Accept Organization Invitation</CardTitle>
         </CardHeader>
 
         <CardContent>
@@ -164,16 +156,14 @@ export const AcceptInvitationPage: React.FC = observer(() => {
               className="p-4 rounded-lg mb-6"
               style={{
                 background: 'rgba(254, 242, 242, 0.9)',
-                border: '1px solid rgba(239, 68, 68, 0.3)'
+                border: '1px solid rgba(239, 68, 68, 0.3)',
               }}
             >
               <div className="flex items-center gap-3">
                 <AlertCircle className="text-red-500" size={24} />
                 <div>
                   <h4 className="font-semibold text-red-900">Invalid Invitation</h4>
-                  <p className="text-red-700 text-sm">
-                    {viewModel.validationError}
-                  </p>
+                  <p className="text-red-700 text-sm">{viewModel.validationError}</p>
                 </div>
               </div>
             </div>
@@ -187,7 +177,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
                 className="p-4 rounded-lg mb-6"
                 style={{
                   background: 'rgba(239, 246, 255, 0.9)',
-                  border: '1px solid rgba(59, 130, 246, 0.2)'
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
                 }}
               >
                 <div className="flex items-center gap-3">
@@ -195,7 +185,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
                     className="p-2 rounded-full"
                     style={{
                       background: 'rgba(59, 130, 246, 0.2)',
-                      border: '1px solid rgba(59, 130, 246, 0.3)'
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
                     }}
                   >
                     <Building className="text-blue-600" size={24} />
@@ -204,9 +194,15 @@ export const AcceptInvitationPage: React.FC = observer(() => {
                     <h3 className="font-semibold text-gray-900">
                       {viewModel.invitationDetails.orgName}
                     </h3>
-                    <p className="text-sm text-gray-600">
-                      Role: {viewModel.invitationDetails.role}
-                    </p>
+                    {viewModel.invitationDetails.roles.length > 0 && (
+                      <p className="text-sm text-gray-600">
+                        {viewModel.invitationDetails.roles.length === 1 ? 'Role' : 'Roles'}:{' '}
+                        {viewModel.invitationDetails.roles
+                          .map((r) => r.role_name)
+                          .filter(Boolean)
+                          .join(', ')}
+                      </p>
+                    )}
                     {viewModel.invitationDetails.inviterName && (
                       <p className="text-xs text-gray-500">
                         Invited by: {viewModel.invitationDetails.inviterName}
@@ -242,12 +238,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <svg
-                      className="mx-auto mb-2"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                    >
+                    <svg className="mx-auto mb-2" width="24" height="24" viewBox="0 0 24 24">
                       <path
                         fill="#4285F4"
                         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -288,9 +279,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
                       className={viewModel.emailError ? 'border-red-500' : ''}
                     />
                     {viewModel.emailError && (
-                      <p className="text-sm text-red-500">
-                        {viewModel.emailError}
-                      </p>
+                      <p className="text-sm text-red-500">{viewModel.emailError}</p>
                     )}
                   </div>
 
@@ -308,9 +297,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
                       className={viewModel.passwordError ? 'border-red-500' : ''}
                     />
                     {viewModel.passwordError && (
-                      <p className="text-sm text-red-500">
-                        {viewModel.passwordError}
-                      </p>
+                      <p className="text-sm text-red-500">{viewModel.passwordError}</p>
                     )}
                   </div>
 
@@ -325,14 +312,10 @@ export const AcceptInvitationPage: React.FC = observer(() => {
                       value={viewModel.confirmPassword}
                       onChange={(e) => viewModel.setConfirmPassword(e.target.value)}
                       placeholder="Confirm your password"
-                      className={
-                        viewModel.confirmPasswordError ? 'border-red-500' : ''
-                      }
+                      className={viewModel.confirmPasswordError ? 'border-red-500' : ''}
                     />
                     {viewModel.confirmPasswordError && (
-                      <p className="text-sm text-red-500">
-                        {viewModel.confirmPasswordError}
-                      </p>
+                      <p className="text-sm text-red-500">{viewModel.confirmPasswordError}</p>
                     )}
                   </div>
 
@@ -375,9 +358,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
                       className={viewModel.emailError ? 'border-red-500' : ''}
                     />
                     {viewModel.emailError && (
-                      <p className="text-sm text-red-500">
-                        {viewModel.emailError}
-                      </p>
+                      <p className="text-sm text-red-500">{viewModel.emailError}</p>
                     )}
                     <p className="text-xs text-gray-500">
                       Use the email associated with your Google account
@@ -416,12 +397,10 @@ export const AcceptInvitationPage: React.FC = observer(() => {
                   className="mt-4 p-3 rounded-lg"
                   style={{
                     background: 'rgba(254, 242, 242, 0.9)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)'
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
                   }}
                 >
-                  <p className="text-sm text-red-700">
-                    {viewModel.acceptanceError}
-                  </p>
+                  <p className="text-sm text-red-700">{viewModel.acceptanceError}</p>
                 </div>
               )}
             </div>

@@ -10,7 +10,7 @@ BEGIN
 
   INSERT INTO invitations_projection (
     invitation_id, organization_id, email, first_name, last_name,
-    role, roles, token, expires_at, status,
+    roles, token, expires_at, status,
     access_start_date, access_expiration_date, notification_preferences,
     phones, correlation_id, tags, created_at, updated_at
   ) VALUES (
@@ -19,7 +19,6 @@ BEGIN
     safe_jsonb_extract_text(p_event.event_data, 'email'),
     safe_jsonb_extract_text(p_event.event_data, 'first_name'),
     safe_jsonb_extract_text(p_event.event_data, 'last_name'),
-    safe_jsonb_extract_text(p_event.event_data, 'role'),
     COALESCE(p_event.event_data->'roles', '[]'::jsonb),
     safe_jsonb_extract_text(p_event.event_data, 'token'),
     safe_jsonb_extract_timestamp(p_event.event_data, 'expires_at'),
