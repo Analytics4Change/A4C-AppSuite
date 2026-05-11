@@ -121,14 +121,43 @@ export default [
       'no-var': 'error',
       'no-undef': 'error', // This should be handled by globals now
 
-      // FUTURE — deferred to follow-up card:
-      //   dev/active/migrate-services-to-api-rpc-envelope/
-      // A no-restricted-syntax rule will forbid direct .schema('api').rpc(...) outside
-      // src/services/auth/supabase.service.ts and src/services/api/envelope.ts. Lands
-      // together with the codemod that migrates the 8 legacy services to
-      // apiRpcEnvelope<T>. Repo-wide --max-warnings 0 means the rule can't ship until
-      // existing call sites are migrated. See also the PII handling section in
-      // documentation/architecture/decisions/adr-rpc-readback-pattern.md.
+      // Bans direct .schema(*).rpc(...) calls outside the SDK helpers. The selector
+      // matches any schema argument, not just 'api' — there are no .schema('public').rpc(...)
+      // calls in the repo today; if that changes, broaden the override list below.
+      //
+      // Activated 2026-05-11 (PR-C closeout) after migrating all 11 services to
+      // supabaseService.apiRpc<T> / apiRpcEnvelope<T>. The repo-wide --max-warnings 0
+      // policy means new direct callers will fail the lint gate.
+      // See documentation/architecture/decisions/adr-rpc-readback-pattern.md
+      // §"PII handling" + dev/active/migrate-services-to-api-rpc-envelope/.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.type='MemberExpression'][callee.property.name='rpc']" +
+            "[callee.object.type='CallExpression'][callee.object.callee.type='MemberExpression']" +
+            "[callee.object.callee.property.name='schema']",
+          message:
+            "Direct .schema('api').rpc(...) calls bypass PII masking. Use " +
+            "supabaseService.apiRpcEnvelope<T>(...) for envelope-shape writes or " +
+            "supabaseService.apiRpc<T>(...) for read-shape RPCs. The two SDK-boundary " +
+            'helpers are allow-listed at src/services/auth/supabase.service.ts and ' +
+            'src/services/api/envelope.ts.',
+        },
+      ],
+    },
+  },
+
+  // SDK boundary — this is the only file that legitimately calls .schema('api').rpc(...).
+  // The helpers exposed here (apiRpc, apiRpcEnvelope) are the only sanctioned way for
+  // the rest of the codebase to invoke api.* RPCs; no-restricted-syntax above forbids
+  // the pattern everywhere else. `envelope.ts` was previously listed defensively but
+  // operates only on PostgrestSingleResponse objects (does not call .schema().rpc()
+  // itself), so it doesn't trigger the rule — F5 PR #58 review removed the dead entry.
+  {
+    files: ['src/services/auth/supabase.service.ts'],
+    rules: {
+      'no-restricted-syntax': 'off',
     },
   },
 

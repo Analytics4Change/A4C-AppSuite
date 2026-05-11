@@ -11,7 +11,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { PostgrestSingleResponse } from '@supabase/supabase-js';
 import type { ApiEnvelope } from '../envelope';
-import { unwrapApiEnvelope, throwIfPostgrestError } from '../envelope';
+import { unwrapApiEnvelope, throwIfPostgrestError, logIfPostgrestError } from '../envelope';
 
 // Stub maskPii to be identity so tests assert on shape, not masking behavior.
 vi.mock('@/utils/maskPii', () => ({
@@ -250,5 +250,46 @@ describe('throwIfPostgrestError', () => {
         error: 'permission denied',
       });
     });
+  });
+});
+
+describe('logIfPostgrestError (F1 — return-contract companion)', () => {
+  beforeEach(() => {
+    mockLogError.mockReset();
+  });
+
+  it('emits log.error on PostgREST-shape failure and does NOT throw', () => {
+    const env: ApiEnvelope<Record<string, unknown>> = {
+      success: false,
+      error: 'permission denied',
+      postgrestError: { code: '42501', message: 'permission denied', details: '', hint: '' },
+    };
+
+    expect(() => logIfPostgrestError(env, 'register client')).not.toThrow();
+    expect(mockLogError).toHaveBeenCalledTimes(1);
+    expect(mockLogError).toHaveBeenCalledWith('Failed to register client', {
+      error: 'permission denied',
+    });
+  });
+
+  it('does NOT log on handler-driven envelope failure', () => {
+    const env: ApiEnvelope<Record<string, unknown>> = {
+      success: false,
+      error: 'Duplicate client',
+      errorDetails: { code: 'DUPLICATE', message: 'm' },
+    };
+
+    expect(() => logIfPostgrestError(env, 'register client')).not.toThrow();
+    expect(mockLogError).not.toHaveBeenCalled();
+  });
+
+  it('does NOT log on success envelope', () => {
+    const env: ApiEnvelope<{ client_id: string }> = {
+      success: true,
+      client_id: 'c1',
+    };
+
+    expect(() => logIfPostgrestError(env, 'register client')).not.toThrow();
+    expect(mockLogError).not.toHaveBeenCalled();
   });
 });

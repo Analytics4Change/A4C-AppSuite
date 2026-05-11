@@ -8,7 +8,7 @@
  * - Regular users: See only their own organization
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
 import type {
   Organization,
@@ -82,9 +82,7 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
     try {
       log.debug('Fetching organizations with filters', { filters });
 
-      // Use API schema RPC function instead of direct table query
-      // This matches the established pattern for Temporal workflow activities
-      const { data, error } = await supabase.schema('api').rpc('get_organizations', {
+      const { data, error } = await supabaseService.apiRpc<OrganizationRow[]>('get_organizations', {
         p_type: filters?.type && filters.type !== 'all' ? filters.type : null,
         p_is_active:
           filters?.status && filters.status !== 'all' ? filters.status === 'active' : null,
@@ -102,7 +100,7 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
       }
 
       log.info(`Fetched ${data.length} organizations`, { filters });
-      return data.map((row: OrganizationRow) => this.mapRowToOrganization(row));
+      return data.map((row) => this.mapRowToOrganization(row));
     } catch (error) {
       log.error('Error in getOrganizations', { error, filters });
       throw error;
@@ -113,10 +111,10 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
     try {
       log.debug('Fetching organization by ID', { orgId });
 
-      // Use API schema RPC function instead of direct table query
-      const { data, error } = await supabase.schema('api').rpc('get_organization_by_id', {
-        p_org_id: orgId,
-      });
+      const { data, error } = await supabaseService.apiRpc<OrganizationRow[]>(
+        'get_organization_by_id',
+        { p_org_id: orgId }
+      );
 
       if (error) {
         log.error('Failed to fetch organization by ID', { error, orgId });
@@ -141,10 +139,10 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
     try {
       log.debug('Fetching child organizations', { parentOrgId });
 
-      // Use API schema RPC function instead of direct table query
-      const { data, error } = await supabase.schema('api').rpc('get_child_organizations', {
-        p_parent_org_id: parentOrgId,
-      });
+      const { data, error } = await supabaseService.apiRpc<OrganizationRow[]>(
+        'get_child_organizations',
+        { p_parent_org_id: parentOrgId }
+      );
 
       if (error) {
         log.error('Failed to fetch child organizations', { error, parentOrgId });
@@ -157,7 +155,7 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
       }
 
       log.info(`Fetched ${data.length} child organizations`, { parentOrgId });
-      return data.map((row: OrganizationRow) => this.mapRowToOrganization(row));
+      return data.map((row) => this.mapRowToOrganization(row));
     } catch (error) {
       log.error('Error in getChildOrganizations', { error, parentOrgId });
       throw error;
@@ -173,17 +171,19 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
 
       log.debug('Fetching paginated organizations', { options });
 
-      // Use API schema RPC function for paginated query
-      const { data, error } = await supabase.schema('api').rpc('get_organizations_paginated', {
-        p_type: options?.type && options.type !== 'all' ? options.type : null,
-        p_is_active:
-          options?.status && options.status !== 'all' ? options.status === 'active' : null,
-        p_search_term: options?.searchTerm || null,
-        p_page: page,
-        p_page_size: pageSize,
-        p_sort_by: options?.sortBy || 'name',
-        p_sort_order: options?.sortOrder || 'asc',
-      });
+      const { data, error } = await supabaseService.apiRpc<OrganizationPaginatedRow[]>(
+        'get_organizations_paginated',
+        {
+          p_type: options?.type && options.type !== 'all' ? options.type : null,
+          p_is_active:
+            options?.status && options.status !== 'all' ? options.status === 'active' : null,
+          p_search_term: options?.searchTerm || null,
+          p_page: page,
+          p_page_size: pageSize,
+          p_sort_by: options?.sortBy || 'name',
+          p_sort_order: options?.sortOrder || 'asc',
+        }
+      );
 
       if (error) {
         log.error('Failed to fetch paginated organizations', { error, options });
@@ -202,13 +202,13 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
       }
 
       // Extract total_count from first row (all rows have same value via window function)
-      const totalCount = (data[0] as OrganizationPaginatedRow).total_count;
+      const totalCount = data[0].total_count;
       const totalPages = Math.ceil(totalCount / pageSize);
 
       log.info(`Fetched page ${page} of ${totalPages} (${totalCount} total)`, { options });
 
       return {
-        data: data.map((row: OrganizationPaginatedRow) => this.mapRowToOrganization(row)),
+        data: data.map((row) => this.mapRowToOrganization(row)),
         totalCount,
         page,
         pageSize,
@@ -220,30 +220,44 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
     }
   }
 
+  /**
+   * `get_organization_details` is envelope-shape per the M3 registry: returns
+   * `{success, organization, contacts, addresses, phones}` on success and
+   * `{success: false, error}` on handler-driven failure. PR-A inventory had this
+   * misclassified as read-shape; corrected during PR-C implementation 2026-05-11.
+   */
   async getOrganizationDetails(orgId: string): Promise<OrganizationDetails | null> {
     try {
       log.debug('Fetching organization details', { orgId });
 
-      const { data: result, error } = await supabase
-        .schema('api')
-        .rpc('get_organization_details', { p_org_id: orgId });
+      const env = await supabaseService.apiRpcEnvelope<{
+        organization?: OrganizationDetails['organization'];
+        contacts?: OrganizationDetails['contacts'];
+        addresses?: OrganizationDetails['addresses'];
+        phones?: OrganizationDetails['phones'];
+      }>('get_organization_details', { p_org_id: orgId });
 
-      if (error) {
-        log.error('Failed to fetch organization details', { error, orgId });
-        throw new Error(`Failed to fetch organization details: ${error.message}`);
-      }
-
-      if (!result?.success) {
-        log.debug('Organization details not found', { orgId, error: result?.error });
+      if (!env.success) {
+        log.debug('Organization details not found', { orgId, error: env.error });
         return null;
       }
 
-      log.info('Fetched organization details', { orgId, name: result.organization?.name });
+      // Runtime guard for the envelope-contract invariant: api.get_organization_details
+      // returns `organization` on every success (verified against the RPC body). The
+      // inline generic types `organization?` as optional only because the M3 codegen
+      // emits `Partial`-like shapes for envelope success-path fields. If this guard
+      // ever fires, the RPC contract has drifted — fail closed.
+      if (!env.organization) {
+        log.warn('Organization details envelope missing organization field', { orgId });
+        return null;
+      }
+
+      log.info('Fetched organization details', { orgId, name: env.organization.name });
       return {
-        organization: result.organization,
-        contacts: result.contacts ?? [],
-        addresses: result.addresses ?? [],
-        phones: result.phones ?? [],
+        organization: env.organization,
+        contacts: env.contacts ?? [],
+        addresses: env.addresses ?? [],
+        phones: env.phones ?? [],
       };
     } catch (error) {
       log.error('Error in getOrganizationDetails', { error, orgId });
