@@ -191,9 +191,61 @@ return data ?? [];
 
 `apiRpc<T>` only masks the wrapper error (`PostgrestError`), NOT the `data` payload. Mutating `data.error` inside a generic `apiRpc<T>` would silently change the caller's typed `T` — a contract break. `apiRpcEnvelope<T>` exists specifically to mask the envelope's `data.error` field via `unwrapApiEnvelope<T>` and return a typed `ApiEnvelope<T>`.
 
-### Direct `.schema('api').rpc(...)` (legacy)
+### Companion helpers — `throwIfPostgrestError` and `logIfPostgrestError`
 
-Some services still call `supabase.schema('api').rpc(...)` directly. These bypass masking and are slated for migration to `apiRpcEnvelope<T>` in a follow-up card. New code MUST use one of the two helpers above; an ESLint rule will land alongside the bulk migration to enforce this.
+PII masking happens at the SDK boundary; **observability does too**. Two named exports from `@/services/api/envelope.ts` close the observability surface so services don't reinvent the per-method `if (env.postgrestError) log.error(...)` boilerplate:
+
+| Helper | When to use | Behavior on `env.postgrestError` |
+|---|---|---|
+| `throwIfPostgrestError(env, verb)` | Service method's pre-migration contract was to **throw** on PostgREST 4xx/5xx (e.g. `listClients`, `getClient`, Schedule's `parseOrThrow` methods) | Logs `Failed to <verb>` at error level **AND** throws `Error('Failed to <verb>: <env.error>')` |
+| `logIfPostgrestError(env, verb)` | Service method's pre-migration contract was to **return** `{success: false, error}` on PostgREST 4xx/5xx (e.g. ClientService lifecycle methods register/update/admit/discharge) | Logs `Failed to <verb>` at error level; does NOT throw — caller continues with `return { success: false, error: env.error }` |
+
+Both helpers no-op on success envelopes and on handler-driven envelope failures (where `env.postgrestError` is undefined). Handler-driven failures are expected business-logic outcomes; surfacing them as error-level logs would generate noise.
+
+```typescript
+// Throw contract (queries that historically threw on RPC failure)
+const env = await supabaseService.apiRpcEnvelope<{ data?: Client[] }>('list_clients', { ... });
+throwIfPostgrestError(env, 'list clients');
+if (!env.success) throw new Error(env.error ?? 'Failed to list clients');
+return env.data ?? [];
+
+// Return contract (mutations that historically returned the failure envelope)
+const env = await supabaseService.apiRpcEnvelope<Omit<ClientUpdateResult, 'success'>>(
+  'register_client', { ... }
+);
+if (!env.success) {
+  logIfPostgrestError(env, 'register client');
+  return { success: false, error: env.error };
+}
+return env as ClientUpdateResult;
+```
+
+### Inline generic idiom — `Omit<NamedResult, 'success'>`
+
+Always prefer the named result type from the relevant `*.types.ts` file over an inline anonymous generic. Use the `Omit<NamedResult, 'success'>` shape so the success-path intersection produces a value structurally compatible with the named type:
+
+```typescript
+// ❌ DON'T: inline anonymous mirror of the named type
+const env = await supabaseService.apiRpcEnvelope<{ phone_id?: string; phone?: ClientPhone }>(
+  'add_client_phone', { ... }
+);
+return { success: true, phone_id: env.phone_id, phone: env.phone };
+
+// ✅ DO: named type via Omit, uniform return
+const env = await supabaseService.apiRpcEnvelope<Omit<ClientPhoneResult, 'success'>>(
+  'add_client_phone', { ... }
+);
+if (!env.success) return { success: false, error: env.error };
+return env as ClientPhoneResult;
+```
+
+Benefits: single source of truth for what the RPC returns; catches accidental shape drift via `tsc`; satisfies the "No Anonymous Types" architecture-checklist item. The `as NamedResult` cast on the success path is safe because `ApiEnvelopeSuccess<Omit<NamedResult, 'success'>>` = `{success: true} & Omit<NamedResult, 'success'>` ≡ `NamedResult` (with `success: true` strictly narrower than `success: boolean`).
+
+For void results (`ClientVoidResult` and friends — only `{success, error?}`), no generic argument is needed — `apiRpcEnvelope(...)` defaults to `Record<string, never>` and the success-path return is just `{ success: true }`.
+
+### Direct `.schema('api').rpc(...)` is blocked
+
+The ESLint `no-restricted-syntax` rule at `frontend/eslint.config.js` blocks direct `.schema(*).rpc(...)` calls outside the SDK boundary. The only allow-listed file is `src/services/auth/supabase.service.ts` (which implements the two helpers). New direct callers fail the lint gate under `--max-warnings 0`. PR-A/B/C of the `migrate-services-to-api-rpc-envelope` card (2026-05-11) completed the bulk migration that made activation possible.
 
 ### Type-narrowed helper signatures (M3 registry)
 
