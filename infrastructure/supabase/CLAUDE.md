@@ -298,6 +298,42 @@ handlers/
 - [adr-rpc-readback-pattern.md](../../documentation/architecture/decisions/adr-rpc-readback-pattern.md) for the full contract decision (response shape, audit-trail-preservation rationale, telemetry convention, and the inventory of 18 RPCs that follow this pattern).
 - [event-handler-pattern.md](../../documentation/infrastructure/patterns/event-handler-pattern.md) for the complete implementation guide.
 
+> **⚠️ Edge Function clients with `db: { schema: 'api' }` MUST pin `.schema('public')` on every cross-schema `.from()`**
+>
+> Service-role clients in Edge Functions are typically constructed with
+> `db: { schema: 'api' }` for RPC ergonomics (e.g., `supabaseAdmin` in
+> `manage-user/index.ts`, `supabase` in `accept-invitation/index.ts`). This
+> changes the default for **both** `.rpc()` AND `.from()` — but projection
+> tables and `domain_events` live in `public`. Any naked `.from(<public-table>)`
+> resolves as `api.<public-table>` and surfaces as:
+>
+>     Could not find the table 'api.<name>' in the schema cache
+>
+> Required form for every cross-schema read in an Edge Function:
+>
+> ```typescript
+> const result = await client
+>   .schema('public')   // ← required — every .from() needs its own
+>   .from('users')
+>   .select('id')
+>   .eq('id', userId)
+>   .maybeSingle();
+> ```
+>
+> The bug class manifests at runtime (no compile-time signal), so the regression
+> guard is the test invariant: every helper that does cross-schema reads MUST
+> have a `.from()`-spy test that asserts every `.from()` is preceded by
+> `.schema('public')`. Reference patterns:
+> - `infrastructure/supabase/supabase/functions/_shared/rpc-readback.ts` (helper)
+> - `infrastructure/supabase/supabase/functions/manage-user/__tests__/deactivate-readback.test.ts` Test 9 (invariant)
+> - `infrastructure/supabase/supabase/functions/accept-invitation/__tests__/existing-user-check-schema.test.ts` Test 5 (invariant)
+>
+> History: introduced by PR #61 hotfix (2026-05-12) after two consecutive bug
+> incidents — the helper's first deployment surfaced `api.users` schema-cache
+> miss in UAT, and the `accept-invitation` audit found a pre-existing silent
+> instance that was re-emitting `user.created` on every existing-user
+> OAuth/SSO accept.
+
 ## CQRS Query Rule
 
 > **⚠️ CRITICAL: All frontend queries MUST use `api.` schema RPC functions.**

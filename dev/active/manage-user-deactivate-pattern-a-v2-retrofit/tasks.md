@@ -52,6 +52,14 @@
 
 - [ ] Seed `manage-user-reactivate-pattern-a-v2-retrofit/` card after this PR merges. Will reuse `_shared/rpc-readback.ts` with `expectedState: { is_active: true }`.
 
+---
+
+## Process discipline (template — apply to any Edge Function / _shared/ helper card)
+
+Per the 2026-05-12 PR #60→#61 hotfix lesson (MEMORY.md "Pre-deploy ritual gap — config-dependent SDK behavior"), for tasks that touch Edge Functions or `_shared/` helpers:
+
+- [x] **Deploy to dev + smoke against real Supabase + paste log evidence into this card BEFORE opening PR.** Smoke artifact validates SDK-boundary config (schema, RLS, GRANT, db.headers, auth) that local unit tests cannot. _Status for THIS card_: this discipline was first formalized DURING this card's hotfix cycle — the deactivate retrofit shipped without it, surfaced the schema-mismatch defect at UAT Test 1, and the template line is now codified here as the precedent for all future Edge Function cards. Reactivate retrofit (next card) must satisfy this BEFORE opening its PR.
+
 ## Cross-references
 
 - Plan file: `~/.claude/plans/ddoes-it-make-sense-lucky-dongarra.md`

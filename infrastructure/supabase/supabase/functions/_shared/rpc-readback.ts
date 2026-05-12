@@ -13,6 +13,23 @@
  *    handler-update-then-throw window AND the case where the projection
  *    looked updated for an unrelated reason.
  *
+ * # Schema-pinning invariant
+ *
+ * Edge Function service-role clients (e.g. `supabaseAdmin` in `manage-user/index.ts`)
+ * are typically constructed with `db: { schema: 'api' }` for RPC ergonomics.
+ * Projection tables and `domain_events` live in **`public`**, so every `.from()`
+ * call inside this helper MUST be preceded by `.schema('public')`. Pre-fix
+ * (2026-05-12 hotfix, PR #61), the helper called `client.from(...)` directly
+ * and PostgREST resolved every query as `api.<table>`:
+ *
+ *     Could not find the table 'api.users' in the schema cache
+ *
+ * The helper's regression test (Test 9 in `manage-user/__tests__/`) enforces
+ * the `.from()`-spy invariant: every `.from()` MUST have a preceding
+ * `.schema('public')` call. The architect PR #58 + PR #61 review codified
+ * this as the chokepoint pattern for any future Pattern A v2 Edge Function
+ * adopter (e.g. the reactivate retrofit, which lifts this helper unchanged).
+ *
  * # Transactional model — SQL RPC vs Edge Function
  *
  * In the SQL precedent (`api.delete_user`, `api.update_role`, etc.) the
@@ -45,17 +62,8 @@
  * - First adopter: `manage-user.deactivate` (this PR)
  */
 
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { maskPii } from './maskPii.ts';
-
-/**
- * Loose type alias matching the AnySchemaSupabaseClient pattern used elsewhere
- * in `_shared` and the frontend SDK boundary. Required because `supabaseAdmin`
- * is configured with the default 'public' schema but reads from `api` and
- * other tables.
- */
-// deno-lint-ignore no-explicit-any
-type AnyClient = SupabaseClient<any, any, any>;
+import type { AnySchemaSupabaseClient } from './types.ts';
 
 export type ProjectionReadbackResult<T> =
   | { success: true; row: T }
@@ -93,7 +101,7 @@ export type ProjectionReadbackResult<T> =
  * responsible for it.
  */
 export async function checkProjectionReadback<T>(
-  client: AnyClient,
+  client: AnySchemaSupabaseClient,
   eventId: string,
   table: string,
   lookupKey: string,
@@ -104,7 +112,18 @@ export async function checkProjectionReadback<T>(
   // If NOT FOUND: query `processing_error` on the captured event_id and
   // surface the masked failure reason. Surface query errors verbatim
   // (RLS denials, missing GRANTs would be silent-failure modes if swallowed).
-  let readBackQuery = client.from(table).select('*').eq(lookupKey, lookupValue);
+  //
+  // Schema note: Edge Function service-role clients (e.g. `supabaseAdmin` in
+  // `manage-user/index.ts`) are typically constructed with `db: { schema: 'api' }`
+  // for RPC ergonomics. Projection tables and `domain_events` live in `public`,
+  // so the read-back must explicitly target the public schema via
+  // `.schema('public')`. Returned bug from first deployment 2026-05-12:
+  // "Could not find the table 'api.users' in the schema cache".
+  let readBackQuery = client
+    .schema('public')
+    .from(table)
+    .select('*')
+    .eq(lookupKey, lookupValue);
   for (const [column, value] of Object.entries(expectedState)) {
     readBackQuery = readBackQuery.eq(column, value);
   }
@@ -118,6 +137,7 @@ export async function checkProjectionReadback<T>(
 
   if (!readBackResult.data) {
     const procErrorResult = await client
+      .schema('public')
       .from('domain_events')
       .select('processing_error')
       .eq('id', eventId)
@@ -139,6 +159,7 @@ export async function checkProjectionReadback<T>(
   // when the read-back looks fine. Catches the partial-update-then-throw
   // window where the handler successfully wrote some state before raising.
   const procErrorResult = await client
+    .schema('public')
     .from('domain_events')
     .select('processing_error')
     .eq('id', eventId)

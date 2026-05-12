@@ -48,27 +48,61 @@ interface MockClientConfig {
    * `domain_events.id = EVENT_ID` — both share the column name `id`.
    */
   onEq?: (table: string, column: string, value: unknown) => void;
+  /**
+   * Callback invoked on every `.schema(name)` call. Used in conjunction with
+   * `onFrom` to enforce the schema-pinning invariant: every `.from()` call
+   * MUST be preceded by `.schema('public')`. Regression guard for the
+   * 2026-05-12 hotfix.
+   */
+  onSchema?: (schema: string) => void;
+  /**
+   * Callback invoked on every `.from(table)` call with the table name and the
+   * most-recent `.schema()` value (or `null` if no `.schema()` preceded it).
+   * Architectural invariant: in this helper, `currentSchema` MUST be
+   * `'public'` at every `.from()` call site — `null` or any other value
+   * means a schema-pinning regression. The architect's PR #61 review F2
+   * explicitly preferred this `.from()`-spy invariant over count-based
+   * assertions because it catches ANY future violation regardless of how
+   * the helper's query count changes.
+   */
+  onFrom?: (table: string, currentSchema: string | null) => void;
 }
 
 function makeMockClient(config: MockClientConfig) {
   const onEq = config.onEq ?? (() => {});
+  const onSchema = config.onSchema ?? (() => {});
+  const onFrom = config.onFrom ?? (() => {});
+
+  const fromImpl = (table: string, currentSchema: string | null) => {
+    onFrom(table, currentSchema);
+    const fixture = config.tables[table] ?? { data: null, error: null };
+    const chain = {
+      select(_columns: string) {
+        return chain;
+      },
+      eq(column: string, value: unknown) {
+        onEq(table, column, value);
+        return chain;
+      },
+      async maybeSingle() {
+        return { data: fixture.data, error: fixture.error ?? null };
+      },
+    };
+    return chain;
+  };
+
+  const schemaImpl = (schema: string) => {
+    onSchema(schema);
+    // Returning a fresh `{from}` scope: after this `.schema(...)`, the next
+    // `.from(table)` will see `schema` in `currentSchema`. If a caller skips
+    // `.schema()` and goes straight to `client.from(...)`, currentSchema is
+    // null — which the schema-pinning test invariant treats as a regression.
+    return { from: (table: string) => fromImpl(table, schema) };
+  };
+
   return {
-    from(table: string) {
-      const fixture = config.tables[table] ?? { data: null, error: null };
-      const chain = {
-        select(_columns: string) {
-          return chain;
-        },
-        eq(column: string, value: unknown) {
-          onEq(table, column, value);
-          return chain;
-        },
-        async maybeSingle() {
-          return { data: fixture.data, error: fixture.error ?? null };
-        },
-      };
-      return chain;
-    },
+    schema: schemaImpl,
+    from: (table: string) => fromImpl(table, null),
     // deno-lint-ignore no-explicit-any
   } as any;
 }
@@ -289,6 +323,54 @@ Deno.test('7. Helper does NOT swallow projection-table query errors', async () =
       `expected read-back query failure, got: ${result.error}`,
     );
   }
+});
+
+Deno.test('9. Schema-pinning invariant: every .from() preceded by .schema("public") (PR #61 F2)', async () => {
+  // Architect PR #61 F2: upgraded from a count-based `>= 2` check to the
+  // `.from()`-spy invariant. Architectural invariant: ANY `.from()` call in
+  // this helper without a preceding `.schema('public')` is a regression,
+  // regardless of how many queries the helper makes. Catches any future
+  // refactor that drops the `.schema('public')` chain on a new code path.
+  //
+  // The Edge Function's service-role client is constructed with
+  // `db: { schema: 'api' }` for RPC ergonomics. Before the hotfix the helper
+  // called `client.from(table)` directly, which resolved as `api.<table>` —
+  // but `users` and `domain_events` live in `public`, so PostgREST returned
+  // "Could not find the table 'api.users' in the schema cache".
+  const fromCallLog: Array<{ table: string; schema: string | null }> = [];
+
+  const client = makeMockClient({
+    tables: {
+      users: { data: { id: USER_ID, is_active: false } },
+      domain_events: { data: { processing_error: null } },
+    },
+    onFrom: (table, currentSchema) => {
+      fromCallLog.push({ table, schema: currentSchema });
+    },
+  });
+
+  await checkProjectionReadback(client, EVENT_ID, 'users', 'id', USER_ID, {
+    is_active: false,
+  });
+
+  // Invariant: every .from() call MUST have been preceded by .schema('public').
+  // null = bare client.from(), any other value = wrong schema. Both fail.
+  for (const call of fromCallLog) {
+    assertEquals(
+      call.schema,
+      'public',
+      `.from('${call.table}') called without preceding .schema('public') — schema-pinning regression`,
+    );
+  }
+
+  // Belt: at least 2 queries (projection read-back + race-safe processing_error).
+  // Architectural floor; helpers may add more chains in the future and that's fine
+  // as long as each one continues to be schema-pinned (asserted above).
+  assertEquals(
+    fromCallLog.length >= 2,
+    true,
+    `helper must call .from() at least twice; got ${fromCallLog.length}`,
+  );
 });
 
 Deno.test('8. PII masking on processing_error string (architect Q6)', async () => {

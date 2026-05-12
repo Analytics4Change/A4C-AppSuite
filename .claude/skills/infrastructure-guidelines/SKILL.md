@@ -445,6 +445,62 @@ $comment$Update user profile (first_name, last_name) via domain event
 
 ---
 
+## 19. Edge Function Schema-Pinning for Cross-Schema Reads
+
+Service-role clients in Edge Functions are typically constructed with `db: { schema: 'api' }` for RPC ergonomics. That config changes the default for **both** `.rpc()` AND `.from()`. Projection tables and `domain_events` live in `public`, so any naked `.from(<public-table>)` on such a client resolves as `api.<public-table>` and surfaces a PostgREST schema-cache miss at runtime:
+
+```
+Could not find the table 'api.<name>' in the schema cache
+```
+
+**Required form** — every cross-schema `.from()` in an Edge Function MUST be preceded by `.schema('<owning-schema>')`:
+
+```typescript
+// ❌ WRONG: bare .from() inherits the client's `db.schema='api'` override
+const result = await supabaseAdmin.from('users').select('id').eq('id', userId).maybeSingle();
+
+// ✅ CORRECT: explicit schema pin per call site
+const result = await supabaseAdmin
+  .schema('public')
+  .from('users')
+  .select('id')
+  .eq('id', userId)
+  .maybeSingle();
+```
+
+**The bug class is non-obvious**: no compile-time signal, no static-analysis catch in the SDK chain, manifests only at runtime against a real PostgREST instance. Local Deno unit tests with hand-rolled mocks miss it by construction unless the mock models `.schema()`.
+
+**Regression-test invariant** — every helper that does cross-schema reads MUST have a `.from()`-spy test that asserts every `.from(table)` was preceded by `.schema('public')`:
+
+```typescript
+// In the test mock:
+const fromCallLog: Array<{table: string; schema: string | null}> = [];
+const client = makeMockClient({
+  onSchema: (s) => { /* set currentSchema */ },
+  onFrom: (table, currentSchema) => fromCallLog.push({ table, schema: currentSchema }),
+  // ...
+});
+
+// In the test:
+for (const call of fromCallLog) {
+  assertEquals(call.schema, 'public',
+    `.from('${call.table}') called without preceding .schema('public') — schema-pinning regression`);
+}
+```
+
+**Canonical files** (read for the pattern):
+- `infrastructure/supabase/supabase/functions/_shared/rpc-readback.ts` — boundary helper with schema-pinning + `# Schema-pinning invariant` docblock section
+- `infrastructure/supabase/supabase/functions/manage-user/__tests__/deactivate-readback.test.ts` Test 9 — `.from()`-spy invariant
+- `infrastructure/supabase/supabase/functions/accept-invitation/__tests__/existing-user-check-schema.test.ts` Test 5 — same invariant on a different helper
+
+**History**: PR #61 hotfix (2026-05-12) after two consecutive bug incidents in the same PR cycle — the helper's first deployment surfaced `api.users` schema-cache miss in UAT, and a same-PR audit found a pre-existing silent instance in `accept-invitation` that was re-emitting `user.created` on every existing-user OAuth/SSO accept.
+
+**Bounded scope**: this rule applies ONLY to Edge Functions that mix `db: { schema: 'api' }` with direct `.from()` calls on non-`api` tables. Pure-RPC Edge Functions are unaffected (RPC calls don't care about the from-schema). Audited 2026-05-12: only `manage-user` (via the helper) and `accept-invitation` (via `checkExistingUserPath`) match the pattern; `invite-user`, `organization-bootstrap`, `organization-delete`, `workflow-status`, `validate-invitation` are pure-RPC and clean.
+
+**See**: `infrastructure/supabase/CLAUDE.md` § Critical Rules (mirror with the same rule body and inline ts code block).
+
+---
+
 ## File Locations
 
 | What | Where |
