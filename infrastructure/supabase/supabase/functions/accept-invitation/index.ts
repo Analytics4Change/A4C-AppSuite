@@ -139,6 +139,74 @@ export interface CreatedInvitationPhone {
  *   delivery (in workflows/) is responsible for skipping or escalating
  *   based on phone capability.
  */
+/**
+ * Result of the existing-user-path check used in the OAuth/SSO accept-invitation
+ * flow ("Sally scenario" — user with a role in Org A accepts invite to Org B,
+ * should NOT receive a fresh `user.created` event).
+ */
+export interface ExistingUserPathResult {
+  /** True if the user already has at least one role assignment in any org. */
+  isExistingUser: boolean;
+  /** True if the user's public.users row is soft-deleted (tombstoned). */
+  isDeleted: boolean;
+  /** Non-null if the roles-projection query itself failed (RLS, GRANT, etc.). */
+  rolesCheckError: unknown;
+}
+
+/**
+ * Check whether a user is "existing" (has at least one role assignment in
+ * any organization) versus new. Soft-deleted users are treated as NEW so
+ * that re-invited deleted users get the full `user.created` flow.
+ *
+ * # Schema-pinning invariant
+ *
+ * The caller's `supabase` client may be constructed with `db: { schema: 'api' }`
+ * for RPC ergonomics (this Edge Function is one such — see L320-322). Both
+ * `users` and `user_roles_projection` live in the **public** schema, so this
+ * helper MUST explicitly call `.schema('public')` on every `.from()`. Pre-fix
+ * (2026-05-12 hotfix), the queries silently resolved to `api.users` and
+ * `api.user_roles_projection` (missing tables), the rolesCheckError catch in
+ * the caller swallowed the failure, and `isExistingUser` always returned
+ * `false` — causing every existing-user OAuth/SSO invitation accept to
+ * re-emit `user.created`. See `_shared/rpc-readback.ts` for the canonical
+ * schema-pinning pattern.
+ */
+// deno-lint-ignore no-explicit-any
+export async function checkExistingUserPath(
+  // deno-lint-ignore no-explicit-any
+  client: any,
+  userId: string,
+): Promise<ExistingUserPathResult> {
+  const { data: userRow } = await client
+    .schema('public')
+    .from('users')
+    .select('deleted_at')
+    .eq('id', userId)
+    .maybeSingle();
+
+  const isDeleted = !!userRow?.deleted_at;
+
+  let existingRoles: Array<{ id: string }> | null = null;
+  let rolesCheckError: unknown = null;
+
+  if (!isDeleted) {
+    const result = await client
+      .schema('public')
+      .from('user_roles_projection')
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1);
+    existingRoles = result.data;
+    rolesCheckError = result.error;
+  }
+
+  return {
+    isExistingUser: !isDeleted && !!existingRoles && existingRoles.length > 0,
+    isDeleted,
+    rolesCheckError,
+  };
+}
+
 export function resolveInvitationPhonePlaceholder(
   rawPhoneId: string | null | undefined,
   createdPhoneIds: CreatedInvitationPhone[],
@@ -508,37 +576,21 @@ serve(async (req) => {
       // Check if user is new or existing (has roles in ANY organization - "Sally scenario")
       // Sally: user with role in Org A accepts invite to Org B → skip user.created
       //
-      // Soft-deleted users are treated as NEW for this check — a deleted user
-      // being re-invited should receive the full user.created flow, since the
-      // prior public.users row is tombstoned and logically orphaned role rows
-      // should not short-circuit the onboarding path.
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('deleted_at')
-        .eq('id', userId)
-        .maybeSingle();
-
-      const isDeleted = !!userRow?.deleted_at;
-
-      let existingRoles: Array<{ id: string }> | null = null;
-      let rolesCheckError: unknown = null;
-
-      if (!isDeleted) {
-        const result = await supabase
-          .from('user_roles_projection')
-          .select('id')
-          .eq('user_id', userId)
-          .limit(1);
-        existingRoles = result.data;
-        rolesCheckError = result.error;
-      }
-
-      if (rolesCheckError) {
-        console.warn(`[accept-invitation v${DEPLOY_VERSION}] Failed to check existing roles:`, rolesCheckError);
+      // Extracted to `checkExistingUserPath` (below) so the schema-pinning
+      // invariant can be regression-tested in isolation. Pre-extraction, both
+      // queries resolved as `api.users` / `api.user_roles_projection` (missing
+      // tables) and the rolesCheckError catch silently swallowed the failure,
+      // causing every existing-user OAuth/SSO invitation accept to re-emit
+      // `user.created`. Hotfixed 2026-05-12 (PR #61).
+      const existingUserCheck = await checkExistingUserPath(supabase, userId);
+      if (existingUserCheck.rolesCheckError) {
+        console.warn(
+          `[accept-invitation v${DEPLOY_VERSION}] Failed to check existing roles:`,
+          existingUserCheck.rolesCheckError,
+        );
         // Continue - we'll emit user.created to be safe (idempotent via projections)
       }
-
-      const isExistingUser = !isDeleted && !!existingRoles && existingRoles.length > 0;
+      const isExistingUser = existingUserCheck.isExistingUser;
 
       // Only emit user.created for NEW users (Sally scenario: skip for existing)
       if (!isExistingUser) {
