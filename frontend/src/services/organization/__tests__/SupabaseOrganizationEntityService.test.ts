@@ -8,12 +8,24 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockApiRpcEnvelope } = vi.hoisted(() => ({
+const { mockApiRpcEnvelope, mockLogError } = vi.hoisted(() => ({
   mockApiRpcEnvelope: vi.fn(),
+  mockLogError: vi.fn(),
 }));
 
 vi.mock('@/services/auth/supabase.service', () => ({
   supabaseService: { apiRpcEnvelope: mockApiRpcEnvelope },
+}));
+
+vi.mock('@/utils/logger', () => ({
+  Logger: {
+    getLogger: () => ({
+      error: mockLogError,
+      warn: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+    }),
+  },
 }));
 
 import { SupabaseOrganizationEntityService } from '../SupabaseOrganizationEntityService';
@@ -23,6 +35,7 @@ describe('SupabaseOrganizationEntityService', () => {
 
   beforeEach(() => {
     mockApiRpcEnvelope.mockReset();
+    mockLogError.mockReset();
     service = new SupabaseOrganizationEntityService();
   });
 
@@ -87,6 +100,60 @@ describe('SupabaseOrganizationEntityService', () => {
 
       expect(result.success).toBe(true);
       expect(result.phone).toEqual(phone);
+    });
+  });
+
+  describe('logIfPostgrestError integration (PR-D backfill — verb from rpcName)', () => {
+    it('derives verb from rpcName via snake→space transform on PostgREST failure', async () => {
+      mockApiRpcEnvelope.mockResolvedValueOnce({
+        success: false,
+        error: 'permission denied',
+        postgrestError: { code: '42501', message: 'permission denied', details: '', hint: '' },
+      });
+
+      await service.createContact('org-1', {} as never);
+
+      // Verb is derived from rpcName ('create_organization_contact' → 'create organization contact')
+      // per the Q2 architect-revised plan: no caller changes, single-line transform inside wrapper.
+      expect(mockLogError).toHaveBeenCalledWith('Failed to create organization contact', {
+        error: 'permission denied',
+      });
+    });
+
+    it('uses correct verb for each of the 9 entity RPCs', async () => {
+      const cases: Array<[() => Promise<unknown>, string]> = [
+        [() => service.createContact('o', {} as never), 'create organization contact'],
+        [() => service.updateContact('c', {} as never), 'update organization contact'],
+        [() => service.deleteContact('c'), 'delete organization contact'],
+        [() => service.createAddress('o', {} as never), 'create organization address'],
+        [() => service.updateAddress('a', {} as never), 'update organization address'],
+        [() => service.deleteAddress('a'), 'delete organization address'],
+        [() => service.createPhone('o', {} as never), 'create organization phone'],
+        [() => service.updatePhone('p', {} as never), 'update organization phone'],
+        [() => service.deletePhone('p'), 'delete organization phone'],
+      ];
+
+      for (const [call, expectedVerb] of cases) {
+        mockLogError.mockReset();
+        mockApiRpcEnvelope.mockResolvedValueOnce({
+          success: false,
+          error: 'boom',
+          postgrestError: { code: '500', message: 'boom', details: '', hint: '' },
+        });
+        await call();
+        expect(mockLogError).toHaveBeenCalledWith(`Failed to ${expectedVerb}`, { error: 'boom' });
+      }
+    });
+
+    it('does NOT emit log.error on handler-driven envelope failure', async () => {
+      mockApiRpcEnvelope.mockResolvedValueOnce({
+        success: false,
+        error: 'Duplicate contact',
+      });
+
+      await service.createContact('o', {} as never);
+
+      expect(mockLogError).not.toHaveBeenCalled();
     });
   });
 

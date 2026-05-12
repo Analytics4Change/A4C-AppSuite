@@ -10,13 +10,25 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockApiRpcEnvelope, mockApiRpc } = vi.hoisted(() => ({
+const { mockApiRpcEnvelope, mockApiRpc, mockLogError } = vi.hoisted(() => ({
   mockApiRpcEnvelope: vi.fn(),
   mockApiRpc: vi.fn(),
+  mockLogError: vi.fn(),
 }));
 
 vi.mock('@/services/auth/supabase.service', () => ({
   supabaseService: { apiRpcEnvelope: mockApiRpcEnvelope, apiRpc: mockApiRpc },
+}));
+
+vi.mock('@/utils/logger', () => ({
+  Logger: {
+    getLogger: () => ({
+      error: mockLogError,
+      warn: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+    }),
+  },
 }));
 
 import { SupabaseRoleService } from '../SupabaseRoleService';
@@ -27,7 +39,52 @@ describe('SupabaseRoleService', () => {
   beforeEach(() => {
     mockApiRpcEnvelope.mockReset();
     mockApiRpc.mockReset();
+    mockLogError.mockReset();
     service = new SupabaseRoleService();
+  });
+
+  // ---------------------------------------------------------------------------
+  // PR-D observability backfill — logIfPostgrestError on return-contract methods
+  // ---------------------------------------------------------------------------
+
+  describe('logIfPostgrestError integration (PR-D backfill)', () => {
+    it('updateRole emits log.error on PostgREST failure with verb-prefixed message', async () => {
+      mockApiRpcEnvelope.mockResolvedValueOnce({
+        success: false,
+        error: 'permission denied',
+        postgrestError: { code: '42501', message: 'permission denied', details: '', hint: '' },
+      });
+
+      await service.updateRole({ id: 'r1', name: 'r' } as never);
+
+      expect(mockLogError).toHaveBeenCalledWith('Failed to update role', {
+        error: 'permission denied',
+      });
+    });
+
+    it('deleteRole emits log.error with the right verb', async () => {
+      mockApiRpcEnvelope.mockResolvedValueOnce({
+        success: false,
+        error: 'db timeout',
+        postgrestError: { code: '500', message: 'db timeout', details: '', hint: '' },
+      });
+
+      await service.deleteRole('r1');
+
+      expect(mockLogError).toHaveBeenCalledWith('Failed to delete role', { error: 'db timeout' });
+    });
+
+    it('does NOT emit log.error on handler-driven failure (HAS_USERS envelope)', async () => {
+      mockApiRpcEnvelope.mockResolvedValueOnce({
+        success: false,
+        error: 'Cannot delete',
+        errorDetails: { code: 'HAS_USERS', count: 5, message: 'm' },
+      });
+
+      await service.deleteRole('r1');
+
+      expect(mockLogError).not.toHaveBeenCalled();
+    });
   });
 
   describe('deleteRole — count round-trip (NT-2b regression guard)', () => {

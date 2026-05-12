@@ -10,6 +10,7 @@
  */
 
 import { supabaseService } from '@/services/auth/supabase.service';
+import { logIfPostgrestError } from '@/services/api/envelope';
 import { Logger } from '@/utils/logger';
 import type {
   OrganizationDetailRecord,
@@ -35,6 +36,7 @@ export class SupabaseOrganizationCommandService implements IOrganizationCommandS
       }>('update_organization', { p_org_id: orgId, p_data: data, p_reason: reason ?? null });
 
       if (!env.success) {
+        logIfPostgrestError(env, 'update organization');
         log.warn('update_organization returned failure', { error: env.error, orgId });
         return { success: false, error: env.error };
       }
@@ -59,6 +61,7 @@ export class SupabaseOrganizationCommandService implements IOrganizationCommandS
       }>('deactivate_organization', { p_org_id: orgId, p_reason: reason ?? null });
 
       if (!env.success) {
+        logIfPostgrestError(env, 'deactivate organization');
         log.warn('deactivate_organization returned failure', { error: env.error, orgId });
         return { success: false, error: env.error };
       }
@@ -80,6 +83,7 @@ export class SupabaseOrganizationCommandService implements IOrganizationCommandS
       }>('reactivate_organization', { p_org_id: orgId });
 
       if (!env.success) {
+        logIfPostgrestError(env, 'reactivate organization');
         log.warn('reactivate_organization returned failure', { error: env.error, orgId });
         return { success: false, error: env.error };
       }
@@ -101,6 +105,7 @@ export class SupabaseOrganizationCommandService implements IOrganizationCommandS
       }>('delete_organization', { p_org_id: orgId, p_reason: reason ?? null });
 
       if (!env.success) {
+        logIfPostgrestError(env, 'delete organization');
         log.warn('delete_organization returned failure', { error: env.error, orgId });
         return { success: false, error: env.error };
       }
