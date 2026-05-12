@@ -104,7 +104,18 @@ export async function checkProjectionReadback<T>(
   // If NOT FOUND: query `processing_error` on the captured event_id and
   // surface the masked failure reason. Surface query errors verbatim
   // (RLS denials, missing GRANTs would be silent-failure modes if swallowed).
-  let readBackQuery = client.from(table).select('*').eq(lookupKey, lookupValue);
+  //
+  // Schema note: Edge Function service-role clients (e.g. `supabaseAdmin` in
+  // `manage-user/index.ts`) are typically constructed with `db: { schema: 'api' }`
+  // for RPC ergonomics. Projection tables and `domain_events` live in `public`,
+  // so the read-back must explicitly target the public schema via
+  // `.schema('public')`. Returned bug from first deployment 2026-05-12:
+  // "Could not find the table 'api.users' in the schema cache".
+  let readBackQuery = client
+    .schema('public')
+    .from(table)
+    .select('*')
+    .eq(lookupKey, lookupValue);
   for (const [column, value] of Object.entries(expectedState)) {
     readBackQuery = readBackQuery.eq(column, value);
   }
@@ -118,6 +129,7 @@ export async function checkProjectionReadback<T>(
 
   if (!readBackResult.data) {
     const procErrorResult = await client
+      .schema('public')
       .from('domain_events')
       .select('processing_error')
       .eq('id', eventId)
@@ -139,6 +151,7 @@ export async function checkProjectionReadback<T>(
   // when the read-back looks fine. Catches the partial-update-then-throw
   // window where the handler successfully wrote some state before raising.
   const procErrorResult = await client
+    .schema('public')
     .from('domain_events')
     .select('processing_error')
     .eq('id', eventId)

@@ -42,7 +42,7 @@ import { buildEventMetadata } from '../_shared/emit-event.ts';
 import { checkProjectionReadback } from '../_shared/rpc-readback.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v16-deactivate-pattern-a-v2-readback';
+const DEPLOY_VERSION = 'v16-1-readback-schema-fix';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;

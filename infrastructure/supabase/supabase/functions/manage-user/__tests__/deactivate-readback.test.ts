@@ -48,27 +48,43 @@ interface MockClientConfig {
    * `domain_events.id = EVENT_ID` — both share the column name `id`.
    */
   onEq?: (table: string, column: string, value: unknown) => void;
+  /**
+   * Callback invoked on every `.schema(name)` call. Regression guard for the
+   * 2026-05-12 hotfix where the helper called `client.from('users')` directly
+   * — `users` lives in `public`, but the Edge Function's `supabaseAdmin` is
+   * configured with `schema: 'api'` for RPC ergonomics, so PostgREST resolved
+   * the query as `api.users` (missing). Fix: explicit `.schema('public')` on
+   * every projection / domain_events query.
+   */
+  onSchema?: (schema: string) => void;
 }
 
 function makeMockClient(config: MockClientConfig) {
   const onEq = config.onEq ?? (() => {});
+  const onSchema = config.onSchema ?? (() => {});
+  const fromImpl = (table: string) => {
+    const fixture = config.tables[table] ?? { data: null, error: null };
+    const chain = {
+      select(_columns: string) {
+        return chain;
+      },
+      eq(column: string, value: unknown) {
+        onEq(table, column, value);
+        return chain;
+      },
+      async maybeSingle() {
+        return { data: fixture.data, error: fixture.error ?? null };
+      },
+    };
+    return chain;
+  };
+  const schemaImpl = (schema: string) => {
+    onSchema(schema);
+    return { from: fromImpl };
+  };
   return {
-    from(table: string) {
-      const fixture = config.tables[table] ?? { data: null, error: null };
-      const chain = {
-        select(_columns: string) {
-          return chain;
-        },
-        eq(column: string, value: unknown) {
-          onEq(table, column, value);
-          return chain;
-        },
-        async maybeSingle() {
-          return { data: fixture.data, error: fixture.error ?? null };
-        },
-      };
-      return chain;
-    },
+    schema: schemaImpl,
+    from: fromImpl,
     // deno-lint-ignore no-explicit-any
   } as any;
 }
@@ -289,6 +305,43 @@ Deno.test('7. Helper does NOT swallow projection-table query errors', async () =
       `expected read-back query failure, got: ${result.error}`,
     );
   }
+});
+
+Deno.test('9. Schema regression guard: queries explicitly target public schema (2026-05-12 hotfix)', async () => {
+  // The Edge Function's service-role client is constructed with `db: { schema: 'api' }`
+  // for RPC ergonomics. Before the hotfix the helper called `client.from(table)`
+  // directly, which resolved as `api.<table>` — but `users` and `domain_events`
+  // live in `public`, so PostgREST returned "Could not find the table 'api.users'
+  // in the schema cache". The fix is explicit `.schema('public')` on every
+  // projection / domain_events query. This test fails if a future refactor
+  // drops the `.schema('public')` calls.
+  const schemaCalls: string[] = [];
+  const client = makeMockClient({
+    tables: {
+      users: { data: { id: USER_ID, is_active: false } },
+      domain_events: { data: { processing_error: null } },
+    },
+    onSchema: (schema) => {
+      schemaCalls.push(schema);
+    },
+  });
+
+  await checkProjectionReadback(client, EVENT_ID, 'users', 'id', USER_ID, {
+    is_active: false,
+  });
+
+  // Happy path issues exactly two queries (projection read-back + race-safe
+  // processing_error check). Both must explicitly route through public schema.
+  assertEquals(
+    schemaCalls.every((s) => s === 'public'),
+    true,
+    `every .schema() call must target 'public'; got: ${JSON.stringify(schemaCalls)}`,
+  );
+  assertEquals(
+    schemaCalls.length >= 2,
+    true,
+    'helper must call .schema() at least twice (read-back + processing_error check)',
+  );
 });
 
 Deno.test('8. PII masking on processing_error string (architect Q6)', async () => {
