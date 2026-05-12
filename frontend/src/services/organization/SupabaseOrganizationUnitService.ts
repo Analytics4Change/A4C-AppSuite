@@ -24,7 +24,7 @@
  */
 
 import { supabaseService } from '@/services/auth/supabase.service';
-import type { EnvelopeErrorDetails } from '@/services/api/envelope';
+import { logIfPostgrestError, type EnvelopeErrorDetails } from '@/services/api/envelope';
 import { Logger } from '@/utils/logger';
 import type { IOrganizationUnitService } from './IOrganizationUnitService';
 import type {
@@ -279,6 +279,7 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
       );
 
       if (!env.success) {
+        logIfPostgrestError(env, 'create organization unit');
         log.warn('Create unit failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
@@ -341,6 +342,7 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
       );
 
       if (!env.success) {
+        logIfPostgrestError(env, 'update organization unit');
         log.warn('Update unit failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
@@ -396,6 +398,7 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
       );
 
       if (!env.success) {
+        logIfPostgrestError(env, 'deactivate organization unit');
         log.warn('Deactivate unit failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
@@ -450,6 +453,7 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
       );
 
       if (!env.success) {
+        logIfPostgrestError(env, 'reactivate organization unit');
         log.warn('Reactivate unit failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
@@ -507,6 +511,7 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
       }>('delete_organization_unit', { p_unit_id: unitId });
 
       if (!env.success) {
+        logIfPostgrestError(env, 'delete organization unit');
         log.warn('Delete unit failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,

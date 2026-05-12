@@ -6,6 +6,7 @@
  */
 
 import { supabaseService } from '@/services/auth/supabase.service';
+import { logIfPostgrestError } from '@/services/api/envelope';
 import { Logger } from '@/utils/logger';
 import type { EnvelopeRpcs } from '@/services/api/rpc-registry.generated';
 import type {
@@ -122,6 +123,10 @@ export class SupabaseOrganizationEntityService implements IOrganizationEntitySer
       );
 
       if (!env.success) {
+        // Verb derived from rpcName via snake→space (architect-approved Q2 — no
+        // caller changes, no per-method verb drift; rpcName already encodes the
+        // full noun phrase for the 9 entity-CRUD RPCs).
+        logIfPostgrestError(env, rpcName.replace(/_/g, ' '));
         log.warn(`${rpcName} returned failure`, { error: env.error });
         return { success: false, error: env.error };
       }

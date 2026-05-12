@@ -26,7 +26,7 @@
  */
 
 import { supabaseService } from '@/services/auth/supabase.service';
-import type { EnvelopeErrorDetails } from '@/services/api/envelope';
+import { logIfPostgrestError, type EnvelopeErrorDetails } from '@/services/api/envelope';
 import { Logger } from '@/utils/logger';
 import type { IRoleService } from './IRoleService';
 import type {
@@ -468,6 +468,7 @@ export class SupabaseRoleService implements IRoleService {
       });
 
       if (!env.success) {
+        logIfPostgrestError(env, 'update role');
         log.warn('Update role failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
@@ -540,6 +541,7 @@ export class SupabaseRoleService implements IRoleService {
       const env = await supabaseService.apiRpcEnvelope('deactivate_role', { p_role_id: roleId });
 
       if (!env.success) {
+        logIfPostgrestError(env, 'deactivate role');
         log.warn('Deactivate role failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
@@ -573,6 +575,7 @@ export class SupabaseRoleService implements IRoleService {
       const env = await supabaseService.apiRpcEnvelope('reactivate_role', { p_role_id: roleId });
 
       if (!env.success) {
+        logIfPostgrestError(env, 'reactivate role');
         log.warn('Reactivate role failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
@@ -606,6 +609,7 @@ export class SupabaseRoleService implements IRoleService {
       const env = await supabaseService.apiRpcEnvelope('delete_role', { p_role_id: roleId });
 
       if (!env.success) {
+        logIfPostgrestError(env, 'delete role');
         log.warn('Delete role failed', { error: env.error, errorDetails: env.errorDetails });
         return {
           success: false,
