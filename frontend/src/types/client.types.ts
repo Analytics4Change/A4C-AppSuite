@@ -706,6 +706,14 @@ export type ClientProjectionRow = Omit<
 export interface ClientRpcEnvelope {
   success: boolean;
   error?: string;
+  /**
+   * Captured event_id from the underlying `emit_domain_event` call. Additive
+   * on success responses for audit-log deep-linking. Optional — consumers
+   * are not required to surface it. First introduced 2026-05-12 alongside
+   * the `manage-user.deactivate` Pattern A v2 read-back retrofit; available
+   * uniformly on every envelope-returning service call going forward.
+   */
+  eventId?: string;
 }
 
 /** Response for api.register_client / api.update_client / api.admit_client / api.discharge_client */

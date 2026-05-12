@@ -39,9 +39,10 @@ import {
   endSpan,
 } from '../_shared/tracing-context.ts';
 import { buildEventMetadata } from '../_shared/emit-event.ts';
+import { checkProjectionReadback } from '../_shared/rpc-readback.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v15-modify-roles-extracted';
+const DEPLOY_VERSION = 'v16-deactivate-pattern-a-v2-readback';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -68,6 +69,13 @@ interface ManageUserResponse {
   userId?: string;
   operation?: Operation;
   error?: string;
+  /**
+   * Captured event_id from the emit RPC. Additive on success responses for
+   * audit-log deep-linking in the frontend. Optional — consumers are not
+   * required to surface it. First introduced by the deactivate Pattern A v2
+   * retrofit (v16).
+   */
+  eventId?: string;
 }
 
 /**
@@ -344,6 +352,55 @@ serve(async (req) => {
     console.log(`[manage-user v${DEPLOY_VERSION}] Event emitted: ${eventId}`);
 
     // ==========================================================================
+    // PATTERN A v2 READ-BACK (deactivate only — reactivate retrofit in next card)
+    //
+    // Closes the F1-class silent-failure gap where the emit RPC succeeds but
+    // the handler raises mid-update (RLS, schema drift, race condition), the
+    // trigger persists processing_error on the event row WITHOUT rolling back,
+    // and the function would otherwise return {success: true} while
+    // users.is_active stays true.
+    //
+    // The shared helper queries by captured event_id (race-safe against
+    // concurrent emitters on the same stream) and masks processing_error via
+    // _shared/maskPii.ts at the boundary. See _shared/rpc-readback.ts docblock
+    // for the transactional model (wire-tier port is safer than SQL RPC's
+    // intra-transaction read-back, not less safe).
+    //
+    // Scope: deactivate only. The `reactivate` operation is intentionally not
+    // retrofitted here — the architect-recommended next card
+    // `manage-user-reactivate-pattern-a-v2-retrofit/` will reuse this helper
+    // byte-equivalently with `expectedState: { is_active: true }`.
+    // ==========================================================================
+
+    if (requestData.operation === 'deactivate') {
+      const readback = await checkProjectionReadback<{ id: string; is_active: boolean }>(
+        supabaseAdmin,
+        eventId as string,
+        'users',
+        'id',
+        requestData.userId,
+        { is_active: false },
+      );
+
+      if (!readback.success) {
+        console.error(
+          `[manage-user v${DEPLOY_VERSION}] Read-back failed for ${eventType}:`,
+          readback.error,
+        );
+        const errorResponse: ManageUserResponse = {
+          success: false,
+          error: readback.error,
+        };
+        return new Response(JSON.stringify(errorResponse), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log(`[manage-user v${DEPLOY_VERSION}] Read-back verified: is_active=false`);
+    }
+
+    // ==========================================================================
     // UPDATE SUPABASE AUTH BAN STATE (global login prevention)
     // The event processor handles projection updates (is_active, deactivated_at,
     // reactivated_at). Banning at the auth tier is what actually prevents login.
@@ -394,6 +451,7 @@ serve(async (req) => {
       success: true,
       userId: requestData.userId,
       operation: requestData.operation,
+      eventId: eventId as string,
     };
 
     // End span with success status

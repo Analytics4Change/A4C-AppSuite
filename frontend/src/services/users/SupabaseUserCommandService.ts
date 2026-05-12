@@ -348,8 +348,10 @@ export class SupabaseUserCommandService implements IUserCommandService {
         };
       }
 
-      log.info('User deactivated successfully', { userId });
-      return { success: true };
+      log.info('User deactivated successfully', { userId, eventId: data?.eventId });
+      // Surface eventId additively for future audit-log deep-linking. Optional;
+      // ClientRpcEnvelope.eventId is undefined-tolerant.
+      return { success: true, eventId: data?.eventId };
     } catch (error) {
       log.error('Error in deactivateUser', error);
       return {
