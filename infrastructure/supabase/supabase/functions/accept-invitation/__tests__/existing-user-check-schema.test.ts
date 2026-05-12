@@ -53,6 +53,8 @@ interface MockClientConfig {
 
 function makeMockClient(config: MockClientConfig) {
   const onRpc = config.onRpc ?? (() => {});
+  // Track .from() invocations so Test 5 can assert ZERO (Rule 19 invariant).
+  const fromCalls: string[] = [];
 
   return {
     async rpc(name: string, args: unknown) {
@@ -60,6 +62,22 @@ function makeMockClient(config: MockClientConfig) {
       const fixture = config.rpcs[name] ?? { data: null, error: null };
       return { data: fixture.data, error: fixture.error ?? null };
     },
+    // Throw-stub for .from() — the SQL-RPC pivot REMOVED all wire-tier
+    // cross-schema reads from checkExistingUserPath. If a future refactor
+    // re-introduces .from('users') or similar, this stub fires and the
+    // test fails loudly with a Rule-19-aware error message rather than
+    // silently passing because the mock happens to not implement .from.
+    from(table: string) {
+      fromCalls.push(table);
+      throw new Error(
+        `Test invariant violated: checkExistingUserPath called .from('${table}'). ` +
+        `Rule 19 prohibits wire-tier cross-schema reads from Edge Functions — ` +
+        `use an api.* SQL RPC instead. See ` +
+        `.claude/skills/infrastructure-guidelines/SKILL.md Rule 19.`,
+      );
+    },
+    // Expose the spy so Test 5 can assert ZERO .from() calls reached the mock.
+    __fromCalls: fromCalls,
     // deno-lint-ignore no-explicit-any
   } as any;
 }
@@ -147,11 +165,10 @@ Deno.test('5. Helper invokes api.check_user_invitation_existence with p_user_id'
   // (and only that RPC), passing the userId as `p_user_id`. The architectural
   // invariant this test guards: future refactors must not re-introduce naked
   // `.from()` reads against the public schema — those fail at the deployed
-  // PostgREST gateway. If anyone removes the RPC call and goes back to .from(),
-  // this test still passes (false negative). The complement guard is the
-  // explicit absence of `client.from()` on the mock — if a refactor calls
-  // `client.from(...)` the test client will throw `client.from is not a
-  // function` and the test will fail loudly.
+  // PostgREST gateway. The mock's `.from()` is a throw-stub (see
+  // makeMockClient above) — if a refactor calls `client.from(...)`, the stub
+  // throws with a Rule-19-aware error message, the test fails loudly, and
+  // the developer is pointed straight at the architectural rule.
   const rpcCalls: Array<{ name: string; args: unknown }> = [];
   const client = makeMockClient({
     rpcs: {
@@ -169,6 +186,14 @@ Deno.test('5. Helper invokes api.check_user_invitation_existence with p_user_id'
   assertEquals(rpcCalls.length, 1, 'helper must invoke exactly one RPC');
   assertEquals(rpcCalls[0].name, 'check_user_invitation_existence');
   assertEquals(rpcCalls[0].args, { p_user_id: USER_ID });
+  // Rule 19 architectural-invariant guard (F4): the throw-stub on .from()
+  // must NEVER be invoked. If this assertion fails, a regression has
+  // re-introduced wire-tier cross-schema reads.
+  assertEquals(
+    (client as { __fromCalls: string[] }).__fromCalls.length,
+    0,
+    'Rule 19 violation: helper invoked .from(...) which is prohibited',
+  );
 });
 
 Deno.test('6. Malformed RPC response (missing fields) coerces to safe defaults', async () => {

@@ -473,6 +473,26 @@ const { data, error } = await client.rpc('check_user_invitation_existence', {
 });
 ```
 
+**Carve-out**: `db: { schema: 'api' }` clients are still the correct construction for Edge Functions that exclusively call `.rpc()` — Rule 19 only governs `.from()` calls. Two legitimate patterns:
+
+```typescript
+// ✅ FINE: db:{schema:'api'} for pure-RPC ergonomics
+const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false },
+  db: { schema: 'api' },
+});
+await supabaseAdmin.rpc('emit_domain_event', { /* ... */ });  // RPC: fine
+await supabaseAdmin.from('users').select('id');               // ❌ Rule 19 violation
+
+// ✅ ALSO FINE: per-call .schema('api').rpc() on a client without db.schema
+const supabaseUser = createClient(SUPABASE_URL, ANON_KEY, {
+  global: { headers: { Authorization: authHeader } },
+});
+await supabaseUser.schema('api').rpc('deactivate_user', { /* ... */ });  // RPC: fine
+```
+
+The invariant: the wire request must terminate on an `api.*` entry point. The client construction style is incidental.
+
 **Architectural pattern**: this is the same approach `api.delete_user` (PR #40), `api.deactivate_user` (2026-05-12 PR), and other Pattern A v2 SQL RPCs use. RPC body does the projection read + `domain_events.processing_error` lookup atomically — see `documentation/architecture/decisions/adr-rpc-readback-pattern.md`.
 
 **Bug class summary**: PR #60 introduced a wire-tier Pattern A v2 helper (`_shared/rpc-readback.ts`) that did naked `.from()` reads. UAT Test 1 hit the schema-cache miss. PR #61 added `.schema('public')` pinning everywhere. UAT Test 1 (redo) hit the gateway-level "must be one of: api" rejection. Both wire-tier approaches were architecturally infeasible against this PostgREST configuration. The SQL-RPC pivot moves the projection reads where they belong — inside the database — and the helper is now deleted.

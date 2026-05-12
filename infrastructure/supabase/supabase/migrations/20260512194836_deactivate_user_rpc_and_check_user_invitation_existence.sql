@@ -87,6 +87,14 @@ BEGIN
     -- adr-edge-function-vs-sql-rpc.md Rollout 2026-04-27 course correction).
     -- The deactivate operation requires `user.update` per the Edge Function's
     -- pre-pivot permission check.
+    --
+    -- INTENTIONAL DUPLICATION: this guard is also enforced at the Deno tier
+    -- (manage-user/index.ts:218 `hasPermission(effectivePermissions, 'user.update')`).
+    -- The SQL guard is AUTHORITATIVE (it cannot be bypassed by a misconfigured
+    -- Edge Function). The Deno guard is a belt-and-suspenders early-rejection
+    -- that saves a database round-trip on permission failures and produces a
+    -- clearer 403 error path. Do NOT strip the Deno check as "duplicate" —
+    -- both are load-bearing.
     IF NOT public.has_permission('user.update') THEN
         RAISE EXCEPTION 'Permission denied' USING ERRCODE = '42501';
     END IF;
@@ -187,12 +195,26 @@ BEGIN
 END;
 $$;
 
+-- authenticated only: called from manage-user Edge Function which forwards
+-- the caller's JWT (RPC needs request.jwt.claims.org_id + auth.uid()).
 GRANT EXECUTE ON FUNCTION api.deactivate_user(uuid, text) TO authenticated;
 
 COMMENT ON FUNCTION api.deactivate_user(uuid, text) IS
 $$Deactivates a user by emitting user.deactivated; handle_user_deactivated sets
 users.is_active = false. Does NOT modify auth.users; the Edge Function still
 calls auth.admin.updateUserById to install the ban after this RPC succeeds.
+
+Envelope contract (Pattern A v2):
+  success=true  → {success: true, eventId: <uuid>, userId: <uuid>}
+  success=false → {success: false, error: <text>, eventId?: <uuid>}
+
+The eventId field is INCLUDED on success-false envelopes returned by the two
+read-back-miss paths (projection IF NOT FOUND, processing_error captured).
+The Edge Function surfaces env.eventId on failure for audit-log deep-linking
+into the admin /admin/events view. Do NOT normalize this away to match
+api.delete_user's success-false shape — the eventId on failure is a load-bearing
+field, not vestigial. (Tenancy + idempotency success-false envelopes pre-emit
+do NOT carry eventId; no event was written.)
 
 Pivoted from Edge Function tier (PR #60 / PR #61) after the deployed PostgREST's
 api-only schema exposure made wire-tier .from('public.users') queries fail.
@@ -248,6 +270,10 @@ BEGIN
 END;
 $$;
 
+-- authenticated: callable from any user-facing flow that may need the check.
+-- service_role: REQUIRED — accept-invitation Edge Function runs unauthenticated
+-- and uses an admin client (service_role JWT) to invoke this RPC for the
+-- Sally-scenario detection during OAuth/SSO accept.
 GRANT EXECUTE ON FUNCTION api.check_user_invitation_existence(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION api.check_user_invitation_existence(uuid) TO service_role;
 

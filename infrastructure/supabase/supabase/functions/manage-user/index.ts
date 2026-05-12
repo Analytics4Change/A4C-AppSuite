@@ -294,18 +294,17 @@ serve(async (req) => {
     if (requestData.operation === 'deactivate') {
       console.log(`[manage-user v${DEPLOY_VERSION}] Calling api.deactivate_user RPC...`);
 
-      // RPC must use caller's JWT for `auth.uid()` + `org_id` claim + permission
-      // gate. Build a per-call client with the user's auth header instead of the
-      // service-role client above.
-      const supabaseRpcCaller = createClient(env.SUPABASE_URL, resolveAnonKey(req, env), {
-        global: { headers: { Authorization: authHeader } },
-        db: { schema: 'api' },
-      });
-
-      const { data: envelope, error: rpcError } = await supabaseRpcCaller.rpc('deactivate_user', {
-        p_user_id: requestData.userId,
-        p_reason: requestData.reason ?? null,
-      });
+      // Reuse supabaseUser (already JWT-forwarding from L185) — the RPC must
+      // see request.jwt.claims.org_id + auth.uid() + caller's effective
+      // permissions. Pin schema='api' per-call rather than constructing a
+      // third client. (Three clients in one handler was an organic accretion;
+      // the wire-tier helper that needed a separate client is now gone.)
+      const { data: envelope, error: rpcError } = await supabaseUser
+        .schema('api')
+        .rpc('deactivate_user', {
+          p_user_id: requestData.userId,
+          p_reason: requestData.reason ?? null,
+        });
 
       if (rpcError) {
         console.error(`[manage-user v${DEPLOY_VERSION}] deactivate_user RPC error:`, rpcError);

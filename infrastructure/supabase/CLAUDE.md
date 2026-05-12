@@ -321,6 +321,29 @@ handlers/
 > });
 > ```
 >
+> **Carve-out**: `db: { schema: 'api' }` clients are still the correct
+> construction for Edge Functions that exclusively call `.rpc()` — Rule 19
+> only governs `.from()` calls. Two legitimate patterns:
+>
+> ```typescript
+> // ✅ FINE: db:{schema:'api'} for pure-RPC ergonomics
+> const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+>   auth: { autoRefreshToken: false, persistSession: false },
+>   db: { schema: 'api' },
+> });
+> await supabaseAdmin.rpc('emit_domain_event', { /* ... */ });  // RPC: fine
+> await supabaseAdmin.from('users').select('id');               // ❌ Rule 19 violation
+>
+> // ✅ ALSO FINE: per-call .schema('api').rpc() on a client without db.schema
+> const supabaseUser = createClient(SUPABASE_URL, ANON_KEY, {
+>   global: { headers: { Authorization: authHeader } },
+> });
+> await supabaseUser.schema('api').rpc('deactivate_user', { /* ... */ });  // RPC: fine
+> ```
+>
+> The invariant: the wire request must terminate on an `api.*` entry point.
+> The client construction style is incidental.
+>
 > The pattern mirrors `api.delete_user` (PR #40), `api.deactivate_user`
 > (2026-05-12), and the broader Pattern A v2 inventory in
 > `adr-rpc-readback-pattern.md`.
