@@ -706,6 +706,15 @@ export type ClientProjectionRow = Omit<
 export interface ClientRpcEnvelope {
   success: boolean;
   error?: string;
+  /**
+   * Captured event_id from the underlying `emit_domain_event` call. **Reserved
+   * for future use** — no `api.*` client RPC currently emits this field on
+   * its success envelope. Added 2026-05-12 alongside `UserRpcEnvelope.eventId`
+   * for cross-service uniformity; will be populated as individual client
+   * write RPCs adopt the audit-deep-linking pattern. Optional throughout —
+   * consumers are not required to surface it.
+   */
+  eventId?: string;
 }
 
 /** Response for api.register_client / api.update_client / api.admit_client / api.discharge_client */
