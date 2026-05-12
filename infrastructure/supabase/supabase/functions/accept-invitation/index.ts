@@ -171,7 +171,6 @@ export interface ExistingUserPathResult {
  * re-emit `user.created`. See `_shared/rpc-readback.ts` for the canonical
  * schema-pinning pattern.
  */
-// deno-lint-ignore no-explicit-any
 export async function checkExistingUserPath(
   // deno-lint-ignore no-explicit-any
   client: any,
