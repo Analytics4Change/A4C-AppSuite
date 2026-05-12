@@ -9,9 +9,21 @@ enabled = true
 # Port to use for the API URL.
 port = 54321
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
-# endpoints. `public` and `graphql_public` schemas are included by default.
-# `api` schema added for Edge Function wrapper functions (e.g., emit_domain_event)
-schemas = ["public", "graphql_public", "api"]
+# endpoints.
+#
+# IMPORTANT: this list MUST match the deployed Supabase project's PostgREST
+# allowlist (currently `["api"]` only). Local PostgREST exposing `public` while
+# deployed PostgREST exposes only `api` causes runtime-fatal drift: local Deno
+# tests pass while deployed UAT fails. The two error shapes from PR #60 + PR #61
+# both stemmed from this drift:
+#   - "Could not find the table 'api.users' in the schema cache"  (naked .from)
+#   - "The schema must be one of the following: api"               (.schema('public') chain)
+#
+# Edge Functions and frontend code MUST route every cross-schema read through
+# an `api.*` SQL RPC. See:
+#   - `.claude/skills/infrastructure-guidelines/SKILL.md` Rule 19
+#   - `infrastructure/supabase/CLAUDE.md` § Edge Functions MUST NOT Use PostgREST for Cross-Schema Reads
+schemas = ["api"]
 # Extra schemas to add to the search_path of every request.
 extra_search_path = ["public", "extensions"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size

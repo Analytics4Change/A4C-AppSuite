@@ -206,6 +206,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      check_user_invitation_existence: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
       check_user_org_membership: {
         Args: { p_email: string; p_org_id: string }
         Returns: {
@@ -310,6 +314,10 @@ export type Database = {
       deactivate_role: { Args: { p_role_id: string }; Returns: Json }
       deactivate_schedule_template: {
         Args: { p_reason?: string; p_template_id: string }
+        Returns: Json
+      }
+      deactivate_user: {
+        Args: { p_reason?: string; p_user_id: string }
         Returns: Json
       }
       delete_field_category: {

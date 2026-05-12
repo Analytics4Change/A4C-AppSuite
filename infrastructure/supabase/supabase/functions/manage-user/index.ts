@@ -1,7 +1,7 @@
 /**
  * Manage User Edge Function
  *
- * Handles user lifecycle operations: deactivate, reactivate. Three operations
+ * Handles user lifecycle operations: deactivate, reactivate. Four operations
  * have been extracted to SQL RPCs per adr-edge-function-vs-sql-rpc.md:
  * - `update_notification_preferences` → `api.update_user_notification_preferences`
  *   (migration 20260424194102_add_update_user_notification_preferences_rpc.sql)
@@ -9,10 +9,18 @@
  *   (migration 20260427205333_extract_delete_user_rpc.sql)
  * - `modify_roles` → `api.modify_user_roles`
  *   (migration 20260430172139_add_modify_user_roles_rpc.sql)
+ * - `deactivate` (emit + Pattern A v2 read-back only) → `api.deactivate_user`
+ *   (migration 20260512194836_deactivate_user_rpc_and_check_user_invitation_existence.sql)
+ *   The Edge Function stays for the LB1 `auth.admin.updateUserById` ban call
+ *   AFTER the RPC succeeds; the wire-tier emit + read-back the function used
+ *   to do was pivoted into the SQL RPC because the deployed PostgREST exposes
+ *   only the `api` schema, making cross-schema `.from(public.users)` reads
+ *   impossible. See plan `~/.claude/plans/ddoes-it-make-sense-lucky-dongarra.md`
+ *   for the architecture details.
  *
  * Operations:
- * - deactivate: Deactivate a user within the organization
- * - reactivate: Reactivate a deactivated user
+ * - deactivate: Deactivate a user within the organization (Pattern A v2 via SQL RPC)
+ * - reactivate: Reactivate a deactivated user (legacy emit flow — retrofit deferred to next card)
  *
  * CQRS-compliant: Emits domain events:
  * - user.deactivated / user.reactivated
@@ -39,10 +47,9 @@ import {
   endSpan,
 } from '../_shared/tracing-context.ts';
 import { buildEventMetadata } from '../_shared/emit-event.ts';
-import { checkProjectionReadback } from '../_shared/rpc-readback.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v16-1-readback-schema-fix';
+const DEPLOY_VERSION = 'v17-deactivate-sql-rpc-pivot';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -70,23 +77,23 @@ interface ManageUserResponse {
   operation?: Operation;
   error?: string;
   /**
-   * Captured event_id from the emit RPC. Additive on success responses for
-   * audit-log deep-linking in the frontend. Optional — consumers are not
-   * required to surface it. First introduced by the deactivate Pattern A v2
-   * retrofit (v16).
+   * Captured event_id from the emit (Pattern A v2 — sourced from
+   * api.deactivate_user envelope for deactivate, from inline emit for
+   * reactivate). Additive on success responses for audit-log deep-linking
+   * in the frontend. Optional — consumers are not required to surface it.
    */
   eventId?: string;
 }
 
 /**
- * Get user details for validation
+ * Get user details for validation (reactivate path only — the deactivate
+ * path now delegates tenancy/idempotency checks to `api.deactivate_user`).
  */
 async function getUserDetails(
   supabase: AnySchemaSupabaseClient,
   userId: string,
   orgId: string
 ): Promise<{ exists: boolean; isActive: boolean; email?: string }> {
-  // Query user and their role in the org
   const { data, error } = await supabase
     .rpc('get_user_org_details', { p_user_id: userId, p_org_id: orgId });
 
@@ -155,9 +162,6 @@ serve(async (req) => {
       );
     }
 
-    // Extract and decode JWT token to access custom claims
-    // Custom claims are added to the JWT payload via database hook, NOT to user.app_metadata
-    // See: infrastructure/supabase/sql/03-functions/authorization/003-supabase-auth-jwt-hook.sql
     const jwt = authHeader.replace('Bearer ', '');
     const jwtParts = jwt.split('.');
 
@@ -168,7 +172,6 @@ serve(async (req) => {
       );
     }
 
-    // Decode JWT payload (base64)
     let jwtPayload: JWTPayload;
     try {
       jwtPayload = JSON.parse(atob(jwtParts[1]));
@@ -179,12 +182,10 @@ serve(async (req) => {
       );
     }
 
-    // Create Supabase client with user's JWT for auth validation
     const supabaseUser = createClient(env.SUPABASE_URL, resolveAnonKey(req, env), {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Validate the JWT by calling getUser
     const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
     if (authError || !user) {
       return new Response(
@@ -193,7 +194,6 @@ serve(async (req) => {
       );
     }
 
-    // Check if user's organization is deactivated (access blocked via JWT hook)
     if (jwtPayload.access_blocked) {
       console.log(`[manage-user ${DEPLOY_VERSION}] Access blocked for user ${user.id}: ${jwtPayload.access_block_reason || 'organization_deactivated'}`);
       return new Response(
@@ -202,8 +202,6 @@ serve(async (req) => {
       );
     }
 
-    // Extract custom claims from decoded JWT payload (not from user.app_metadata!)
-    // The JWT hook adds claims directly to the token payload
     const orgId = jwtPayload.org_id;
     const effectivePermissions = jwtPayload.effective_permissions;
 
@@ -214,8 +212,6 @@ serve(async (req) => {
       );
     }
 
-    // Check permissions based on operation
-    // Note: Permission check happens before parsing body, so we extract operation from request
     const bodyText = await req.text();
     const preCheckData = JSON.parse(bodyText) as ManageUserRequest;
 
@@ -232,7 +228,6 @@ serve(async (req) => {
     // ==========================================================================
     // REQUEST VALIDATION
     // ==========================================================================
-    // Note: Body already parsed above for permission check
     const requestData: ManageUserRequest = preCheckData;
 
     if (!requestData.operation) {
@@ -265,7 +260,7 @@ serve(async (req) => {
     }
 
     // ==========================================================================
-    // VALIDATE USER EXISTS IN ORG
+    // ADMIN CLIENT (for RPC calls + LB1 auth.admin.updateUserById)
     // ==========================================================================
     const supabaseAdmin = createClient(env.SUPABASE_URL, resolveServiceRoleKey(env)!, {
       auth: {
@@ -277,126 +272,62 @@ serve(async (req) => {
       },
     });
 
-    const userDetails = await getUserDetails(supabaseAdmin, requestData.userId, orgId);
-
-    if (!userDetails.exists) {
-      return new Response(
-        JSON.stringify({ error: 'User not found in this organization' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate operation is appropriate for current state
-    if (requestData.operation === 'deactivate' && !userDetails.isActive) {
-      return new Response(
-        JSON.stringify({ error: 'User is already deactivated' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (requestData.operation === 'reactivate' && userDetails.isActive) {
-      return new Response(
-        JSON.stringify({ error: 'User is already active' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ==========================================================================
-    // EMIT DOMAIN EVENT (for deactivate/reactivate operations)
-    // ==========================================================================
-    const now = new Date().toISOString();
-
-    // Determine event type and timestamp field based on operation
-    let eventType: string;
-    let timestampField: string;
-    switch (requestData.operation) {
-      case 'deactivate':
-        eventType = 'user.deactivated';
-        timestampField = 'deactivated_at';
-        break;
-      case 'reactivate':
-        eventType = 'user.reactivated';
-        timestampField = 'reactivated_at';
-        break;
-    }
-
-    console.log(`[manage-user v${DEPLOY_VERSION}] Emitting ${eventType} event...`);
-
-    const eventData: Record<string, unknown> = {
-      user_id: requestData.userId,
-      org_id: orgId,
-      [timestampField]: now,
-    };
-
-    if (requestData.reason) {
-      eventData.reason = requestData.reason;
-    }
-
-    const { data: eventId, error: eventError } = await supabaseAdmin
-      .rpc('emit_domain_event', {
-        p_stream_id: requestData.userId,
-        p_stream_type: 'user',
-        p_event_type: eventType,
-        p_event_data: eventData,
-        p_event_metadata: buildEventMetadata(tracingContext, eventType, req, {
-          user_id: user.id,
-          reason: requestData.reason || `Manual ${requestData.operation}`,
-        }),
-      });
-
-    if (eventError) {
-      console.error(`[manage-user v${DEPLOY_VERSION}] Failed to emit event:`, eventError);
-      return handleRpcError(eventError, correlationId, corsHeaders, `${requestData.operation} user`);
-    }
-
-    console.log(`[manage-user v${DEPLOY_VERSION}] Event emitted: ${eventId}`);
-
-    // ==========================================================================
-    // PATTERN A v2 READ-BACK (deactivate only — reactivate retrofit in next card)
+    // Forward caller's JWT so the RPC's permission checks (`auth.uid()`,
+    // `request.jwt.claims.org_id`, `has_permission`) authorize against the
+    // caller, not the service role.
     //
-    // Closes the F1-class silent-failure gap where the emit RPC succeeds but
-    // the handler raises mid-update (RLS, schema drift, race condition), the
-    // trigger persists processing_error on the event row WITHOUT rolling back,
-    // and the function would otherwise return {success: true} while
-    // users.is_active stays true.
+    // For deactivate (post-pivot 2026-05-12), api.deactivate_user does:
+    //   - access_blocked guard
+    //   - has_permission('user.update') guard
+    //   - tenancy guard via JWT org_id + users.current_organization_id lookup
+    //   - idempotency (already-inactive, already-deleted)
+    //   - emit user.deactivated + Pattern A v2 read-back (BOTH checks per Rule 13)
     //
-    // The shared helper queries by captured event_id (race-safe against
-    // concurrent emitters on the same stream) and masks processing_error via
-    // _shared/maskPii.ts at the boundary. See _shared/rpc-readback.ts docblock
-    // for the transactional model (wire-tier port is safer than SQL RPC's
-    // intra-transaction read-back, not less safe).
-    //
-    // Scope: deactivate only. The `reactivate` operation is intentionally not
-    // retrofitted here — the architect-recommended next card
-    // `manage-user-reactivate-pattern-a-v2-retrofit/` will reuse this helper
-    // byte-equivalently with `expectedState: { is_active: true }`.
+    // For reactivate (legacy emit flow): retained as-is. The matching
+    // Pattern A v2 retrofit for the reactivate path is the next card.
+
     // ==========================================================================
+    // DEACTIVATE PATH — SQL RPC (Pattern A v2 lives in api.deactivate_user)
+    // ==========================================================================
+    let eventId: string | undefined;
 
     if (requestData.operation === 'deactivate') {
-      const readback = await checkProjectionReadback<{ id: string; is_active: boolean }>(
-        supabaseAdmin,
-        eventId as string,
-        'users',
-        'id',
-        requestData.userId,
-        { is_active: false },
-      );
+      console.log(`[manage-user v${DEPLOY_VERSION}] Calling api.deactivate_user RPC...`);
 
-      if (!readback.success) {
-        console.error(
-          `[manage-user v${DEPLOY_VERSION}] Read-back failed for ${eventType}:`,
-          readback.error,
-        );
-        // SQL Pattern A v2 parity (adr-rpc-readback-pattern.md Decision 2):
-        // envelope-handler-failures return HTTP 200 + {success: false, error};
-        // callers parse `data.success`, never an HTTP status. The wire-tier
-        // port mirrors that contract so the same frontend envelope-unwrap
-        // logic works regardless of whether the operation went through an
-        // SQL RPC or this Edge Function.
+      // Reuse supabaseUser (already JWT-forwarding from L185) — the RPC must
+      // see request.jwt.claims.org_id + auth.uid() + caller's effective
+      // permissions. Pin schema='api' per-call rather than constructing a
+      // third client. (Three clients in one handler was an organic accretion;
+      // the wire-tier helper that needed a separate client is now gone.)
+      const { data: envelope, error: rpcError } = await supabaseUser
+        .schema('api')
+        .rpc('deactivate_user', {
+          p_user_id: requestData.userId,
+          p_reason: requestData.reason ?? null,
+        });
+
+      if (rpcError) {
+        console.error(`[manage-user v${DEPLOY_VERSION}] deactivate_user RPC error:`, rpcError);
+        return handleRpcError(rpcError, correlationId, corsHeaders, 'deactivate user');
+      }
+
+      // Pattern A v2 envelope: returns 200 + {success: false, error, eventId?}
+      // for all handler-driven failures (idempotency, tenancy, projection
+      // read-back miss, processing_error). Caller parses data.success, not HTTP
+      // status — matches the SQL Pattern A v2 contract (adr-rpc-readback-pattern.md).
+      const env_ = (envelope ?? {}) as {
+        success?: boolean;
+        error?: string;
+        eventId?: string;
+        userId?: string;
+      };
+
+      if (!env_.success) {
+        console.warn(`[manage-user v${DEPLOY_VERSION}] deactivate_user envelope failure:`, env_.error);
         const errorResponse: ManageUserResponse = {
           success: false,
-          error: readback.error,
-          eventId: eventId as string,
+          error: env_.error ?? 'Failed to deactivate user',
+          eventId: env_.eventId,
         };
         return new Response(JSON.stringify(errorResponse), {
           status: 200,
@@ -404,12 +335,65 @@ serve(async (req) => {
         });
       }
 
-      console.log(`[manage-user v${DEPLOY_VERSION}] Read-back verified: is_active=false`);
+      eventId = env_.eventId;
+      console.log(`[manage-user v${DEPLOY_VERSION}] deactivate_user OK, eventId=${eventId}`);
+    } else {
+      // ==========================================================================
+      // REACTIVATE PATH — LEGACY EMIT FLOW (retrofit deferred to next card)
+      // ==========================================================================
+      const userDetails = await getUserDetails(supabaseAdmin, requestData.userId, orgId);
+
+      if (!userDetails.exists) {
+        return new Response(
+          JSON.stringify({ error: 'User not found in this organization' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (userDetails.isActive) {
+        return new Response(
+          JSON.stringify({ error: 'User is already active' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const now = new Date().toISOString();
+      const eventType = 'user.reactivated';
+      const eventData: Record<string, unknown> = {
+        user_id: requestData.userId,
+        org_id: orgId,
+        reactivated_at: now,
+      };
+      if (requestData.reason) {
+        eventData.reason = requestData.reason;
+      }
+
+      console.log(`[manage-user v${DEPLOY_VERSION}] Emitting ${eventType} event...`);
+
+      const { data: emittedEventId, error: eventError } = await supabaseAdmin
+        .rpc('emit_domain_event', {
+          p_stream_id: requestData.userId,
+          p_stream_type: 'user',
+          p_event_type: eventType,
+          p_event_data: eventData,
+          p_event_metadata: buildEventMetadata(tracingContext, eventType, req, {
+            user_id: user.id,
+            reason: requestData.reason || 'Manual reactivate',
+          }),
+        });
+
+      if (eventError) {
+        console.error(`[manage-user v${DEPLOY_VERSION}] Failed to emit event:`, eventError);
+        return handleRpcError(eventError, correlationId, corsHeaders, 'reactivate user');
+      }
+
+      eventId = emittedEventId as string | undefined;
+      console.log(`[manage-user v${DEPLOY_VERSION}] Event emitted: ${eventId}`);
     }
 
     // ==========================================================================
-    // UPDATE SUPABASE AUTH BAN STATE (global login prevention)
-    // The event processor handles projection updates (is_active, deactivated_at,
+    // UPDATE SUPABASE AUTH BAN STATE (global login prevention) — LB1
+    // The event handler updated projection state (is_active, deactivated_at /
     // reactivated_at). Banning at the auth tier is what actually prevents login.
     //
     // Supabase Auth contract:
@@ -419,10 +403,7 @@ serve(async (req) => {
     // Historical bug (fixed 2026-04-29 same-day as discovery): the deactivate
     // branch previously called updateUserById with ban_duration: 'none',
     // which UNBANS rather than bans. Deactivated users could continue to log
-    // in because Supabase Auth never received a real ban. Surfaced during
-    // smoke testing of manage-user-delete-rpc-and-scope-retrofit. Reactivate
-    // also previously had no auth call — meaning even after this fix, banned
-    // users would stay banned forever without the parallel unban here.
+    // in because Supabase Auth never received a real ban.
     // ==========================================================================
 
     if (requestData.operation === 'deactivate') {
@@ -433,11 +414,11 @@ serve(async (req) => {
 
       if (banError) {
         console.warn(`[manage-user v${DEPLOY_VERSION}] Failed to ban auth user:`, banError);
-        // Don't fail the request - event was emitted, projection will update.
-        // But surface this as a warning since the auth-tier ban is the actual
-        // login-prevention mechanism; without it the user can still log in.
+        // Don't fail the request - projection update already succeeded via RPC.
+        // The auth-tier ban is the actual login-prevention mechanism; without
+        // it the user can still log in. Surface as a warning for ops visibility.
       }
-    } else if (requestData.operation === 'reactivate') {
+    } else {
       const { error: unbanError } = await supabaseAdmin.auth.admin.updateUserById(
         requestData.userId,
         { ban_duration: 'none' } // Clear any existing ban (set by prior deactivate).
@@ -445,9 +426,6 @@ serve(async (req) => {
 
       if (unbanError) {
         console.warn(`[manage-user v${DEPLOY_VERSION}] Failed to unban auth user:`, unbanError);
-        // Don't fail the request - event was emitted, projection will update.
-        // But surface this as a warning since the user will remain unable to
-        // log in until the ban is cleared.
       }
     }
 
@@ -458,10 +436,9 @@ serve(async (req) => {
       success: true,
       userId: requestData.userId,
       operation: requestData.operation,
-      eventId: eventId as string,
+      eventId,
     };
 
-    // End span with success status
     const completedSpan = endSpan(span, 'ok');
     console.log(`[manage-user v${DEPLOY_VERSION}] Completed in ${completedSpan.durationMs}ms, correlation_id=${correlationId}`);
 
@@ -471,7 +448,6 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    // End span with error status
     const completedSpan = endSpan(span, 'error');
     console.error(`[manage-user v${DEPLOY_VERSION}] Unhandled error after ${completedSpan.durationMs}ms:`, error);
     return createInternalError(correlationId, corsHeaders, error.message);

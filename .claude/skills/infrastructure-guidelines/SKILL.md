@@ -445,59 +445,76 @@ $comment$Update user profile (first_name, last_name) via domain event
 
 ---
 
-## 19. Edge Function Schema-Pinning for Cross-Schema Reads
+## 19. Edge Functions MUST NOT Use PostgREST for Cross-Schema Reads
 
-Service-role clients in Edge Functions are typically constructed with `db: { schema: 'api' }` for RPC ergonomics. That config changes the default for **both** `.rpc()` AND `.from()`. Projection tables and `domain_events` live in `public`, so any naked `.from(<public-table>)` on such a client resolves as `api.<public-table>` and surfaces a PostgREST schema-cache miss at runtime:
+> **Rule restated 2026-05-12** — the PR #61 hotfix rule ("pin `.schema('public')` on every cross-schema `.from()`") was **mechanically wrong** against this project's deployed PostgREST. See History below.
+
+**The deployed Supabase project's PostgREST exposes only the `api` schema.** Any wire-tier `.from(<non-api-table>)` call — with OR without `.schema('public')` pinning — fails at the gateway. The two observed error shapes from successive failed approaches:
 
 ```
-Could not find the table 'api.<name>' in the schema cache
+Could not find the table 'api.users' in the schema cache         (naked .from on db.schema='api' client)
+The schema must be one of the following: api                      (.schema('public').from(...) chain)
 ```
 
-**Required form** — every cross-schema `.from()` in an Edge Function MUST be preceded by `.schema('<owning-schema>')`:
+**Required form** — every Edge Function read on a non-`api` table MUST go through an `api.*` SQL RPC. RPC bodies have full SQL access to all schemas regardless of PostgREST's exposed-schemas config; PostgREST only needs to find the RPC entry point in `api`.
 
 ```typescript
-// ❌ WRONG: bare .from() inherits the client's `db.schema='api'` override
-const result = await supabaseAdmin.from('users').select('id').eq('id', userId).maybeSingle();
+// ❌ WRONG (failed at runtime): bare .from() inherits the client's `db.schema='api'`
+const result = await client.from('users').select('id').eq('id', userId).maybeSingle();
 
-// ✅ CORRECT: explicit schema pin per call site
-const result = await supabaseAdmin
-  .schema('public')
-  .from('users')
-  .select('id')
-  .eq('id', userId)
-  .maybeSingle();
-```
+// ❌ ALSO WRONG (failed at runtime): .schema('public') chain is rejected by the
+// deployed PostgREST's exposed-schemas allowlist
+const result = await client.schema('public').from('users')
+  .select('id').eq('id', userId).maybeSingle();
 
-**The bug class is non-obvious**: no compile-time signal, no static-analysis catch in the SDK chain, manifests only at runtime against a real PostgREST instance. Local Deno unit tests with hand-rolled mocks miss it by construction unless the mock models `.schema()`.
-
-**Regression-test invariant** — every helper that does cross-schema reads MUST have a `.from()`-spy test that asserts every `.from(table)` was preceded by `.schema('public')`:
-
-```typescript
-// In the test mock:
-const fromCallLog: Array<{table: string; schema: string | null}> = [];
-const client = makeMockClient({
-  onSchema: (s) => { /* set currentSchema */ },
-  onFrom: (table, currentSchema) => fromCallLog.push({ table, schema: currentSchema }),
-  // ...
+// ✅ CORRECT: SQL RPC. The RPC body reads `public.users` natively in SQL.
+const { data, error } = await client.rpc('check_user_invitation_existence', {
+  p_user_id: userId,
 });
-
-// In the test:
-for (const call of fromCallLog) {
-  assertEquals(call.schema, 'public',
-    `.from('${call.table}') called without preceding .schema('public') — schema-pinning regression`);
-}
 ```
 
-**Canonical files** (read for the pattern):
-- `infrastructure/supabase/supabase/functions/_shared/rpc-readback.ts` — boundary helper with schema-pinning + `# Schema-pinning invariant` docblock section
-- `infrastructure/supabase/supabase/functions/manage-user/__tests__/deactivate-readback.test.ts` Test 9 — `.from()`-spy invariant
-- `infrastructure/supabase/supabase/functions/accept-invitation/__tests__/existing-user-check-schema.test.ts` Test 5 — same invariant on a different helper
+**Carve-out**: `db: { schema: 'api' }` clients are still the correct construction for Edge Functions that exclusively call `.rpc()` — Rule 19 only governs `.from()` calls. Two legitimate patterns:
 
-**History**: PR #61 hotfix (2026-05-12) after two consecutive bug incidents in the same PR cycle — the helper's first deployment surfaced `api.users` schema-cache miss in UAT, and a same-PR audit found a pre-existing silent instance in `accept-invitation` that was re-emitting `user.created` on every existing-user OAuth/SSO accept.
+```typescript
+// ✅ FINE: db:{schema:'api'} for pure-RPC ergonomics
+const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false },
+  db: { schema: 'api' },
+});
+await supabaseAdmin.rpc('emit_domain_event', { /* ... */ });  // RPC: fine
+await supabaseAdmin.from('users').select('id');               // ❌ Rule 19 violation
 
-**Bounded scope**: this rule applies ONLY to Edge Functions that mix `db: { schema: 'api' }` with direct `.from()` calls on non-`api` tables. Pure-RPC Edge Functions are unaffected (RPC calls don't care about the from-schema). Audited 2026-05-12: only `manage-user` (via the helper) and `accept-invitation` (via `checkExistingUserPath`) match the pattern; `invite-user`, `organization-bootstrap`, `organization-delete`, `workflow-status`, `validate-invitation` are pure-RPC and clean.
+// ✅ ALSO FINE: per-call .schema('api').rpc() on a client without db.schema
+const supabaseUser = createClient(SUPABASE_URL, ANON_KEY, {
+  global: { headers: { Authorization: authHeader } },
+});
+await supabaseUser.schema('api').rpc('deactivate_user', { /* ... */ });  // RPC: fine
+```
 
-**See**: `infrastructure/supabase/CLAUDE.md` § Critical Rules (mirror with the same rule body and inline ts code block).
+The invariant: the wire request must terminate on an `api.*` entry point. The client construction style is incidental.
+
+**Architectural pattern**: this is the same approach `api.delete_user` (PR #40), `api.deactivate_user` (2026-05-12 PR), and other Pattern A v2 SQL RPCs use. RPC body does the projection read + `domain_events.processing_error` lookup atomically — see `documentation/architecture/decisions/adr-rpc-readback-pattern.md`.
+
+**Bug class summary**: PR #60 introduced a wire-tier Pattern A v2 helper (`_shared/rpc-readback.ts`) that did naked `.from()` reads. UAT Test 1 hit the schema-cache miss. PR #61 added `.schema('public')` pinning everywhere. UAT Test 1 (redo) hit the gateway-level "must be one of: api" rejection. Both wire-tier approaches were architecturally infeasible against this PostgREST configuration. The SQL-RPC pivot moves the projection reads where they belong — inside the database — and the helper is now deleted.
+
+**Self-audit pattern** — when adding a new Edge Function or touching an existing one:
+
+```bash
+# Find any wire-tier read against a non-api table — every match needs review.
+grep -rnE "\.from\('([^']+)'\)" infrastructure/supabase/supabase/functions/ \
+  | grep -vE "_shared/__tests__|__tests__/.*\.test\.ts"
+```
+
+If the targeted table is not in `api`, replace with an `api.*` RPC. The single sanctioned wire-tier `.from()` pattern remaining: pure-RPC Edge Functions that exclusively use `.rpc()` need no `.from()` at all.
+
+**History** (preserved as cautionary lesson):
+- **PR #60** (2026-05-12) — wire-tier `_shared/rpc-readback.ts` helper, naked `.from(public-table)`. UAT failed: `Could not find the table 'api.users' in the schema cache`.
+- **PR #61** (2026-05-12) — hotfix: pinned `.schema('public')` on every `.from()`. UAT failed AGAIN: `The schema must be one of the following: api`. The fix was based on a `config.toml:14` `schemas = ["public", "graphql_public", "api"]` reading that did not reflect the deployed runtime PostgREST config.
+- **SQL-RPC pivot** (2026-05-12, this rule's current form) — wire-tier helper deleted; both call sites moved to `api.deactivate_user` / `api.check_user_invitation_existence`. The PR #61 schema-pinning convention is INVALIDATED.
+
+**Pre-deploy ritual gap closed**: before declaring any wire-tier SDK pattern viable, deploy to dev + smoke-test against the real Supabase project. Local Deno tests with mock clients cannot model PostgREST's exposed-schemas allowlist.
+
+**See**: `infrastructure/supabase/CLAUDE.md` § Critical Rules (mirror with the same rule body); `documentation/architecture/decisions/adr-rpc-readback-pattern.md`; `documentation/architecture/decisions/adr-edge-function-vs-sql-rpc.md` (load-bearing criteria LB1–LB6 for "Edge Function vs SQL RPC" selection).
 
 ---
 

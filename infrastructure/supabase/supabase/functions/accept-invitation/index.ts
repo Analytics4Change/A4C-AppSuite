@@ -27,7 +27,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v23-asyncapi-roles-emit';
+const DEPLOY_VERSION = 'v24-existing-user-check-sql-rpc-pivot';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -158,51 +158,56 @@ export interface ExistingUserPathResult {
  * any organization) versus new. Soft-deleted users are treated as NEW so
  * that re-invited deleted users get the full `user.created` flow.
  *
- * # Schema-pinning invariant
+ * # SQL-RPC pivot (2026-05-12 — supersedes the 2026-05-12 PR #61 hotfix)
  *
- * The caller's `supabase` client may be constructed with `db: { schema: 'api' }`
- * for RPC ergonomics (this Edge Function is one such — see L320-322). Both
- * `users` and `user_roles_projection` live in the **public** schema, so this
- * helper MUST explicitly call `.schema('public')` on every `.from()`. Pre-fix
- * (2026-05-12 hotfix), the queries silently resolved to `api.users` and
- * `api.user_roles_projection` (missing tables), the rolesCheckError catch in
- * the caller swallowed the failure, and `isExistingUser` always returned
- * `false` — causing every existing-user OAuth/SSO invitation accept to
- * re-emit `user.created`. See `_shared/rpc-readback.ts` for the canonical
- * schema-pinning pattern.
+ * Pre-pivot this helper used `client.from('users')` / `client.from('user_roles_projection')`
+ * — naked PostgREST table reads against the `public` schema. The Edge
+ * Function's `supabase` client is constructed with `db: { schema: 'api' }`
+ * for RPC ergonomics (L387 below), so naked `.from('users')` resolves as
+ * `api.users` and fails the schema-cache lookup. The PR #61 hotfix added
+ * `.schema('public')` pinning — that surfaced a second wire-tier failure
+ * because the deployed PostgREST exposes ONLY the `api` schema and rejects
+ * `.schema('public')` chains at the gateway:
+ *
+ *     Could not find the table 'api.users' in the schema cache         (pre-PR #61)
+ *     The schema must be one of the following: api                     (post-PR #61)
+ *
+ * Architectural fix: do the projection reads in pure SQL inside an
+ * `api.check_user_invitation_existence` RPC. RPC bodies have full SQL
+ * access regardless of PostgREST's exposed-schemas config. The function
+ * signature stays the same so call sites are untouched.
+ *
+ * Mirrors the same SQL-RPC pattern as `api.delete_user` (Pattern A v2 in
+ * pure SQL — PR #40 precedent). See
+ * `documentation/architecture/decisions/adr-rpc-readback-pattern.md`.
  */
 export async function checkExistingUserPath(
   // deno-lint-ignore no-explicit-any
   client: any,
   userId: string,
 ): Promise<ExistingUserPathResult> {
-  const { data: userRow } = await client
-    .schema('public')
-    .from('users')
-    .select('deleted_at')
-    .eq('id', userId)
-    .maybeSingle();
+  const { data, error } = await client.rpc('check_user_invitation_existence', {
+    p_user_id: userId,
+  });
 
-  const isDeleted = !!userRow?.deleted_at;
-
-  let existingRoles: Array<{ id: string }> | null = null;
-  let rolesCheckError: unknown = null;
-
-  if (!isDeleted) {
-    const result = await client
-      .schema('public')
-      .from('user_roles_projection')
-      .select('id')
-      .eq('user_id', userId)
-      .limit(1);
-    existingRoles = result.data;
-    rolesCheckError = result.error;
+  if (error) {
+    // RPC-level failure (RLS, GRANT, infrastructure). Preserve fail-safe
+    // semantics: caller will emit user.created (idempotent via projections)
+    // and log the error to console. Surfaced via `rolesCheckError` for
+    // structured-log continuity with the pre-pivot helper signature.
+    return {
+      isExistingUser: false,
+      isDeleted: false,
+      rolesCheckError: error,
+    };
   }
 
+  // RPC returns jsonb: { isExistingUser: boolean, isDeleted: boolean }
+  const result = (data ?? {}) as { isExistingUser?: boolean; isDeleted?: boolean };
   return {
-    isExistingUser: !isDeleted && !!existingRoles && existingRoles.length > 0,
-    isDeleted,
-    rolesCheckError,
+    isExistingUser: !!result.isExistingUser,
+    isDeleted: !!result.isDeleted,
+    rolesCheckError: null,
   };
 }
 

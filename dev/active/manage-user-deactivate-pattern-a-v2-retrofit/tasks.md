@@ -2,13 +2,18 @@
 
 ## Current Status
 
-**Phase**: Implementation complete; awaiting CI + review + merge
-**Status**: 🟢 PR-ready
-**Branch**: `feat/manage-user-deactivate-pattern-a-v2-retrofit`
+**Phase**: SQL-RPC pivot shipped (PR #63); awaiting CI + UAT
+**Status**: 🟢 PR open
+**Branches** (chronological):
+- `feat/manage-user-deactivate-pattern-a-v2-retrofit` — PR #60 (merged) — wire-tier helper. FAILED UAT.
+- `hotfix/edge-function-schema-pinning` — PR #61 (merged) — `.schema('public')` pinning. FAILED UAT.
+- `fix/accept-invitation-lint-unblock-deploy` — PR #62 (merged) — tiny lint fix.
+- `feat/deactivate-sql-rpc-pivot` — **PR #63 (open)** — SQL-RPC pivot. Current.
 
 ## Plan reference
 
-`~/.claude/plans/ddoes-it-make-sense-lucky-dongarra.md` (post-architect-review)
+- Original retrofit: `~/.claude/plans/ddoes-it-make-sense-lucky-dongarra.md`
+- SQL-RPC pivot (post-PR-#60/#61 failures): same plan file (final section)
 
 ## Tasks
 
@@ -50,7 +55,26 @@
 
 ### Phase 6 — Follow-up
 
-- [ ] Seed `manage-user-reactivate-pattern-a-v2-retrofit/` card after this PR merges. Will reuse `_shared/rpc-readback.ts` with `expectedState: { is_active: true }`.
+- [ ] Seed `manage-user-reactivate-pattern-a-v2-retrofit/` card after PR #63 merges. **Mirror `api.deactivate_user` SQL-RPC pattern** — create `api.reactivate_user` RPC (Pattern A v2 with predicate `is_active = true`), then thin Edge Function wrapper that calls the RPC + `auth.admin.updateUserById({ban_duration: 'none'})`. **Do NOT reuse a wire-tier helper** — that approach is dead per Rule 19.
+
+### Phase 7 — SQL-RPC pivot (PR #63, 2026-05-12)
+
+- [x] Architect approves pivot plan
+- [x] Migration `20260512194836_deactivate_user_rpc_and_check_user_invitation_existence.sql` — creates `api.deactivate_user` + `api.check_user_invitation_existence`
+- [x] Apply migration to dev DB
+- [x] Regenerate `database.types.ts` (frontend + workflows, byte-identical)
+- [x] Patch `rpc-registry.generated.ts` for both new RPCs
+- [x] Rewrite `manage-user/index.ts` deactivate path → calls `api.deactivate_user`; reactivate path untouched
+- [x] Rewrite `accept-invitation/index.ts` `checkExistingUserPath` → calls `api.check_user_invitation_existence`; signature preserved
+- [x] Delete `_shared/rpc-readback.ts`
+- [x] Delete `manage-user/__tests__/deactivate-readback.test.ts` (tested deleted helper)
+- [x] Rewrite `accept-invitation/__tests__/existing-user-check-schema.test.ts` to mock RPC — 6 cases passing
+- [x] INVALIDATE Rule 19 in SKILL.md + `infrastructure/supabase/CLAUDE.md` (replace with "no PostgREST cross-schema reads"); MEMORY.md updated
+- [x] Verify: typecheck (frontend + workflows), lint, build, deno tests (96/96), migration plpgsql_check
+- [x] Open PR #63
+- [ ] CI green
+- [ ] **UAT against dev** (required merge gate — see PR description for the 7-scenario plan)
+- [ ] Merge
 
 ---
 
