@@ -41,8 +41,13 @@ interface MockQueryFixture {
 interface MockClientConfig {
   /** Map of (table → keyed fixture). */
   tables: Record<string, MockQueryFixture>;
-  /** Callback invoked with the `.eq()` filter args. Lets tests assert helper queried by event_id. */
-  onEq?: (column: string, value: unknown) => void;
+  /**
+   * Callback invoked with the table + `.eq()` filter args. Threading the table
+   * name closes the architect-flagged gap (P3 F5) where a table-agnostic
+   * callback couldn't distinguish `users.id = EVENT_ID` from
+   * `domain_events.id = EVENT_ID` — both share the column name `id`.
+   */
+  onEq?: (table: string, column: string, value: unknown) => void;
 }
 
 function makeMockClient(config: MockClientConfig) {
@@ -55,7 +60,7 @@ function makeMockClient(config: MockClientConfig) {
           return chain;
         },
         eq(column: string, value: unknown) {
-          onEq(column, value);
+          onEq(table, column, value);
           return chain;
         },
         async maybeSingle() {
@@ -154,14 +159,16 @@ Deno.test('3. Race-safe: projection looks updated but processing_error set → m
   }
 });
 
-Deno.test('4. Expected-state mismatch: row exists but does not match predicate → treated as missing', async () => {
-  // `maybeSingle()` returns null because the .eq('is_active', false) predicate
-  // excludes the still-active row. Helper falls through to processing_error
-  // lookup as if NOT FOUND. The mock returns null for the missing row.
+Deno.test('4. NOT FOUND with no processing_error → fallback message', async () => {
+  // Renamed per architect P3 F3: the mock's .eq() is filter-blind, so this
+  // test mechanically exercises the NOT FOUND branch with processing_error
+  // unset, NOT the predicate-vs-row-existence distinction. Coverage on the
+  // fallback message is real; the rename prevents over-trust of the scope.
+  // True predicate-mismatch behavior is verified at integration time.
   const client = makeMockClient({
     tables: {
-      users: { data: null }, // mock's `.eq()` chain produces null for predicate mismatch
-      domain_events: { data: { processing_error: null } }, // no processing_error either
+      users: { data: null },
+      domain_events: { data: { processing_error: null } },
     },
   });
 
@@ -184,18 +191,19 @@ Deno.test('4. Expected-state mismatch: row exists but does not match predicate �
 });
 
 Deno.test('5. Helper queries domain_events by captured event_id (race-safe contract)', async () => {
-  // Spy on .eq() calls to verify the helper queries `domain_events` by the
-  // captured event_id specifically, NOT by stream_id or "latest event".
-  // Concurrent emitters on the same stream would produce false negatives if
-  // the helper relied on stream_id.
-  const eqCalls: Array<{ column: string; value: unknown }> = [];
+  // Spy on .eq() calls to verify the helper queries `domain_events` specifically
+  // by the captured event_id, NOT by stream_id or "latest event". Architect P3
+  // F5 fix: thread the table name through onEq so the assertion can
+  // distinguish `domain_events.id = EVENT_ID` from `users.id = EVENT_ID`
+  // (both share the column name `id`).
+  const eqCalls: Array<{ table: string; column: string; value: unknown }> = [];
   const client = makeMockClient({
     tables: {
       users: { data: null }, // force the failure path so domain_events query fires
       domain_events: { data: { processing_error: 'some error' } },
     },
-    onEq: (column, value) => {
-      eqCalls.push({ column, value });
+    onEq: (table, column, value) => {
+      eqCalls.push({ table, column, value });
     },
   });
 
@@ -203,18 +211,21 @@ Deno.test('5. Helper queries domain_events by captured event_id (race-safe contr
     is_active: false,
   });
 
-  // Verify domain_events was queried by `id = EVENT_ID`, never by stream_id.
+  // Verify domain_events specifically (not users) was queried by `id = EVENT_ID`.
   const domainEventsQueries = eqCalls.filter(
-    (call) => call.column === 'id' && call.value === EVENT_ID,
+    (call) => call.table === 'domain_events' && call.column === 'id' && call.value === EVENT_ID,
   );
   assertEquals(
     domainEventsQueries.length >= 1,
     true,
-    'domain_events must be queried by captured event_id',
+    'domain_events must be queried by captured event_id (not stream_id, not latest event)',
   );
 
+  // Belt: helper must never query domain_events by stream_id (race-unsafe).
   const wrongQueries = eqCalls.filter(
-    (call) => call.column === 'stream_id' || call.column === 'stream_type',
+    (call) =>
+      call.table === 'domain_events' &&
+      (call.column === 'stream_id' || call.column === 'stream_type'),
   );
   assertEquals(
     wrongQueries.length,

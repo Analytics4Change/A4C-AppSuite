@@ -387,12 +387,19 @@ serve(async (req) => {
           `[manage-user v${DEPLOY_VERSION}] Read-back failed for ${eventType}:`,
           readback.error,
         );
+        // SQL Pattern A v2 parity (adr-rpc-readback-pattern.md Decision 2):
+        // envelope-handler-failures return HTTP 200 + {success: false, error};
+        // callers parse `data.success`, never an HTTP status. The wire-tier
+        // port mirrors that contract so the same frontend envelope-unwrap
+        // logic works regardless of whether the operation went through an
+        // SQL RPC or this Edge Function.
         const errorResponse: ManageUserResponse = {
           success: false,
           error: readback.error,
+          eventId: eventId as string,
         };
         return new Response(JSON.stringify(errorResponse), {
-          status: 500,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }

@@ -707,11 +707,12 @@ export interface ClientRpcEnvelope {
   success: boolean;
   error?: string;
   /**
-   * Captured event_id from the underlying `emit_domain_event` call. Additive
-   * on success responses for audit-log deep-linking. Optional — consumers
-   * are not required to surface it. First introduced 2026-05-12 alongside
-   * the `manage-user.deactivate` Pattern A v2 read-back retrofit; available
-   * uniformly on every envelope-returning service call going forward.
+   * Captured event_id from the underlying `emit_domain_event` call. **Reserved
+   * for future use** — no `api.*` client RPC currently emits this field on
+   * its success envelope. Added 2026-05-12 alongside `UserRpcEnvelope.eventId`
+   * for cross-service uniformity; will be populated as individual client
+   * write RPCs adopt the audit-deep-linking pattern. Optional throughout —
+   * consumers are not required to surface it.
    */
   eventId?: string;
 }

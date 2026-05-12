@@ -75,7 +75,10 @@ export type ProjectionReadbackResult<T> =
  * @param table - Projection table to read back (e.g. `'users'`,
  *   `'roles_projection'`).
  * @param lookupKey - Primary-key column on the projection (typically `'id'`).
- * @param lookupValue - Value to filter the lookupKey on.
+ * @param lookupValue - Value to filter the lookupKey on. Typed `string | number`
+ *   to cover both UUID-keyed (deactivate, reactivate, role, OU) and surrogate-
+ *   integer-keyed projections without forcing every caller to coerce. `.eq()`
+ *   accepts both at runtime.
  * @param expectedState - Object of column→value pairs conjoined into the
  *   read-back query via `.eq()` chains. This is load-bearing: without it,
  *   `IF NOT FOUND` cannot distinguish "handler updated correctly" from
@@ -94,7 +97,7 @@ export async function checkProjectionReadback<T>(
   eventId: string,
   table: string,
   lookupKey: string,
-  lookupValue: string,
+  lookupValue: string | number,
   expectedState: Record<string, unknown>,
 ): Promise<ProjectionReadbackResult<T>> {
   // Check 1: read back with expected-state predicate.
