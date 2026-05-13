@@ -1,8 +1,22 @@
 # Fix `handle_user_role_assigned` to maintain `public.users.accessible_organizations`
 
-**Status**: seed (not yet planned)
+**Status**: SUPERSEDED 2026-05-13 — see `dev/active/reject-cross-provider-invitations/plan.md`
 **Priority**: Medium (affects post-invitation routing for multi-org users — frontend lands them on the wrong subdomain)
 **Origin**: PR #63 UAT Test 5 post-test finding (2026-05-13, Sally scenario for `dakaratekid@gmail.com`)
+
+## Supersession note (2026-05-13)
+
+Planning investigation revealed this seed treats a symptom of architectural drift, not a root cause. Per `documentation/architecture/data/provider-partners-architecture.md` (last updated 2026-05-06, still authoritative): cross-tenant access between distinct `provider`-type orgs is reserved for users whose home org is `provider_partner`, and is mediated by `cross_tenant_access_grants_projection` — NOT by native role assignment. dakaratekid's case is a provider→provider Sally invitation that should have been rejected at the boundary. Both `liveforlife` and `testorg-20260329` are confirmed `type='provider'`, `partner_type=NULL`.
+
+The architectural fix is to reject the invitation, not denormalize the data of an accepted-but-unintended invitation. See `dev/active/reject-cross-provider-invitations/` for the boundary-repair plan, including dakaratekid cleanup. The accessible_organizations denormalization gap closes automatically once provider→provider Sally invitations are rejected (no new offending rows).
+
+The full cross-tenant grant pipeline (api.create_access_grant, RLS on provider data, partner UI) remains parked at `dev/active/sub-tenant-admin-design/`.
+
+Routing-to-a4c symptom (dakaratekid landing on `a4c.firstovertheline.com/clients` despite JWT `org_id=liveforlife`) is NOT caused by `accessible_organizations` — routing reads JWT `org_id`, not the array. Seeded separately: `dev/active/investigate-auth-callback-priority-2-fallthrough.md`.
+
+---
+
+## Original framing (preserved for context, do not act on)
 
 ## Problem
 
