@@ -5,6 +5,35 @@
  * It handles both email/password and OAuth (Google) authentication methods.
  *
  * CQRS-compliant: Emits domain events for user creation and role assignment.
+ *
+ * # Cross-provider invitation boundary gate (2026-05-13, card reject-cross-provider-invitations)
+ *
+ * After the Sally-scenario detector (`checkExistingUserPath`) confirms the
+ * invitee is an existing user (has ≥1 role in any org), this function calls
+ * `api.check_invitation_acceptance_eligibility(invitee_user_id, target_org_id)`
+ * BEFORE emitting any `user.role.assigned` events.
+ *
+ * If the RPC returns `eligible=false` with `error='cross_provider_invitation_blocked'`,
+ * the request is rejected with HTTP 403. No role events are emitted; the
+ * invitation row stays in `pending` status (admin can revoke manually).
+ *
+ * Rationale: per `documentation/architecture/data/provider-partners-architecture.md`,
+ * cross-tenant access between `type='provider'` orgs is reserved for users
+ * whose home org is `type='provider_partner'`, mediated by
+ * `cross_tenant_access_grants_projection`. Direct cross-provider invitations
+ * were silently creating native multi-tenant role rows — closed in this commit.
+ *
+ * Defense-in-depth: `invite-user/index.ts` runs the same eligibility check at
+ * invitation-creation time (returns 422), so most blocked cases never produce
+ * an invitation token. This gate catches in-flight tokens issued before the
+ * `invite-user` gate shipped.
+ *
+ * TOCTOU window: between the eligibility check and the role-event emit, the
+ * invitee could in principle gain a new role in another provider org via a
+ * concurrent accept in a different tab. The window is single-EF-execution
+ * (~100ms) and the failure mode is benign — the second event still routes
+ * through `handle_user_role_assigned` which is idempotent on
+ * `(user_id, role_id, org_id)`. No mitigation in v1; revisit if observable.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -19,6 +48,7 @@ import {
   createCorsPreflightResponse,
   standardCorsHeaders,
 } from '../_shared/error-response.ts';
+import { checkInvitationEligibility } from '../_shared/check-invitation-eligibility.ts';
 import {
   extractTracingContext,
   createSpan,
@@ -27,7 +57,7 @@ import {
 import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v24-existing-user-check-sql-rpc-pivot';
+const DEPLOY_VERSION = 'v25-cross-provider-invitation-gate';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -595,6 +625,31 @@ serve(async (req) => {
         // Continue - we'll emit user.created to be safe (idempotent via projections)
       }
       const isExistingUser = existingUserCheck.isExistingUser;
+
+      // ====================================================================
+      // CROSS-PROVIDER INVITATION GATE (Sally path only)
+      // ====================================================================
+      // Card: reject-cross-provider-invitations (2026-05-13).
+      // For existing users (Sally), call api.check_invitation_acceptance_eligibility
+      // BEFORE emitting role events. If blocked, return 403. Skipping for
+      // greenfield users is safe: they have no existing roles to gate against,
+      // so the RPC would always return eligible=true.
+      //
+      // See top-of-file docblock for rationale + TOCTOU notes.
+      if (isExistingUser) {
+        const gate = await checkInvitationEligibility({
+          client: supabase,
+          inviteeUserId: userId,
+          targetOrgId: invitation.organization_id,
+          correlationId,
+          corsHeaders,
+          blockedStatus: 403,
+          logTag: `[accept-invitation v${DEPLOY_VERSION}]`,
+        });
+        if ('response' in gate) {
+          return gate.response;
+        }
+      }
 
       // Only emit user.created for NEW users (Sally scenario: skip for existing)
       if (!isExistingUser) {

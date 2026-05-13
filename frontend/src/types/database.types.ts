@@ -179,6 +179,10 @@ export type Database = {
         Args: { p_org_id: string }
         Returns: boolean
       }
+      check_invitation_acceptance_eligibility: {
+        Args: { p_invitee_user_id: string; p_target_org_id: string }
+        Returns: Json
+      }
       check_organization_by_name: {
         Args: { p_name: string }
         Returns: {
@@ -1609,31 +1613,6 @@ export type Database = {
       }
       validate_role_assignment: {
         Args: { p_role_ids: string[] }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
         Returns: Json
       }
     }
@@ -5908,9 +5887,6 @@ export type CompositeTypes<
 
 export const Constants = {
   api: {
-    Enums: {},
-  },
-  graphql_public: {
     Enums: {},
   },
   public: {
