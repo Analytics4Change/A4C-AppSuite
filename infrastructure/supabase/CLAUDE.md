@@ -382,6 +382,17 @@ handlers/
 > `documentation/architecture/decisions/adr-rpc-readback-pattern.md`;
 > `documentation/architecture/decisions/adr-edge-function-vs-sql-rpc.md`.
 
+> **⚠️ Cross-provider invitations are rejected at the Edge Function boundary**
+>
+> `accept-invitation` and `invite-user` call `api.check_invitation_acceptance_eligibility`
+> to reject direct provider→provider invitations (the invitee is already a
+> member of a different `type='provider'` org). Per
+> `documentation/architecture/data/provider-partners-architecture.md`,
+> cross-tenant access between providers requires a grant via a
+> `type='provider_partner'` org, not native multi-tenant role assignment.
+> Canonical statement of the rule lives in the EF docblocks; the RPC is
+> sourced at `infrastructure/supabase/supabase/migrations/20260513203931_reject_cross_provider_invitations.sql`.
+
 ## CQRS Query Rule
 
 > **⚠️ CRITICAL: All frontend queries MUST use `api.` schema RPC functions.**

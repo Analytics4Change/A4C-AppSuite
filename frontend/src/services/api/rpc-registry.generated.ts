@@ -105,6 +105,7 @@ export type EnvelopeRpcs =
 export type ReadRpcs =
   | 'bulk_assign_role'
   | 'check_field_definitions_exist'
+  | 'check_invitation_acceptance_eligibility'
   | 'check_organization_by_name'
   | 'check_organization_by_slug'
   | 'check_pending_invitation'

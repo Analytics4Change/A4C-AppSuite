@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-05-06
+last_updated: 2026-05-13
 ---
 
 <!-- TL;DR-START -->
@@ -40,6 +40,20 @@ last_updated: 2026-05-06
 **Version**: 2.2 (Updated for foundation implementation)
 **Last Updated**: 2025-12-02
 **Authentication**: Supabase Auth
+
+> [!IMPORTANT]
+> **Boundary Repair (2026-05-13)** — `accept-invitation` and `invite-user` Edge
+> Functions now reject direct cross-provider invitations at the boundary via
+> `api.check_invitation_acceptance_eligibility`. Provider→provider native
+> multi-tenant role assignment was previously silently allowed by the Sally
+> path; that drift is now closed. Partner→provider invitations are NOT yet
+> wired (grant producer pipeline is still un-implemented, see "NOT
+> Implemented" list above). Canonical statement of the gate lives in the
+> top-of-file docblocks of:
+> - `infrastructure/supabase/supabase/functions/accept-invitation/index.ts`
+> - `infrastructure/supabase/supabase/functions/invite-user/index.ts`
+>
+> Card: `dev/active/reject-cross-provider-invitations/`.
 
 ## Executive Summary
 
@@ -207,25 +221,25 @@ organizations_projection (PostgreSQL)
 │   └── Can manage all provider partner relationships
 │
 ├── VAR Partner ABC (Provider Partner Org) - Root level
-│   ├── type: 'partner'
+│   ├── type: 'provider_partner'
 │   ├── partner_type: 'var'
 │   ├── Roles: Partner Administrator, VAR Consultant
 │   └── Access: Via cross_tenant_access_grants (future)
 │
 ├── Juvenile Court XYZ (Provider Partner Org) - Root level
-│   ├── type: 'partner'
+│   ├── type: 'provider_partner'
 │   ├── partner_type: 'court'
 │   ├── Roles: Court Administrator, Guardian ad Litem
 │   └── Access: Court order-based grants (future)
 │
 ├── County CPS (Provider Partner Org) - Root level
-│   ├── type: 'partner'
+│   ├── type: 'provider_partner'
 │   ├── partner_type: 'other' (social services)
 │   ├── Roles: Agency Administrator, Case Worker
 │   └── Access: Assignment-based grants (future)
 │
 ├── Johnson Family Org (Provider Partner Org) - Root level
-│   ├── type: 'partner'
+│   ├── type: 'provider_partner'
 │   ├── partner_type: 'family'
 │   ├── Roles: Parent/Guardian
 │   └── Access: Consent-based grants (future)
@@ -281,7 +295,7 @@ family_consents_projection:          -- Family member consents
 cross_tenant_access_grants_projection:
   consultant_org_id: [partner_org_id]
   provider_org_id: org_provider_a
-  authorization_type: 'var_contract' | 'court_order' | 'agency_assignment' | 'family_consent'
+  authorization_type: 'var_contract' | 'court_order' | 'social_services_assignment' | 'family_participation'
   authorization_reference: [relationship_record_id]
   status: 'active'
 ```
@@ -307,7 +321,7 @@ interface AccessGrantCreatedEvent {
     consultant_user_id: string;     // Partner user
     consultant_org_id: string;      // Partner organization
     provider_org_id: string;        // Target provider
-    authorization_type: 'var_contract' | 'court_order' | 'agency_assignment' | 'family_consent';
+    authorization_type: 'var_contract' | 'court_order' | 'social_services_assignment' | 'family_participation';
     authorization_reference: string; // Relationship record ID
     scope: {
       data_types: string[];          // Type-specific data access
@@ -368,7 +382,7 @@ interface AccessGrantCreatedEvent {
 **Agency Assignment Authorization**:
 ```typescript
 {
-  authorization_type: 'agency_assignment',
+  authorization_type: 'social_services_assignment',
   authorization_reference: 'assignment_uuid',
   scope: {
     data_types: ['case_notes', 'service_plans', 'progress_reports'],
@@ -383,7 +397,7 @@ interface AccessGrantCreatedEvent {
 **Family Consent Authorization**:
 ```typescript
 {
-  authorization_type: 'family_consent',
+  authorization_type: 'family_participation',
   authorization_reference: 'consent_uuid',
   scope: {
     data_types: ['basic_health_status', 'appointment_schedules'],
@@ -431,14 +445,14 @@ USING (
         ))
         OR
         -- Agency: Check active assignment
-        (ctag.authorization_type = 'agency_assignment' AND EXISTS (
+        (ctag.authorization_type = 'social_services_assignment' AND EXISTS (
           SELECT 1 FROM agency_assignments_projection aa
           WHERE aa.id = ctag.authorization_reference::uuid
             AND aa.status = 'active'
         ))
         OR
         -- Family: Check valid consent
-        (ctag.authorization_type = 'family_consent' AND EXISTS (
+        (ctag.authorization_type = 'family_participation' AND EXISTS (
           SELECT 1 FROM family_consents_projection fc
           WHERE fc.id = ctag.authorization_reference::uuid
             AND fc.status = 'active'
@@ -579,7 +593,7 @@ CREATE TABLE cross_tenant_access_grants_projection (
   consultant_org_id UUID NOT NULL,
   provider_org_id UUID NOT NULL,
   authorization_type TEXT NOT NULL CHECK (authorization_type IN (
-    'var_contract', 'court_order', 'agency_assignment', 'family_consent'
+    'var_contract', 'court_order', 'social_services_assignment', 'family_participation'
   )),
   authorization_reference UUID,  -- References type-specific relationship record
   scope JSONB NOT NULL,
@@ -643,7 +657,7 @@ Enhanced metadata captures provider partner context:
       partnerOrgId: 'partner_org_uuid',
       partnerType: 'var' | 'court' | 'agency' | 'family',
       grantId: 'grant_uuid',
-      authorizationType: 'var_contract' | 'court_order' | 'agency_assignment' | 'family_consent',
+      authorizationType: 'var_contract' | 'court_order' | 'social_services_assignment' | 'family_participation',
       authorizationReference: 'relationship_uuid',
       legalBasis: 'Court Order #2024-JV-1234' | 'CPS Assignment' | 'Parental Consent',
       dataScope: ['basic_info', 'treatment_notes'],
@@ -674,13 +688,17 @@ Enhanced metadata captures provider partner context:
 
 **Database Schema (Implemented)**:
 ```sql
--- organizations_projection supports partner organizations
-CREATE TYPE organization_type AS ENUM ('provider', 'partner');
+-- organizations_projection supports partner organizations. NOTE: the live
+-- schema does NOT use a dedicated ENUM type — the column is `text` constrained
+-- by CHECK (`baseline_v4.sql:13111`):
+--   CHECK (type = ANY (ARRAY['platform_owner'::text, 'provider'::text, 'provider_partner'::text]))
+-- The legacy `'partner'` value documented in earlier drafts is incorrect.
 CREATE TYPE partner_type AS ENUM ('var', 'family', 'court', 'other');
 
 -- organizations_projection includes:
---   type: organization_type (provider or partner)
---   partner_type: partner_type (for partner orgs only)
+--   type: text CHECK (type IN ('platform_owner', 'provider', 'provider_partner'))
+--   partner_type: partner_type (REQUIRED for type='provider_partner' rows,
+--                  enforced by CHECK chk_partner_type_required)
 --   referring_partner_id: UUID (optional, who referred this org)
 ```
 

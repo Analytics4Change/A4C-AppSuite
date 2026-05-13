@@ -6,6 +6,28 @@
  *
  * CQRS-compliant: Emits user.invited domain event.
  * Permission required: user.create
+ *
+ * # Cross-provider invitation boundary gate (2026-05-13, card reject-cross-provider-invitations)
+ *
+ * When `checkEmailStatus` returns `other_org_member` (user exists in some
+ * organization other than the target), this function calls
+ * `api.check_invitation_acceptance_eligibility(invitee_user_id, target_org_id)`
+ * BEFORE generating the invitation token or emitting `user.invited`.
+ *
+ * If the RPC returns `eligible=false` with `error='cross_provider_invitation_blocked'`,
+ * the request is rejected with HTTP 422. No invitation token is issued; no
+ * `user.invited` event is emitted. This is the canonical (pre-issuance) gate
+ * — preferred over the `accept-invitation` Sally-path gate because it
+ * prevents a bad token from ever reaching the invitee.
+ *
+ * Rationale: per `documentation/architecture/data/provider-partners-architecture.md`,
+ * cross-tenant access between `type='provider'` orgs is reserved for users
+ * whose home org is `type='provider_partner'`, mediated by
+ * `cross_tenant_access_grants_projection`. Direct cross-provider invitations
+ * were silently creating native multi-tenant role rows — closed in this commit.
+ *
+ * Defense-in-depth: `accept-invitation/index.ts` runs the SAME eligibility
+ * check at acceptance time (returns 403). Both gates call the same RPC.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -25,6 +47,7 @@ import {
   standardCorsHeaders,
   createErrorResponse,
 } from '../_shared/error-response.ts';
+import { checkInvitationEligibility } from '../_shared/check-invitation-eligibility.ts';
 import {
   extractTracingContext,
   createSpan,
@@ -35,7 +58,7 @@ import { buildEventMetadata } from '../_shared/emit-event.ts';
 import { maskPii } from '../_shared/maskPii.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v17-revoke-extracted';
+const DEPLOY_VERSION = 'v18-cross-provider-invitation-gate';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -780,6 +803,32 @@ serve(async (req) => {
         } as InviteUserResponse),
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // ==========================================================================
+    // CROSS-PROVIDER INVITATION GATE (pre-issuance, defense in depth)
+    // ==========================================================================
+    // Card: reject-cross-provider-invitations (2026-05-13).
+    // If checkEmailStatus identified the invitee as a member of some OTHER
+    // organization (other_org_member), run api.check_invitation_acceptance_eligibility
+    // to confirm the cross-org invitation is allowed. Block at 422 BEFORE
+    // generating the invitation token / emitting user.invited.
+    //
+    // See top-of-file docblock for full rationale + reference to the
+    // acceptance-time gate in accept-invitation/index.ts.
+    if (emailStatus.status === 'other_org_member' && emailStatus.userId) {
+      const gate = await checkInvitationEligibility({
+        client: supabaseAdmin,
+        inviteeUserId: emailStatus.userId,
+        targetOrgId: orgId,
+        correlationId,
+        corsHeaders,
+        blockedStatus: 422,
+        logTag: `[invite-user v${DEPLOY_VERSION}]`,
+      });
+      if ('response' in gate) {
+        return gate.response;
+      }
     }
 
     // ==========================================================================
