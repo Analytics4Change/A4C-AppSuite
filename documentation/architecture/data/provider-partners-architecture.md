@@ -37,8 +37,8 @@ last_updated: 2026-05-13
 > - ❌ Type-specific relationship projections (VAR contracts, court authorizations, etc.)
 
 **Status**: ✅ Foundation Implemented | ⏳ Type-Specific Features Planned
-**Version**: 2.2 (Updated for foundation implementation)
-**Last Updated**: 2025-12-02
+**Version**: 2.3 (Boundary repair: cross-provider invitation gate)
+**Last Updated**: 2026-05-13
 **Authentication**: Supabase Auth
 
 > [!IMPORTANT]
@@ -814,7 +814,7 @@ CREATE TYPE partner_type AS ENUM ('var', 'family', 'court', 'other');
 
 ---
 
-**Document Version:** 2.2
-**Last Updated:** 2025-12-02
+**Document Version:** 2.3
+**Last Updated:** 2026-05-13
 **Status:** Foundation Implemented | Type-Specific Features Planned
 **Owner:** A4C Architecture Team

@@ -225,7 +225,14 @@ async function checkEmailStatus(
     }
   }
 
-  // Check if user exists in system (other orgs)
+  // Check if user exists in system (other orgs).
+  // PR #64 closeout (Finding #3): api.check_user_exists now filters
+  // `deleted_at IS NULL`, so a soft-deleted email returns no row here and is
+  // treated as greenfield (correct for re-invite-after-delete flow). The
+  // downstream cross-provider eligibility gate also relies on this filter
+  // to avoid blocking re-invitations of formerly-deleted users; the audit
+  // query in migration 20260513203931:185-187 mirrors the same filter, so
+  // audit and runtime are now aligned.
   const { data: existingUser, error: userError } = await supabase
     .rpc('check_user_exists', { p_email: email });
 
