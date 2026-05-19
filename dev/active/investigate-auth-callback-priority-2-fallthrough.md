@@ -1,9 +1,40 @@
 # Investigate AuthCallback Priority-2 fall-through to platform subdomain
 
-**Status**: seed (not yet planned)
+**Status**: seed (not yet planned) — **reproducibility data captured 2026-05-19** via PR #64 UAT T6
 **Priority**: Medium
 **Origin**: 2026-05-13 follow-up from `dev/active/reject-cross-provider-invitations/` planning investigation
 **Predecessor**: PR #63 UAT Test 5 (dakaratekid@gmail.com)
+
+## Reproducibility evidence (2026-05-19)
+
+During PR #64 UAT T6, dakaratekid was logged out and back in across **4 login cycles**:
+
+- **3 out of 4 cycles**: landed correctly on `liveforlife.firstovertheline.com` (Priority-2 happy path)
+- **1 out of 4 cycles**: fell through to `a4c.firstovertheline.com` (Priority-3 default — the bug)
+- **Reproducibility**: ~25%, intermittent, NOT deterministic
+
+**Key implication**: this is almost certainly a **race condition**, not a configuration / data issue. Possible root causes (in order of plausibility):
+
+1. **Stale JWT decoded before refresh completes** — the AuthCallback decodes the JWT from `freshSession` obtained via `auth.getSession()`, but on a fast OAuth callback the session might still be the prior-tab's session if `handleOAuthCallback()` hasn't fully completed when `determineRedirectUrl()` runs. The comment at `AuthCallback.tsx:200-203` explicitly acknowledges this: "This avoids the stale closure problem where `handleOAuthCallback()` updates Supabase's internal state but the React state closure captured at render time still has the old (null) session." The fix may not be complete — there could still be a race between Supabase's internal-state update and the next `getSession()` call.
+2. **Async timing in `getOrganizationSubdomainInfo`** — RPC may occasionally time out or return a delayed response; the catch-block falls through to Priority 3 without distinguishing "RPC failed" from "RPC said no verified subdomain."
+3. **Cloudflare or CDN caching** — unlikely but possible; could cache a stale 401 from the RPC under certain conditions.
+4. **Subdomain DNS propagation lag** — unlikely on liveforlife specifically since `subdomain_status='verified'` and the org has existed for weeks.
+
+## Suggested investigation order (updated 2026-05-19)
+
+1. **Add structured logging to AuthCallback** to capture, per cycle:
+   - What was in `freshSession?.access_token` at decode time (just first 16 chars + presence-check, not full token)
+   - What `orgId` was decoded
+   - What `getOrganizationSubdomainInfo(orgId)` returned (full response, including error)
+   - Which Priority branch fired (2 vs 3)
+   - Time deltas between `handleOAuthCallback()` start, session-fetch, RPC call, redirect
+2. **Reproduce the 1-in-4 rate** with logging enabled. Capture at least 5 fall-through cases + 15 successful cases to compare.
+3. **Hypothesis test**: if the bug is the "stale JWT before refresh," fall-through cases should show `freshSession?.access_token` either NULL or matching a *prior* session — observable from log analysis.
+4. **If the bug is RPC failure**, fall-through cases should show non-null error in the `getOrganizationSubdomainInfo` response.
+5. **Frontend fix candidates** depend on root cause:
+   - For race condition: add a retry loop or `await` until session token is the OAuth-callback-provisioned one
+   - For RPC failure: distinguish "RPC error" (retry / show error) from "no verified subdomain" (Priority 3 is legitimate)
+   - Both: improve the Priority-3 fallback path to NOT silently swallow the situation — log it, surface it to error tracking
 
 ## Problem
 
