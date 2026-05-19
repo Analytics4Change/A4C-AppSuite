@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-19
 ---
 
 <!-- TL;DR-START -->
@@ -180,16 +180,18 @@ CREATE INDEX idx_users_current_organization ON users(current_organization_id);
   - Reporting and analytics
 - **Performance**: Faster than scanning all users
 
-#### idx_users_roles
+#### idx_users_accessible_orgs_gin
 ```sql
-CREATE INDEX idx_users_roles ON users USING GIN (accessible_organizations);
+CREATE INDEX idx_users_accessible_orgs_gin ON public.users USING GIN (accessible_organizations);
 ```
 - **Purpose**: Enable efficient queries on accessible organizations array
 - **Type**: GIN (Generalized Inverted Index) for array containment
 - **Usage**:
   - Find all users with access to an organization: `WHERE '<org-uuid>' = ANY(accessible_organizations)`
+  - Membership oracle queries in `api.list_users` and any other admin-list RPC
   - Multi-tenant access queries
-- **Performance**: Essential for array containment queries
+- **Performance**: Essential for array containment queries — without this index, predicates of the form `<uuid> = ANY(accessible_organizations)` degrade to a sequential scan
+- **Added in**: `infrastructure/supabase/supabase/migrations/20260519233323_fix_list_users_include_roleless.sql`
 
 #### idx_users_external_id
 ```sql
