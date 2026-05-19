@@ -43,45 +43,45 @@ Implications:
 2. As the permission catalog grows (new applets, new permissions), the chunking will hit more roles.
 3. The fix is **structurally correct** for the long term, not just a tactical workaround.
 
+## Investigation finding (2026-05-19) — the nginx is NOT in the ingress tier
+
+The card originally assumed the 400 came from an nginx-ingress controller and prescribed an `nginx.ingress.kubernetes.io/large-client-header-buffers` annotation. **That diagnosis was wrong.** Cluster reality:
+
+- Ingress controller: **Traefik 3.3.6** (k3s default, helm-installed). All 3 cluster Ingresses (`a4c-frontend-ingress`, `tenant-wildcard-ingress`, `temporal-api-ingress`) use `ingressClassName: traefik`. There is no nginx-ingress installation anywhere in the cluster.
+- The `nginx/1.31.0` error string comes from the **frontend SPA container's own nginx** (`nginx:alpine` per `frontend/Dockerfile:5`). The SPA pod IS the upstream that Traefik forwards to. Its config (`frontend/nginx/default.conf`) had no `large_client_header_buffers` directive, so it inherited nginx's default of `4 8k`.
+- Request path: browser → Cloudflare → Cloudflare Tunnel → Traefik (port 80/443) → `a4c-frontend-service` → `nginx:alpine` pod → 400.
+
+This means the fix is much simpler than the card initially scoped — and it ships through the standard frontend CI/CD pipeline.
+
 ## Fix
 
-Add an `nginx.ingress.kubernetes.io/large-client-header-buffers` annotation to the Ingress resource(s) serving `*.firstovertheline.com`. Suggested value: `"4 32k"` (4 buffers × 32KB each — generous headroom for super_admin's JWT plus future claim growth).
+Add `large_client_header_buffers 4 32k;` to the `server` block in `frontend/nginx/default.conf`. 32k is overkill for a 4.3 KB JWT chunked across cookies but gives headroom for future permission-catalog growth. Single-file diff; `frontend-deploy.yml` rebuilds the image and rolls the pod on merge to main.
 
-```yaml
-metadata:
-  annotations:
-    nginx.ingress.kubernetes.io/large-client-header-buffers: "4 32k"
-    # Or, if ingress-nginx variant:
-    # nginx.ingress.kubernetes.io/proxy-buffer-size: "32k"
-    # nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+```nginx
+server {
+    listen 80;
+    server_name _;
+    # ...
+    large_client_header_buffers 4 32k;
+    # ...
+}
 ```
 
-## Open questions for planning
+## Open questions (resolved during investigation)
 
-1. **Where is the Ingress resource defined?**
-   `infrastructure/k8s/` contains `temporal-api/ingress.yaml` but no Ingress for the frontend / wildcard subdomain. Grep shows it's not tracked in this repo:
-   ```bash
-   grep -rE "kind: Ingress" infrastructure/k8s/ 2>/dev/null
-   # Only temporal-api/ingress.yaml
-   ```
-   The frontend / wildcard Ingress is likely defined in the cluster directly (kubectl apply against the k3s cluster) without IaC tracking — that's a separate hygiene gap worth surfacing in the same card.
-
-2. **Is the Ingress controller `ingress-nginx` (Kubernetes community) or another distribution (nginx, traefik)?**
-   The error format `nginx/1.31.0` suggests stock nginx, which matches `ingress-nginx`. Confirm by `kubectl describe pod -n ingress-nginx <pod>`.
-
-3. **Is the bootstrap workflow (`workflows/src/activities/createIngressForOrgUnit.ts` or similar) creating per-org Ingress resources, OR a wildcard Ingress with TLS handling subdomains?**
-   - Wildcard → one annotation patch fixes everything
-   - Per-org → bootstrap activity needs the annotation baked into the generated YAML, and all existing per-org Ingresses need patching
+1. ~~**Where is the Ingress resource defined?**~~ → Resolved: not relevant to this fix. (Still a real GitOps gap: `a4c-frontend-ingress` and `tenant-wildcard-ingress` are NOT tracked in `infrastructure/k8s/`. Recommend a separate card.)
+2. ~~**Is the Ingress controller nginx or traefik?**~~ → Resolved: **Traefik 3.3.6**. The nginx in the error is in-container.
+3. ~~**Per-org vs wildcard Ingress?**~~ → Resolved: single wildcard `tenant-wildcard-ingress` fans out to `a4c-frontend-service`. Bootstrap workflow doesn't generate per-org Ingresses. Not relevant — the fix is in the SPA container, not Ingress YAML.
 
 ## Verification
 
-After applying the patch:
+After PR merges and `frontend-deploy.yml` completes:
 
-1. `kubectl describe ingress -n <namespace> <name>` shows the annotation
+1. `kubectl exec -n default <a4c-frontend-pod> -- nginx -T | grep large_client_header_buffers` shows `4 32k`
 2. Login as super_admin on `a4c.firstovertheline.com`
-3. Navigate to ANY provider subdomain (e.g., `liveforlife.firstovertheline.com`, `testorg-20260329.firstovertheline.com`)
+3. Navigate to a provider subdomain (`liveforlife.firstovertheline.com`, `testorg-20260329.firstovertheline.com`)
 4. Expected: page loads (no 400)
-5. DevTools → Network → confirm request `Cookie` header is large (>4KB) and response is 200
+5. DevTools → Network → request `Cookie` header is >4KB, response is 200
 
 ## Out of scope
 
