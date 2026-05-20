@@ -714,19 +714,22 @@ WHERE current_organization_id IS NOT NULL
 ```
 
 #### Array Containment Query Slow
-**Symptom**: Queries with `ANY(accessible_organizations)` taking > 100ms
+**Symptom**: Membership queries against `accessible_organizations` taking > 100ms
 
 **Diagnosis**:
 ```sql
+-- Use the indexable containment form, not `scalar = ANY(column)`
 EXPLAIN ANALYZE
-SELECT * FROM users WHERE '<org-uuid>' = ANY(accessible_organizations);
+SELECT * FROM users WHERE accessible_organizations @> ARRAY['<org-uuid>']::uuid[];
 ```
 
-**Expected Plan**: Should use `idx_users_roles` GIN index
+**Expected Plan**: Should use `idx_users_accessible_orgs_gin` (Bitmap Index Scan)
+
+**Note**: `scalar = ANY(column)` is NOT indexable by GIN `array_ops`; the planner cannot rewrite it to use the index. Always use `@> ARRAY[...]::uuid[]`.
 
 **Solution**:
 - Verify GIN index exists: `\d users`
-- REINDEX if needed: `REINDEX INDEX idx_users_roles;`
+- REINDEX if needed: `REINDEX INDEX idx_users_accessible_orgs_gin;`
 - VACUUM table: `VACUUM ANALYZE users;`
 
 ### Performance Issues
