@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-05-20
 ---
 
 <!-- TL;DR-START -->
@@ -180,16 +180,29 @@ CREATE INDEX idx_users_current_organization ON users(current_organization_id);
   - Reporting and analytics
 - **Performance**: Faster than scanning all users
 
-#### idx_users_roles
+#### idx_users_accessible_orgs_gin
 ```sql
-CREATE INDEX idx_users_roles ON users USING GIN (accessible_organizations);
+CREATE INDEX idx_users_accessible_orgs_gin ON public.users USING GIN (accessible_organizations);
 ```
 - **Purpose**: Enable efficient queries on accessible organizations array
 - **Type**: GIN (Generalized Inverted Index) for array containment
 - **Usage**:
-  - Find all users with access to an organization: `WHERE '<org-uuid>' = ANY(accessible_organizations)`
+  - Find all users with access to an organization: `WHERE accessible_organizations @> ARRAY['<org-uuid>'::uuid]`
+  - Membership oracle queries in `api.list_users` and any other admin-list RPC
   - Multi-tenant access queries
 - **Performance**: Essential for array containment queries
+- **Predicate-shape requirement**: PostgreSQL's GIN `array_ops` opclass indexes the containment operators (`@>`, `<@`, `&&`, `=`) but **not** the `scalar = ANY(column)` form. Always write `accessible_organizations @> ARRAY[<uuid>]::uuid[]` — the planner cannot rewrite `<uuid> = ANY(accessible_organizations)` into a GIN-eligible predicate, so the latter form will fall back to a sequential scan even with the index present.
+- **Added in**: `infrastructure/supabase/supabase/migrations/20260519233323_fix_list_users_include_roleless.sql`
+
+#### idx_users_roles
+```sql
+CREATE INDEX idx_users_roles ON public.users USING GIN (roles);
+```
+- **Purpose**: Enable efficient queries on the JSONB `roles` column (if/when it is populated; primary role data lives in `user_roles_projection`)
+- **Type**: GIN (Generalized Inverted Index) for JSONB containment
+- **Usage**: JSONB containment predicates (`roles @> '[{"role_name":"admin"}]'::jsonb`); not currently used by any `api.*` RPC
+- **Performance**: Indexes JSONB containment / key-existence operators
+- **Note**: The index name is potentially confusing — it covers the legacy `users.roles` JSONB column, NOT `accessible_organizations`. Membership queries belong on `idx_users_accessible_orgs_gin` above.
 
 #### idx_users_external_id
 ```sql
@@ -701,19 +714,22 @@ WHERE current_organization_id IS NOT NULL
 ```
 
 #### Array Containment Query Slow
-**Symptom**: Queries with `ANY(accessible_organizations)` taking > 100ms
+**Symptom**: Membership queries against `accessible_organizations` taking > 100ms
 
 **Diagnosis**:
 ```sql
+-- Use the indexable containment form, not `scalar = ANY(column)`
 EXPLAIN ANALYZE
-SELECT * FROM users WHERE '<org-uuid>' = ANY(accessible_organizations);
+SELECT * FROM users WHERE accessible_organizations @> ARRAY['<org-uuid>']::uuid[];
 ```
 
-**Expected Plan**: Should use `idx_users_roles` GIN index
+**Expected Plan**: Should use `idx_users_accessible_orgs_gin` (Bitmap Index Scan)
+
+**Note**: `scalar = ANY(column)` is NOT indexable by GIN `array_ops`; the planner cannot rewrite it to use the index. Always use `@> ARRAY[...]::uuid[]`.
 
 **Solution**:
 - Verify GIN index exists: `\d users`
-- REINDEX if needed: `REINDEX INDEX idx_users_roles;`
+- REINDEX if needed: `REINDEX INDEX idx_users_accessible_orgs_gin;`
 - VACUUM table: `VACUUM ANALYZE users;`
 
 ### Performance Issues
