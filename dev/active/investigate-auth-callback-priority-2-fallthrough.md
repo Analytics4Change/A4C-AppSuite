@@ -13,6 +13,16 @@ During PR #64 UAT T6, dakaratekid was logged out and back in across **4 login cy
 - **1 out of 4 cycles**: fell through to `a4c.firstovertheline.com` (Priority-3 default — the bug)
 - **Reproducibility**: ~25%, intermittent, NOT deterministic
 
+### Additional observation 2026-05-20 (PR #66 UAT prep)
+
+Fresh Chrome session under dakaratekid Google identity (post-PR #65 nginx fix shipped). Login flow:
+
+1. Opened `a4c.firstovertheline.com/login` directly
+2. Chose Google authentication; OAuth completed successfully
+3. **Landed at `a4c.firstovertheline.com/clients`** instead of expected `liveforlife.firstovertheline.com/clients`
+
+This is the **5th cumulative data point** (1 fall-through across PR #64 T6 + 1 from this session = ~25% rate persists). Workaround: manual URL navigation to `liveforlife.firstovertheline.com` worked cleanly with no re-auth required (the `.firstovertheline.com` cookie carried the session, and the nginx buffer fix from PR #65 ensured the chunked auth-token cookies fit). Underscores hypothesis 1 (stale-session race) — if Cloudflare/CDN caching were the cause, manual navigation likely wouldn't paper over it.
+
 **Key implication**: this is almost certainly a **race condition**, not a configuration / data issue. Possible root causes (in order of plausibility):
 
 1. **Stale JWT decoded before refresh completes** — the AuthCallback decodes the JWT from `freshSession` obtained via `auth.getSession()`, but on a fast OAuth callback the session might still be the prior-tab's session if `handleOAuthCallback()` hasn't fully completed when `determineRedirectUrl()` runs. The comment at `AuthCallback.tsx:200-203` explicitly acknowledges this: "This avoids the stale closure problem where `handleOAuthCallback()` updates Supabase's internal state but the React state closure captured at render time still has the old (null) session." The fix may not be complete — there could still be a race between Supabase's internal-state update and the next `getSession()` call.
