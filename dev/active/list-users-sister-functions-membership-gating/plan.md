@@ -36,7 +36,15 @@ In all three, the eventual membership filter is `u.current_organization_id = v_o
 
 ## Fix sketch
 
-Replace each `WHERE u.current_organization_id = v_org_id` with `WHERE v_org_id = ANY(u.accessible_organizations)`. Same predicate as the now-shipped `api.list_users` fix; uses the same backing index (`idx_users_accessible_orgs_gin` from PR #66). Single migration covering all three functions.
+Replace each `WHERE u.current_organization_id = v_org_id` with:
+
+```sql
+WHERE u.accessible_organizations @> ARRAY[v_org_id]::uuid[]
+```
+
+Use the **`@>` containment form, NOT `= ANY(...)`** — PostgreSQL's GIN `array_ops` opclass indexes `@>`, `<@`, `&&`, `=` but does **not** support `scalar = ANY(column)`. PR #66 established this convention after a reviewer caught the `= ANY` form leaving the GIN index unused (see PR #66 architectural review, Finding 1). The same backing index (`idx_users_accessible_orgs_gin`, created in PR #66) covers all three sister functions; no new index needed.
+
+Single migration covering all three functions. Each function should also consider whether the sister-specific tenancy guard (already present via `has_effective_permission('user.role_assign', ...)` for two of them; `public.get_current_org_id()` for `schedule_management`) needs adjustment after broadening the visible rowset — review case-by-case.
 
 ## Test subjects (synthesize if absent)
 

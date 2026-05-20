@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-05-19
+last_updated: 2026-05-20
 ---
 
 <!-- TL;DR-START -->
@@ -187,11 +187,22 @@ CREATE INDEX idx_users_accessible_orgs_gin ON public.users USING GIN (accessible
 - **Purpose**: Enable efficient queries on accessible organizations array
 - **Type**: GIN (Generalized Inverted Index) for array containment
 - **Usage**:
-  - Find all users with access to an organization: `WHERE '<org-uuid>' = ANY(accessible_organizations)`
+  - Find all users with access to an organization: `WHERE accessible_organizations @> ARRAY['<org-uuid>'::uuid]`
   - Membership oracle queries in `api.list_users` and any other admin-list RPC
   - Multi-tenant access queries
-- **Performance**: Essential for array containment queries — without this index, predicates of the form `<uuid> = ANY(accessible_organizations)` degrade to a sequential scan
+- **Performance**: Essential for array containment queries
+- **Predicate-shape requirement**: PostgreSQL's GIN `array_ops` opclass indexes the containment operators (`@>`, `<@`, `&&`, `=`) but **not** the `scalar = ANY(column)` form. Always write `accessible_organizations @> ARRAY[<uuid>]::uuid[]` — the planner cannot rewrite `<uuid> = ANY(accessible_organizations)` into a GIN-eligible predicate, so the latter form will fall back to a sequential scan even with the index present.
 - **Added in**: `infrastructure/supabase/supabase/migrations/20260519233323_fix_list_users_include_roleless.sql`
+
+#### idx_users_roles
+```sql
+CREATE INDEX idx_users_roles ON public.users USING GIN (roles);
+```
+- **Purpose**: Enable efficient queries on the JSONB `roles` column (if/when it is populated; primary role data lives in `user_roles_projection`)
+- **Type**: GIN (Generalized Inverted Index) for JSONB containment
+- **Usage**: JSONB containment predicates (`roles @> '[{"role_name":"admin"}]'::jsonb`); not currently used by any `api.*` RPC
+- **Performance**: Indexes JSONB containment / key-existence operators
+- **Note**: The index name is potentially confusing — it covers the legacy `users.roles` JSONB column, NOT `accessible_organizations`. Membership queries belong on `idx_users_accessible_orgs_gin` above.
 
 #### idx_users_external_id
 ```sql
