@@ -102,3 +102,36 @@ No frontend code change expected (signatures unchanged).
 - ✅ **Finding #7** (Nit) — Phase 2.2 time estimate bumped to 40 min (15+25 split)
 - ✅ **Finding #8** (Nit) — Phase 6.4a UI walkthrough explicit on click-path and verification target
 - ⏸️ **Finding #9** (Nit) — `frontend/src/services/CLAUDE.md` + `infrastructure/supabase/CLAUDE.md` quick search-pass deferred to Phase 4 task 4.3 as part of the Drift Checklist
+
+---
+
+## Closeout — 2026-05-21
+
+**PR #67 merged**: commit `ad95a3f1` at 2026-05-21T23:15:28Z. Architectural review verdict was **APPROVE WITH IN-PR FIXES** (5 findings, all addressed). User escalated Item #4 (architect's "map the divergence in the header" nit) to "unify the approach"; informed by a threat-model audit (three parallel Explore agents). Result: 2 of 3 sister RPCs refactored from the verbose `get_permission_scope + manual @>` two-step pattern to a single `has_effective_permission(perm, path)` call. All three sisters now share a uniform three-step skeleton (permission gate → org derivation → membership predicate).
+
+### CI / deploy verification
+
+- **Deploy Database Migrations** (run [26258662241](https://github.com/Analytics4Change/A4C-AppSuite/actions/runs/26258662241)) — SUCCESS. Apply-step reported "Remote database is up to date" — body was already current via the in-PR `migration repair --status reverted` + re-push iteration.
+- **RPC Shape Registry Sync** on PR HEAD `1207ca46` (run [26258151473](https://github.com/Analytics4Change/A4C-AppSuite/actions/runs/26258151473)) — SUCCESS.
+
+### Final diff at merge
+
+- 6 files changed, 757 insertions(+), 78 deletions(-)
+- New migration: `infrastructure/supabase/supabase/migrations/20260521195657_fix_list_users_sister_functions_membership_gating.sql` (refactored bodies + slimmed header)
+- `documentation/architecture/authorization/rbac-architecture.md` — permission-gate description fixed for `list_users_for_role_management` entry per architect Finding #5 exact wording
+- `infrastructure/supabase/CLAUDE.md` — two new subsections under "Supabase CLI Migrations": "Migration-session SET search_path gotcha" + "`list_users*` family pattern — three-step skeleton"
+- `documentation/infrastructure/reference/database/tables/users.md` — minor; GIN-index section updated to note coverage of all four `list_users*` RPCs
+
+### UAT verification (transactional smoke harness)
+
+The transactional `BEGIN; ... ROLLBACK;` smoke harness from this card's Phase 3 was re-run post-refactor and produced identical pass results (semantic equivalence at current JWT-shape; the forward-compatibility improvement is invisible until cross-tenant grants ship and produce multi-entry-per-permission JWTs). No UI walkthrough run post-merge — these are read RPCs with no user-observable behavior change at current single-org dev state.
+
+### Side-finding promoted to its own card
+
+The threat-model audit's central finding — that PR #66's `api.list_users` tenancy guard would block legitimate partner-consultant grants when sub-tenant-admin / provider-partner work activates — is captured in `memory/pr-67-close-out.md` "Deferred: cross-tenant-grant audit" subsection AND seeded as a new design-discussion card at `dev/active/cross-tenant-access-grant-rollout/`. That card holds Phase 0 (architecture design) and the downstream RPC-audit phases including the operational tripwire on `compute_effective_permissions`.
+
+### Card archived
+
+This card's work is complete. Future related work belongs in:
+- `dev/active/cross-tenant-access-grant-rollout/` — the broader grant architecture + audit
+- A future "extend list_users-family normalization to mutation siblings" card (`api.bulk_assign_role` + `api.sync_role_assignments` — they share the same legacy two-step pattern but were out of scope here per visibility-vs-mutation split)
