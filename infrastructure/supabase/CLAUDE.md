@@ -83,6 +83,29 @@ supabase migration repair --status reverted <version>
 
 **Note**: Docker/Podman is required for some Supabase CLI commands. Set `DOCKER_HOST=unix:///run/user/1000/podman/podman.sock` if using Podman.
 
+### Migration-session `SET search_path` gotcha (extension-typed parameters)
+
+Function-attribute `SET search_path TO 'public', 'extensions', ...` applies INSIDE the function body but **NOT during `CREATE OR REPLACE FUNCTION` parameter-type parsing**. Any migration that uses extension-typed parameters in a signature (`ltree`, `vector`, `pg_trgm`, etc.) will fail with `type "<type>" does not exist (SQLSTATE 42704)` unless the migration session's search_path includes `extensions`. Add a session-level `SET search_path = public, extensions, pg_temp;` at the top of the migration file before any such `CREATE OR REPLACE FUNCTION` statements. (Discovered in PR #67 when migration with `p_scope_path ltree` parameter failed first push.)
+
+### `list_users*` family pattern — three-step skeleton
+
+The four `api.list_users*` RPCs share a normalized three-step skeleton (established across PR #66 and PR #67):
+
+1. **Permission gate**: `IF NOT public.has_effective_permission('<perm>', <scope_path>) THEN RAISE EXCEPTION 'Missing permission: <perm>' USING ERRCODE = 'insufficient_privilege'; END IF;` (or, for the org-param shape, the early-return tenancy guard — see `list_users` exception below).
+2. **`v_org_id` derivation** (signature-dependent):
+   - org-param signature (`list_users`): `v_org_id := p_org_id` directly (with tenancy guard)
+   - scope-path signature (`list_users_for_role_management`, `list_users_for_bulk_assignment`): `SELECT o.id INTO v_org_id FROM organizations_projection o WHERE o.path = subpath(p_scope_path, 0, 1) AND o.deleted_at IS NULL;`
+   - template-id signature (`list_users_for_schedule_management`): `v_org_id := public.get_current_org_id();` then validate template belongs to that org
+3. **Membership-predicate query**: `WHERE u.accessible_organizations @> ARRAY[v_org_id]::uuid[]` — the canonical membership oracle, GIN-indexed via `idx_users_accessible_orgs_gin`. NEVER use `current_organization_id = v_org_id` (that's the user's active-session pointer, not a membership oracle) and NEVER use `scalar = ANY(accessible_organizations)` (GIN `array_ops` doesn't index that form — the `@>` containment form is required).
+
+**Variant**: `api.list_users` (PR #66) uses an early-return tenancy guard (`IF NOT (has_platform_privilege() OR p_org_id = get_current_org_id()) THEN RETURN; END IF;`) in place of the scope-bound permission gate, because its signature takes an explicit `p_org_id` parameter without a permission name. This guard is correct for the org-internal admin use case but is potentially incompatible with future cross-tenant grants — flagged for future audit when partner-grant work activates.
+
+**Two-step → one-step normalization (PR #67)**: legacy bodies that derived `v_user_scope := public.get_permission_scope(perm)` and then manually checked `v_user_scope @> p_scope_path` should be collapsed to a single `has_effective_permission(perm, p_scope_path)` call. This is strictly more correct under multi-scope JWT entries (cross-tenant grant scenario): `get_permission_scope` does `LIMIT 1`; `has_effective_permission` does `EXISTS`. Today they're observationally equivalent because `compute_effective_permissions` ends in `DISTINCT ON (permission_name)`, but that invariant is one cross-tenant-grant feature away from breaking.
+
+**Four-site distribution audit** (baseline_v4 grep for the two-step `'Requested scope is outside your permission scope'` error): `api.bulk_assign_role` (L362, mutation), `api.list_users_for_bulk_assignment` (L4705, visibility — normalized in PR #67), `api.list_users_for_role_management` (L4793, visibility — normalized in PR #67), `api.sync_role_assignments` (L5571, mutation). The two mutation siblings remain on the legacy pattern; a future card may extend normalization to them.
+
+**Pattern origin**: PR #66 introduced the `accessible_organizations @>` membership convention; PR #67 extended it to the three sister RPCs + normalized the permission-check helper. See `memory/pr-66-close-out.md` and (when written post-merge) `memory/pr-67-close-out.md` for the full close-out narratives.
+
 ## PL/pgSQL Validation (plpgsql_check)
 
 CI/CD validates all PL/pgSQL functions before deploying migrations. Catches column name mismatches, type errors, and other issues before reaching production.

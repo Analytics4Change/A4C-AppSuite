@@ -3,74 +3,61 @@
 -- Origin:    dev/active/list-users-sister-functions-membership-gating/
 -- Precedent: PR #66 (merged 2026-05-20, commit 33e77a4f) — established the
 --            `accessible_organizations @> ARRAY[<uuid>]::uuid[]` convention
---            for membership-gated user-listing RPCs.
+--            as the canonical membership oracle for user-listing RPCs.
 -- ============================================================================
 --
--- Problem
--- -------
--- Three sister RPCs to api.list_users carry a different but related smell:
--- they gate user-list membership by `u.current_organization_id = v_org_id`.
--- `current_organization_id` is the user's ACTIVE SESSION pointer (per memory,
--- set via api.switch_org_unit at clock-in for direct-care staff; NULL for
--- super_admin and platform-only users). It is NOT the membership oracle.
+-- What this does
+-- --------------
+-- Two changes across the three `list_users_for_*` visibility-class RPCs:
 --
--- Consequence pre-fix: multi-org users (users with a row in
--- user_organizations_projection for multiple orgs) are invisible in
--- role-management, bulk-assignment, and schedule-assignment admin UIs unless
--- their `current_organization_id` happens to match the target org. Same gap
--- as PR #66's api.list_users, on three additional surfaces.
+-- (1) Membership predicate swap: `WHERE u.current_organization_id = v_org_id`
+--     → `WHERE u.accessible_organizations @> ARRAY[v_org_id]::uuid[]`.
+--     Reuses the GIN index idx_users_accessible_orgs_gin from PR #66.
+--     Fixes the multi-org-user invisibility gap that the active-session
+--     pointer (`current_organization_id`) created.
 --
--- Today on dev the defect is dormant (no multi-org users exist), but it
--- will become routine when the cross-tenant grant pipeline ships per
--- dev/active/sub-tenant-admin-design/.
+-- (2) Permission-check normalization (role-functions only — schedule already
+--     uses this shape): collapse `v_user_scope := get_permission_scope(...)
+--     + manual ltree @> check` into a single `has_effective_permission(perm,
+--     scope_path)` call. All three sister RPCs now share the permission-
+--     check helper. See infrastructure/supabase/CLAUDE.md §"`list_users*`
+--     family pattern — three-step skeleton" for the full pattern doc.
 --
--- Fix
--- ---
--- Replace the predicate in all three function bodies:
+-- Four-site distribution of the prior two-step pattern
+-- ----------------------------------------------------
+-- A grep of baseline_v4 for the two-step pattern's "Requested scope is
+-- outside your permission scope" error message finds FOUR sites:
 --
---   BEFORE: WHERE u.current_organization_id = v_org_id
---   AFTER:  WHERE u.accessible_organizations @> ARRAY[v_org_id]::uuid[]
+--   L362  api.bulk_assign_role            (mutation; out of scope)
+--   L4705 api.list_users_for_bulk_assignment (visibility; normalized here)
+--   L4793 api.list_users_for_role_management (visibility; normalized here)
+--   L5571 api.sync_role_assignments        (mutation; out of scope)
 --
--- `users.accessible_organizations` (uuid[]) is the canonical membership
--- oracle, maintained by trigger trg_sync_accessible_orgs from
--- user_organizations_projection. Same predicate shape PR #66 established
--- for api.list_users; reuses the GIN index idx_users_accessible_orgs_gin
--- created in that PR.
+-- This PR normalizes the two VISIBILITY-class siblings only. The two
+-- MUTATION-class siblings are intentionally out of scope: mutations carry
+-- side-effect risk warranting a focused diff, and PR #67 is scoped by both
+-- card title and architect-blessed plan to "list_users sister RPCs." Short-
+-- term visibility/mutation inconsistency in permission-check style is
+-- acceptable; no user-observable behavior changes. Future normalization
+-- card may extend to the mutation siblings.
 --
--- Predicate-shape note (re-stated from PR #66): PostgreSQL's GIN array_ops
--- opclass indexes the containment operators (@>, <@, &&, =) but NOT
--- `scalar = ANY(col)`. The `@>` form is the GIN-indexable shape; do not
--- rewrite to `= ANY` without dropping the index.
+-- Tripwire — why the permission-check refactor is strictly more correct
+-- ---------------------------------------------------------------------
+-- The two-step pattern (get_permission_scope LIMIT 1, manual @> check) is
+-- observationally equivalent to has_effective_permission (EXISTS) TODAY
+-- because compute_effective_permissions (baseline_v4:6932-6985) ends in
+-- `SELECT DISTINCT ON (permission_name)` — JWT carries at most one entry
+-- per permission name. If that invariant is ever broken (e.g., cross-tenant
+-- grants ship and produce multiple effective_permissions entries for the
+-- same permission at different scopes), the LIMIT-1 pattern silently picks
+-- first and may miss a valid match; the EXISTS pattern correctly ORs across
+-- all entries. The refactor removes a latent correctness bug ahead of the
+-- cross-tenant grant work captured in dev/active/sub-tenant-admin-design/.
 --
--- Scope decisions (per architect-reviewed plan)
--- ---------------------------------------------
--- - NOT changing the per-function permission gates (each RPC already has
---   one: has_effective_permission('user.role_assign', p_scope_path) for the
---   two role-functions; has_effective_permission('user.schedule_manage',
---   <ou_or_org_path>) for schedule_management). The predicate swap broadens
---   what's enumerable AT a given scope, but the scope itself is still
---   gated by the existing checks.
--- - NOT reframing `current_organization_id` semantics — it remains the
---   active-session pointer for direct-care use.
--- - NOT addressing super_admin invisibility. Super_admins on dev have
---   `current_organization_id IS NULL` AND `accessible_organizations IS NULL`.
---   `NULL::uuid[] @> ARRAY[<uuid>]::uuid[]` returns NULL (treated as
---   not-matching by WHERE), so super_admins remain excluded post-fix.
---   They have global permissions and rarely have specific role_id
---   assignments at narrow ltree paths, so this is acceptable. If UX
---   feedback later disagrees, file a separate card.
--- - NOT applying PR #66's COUNT(*) OVER () dedup pattern: these three RPCs
---   don't return total_count; they paginate directly with LIMIT/OFFSET.
---   Pagination total is a consumer-side concern.
---
--- COMMENT prose
--- -------------
--- - list_users_for_bulk_assignment had descriptive COMMENT prose pre-fix:
---   edit to mention `accessible_organizations` as the membership oracle.
--- - list_users_for_role_management and list_users_for_schedule_management
---   carried only the bare `@a4c-rpc-shape: read` tag pre-fix: author full
---   new prose blocks (purpose + membership oracle + permission gate +
---   shape tag), modeled on api.list_users.
+-- Migration-session search_path note: the `ltree` parameter type lives in
+-- the `extensions` schema. Function-attribute `SET search_path` does NOT
+-- apply during CREATE-time parameter parsing — set session-level so `ltree`
+-- resolves. (Pattern codified in infrastructure/supabase/CLAUDE.md.)
 --
 -- Body-drift anchor (captured 2026-05-21 pre-write — Phase 1.5):
 --   list_users_for_bulk_assignment    md5: 49e14e620a8b6fc8900cbc018ad5d6bc
@@ -80,11 +67,6 @@
 -- Idempotent: all three are CREATE OR REPLACE FUNCTION (signature unchanged
 -- -> OID preserved -> existing COMMENT preserved; defensive re-emission
 -- handles future DROP+CREATE).
---
--- Session search_path note: the `ltree` parameter type lives in the
--- `extensions` schema. The function-body `SET search_path` clauses apply
--- inside the function but NOT during CREATE-time parameter type resolution.
--- Set the migration-session search_path explicitly so `ltree` resolves.
 -- ============================================================================
 
 SET search_path = public, extensions, pg_temp;
@@ -114,20 +96,16 @@ SECURITY DEFINER
 SET search_path TO 'public', 'extensions', 'pg_temp'
 AS $function$
 DECLARE
-  v_user_scope extensions.ltree;
   v_org_id UUID;
 BEGIN
-  -- Get user's scope for permission check
-  v_user_scope := public.get_permission_scope('user.role_assign');
-
-  IF v_user_scope IS NULL THEN
+  -- Permission gate: caller must hold user.role_assign at a scope that
+  -- contains p_scope_path. Uses has_effective_permission (EXISTS over JWT
+  -- effective_permissions) which correctly ORs across multiple matching
+  -- entries — forward-compatible with future cross-tenant grants. See
+  -- header for the DISTINCT ON tripwire that makes the prior two-step
+  -- pattern observationally equivalent today.
+  IF NOT public.has_effective_permission('user.role_assign', p_scope_path) THEN
     RAISE EXCEPTION 'Missing permission: user.role_assign'
-      USING ERRCODE = 'insufficient_privilege';
-  END IF;
-
-  -- Verify requested scope is within user's scope
-  IF NOT (v_user_scope @> p_scope_path) THEN
-    RAISE EXCEPTION 'Requested scope is outside your permission scope'
       USING ERRCODE = 'insufficient_privilege';
   END IF;
 
@@ -192,9 +170,8 @@ BEGIN
 END;
 $function$;
 
--- Edit existing prose to mention accessible_organizations as the membership oracle.
 COMMENT ON FUNCTION api.list_users_for_bulk_assignment(uuid, ltree, text, integer, integer) IS
-$comment$List users in an organization eligible for bulk role assignment to a specific role at a specific scope. Includes current role names per user and an is_already_assigned flag. Membership gated by users.accessible_organizations (the canonical membership oracle, maintained by trg_sync_accessible_orgs from user_organizations_projection). Permission gated by has_permission('user.role_assign') within the requested scope path.
+$comment$List users in an organization eligible for bulk role assignment to a specific role at a specific scope. Includes current role names per user and an is_already_assigned flag. Membership gated by users.accessible_organizations (the canonical membership oracle, maintained by trg_sync_accessible_orgs from user_organizations_projection). Permission gated by has_effective_permission('user.role_assign', p_scope_path) (verifies the caller holds the permission at a scope that contains the requested path).
 
 @a4c-rpc-shape: read$comment$;
 
@@ -223,20 +200,16 @@ SECURITY DEFINER
 SET search_path TO 'public', 'extensions', 'pg_temp'
 AS $function$
 DECLARE
-  v_user_scope extensions.ltree;
   v_org_id UUID;
 BEGIN
-  -- Get user's scope for permission check
-  v_user_scope := public.get_permission_scope('user.role_assign');
-
-  IF v_user_scope IS NULL THEN
+  -- Permission gate: caller must hold user.role_assign at a scope that
+  -- contains p_scope_path. Uses has_effective_permission (EXISTS over JWT
+  -- effective_permissions) which correctly ORs across multiple matching
+  -- entries — forward-compatible with future cross-tenant grants. See
+  -- header for the DISTINCT ON tripwire that makes the prior two-step
+  -- pattern observationally equivalent today.
+  IF NOT public.has_effective_permission('user.role_assign', p_scope_path) THEN
     RAISE EXCEPTION 'Missing permission: user.role_assign'
-      USING ERRCODE = 'insufficient_privilege';
-  END IF;
-
-  -- Verify requested scope is within user's scope
-  IF NOT (v_user_scope @> p_scope_path) THEN
-    RAISE EXCEPTION 'Requested scope is outside your permission scope'
       USING ERRCODE = 'insufficient_privilege';
   END IF;
 
@@ -296,9 +269,8 @@ BEGIN
 END;
 $function$;
 
--- Author new prose (function previously carried only the bare shape tag).
 COMMENT ON FUNCTION api.list_users_for_role_management(uuid, ltree, text, integer, integer) IS
-$comment$List users in an organization with their assignment status for a specific role at a specific scope. Returns is_assigned flag distinguishing role-bearing users from candidates. Membership gated by users.accessible_organizations (the canonical membership oracle, maintained by trg_sync_accessible_orgs from user_organizations_projection). Permission gated by has_permission('user.role_assign') within the requested scope path. Used by the Roles management UI to enumerate assigned users when reviewing or deleting a role.
+$comment$List users in an organization with their assignment status for a specific role at a specific scope. Returns is_assigned flag distinguishing role-bearing users from candidates. Membership gated by users.accessible_organizations (the canonical membership oracle, maintained by trg_sync_accessible_orgs from user_organizations_projection). Permission gated by has_effective_permission('user.role_assign', p_scope_path) (verifies the caller holds the permission at a scope that contains the requested path). Used by the Roles management UI to enumerate assigned users when reviewing or deleting a role.
 
 @a4c-rpc-shape: read$comment$;
 
@@ -421,8 +393,7 @@ BEGIN
 END;
 $function$;
 
--- Author new prose (function previously carried only the bare shape tag).
 COMMENT ON FUNCTION api.list_users_for_schedule_management(uuid, text, integer, integer) IS
-$comment$List users in an organization with their assignment status for a specific schedule template. Returns is_assigned flag plus current_schedule_id/name when the user is on a DIFFERENT template (helps reviewers see where they'd move from). Membership gated by users.accessible_organizations (the canonical membership oracle, maintained by trg_sync_accessible_orgs from user_organizations_projection). Permission gated by has_effective_permission('user.schedule_manage', <ou_path OR org_path>) where the path derives from the template's org_unit_id (or the org root if the template is org-scoped).
+$comment$List users in an organization with their assignment status for a specific schedule template. Returns is_assigned flag plus current_schedule_id/name when the user is on a DIFFERENT template (helps reviewers see where they'd move from). Membership gated by users.accessible_organizations (the canonical membership oracle, maintained by trg_sync_accessible_orgs from user_organizations_projection). Permission gated by has_effective_permission('user.schedule_manage', <ou_path OR org_path>) (verifies the caller holds the permission at a scope that contains the template's org_unit_id path, or the org root if the template is org-scoped).
 
 @a4c-rpc-shape: read$comment$;

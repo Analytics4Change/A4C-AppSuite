@@ -2,6 +2,8 @@
 status: current
 last_updated: 2026-05-21
 ---
+<!-- last_updated note: also touched on 2026-05-21 for PR #67 review-response — permission-gate description updated to has_effective_permission per architect Finding #5 -->
+
 
 <!-- TL;DR-START -->
 ## TL;DR
@@ -491,7 +493,7 @@ For bulk operations where administrators need to add and remove multiple role as
 
 #### `api.list_users_for_role_management`
 
-Returns all users in the organization with their current assignment status for a specific role at a specific scope. Membership gated by `users.accessible_organizations` (the canonical membership oracle, maintained by `trg_sync_accessible_orgs` from `user_organizations_projection`). Permission gated by `has_permission('user.role_assign')` within the requested scope path.
+Returns all users in the organization with their current assignment status for a specific role at a specific scope. Membership gated by `users.accessible_organizations` (the canonical membership oracle, maintained by `trg_sync_accessible_orgs` from `user_organizations_projection`). Permission gated by `has_effective_permission('user.role_assign', p_scope_path)` (verifies the caller holds the permission at a scope that contains the requested path).
 
 ```sql
 -- Signature
