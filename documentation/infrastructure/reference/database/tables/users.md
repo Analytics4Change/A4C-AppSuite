@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-05-20
+last_updated: 2026-05-21
 ---
 
 <!-- TL;DR-START -->
@@ -188,7 +188,7 @@ CREATE INDEX idx_users_accessible_orgs_gin ON public.users USING GIN (accessible
 - **Type**: GIN (Generalized Inverted Index) for array containment
 - **Usage**:
   - Find all users with access to an organization: `WHERE accessible_organizations @> ARRAY['<org-uuid>'::uuid]`
-  - Membership oracle queries in `api.list_users` and any other admin-list RPC
+  - Membership oracle queries in **all four** `list_users*` RPCs: `api.list_users`, `api.list_users_for_role_management`, `api.list_users_for_bulk_assignment`, `api.list_users_for_schedule_management`
   - Multi-tenant access queries
 - **Performance**: Essential for array containment queries
 - **Predicate-shape requirement**: PostgreSQL's GIN `array_ops` opclass indexes the containment operators (`@>`, `<@`, `&&`, `=`) but **not** the `scalar = ANY(column)` form. Always write `accessible_organizations @> ARRAY[<uuid>]::uuid[]` — the planner cannot rewrite `<uuid> = ANY(accessible_organizations)` into a GIN-eligible predicate, so the latter form will fall back to a sequential scan even with the index present.
