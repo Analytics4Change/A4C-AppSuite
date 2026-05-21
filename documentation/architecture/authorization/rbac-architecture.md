@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-05-06
+last_updated: 2026-05-21
 ---
 
 <!-- TL;DR-START -->
@@ -491,20 +491,30 @@ For bulk operations where administrators need to add and remove multiple role as
 
 #### `api.list_users_for_role_management`
 
-Returns all users in the organization with their current assignment status for a specific role.
+Returns all users in the organization with their current assignment status for a specific role at a specific scope. Membership gated by `users.accessible_organizations` (the canonical membership oracle, maintained by `trg_sync_accessible_orgs` from `user_organizations_projection`). Permission gated by `has_permission('user.role_assign')` within the requested scope path.
 
 ```sql
 -- Signature
-api.list_users_for_role_management(p_role_id uuid)
+api.list_users_for_role_management(
+  p_role_id     uuid,
+  p_scope_path  ltree,
+  p_search_term text    DEFAULT NULL,
+  p_limit       integer DEFAULT 100,
+  p_offset      integer DEFAULT 0
+)
 RETURNS TABLE (
-  user_id uuid,
-  email text,
-  name text,
-  is_assigned boolean  -- True if user currently has this role
+  id            uuid,
+  email         text,
+  display_name  text,            -- COALESCE(u.name, u.email)
+  is_active     boolean,
+  current_roles text[],          -- All role names this user currently holds
+  is_assigned   boolean          -- True if user currently has THIS role at THIS scope
 )
 ```
 
 **Usage**: Called when opening the role assignment dialog to show all eligible users with their current assignment state.
+
+**Sister functions** (`api.list_users_for_bulk_assignment`, `api.list_users_for_schedule_management`) share the same membership-oracle pattern. See migration `20260521195657_fix_list_users_sister_functions_membership_gating.sql` for the unified-visibility predicate convention established across all four `list_users*` RPCs (origin: PR #66).
 
 #### `api.sync_role_assignments`
 
