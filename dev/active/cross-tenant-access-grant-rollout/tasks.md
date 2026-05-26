@@ -287,3 +287,62 @@ Independent architect review (software-architect-dbc) on 2026-05-26 — verdict 
 - **4 important findings**: doc-vs-handler `permissions` key shape mismatch fixed (arch doc L325-365 updated to top-level form); `grant.create` permission seeding added to Phase 1 step 12; `var_partnerships_projection` schema deltas reconciled (contract_number + 4-value status + suspension/termination audit columns); Phase 1 step 12/18 collision resolved.
 - **11 sub-decisions** promoted from "deferred to Phase 1" to "locked at 0.4".
 - **Pattern improvements**: per-authorization-type validation extracted to `public._validate_authorization_<type>` helpers; INTERSECT for permission narrowing; index naming consistency; AsyncAPI YAML sketch in ADR addendum; forward-compat note on grant immutability.
+
+---
+
+## Phase 0.5 — Outcomes (phasing decision; CLOSES PHASE 0)
+
+### Decisions locked (5 total)
+
+**User-confirmed via AskUserQuestion** (3):
+
+1. **Card structure** → **Multi-card**. Each downstream phase (1, 2, 3, 4, N×3) is its own `dev/active/` card with its own plan.md, tasks.md, branch, architect-review cycle, and PR. Phase 0 closes on this card.
+2. **Phase 4 partitioning** → **Omnibus Phase 4 card** with internal sub-sections per RLS-protected table cluster (~12). Architect reviews one cohesive RLS-extension strategy; extract sub-clusters later if any grows.
+3. **Phase N partitioning** → **One card per authorization-type** (court orders, agency assignments, family consents). Independent stakeholder timelines (legal review for courts ≠ CPS coordination ≠ family-trust review).
+
+**Derived from architecture** (2):
+
+4. **Phase 1 ships first** (gates Phase 2/3/4 via `has_cross_tenant_access()` + `grant_role_templates` + `authorization_reference` column + permission seeding + JWT shape).
+5. **Inter-phase parallelism**: Phase 2/3/4 are parallelable post-Phase-1 (no inter-dependencies). Phase N types are parallelable post-Phase-2. Phase 3 CAN technically ship before Phase 1 (code-only refactor) but no consultant benefit until Path B JWT shape lands.
+
+### Card structure (locked naming convention)
+
+| Phase | Card slug | Branch name | Status |
+|---|---|---|---|
+| 0 | `cross-tenant-access-grant-rollout/` (this card) | `feat/cross-tenant-access-grant-phase-0-design` (this branch) | **CLOSING** |
+| 1 | `cross-tenant-grant-phase-1-jwt-shape/` | `feat/cross-tenant-grant-phase-1-jwt-shape` | next |
+| 2 | `cross-tenant-grant-phase-2-write-side/` | `feat/cross-tenant-grant-phase-2-write-side` | follows P1 |
+| 3 | `cross-tenant-grant-phase-3-list-users-refactor/` | `feat/cross-tenant-grant-phase-3-list-users-refactor` | parallel w/ P2 |
+| 4 | `cross-tenant-grant-phase-4-rls-audit/` | `feat/cross-tenant-grant-phase-4-rls-audit` | parallel w/ P2/P3 |
+| N — court | `cross-tenant-grant-court-orders/` | `feat/cross-tenant-grant-court-orders` | follows P2 |
+| N — agency | `cross-tenant-grant-agency-assignments/` | `feat/cross-tenant-grant-agency-assignments` | follows P2 |
+| N — family | `cross-tenant-grant-family-consents/` | `feat/cross-tenant-grant-family-consents` | follows P2 |
+
+Seeding is on-demand per branch-on-decision rule. Only Phase 1's card seeds when work begins (post Phase 0 PR merge).
+
+### Inter-phase dependency graph
+
+```
+Phase 0 (this) ──┬──> Phase 1 ──┬──> Phase 2 (VAR write-side) ──┬──> Phase N (court)
+                 │              │                                 ├──> Phase N (agency)
+                 │              ├──> Phase 3 (list_users refactor)└──> Phase N (family)
+                 │              └──> Phase 4 (RLS audit, 35 RPCs)
+                 └─ closing
+```
+
+Phase 2/3/4 parallelable post-Phase-1; Phase N types parallelable post-Phase-2. Full graph in ADR § Phase 0.5.
+
+### Phase 0 closure
+
+This card (`cross-tenant-access-grant-rollout/`) completes Phase 0 at this commit. The card will be archived (moved to `dev/archived/`) after the Phase 0 PR (this branch) merges. Phase 0's residual deliverables — Phase 1 manifest enumeration, ADR Phase 0.1+0.2+0.3+0.4+0.5 sections, RPC reachability matrix, provider-partners doc updates — become the foundational reference set for all downstream phases.
+
+### Phase 1 next-step pointer
+
+After Phase 0 PR merges to main:
+
+1. Branch `feat/cross-tenant-grant-phase-1-jwt-shape` from main (per branch-on-decision rule).
+2. Seed `dev/active/cross-tenant-grant-phase-1-jwt-shape/` with plan.md tracking the 17-step migration manifest from ADR Consequences.
+3. Phase 1 plan-mode pass: identify any unresolved sub-decisions (e.g., `var_partnership.expired` emitter shape — scheduled job vs RPC, currently deferred).
+4. Architect review of Phase 1 plan before any migration is written.
+5. Phase 1 implementation: produce the migration file (transactional `.sql` covering all 17 steps), regenerate `database.types.ts` for both frontend + workflows, smoke-test against dev Supabase.
+6. PR + UAT + merge.

@@ -363,6 +363,93 @@ Pre-flight: re-verify `SELECT COUNT(*) FROM cross_tenant_access_grants_projectio
 
 Documented residual HIPAA risk that operational mitigation (immediate audit logging + notification) handles. Phase 2's grant-write-side design must include the emergency-revoke variant.
 
+## Phase 0.5 — Phasing Decision
+
+Sequencing of the multi-phase rollout against the now-finalized Phase 1 manifest (17 ordered steps), Phase 2 manifest sketch, Phase 3 scope (2 RPCs from the 0.3 matrix), Phase 4 scope (35 RPCs from the 0.3 matrix), and Phase N scope (court/agency/family — deferred per 0.4 v1 scope decision).
+
+### Card structure (user-confirmed)
+
+**Multi-card** — each phase is its own `dev/active/` card. Phase 0 closes on this card; downstream phases get their own cards with their own plan.md / tasks.md / branches / architect-review cycles / PRs.
+
+Card naming convention:
+
+| Phase | Card slug | Branch name |
+|---|---|---|
+| 0 | `cross-tenant-access-grant-rollout/` (this card; closes after 0.5) | `feat/cross-tenant-access-grant-phase-0-design` (this branch) |
+| 1 | `cross-tenant-grant-phase-1-jwt-shape/` | `feat/cross-tenant-grant-phase-1-jwt-shape` |
+| 2 | `cross-tenant-grant-phase-2-write-side/` | `feat/cross-tenant-grant-phase-2-write-side` |
+| 3 | `cross-tenant-grant-phase-3-list-users-refactor/` | `feat/cross-tenant-grant-phase-3-list-users-refactor` |
+| 4 | `cross-tenant-grant-phase-4-rls-audit/` | `feat/cross-tenant-grant-phase-4-rls-audit` |
+| N — court | `cross-tenant-grant-court-orders/` | `feat/cross-tenant-grant-court-orders` |
+| N — agency | `cross-tenant-grant-agency-assignments/` | `feat/cross-tenant-grant-agency-assignments` |
+| N — family | `cross-tenant-grant-family-consents/` | `feat/cross-tenant-grant-family-consents` |
+
+Card seeding happens on-demand per branch-on-decision rule — only Phase 1's card seeds immediately after Phase 0 closes; Phases 2-N seed when work on each begins.
+
+### Phase 4 partitioning (user-confirmed)
+
+**Omnibus Phase 4 card** with internal sub-sections per underlying RLS-protected table cluster (~12 sub-sections per the 0.3 matrix's Phase 4 handoff). Architect reviews one cohesive RLS-extension strategy across all tables. If any sub-cluster grows unexpectedly, it can be extracted to a separate card later.
+
+### Phase N partitioning (user-confirmed)
+
+**One card per authorization-type**:
+
+- `cross-tenant-grant-court-orders/` — court_authorizations_projection + event family + emit RPCs + RLS extensions. Legal review for court systems.
+- `cross-tenant-grant-agency-assignments/` — agency_assignments_projection + family + RPCs + RLS. CPS/social services coordination.
+- `cross-tenant-grant-family-consents/` — family_consents_projection + family + RPCs + RLS. Family-trust review.
+
+Each card uses the VAR Phase 2 pattern as template. Independent timelines per stakeholder coordination requirements.
+
+### Inter-phase dependency graph (derived)
+
+```
+                    ┌────────────────┐
+                    │ Phase 0 (this) │
+                    │   DESIGN ONLY  │
+                    └────────┬───────┘
+                             │ unblocks
+                             ▼
+                    ┌────────────────┐
+                    │ Phase 1        │ 17-step migration: JWT shape +
+                    │ JWT SHAPE +    │ has_cross_tenant_access() real +
+                    │ FOUNDATION     │ grant_role_templates table +
+                    └────┬───┬───┬───┘ authorization_reference column
+                         │   │   │
+                  ┌──────┘   │   └──────┐
+                  │          │          │
+                  ▼          ▼          ▼
+            ┌─────────┐ ┌─────────┐ ┌─────────┐
+            │ Phase 2 │ │ Phase 3 │ │ Phase 4 │  Phase 2/3/4 are PARALLELABLE
+            │ WRITE-  │ │ LIST_-  │ │ RLS     │  (no inter-dependencies)
+            │ SIDE    │ │ USERS+  │ │ AUDIT   │
+            │ (VAR)   │ │ LIST_-  │ │ (35     │
+            └────┬────┘ │ INVITE  │ │ RPCs)   │
+                 │      │ REFACTOR│ └─────────┘
+                 │ unblocks  └─────┘
+                 ▼
+    ┌────────────┴─────────────────────────┐
+    │                │                     │
+    ▼                ▼                     ▼
+┌─────────┐    ┌─────────┐          ┌─────────┐
+│ Phase N │    │ Phase N │          │ Phase N │  Phase N types are PARALLELABLE
+│ COURT   │    │ AGENCY  │          │ FAMILY  │  (independent stakeholder timelines)
+└─────────┘    └─────────┘          └─────────┘
+```
+
+**Hard prerequisites**:
+
+- **Phase 1 ships first**. It makes `has_cross_tenant_access()` real, deploys `grant_role_templates`, adds `authorization_reference` column, ships the JWT-shape extension. Every downstream phase depends on at least one of these.
+- **Phase 2 depends on Phase 1** for `grant_role_templates` + `authorization_reference` + `permission.defined` seeding of `grant.create/view/revoke` permissions.
+- **Phase 3 depends on Phase 1** functionally — the `list_users` + `list_invitations` refactor only benefits consultants when Path B's JWT shape is deployed. Phase 3 CAN technically ship before Phase 1 (the refactor itself is a code-only change, no runtime dependency on Path B), but there's no point until Path B lands.
+- **Phase 4 depends on Phase 1** structurally — RLS clauses extend by calling `has_cross_tenant_access()`, which is a stub before Phase 1.
+- **Phase N depends on Phase 2** — court/agency/family use the VAR Phase 2 pattern as template (per-type validation helpers, emit RPCs, RLS clauses, AsyncAPI channels).
+- **Phase 2/3/4 are parallelable** post-Phase-1 — no inter-dependencies.
+- **Phase N types are parallelable** post-Phase-2 — no inter-dependencies between court/agency/family.
+
+### Phase 1 next-step pointer
+
+After Phase 0 closes (this commit), the next work is **Phase 1 card seed**: create `dev/active/cross-tenant-grant-phase-1-jwt-shape/` with plan.md + tasks.md tracking the 17-step migration manifest from Consequences below. Phase 1 branch (`feat/cross-tenant-grant-phase-1-jwt-shape`) branches from `main` per branch-on-decision rule.
+
 ## Decisions
 
 ### Decision A — JWT shape: extend `compute_effective_permissions` (Path B)
